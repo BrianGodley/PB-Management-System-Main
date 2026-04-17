@@ -305,7 +305,7 @@ export default function Collections() {
           {/* ── Collections ────────────────────────────────────────────────── */}
           {mainTab === 'collections' && (
             <div className="flex flex-col flex-1 overflow-hidden">
-              <div className="flex gap-1.5 mb-3 flex-shrink-0">
+              <div className="flex items-center gap-1.5 mb-3 flex-shrink-0">
                 {COLL_SECTIONS.map(s => (
                   <button key={s.key} onClick={() => setCollTab(s.key)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
@@ -313,6 +313,13 @@ export default function Collections() {
                     }`}
                   >{s.label}</button>
                 ))}
+                <div className="flex-1" />
+                {(() => { const s = collSummary(collTab); return (
+                  <div className="flex items-center gap-4 text-xs text-gray-600">
+                    <span>Subtotal Deposits: <strong className="text-gray-800">{fmtC(s.totDep)}</strong></span>
+                    <span>Subtotal Invoices: <strong className="text-gray-800">{fmtC(s.totInv)}</strong></span>
+                  </div>
+                )})()}
               </div>
               {COLL_SECTIONS.filter(s => s.key === collTab).map(sec => (
                 <CollectionTable
@@ -434,22 +441,6 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
           <col style={{ width:'32px'  }} />
         </colgroup>
         <thead className="sticky top-0 z-10">
-          {/* Subtotals row — above day names */}
-          <tr className="bg-amber-50 border-b border-amber-300">
-            <td colSpan={3} />
-            <td colSpan={2} className="border-l border-gray-400" />
-            <td colSpan={2} className="border-l border-gray-400" />
-            <td colSpan={2} className="border-l border-gray-400" />
-            <td colSpan={2} className="px-2 py-1 text-center border-l border-gray-400">
-              <span className="text-[10px] text-amber-800 font-bold">Subtotal Deposits</span>
-              <span className="text-[10px] text-amber-900 font-extrabold ml-1">{fmtC(summary.totDep)}</span>
-            </td>
-            <td colSpan={2} className="px-2 py-1 text-center border-l border-r border-gray-400">
-              <span className="text-[10px] text-amber-800 font-bold">Subtotal Invoices</span>
-              <span className="text-[10px] text-amber-900 font-extrabold ml-1">{fmtC(summary.totInv)}</span>
-            </td>
-            <td colSpan={3} />
-          </tr>
           {/* Day header row */}
           <tr className="bg-gray-50 border-b border-gray-200">
             <th rowSpan={2} className="px-3 py-2 text-center font-semibold text-gray-700 border-r border-gray-300">Client</th>
