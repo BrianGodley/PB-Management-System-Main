@@ -18,7 +18,7 @@ export default function JobsList() {
   const [loading, setLoading] = useState(true)
   const [selectedJob, setSelectedJob] = useState(ALL_JOBS)
   const [tab, setTab] = useState('jobs')
-  const [jobModal, setJobModal] = useState(null)   // job object being viewed/edited
+  const [jobModal, setJobModal] = useState(null)
   const [search, setSearch] = useState('')
 
   useEffect(() => { fetchJobs() }, [])
@@ -66,109 +66,77 @@ export default function JobsList() {
       return la.localeCompare(lb) || (a.name || a.client_name || '').localeCompare(b.name || b.client_name || '')
     })
 
-  const mgmtItems = []
-
-  const isMgmt = false
   const selectedJobObj = selectedJob === ALL_JOBS ? null : jobs.find(j => j.id === selectedJob) || null
 
+  const TABS = [
+    { key: 'jobs',       label: 'Jobs'      },
+    { key: 'schedule',   label: 'Schedule'  },
+    { key: 'daily-logs', label: 'Daily Logs'},
+    { key: 'tasks',      label: 'Tasks'     },
+    { key: 'files',      label: 'Files'     },
+    { key: 'tracking',   label: 'Tracking'  },
+    { key: 'templates',  label: 'Templates' },
+  ]
+
   return (
-    // h-full + flex-col so the layout fills the viewport and the bottom section can flex-1
     <div className="flex flex-col h-full">
 
       {/* ── Summary stats ─────────────────────────────────────── */}
-      <div className="flex gap-2 mb-3 flex-shrink-0">
+      <div className="flex gap-2 mb-3 flex-shrink-0 overflow-x-auto pb-1">
         {[
           { label: 'Under Construction', value: underConstruction, count: jobs.filter(j => (j.status||'active')==='active').length,    color: 'text-green-700' },
           { label: 'All Open Jobs',       value: allOpen,           count: jobs.filter(j => ['active','on_hold'].includes(j.status||'active')).length, color: 'text-blue-700'  },
           { label: 'Completed',           value: completedTotal,    count: jobs.filter(j => j.status==='completed').length,              color: 'text-gray-600'  },
         ].map(s => (
-          <div key={s.label} className="flex-1 flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm">
+          <div key={s.label} className="flex-shrink-0 sm:flex-1 flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm min-w-[160px]">
             <span className="text-xs text-gray-600 font-medium">{s.label}</span>
-            <div className="text-right">
+            <div className="text-right ml-2">
               <span className={`text-sm font-bold ${s.color}`}>${s.value.toLocaleString()}</span>
-              <span className="text-xs text-gray-500 ml-1.5">({s.count})</span>
+              <span className="text-xs text-gray-500 ml-1">({s.count})</span>
             </div>
           </div>
         ))}
-        <Link to="/jobs/new" className="btn-primary text-sm px-3 flex items-center whitespace-nowrap">+ Add Job</Link>
+        <Link to="/jobs/new" className="btn-primary text-sm px-3 flex items-center whitespace-nowrap flex-shrink-0">+ Add Job</Link>
+      </div>
+
+      {/* ── Mobile: job selector dropdown ─────────────────────── */}
+      <div className="lg:hidden mb-2 flex-shrink-0">
+        <select
+          value={selectedJob}
+          onChange={e => setSelectedJob(e.target.value)}
+          className="input text-sm w-full"
+        >
+          <option value={ALL_JOBS}>All Jobs</option>
+          {sorted.map(job => (
+            <option key={job.id} value={job.id}>
+              {job.name || job.client_name}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* ── Menu bar ──────────────────────────────────────────── */}
-      <div className="flex items-center gap-1 border-b border-gray-200 mb-4 pb-0 flex-shrink-0">
-        <button
-          onClick={() => setTab('jobs')}
-          className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
-            tab === 'jobs' ? 'border-green-700 text-green-700 bg-green-50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-          }`}
-        >
-          Jobs
-        </button>
-
-        <button
-          onClick={() => setTab('schedule')}
-          className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
-            tab === 'schedule' ? 'border-green-700 text-green-700 bg-green-50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-          }`}
-        >
-          Schedule
-        </button>
-
-        <button
-          onClick={() => setTab('daily-logs')}
-          className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
-            tab === 'daily-logs' ? 'border-green-700 text-green-700 bg-green-50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-          }`}
-        >
-          Daily Logs
-        </button>
-
-        <button
-          onClick={() => setTab('tasks')}
-          className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
-            tab === 'tasks' ? 'border-green-700 text-green-700 bg-green-50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-          }`}
-        >
-          Tasks
-        </button>
-
-        <button
-          onClick={() => setTab('files')}
-          className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
-            tab === 'files' ? 'border-green-700 text-green-700 bg-green-50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-          }`}
-        >
-          Files
-        </button>
-
-        <button
-          onClick={() => setTab('tracking')}
-          className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
-            tab === 'tracking' ? 'border-green-700 text-green-700 bg-green-50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-          }`}
-        >
-          Tracking
-        </button>
-
-        <button
-          onClick={() => setTab('templates')}
-          className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
-            tab === 'templates' ? 'border-green-700 text-green-700 bg-green-50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-          }`}
-        >
-          Templates
-        </button>
+      <div className="flex border-b border-gray-200 mb-4 pb-0 flex-shrink-0 overflow-x-auto">
+        {TABS.map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`px-3 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
+              tab === t.key
+                ? 'border-green-700 text-green-700 bg-green-50'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      {/* ── Main content: sidebar + right panel ───────────────── */}
-      {/*
-        flex-1 min-h-0 = fills remaining viewport height and allows children to shrink/scroll.
-        The sidebar and right panel each manage their own vertical scroll.
-        The page itself does NOT scroll — only the right panel does.
-      */}
+      {/* ── Main content: sidebar (desktop only) + right panel ── */}
       <div className="flex gap-2 flex-1 min-h-0">
 
-        {/* Jobs sidebar — pulls left to cancel main's padding, pl-1 keeps a tiny gap from the app nav border */}
-        <div className="w-52 flex-shrink-0 flex flex-col min-h-0 -ml-4 lg:-ml-6 pl-3">
+        {/* Jobs sidebar — desktop only */}
+        <div className="hidden lg:flex w-52 flex-shrink-0 flex-col min-h-0 -ml-6 pl-3">
           <input
             type="text"
             placeholder="Search jobs…"
@@ -229,15 +197,15 @@ export default function JobsList() {
           )}
         </div>
 
-        {/* Right panel — this is the ONLY thing that scrolls. Negative right margin cancels main's padding so content + scrollbar reach the window edge */}
-        <div className="flex-1 min-w-0 overflow-y-auto -mr-4 lg:-mr-6">
+        {/* Right panel — only thing that scrolls */}
+        <div className="flex-1 min-w-0 overflow-y-auto lg:-mr-6">
 
           {tab === 'jobs' && (
             selectedJobObj ? (
-              <JobDetail job={selectedJobObj} onDelete={deleteJob} price={price} />
+              <JobDetail job={selectedJobObj} onDelete={deleteJob} price={price} onEdit={() => setJobModal(selectedJobObj)} />
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-gray-400 py-20">
-                <p className="text-4xl mb-3">👈</p>
+                <p className="text-4xl mb-3">👆</p>
                 <p className="text-sm">
                   {selectedJob === ALL_JOBS ? 'Select a job from the list to view details' : 'Select a job from the list'}
                 </p>
@@ -276,7 +244,7 @@ export default function JobsList() {
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-gray-400 py-20">
-                <p className="text-4xl mb-3">👈</p>
+                <p className="text-4xl mb-3">👆</p>
                 <p className="text-sm">Select a job from the list to open tracking</p>
               </div>
             )
@@ -296,7 +264,7 @@ export default function JobsList() {
   )
 }
 
-function JobDetail({ job, onDelete, price }) {
+function JobDetail({ job, onDelete, price, onEdit }) {
   const statusInfo = {
     active:    { label: 'Active',    cls: 'bg-green-100 text-green-800 border border-green-300' },
     completed: { label: 'Completed', cls: 'bg-gray-100 text-gray-700 border border-gray-300'   },
@@ -305,16 +273,15 @@ function JobDetail({ job, onDelete, price }) {
   }[job.status] || { label: 'Active', cls: 'bg-green-100 text-green-800 border border-green-300' }
 
   return (
-    <div className="card h-full overflow-y-auto">
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <h2 className="text-xl font-bold text-gray-900">{job.name || job.client_name}</h2>
-          <p className="text-sm text-gray-500">{job.client_name}</p>
+    <div className="card">
+      <div className="flex items-start justify-between mb-4 gap-2">
+        <div className="min-w-0">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900 truncate">{job.name || job.client_name}</h2>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
           <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${statusInfo.cls}`}>{statusInfo.label}</span>
-          <Link to={`/jobs/${job.id}`} className="text-xs px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors">Full View</Link>
-          <Link to={`/jobs/${job.id}/tracker`} className="text-xs px-3 py-1.5 rounded-lg bg-green-700 text-white hover:bg-green-800 transition-colors">Track</Link>
+          <Link to={`/jobs/${job.id}`} className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors">Full View</Link>
+          <Link to={`/jobs/${job.id}/tracker`} className="text-xs px-2.5 py-1.5 rounded-lg bg-green-700 text-white hover:bg-green-800 transition-colors">Track</Link>
           <button
             onClick={() => onDelete(job.id, job.name || job.client_name)}
             className="text-xs px-2 py-1.5 rounded-lg border border-red-100 text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
@@ -372,7 +339,6 @@ function JobInfoModal({ job, onClose, onSaveName }) {
   const [saving, setSaving]   = useState(false)
   const [error,  setError]    = useState('')
 
-  // GPMD gauge: target $500/day is green zone
   const gpmd    = parseFloat(job.gpmd) || 0
   const target  = 500
   const pct     = Math.min(100, Math.round((gpmd / target) * 100))
@@ -390,14 +356,14 @@ function JobInfoModal({ job, onClose, onSaveName }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
       onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="bg-white rounded-xl shadow-xl w-[420px] overflow-hidden">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-[420px] overflow-hidden">
 
         {/* Header */}
         <div className="px-5 pt-5 pb-4 border-b border-gray-100 flex items-start justify-between">
-          <div>
+          <div className="min-w-0 flex-1">
             <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">Job Info</p>
             {editing ? (
               <div className="flex items-center gap-2">
@@ -407,7 +373,7 @@ function JobInfoModal({ job, onClose, onSaveName }) {
                   value={draft}
                   onChange={e => { setDraft(e.target.value); setError('') }}
                   onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') { setEditing(false); setDraft(job.name || job.client_name || '') } }}
-                  className="input text-base font-bold text-gray-900 py-1"
+                  className="input text-base font-bold text-gray-900 py-1 w-full"
                 />
               </div>
             ) : (
@@ -415,7 +381,7 @@ function JobInfoModal({ job, onClose, onSaveName }) {
             )}
             {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
           </div>
-          <button onClick={onClose} className="text-gray-300 hover:text-gray-500 ml-3 mt-0.5">
+          <button onClick={onClose} className="text-gray-300 hover:text-gray-500 ml-3 mt-0.5 flex-shrink-0">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -424,22 +390,16 @@ function JobInfoModal({ job, onClose, onSaveName }) {
 
         {/* Body */}
         <div className="px-5 py-4 space-y-4">
-
-          {/* Client name */}
           {job.client_name && job.client_name !== (job.name || '') && (
             <div>
               <p className="text-xs text-gray-400 mb-0.5">Client</p>
               <p className="text-sm text-gray-700">{job.client_name}</p>
             </div>
           )}
-
-          {/* Address */}
           <div>
             <p className="text-xs text-gray-400 mb-0.5">Job Address</p>
             <p className="text-sm text-gray-700">{job.job_address || <span className="text-gray-300 italic">Not set</span>}</p>
           </div>
-
-          {/* GPMD bar */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <p className="text-xs text-gray-400">Estimated GPMD</p>
@@ -459,8 +419,6 @@ function JobInfoModal({ job, onClose, onSaveName }) {
               <span>$500+</span>
             </div>
           </div>
-
-          {/* Sold date + status */}
           <div className="flex gap-3">
             {job.sold_date && (
               <div className="flex-1 bg-gray-50 rounded-lg p-3">
