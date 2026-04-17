@@ -521,7 +521,7 @@ export default function SubsVendors() {
                     Company Name {sortDir === 'asc' ? '↑' : '↓'}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Primary Contact</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{typeView === 'sub' ? 'Trades' : 'Divisions'}</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{typeView === 'sub' ? 'Trades' : 'Materials'}</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Liability Exp.</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">W/C Exp.</th>
