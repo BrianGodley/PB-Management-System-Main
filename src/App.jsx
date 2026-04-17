@@ -1,0 +1,74 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
+import Layout from './components/Layout'
+import Login from './pages/Login'
+import Dashboard from './pages/Dashboard'
+import Clients from './pages/Clients'
+import ClientDetail from './pages/ClientDetail'
+import NewJob from './pages/NewJob'
+import JobDetail from './pages/JobDetail'
+import JobsList from './pages/JobsList'
+import Bids from './pages/Bids'
+import JobTracker from './pages/JobTracker'
+import Collections from './pages/Collections'
+import Settings from './pages/Settings'
+import Admin from './pages/Admin'
+import EstimateDetail from './pages/EstimateDetail'
+import MasterRates from './pages/MasterRates'
+import Statistics from './pages/Statistics'
+import Profile from './pages/Profile'
+
+function ProtectedRoute({ children }) {
+  const { user, loading } = useAuth()
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-700 mx-auto mb-4"></div>
+        <p className="text-gray-500">Loading...</p>
+      </div>
+    </div>
+  )
+  if (!user) return <Navigate to="/login" replace />
+  return children
+}
+
+function AppRoutes() {
+  const { user } = useAuth()
+  return (
+    <Routes>
+      <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+      <Route path="/" element={
+        <ProtectedRoute>
+          <Layout />
+        </ProtectedRoute>
+      }>
+        <Route index element={<Dashboard />} />
+        <Route path="clients" element={<Clients />} />
+        <Route path="clients/:id" element={<ClientDetail />} />
+        <Route path="jobs" element={<JobsList />} />
+        <Route path="jobs/new" element={<NewJob />} />
+        <Route path="jobs/:id" element={<JobDetail />} />
+        <Route path="jobs/:id/tracker" element={<JobTracker />} />
+        <Route path="estimates/:id" element={<EstimateDetail />} />
+        <Route path="bids" element={<Bids />} />
+        <Route path="tracker" element={<JobTracker />} />
+        <Route path="collections" element={<Collections />} />
+        <Route path="settings" element={<Settings />} />
+        <Route path="admin" element={<Admin />} />
+        <Route path="master-rates" element={<MasterRates />} />
+        <Route path="statistics" element={<Statistics />} />
+        <Route path="profile" element={<Profile />} />
+      </Route>
+    </Routes>
+  )
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </BrowserRouter>
+  )
+}

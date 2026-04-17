@@ -1,0 +1,127 @@
+-- ─────────────────────────────────────────────────────────────────────────────
+-- supabase-update-32.sql
+-- Adds Irrigation labor rates and material rates to the database.
+-- All rates are referenced by IrrigationModule.jsx and IrrigationSummary.jsx.
+--
+-- labor_rates  (category = 'Irrigation') — hrs/zone and hrs/timer rates
+-- material_rates (category = 'Irrigation') — per-zone and per-timer material costs
+-- company_settings — adds sales_tax_rate (9.5%) used to gross up irrigation materials
+--
+-- Source: Excel "Irrigation Module" sheet
+--   Zone labor formula:   =VLOOKUP(mode, rateTable, 2) * qty  → rate (hrs/zone) × qty
+--   Material formulas:    =F7*345, =F10*230, etc. (before tax)
+--   Tax formula (row 28): =P24+(P24*SalesTax)  → totalMat = rawMat × (1 + SalesTax)
+--
+-- Run after supabase-update-31.sql
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- ── Remove existing rows (idempotent) ─────────────────────────────────────────
+
+DELETE FROM labor_rates    WHERE category = 'Irrigation';
+DELETE FROM material_rates WHERE category = 'Irrigation';
+
+-- ── Labor rates ───────────────────────────────────────────────────────────────
+-- rate column = hours per zone (or hours per timer unit).
+-- Module computes: hrs = rate × qty  (NOT qty / rate)
+-- Excel VLOOKUP table R5:S6 returns Hand=16, Trench=12.5 as hrs/zone.
+
+INSERT INTO labor_rates (name, rate, rate_per_day, unit, category, notes) VALUES
+
+  ('Irrigation - Hand Zone',
+   16, 0, 'hrs/zone', 'Irrigation',
+   'Hours per zone for hand installation (no trenching). Excel VLOOKUP Hand=16. Applies to: Planter Spray Heads, Hillside zones.'),
+
+  ('Irrigation - Trench Zone',
+   12.5, 0, 'hrs/zone', 'Irrigation',
+   'Hours per zone for trenched installation. Excel VLOOKUP Trench=12.5. Applies to: Lawn, Drip per Plant, Planter Dripline zones.'),
+
+  ('Irrigation - Timer Install',
+   0.5, 0, 'hrs/ea', 'Irrigation',
+   'Labor hours to install any controller/timer — 0.5 hours per unit regardless of station count.');
+
+-- ── Material rates — Zone types ───────────────────────────────────────────────
+-- unit_cost = material cost per zone BEFORE sales tax.
+-- Tax is applied in the module: totalMat = rawMat × (1 + sales_tax_rate)
+-- Source: Excel formulas =F7*345, =F8*345, =F9*345, =F10*230, =F11*345
+
+INSERT INTO material_rates (name, unit_cost, unit, category, notes) VALUES
+
+  ('Irrigation Zone - Planter Spray',
+   345.00, 'per zone', 'Irrigation',
+   'Material cost per planter spray head zone (before tax). Excel: =F7*345.'),
+
+  ('Irrigation Zone - Lawn',
+   345.00, 'per zone', 'Irrigation',
+   'Material cost per lawn zone ≤ 1,000 SF (before tax). Excel: =F8*345.'),
+
+  ('Irrigation Zone - Hillside',
+   345.00, 'per zone', 'Irrigation',
+   'Material cost per hillside zone ≤ 6 large heads (before tax). Excel: =F9*345.'),
+
+  ('Irrigation Zone - Drip per Plant',
+   230.00, 'per zone', 'Irrigation',
+   'Material cost per drip zone ≤ 50 emitters (before tax). Excel: =F10*230.'),
+
+  ('Irrigation Zone - Planter Dripline',
+   345.00, 'per zone', 'Irrigation',
+   'Material cost per planter dripline zone ≤ 700 SF (before tax). Excel: =F11*345.');
+
+-- ── Material rates — Timer / Controller types ─────────────────────────────────
+-- unit_cost = material cost per controller unit BEFORE sales tax.
+-- Source: Excel formulas =F15*69, =F16*138, =F17*184, =F18*270.25,
+--                        =F19*322, =F20*402.5, =F21*345, =F22*115
+
+INSERT INTO material_rates (name, unit_cost, unit, category, notes) VALUES
+
+  ('Irrigation Timer - 4 Station',
+    69.00, 'per unit', 'Irrigation',
+   'Material cost for a 4-station irrigation controller (before tax). Excel: =F15*69.'),
+
+  ('Irrigation Timer - 6 Station',
+   138.00, 'per unit', 'Irrigation',
+   'Material cost for a 6-station irrigation controller (before tax). Excel: =F16*138.'),
+
+  ('Irrigation Timer - 9 Station',
+   184.00, 'per unit', 'Irrigation',
+   'Material cost for a 9-station irrigation controller (before tax). Excel: =F17*184.'),
+
+  ('Irrigation Timer - 12 Station',
+   270.25, 'per unit', 'Irrigation',
+   'Material cost for a 12-station irrigation controller (before tax). Excel: =F18*270.25.'),
+
+  ('Irrigation Timer - 15 Station',
+   322.00, 'per unit', 'Irrigation',
+   'Material cost for a 15-station irrigation controller (before tax). Excel: =F19*322.'),
+
+  ('Irrigation Timer - 18 Station',
+   402.50, 'per unit', 'Irrigation',
+   'Material cost for an 18-station irrigation controller (before tax). Excel: =F20*402.5.'),
+
+  ('Irrigation Timer - Hunter ICC 8 Station',
+   345.00, 'per unit', 'Irrigation',
+   'Material cost for a Hunter ICC 8-station commercial controller (before tax). Excel: =F21*345.'),
+
+  ('Irrigation Timer - Additional 8 Station Module',
+   115.00, 'per unit', 'Irrigation',
+   'Material cost for an additional 8-station expansion module (before tax). Excel: =F22*115.');
+
+-- ── Sales tax rate ────────────────────────────────────────────────────────────
+-- Applied to all irrigation materials: totalMat = rawMat × (1 + sales_tax_rate)
+-- Reverse-engineered from Excel: $345 × 1.0949 ≈ $377.78 (confirmed by user)
+-- Stored as a decimal (0.095 = 9.5%).
+-- Update this value to match your actual local sales tax rate.
+
+INSERT INTO company_settings (key, value, description)
+VALUES (
+  'sales_tax_rate',
+  '0.095',
+  'Sales tax rate applied to irrigation materials (decimal, e.g. 0.095 = 9.5%). Update to match local rate.'
+)
+ON CONFLICT (key) DO UPDATE
+  SET value       = EXCLUDED.value,
+      description = EXCLUDED.description;
+
+-- ── Verify ────────────────────────────────────────────────────────────────────
+-- SELECT name, rate, unit, notes FROM labor_rates    WHERE category = 'Irrigation' ORDER BY name;
+-- SELECT name, unit_cost, unit, notes FROM material_rates WHERE category = 'Irrigation' ORDER BY name;
+-- SELECT key, value, description FROM company_settings WHERE key = 'sales_tax_rate';
