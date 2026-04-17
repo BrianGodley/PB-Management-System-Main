@@ -308,22 +308,6 @@ export default function SubsVendors() {
     setImportError('')
   }
 
-  async function confirmImport() {
-    setImporting(true)
-    const payload = importRows.map(({ _row, ...row }) => row)
-    const { error } = await supabase.from('subs_vendors').insert(payload)
-    if (error) {
-      console.error(error)
-      setImportError('Import failed: ' + error.message)
-      setImporting(false)
-      return
-    }
-    setImporting(false)
-    setShowImport(false)
-    setImportRows([])
-    fetchSubs()
-  }
-
   // Filter + search
   const filtered = subs
     .filter(s => filter === 'all' || s.status === filter)
