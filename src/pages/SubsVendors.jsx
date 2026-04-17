@@ -56,12 +56,17 @@ export default function SubsVendors() {
   const [form,      setForm]      = useState(EMPTY_FORM)
   const [saving,    setSaving]    = useState(false)
   const [error,     setError]     = useState('')
-  const [sortDir,     setSortDir]     = useState('asc')
-  const [selected,    setSelected]    = useState(new Set())
-  const [showImport,  setShowImport]  = useState(false)
-  const [importRows,  setImportRows]  = useState([])
-  const [importError, setImportError] = useState('')
-  const [importing,   setImporting]   = useState(false)
+  const [sortDir,       setSortDir]       = useState('asc')
+  const [selected,      setSelected]      = useState(new Set())
+  // Import flow: null → 'mapping' → 'preview'
+  const [importStep,    setImportStep]    = useState(null)
+  const [importMeta,    setImportMeta]    = useState(null)   // { name, rowCount }
+  const [importHeaders, setImportHeaders] = useState([])     // column names from file
+  const [importRawData, setImportRawData] = useState([])     // raw rows from XLSX
+  const [importMapping, setImportMapping] = useState({})     // fieldKey → headerName
+  const [importRows,    setImportRows]    = useState([])     // mapped rows for preview
+  const [importError,   setImportError]   = useState('')
+  const [importing,     setImporting]     = useState(false)
   const importFileRef = useRef(null)
 
   useEffect(() => { fetchSubs() }, [])
@@ -163,81 +168,18 @@ export default function SubsVendors() {
       'Workers Comp Exp Date':   s.workers_comp_exp || '',
       'Notes':                   s.notes || '',
     }))
-
     const ws = XLSX.utils.json_to_sheet(data)
-
-    // Column widths
     ws['!cols'] = [
       { wch: 35 }, { wch: 30 }, { wch: 16 }, { wch: 22 },
       { wch: 28 }, { wch: 16 }, { wch: 16 }, { wch: 22 },
       { wch: 18 }, { wch: 22 }, { wch: 35 },
     ]
-
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Subs & Vendors')
     XLSX.writeFile(wb, `subs-vendors-${new Date().toISOString().split('T')[0]}.xlsx`)
   }
 
-  // ── Import ─────────────────────────────────────────────────
-  function mapXLSXRow(row, i) {
-    // Flexible column name matching
-    const get = (...keys) => {
-      for (const key of keys) {
-        const found = Object.keys(row).find(k => k.toLowerCase().trim() === key.toLowerCase())
-        if (found && row[found] !== undefined && row[found] !== '') return String(row[found]).trim()
-      }
-      return ''
-    }
-
-    const company = get('Company Name', 'Company', 'Name')
-    if (!company) return null
-
-    // Divisions — pipe, semicolon, or comma separated
-    const rawDivs = get('Divisions', 'Division', 'Trade', 'Trades')
-    const divisions = rawDivs
-      ? rawDivs.split(/[|;,]/).map(d => d.trim()).filter(Boolean)
-      : []
-
-    // Normalize status value
-    const rawStatus = get('Status').toLowerCase()
-    const status = STATUS_OPTIONS.find(s =>
-      rawStatus.includes(s.value.replace('_', '')) || rawStatus.includes(s.label.toLowerCase())
-    )?.value || 'no_email'
-
-    // Parse dates — handle Excel serial numbers and string dates
-    const parseDate = val => {
-      if (!val) return null
-      if (typeof val === 'number') {
-        // Excel serial date
-        const d = XLSX.SSF.parse_date_code(val)
-        return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`
-      }
-      const s = String(val).trim()
-      if (!s) return null
-      // Try ISO format first
-      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
-      // Try M/D/YYYY or similar
-      const d = new Date(s)
-      if (!isNaN(d)) return d.toISOString().split('T')[0]
-      return null
-    }
-
-    return {
-      _row: i + 2,
-      company_name:           company,
-      divisions,
-      status,
-      primary_contact:        get('Primary Contact', 'Contact', 'Contact Name') || null,
-      email:                  get('Email', 'E-mail') || null,
-      cell:                   get('Cell', 'Mobile', 'Cell Phone') || null,
-      phone:                  get('Phone', 'Phone Number', 'Office Phone') || null,
-      trade_agreement_status: get('Trade Agreement Status', 'Trade Agreement') || null,
-      liability_exp:          parseDate(row['Liability Exp Date'] ?? row['Liability Exp'] ?? row['Liability Expiration']) || null,
-      workers_comp_exp:       parseDate(row["Workers Comp Exp Date"] ?? row["Worker's Comp Exp Date"] ?? row['Workers Comp Exp']) || null,
-      notes:                  get('Notes', 'Note') || null,
-    }
-  }
-
+  // ── Import — Step 1: read file, extract headers ───────────
   function handleImportFile(e) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -245,21 +187,125 @@ export default function SubsVendors() {
     const reader = new FileReader()
     reader.onload = ev => {
       try {
-        const wb   = XLSX.read(new Uint8Array(ev.target.result), { type: 'array', cellDates: false })
-        const ws   = wb.Sheets[wb.SheetNames[0]]
-        const json = XLSX.utils.sheet_to_json(ws, { defval: '' })
-        if (json.length === 0) { setImportError('No rows found in the file.'); return }
-        const rows = json.map((row, i) => mapXLSXRow(row, i)).filter(Boolean)
-        if (rows.length === 0) { setImportError('No valid rows found. Make sure the file has a "Company Name" column.'); return }
-        setImportRows(rows)
-        setShowImport(true)
+        const wb      = XLSX.read(new Uint8Array(ev.target.result), { type: 'array', cellDates: true })
+        const ws      = wb.Sheets[wb.SheetNames[0]]
+        const json    = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false })
+        if (!json.length) { setImportError('No data found in file.'); return }
+
+        const headers = Object.keys(json[0])
+        setImportHeaders(headers)
+        setImportRawData(json)
+        setImportMeta({ name: file.name, rowCount: json.length })
+        setImportMapping(autoMap(headers))
+        setImportStep('mapping')
       } catch (err) {
-        console.error(err)
+        console.error('XLSX read error:', err)
         setImportError('Could not read file. Make sure it is a valid .xlsx file.')
       }
     }
     reader.readAsArrayBuffer(file)
     e.target.value = ''
+  }
+
+  // Auto-guess column mappings from header names
+  function autoMap(headers) {
+    const aliases = {
+      company_name:           ['company name','company','name','vendor name','sub name'],
+      divisions:              ['divisions','division','trade','trades','specialty','specialties'],
+      status:                 ['status','active status'],
+      primary_contact:        ['primary contact','contact','contact name','rep','representative'],
+      email:                  ['email','e-mail','email address'],
+      cell:                   ['cell','mobile','cell phone','mobile phone','cell #'],
+      phone:                  ['phone','phone number','office phone','telephone','phone #'],
+      trade_agreement_status: ['trade agreement status','trade agreement','agreement status','agreement'],
+      liability_exp:          ['liability exp date','liability exp','liability expiration','liability ins exp','liability insurance expiration'],
+      workers_comp_exp:       ["workers comp exp date","worker's comp exp date",'workers comp exp','workers comp','wc exp',"worker's comp"],
+      notes:                  ['notes','note','comments','comment','remarks'],
+    }
+    const mapping = {}
+    for (const [field, aliasList] of Object.entries(aliases)) {
+      const match = headers.find(h => aliasList.includes(h.toLowerCase().trim()))
+      if (match) mapping[field] = match
+    }
+    return mapping
+  }
+
+  // ── Import — Step 2: apply mapping, build preview rows ────
+  function parseDate(val) {
+    if (!val) return null
+    const s = String(val).trim()
+    if (!s) return null
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+    const d = new Date(s)
+    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0]
+    return null
+  }
+
+  function applyMappingAndPreview() {
+    const m = importMapping
+    if (!m.company_name) { setImportError('You must map a column to Company Name.'); return }
+    setImportError('')
+    const rows = importRawData.map((row, i) => {
+      const get = field => {
+        const header = m[field]
+        return header ? String(row[header] ?? '').trim() : ''
+      }
+      const company = get('company_name')
+      if (!company) return null
+      const rawDivs = get('divisions')
+      const divisions = rawDivs ? rawDivs.split(/[|;]/).map(d => d.trim()).filter(Boolean) : []
+      const rawStatus = get('status').toLowerCase()
+      const status = STATUS_OPTIONS.find(s =>
+        rawStatus.includes(s.value.replace('_','')) || rawStatus.includes(s.label.toLowerCase())
+      )?.value || 'no_email'
+      return {
+        _row: i + 2,
+        company_name:           company,
+        divisions,
+        status,
+        primary_contact:        get('primary_contact') || null,
+        email:                  get('email') || null,
+        cell:                   get('cell') || null,
+        phone:                  get('phone') || null,
+        trade_agreement_status: get('trade_agreement_status') || null,
+        liability_exp:          parseDate(get('liability_exp')),
+        workers_comp_exp:       parseDate(get('workers_comp_exp')),
+        notes:                  get('notes') || null,
+      }
+    }).filter(Boolean)
+
+    if (!rows.length) { setImportError('No valid rows after mapping. Check that Company Name column has data.'); return }
+    setImportRows(rows)
+    setImportStep('preview')
+  }
+
+  // ── Import — Step 3: write to Supabase ────────────────────
+  async function confirmImport() {
+    setImporting(true)
+    const payload = importRows.map(({ _row, ...row }) => row)
+    const { error } = await supabase.from('subs_vendors').insert(payload)
+    if (error) {
+      console.error(error)
+      setImportError('Import failed: ' + error.message)
+      setImporting(false)
+      return
+    }
+    setImporting(false)
+    setImportStep(null)
+    setImportRows([])
+    setImportRawData([])
+    setImportHeaders([])
+    setImportMeta(null)
+    fetchSubs()
+  }
+
+  function closeImport() {
+    setImportStep(null)
+    setImportRows([])
+    setImportRawData([])
+    setImportHeaders([])
+    setImportMeta(null)
+    setImportError('')
   }
 
   async function confirmImport() {
@@ -543,32 +589,107 @@ export default function SubsVendors() {
         </div>
       )}
 
-      {/* Import Preview Modal */}
-      {showImport && (
+      {/* ── Import: Step 1 — Column Mapping ───────────────────── */}
+      {importStep === 'mapping' && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-[720px] flex flex-col max-h-[92vh]">
-
-            {/* Header */}
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-[560px] flex flex-col max-h-[92vh]">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
               <div>
-                <h2 className="text-base font-bold text-gray-900">Import Preview</h2>
-                <p className="text-xs text-gray-400 mt-0.5">{importRows.length} rows ready to import</p>
+                <h2 className="text-base font-bold text-gray-900">Map Columns</h2>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {importMeta?.name} · {importMeta?.rowCount} rows · {importHeaders.length} columns detected
+                </p>
               </div>
-              <button onClick={() => { setShowImport(false); setImportRows([]) }}
-                className="text-gray-300 hover:text-gray-500 p-2">
+              <button onClick={closeImport} className="text-gray-300 hover:text-gray-500 p-2">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
 
-            {/* Preview table */}
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-1">
+              <p className="text-xs text-gray-400 mb-3">
+                Match your file's columns to the app fields. Columns we couldn't auto-detect are shown in yellow.
+              </p>
+              {[
+                { key: 'company_name',           label: 'Company Name',          required: true  },
+                { key: 'divisions',               label: 'Divisions'                              },
+                { key: 'status',                  label: 'Status'                                 },
+                { key: 'primary_contact',         label: 'Primary Contact'                        },
+                { key: 'email',                   label: 'Email'                                  },
+                { key: 'cell',                    label: 'Cell'                                   },
+                { key: 'phone',                   label: 'Phone'                                  },
+                { key: 'trade_agreement_status',  label: 'Trade Agreement Status'                 },
+                { key: 'liability_exp',           label: 'Liability Exp Date'                     },
+                { key: 'workers_comp_exp',        label: "Workers Comp Exp Date"                  },
+                { key: 'notes',                   label: 'Notes'                                  },
+              ].map(field => {
+                const mapped = importMapping[field.key]
+                return (
+                  <div key={field.key} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg ${
+                    !mapped && !field.required ? 'bg-yellow-50 border border-yellow-100' :
+                    !mapped && field.required  ? 'bg-red-50 border border-red-200' :
+                                                 'bg-gray-50 border border-gray-100'
+                  }`}>
+                    <span className="text-xs font-medium text-gray-700 w-44 flex-shrink-0">
+                      {field.label}
+                      {field.required && <span className="text-red-400 ml-0.5">*</span>}
+                    </span>
+                    <select
+                      value={importMapping[field.key] || ''}
+                      onChange={e => setImportMapping(m => ({ ...m, [field.key]: e.target.value || undefined }))}
+                      className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-green-500"
+                    >
+                      <option value="">— skip this field —</option>
+                      {importHeaders.map(h => (
+                        <option key={h} value={h}>{h}</option>
+                      ))}
+                    </select>
+                    {mapped && (
+                      <span className="text-[10px] text-green-600 font-medium flex-shrink-0">✓</span>
+                    )}
+                  </div>
+                )
+              })}
+              {importError && <p className="text-xs text-red-500 pt-2">{importError}</p>}
+            </div>
+
+            <div className="px-5 py-4 flex gap-2 flex-shrink-0 border-t border-gray-100">
+              <button onClick={applyMappingAndPreview}
+                className="flex-1 btn-primary text-sm py-3">
+                Preview Import →
+              </button>
+              <button onClick={closeImport}
+                className="px-5 py-3 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Import: Step 2 — Preview ────────────────────────────── */}
+      {importStep === 'preview' && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-[760px] flex flex-col max-h-[92vh]">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+              <div>
+                <h2 className="text-base font-bold text-gray-900">Preview Import</h2>
+                <p className="text-xs text-gray-400 mt-0.5">{importRows.length} records ready to import</p>
+              </div>
+              <button onClick={closeImport} className="text-gray-300 hover:text-gray-500 p-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
             <div className="flex-1 overflow-auto px-5 py-4">
               {importError && <p className="text-xs text-red-500 mb-3">{importError}</p>}
-              <table className="w-full text-xs border border-gray-200 rounded-lg overflow-hidden">
+              <table className="w-full text-xs min-w-[600px]">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
-                    {['Company Name', 'Divisions', 'Status', 'Contact', 'Email', 'Cell', 'Liability Exp', 'W/C Exp'].map(h => (
+                    {['Company Name','Divisions','Status','Contact','Cell','Liability Exp','W/C Exp'].map(h => (
                       <th key={h} className="px-3 py-2 text-left font-semibold text-gray-500 whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -577,30 +698,32 @@ export default function SubsVendors() {
                   {importRows.map((row, i) => (
                     <tr key={i} className="hover:bg-gray-50">
                       <td className="px-3 py-2 font-medium text-gray-800 max-w-[180px] truncate">{row.company_name}</td>
-                      <td className="px-3 py-2 text-gray-500 max-w-[140px] truncate">{(row.divisions || []).join(', ') || '—'}</td>
+                      <td className="px-3 py-2 text-gray-500 max-w-[140px] truncate">{(row.divisions||[]).join(', ')||'—'}</td>
                       <td className="px-3 py-2">
                         <span className={`px-1.5 py-0.5 rounded-full border text-[10px] font-medium ${statusInfo(row.status).cls}`}>
                           {statusInfo(row.status).label}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-gray-600">{row.primary_contact || '—'}</td>
-                      <td className="px-3 py-2 text-gray-500 max-w-[140px] truncate">{row.email || '—'}</td>
-                      <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{row.cell || '—'}</td>
-                      <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{row.liability_exp || '—'}</td>
-                      <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{row.workers_comp_exp || '—'}</td>
+                      <td className="px-3 py-2 text-gray-600">{row.primary_contact||'—'}</td>
+                      <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{row.cell||'—'}</td>
+                      <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{row.liability_exp||'—'}</td>
+                      <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{row.workers_comp_exp||'—'}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
 
-            {/* Footer */}
             <div className="px-5 py-4 flex gap-2 flex-shrink-0 border-t border-gray-100">
               <button onClick={confirmImport} disabled={importing}
                 className="flex-1 btn-primary text-sm py-3 disabled:opacity-50">
                 {importing ? 'Importing…' : `Import ${importRows.length} Records`}
               </button>
-              <button onClick={() => { setShowImport(false); setImportRows([]) }}
+              <button onClick={() => setImportStep('mapping')}
+                className="px-5 py-3 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">
+                ← Back
+              </button>
+              <button onClick={closeImport}
                 className="px-5 py-3 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">
                 Cancel
               </button>
