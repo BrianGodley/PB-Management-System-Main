@@ -433,7 +433,7 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
             <th rowSpan={2} className="px-2 py-2 text-right font-semibold text-gray-500 text-[11px]">{section.prevLabel}</th>
             <th rowSpan={2} className="px-2 py-2 text-right font-semibold text-gray-500 text-[11px] border-r border-gray-200">{section.balLabel}</th>
             {DAYS.map(d => (
-              <th key={d} colSpan={2} className="px-2 py-1.5 text-center font-semibold text-gray-500 border-l border-gray-200 text-[11px]">
+              <th key={d} colSpan={2} className="px-2 py-1.5 text-center font-semibold text-gray-600 border-l border-r border-gray-300 text-[11px] bg-gray-100">
                 {DAY_LABELS[d]}
               </th>
             ))}
@@ -444,8 +444,8 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
           <tr className="bg-gray-100 border-b border-gray-200">
             {DAYS.map(d => (
               <>
-                <th key={d+'i'} className="px-2 py-1 text-right text-gray-400 font-medium text-[10px] border-l border-gray-200">Inv.</th>
-                <th key={d+'d'} className="px-2 py-1 text-right text-gray-400 font-medium text-[10px]">Dep.</th>
+                <th key={d+'i'} className="px-2 py-1 text-right text-gray-400 font-medium text-[10px] border-l border-gray-300">Inv.</th>
+                <th key={d+'d'} className="px-2 py-1 text-right text-gray-400 font-medium text-[10px] border-r border-gray-300">Dep.</th>
               </>
             ))}
           </tr>
@@ -482,10 +482,10 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
                     </td>
                     {DAYS.map(d => (
                       <>
-                        <td key={d+'i'} className="px-1 py-1 border-l border-gray-100">
+                        <td key={d+'i'} className="px-1 py-1 border-l border-gray-200">
                           <CellInput value={row[`${d}_inv`]||''} onSave={v => onUpdate(row.id,`${d}_inv`,v)} />
                         </td>
-                        <td key={d+'d'} className="px-1 py-1">
+                        <td key={d+'d'} className="px-1 py-1 border-r border-gray-200">
                           <CellInput value={row[`${d}_dep`]||''} onSave={v => onUpdate(row.id,`${d}_dep`,v)} />
                         </td>
                       </>
