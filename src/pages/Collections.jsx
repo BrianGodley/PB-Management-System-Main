@@ -235,7 +235,7 @@ export default function Collections() {
 
       {/* ── Header & week nav ────────────────────────────────────────────────── */}
       <div className="flex items-center gap-3 mb-4 flex-shrink-0 flex-wrap">
-        <h1 className="text-xl font-bold text-gray-900">Collections & Finance</h1>
+        <h1 className="text-xl font-bold text-gray-900">Finance</h1>
         <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl shadow-sm px-2 py-1">
           <button
             onClick={() => setWeekIdx(i => Math.min(i+1, weeks.length-1))}
