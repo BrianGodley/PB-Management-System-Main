@@ -187,9 +187,21 @@ export default function SubsVendors() {
     const reader = new FileReader()
     reader.onload = ev => {
       try {
-        const wb      = XLSX.read(new Uint8Array(ev.target.result), { type: 'array', cellDates: true })
-        const ws      = wb.Sheets[wb.SheetNames[0]]
-        const json    = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false })
+        const wb  = XLSX.read(new Uint8Array(ev.target.result), { type: 'array', cellDates: true })
+        const ws  = wb.Sheets[wb.SheetNames[0]]
+
+        // Read raw rows as arrays so we can find the real header row
+        const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
+
+        // Find the first row with 3+ non-empty cells — that's the header row
+        let headerRowIndex = 0
+        for (let i = 0; i < Math.min(10, rawRows.length); i++) {
+          const nonEmpty = rawRows[i].filter(c => String(c).trim() !== '').length
+          if (nonEmpty >= 3) { headerRowIndex = i; break }
+        }
+
+        // Re-parse starting at the detected header row
+        const json = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false, range: headerRowIndex })
         if (!json.length) { setImportError('No data found in file.'); return }
 
         const headers = Object.keys(json[0])
