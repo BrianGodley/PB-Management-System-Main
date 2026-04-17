@@ -50,7 +50,7 @@ const EMPTY_FORM = {
   company_name: '', divisions: [], status: 'no_email',
   primary_contact: '', email: '', cell: '', phone: '',
   trade_agreement_status: '', liability_exp: '', workers_comp_exp: '', notes: '',
-  phone_ext: '',
+  phone_ext: '', price_list: '',
 }
 
 // ── Main Page ────────────────────────────────────────────────
@@ -114,6 +114,7 @@ export default function SubsVendors() {
       workers_comp_exp:       sub.workers_comp_exp || '',
       notes:                  sub.notes || '',
       phone_ext:              sub.phone_ext || '',
+      price_list:             sub.price_list || '',
     })
     setError('')
     setShowModal(true)
@@ -148,6 +149,7 @@ export default function SubsVendors() {
       workers_comp_exp:       form.workers_comp_exp || null,
       notes:                  form.notes.trim() || null,
       phone_ext:              form.phone_ext.trim() || null,
+      price_list:             form.price_list.trim() || null,
       updated_at:             new Date().toISOString(),
     }
     const { error } = editSub
@@ -522,6 +524,7 @@ export default function SubsVendors() {
                 <col style={{ width: '20%'   }} />  {/* trades / materials */}
                 {typeView === 'sub' && <col style={{ width: '110px' }} />}  {/* liability exp */}
                 {typeView === 'sub' && <col style={{ width: '110px' }} />}  {/* w/c exp */}
+                {typeView === 'vendor' && <col style={{ width: '150px' }} />}  {/* price list */}
                 <col style={{ width: '120px' }} />  {/* cell */}
                 <col style={{ width: '120px' }} />  {/* phone */}
                 <col style={{ width: '44px'  }} />  {/* actions */}
@@ -544,6 +547,7 @@ export default function SubsVendors() {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{typeView === 'sub' ? 'Trades' : 'Materials'}</th>
                   {typeView === 'sub' && <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Liability Exp.</th>}
                   {typeView === 'sub' && <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">W/C Exp.</th>}
+                  {typeView === 'vendor' && <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Price List</th>}
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Cell</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Phone</th>
                   <th className="px-4 py-3" />
@@ -584,6 +588,7 @@ export default function SubsVendors() {
                           {fmtDate(sub.workers_comp_exp)}
                         </span>
                       </td>}
+                      {typeView === 'vendor' && <td className="px-4 py-3 text-gray-600 truncate">{sub.price_list || <span className="text-gray-300">—</span>}</td>}
                       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{sub.cell || <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{sub.phone || <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-3">
@@ -1011,6 +1016,17 @@ function SubModal({ form, setForm, isEdit, onSave, onClose, onDelete, saving, er
               onChange={e => setForm(f => ({ ...f, trade_agreement_status: e.target.value }))}
               placeholder="e.g. Signed, Pending, Not required" className="input text-sm w-full" />
           </div>
+
+          {/* Price List (vendors only) */}
+          {recordType === 'vendor' && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Price List</label>
+              <input type="text" value={form.price_list}
+                onChange={e => setForm(f => ({ ...f, price_list: e.target.value }))}
+                placeholder="e.g. 2024 catalog, website URL, or on file"
+                className="input text-sm w-full" />
+            </div>
+          )}
 
           {/* Notes */}
           <div>
