@@ -271,6 +271,7 @@ export default function Collections() {
             className="px-2 py-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-30 font-bold text-lg"
           >›</button>
         </div>
+        <div className="flex-1" />
         <button
           onClick={createWeek} disabled={creatingWeek}
           className="text-sm px-3 py-1.5 rounded-lg bg-green-700 text-white font-medium hover:bg-green-800 disabled:opacity-50"
@@ -455,6 +456,21 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
               </>
             ))}
           </tr>
+          <tr className="bg-amber-50 border-b-2 border-amber-300">
+            <td colSpan={3} />
+            <td colSpan={2} className="border-l border-gray-400" />
+            <td colSpan={2} className="border-l border-gray-400" />
+            <td colSpan={2} className="border-l border-gray-400" />
+            <td colSpan={2} className="px-2 py-1 text-center border-l border-gray-400">
+              <span className="text-[10px] text-amber-800 font-bold">Subtotal Deposits</span>
+              <span className="text-[10px] text-amber-900 font-extrabold ml-1">{fmtC(summary.totDep)}</span>
+            </td>
+            <td colSpan={2} className="px-2 py-1 text-center border-l border-r border-gray-400">
+              <span className="text-[10px] text-amber-800 font-bold">Subtotal Invoices</span>
+              <span className="text-[10px] text-amber-900 font-extrabold ml-1">{fmtC(summary.totInv)}</span>
+            </td>
+            <td colSpan={3} />
+          </tr>
         </thead>
         <tbody className="divide-y divide-gray-100 bg-white">
           {allGroups.length === 0 && (
@@ -557,16 +573,6 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
             })}
             <td className="px-2 py-2 text-right text-gray-800 border-l border-amber-200">{fmtC(summary.totEnd)}</td>
             <td /><td />
-          </tr>
-          <tr className="bg-amber-50/50 text-[11px] text-gray-500">
-            <td colSpan={3} />
-            <td colSpan={4} className="px-2 py-1.5 text-right">
-              Subtotal Deposits: <span className="font-semibold text-gray-700 ml-1">{fmtC(summary.totDep)}</span>
-            </td>
-            <td colSpan={4} className="px-2 py-1.5 text-right">
-              Subtotal New Invoices: <span className="font-semibold text-gray-700 ml-1">{fmtC(summary.totInv)}</span>
-            </td>
-            <td colSpan={3} />
           </tr>
         </tbody>
       </table>
