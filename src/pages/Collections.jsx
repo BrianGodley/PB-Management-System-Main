@@ -562,29 +562,6 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
             </>
           ))}
 
-          {/* New group row */}
-          <tr className="bg-gray-50 border-t-2 border-gray-200">
-            <td colSpan={14} className="px-3 py-2">
-              <div className="flex items-center gap-2">
-                <input
-                  type="text" value={newManager}
-                  onChange={e => setNewManager(e.target.value)}
-                  onKeyDown={e => { if (e.key==='Enter' && newManager.trim()) { onAdd(section.key, newManager.trim()); setNewManager('') }}}
-                  placeholder="New manager group name…"
-                  className="text-xs border border-gray-200 rounded px-2 py-1 w-48 focus:outline-none focus:ring-1 focus:ring-green-500"
-                />
-                <button
-                  onClick={() => { if (newManager.trim()) { onAdd(section.key, newManager.trim()); setNewManager('') }}}
-                  disabled={!newManager.trim()}
-                  className="text-xs px-2 py-1 bg-green-700 text-white rounded hover:bg-green-800 disabled:opacity-40"
-                >+ Add Group & Row</button>
-                <button onClick={() => onAdd(section.key, null)} className="text-xs text-gray-500 hover:text-gray-700 ml-2">
-                  + Add ungrouped row
-                </button>
-              </div>
-            </td>
-          </tr>
-
           {/* Subtotals */}
           <tr className="bg-amber-50 font-semibold border-t-2 border-amber-200">
             <td className="px-3 py-2 text-gray-700 text-[11px] font-bold">Subtotals</td>
@@ -601,6 +578,26 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
             })}
             <td className="px-2 py-2 text-right text-gray-800 border-l border-amber-200">{fmtC(summary.totEnd)}</td>
             <td /><td />
+          </tr>
+
+          {/* New group row */}
+          <tr className="bg-gray-50 border-t-2 border-gray-200">
+            <td colSpan={14} className="px-3 py-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text" value={newManager}
+                  onChange={e => setNewManager(e.target.value)}
+                  onKeyDown={e => { if (e.key==='Enter' && newManager.trim()) { onAdd(section.key, newManager.trim()); setNewManager('') }}}
+                  placeholder="New Group Manager Name…"
+                  className="text-xs border border-gray-200 rounded px-2 py-1 w-52 focus:outline-none focus:ring-1 focus:ring-green-500"
+                />
+                <button
+                  onClick={() => { if (newManager.trim()) { onAdd(section.key, newManager.trim()); setNewManager('') }}}
+                  disabled={!newManager.trim()}
+                  className="text-xs px-2 py-1 bg-green-700 text-white rounded hover:bg-green-800 disabled:opacity-40"
+                >+ Add Group & Row</button>
+              </div>
+            </td>
           </tr>
         </tbody>
       </table>
