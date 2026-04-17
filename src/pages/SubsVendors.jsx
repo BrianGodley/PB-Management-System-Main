@@ -40,6 +40,7 @@ function isSoonExpiring(d) {
 }
 
 const EMPTY_FORM = {
+  type: 'sub',
   company_name: '', divisions: [], status: 'no_email',
   primary_contact: '', email: '', cell: '', phone: '',
   trade_agreement_status: '', liability_exp: '', workers_comp_exp: '', notes: '',
@@ -50,6 +51,7 @@ export default function SubsVendors() {
   const [subs,      setSubs]      = useState([])
   const [loading,   setLoading]   = useState(true)
   const [search,    setSearch]    = useState('')
+  const [typeView,  setTypeView]  = useState('sub')   // 'sub' | 'vendor'
   const [filter,    setFilter]    = useState('all')   // 'all' | status value
   const [showModal, setShowModal] = useState(false)
   const [editSub,   setEditSub]   = useState(null)
@@ -84,7 +86,7 @@ export default function SubsVendors() {
 
   function openNew() {
     setEditSub(null)
-    setForm(EMPTY_FORM)
+    setForm({ ...EMPTY_FORM, type: typeView })
     setError('')
     setShowModal(true)
   }
@@ -92,6 +94,7 @@ export default function SubsVendors() {
   function openEdit(sub) {
     setEditSub(sub)
     setForm({
+      type:                   sub.type || 'sub',
       company_name:           sub.company_name || '',
       divisions:              sub.divisions || [],
       status:                 sub.status || 'no_email',
@@ -124,6 +127,7 @@ export default function SubsVendors() {
     setSaving(true)
     setError('')
     const payload = {
+      type:                   form.type,
       company_name:           form.company_name.trim(),
       divisions:              form.divisions,
       status:                 form.status,
@@ -348,6 +352,7 @@ export default function SubsVendors() {
 
   // Filter + search
   const filtered = subs
+    .filter(s => (s.type || 'sub') === typeView)
     .filter(s => filter === 'all' || s.status === filter)
     .filter(s => {
       const q = search.toLowerCase()
@@ -375,9 +380,40 @@ export default function SubsVendors() {
   return (
     <div className="flex flex-col h-full">
 
+      {/* ── Type toggle (Subcontractors / Vendors) ──────────── */}
+      <div className="flex items-center gap-2 mb-4 flex-shrink-0">
+        <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+          <button
+            onClick={() => { setTypeView('sub'); setFilter('all') }}
+            className={`px-5 py-2.5 text-sm font-semibold transition-colors ${
+              typeView === 'sub'
+                ? 'bg-green-700 text-white'
+                : 'bg-white text-gray-500 hover:bg-gray-50'
+            }`}
+          >
+            🔨 Subcontractors
+          </button>
+          <button
+            onClick={() => { setTypeView('vendor'); setFilter('all') }}
+            className={`px-5 py-2.5 text-sm font-semibold border-l border-gray-200 transition-colors ${
+              typeView === 'vendor'
+                ? 'bg-green-700 text-white'
+                : 'bg-white text-gray-500 hover:bg-gray-50'
+            }`}
+          >
+            🛒 Vendors
+          </button>
+        </div>
+        <span className="text-xs text-gray-400 hidden sm:inline">
+          {subs.filter(s => (s.type || 'sub') === typeView).length} {typeView === 'sub' ? 'subcontractors' : 'vendors'}
+        </span>
+      </div>
+
       {/* ── Page header ─────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
-        <h1 className="text-xl font-bold text-gray-900">Subs / Vendors</h1>
+        <h1 className="text-xl font-bold text-gray-900">
+          {typeView === 'sub' ? 'Subcontractors' : 'Vendors'}
+        </h1>
         <div className="flex items-center gap-2 ml-auto">
           {/* Filter tabs */}
           <div className="hidden sm:flex items-center gap-1 bg-gray-100 rounded-lg p-1">
@@ -424,7 +460,7 @@ export default function SubsVendors() {
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            + Sub/Vendor
+            + {typeView === 'sub' ? 'Subcontractor' : 'Vendor'}
           </button>
         </div>
       </div>
@@ -443,11 +479,11 @@ export default function SubsVendors() {
       {/* ── Stats row ───────────────────────────────────────── */}
       <div className="flex gap-2 mb-4 flex-shrink-0 overflow-x-auto pb-1">
         {[
-          { label: 'Total',      count: subs.length,                                                  color: 'text-gray-700' },
-          { label: 'Active',     count: subs.filter(s => s.status === 'active').length,               color: 'text-green-700' },
-          { label: 'Ready',      count: subs.filter(s => s.status === 'ready').length,                color: 'text-teal-700' },
-          { label: 'No Email',   count: subs.filter(s => s.status === 'no_email').length,             color: 'text-gray-500' },
-          { label: 'Ins. Expiring', count: subs.filter(s => isSoonExpiring(s.liability_exp) || isSoonExpiring(s.workers_comp_exp)).length, color: 'text-orange-600' },
+          { label: 'Total',         count: subs.filter(s => (s.type||'sub') === typeView).length,                                                                           color: 'text-gray-700'   },
+          { label: 'Active',        count: subs.filter(s => (s.type||'sub') === typeView && s.status === 'active').length,                                                  color: 'text-green-700'  },
+          { label: 'Ready',         count: subs.filter(s => (s.type||'sub') === typeView && s.status === 'ready').length,                                                   color: 'text-teal-700'   },
+          { label: 'No Email',      count: subs.filter(s => (s.type||'sub') === typeView && s.status === 'no_email').length,                                                color: 'text-gray-500'   },
+          { label: 'Ins. Expiring', count: subs.filter(s => (s.type||'sub') === typeView && (isSoonExpiring(s.liability_exp) || isSoonExpiring(s.workers_comp_exp))).length, color: 'text-orange-600' },
         ].map(s => (
           <div key={s.label} className="flex-shrink-0 bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm flex items-center gap-2">
             <span className="text-xs text-gray-500">{s.label}</span>
@@ -463,8 +499,8 @@ export default function SubsVendors() {
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center flex-1 text-gray-400 py-20">
           <p className="text-5xl mb-3">🔧</p>
-          <p className="text-sm font-medium text-gray-500">{search ? 'No results found' : 'No subs or vendors yet'}</p>
-          {!search && <button onClick={openNew} className="btn-primary text-sm px-4 py-2 mt-4">Add First Entry</button>}
+          <p className="text-sm font-medium text-gray-500">{search ? 'No results found' : `No ${typeView === 'sub' ? 'subcontractors' : 'vendors'} yet`}</p>
+          {!search && <button onClick={openNew} className="btn-primary text-sm px-4 py-2 mt-4">Add First {typeView === 'sub' ? 'Subcontractor' : 'Vendor'}</button>}
         </div>
       ) : (
         <>
@@ -791,7 +827,9 @@ function SubModal({ form, setForm, isEdit, onSave, onClose, onDelete, saving, er
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
           <h2 className="text-base font-bold text-gray-900">
-            {isEdit ? 'Edit Sub / Vendor' : 'Add Sub / Vendor'}
+            {isEdit
+              ? `Edit ${form.type === 'vendor' ? 'Vendor' : 'Subcontractor'}`
+              : `Add ${form.type === 'vendor' ? 'Vendor' : 'Subcontractor'}`}
           </h2>
           <button onClick={onClose} className="text-gray-300 hover:text-gray-500 p-2">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -802,6 +840,35 @@ function SubModal({ form, setForm, isEdit, onSave, onClose, onDelete, saving, er
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
+
+          {/* Type toggle */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-2">Type</label>
+            <div className="flex rounded-lg overflow-hidden border border-gray-200">
+              <button
+                type="button"
+                onClick={() => setForm(f => ({ ...f, type: 'sub' }))}
+                className={`flex-1 py-2.5 text-sm font-semibold transition-colors ${
+                  form.type === 'sub'
+                    ? 'bg-green-700 text-white'
+                    : 'bg-white text-gray-500 hover:bg-gray-50'
+                }`}
+              >
+                🔨 Subcontractor
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm(f => ({ ...f, type: 'vendor' }))}
+                className={`flex-1 py-2.5 text-sm font-semibold border-l border-gray-200 transition-colors ${
+                  form.type === 'vendor'
+                    ? 'bg-green-700 text-white'
+                    : 'bg-white text-gray-500 hover:bg-gray-50'
+                }`}
+              >
+                🛒 Vendor
+              </button>
+            </div>
+          </div>
 
           {/* Company name */}
           <div>
