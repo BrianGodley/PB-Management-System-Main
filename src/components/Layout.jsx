@@ -192,7 +192,7 @@ export default function Layout() {
       </header>
 
       {/* ── BODY: sidebar + content ── */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 min-h-0">
 
         {/* LEFT SIDEBAR — white, no color */}
         <aside className="hidden lg:flex flex-col w-32 bg-white border-r border-gray-200 sticky top-14 h-[calc(100vh-3.5rem)] overflow-y-auto">
@@ -225,7 +225,7 @@ export default function Layout() {
         </aside>
 
         {/* MAIN CONTENT */}
-        <main className="flex-1 p-4 lg:p-6 min-w-0 overflow-y-auto">
+        <main className="flex-1 min-h-0 min-w-0 overflow-y-auto p-4 lg:p-6">
           <Outlet />
         </main>
       </div>
