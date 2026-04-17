@@ -520,8 +520,8 @@ export default function SubsVendors() {
                 <col style={{ width: '22%'   }} />  {/* company name */}
                 <col style={{ width: '15%'   }} />  {/* primary contact */}
                 <col style={{ width: '20%'   }} />  {/* trades / materials */}
-                <col style={{ width: '110px' }} />  {/* liability exp */}
-                <col style={{ width: '110px' }} />  {/* w/c exp */}
+                {typeView === 'sub' && <col style={{ width: '110px' }} />}  {/* liability exp */}
+                {typeView === 'sub' && <col style={{ width: '110px' }} />}  {/* w/c exp */}
                 <col style={{ width: '120px' }} />  {/* cell */}
                 <col style={{ width: '120px' }} />  {/* phone */}
                 <col style={{ width: '44px'  }} />  {/* actions */}
@@ -542,8 +542,8 @@ export default function SubsVendors() {
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Primary Contact</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{typeView === 'sub' ? 'Trades' : 'Materials'}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Liability Exp.</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">W/C Exp.</th>
+                  {typeView === 'sub' && <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Liability Exp.</th>}
+                  {typeView === 'sub' && <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">W/C Exp.</th>}
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Cell</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Phone</th>
                   <th className="px-4 py-3" />
@@ -574,16 +574,16 @@ export default function SubsVendors() {
                       </td>
                       <td className="px-4 py-3 text-gray-700 truncate">{sub.primary_contact || <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-3 text-gray-600 truncate">{(sub.divisions || []).join(', ') || <span className="text-gray-300 italic">—</span>}</td>
-                      <td className="px-4 py-3">
+                      {typeView === 'sub' && <td className="px-4 py-3">
                         <span className={`text-xs font-medium ${liabExp ? 'text-red-600' : liabSoon ? 'text-orange-500' : 'text-gray-600'}`}>
                           {fmtDate(sub.liability_exp)}
                         </span>
-                      </td>
-                      <td className="px-4 py-3">
+                      </td>}
+                      {typeView === 'sub' && <td className="px-4 py-3">
                         <span className={`text-xs font-medium ${wcExp ? 'text-red-600' : wcSoon ? 'text-orange-500' : 'text-gray-600'}`}>
                           {fmtDate(sub.workers_comp_exp)}
                         </span>
-                      </td>
+                      </td>}
                       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{sub.cell || <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{sub.phone || <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-3">
