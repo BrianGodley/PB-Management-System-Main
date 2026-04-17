@@ -431,13 +431,13 @@ function LogModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50"
       onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-[680px] max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-[680px] max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden">
 
         {/* Modal header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
           <div>
             <h2 className="text-base font-bold text-gray-900">{isEdit ? 'Edit Daily Log' : 'Daily Log'}</h2>
             {selectedJob !== 'all' && (
@@ -452,10 +452,10 @@ function LogModal({
         </div>
 
         {/* Scrollable body */}
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-col sm:flex-row flex-1 overflow-hidden">
 
-          {/* Left column */}
-          <div className="w-64 flex-shrink-0 px-5 py-5 border-r border-gray-100 overflow-y-auto space-y-4">
+          {/* Left column — full width on mobile, fixed width sidebar on desktop */}
+          <div className="w-full sm:w-64 flex-shrink-0 px-5 py-4 border-b sm:border-b-0 sm:border-r border-gray-100 overflow-y-auto space-y-4">
 
             {/* Job selector (all-jobs mode) */}
             {selectedJob === 'all' && (
@@ -558,6 +558,7 @@ function LogModal({
                   ref={fileRef}
                   type="file"
                   accept="image/*"
+                  capture={false}
                   multiple
                   className="hidden"
                   onChange={onPhotoSelect}

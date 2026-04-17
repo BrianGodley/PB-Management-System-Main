@@ -16,10 +16,10 @@ const REMINDERS  = ['None', '1 day before', '2 days before', '3 days before', '1
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const DAY_NAMES   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 
-const LANE_H    = 24   // px per item lane
-const DAY_H     = 30   // px reserved for the day-number strip at top of each row
-const ROW_PAD   = 8    // extra padding below items
-const MIN_ROW_H = 160  // minimum row height so empty weeks still look like a real calendar
+const LANE_H    = 24
+const DAY_H     = 30
+const ROW_PAD   = 8
+const MIN_ROW_H = 160
 
 // ── Date helpers ─────────────────────────────────────────────
 function daysInMonth(y, m) { return new Date(y, m + 1, 0).getDate() }
@@ -51,6 +51,10 @@ function countWorkDays(start, end) {
   return count
 }
 
+function fmtDate(ds) {
+  return new Date(ds + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
 const EMPTY_FORM = {
   title: '', display_color: '#15803d', assignees: '',
   start_date: '', end_date: '', work_days: '', progress: 0, reminder: 'None', notes: '',
@@ -58,7 +62,6 @@ const EMPTY_FORM = {
 
 // ── WeekRow: renders one 7-day row with spanning item bars ───
 function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, onDayClick, onItemClick }) {
-  // Build actual Date objects for each column (null for padding cells)
   const weekDates = weekDays.map(day => day ? new Date(year, month, day) : null)
   const validDates = weekDates.filter(Boolean)
   if (validDates.length === 0) return null
@@ -66,7 +69,6 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
   const weekMinMs = Math.min(...validDates.map(d => d.getTime()))
   const weekMaxMs = Math.max(...validDates.map(d => d.getTime()))
 
-  // Filter items overlapping this week, sorted by start date
   const weekItems = items
     .filter(item => {
       const s = new Date(item.start_date + 'T00:00:00').getTime()
@@ -75,9 +77,8 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
     })
     .sort((a, b) => new Date(a.start_date) - new Date(b.start_date))
 
-  // Compute startCol / endCol / lane for each item
   const itemInfo = {}
-  const laneRanges = [] // laneRanges[l] = [{s, e}]
+  const laneRanges = []
 
   weekItems.forEach(item => {
     const iStart = new Date(item.start_date + 'T00:00:00')
@@ -93,7 +94,6 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
     })
     if (startCol === -1) return
 
-    // Assign to first lane with no column overlap
     let lane = 0
     while (true) {
       const occupied = laneRanges[lane] || []
@@ -113,8 +113,6 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
 
   return (
     <div className="relative border-b border-gray-200" style={{ height: rowH }}>
-
-      {/* ── Day cells (background + day numbers + click target) ── */}
       <div className="absolute inset-0 grid grid-cols-7">
         {weekDays.map((day, col) => {
           const ds = day
@@ -139,14 +137,12 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
         })}
       </div>
 
-      {/* ── Spanning item bars ─────────────────────────────────── */}
       <div className="absolute inset-x-0 pointer-events-none" style={{ top: DAY_H }}>
         {weekItems.map(item => {
           const info = itemInfo[item.id]
           if (!info) return null
           const { startCol, endCol, lane } = info
 
-          // Rounded corners only at true item start/end, flat where it continues across week boundary
           const iStart     = new Date(item.start_date + 'T00:00:00')
           const iEnd       = new Date(item.end_date   + 'T00:00:00')
           const cellStart  = weekDates[startCol]
@@ -188,6 +184,54 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
   )
 }
 
+// ── Mobile schedule item card ────────────────────────────────
+function MobileScheduleCard({ item, jobName, onClick }) {
+  return (
+    <div
+      onClick={onClick}
+      className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm active:bg-gray-50 cursor-pointer"
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className="w-1.5 self-stretch rounded-full flex-shrink-0"
+          style={{ backgroundColor: item.display_color || '#15803d', minHeight: 40 }}
+        />
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-gray-900 text-sm leading-tight">{item.title}</p>
+          {jobName && (
+            <p className="text-xs text-purple-600 mt-0.5 font-medium">{jobName}</p>
+          )}
+          <p className="text-xs text-gray-500 mt-1">
+            {fmtDate(item.start_date)}
+            {item.start_date !== item.end_date && <> – {fmtDate(item.end_date)}</>}
+            {item.work_days > 0 && <span className="text-gray-400"> · {item.work_days} day{item.work_days !== 1 ? 's' : ''}</span>}
+          </p>
+          {item.assignees && (
+            <p className="text-xs text-gray-400 mt-0.5">👤 {item.assignees}</p>
+          )}
+          {item.progress > 0 && (
+            <div className="mt-2">
+              <div className="flex items-center justify-between mb-0.5">
+                <span className="text-[10px] text-gray-400">Progress</span>
+                <span className="text-[10px] font-semibold text-gray-600">{item.progress}%</span>
+              </div>
+              <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                <div
+                  className="h-1.5 rounded-full"
+                  style={{ width: `${item.progress}%`, backgroundColor: item.display_color || '#15803d' }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+        <svg className="w-4 h-4 text-gray-300 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </div>
+    </div>
+  )
+}
+
 // ── Main calendar component ──────────────────────────────────
 export default function ScheduleCalendar({ jobs = [], selectedJob }) {
   const today = new Date()
@@ -196,7 +240,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
 
-  const [phase,       setPhase]       = useState(null)  // null | 'job-select' | 'details'
+  const [phase,       setPhase]       = useState(null)
   const [clickedDate, setClickedDate] = useState(null)
   const [editItem,    setEditItem]    = useState(null)
   const [form,        setForm]        = useState(EMPTY_FORM)
@@ -246,8 +290,20 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
     }
   }
 
+  function handleAddNew() {
+    const ds = dateStr(today)
+    setClickedDate(ds)
+    setForm({ ...EMPTY_FORM, start_date: ds, end_date: ds, work_days: 1 })
+    setEditItem(null)
+    if (selectedJob === 'all') {
+      setModalJobId(null); setPhase('job-select')
+    } else {
+      setModalJobId(selectedJob); setPhase('details')
+    }
+  }
+
   function handleItemClick(e, item) {
-    e.stopPropagation()
+    if (e) e.stopPropagation()
     setEditItem(item)
     setModalJobId(item.job_id)
     setForm({
@@ -312,7 +368,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
     closeModal(); fetchItems()
   }
 
-  // Build week rows
+  // Build week rows (desktop only)
   const firstDay = firstDayOfMonth(year, month)
   const numDays  = daysInMonth(year, month)
   const cells    = Array.from({ length: firstDay + numDays }, (_, i) => i < firstDay ? null : i - firstDay + 1)
@@ -323,63 +379,128 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
   const jobMap   = Object.fromEntries(jobs.map(j => [j.id, j.name || j.client_name]))
   const todayStr = dateStr(today)
 
+  // Month navigation header (shared between mobile and desktop)
+  const MonthNav = () => (
+    <div className="flex items-center justify-between mb-3">
+      <button onClick={prevMonth} className="p-2 rounded-lg hover:bg-gray-100 text-gray-600">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+      <h3 className="text-sm font-bold text-gray-800">{MONTH_NAMES[month]} {year}</h3>
+      <button onClick={nextMonth} className="p-2 rounded-lg hover:bg-gray-100 text-gray-600">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+    </div>
+  )
+
   return (
     <div className="flex flex-col select-none">
 
-      {/* ── Month navigation + day headers — sticky ───────────── */}
-      <div className="sticky top-0 z-10 bg-white pb-0">
-        <div className="flex items-center justify-between mb-2">
-          <button onClick={prevMonth} className="p-1.5 rounded hover:bg-gray-100 text-gray-600">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <h3 className="text-sm font-bold text-gray-800">{MONTH_NAMES[month]} {year}</h3>
-          <button onClick={nextMonth} className="p-1.5 rounded hover:bg-gray-100 text-gray-600">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
+      {/* ══════════════════════════════════════════════════════
+          MOBILE VIEW — hidden on lg+ screens
+      ══════════════════════════════════════════════════════ */}
+      <div className="lg:hidden flex flex-col">
+        <MonthNav />
 
-        {/* Day-of-week header */}
-        <div className="grid grid-cols-7 border-l border-t border-gray-200">
-          {DAY_NAMES.map(d => (
-            <div key={d} className="text-center text-xs font-semibold text-gray-400 py-1.5 border-r border-b border-gray-200 bg-white">
-              {d}
-            </div>
-          ))}
-        </div>
+        {/* Add button */}
+        <button
+          onClick={handleAddNew}
+          className="w-full flex items-center justify-center gap-2 py-3 mb-4 rounded-xl border-2 border-dashed border-green-300 text-green-700 font-medium text-sm hover:bg-green-50 active:bg-green-100 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          New Schedule Item
+        </button>
+
+        {loading ? (
+          <div className="flex justify-center py-10">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-700" />
+          </div>
+        ) : items.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+            <p className="text-4xl mb-3">📅</p>
+            <p className="text-sm font-medium text-gray-500">No items this month</p>
+            <p className="text-xs mt-1 text-gray-400">Tap above to add a schedule item</p>
+          </div>
+        ) : (
+          <div className="space-y-3 pb-4">
+            {items.map(item => (
+              <MobileScheduleCard
+                key={item.id}
+                item={item}
+                jobName={selectedJob === 'all' ? jobMap[item.job_id] : null}
+                onClick={() => handleItemClick(null, item)}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* ── Week rows — grow to natural height ────────────────── */}
-      {loading ? (
-        <div className="flex justify-center py-10">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-700" />
-        </div>
-      ) : (
-        <div className="border-l border-gray-200">
-          {weeks.map((weekDays, idx) => (
-            <WeekRow
-              key={idx}
-              weekDays={weekDays}
-              year={year}
-              month={month}
-              items={items}
-              selectedJob={selectedJob}
-              jobMap={jobMap}
-              todayStr={todayStr}
-              onDayClick={handleDayClick}
-              onItemClick={handleItemClick}
-            />
-          ))}
-        </div>
-      )}
+      {/* ══════════════════════════════════════════════════════
+          DESKTOP VIEW — hidden on mobile, shown on lg+
+      ══════════════════════════════════════════════════════ */}
+      <div className="hidden lg:flex lg:flex-col">
 
-      {/* ── Modal: Job Selector ───────────────────────────────── */}
+        {/* Month navigation + day headers — sticky */}
+        <div className="sticky top-0 z-10 bg-white pb-0">
+          <div className="flex items-center justify-between mb-2">
+            <button onClick={prevMonth} className="p-1.5 rounded hover:bg-gray-100 text-gray-600">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <h3 className="text-sm font-bold text-gray-800">{MONTH_NAMES[month]} {year}</h3>
+            <button onClick={nextMonth} className="p-1.5 rounded hover:bg-gray-100 text-gray-600">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="grid grid-cols-7 border-l border-t border-gray-200">
+            {DAY_NAMES.map(d => (
+              <div key={d} className="text-center text-xs font-semibold text-gray-400 py-1.5 border-r border-b border-gray-200 bg-white">
+                {d}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Week rows */}
+        {loading ? (
+          <div className="flex justify-center py-10">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-700" />
+          </div>
+        ) : (
+          <div className="border-l border-gray-200">
+            {weeks.map((weekDays, idx) => (
+              <WeekRow
+                key={idx}
+                weekDays={weekDays}
+                year={year}
+                month={month}
+                items={items}
+                selectedJob={selectedJob}
+                jobMap={jobMap}
+                todayStr={todayStr}
+                onDayClick={handleDayClick}
+                onItemClick={handleItemClick}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Modals (shared by both mobile and desktop) ────────── */}
+
+      {/* Job Selector */}
       {phase === 'job-select' && (
         <ModalOverlay onClose={closeModal}>
-          <div className="bg-white rounded-xl shadow-xl w-80 p-5">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-5">
             <h3 className="text-sm font-bold text-gray-800 mb-1">Select a Job</h3>
             <p className="text-xs text-gray-400 mb-3">{clickedDate}</p>
             <div className="space-y-1 max-h-64 overflow-y-auto">
@@ -387,7 +508,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
                 <button
                   key={j.id}
                   onClick={() => { setModalJobId(j.id); setPhase('details') }}
-                  className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-green-50 hover:text-green-700 transition-colors text-gray-700 border border-transparent hover:border-green-200"
+                  className="w-full text-left px-3 py-2.5 rounded-lg text-sm hover:bg-green-50 hover:text-green-700 transition-colors text-gray-700 border border-transparent hover:border-green-200"
                 >
                   {j.name || j.client_name}
                 </button>
@@ -398,10 +519,10 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
         </ModalOverlay>
       )}
 
-      {/* ── Modal: Schedule Item Details ─────────────────────── */}
+      {/* Schedule Item Details */}
       {phase === 'details' && (
         <ModalOverlay onClose={closeModal}>
-          <div className="bg-white rounded-xl shadow-xl w-[420px] max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-[420px] mx-4 max-h-[90vh] overflow-y-auto">
             <div className="px-5 pt-5 pb-4 border-b border-gray-100">
               <h3 className="text-sm font-bold text-gray-800">
                 {editItem ? 'Edit Schedule Item' : 'Schedule Item Details'}
@@ -426,7 +547,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
                   {COLORS.map(c => (
                     <button key={c.value} onClick={() => updateField('display_color', c.value)}
                       style={{ backgroundColor: c.value }}
-                      className={`w-7 h-7 rounded-full transition-transform ${form.display_color === c.value ? 'ring-2 ring-offset-1 ring-gray-400 scale-110' : 'hover:scale-105'}`}
+                      className={`w-8 h-8 rounded-full transition-transform ${form.display_color === c.value ? 'ring-2 ring-offset-1 ring-gray-400 scale-110' : 'hover:scale-105'}`}
                       title={c.label} />
                   ))}
                 </div>
@@ -439,8 +560,8 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
                   placeholder="e.g. Mike, Sarah" className="input text-sm w-full" />
               </div>
 
-              {/* Start / Work Days / End */}
-              <div className="grid grid-cols-3 gap-2">
+              {/* Start / Work Days / End — stacked on very small screens */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Start Date</label>
                   <input type="date" value={form.start_date} onChange={e => updateField('start_date', e.target.value)} className="input text-sm w-full" />
@@ -479,20 +600,20 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Notes</label>
                 <textarea value={form.notes} onChange={e => updateField('notes', e.target.value)}
-                  rows={2} placeholder="Optional notes…" className="input text-sm w-full resize-none" />
+                  rows={3} placeholder="Optional notes…" className="input text-sm w-full resize-none" />
               </div>
             </div>
 
             <div className="px-5 pb-5 flex items-center gap-2">
               <button onClick={saveItem} disabled={saving || !form.title.trim()}
-                className="flex-1 btn-primary text-sm py-2 disabled:opacity-50">
+                className="flex-1 btn-primary text-sm py-2.5 disabled:opacity-50">
                 {saving ? 'Saving…' : editItem ? 'Update' : 'Save'}
               </button>
-              <button onClick={closeModal} className="px-4 py-2 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">
+              <button onClick={closeModal} className="px-4 py-2.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">
                 Cancel
               </button>
               {editItem && (
-                <button onClick={deleteItem} className="px-3 py-2 text-sm rounded-lg border border-red-100 text-red-400 hover:bg-red-50 hover:text-red-600">
+                <button onClick={deleteItem} className="px-3 py-2.5 text-sm rounded-lg border border-red-100 text-red-400 hover:bg-red-50 hover:text-red-600">
                   Delete
                 </button>
               )}
@@ -506,7 +627,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
 
 function ModalOverlay({ children, onClose }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-0 sm:px-4"
       onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
       {children}
     </div>
