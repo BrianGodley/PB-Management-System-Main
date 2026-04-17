@@ -520,9 +520,9 @@ export default function SubsVendors() {
                   >
                     Company Name {sortDir === 'asc' ? '↑' : '↓'}
                   </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Primary Contact</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Divisions</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Primary Contact</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Liability Exp.</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">W/C Exp.</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Cell</th>
@@ -553,6 +553,7 @@ export default function SubsVendors() {
                           {sub.company_name}
                         </button>
                       </td>
+                      <td className="px-4 py-3 text-gray-700">{sub.primary_contact || <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-3 text-gray-600 max-w-[200px]">
                         <span className="truncate block">{(sub.divisions || []).join(', ') || <span className="text-gray-300 italic">—</span>}</span>
                       </td>
@@ -561,7 +562,6 @@ export default function SubsVendors() {
                           {st.label}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-gray-700">{sub.primary_contact || <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-3">
                         <span className={`text-xs font-medium ${liabExp ? 'text-red-600' : liabSoon ? 'text-orange-500' : 'text-gray-600'}`}>
                           {fmtDate(sub.liability_exp)}
