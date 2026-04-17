@@ -50,7 +50,7 @@ const EMPTY_FORM = {
   company_name: '', divisions: [], status: 'no_email',
   primary_contact: '', email: '', cell: '', phone: '',
   trade_agreement_status: '', liability_exp: '', workers_comp_exp: '', notes: '',
-  phone_ext: '', price_list: '',
+  phone_ext: '', price_list: '', services_pricing: '',
 }
 
 // ── Main Page ────────────────────────────────────────────────
@@ -115,6 +115,7 @@ export default function SubsVendors() {
       notes:                  sub.notes || '',
       phone_ext:              sub.phone_ext || '',
       price_list:             sub.price_list || '',
+      services_pricing:       sub.services_pricing || '',
     })
     setError('')
     setShowModal(true)
@@ -150,6 +151,7 @@ export default function SubsVendors() {
       notes:                  form.notes.trim() || null,
       phone_ext:              form.phone_ext.trim() || null,
       price_list:             form.price_list.trim() || null,
+      services_pricing:       form.services_pricing.trim() || null,
       updated_at:             new Date().toISOString(),
     }
     const { error } = editSub
@@ -522,8 +524,7 @@ export default function SubsVendors() {
                 <col style={{ width: '22%'   }} />  {/* company name */}
                 <col style={{ width: '15%'   }} />  {/* primary contact */}
                 <col style={{ width: '20%'   }} />  {/* trades / materials */}
-                {typeView === 'sub' && <col style={{ width: '110px' }} />}  {/* liability exp */}
-                {typeView === 'sub' && <col style={{ width: '110px' }} />}  {/* w/c exp */}
+                {typeView === 'sub' && <col style={{ width: '150px' }} />}   {/* services pricing */}
                 {typeView === 'vendor' && <col style={{ width: '150px' }} />}  {/* price list */}
                 <col style={{ width: '120px' }} />  {/* cell */}
                 <col style={{ width: '120px' }} />  {/* phone */}
@@ -545,8 +546,7 @@ export default function SubsVendors() {
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Primary Contact</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{typeView === 'sub' ? 'Trades' : 'Materials'}</th>
-                  {typeView === 'sub' && <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Liability Exp.</th>}
-                  {typeView === 'sub' && <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">W/C Exp.</th>}
+                  {typeView === 'sub' && <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Services Pricing</th>}
                   {typeView === 'vendor' && <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Price List</th>}
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Cell</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Phone</th>
@@ -578,16 +578,7 @@ export default function SubsVendors() {
                       </td>
                       <td className="px-4 py-3 text-gray-700 truncate">{sub.primary_contact || <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-3 text-gray-600 truncate">{(sub.divisions || []).join(', ') || <span className="text-gray-300 italic">—</span>}</td>
-                      {typeView === 'sub' && <td className="px-4 py-3">
-                        <span className={`text-xs font-medium ${liabExp ? 'text-red-600' : liabSoon ? 'text-orange-500' : 'text-gray-600'}`}>
-                          {fmtDate(sub.liability_exp)}
-                        </span>
-                      </td>}
-                      {typeView === 'sub' && <td className="px-4 py-3">
-                        <span className={`text-xs font-medium ${wcExp ? 'text-red-600' : wcSoon ? 'text-orange-500' : 'text-gray-600'}`}>
-                          {fmtDate(sub.workers_comp_exp)}
-                        </span>
-                      </td>}
+                      {typeView === 'sub' && <td className="px-4 py-3 text-gray-600 truncate">{sub.services_pricing || <span className="text-gray-300">—</span>}</td>}
                       {typeView === 'vendor' && <td className="px-4 py-3 text-gray-600 truncate">{sub.price_list || <span className="text-gray-300">—</span>}</td>}
                       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{sub.cell || <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{sub.phone || <span className="text-gray-300">—</span>}</td>
@@ -1016,6 +1007,17 @@ function SubModal({ form, setForm, isEdit, onSave, onClose, onDelete, saving, er
               onChange={e => setForm(f => ({ ...f, trade_agreement_status: e.target.value }))}
               placeholder="e.g. Signed, Pending, Not required" className="input text-sm w-full" />
           </div>
+
+          {/* Services Pricing (subs only) */}
+          {recordType === 'sub' && (
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Services Pricing</label>
+              <input type="text" value={form.services_pricing}
+                onChange={e => setForm(f => ({ ...f, services_pricing: e.target.value }))}
+                placeholder="e.g. T&M, fixed bid, schedule on file"
+                className="input text-sm w-full" />
+            </div>
+          )}
 
           {/* Price List (vendors only) */}
           {recordType === 'vendor' && (
