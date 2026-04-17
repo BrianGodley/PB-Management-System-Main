@@ -83,19 +83,30 @@ function CellInput({ value, onSave, placeholder='' }) {
   )
 }
 
-function TextCell({ value, onSave, placeholder='', bold=false }) {
+function TextCell({ value, onSave, placeholder='', bold=false, onDelete=null }) {
   const [local, setLocal] = useState(value ?? '')
+  const [focused, setFocused] = useState(false)
   useEffect(() => setLocal(value ?? ''), [value])
   return (
-    <input
-      type="text"
-      value={local}
-      onChange={e => setLocal(e.target.value)}
-      onBlur={() => { if (local !== (value ?? '')) onSave(local) }}
-      onKeyDown={e => { if (e.key==='Enter') e.target.blur() }}
-      placeholder={placeholder}
-      className={`w-full bg-transparent text-xs px-1 py-0.5 focus:outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-300 rounded ${bold ? 'font-medium text-gray-800' : 'text-gray-600'}`}
-    />
+    <div className="relative flex items-center">
+      <input
+        type="text"
+        value={local}
+        onChange={e => setLocal(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => { setFocused(false); if (local !== (value ?? '')) onSave(local) }}
+        onKeyDown={e => { if (e.key==='Enter') e.target.blur() }}
+        placeholder={placeholder}
+        className={`w-full bg-transparent text-xs px-1 py-0.5 focus:outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-300 rounded ${bold ? 'font-medium text-gray-800' : 'text-gray-600'} ${onDelete && focused ? 'pr-5' : ''}`}
+      />
+      {onDelete && focused && (
+        <button
+          onMouseDown={e => { e.preventDefault(); onDelete() }}
+          className="absolute right-0.5 text-red-400 hover:text-red-600 text-[10px] leading-none px-0.5"
+          title="Delete row"
+        >✕</button>
+      )}
+    </div>
   )
 }
 
@@ -478,42 +489,49 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
             <>
               {manager && (
                 <tr key={'mgr-'+manager} className="bg-green-50">
-                  <td colSpan={14} className="px-3 py-0.5 flex items-center gap-1.5">
-                    <span className="text-green-700 text-[10px] font-bold">▸</span>
-                    {editingManager === manager ? (
-                      <>
-                        <input
-                          autoFocus
-                          value={editManagerVal}
-                          onChange={e => setEditManagerVal(e.target.value)}
-                          onBlur={() => {
-                            const v = editManagerVal.trim()
-                            if (v && v !== manager) mRows.forEach(r => onUpdate(r.id,'manager',v))
-                            setEditingManager(null)
-                          }}
-                          onKeyDown={e => {
-                            if (e.key==='Enter') e.target.blur()
-                            if (e.key==='Escape') setEditingManager(null)
-                          }}
-                          className="text-[11px] font-bold text-green-800 uppercase tracking-wider bg-white border border-green-400 focus:border-green-600 focus:outline-none rounded px-1 py-0 w-40"
-                        />
-                        <button
-                          onMouseDown={e => e.preventDefault()}
-                          onClick={() => { if (window.confirm(`Delete entire "${manager}" group and all its rows?`)) { mRows.forEach(r => onDelete(r.id)); setEditingManager(null) } }}
-                          className="text-red-400 hover:text-red-600 text-[10px] ml-1 font-medium"
-                          title="Delete group"
-                        >🗑 Delete</button>
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-[11px] font-bold text-green-800 uppercase tracking-wider">{manager}</span>
-                        <button
-                          onClick={() => { setEditingManager(manager); setEditManagerVal(manager) }}
-                          className="text-green-400 hover:text-green-700 ml-0.5 text-[11px] leading-none"
-                          title="Edit group name"
-                        >✏</button>
-                      </>
-                    )}
+                  <td colSpan={14} className="px-3 py-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-green-700 text-[10px] font-bold">▸</span>
+                      {editingManager === manager ? (
+                        <>
+                          <input
+                            autoFocus
+                            value={editManagerVal}
+                            onChange={e => setEditManagerVal(e.target.value)}
+                            onBlur={() => {
+                              const v = editManagerVal.trim()
+                              if (v && v !== manager) mRows.forEach(r => onUpdate(r.id,'manager',v))
+                              setEditingManager(null)
+                            }}
+                            onKeyDown={e => {
+                              if (e.key==='Enter') e.target.blur()
+                              if (e.key==='Escape') setEditingManager(null)
+                            }}
+                            className="text-[11px] font-bold text-green-800 uppercase tracking-wider bg-white border border-green-400 focus:border-green-600 focus:outline-none rounded px-1 py-0 w-40"
+                          />
+                          <button
+                            onMouseDown={e => e.preventDefault()}
+                            onClick={() => { if (window.confirm(`Delete entire "${manager}" group and all its rows?`)) { mRows.forEach(r => onDelete(r.id)); setEditingManager(null) } }}
+                            className="text-red-400 hover:text-red-600 text-[10px] ml-1 font-medium"
+                            title="Delete group"
+                          >🗑 Delete</button>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-[11px] font-bold text-green-800 uppercase tracking-wider">{manager}</span>
+                          <button
+                            onClick={() => { setEditingManager(manager); setEditManagerVal(manager) }}
+                            className="text-green-400 hover:text-green-700 ml-0.5 text-[11px] leading-none"
+                            title="Edit group name"
+                          >✏</button>
+                        </>
+                      )}
+                    </div>
+                    <div className="mt-1">
+                      <button onClick={() => onAdd(section.key, manager)} className="text-[10px] text-green-700 hover:text-green-900 font-medium">
+                        + Add Row
+                      </button>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -522,7 +540,7 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
                 return (
                   <tr key={row.id} className="hover:bg-gray-50 group">
                     <td className="px-2 py-1 border-r border-gray-300 bg-gray-100">
-                      <TextCell value={row.client_name} onSave={v => onUpdate(row.id,'client_name',v)} placeholder="Client" bold />
+                      <TextCell value={row.client_name} onSave={v => onUpdate(row.id,'client_name',v)} placeholder="Client" bold onDelete={() => onDelete(row.id)} />
                     </td>
                     <td className="px-1 py-1">
                       <CellInput value={row.prev_delivered||''} onSave={v => onUpdate(row.id,'prev_delivered',v)} />
@@ -552,13 +570,6 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
                   </tr>
                 )
               })}
-              <tr key={'add-'+manager}>
-                <td colSpan={14} className="px-3 py-1 bg-gray-50/60">
-                  <button onClick={() => onAdd(section.key, manager||null)} className="text-xs text-green-700 hover:text-green-900 font-medium">
-                    + Add row{manager ? ` (${manager})` : ''}
-                  </button>
-                </td>
-              </tr>
             </>
           ))}
 
