@@ -520,7 +520,6 @@ export default function SubsVendors() {
                 <col style={{ width: '22%'   }} />  {/* company name */}
                 <col style={{ width: '15%'   }} />  {/* primary contact */}
                 <col style={{ width: '20%'   }} />  {/* trades / materials */}
-                <col style={{ width: '120px' }} />  {/* status */}
                 <col style={{ width: '110px' }} />  {/* liability exp */}
                 <col style={{ width: '110px' }} />  {/* w/c exp */}
                 <col style={{ width: '120px' }} />  {/* cell */}
@@ -543,7 +542,6 @@ export default function SubsVendors() {
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Primary Contact</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{typeView === 'sub' ? 'Trades' : 'Materials'}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Liability Exp.</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">W/C Exp.</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Cell</th>
@@ -576,11 +574,6 @@ export default function SubsVendors() {
                       </td>
                       <td className="px-4 py-3 text-gray-700 truncate">{sub.primary_contact || <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-3 text-gray-600 truncate">{(sub.divisions || []).join(', ') || <span className="text-gray-300 italic">—</span>}</td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${st.cls}`}>
-                          {st.label}
-                        </span>
-                      </td>
                       <td className="px-4 py-3">
                         <span className={`text-xs font-medium ${liabExp ? 'text-red-600' : liabSoon ? 'text-orange-500' : 'text-gray-600'}`}>
                           {fmtDate(sub.liability_exp)}
