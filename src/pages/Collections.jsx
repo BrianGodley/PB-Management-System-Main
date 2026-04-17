@@ -63,13 +63,19 @@ function nextWeekEnd(weekEndingDay) {
 // ── Inline cell components ────────────────────────────────────────────────────
 function CellInput({ value, onSave, placeholder='' }) {
   const [local, setLocal] = useState(value ?? '')
+  const [focused, setFocused] = useState(false)
   useEffect(() => setLocal(value ?? ''), [value])
+  const display = !focused && local !== '' && local !== 0 && local !== '0'
+    ? `$${parseFloat(local).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 })}`
+    : local
   return (
     <input
-      type="number" step="0.01"
-      value={local}
+      type={focused ? 'number' : 'text'}
+      step="0.01"
+      value={display}
       onChange={e => setLocal(e.target.value)}
-      onBlur={() => { if (String(local) !== String(value ?? '')) onSave(local) }}
+      onFocus={() => setFocused(true)}
+      onBlur={() => { setFocused(false); if (String(local) !== String(value ?? '')) onSave(local) }}
       onKeyDown={e => { if (e.key==='Enter') e.target.blur() }}
       placeholder={placeholder}
       className="w-full bg-transparent text-right text-xs px-1 py-0.5 focus:outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-300 rounded"
@@ -429,23 +435,23 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
         <thead className="sticky top-0 z-10">
           {/* Day header row */}
           <tr className="bg-gray-50 border-b border-gray-200">
-            <th rowSpan={2} className="px-3 py-2 text-left font-semibold text-gray-700 border-r border-gray-200">Client</th>
-            <th rowSpan={2} className="px-2 py-2 text-right font-semibold text-gray-500 text-[11px]">{section.prevLabel}</th>
-            <th rowSpan={2} className="px-2 py-2 text-right font-semibold text-gray-500 text-[11px] border-r border-gray-200">{section.balLabel}</th>
+            <th rowSpan={2} className="px-3 py-2 text-center font-semibold text-gray-700 border-r border-gray-300">Client</th>
+            <th rowSpan={2} className="px-2 py-2 text-center font-semibold text-gray-600 text-[11px]">Previously<br/>Delivered</th>
+            <th rowSpan={2} className="px-2 py-2 text-center font-semibold text-gray-600 text-[11px] border-r border-gray-300">{section.balLabel}</th>
             {DAYS.map(d => (
-              <th key={d} colSpan={2} className="px-2 py-1.5 text-center font-semibold text-gray-600 border-l border-r border-gray-300 text-[11px] bg-gray-100">
+              <th key={d} colSpan={2} className="px-2 py-1.5 text-center font-extrabold text-gray-700 border-l border-r border-gray-400 text-[11px] bg-gray-200">
                 {DAY_LABELS[d]}
               </th>
             ))}
-            <th rowSpan={2} className="px-2 py-2 text-right font-bold text-gray-700 border-l border-gray-200 text-[11px]">{section.endLabel}</th>
-            <th rowSpan={2} className="px-2 py-2 text-left font-semibold text-gray-500 text-[11px] border-l border-gray-200">Notes</th>
+            <th rowSpan={2} className="px-2 py-2 text-center font-bold text-gray-700 border-l border-gray-300 text-[11px]">{section.endLabel}</th>
+            <th rowSpan={2} className="px-2 py-2 text-left font-semibold text-gray-500 text-[11px] border-l border-gray-300">Notes</th>
             <th rowSpan={2} />
           </tr>
-          <tr className="bg-gray-100 border-b border-gray-200">
+          <tr className="bg-gray-100 border-b border-gray-300">
             {DAYS.map(d => (
               <>
-                <th key={d+'i'} className="px-2 py-1 text-right text-gray-600 font-semibold text-[10px] border-l border-gray-300">Invoice</th>
-                <th key={d+'d'} className="px-2 py-1 text-right text-gray-600 font-semibold text-[10px] border-r border-gray-300">Deposit</th>
+                <th key={d+'i'} className="px-2 py-1 text-center text-gray-600 font-semibold text-[10px] border-l border-gray-400">Invoice</th>
+                <th key={d+'d'} className="px-2 py-1 text-center text-gray-600 font-semibold text-[10px] border-l border-r border-gray-400">Deposit</th>
               </>
             ))}
           </tr>
@@ -471,21 +477,21 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
                 const end = calcEnd(row)
                 return (
                   <tr key={row.id} className="hover:bg-gray-50 group">
-                    <td className="px-2 py-1 border-r border-gray-100">
+                    <td className="px-2 py-1 border-r border-gray-300 bg-gray-100">
                       <TextCell value={row.client_name} onSave={v => onUpdate(row.id,'client_name',v)} placeholder="Client" bold />
                     </td>
                     <td className="px-1 py-1">
                       <CellInput value={row.prev_delivered||''} onSave={v => onUpdate(row.id,'prev_delivered',v)} />
                     </td>
-                    <td className="px-1 py-1 border-r border-gray-100">
+                    <td className="px-1 py-1 border-r border-gray-300">
                       <CellInput value={row.starting_balance||''} onSave={v => onUpdate(row.id,'starting_balance',v)} />
                     </td>
                     {DAYS.map(d => (
                       <>
-                        <td key={d+'i'} className="px-1 py-1 border-l border-gray-200">
+                        <td key={d+'i'} className="px-1 py-1 border-l border-gray-400">
                           <CellInput value={row[`${d}_inv`]||''} onSave={v => onUpdate(row.id,`${d}_inv`,v)} />
                         </td>
-                        <td key={d+'d'} className="px-1 py-1 border-r border-gray-200">
+                        <td key={d+'d'} className="px-1 py-1 border-l border-r border-gray-400">
                           <CellInput value={row[`${d}_dep`]||''} onSave={v => onUpdate(row.id,`${d}_dep`,v)} />
                         </td>
                       </>
