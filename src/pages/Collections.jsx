@@ -444,8 +444,8 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
           <tr className="bg-gray-100 border-b border-gray-200">
             {DAYS.map(d => (
               <>
-                <th key={d+'i'} className="px-2 py-1 text-right text-gray-400 font-medium text-[10px] border-l border-gray-300">Inv.</th>
-                <th key={d+'d'} className="px-2 py-1 text-right text-gray-400 font-medium text-[10px] border-r border-gray-300">Dep.</th>
+                <th key={d+'i'} className="px-2 py-1 text-right text-gray-600 font-semibold text-[10px] border-l border-gray-300">Invoice</th>
+                <th key={d+'d'} className="px-2 py-1 text-right text-gray-600 font-semibold text-[10px] border-r border-gray-300">Deposit</th>
               </>
             ))}
           </tr>
