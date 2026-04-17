@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import ScheduleCalendar from '../components/ScheduleCalendar'
 import DailyLogs from '../components/DailyLogs'
+import TimeClock from '../components/TimeClock'
 
 function lastName(name = '') {
   const t = name.trim()
@@ -74,8 +75,9 @@ export default function JobsList() {
     { key: 'daily-logs', label: 'Daily Logs'},
     { key: 'tasks',      label: 'Tasks'     },
     { key: 'files',      label: 'Files'     },
-    { key: 'tracking',   label: 'Tracking'  },
-    { key: 'templates',  label: 'Templates' },
+    { key: 'tracking',   label: 'Tracking'   },
+    { key: 'timeclock',  label: 'Time Clock' },
+    { key: 'templates',  label: 'Templates'  },
   ]
 
   return (
@@ -228,6 +230,12 @@ export default function JobsList() {
           )}
           {tab === 'tasks'      && <ComingSoon label="Tasks" />}
           {tab === 'files'      && <ComingSoon label="Files" />}
+          {tab === 'timeclock'  && (
+            <TimeClock
+              jobs={jobs}
+              selectedJob={selectedJob === ALL_JOBS ? 'all' : selectedJob}
+            />
+          )}
           {tab === 'templates'  && <ComingSoon label="Templates" />}
           {tab === 'tracking'   && (
             selectedJobObj ? (
