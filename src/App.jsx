@@ -17,6 +17,7 @@ import EstimateDetail from './pages/EstimateDetail'
 import MasterRates from './pages/MasterRates'
 import Statistics from './pages/Statistics'
 import Profile from './pages/Profile'
+import SubsVendors from './pages/SubsVendors'
 
 function PortalPlaceholder({ label, icon }) {
   return (
@@ -69,7 +70,7 @@ function AppRoutes() {
         <Route path="statistics" element={<Statistics />} />
         <Route path="profile" element={<Profile />} />
         <Route path="portal/internal" element={<PortalPlaceholder label="Internal Users" icon="👥" />} />
-        <Route path="portal/subs" element={<PortalPlaceholder label="Subs & Vendors" icon="🔧" />} />
+        <Route path="portal/subs" element={<SubsVendors />} />
       </Route>
     </Routes>
   )
