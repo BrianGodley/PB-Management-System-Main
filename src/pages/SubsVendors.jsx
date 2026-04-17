@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import * as XLSX from 'xlsx'
 
 // ── Constants ────────────────────────────────────────────────
 const DIVISION_OPTIONS = [
@@ -148,127 +149,93 @@ export default function SubsVendors() {
   }
 
   // ── Export ─────────────────────────────────────────────────
-  function exportCSV() {
-    const headers = [
-      'Company Name', 'Divisions', 'Status', 'Primary Contact',
-      'Email', 'Cell', 'Phone', 'Trade Agreement Status',
-      'Liability Exp Date', 'Workers Comp Exp Date', 'Notes',
+  function exportXLSX() {
+    const data = filtered.map(s => ({
+      'Company Name':            s.company_name || '',
+      'Divisions':               (s.divisions || []).join(' | '),
+      'Status':                  statusInfo(s.status).label,
+      'Primary Contact':         s.primary_contact || '',
+      'Email':                   s.email || '',
+      'Cell':                    s.cell || '',
+      'Phone':                   s.phone || '',
+      'Trade Agreement Status':  s.trade_agreement_status || '',
+      'Liability Exp Date':      s.liability_exp || '',
+      'Workers Comp Exp Date':   s.workers_comp_exp || '',
+      'Notes':                   s.notes || '',
+    }))
+
+    const ws = XLSX.utils.json_to_sheet(data)
+
+    // Column widths
+    ws['!cols'] = [
+      { wch: 35 }, { wch: 30 }, { wch: 16 }, { wch: 22 },
+      { wch: 28 }, { wch: 16 }, { wch: 16 }, { wch: 22 },
+      { wch: 18 }, { wch: 22 }, { wch: 35 },
     ]
-    const escape = v => {
-      if (v == null || v === '') return ''
-      const s = String(v)
-      return s.includes(',') || s.includes('"') || s.includes('\n')
-        ? `"${s.replace(/"/g, '""')}"` : s
-    }
-    const rows = [
-      headers.join(','),
-      ...filtered.map(s => [
-        escape(s.company_name),
-        escape((s.divisions || []).join('|')),
-        escape(s.status),
-        escape(s.primary_contact),
-        escape(s.email),
-        escape(s.cell),
-        escape(s.phone),
-        escape(s.trade_agreement_status),
-        escape(s.liability_exp),
-        escape(s.workers_comp_exp),
-        escape(s.notes),
-      ].join(',')),
-    ]
-    const blob = new Blob([rows.join('\n')], { type: 'text/csv' })
-    const url  = URL.createObjectURL(blob)
-    const a    = document.createElement('a')
-    a.href     = url
-    a.download = `subs-vendors-${new Date().toISOString().split('T')[0]}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Subs & Vendors')
+    XLSX.writeFile(wb, `subs-vendors-${new Date().toISOString().split('T')[0]}.xlsx`)
   }
 
   // ── Import ─────────────────────────────────────────────────
-  function parseCSV(text) {
-    const lines = text.trim().split('\n')
-    if (lines.length < 2) return []
-
-    // Parse a single CSV line respecting quoted fields
-    function parseLine(line) {
-      const fields = []
-      let cur = '', inQuote = false
-      for (let i = 0; i < line.length; i++) {
-        const ch = line[i]
-        if (ch === '"') {
-          if (inQuote && line[i + 1] === '"') { cur += '"'; i++ }
-          else inQuote = !inQuote
-        } else if (ch === ',' && !inQuote) {
-          fields.push(cur.trim()); cur = ''
-        } else {
-          cur += ch
-        }
+  function mapXLSXRow(row, i) {
+    // Flexible column name matching
+    const get = (...keys) => {
+      for (const key of keys) {
+        const found = Object.keys(row).find(k => k.toLowerCase().trim() === key.toLowerCase())
+        if (found && row[found] !== undefined && row[found] !== '') return String(row[found]).trim()
       }
-      fields.push(cur.trim())
-      return fields
+      return ''
     }
 
-    const headers = parseLine(lines[0]).map(h => h.toLowerCase().trim())
+    const company = get('Company Name', 'Company', 'Name')
+    if (!company) return null
 
-    // Flexible column mapping
-    const col = name => {
-      const aliases = {
-        company_name:           ['company name', 'company', 'name'],
-        divisions:              ['divisions', 'division', 'trade', 'trades'],
-        status:                 ['status'],
-        primary_contact:        ['primary contact', 'contact', 'contact name'],
-        email:                  ['email', 'e-mail'],
-        cell:                   ['cell', 'mobile', 'cell phone'],
-        phone:                  ['phone', 'phone number', 'office phone'],
-        trade_agreement_status: ['trade agreement status', 'trade agreement'],
-        liability_exp:          ['liability exp date', 'liability exp', 'liability expiration'],
-        workers_comp_exp:       ['workers comp exp date', "worker's comp exp date", 'workers comp exp', 'workers comp'],
-        notes:                  ['notes', 'note'],
+    // Divisions — pipe, semicolon, or comma separated
+    const rawDivs = get('Divisions', 'Division', 'Trade', 'Trades')
+    const divisions = rawDivs
+      ? rawDivs.split(/[|;,]/).map(d => d.trim()).filter(Boolean)
+      : []
+
+    // Normalize status value
+    const rawStatus = get('Status').toLowerCase()
+    const status = STATUS_OPTIONS.find(s =>
+      rawStatus.includes(s.value.replace('_', '')) || rawStatus.includes(s.label.toLowerCase())
+    )?.value || 'no_email'
+
+    // Parse dates — handle Excel serial numbers and string dates
+    const parseDate = val => {
+      if (!val) return null
+      if (typeof val === 'number') {
+        // Excel serial date
+        const d = XLSX.SSF.parse_date_code(val)
+        return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`
       }
-      const list = aliases[name] || [name]
-      for (const alias of list) {
-        const idx = headers.indexOf(alias)
-        if (idx !== -1) return idx
-      }
-      return -1
+      const s = String(val).trim()
+      if (!s) return null
+      // Try ISO format first
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+      // Try M/D/YYYY or similar
+      const d = new Date(s)
+      if (!isNaN(d)) return d.toISOString().split('T')[0]
+      return null
     }
 
-    const get = (fields, name) => {
-      const idx = col(name)
-      return idx >= 0 ? (fields[idx] || '').trim() : ''
+    return {
+      _row: i + 2,
+      company_name:           company,
+      divisions,
+      status,
+      primary_contact:        get('Primary Contact', 'Contact', 'Contact Name') || null,
+      email:                  get('Email', 'E-mail') || null,
+      cell:                   get('Cell', 'Mobile', 'Cell Phone') || null,
+      phone:                  get('Phone', 'Phone Number', 'Office Phone') || null,
+      trade_agreement_status: get('Trade Agreement Status', 'Trade Agreement') || null,
+      liability_exp:          parseDate(row['Liability Exp Date'] ?? row['Liability Exp'] ?? row['Liability Expiration']) || null,
+      workers_comp_exp:       parseDate(row["Workers Comp Exp Date"] ?? row["Worker's Comp Exp Date"] ?? row['Workers Comp Exp']) || null,
+      notes:                  get('Notes', 'Note') || null,
     }
-
-    return lines.slice(1).filter(l => l.trim()).map((line, i) => {
-      const f = parseLine(line)
-      const company = get(f, 'company_name')
-      if (!company) return null
-
-      // Parse divisions — pipe or semicolon separated
-      const rawDivs = get(f, 'divisions')
-      const divisions = rawDivs
-        ? rawDivs.split(/[|;]/).map(d => d.trim()).filter(Boolean)
-        : []
-
-      // Normalize status
-      const rawStatus = get(f, 'status').toLowerCase()
-      const status = ['no_email','ready','active','inactive'].find(s => rawStatus.includes(s.replace('_',''))) || 'no_email'
-
-      return {
-        _row: i + 2,
-        company_name:           company,
-        divisions,
-        status,
-        primary_contact:        get(f, 'primary_contact') || null,
-        email:                  get(f, 'email') || null,
-        cell:                   get(f, 'cell') || null,
-        phone:                  get(f, 'phone') || null,
-        trade_agreement_status: get(f, 'trade_agreement_status') || null,
-        liability_exp:          get(f, 'liability_exp') || null,
-        workers_comp_exp:       get(f, 'workers_comp_exp') || null,
-        notes:                  get(f, 'notes') || null,
-      }
-    }).filter(Boolean)
   }
 
   function handleImportFile(e) {
@@ -278,15 +245,20 @@ export default function SubsVendors() {
     const reader = new FileReader()
     reader.onload = ev => {
       try {
-        const rows = parseCSV(ev.target.result)
-        if (rows.length === 0) { setImportError('No valid rows found. Check your CSV format.'); return }
+        const wb   = XLSX.read(new Uint8Array(ev.target.result), { type: 'array', cellDates: false })
+        const ws   = wb.Sheets[wb.SheetNames[0]]
+        const json = XLSX.utils.sheet_to_json(ws, { defval: '' })
+        if (json.length === 0) { setImportError('No rows found in the file.'); return }
+        const rows = json.map((row, i) => mapXLSXRow(row, i)).filter(Boolean)
+        if (rows.length === 0) { setImportError('No valid rows found. Make sure the file has a "Company Name" column.'); return }
         setImportRows(rows)
         setShowImport(true)
       } catch (err) {
-        setImportError('Could not parse file. Make sure it is a valid CSV.')
+        console.error(err)
+        setImportError('Could not read file. Make sure it is a valid .xlsx file.')
       }
     }
-    reader.readAsText(file)
+    reader.readAsArrayBuffer(file)
     e.target.value = ''
   }
 
@@ -363,11 +335,11 @@ export default function SubsVendors() {
             </svg>
             Import
           </button>
-          <input ref={importFileRef} type="file" accept=".csv" className="hidden" onChange={handleImportFile} />
+          <input ref={importFileRef} type="file" accept=".xlsx" className="hidden" onChange={handleImportFile} />
 
           {/* Export */}
           <button
-            onClick={exportCSV}
+            onClick={exportXLSX}
             className="text-sm px-3 py-1.5 flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
