@@ -419,6 +419,8 @@ export default function Collections() {
 // ── Collection Table ──────────────────────────────────────────────────────────
 function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) {
   const [newManager, setNewManager] = useState('')
+  const [editingManager, setEditingManager] = useState(null)
+  const [editManagerVal, setEditManagerVal] = useState('')
 
   const grouped = {}
   const noManager = []
@@ -475,20 +477,43 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
           {allGroups.map(([manager, mRows]) => (
             <>
               {manager && (
-                <tr key={'mgr-'+manager} className="bg-green-50 group/mgr">
-                  <td colSpan={14} className="px-3 py-1 flex items-center gap-2">
-                    <span className="text-green-700 text-[11px] font-bold">▸</span>
-                    <input
-                      defaultValue={manager}
-                      onBlur={e => { const v = e.target.value.trim(); if (v && v !== manager) mRows.forEach(r => onUpdate(r.id,'manager',v)) }}
-                      onKeyDown={e => { if (e.key==='Enter') e.target.blur() }}
-                      className="text-[11px] font-bold text-green-800 uppercase tracking-wider bg-transparent border-b border-transparent hover:border-green-400 focus:border-green-600 focus:outline-none w-40"
-                    />
-                    <button
-                      onClick={() => { if (window.confirm(`Delete entire "${manager}" group and all its rows?`)) mRows.forEach(r => onDelete(r.id)) }}
-                      className="text-red-300 hover:text-red-600 text-xs opacity-0 group-hover/mgr:opacity-100 transition-opacity ml-1"
-                      title="Delete group"
-                    >✕ Delete Group</button>
+                <tr key={'mgr-'+manager} className="bg-green-50">
+                  <td colSpan={14} className="px-3 py-0.5 flex items-center gap-1.5">
+                    <span className="text-green-700 text-[10px] font-bold">▸</span>
+                    {editingManager === manager ? (
+                      <>
+                        <input
+                          autoFocus
+                          value={editManagerVal}
+                          onChange={e => setEditManagerVal(e.target.value)}
+                          onBlur={() => {
+                            const v = editManagerVal.trim()
+                            if (v && v !== manager) mRows.forEach(r => onUpdate(r.id,'manager',v))
+                            setEditingManager(null)
+                          }}
+                          onKeyDown={e => {
+                            if (e.key==='Enter') e.target.blur()
+                            if (e.key==='Escape') setEditingManager(null)
+                          }}
+                          className="text-[11px] font-bold text-green-800 uppercase tracking-wider bg-white border border-green-400 focus:border-green-600 focus:outline-none rounded px-1 py-0 w-40"
+                        />
+                        <button
+                          onMouseDown={e => e.preventDefault()}
+                          onClick={() => { if (window.confirm(`Delete entire "${manager}" group and all its rows?`)) { mRows.forEach(r => onDelete(r.id)); setEditingManager(null) } }}
+                          className="text-red-400 hover:text-red-600 text-[10px] ml-1 font-medium"
+                          title="Delete group"
+                        >🗑 Delete</button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-[11px] font-bold text-green-800 uppercase tracking-wider">{manager}</span>
+                        <button
+                          onClick={() => { setEditingManager(manager); setEditManagerVal(manager) }}
+                          className="text-green-400 hover:text-green-700 ml-0.5 text-[11px] leading-none"
+                          title="Edit group name"
+                        >✏</button>
+                      </>
+                    )}
                   </td>
                 </tr>
               )}
