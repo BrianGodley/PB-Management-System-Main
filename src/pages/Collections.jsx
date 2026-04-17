@@ -3,9 +3,9 @@ import { supabase } from '../lib/supabase'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const COLL_SECTIONS = [
-  { key:'current',   label:'Current Collections',   prevLabel:'Prev Delivered', balLabel:'Starting Balance', endLabel:'End Balance'  },
-  { key:'punchlist', label:'Punchlist Collections', prevLabel:'$ Delivered',    balLabel:'Open Balance',     endLabel:'Net Balance'  },
-  { key:'long_term', label:'Long-Term Collections', prevLabel:'$ Delivered',    balLabel:'Open Balance',     endLabel:'Net Balance'  },
+  { key:'current',   label:'Current Collections',   prevLabel:'Prev Delivered', balLabel:'Starting Balance', endLabel:'New Balance' },
+  { key:'punchlist', label:'Punchlist Collections', prevLabel:'$ Delivered',    balLabel:'Open Balance',     endLabel:'New Balance' },
+  { key:'long_term', label:'Long-Term Collections', prevLabel:'$ Delivered',    balLabel:'Open Balance',     endLabel:'New Balance' },
 ]
 const DAYS = ['mon','tue','wed','thu','fri']
 const DAY_LABELS = { mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday', fri:'Friday' }
@@ -576,7 +576,8 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
           {/* Subtotals */}
           <tr className="bg-amber-50 font-semibold border-t-2 border-amber-200">
             <td className="px-3 py-2 text-gray-700 text-[11px] font-bold">Subtotals</td>
-            <td /><td />
+            <td className="px-2 py-2 text-right text-gray-600 text-[11px]">{fmtC(rows.reduce((s,r) => s + (parseFloat(r.prev_delivered)||0), 0))}</td>
+            <td className="px-2 py-2 text-right text-gray-600 border-r border-amber-200 text-[11px]">{fmtC(rows.reduce((s,r) => s + (parseFloat(r.starting_balance)||0), 0))}</td>
             {DAYS.map(d => {
               const invS = rows.reduce((s,r) => s + (parseFloat(r[`${d}_inv`])||0), 0)
               const depS = rows.reduce((s,r) => s + (parseFloat(r[`${d}_dep`])||0), 0)
