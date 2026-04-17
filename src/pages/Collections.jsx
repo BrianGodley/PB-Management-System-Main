@@ -274,7 +274,7 @@ export default function Collections() {
         <div className="flex-1" />
         <button
           onClick={createWeek} disabled={creatingWeek}
-          className="text-sm px-3 py-1.5 rounded-lg bg-green-700 text-white font-medium hover:bg-green-800 disabled:opacity-50"
+          className="text-sm px-3 py-1.5 rounded-lg bg-green-700 text-white font-medium hover:bg-green-800 disabled:opacity-50 mr-16"
         >+ New Week</button>
       </div>
 
@@ -434,6 +434,22 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
           <col style={{ width:'32px'  }} />
         </colgroup>
         <thead className="sticky top-0 z-10">
+          {/* Subtotals row — above day names */}
+          <tr className="bg-amber-50 border-b border-amber-300">
+            <td colSpan={3} />
+            <td colSpan={2} className="border-l border-gray-400" />
+            <td colSpan={2} className="border-l border-gray-400" />
+            <td colSpan={2} className="border-l border-gray-400" />
+            <td colSpan={2} className="px-2 py-1 text-center border-l border-gray-400">
+              <span className="text-[10px] text-amber-800 font-bold">Subtotal Deposits</span>
+              <span className="text-[10px] text-amber-900 font-extrabold ml-1">{fmtC(summary.totDep)}</span>
+            </td>
+            <td colSpan={2} className="px-2 py-1 text-center border-l border-r border-gray-400">
+              <span className="text-[10px] text-amber-800 font-bold">Subtotal Invoices</span>
+              <span className="text-[10px] text-amber-900 font-extrabold ml-1">{fmtC(summary.totInv)}</span>
+            </td>
+            <td colSpan={3} />
+          </tr>
           {/* Day header row */}
           <tr className="bg-gray-50 border-b border-gray-200">
             <th rowSpan={2} className="px-3 py-2 text-center font-semibold text-gray-700 border-r border-gray-300">Client</th>
@@ -455,21 +471,6 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
                 <th key={d+'d'} className="px-2 py-1 text-center text-gray-600 font-semibold text-[10px] border-l border-r border-gray-400">Deposit</th>
               </>
             ))}
-          </tr>
-          <tr className="bg-amber-50 border-b-2 border-amber-300">
-            <td colSpan={3} />
-            <td colSpan={2} className="border-l border-gray-400" />
-            <td colSpan={2} className="border-l border-gray-400" />
-            <td colSpan={2} className="border-l border-gray-400" />
-            <td colSpan={2} className="px-2 py-1 text-center border-l border-gray-400">
-              <span className="text-[10px] text-amber-800 font-bold">Subtotal Deposits</span>
-              <span className="text-[10px] text-amber-900 font-extrabold ml-1">{fmtC(summary.totDep)}</span>
-            </td>
-            <td colSpan={2} className="px-2 py-1 text-center border-l border-r border-gray-400">
-              <span className="text-[10px] text-amber-800 font-bold">Subtotal Invoices</span>
-              <span className="text-[10px] text-amber-900 font-extrabold ml-1">{fmtC(summary.totInv)}</span>
-            </td>
-            <td colSpan={3} />
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100 bg-white">
