@@ -1039,57 +1039,6 @@ function CompanySettings({ currentUserIsAdmin }) {
         </div>
       </div>
 
-      {/* ── Week ending day ───────────────────────────────────────────────── */}
-      <div className="card">
-        <div className="flex items-start justify-between mb-1">
-          <h3 className="font-semibold text-gray-800">📅 Weekly Statistic — Week Ending Day</h3>
-          {weekEndingDay === null
-            ? <span className="text-xs font-semibold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Not configured</span>
-            : <span className="text-xs font-semibold bg-green-100 text-green-800 px-2 py-0.5 rounded-full">{WEEK_DAYS[weekEndingDay]?.label}</span>
-          }
-        </div>
-        <p className="text-sm text-gray-500 mb-4">
-          Sets the last day of each statistical week for all weekly tracking statistics.
-          All users share this setting. <strong>Required</strong> before anyone can enter values for a weekly statistic.
-        </p>
-
-        <div className="grid grid-cols-7 gap-1.5 mb-4">
-          {WEEK_DAYS.map(d => (
-            <button
-              key={d.value}
-              disabled={!currentUserIsAdmin}
-              onClick={() => setPendingDay(d.value)}
-              className={`py-2.5 rounded-xl text-xs font-bold border-2 transition-all ${
-                pendingDay === d.value
-                  ? 'text-white border-transparent'
-                  : currentUserIsAdmin
-                    ? 'border-gray-200 text-gray-600 hover:border-green-400 hover:text-green-700'
-                    : 'border-gray-100 text-gray-400 cursor-not-allowed'
-              }`}
-              style={pendingDay === d.value ? { backgroundColor: FG, borderColor: FG } : {}}
-            >
-              {d.short}
-            </button>
-          ))}
-        </div>
-
-        {dayMsg && <div className="mb-3"><Msg m={dayMsg} /></div>}
-
-        {currentUserIsAdmin && (
-          <button
-            onClick={saveWeekDay}
-            disabled={savingDay || pendingDay === null || pendingDay === weekEndingDay}
-            className="px-5 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-40"
-            style={{ backgroundColor: FG }}
-          >
-            {savingDay ? 'Saving…' : 'Save Setting'}
-          </button>
-        )}
-        {currentUserIsAdmin && pendingDay !== null && pendingDay === weekEndingDay && !dayMsg && (
-          <p className="text-xs text-gray-400 mt-2">No changes to save.</p>
-        )}
-      </div>
-
       {/* ── Company week ending day ──────────────────────────────────────── */}
       <div className="card">
         <div className="flex items-start justify-between mb-1">
