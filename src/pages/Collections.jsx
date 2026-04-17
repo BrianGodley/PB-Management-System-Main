@@ -39,20 +39,23 @@ function calcEnd(row) {
   return start + inv - dep
 }
 
-function prevMonday(fridayISO) {
-  const d = new Date(fridayISO + 'T12:00:00')
-  d.setDate(d.getDate() - 4)
+const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+
+// Returns the ISO date of the week-start (6 days before week-ending day)
+function prevWeekStart(weekEndISO, weekEndingDay) {
+  const d = new Date(weekEndISO + 'T12:00:00')
+  d.setDate(d.getDate() - 6)
   return d.toLocaleDateString('en-US', { month:'short', day:'numeric' })
 }
 
-function fmtFriday(fridayISO) {
-  const d = new Date(fridayISO + 'T12:00:00')
+function fmtWeekEnd(weekEndISO) {
+  const d = new Date(weekEndISO + 'T12:00:00')
   return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
 }
 
-function nextFriday() {
+function nextWeekEnd(weekEndingDay) {
   const d = new Date()
-  const diff = (5 - d.getDay() + 7) % 7 || 7
+  const diff = (weekEndingDay - d.getDay() + 7) % 7 || 7
   d.setDate(d.getDate() + diff)
   return d.toISOString().split('T')[0]
 }
@@ -92,21 +95,30 @@ function TextCell({ value, onSave, placeholder='', bold=false }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function Collections() {
-  const [weeks,        setWeeks]        = useState([])
-  const [weekIdx,      setWeekIdx]      = useState(0)
-  const [mainTab,      setMainTab]      = useState('collections')
-  const [collTab,      setCollTab]      = useState('current')
-  const [rows,         setRows]         = useState([])
-  const [payables,     setPayables]     = useState([])
-  const [financial,    setFinancial]    = useState([])
-  const [loading,      setLoading]      = useState(true)
-  const [creatingWeek, setCreatingWeek] = useState(false)
+  const [weeks,              setWeeks]              = useState([])
+  const [weekIdx,            setWeekIdx]            = useState(0)
+  const [mainTab,            setMainTab]            = useState('collections')
+  const [collTab,            setCollTab]            = useState('current')
+  const [rows,               setRows]               = useState([])
+  const [payables,           setPayables]           = useState([])
+  const [financial,          setFinancial]          = useState([])
+  const [loading,            setLoading]            = useState(true)
+  const [creatingWeek,       setCreatingWeek]       = useState(false)
+  const [companyWeekEndDay,  setCompanyWeekEndDay]  = useState(5) // default Friday
 
   const selectedWeek = weeks[weekIdx] || null
 
   useEffect(() => {
-    supabase.from('collection_weeks').select('*').order('week_ending', { ascending:false })
-      .then(({ data }) => { if (data) { setWeeks(data); setWeekIdx(0) }; setLoading(false) })
+    Promise.all([
+      supabase.from('collection_weeks').select('*').order('week_ending', { ascending:false }),
+      supabase.from('company_settings').select('company_week_ending_day').maybeSingle(),
+    ]).then(([weeksRes, settingsRes]) => {
+      if (weeksRes.data) { setWeeks(weeksRes.data); setWeekIdx(0) }
+      if (settingsRes.data?.company_week_ending_day != null) {
+        setCompanyWeekEndDay(settingsRes.data.company_week_ending_day)
+      }
+      setLoading(false)
+    })
   }, [])
 
   useEffect(() => {
@@ -125,7 +137,7 @@ export default function Collections() {
 
   async function createWeek() {
     setCreatingWeek(true)
-    const date = nextFriday()
+    const date = nextWeekEnd(companyWeekEndDay)
     const { data, error } = await supabase.from('collection_weeks').insert({ week_ending: date }).select().single()
     if (!error && data) { setWeeks(prev => [data, ...prev]); setWeekIdx(0) }
     setCreatingWeek(false)
@@ -244,7 +256,7 @@ export default function Collections() {
           >‹</button>
           <span className="text-sm font-semibold text-gray-700 px-2 min-w-[210px] text-center">
             {selectedWeek
-              ? `${prevMonday(selectedWeek.week_ending)} – ${fmtFriday(selectedWeek.week_ending)}`
+              ? `${prevWeekStart(selectedWeek.week_ending, companyWeekEndDay)} – ${fmtWeekEnd(selectedWeek.week_ending)}`
               : 'No weeks yet'}
           </span>
           <button

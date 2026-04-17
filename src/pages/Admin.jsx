@@ -854,11 +854,17 @@ function CompanySettings({ currentUserIsAdmin }) {
   const [savingCompany,  setSavingCompany]  = useState(false)
   const [companyMsg,     setCompanyMsg]     = useState('')
 
-  // ── Week ending day ───────────────────────────────────────────────────────
+  // ── Week ending day (Statistics) ─────────────────────────────────────────
   const [weekEndingDay, setWeekEndingDay] = useState(null)
   const [pendingDay,    setPendingDay]    = useState(null)
   const [savingDay,     setSavingDay]     = useState(false)
   const [dayMsg,        setDayMsg]        = useState('')
+
+  // ── Company week ending day (Finance) ─────────────────────────────────────
+  const [companyWeekDay,        setCompanyWeekDay]        = useState(null)
+  const [pendingCompanyWeekDay, setPendingCompanyWeekDay] = useState(null)
+  const [savingCompanyWeekDay,  setSavingCompanyWeekDay]  = useState(false)
+  const [companyWeekMsg,        setCompanyWeekMsg]        = useState('')
 
   useEffect(() => { loadSettings() }, [])
 
@@ -877,6 +883,9 @@ function CompanySettings({ currentUserIsAdmin }) {
       const val = data.week_ending_day ?? null
       setWeekEndingDay(val)
       setPendingDay(val)
+      const cwd = data.company_week_ending_day ?? 5
+      setCompanyWeekDay(cwd)
+      setPendingCompanyWeekDay(cwd)
     }
     setLoadingCompany(false)
   }
@@ -918,6 +927,24 @@ function CompanySettings({ currentUserIsAdmin }) {
     }
     setSavingDay(false)
     setTimeout(() => setDayMsg(''), 4000)
+  }
+
+  async function saveCompanyWeekDay() {
+    if (pendingCompanyWeekDay === null) return
+    setSavingCompanyWeekDay(true); setCompanyWeekMsg('')
+    const { data: existing } = await supabase.from('company_settings').select('id').maybeSingle()
+    const { error } = await supabase.from('company_settings').upsert(
+      { id: existing?.id || 1, company_week_ending_day: pendingCompanyWeekDay },
+      { onConflict: 'id' }
+    )
+    if (error) {
+      setCompanyWeekMsg('error:' + error.message)
+    } else {
+      setCompanyWeekDay(pendingCompanyWeekDay)
+      setCompanyWeekMsg('ok:Company week ending day saved.')
+    }
+    setSavingCompanyWeekDay(false)
+    setTimeout(() => setCompanyWeekMsg(''), 4000)
   }
 
   const Msg = ({ m }) => m ? (
@@ -1059,6 +1086,56 @@ function CompanySettings({ currentUserIsAdmin }) {
           </button>
         )}
         {currentUserIsAdmin && pendingDay !== null && pendingDay === weekEndingDay && !dayMsg && (
+          <p className="text-xs text-gray-400 mt-2">No changes to save.</p>
+        )}
+      </div>
+
+      {/* ── Company week ending day ──────────────────────────────────────── */}
+      <div className="card">
+        <div className="flex items-start justify-between mb-1">
+          <h3 className="font-semibold text-gray-800">📅 Company Week — Week Ending Day</h3>
+          {companyWeekDay === null
+            ? <span className="text-xs font-semibold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Not configured</span>
+            : <span className="text-xs font-semibold bg-green-100 text-green-800 px-2 py-0.5 rounded-full">{WEEK_DAYS[companyWeekDay]?.label}</span>
+          }
+        </div>
+        <p className="text-sm text-gray-500 mb-4">
+          Sets the last day of the company work week. Used by the Finance module to determine week-ending dates for collections and payables tracking.
+        </p>
+
+        <div className="grid grid-cols-7 gap-1.5 mb-4">
+          {WEEK_DAYS.map(d => (
+            <button
+              key={d.value}
+              disabled={!currentUserIsAdmin}
+              onClick={() => setPendingCompanyWeekDay(d.value)}
+              className={`py-2.5 rounded-xl text-xs font-bold border-2 transition-all ${
+                pendingCompanyWeekDay === d.value
+                  ? 'text-white border-transparent'
+                  : currentUserIsAdmin
+                    ? 'border-gray-200 text-gray-600 hover:border-green-400 hover:text-green-700'
+                    : 'border-gray-100 text-gray-400 cursor-not-allowed'
+              }`}
+              style={pendingCompanyWeekDay === d.value ? { backgroundColor: FG, borderColor: FG } : {}}
+            >
+              {d.short}
+            </button>
+          ))}
+        </div>
+
+        {companyWeekMsg && <div className="mb-3"><Msg m={companyWeekMsg} /></div>}
+
+        {currentUserIsAdmin && (
+          <button
+            onClick={saveCompanyWeekDay}
+            disabled={savingCompanyWeekDay || pendingCompanyWeekDay === null || pendingCompanyWeekDay === companyWeekDay}
+            className="px-5 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-40"
+            style={{ backgroundColor: FG }}
+          >
+            {savingCompanyWeekDay ? 'Saving…' : 'Save Setting'}
+          </button>
+        )}
+        {currentUserIsAdmin && pendingCompanyWeekDay !== null && pendingCompanyWeekDay === companyWeekDay && !companyWeekMsg && (
           <p className="text-xs text-gray-400 mt-2">No changes to save.</p>
         )}
       </div>
