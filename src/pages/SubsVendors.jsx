@@ -505,10 +505,22 @@ export default function SubsVendors() {
         <>
           {/* ── Desktop table ─────────────────────────────────── */}
           <div className="hidden lg:block overflow-auto rounded-xl border border-gray-200 shadow-sm flex-1">
-            <table className="w-full text-sm min-w-[900px]">
+            <table className="w-full text-sm min-w-[960px] table-fixed">
+              <colgroup>
+                <col style={{ width: '36px'  }} />  {/* checkbox */}
+                <col style={{ width: '22%'   }} />  {/* company name */}
+                <col style={{ width: '15%'   }} />  {/* primary contact */}
+                <col style={{ width: '20%'   }} />  {/* trades / materials */}
+                <col style={{ width: '120px' }} />  {/* status */}
+                <col style={{ width: '110px' }} />  {/* liability exp */}
+                <col style={{ width: '110px' }} />  {/* w/c exp */}
+                <col style={{ width: '120px' }} />  {/* cell */}
+                <col style={{ width: '120px' }} />  {/* phone */}
+                <col style={{ width: '44px'  }} />  {/* actions */}
+              </colgroup>
               <thead className="sticky top-0 z-10">
                 <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-3 py-3 w-8">
+                  <th className="px-3 py-3">
                     <input type="checkbox"
                       checked={selected.size === filtered.length && filtered.length > 0}
                       onChange={toggleAll}
@@ -527,7 +539,7 @@ export default function SubsVendors() {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">W/C Exp.</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Cell</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Phone</th>
-                  <th className="px-4 py-3 w-10" />
+                  <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 bg-white">
@@ -548,15 +560,13 @@ export default function SubsVendors() {
                       <td className="px-4 py-3">
                         <button
                           onClick={() => openEdit(sub)}
-                          className="text-blue-600 hover:text-blue-800 font-medium text-left hover:underline"
+                          className="text-blue-600 hover:text-blue-800 font-medium text-left hover:underline truncate block w-full"
                         >
                           {sub.company_name}
                         </button>
                       </td>
-                      <td className="px-4 py-3 text-gray-700">{sub.primary_contact || <span className="text-gray-300">—</span>}</td>
-                      <td className="px-4 py-3 text-gray-600 max-w-[200px]">
-                        <span className="truncate block">{(sub.divisions || []).join(', ') || <span className="text-gray-300 italic">—</span>}</span>
-                      </td>
+                      <td className="px-4 py-3 text-gray-700 truncate">{sub.primary_contact || <span className="text-gray-300">—</span>}</td>
+                      <td className="px-4 py-3 text-gray-600 truncate">{(sub.divisions || []).join(', ') || <span className="text-gray-300 italic">—</span>}</td>
                       <td className="px-4 py-3">
                         <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${st.cls}`}>
                           {st.label}
