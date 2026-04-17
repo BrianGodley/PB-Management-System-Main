@@ -50,6 +50,7 @@ const EMPTY_FORM = {
   company_name: '', divisions: [], status: 'no_email',
   primary_contact: '', email: '', cell: '', phone: '',
   trade_agreement_status: '', liability_exp: '', workers_comp_exp: '', notes: '',
+  phone_ext: '',
 }
 
 // ── Main Page ────────────────────────────────────────────────
@@ -112,6 +113,7 @@ export default function SubsVendors() {
       liability_exp:          sub.liability_exp || '',
       workers_comp_exp:       sub.workers_comp_exp || '',
       notes:                  sub.notes || '',
+      phone_ext:              sub.phone_ext || '',
     })
     setError('')
     setShowModal(true)
@@ -145,6 +147,7 @@ export default function SubsVendors() {
       liability_exp:          form.liability_exp || null,
       workers_comp_exp:       form.workers_comp_exp || null,
       notes:                  form.notes.trim() || null,
+      phone_ext:              form.phone_ext.trim() || null,
       updated_at:             new Date().toISOString(),
     }
     const { error } = editSub
@@ -975,9 +978,17 @@ function SubModal({ form, setForm, isEdit, onSave, onClose, onDelete, saving, er
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Phone</label>
-              <input type="tel" value={form.phone}
-                onChange={e => setForm(f => ({ ...f, phone: formatPhone(e.target.value) }))}
-                placeholder="(818) 555-0000" className="input text-sm w-full" maxLength={14} />
+              <div className="flex gap-2">
+                <input type="tel" value={form.phone}
+                  onChange={e => setForm(f => ({ ...f, phone: formatPhone(e.target.value) }))}
+                  placeholder="(818) 555-0000" className="input text-sm flex-1" maxLength={14} />
+                <div className="flex flex-col gap-0.5">
+                  <label className="text-[10px] text-gray-400">Ext.</label>
+                  <input type="text" value={form.phone_ext}
+                    onChange={e => setForm(f => ({ ...f, phone_ext: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
+                    placeholder="1234" className="input text-sm w-16 text-center" maxLength={6} />
+                </div>
+              </div>
             </div>
           </div>
 
