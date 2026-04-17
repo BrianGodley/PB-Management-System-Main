@@ -210,17 +210,43 @@ export default function SubsVendors() {
   // Auto-guess column mappings from header names
   function autoMap(headers) {
     const aliases = {
-      company_name:           ['company name','company','name','vendor name','sub name'],
-      divisions:              ['divisions','division','trade','trades','specialty','specialties'],
-      status:                 ['status','active status'],
-      primary_contact:        ['primary contact','contact','contact name','rep','representative'],
-      email:                  ['email','e-mail','email address'],
-      cell:                   ['cell','mobile','cell phone','mobile phone','cell #'],
-      phone:                  ['phone','phone number','office phone','telephone','phone #'],
-      trade_agreement_status: ['trade agreement status','trade agreement','agreement status','agreement'],
-      liability_exp:          ['liability exp date','liability exp','liability expiration','liability ins exp','liability insurance expiration'],
-      workers_comp_exp:       ["workers comp exp date","worker's comp exp date",'workers comp exp','workers comp','wc exp',"worker's comp"],
-      notes:                  ['notes','note','comments','comment','remarks'],
+      company_name: [
+        'company name','company','name','vendor name','sub name','business name',
+        'firm name','contractor name','vendor','sub','supplier name','supplier',
+      ],
+      divisions: [
+        'divisions','division','trade','trades','specialty','specialties',
+        'scope','scope of work','type','category','categories','service','services',
+      ],
+      status: ['status','active status','active','standing'],
+      primary_contact: [
+        'primary contact','contact','contact name','rep','representative',
+        'contact person','point of contact','poc','owner','manager',
+      ],
+      email: ['email','e-mail','email address','contact email','e mail'],
+      cell: [
+        'cell','mobile','cell phone','mobile phone','cell #','cell number',
+        'mobile number','mobile #','cellular',
+      ],
+      phone: [
+        'phone','phone number','office phone','telephone','phone #','tel',
+        'office','work phone','office number','main phone','direct',
+      ],
+      trade_agreement_status: [
+        'trade agreement status','trade agreement','agreement status','agreement',
+        'contract status','contract','signed','ta status',
+      ],
+      liability_exp: [
+        'liability exp date','liability exp','liability expiration','liability ins exp',
+        'liability insurance expiration','liability insurance exp','general liability exp',
+        'gl exp','gl expiration','liability','ins exp','insurance exp',
+      ],
+      workers_comp_exp: [
+        'workers comp exp date',"worker's comp exp date",'workers comp exp','workers comp',
+        'wc exp',"worker's comp",'workers compensation exp','wc expiration',
+        "workers' comp exp",'workers comp expiration','wc exp date',
+      ],
+      notes: ['notes','note','comments','comment','remarks','memo','description','info'],
     }
     const mapping = {}
     for (const [field, aliasList] of Object.entries(aliases)) {
@@ -592,9 +618,16 @@ export default function SubsVendors() {
             </div>
 
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-1">
-              <p className="text-xs text-gray-400 mb-3">
-                Match your file's columns to the app fields. Columns we couldn't auto-detect are shown in yellow.
-              </p>
+              {/* Show detected headers so user can see what we found */}
+              <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2.5 mb-3">
+                <p className="text-xs font-semibold text-blue-700 mb-1">Columns found in your file:</p>
+                <div className="flex flex-wrap gap-1">
+                  {importHeaders.map(h => (
+                    <span key={h} className="text-[11px] bg-white border border-blue-200 text-blue-600 rounded px-1.5 py-0.5">{h}</span>
+                  ))}
+                </div>
+                <p className="text-[11px] text-blue-500 mt-2">Use the dropdowns below to match each app field to your file's column.</p>
+              </div>
               {[
                 { key: 'company_name',           label: 'Company Name',          required: true  },
                 { key: 'divisions',               label: 'Divisions'                              },
