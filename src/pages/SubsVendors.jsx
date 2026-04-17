@@ -818,6 +818,7 @@ export default function SubsVendors() {
           saving={saving}
           error={error}
           toggleDivision={toggleDivision}
+          recordType={form.type}
         />
       )}
     </div>
@@ -825,7 +826,7 @@ export default function SubsVendors() {
 }
 
 // ── Add / Edit Modal ─────────────────────────────────────────
-function SubModal({ form, setForm, isEdit, onSave, onClose, onDelete, saving, error, toggleDivision }) {
+function SubModal({ form, setForm, isEdit, onSave, onClose, onDelete, saving, error, toggleDivision, recordType }) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50"
@@ -870,7 +871,7 @@ function SubModal({ form, setForm, isEdit, onSave, onClose, onDelete, saving, er
 
           {/* Divisions */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-2">Divisions / Trades</label>
+            <label className="block text-xs font-medium text-gray-600 mb-2">{recordType === 'vendor' ? 'Materials' : 'Trades'}</label>
             <div className="flex flex-wrap gap-1.5">
               {DIVISION_OPTIONS.map(div => (
                 <button
