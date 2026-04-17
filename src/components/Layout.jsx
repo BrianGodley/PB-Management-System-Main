@@ -8,7 +8,7 @@ const navItems = [
   { path: '/clients',       label: 'Clients',      icon: '👥' },
   { path: '/bids',          label: 'Bids',         icon: '📋' },
   { path: '/jobs',          label: 'Jobs',         icon: '🔨' },
-  { path: '/collections',   label: 'Collections',  icon: '💰' },
+  { path: '/collections',   label: 'Finance',      icon: '💰' },
   { path: '/statistics',    label: 'Statistics',   icon: '📈' },
   { path: '/portal/subs',   label: 'Subs & Vendors', icon: '🔧' },
 ]
