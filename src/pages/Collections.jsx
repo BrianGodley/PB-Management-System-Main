@@ -1,275 +1,635 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../contexts/AuthContext'
 
-const PAYMENT_METHODS = ['Check', 'Credit Card', 'ACH / Bank Transfer', 'Cash', 'Other']
-const COLLECTION_STATUSES = ['outstanding', 'partial', 'paid', 'overdue']
+// ── Constants ─────────────────────────────────────────────────────────────────
+const COLL_SECTIONS = [
+  { key:'current',   label:'Current Collections',   prevLabel:'Prev Delivered', balLabel:'Starting Balance', endLabel:'End Balance'  },
+  { key:'punchlist', label:'Punchlist Collections', prevLabel:'$ Delivered',    balLabel:'Open Balance',     endLabel:'Net Balance'  },
+  { key:'long_term', label:'Long-Term Collections', prevLabel:'$ Delivered',    balLabel:'Open Balance',     endLabel:'Net Balance'  },
+]
+const DAYS = ['mon','tue','wed','thu','fri']
+const DAY_LABELS = { mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday', fri:'Friday' }
 
-const STATUS_STYLES = {
-  outstanding: 'bg-yellow-100 text-yellow-800',
-  partial:     'bg-blue-100 text-blue-800',
-  paid:        'bg-green-100 text-green-800',
-  overdue:     'bg-red-100 text-red-800',
+const PAY_CATS = [
+  { key:'prelim',          label:'Prelims',             cols:['payee','amount_current'] },
+  { key:'credit_card',     label:'Credit Cards',        cols:['payee','amount_current','due_date','rate'] },
+  { key:'credit_account',  label:'Credit Accounts',     cols:['payee','amount_current','amount_future','due_date'] },
+  { key:'non_credit',      label:'Non-Credit Accounts', cols:['payee','amount_current','amount_future','due_date'] },
+]
+
+const FIN_SECTIONS = [
+  { key:'cash_on_hand',    label:'1 — Cash On Hand',         cols:['label','amount'] },
+  { key:'auto_alloc',      label:'2 — Auto Allocations',     cols:['label','amount'] },
+  { key:'payroll',         label:'3 — Payroll Allocations',  cols:['label','amount'] },
+  { key:'payables_alloc',  label:'4 — Payables Allocations', cols:['label','amount'] },
+]
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function fmtC(n) {
+  const v = parseFloat(n)
+  if (isNaN(v) || v === 0) return '—'
+  const s = Math.abs(v).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 })
+  return v < 0 ? `($${s})` : `$${s}`
 }
 
+function calcEnd(row) {
+  const start = parseFloat(row.starting_balance) || 0
+  let inv = 0, dep = 0
+  DAYS.forEach(d => { inv += parseFloat(row[`${d}_inv`]) || 0; dep += parseFloat(row[`${d}_dep`]) || 0 })
+  return start + inv - dep
+}
+
+function prevMonday(fridayISO) {
+  const d = new Date(fridayISO + 'T12:00:00')
+  d.setDate(d.getDate() - 4)
+  return d.toLocaleDateString('en-US', { month:'short', day:'numeric' })
+}
+
+function fmtFriday(fridayISO) {
+  const d = new Date(fridayISO + 'T12:00:00')
+  return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
+}
+
+function nextFriday() {
+  const d = new Date()
+  const diff = (5 - d.getDay() + 7) % 7 || 7
+  d.setDate(d.getDate() + diff)
+  return d.toISOString().split('T')[0]
+}
+
+// ── Inline cell components ────────────────────────────────────────────────────
+function CellInput({ value, onSave, placeholder='' }) {
+  const [local, setLocal] = useState(value ?? '')
+  useEffect(() => setLocal(value ?? ''), [value])
+  return (
+    <input
+      type="number" step="0.01"
+      value={local}
+      onChange={e => setLocal(e.target.value)}
+      onBlur={() => { if (String(local) !== String(value ?? '')) onSave(local) }}
+      onKeyDown={e => { if (e.key==='Enter') e.target.blur() }}
+      placeholder={placeholder}
+      className="w-full bg-transparent text-right text-xs px-1 py-0.5 focus:outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-300 rounded"
+    />
+  )
+}
+
+function TextCell({ value, onSave, placeholder='', bold=false }) {
+  const [local, setLocal] = useState(value ?? '')
+  useEffect(() => setLocal(value ?? ''), [value])
+  return (
+    <input
+      type="text"
+      value={local}
+      onChange={e => setLocal(e.target.value)}
+      onBlur={() => { if (local !== (value ?? '')) onSave(local) }}
+      onKeyDown={e => { if (e.key==='Enter') e.target.blur() }}
+      placeholder={placeholder}
+      className={`w-full bg-transparent text-xs px-1 py-0.5 focus:outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-300 rounded ${bold ? 'font-medium text-gray-800' : 'text-gray-600'}`}
+    />
+  )
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
 export default function Collections() {
-  const { user } = useAuth()
-  const [collections, setCollections] = useState([])
-  const [jobs, setJobs] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [filter, setFilter] = useState('all')
-  const [form, setForm] = useState({
-    job_id: '', invoice_number: '', amount_billed: '',
-    amount_received: '0', due_date: '', date_received: '',
-    payment_method: 'Check', status: 'outstanding', notes: ''
-  })
+  const [weeks,        setWeeks]        = useState([])
+  const [weekIdx,      setWeekIdx]      = useState(0)
+  const [mainTab,      setMainTab]      = useState('collections')
+  const [collTab,      setCollTab]      = useState('current')
+  const [rows,         setRows]         = useState([])
+  const [payables,     setPayables]     = useState([])
+  const [financial,    setFinancial]    = useState([])
+  const [loading,      setLoading]      = useState(true)
+  const [creatingWeek, setCreatingWeek] = useState(false)
 
-  useEffect(() => { fetchData() }, [])
+  const selectedWeek = weeks[weekIdx] || null
 
-  async function fetchData() {
-    setLoading(true)
-    const [collectionsRes, jobsRes] = await Promise.all([
-      supabase.from('collections').select('*, jobs(client_name, job_address)').order('due_date'),
-      supabase.from('jobs').select('id, client_name, job_address, contract_price').eq('status', 'active').order('client_name')
-    ])
-    if (collectionsRes.data) setCollections(collectionsRes.data)
-    if (jobsRes.data) setJobs(jobsRes.data)
-    setLoading(false)
-  }
+  useEffect(() => {
+    supabase.from('collection_weeks').select('*').order('week_ending', { ascending:false })
+      .then(({ data }) => { if (data) { setWeeks(data); setWeekIdx(0) }; setLoading(false) })
+  }, [])
 
-  async function handleSave(e) {
-    e.preventDefault()
-    if (!form.amount_billed) return
-    setSaving(true)
-    const amountBilled = parseFloat(form.amount_billed) || 0
-    const amountReceived = parseFloat(form.amount_received) || 0
-    let status = form.status
-    if (amountReceived >= amountBilled) status = 'paid'
-    else if (amountReceived > 0) status = 'partial'
-
-    const { error } = await supabase.from('collections').insert({
-      job_id: form.job_id || null,
-      invoice_number: form.invoice_number.trim(),
-      amount_billed: amountBilled,
-      amount_received: amountReceived,
-      due_date: form.due_date || null,
-      date_received: form.date_received || null,
-      payment_method: form.payment_method,
-      status,
-      notes: form.notes.trim(),
-      created_by: user?.id,
+  useEffect(() => {
+    if (!selectedWeek) return
+    const id = selectedWeek.id
+    Promise.all([
+      supabase.from('collection_rows').select('*').eq('week_id', id).order('sort_order'),
+      supabase.from('collection_payables').select('*').eq('week_id', id).order('sort_order'),
+      supabase.from('collection_financial').select('*').eq('week_id', id).order('sort_order'),
+    ]).then(([r,p,f]) => {
+      if (r.data) setRows(r.data)
+      if (p.data) setPayables(p.data)
+      if (f.data) setFinancial(f.data)
     })
-    setSaving(false)
-    if (!error) {
-      setForm({ job_id: '', invoice_number: '', amount_billed: '', amount_received: '0', due_date: '', date_received: '', payment_method: 'Check', status: 'outstanding', notes: '' })
-      setShowForm(false)
-      fetchData()
-    }
+  }, [selectedWeek?.id])
+
+  async function createWeek() {
+    setCreatingWeek(true)
+    const date = nextFriday()
+    const { data, error } = await supabase.from('collection_weeks').insert({ week_ending: date }).select().single()
+    if (!error && data) { setWeeks(prev => [data, ...prev]); setWeekIdx(0) }
+    setCreatingWeek(false)
   }
 
-  async function recordPayment(col) {
-    const amount = prompt(`Record payment for ${col.jobs?.client_name || 'this invoice'}.\nAmount received ($):`)
-    if (!amount || isNaN(parseFloat(amount))) return
-    const newReceived = parseFloat(col.amount_received || 0) + parseFloat(amount)
-    const newStatus = newReceived >= parseFloat(col.amount_billed) ? 'paid' : 'partial'
-    await supabase.from('collections').update({
-      amount_received: newReceived,
-      status: newStatus,
-      date_received: new Date().toISOString().split('T')[0],
-    }).eq('id', col.id)
-    fetchData()
+  // ── Row CRUD ────────────────────────────────────────────────────────────────
+  const NUM_FIELDS = ['prev_delivered','starting_balance',
+    'mon_inv','mon_dep','tue_inv','tue_dep','wed_inv','wed_dep','thu_inv','thu_dep','fri_inv','fri_dep']
+
+  async function addRow(section, manager) {
+    const { data } = await supabase.from('collection_rows').insert({
+      week_id: selectedWeek.id, section, manager: manager || null,
+      client_name: 'New Client', sort_order: rows.filter(r => r.section === section).length,
+    }).select().single()
+    if (data) setRows(prev => [...prev, data])
   }
 
-  async function deleteCollection(id) {
-    if (!confirm('Delete this invoice record?')) return
-    await supabase.from('collections').delete().eq('id', id)
-    fetchData()
+  async function updateRow(id, field, value) {
+    const parsed = NUM_FIELDS.includes(field) ? (parseFloat(value) || 0) : value
+    setRows(prev => prev.map(r => r.id === id ? { ...r, [field]: parsed } : r))
+    await supabase.from('collection_rows').update({ [field]: parsed, updated_at: new Date().toISOString() }).eq('id', id)
   }
 
-  const filtered = filter === 'all' ? collections : collections.filter(c => c.status === filter)
+  async function deleteRow(id) {
+    if (!confirm('Delete this row?')) return
+    setRows(prev => prev.filter(r => r.id !== id))
+    await supabase.from('collection_rows').delete().eq('id', id)
+  }
 
-  const totalBilled = collections.reduce((s, c) => s + parseFloat(c.amount_billed || 0), 0)
-  const totalReceived = collections.reduce((s, c) => s + parseFloat(c.amount_received || 0), 0)
-  const totalOutstanding = totalBilled - totalReceived
-  const overdueCount = collections.filter(c => c.status === 'overdue').length
+  // ── Payables CRUD ───────────────────────────────────────────────────────────
+  async function addPayable(category) {
+    const { data } = await supabase.from('collection_payables').insert({
+      week_id: selectedWeek.id, category,
+      sort_order: payables.filter(p => p.category === category).length,
+    }).select().single()
+    if (data) setPayables(prev => [...prev, data])
+  }
 
-  if (loading) return <div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-700"></div></div>
+  async function updatePayable(id, field, value) {
+    const parsed = ['amount_current','amount_future'].includes(field) ? (parseFloat(value) || 0) : value
+    setPayables(prev => prev.map(p => p.id === id ? { ...p, [field]: parsed } : p))
+    await supabase.from('collection_payables').update({ [field]: parsed }).eq('id', id)
+  }
+
+  async function deletePayable(id) {
+    if (!confirm('Delete this row?')) return
+    setPayables(prev => prev.filter(p => p.id !== id))
+    await supabase.from('collection_payables').delete().eq('id', id)
+  }
+
+  // ── Financial CRUD ──────────────────────────────────────────────────────────
+  async function addFinancial(section) {
+    const { data } = await supabase.from('collection_financial').insert({
+      week_id: selectedWeek.id, section,
+      sort_order: financial.filter(f => f.section === section).length,
+    }).select().single()
+    if (data) setFinancial(prev => [...prev, data])
+  }
+
+  async function updateFinancial(id, field, value) {
+    const parsed = field === 'amount' ? (parseFloat(value) || 0) : value
+    setFinancial(prev => prev.map(f => f.id === id ? { ...f, [field]: parsed } : f))
+    await supabase.from('collection_financial').update({ [field]: parsed }).eq('id', id)
+  }
+
+  async function deleteFinancial(id) {
+    if (!confirm('Delete this row?')) return
+    setFinancial(prev => prev.filter(f => f.id !== id))
+    await supabase.from('collection_financial').delete().eq('id', id)
+  }
+
+  // ── Summaries ───────────────────────────────────────────────────────────────
+  function collSummary(section) {
+    const sRows = rows.filter(r => r.section === section)
+    const totDep = sRows.reduce((s,r) => { DAYS.forEach(d => { s += parseFloat(r[`${d}_dep`]) || 0 }); return s }, 0)
+    const totInv = sRows.reduce((s,r) => { DAYS.forEach(d => { s += parseFloat(r[`${d}_inv`]) || 0 }); return s }, 0)
+    const totEnd = sRows.reduce((s,r) => s + calcEnd(r), 0)
+    return { totDep, totInv, totEnd }
+  }
+
+  function paySubtotal(cat) {
+    return payables.filter(p => p.category === cat).reduce((s,p) => s + (parseFloat(p.amount_current) || 0), 0)
+  }
+
+  function finTotal(sec) {
+    return financial.filter(f => f.section === sec).reduce((s,f) => s + (parseFloat(f.amount) || 0), 0)
+  }
+
+  const totalDeposited   = COLL_SECTIONS.reduce((s,sec) => s + collSummary(sec.key).totDep, 0)
+  const totalNewInv      = COLL_SECTIONS.reduce((s,sec) => s + collSummary(sec.key).totInv, 0)
+  const totalReceivables = rows.reduce((s,r) => s + calcEnd(r), 0)
+  const totalPayables    = PAY_CATS.reduce((s,c) => s + paySubtotal(c.key), 0)
+  const cashOnHand       = finTotal('cash_on_hand')
+  const autoAlloc        = finTotal('auto_alloc')
+  const payrollAlloc     = finTotal('payroll')
+  const payablesAlloc    = finTotal('payables_alloc')
+  const netTotal         = cashOnHand - autoAlloc - payrollAlloc - payablesAlloc
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-full py-20">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700" />
+    </div>
+  )
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Collections</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{collections.length} invoices</p>
-        </div>
-        <button onClick={() => setShowForm(!showForm)} className="btn-primary">
-          {showForm ? 'Cancel' : '+ New Invoice'}
-        </button>
-      </div>
+    <div className="flex flex-col h-full">
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <div className="card text-center">
-          <p className="text-xs text-gray-500 mb-1">Total Billed</p>
-          <p className="font-bold text-gray-900">${totalBilled.toLocaleString()}</p>
-        </div>
-        <div className="card text-center">
-          <p className="text-xs text-gray-500 mb-1">Collected</p>
-          <p className="font-bold text-green-700">${totalReceived.toLocaleString()}</p>
-        </div>
-        <div className="card text-center">
-          <p className="text-xs text-gray-500 mb-1">Outstanding</p>
-          <p className="font-bold text-yellow-700">${totalOutstanding.toLocaleString()}</p>
-        </div>
-        <div className="card text-center">
-          <p className="text-xs text-gray-500 mb-1">Overdue</p>
-          <p className={`font-bold ${overdueCount > 0 ? 'text-red-600' : 'text-gray-400'}`}>{overdueCount}</p>
-        </div>
-      </div>
-
-      {/* New invoice form */}
-      {showForm && (
-        <form onSubmit={handleSave} className="card mb-6">
-          <h2 className="font-semibold text-gray-900 mb-4">New Invoice</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="label">Linked Job (optional)</label>
-              <select className="input" value={form.job_id} onChange={e => setForm(p => ({ ...p, job_id: e.target.value }))}>
-                <option value="">-- Select a job --</option>
-                {jobs.map(j => <option key={j.id} value={j.id}>{j.client_name} — {j.job_address}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="label">Invoice Number</label>
-              <input className="input" value={form.invoice_number} onChange={e => setForm(p => ({ ...p, invoice_number: e.target.value }))} placeholder="INV-001" />
-            </div>
-            <div>
-              <label className="label">Amount Billed ($) *</label>
-              <input className="input" type="number" step="0.01" value={form.amount_billed} onChange={e => setForm(p => ({ ...p, amount_billed: e.target.value }))} placeholder="0.00" required />
-            </div>
-            <div>
-              <label className="label">Amount Received ($)</label>
-              <input className="input" type="number" step="0.01" value={form.amount_received} onChange={e => setForm(p => ({ ...p, amount_received: e.target.value }))} placeholder="0.00" />
-            </div>
-            <div>
-              <label className="label">Due Date</label>
-              <input className="input" type="date" value={form.due_date} onChange={e => setForm(p => ({ ...p, due_date: e.target.value }))} />
-            </div>
-            <div>
-              <label className="label">Date Received</label>
-              <input className="input" type="date" value={form.date_received} onChange={e => setForm(p => ({ ...p, date_received: e.target.value }))} />
-            </div>
-            <div>
-              <label className="label">Payment Method</label>
-              <select className="input" value={form.payment_method} onChange={e => setForm(p => ({ ...p, payment_method: e.target.value }))}>
-                {PAYMENT_METHODS.map(m => <option key={m}>{m}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="label">Status</label>
-              <select className="input" value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value }))}>
-                {COLLECTION_STATUSES.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
-              </select>
-            </div>
-            <div className="sm:col-span-2">
-              <label className="label">Notes</label>
-              <textarea className="input resize-none" rows={2} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Notes..." />
-            </div>
-          </div>
-          <div className="flex gap-2 mt-4">
-            <button type="button" onClick={() => setShowForm(false)} className="btn-secondary flex-1">Cancel</button>
-            <button type="submit" disabled={saving} className="btn-primary flex-1">{saving ? 'Saving...' : 'Save Invoice'}</button>
-          </div>
-        </form>
-      )}
-
-      {/* Filters */}
-      <div className="flex gap-1 flex-wrap mb-4">
-        {['all', ...COLLECTION_STATUSES].map(s => (
+      {/* ── Header & week nav ────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-3 mb-4 flex-shrink-0 flex-wrap">
+        <h1 className="text-xl font-bold text-gray-900">Collections & Finance</h1>
+        <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl shadow-sm px-2 py-1">
           <button
-            key={s}
-            onClick={() => setFilter(s)}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium capitalize transition-colors ${
-              filter === s ? 'bg-green-700 text-white' : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'
-            }`}
-          >
-            {s.charAt(0).toUpperCase() + s.slice(1)}
-          </button>
-        ))}
+            onClick={() => setWeekIdx(i => Math.min(i+1, weeks.length-1))}
+            disabled={weekIdx >= weeks.length-1}
+            className="px-2 py-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-30 font-bold text-lg"
+          >‹</button>
+          <span className="text-sm font-semibold text-gray-700 px-2 min-w-[210px] text-center">
+            {selectedWeek
+              ? `${prevMonday(selectedWeek.week_ending)} – ${fmtFriday(selectedWeek.week_ending)}`
+              : 'No weeks yet'}
+          </span>
+          <button
+            onClick={() => setWeekIdx(i => Math.max(i-1, 0))}
+            disabled={weekIdx <= 0}
+            className="px-2 py-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-30 font-bold text-lg"
+          >›</button>
+        </div>
+        <button
+          onClick={createWeek} disabled={creatingWeek}
+          className="text-sm px-3 py-1.5 rounded-lg bg-green-700 text-white font-medium hover:bg-green-800 disabled:opacity-50"
+        >+ New Week</button>
       </div>
 
-      {/* Collections list */}
-      {filtered.length === 0 ? (
-        <div className="card text-center py-12">
-          <p className="text-4xl mb-3">💰</p>
-          <p className="text-gray-500 mb-4">No invoices found.</p>
-          <button onClick={() => setShowForm(true)} className="btn-primary">Create First Invoice</button>
+      {!selectedWeek ? (
+        <div className="flex-1 flex items-center justify-center text-gray-400">
+          <div className="text-center">
+            <p className="text-4xl mb-3">📋</p>
+            <p className="text-sm font-medium text-gray-500">No weeks yet — click <strong>+ New Week</strong> to start</p>
+          </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map(col => {
-            const billed = parseFloat(col.amount_billed || 0)
-            const received = parseFloat(col.amount_received || 0)
-            const balance = billed - received
-            const pct = billed > 0 ? (received / billed) * 100 : 0
-            return (
-              <div key={col.id} className="card hover:shadow-md transition-shadow">
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-gray-900 truncate">
-                      {col.jobs?.client_name || 'No linked job'}
-                    </p>
-                    {col.invoice_number && <p className="text-xs text-gray-500">{col.invoice_number}</p>}
-                    {col.jobs?.job_address && <p className="text-xs text-gray-400 truncate">{col.jobs.job_address}</p>}
-                  </div>
-                  <div className="flex items-center gap-1 ml-2">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_STYLES[col.status]}`}>
-                      {col.status.charAt(0).toUpperCase() + col.status.slice(1)}
-                    </span>
-                    <button onClick={() => deleteCollection(col.id)} className="text-red-300 hover:text-red-500 text-xs">✕</button>
-                  </div>
-                </div>
+        <>
+          {/* ── Main tabs ──────────────────────────────────────────────────── */}
+          <div className="flex gap-0 border-b border-gray-200 mb-4 flex-shrink-0">
+            {[
+              { key:'collections', label:'💰 Collections'        },
+              { key:'payables',    label:'💳 Payables'           },
+              { key:'financial',   label:'📊 Financial Planning' },
+            ].map(t => (
+              <button key={t.key} onClick={() => setMainTab(t.key)}
+                className={`px-5 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+                  mainTab === t.key ? 'border-green-700 text-green-800' : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >{t.label}</button>
+            ))}
+          </div>
 
-                {/* Progress bar */}
-                <div className="mb-3">
-                  <div className="w-full bg-gray-100 rounded-full h-2">
-                    <div className={`h-2 rounded-full ${pct >= 100 ? 'bg-green-500' : pct > 0 ? 'bg-blue-500' : 'bg-gray-300'}`} style={{ width: `${Math.min(pct, 100)}%` }}></div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 text-center mb-3">
-                  <div className="bg-gray-50 rounded-lg p-2">
-                    <p className="text-xs text-gray-400">Billed</p>
-                    <p className="font-semibold text-gray-800 text-sm">${billed.toLocaleString()}</p>
-                  </div>
-                  <div className="bg-green-50 rounded-lg p-2">
-                    <p className="text-xs text-gray-400">Received</p>
-                    <p className="font-semibold text-green-700 text-sm">${received.toLocaleString()}</p>
-                  </div>
-                  <div className={`rounded-lg p-2 ${balance > 0 ? 'bg-yellow-50' : 'bg-gray-50'}`}>
-                    <p className="text-xs text-gray-400">Balance</p>
-                    <p className={`font-semibold text-sm ${balance > 0 ? 'text-yellow-700' : 'text-gray-400'}`}>${balance.toLocaleString()}</p>
-                  </div>
-                </div>
-
-                <div className="text-xs text-gray-500 mb-3 space-y-0.5">
-                  {col.due_date && <p>📅 Due: {new Date(col.due_date).toLocaleDateString()}</p>}
-                  {col.date_received && <p>✅ Paid: {new Date(col.date_received).toLocaleDateString()}</p>}
-                  {col.payment_method && <p>💳 {col.payment_method}</p>}
-                </div>
-
-                {col.status !== 'paid' && (
-                  <button onClick={() => recordPayment(col)} className="btn-primary w-full text-sm">
-                    💰 Record Payment
-                  </button>
-                )}
+          {/* ── Collections ────────────────────────────────────────────────── */}
+          {mainTab === 'collections' && (
+            <div className="flex flex-col flex-1 overflow-hidden">
+              <div className="flex gap-1.5 mb-3 flex-shrink-0">
+                {COLL_SECTIONS.map(s => (
+                  <button key={s.key} onClick={() => setCollTab(s.key)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                      collTab === s.key ? 'bg-green-700 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >{s.label}</button>
+                ))}
               </div>
-            )
-          })}
-        </div>
+              {COLL_SECTIONS.filter(s => s.key === collTab).map(sec => (
+                <CollectionTable
+                  key={sec.key}
+                  section={sec}
+                  rows={rows.filter(r => r.section === sec.key)}
+                  summary={collSummary(sec.key)}
+                  onUpdate={updateRow}
+                  onDelete={deleteRow}
+                  onAdd={addRow}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* ── Payables ───────────────────────────────────────────────────── */}
+          {mainTab === 'payables' && (
+            <div className="flex-1 overflow-y-auto">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pb-4">
+                {PAY_CATS.map(cat => (
+                  <PayableTable
+                    key={cat.key}
+                    cat={cat}
+                    rows={payables.filter(p => p.category === cat.key)}
+                    subtotal={paySubtotal(cat.key)}
+                    onUpdate={updatePayable}
+                    onDelete={deletePayable}
+                    onAdd={() => addPayable(cat.key)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Financial Planning ─────────────────────────────────────────── */}
+          {mainTab === 'financial' && (
+            <div className="flex-1 overflow-y-auto">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pb-4">
+                {FIN_SECTIONS.map(sec => (
+                  <FinancialTable
+                    key={sec.key}
+                    sec={sec}
+                    rows={financial.filter(f => f.section === sec.key)}
+                    total={finTotal(sec.key)}
+                    onUpdate={updateFinancial}
+                    onDelete={deleteFinancial}
+                    onAdd={() => addFinancial(sec.key)}
+                  />
+                ))}
+
+                {/* Totals summary card */}
+                <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                  <div className="bg-gray-700 text-white px-4 py-2.5">
+                    <h3 className="text-sm font-bold">5 — Financial Planning Totals</h3>
+                  </div>
+                  <div className="divide-y divide-gray-100">
+                    {[
+                      { label:'Cash On Hand',        value: cashOnHand,     color:'text-green-700' },
+                      { label:'Auto Allocations',    value: autoAlloc,      color:'text-red-600'   },
+                      { label:'Payroll Allocations', value: payrollAlloc,   color:'text-red-600'   },
+                      { label:'Payable Allocations', value: payablesAlloc,  color:'text-red-600'   },
+                    ].map(({ label, value, color }) => (
+                      <div key={label} className="flex items-center justify-between px-4 py-2 text-xs">
+                        <span className="text-gray-600">{label}</span>
+                        <span className={`font-medium ${color}`}>{fmtC(value)}</span>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50">
+                      <span className="text-sm font-bold text-gray-800">Net Total</span>
+                      <span className={`text-sm font-bold ${netTotal >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmtC(netTotal)}</span>
+                    </div>
+                  </div>
+                  <div className="border-t border-gray-200 bg-gray-50/50 px-4 py-3 space-y-1.5 text-xs">
+                    {[
+                      { label:'Total Deposited (all sections)', value: totalDeposited,              color:'text-gray-700' },
+                      { label:'Total New Invoices',             value: totalNewInv,                 color:'text-gray-700' },
+                      { label:'Total Receivables',             value: totalReceivables,            color:'text-green-700'},
+                      { label:'Total Payables',                value: totalPayables,               color:'text-red-600'  },
+                      { label:'Receivables vs Payables',       value: totalReceivables-totalPayables, color: totalReceivables-totalPayables >= 0 ? 'text-green-700' : 'text-red-600' },
+                    ].map(({ label, value, color }, i) => (
+                      <div key={label} className={`flex justify-between ${i === 4 ? 'font-bold border-t border-gray-200 pt-1.5' : ''}`}>
+                        <span className="text-gray-500">{label}</span>
+                        <span className={`font-semibold ${color}`}>{fmtC(value)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
+    </div>
+  )
+}
+
+// ── Collection Table ──────────────────────────────────────────────────────────
+function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) {
+  const [newManager, setNewManager] = useState('')
+
+  const grouped = {}
+  const noManager = []
+  rows.forEach(r => {
+    if (r.manager) { if (!grouped[r.manager]) grouped[r.manager] = []; grouped[r.manager].push(r) }
+    else noManager.push(r)
+  })
+  const allGroups = [...Object.entries(grouped), ...(noManager.length ? [['', noManager]] : [])]
+
+  return (
+    <div className="flex-1 overflow-auto rounded-xl border border-gray-200 shadow-sm">
+      <table className="text-xs w-full table-fixed" style={{ minWidth: '1120px' }}>
+        <colgroup>
+          <col style={{ width:'170px' }} />
+          <col style={{ width:'88px'  }} />
+          <col style={{ width:'88px'  }} />
+          {DAYS.flatMap(() => [<col style={{ width:'78px' }} />, <col style={{ width:'78px' }} />])}
+          <col style={{ width:'90px'  }} />
+          <col style={{ width:'180px' }} />
+          <col style={{ width:'32px'  }} />
+        </colgroup>
+        <thead className="sticky top-0 z-10">
+          {/* Day header row */}
+          <tr className="bg-gray-50 border-b border-gray-200">
+            <th rowSpan={2} className="px-3 py-2 text-left font-semibold text-gray-700 border-r border-gray-200">Client</th>
+            <th rowSpan={2} className="px-2 py-2 text-right font-semibold text-gray-500 text-[11px]">{section.prevLabel}</th>
+            <th rowSpan={2} className="px-2 py-2 text-right font-semibold text-gray-500 text-[11px] border-r border-gray-200">{section.balLabel}</th>
+            {DAYS.map(d => (
+              <th key={d} colSpan={2} className="px-2 py-1.5 text-center font-semibold text-gray-500 border-l border-gray-200 text-[11px]">
+                {DAY_LABELS[d]}
+              </th>
+            ))}
+            <th rowSpan={2} className="px-2 py-2 text-right font-bold text-gray-700 border-l border-gray-200 text-[11px]">{section.endLabel}</th>
+            <th rowSpan={2} className="px-2 py-2 text-left font-semibold text-gray-500 text-[11px] border-l border-gray-200">Notes</th>
+            <th rowSpan={2} />
+          </tr>
+          <tr className="bg-gray-100 border-b border-gray-200">
+            {DAYS.map(d => (
+              <>
+                <th key={d+'i'} className="px-2 py-1 text-right text-gray-400 font-medium text-[10px] border-l border-gray-200">Inv.</th>
+                <th key={d+'d'} className="px-2 py-1 text-right text-gray-400 font-medium text-[10px]">Dep.</th>
+              </>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100 bg-white">
+          {allGroups.length === 0 && (
+            <tr>
+              <td colSpan={14} className="px-4 py-6 text-center text-gray-400 text-xs">
+                No clients yet — add a row below
+              </td>
+            </tr>
+          )}
+          {allGroups.map(([manager, mRows]) => (
+            <>
+              {manager && (
+                <tr key={'mgr-'+manager} className="bg-green-50">
+                  <td colSpan={14} className="px-3 py-1.5 font-bold text-green-800 text-[11px] uppercase tracking-wider">
+                    ▸ {manager}
+                  </td>
+                </tr>
+              )}
+              {mRows.map(row => {
+                const end = calcEnd(row)
+                return (
+                  <tr key={row.id} className="hover:bg-gray-50 group">
+                    <td className="px-2 py-1 border-r border-gray-100">
+                      <TextCell value={row.client_name} onSave={v => onUpdate(row.id,'client_name',v)} placeholder="Client" bold />
+                    </td>
+                    <td className="px-1 py-1">
+                      <CellInput value={row.prev_delivered||''} onSave={v => onUpdate(row.id,'prev_delivered',v)} />
+                    </td>
+                    <td className="px-1 py-1 border-r border-gray-100">
+                      <CellInput value={row.starting_balance||''} onSave={v => onUpdate(row.id,'starting_balance',v)} />
+                    </td>
+                    {DAYS.map(d => (
+                      <>
+                        <td key={d+'i'} className="px-1 py-1 border-l border-gray-100">
+                          <CellInput value={row[`${d}_inv`]||''} onSave={v => onUpdate(row.id,`${d}_inv`,v)} />
+                        </td>
+                        <td key={d+'d'} className="px-1 py-1">
+                          <CellInput value={row[`${d}_dep`]||''} onSave={v => onUpdate(row.id,`${d}_dep`,v)} />
+                        </td>
+                      </>
+                    ))}
+                    <td className={`px-2 py-1 text-right font-semibold border-l border-gray-100 ${end < 0 ? 'text-red-600' : end > 0 ? 'text-gray-800' : 'text-gray-400'}`}>
+                      {fmtC(end)}
+                    </td>
+                    <td className="px-1 py-1 border-l border-gray-100">
+                      <TextCell value={row.notes||''} onSave={v => onUpdate(row.id,'notes',v)} placeholder="Notes…" />
+                    </td>
+                    <td className="px-1 text-center">
+                      <button onClick={() => onDelete(row.id)} className="text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+                    </td>
+                  </tr>
+                )
+              })}
+              <tr key={'add-'+manager}>
+                <td colSpan={14} className="px-3 py-1 bg-gray-50/60">
+                  <button onClick={() => onAdd(section.key, manager||null)} className="text-xs text-green-700 hover:text-green-900 font-medium">
+                    + Add row{manager ? ` (${manager})` : ''}
+                  </button>
+                </td>
+              </tr>
+            </>
+          ))}
+
+          {/* New group row */}
+          <tr className="bg-gray-50 border-t-2 border-gray-200">
+            <td colSpan={14} className="px-3 py-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text" value={newManager}
+                  onChange={e => setNewManager(e.target.value)}
+                  onKeyDown={e => { if (e.key==='Enter' && newManager.trim()) { onAdd(section.key, newManager.trim()); setNewManager('') }}}
+                  placeholder="New manager group name…"
+                  className="text-xs border border-gray-200 rounded px-2 py-1 w-48 focus:outline-none focus:ring-1 focus:ring-green-500"
+                />
+                <button
+                  onClick={() => { if (newManager.trim()) { onAdd(section.key, newManager.trim()); setNewManager('') }}}
+                  disabled={!newManager.trim()}
+                  className="text-xs px-2 py-1 bg-green-700 text-white rounded hover:bg-green-800 disabled:opacity-40"
+                >+ Add Group & Row</button>
+                <button onClick={() => onAdd(section.key, null)} className="text-xs text-gray-500 hover:text-gray-700 ml-2">
+                  + Add ungrouped row
+                </button>
+              </div>
+            </td>
+          </tr>
+
+          {/* Subtotals */}
+          <tr className="bg-amber-50 font-semibold border-t-2 border-amber-200">
+            <td className="px-3 py-2 text-gray-700 text-[11px] font-bold">Subtotals</td>
+            <td /><td />
+            {DAYS.map(d => {
+              const invS = rows.reduce((s,r) => s + (parseFloat(r[`${d}_inv`])||0), 0)
+              const depS = rows.reduce((s,r) => s + (parseFloat(r[`${d}_dep`])||0), 0)
+              return (
+                <>
+                  <td key={d+'i'} className="px-2 py-2 text-right text-gray-600 border-l border-amber-200 text-[11px]">{fmtC(invS)}</td>
+                  <td key={d+'d'} className="px-2 py-2 text-right text-gray-600 text-[11px]">{fmtC(depS)}</td>
+                </>
+              )
+            })}
+            <td className="px-2 py-2 text-right text-gray-800 border-l border-amber-200">{fmtC(summary.totEnd)}</td>
+            <td /><td />
+          </tr>
+          <tr className="bg-amber-50/50 text-[11px] text-gray-500">
+            <td colSpan={3} />
+            <td colSpan={4} className="px-2 py-1.5 text-right">
+              Subtotal Deposits: <span className="font-semibold text-gray-700 ml-1">{fmtC(summary.totDep)}</span>
+            </td>
+            <td colSpan={4} className="px-2 py-1.5 text-right">
+              Subtotal New Invoices: <span className="font-semibold text-gray-700 ml-1">{fmtC(summary.totInv)}</span>
+            </td>
+            <td colSpan={3} />
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ── Payable Table ─────────────────────────────────────────────────────────────
+const COL_LABELS = { payee:'Payee', amount_current:'Amount', amount_future:'Future', due_date:'Due Date', rate:'Rate' }
+
+function PayableTable({ cat, rows, subtotal, onUpdate, onDelete, onAdd }) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+      <div className="bg-green-800 text-white px-4 py-2.5 flex items-center justify-between flex-shrink-0">
+        <h3 className="text-sm font-bold">{cat.label}</h3>
+        <span className="text-xs font-semibold text-green-100">{fmtC(subtotal)}</span>
+      </div>
+      <table className="w-full text-xs flex-1">
+        <thead className="bg-gray-50 border-b border-gray-200">
+          <tr>
+            {cat.cols.map(c => <th key={c} className="px-3 py-2 text-left font-semibold text-gray-500">{COL_LABELS[c]}</th>)}
+            <th className="w-8" />
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {rows.map(row => (
+            <tr key={row.id} className="hover:bg-gray-50 group">
+              {cat.cols.map(c => (
+                <td key={c} className="px-2 py-1">
+                  {['amount_current','amount_future'].includes(c)
+                    ? <CellInput value={row[c]||''} onSave={v => onUpdate(row.id, c, v)} />
+                    : <TextCell  value={row[c]||''} onSave={v => onUpdate(row.id, c, v)} placeholder={COL_LABELS[c]} />}
+                </td>
+              ))}
+              <td className="px-1 text-center">
+                <button onClick={() => onDelete(row.id)} className="text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="px-3 py-2 border-t border-gray-100 bg-gray-50 flex items-center justify-between flex-shrink-0">
+        <button onClick={onAdd} className="text-xs text-green-700 hover:text-green-900 font-medium">+ Add row</button>
+        <span className="text-xs font-semibold text-gray-700">Subtotal: {fmtC(subtotal)}</span>
+      </div>
+    </div>
+  )
+}
+
+// ── Financial Table ───────────────────────────────────────────────────────────
+function FinancialTable({ sec, rows, total, onUpdate, onDelete, onAdd }) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+      <div className="bg-blue-800 text-white px-4 py-2.5 flex items-center justify-between flex-shrink-0">
+        <h3 className="text-sm font-bold">{sec.label}</h3>
+        <span className="text-xs font-semibold text-blue-100">{fmtC(total)}</span>
+      </div>
+      <table className="w-full text-xs flex-1">
+        <thead className="bg-gray-50 border-b border-gray-200">
+          <tr>
+            <th className="px-3 py-2 text-left font-semibold text-gray-500">Account / Type</th>
+            <th className="px-3 py-2 text-right font-semibold text-gray-500 w-28">Amount</th>
+            <th className="w-8" />
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {rows.map(row => (
+            <tr key={row.id} className="hover:bg-gray-50 group">
+              <td className="px-2 py-1"><TextCell value={row.label||''} onSave={v => onUpdate(row.id,'label',v)} placeholder="Label…" /></td>
+              <td className="px-2 py-1"><CellInput value={row.amount||''} onSave={v => onUpdate(row.id,'amount',v)} /></td>
+              <td className="px-1 text-center">
+                <button onClick={() => onDelete(row.id)} className="text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="px-3 py-2 border-t border-gray-100 bg-gray-50 flex items-center justify-between flex-shrink-0">
+        <button onClick={onAdd} className="text-xs text-green-700 hover:text-green-900 font-medium">+ Add row</button>
+        <span className="text-xs font-semibold text-gray-700">Total: {fmtC(total)}</span>
+      </div>
     </div>
   )
 }
