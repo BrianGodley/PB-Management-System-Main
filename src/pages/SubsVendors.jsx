@@ -833,6 +833,16 @@ export default function SubsVendors() {
 
 // ── Add / Edit Modal ─────────────────────────────────────────
 function SubModal({ form, setForm, isEdit, onSave, onClose, onDelete, saving, error, toggleDivision, recordType }) {
+  const [customInput, setCustomInput] = useState('')
+
+  function addCustom() {
+    const val = customInput.trim()
+    if (!val) return
+    if (!form.divisions.includes(val)) {
+      setForm(f => ({ ...f, divisions: [...f.divisions, val] }))
+    }
+    setCustomInput('')
+  }
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50"
@@ -878,21 +888,61 @@ function SubModal({ form, setForm, isEdit, onSave, onClose, onDelete, saving, er
           {/* Divisions */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-2">{recordType === 'vendor' ? 'Materials' : 'Trades'}</label>
-            <div className="flex flex-wrap gap-1.5">
-              {(recordType === 'vendor' ? MATERIAL_OPTIONS : DIVISION_OPTIONS).map(div => (
-                <button
-                  key={div}
-                  type="button"
-                  onClick={() => toggleDivision(div)}
-                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                    form.divisions.includes(div)
-                      ? 'bg-green-700 text-white border-green-700'
-                      : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-green-400 hover:text-green-700'
-                  }`}
-                >
-                  {div}
-                </button>
-              ))}
+            {/* Dropdown selector */}
+            <select
+              value=""
+              onChange={e => {
+                const val = e.target.value
+                if (val && !form.divisions.includes(val)) {
+                  setForm(f => ({ ...f, divisions: [...f.divisions, val] }))
+                }
+              }}
+              className="input text-sm w-full"
+            >
+              <option value="">— Select a {recordType === 'vendor' ? 'material' : 'trade'} —</option>
+              {(recordType === 'vendor' ? MATERIAL_OPTIONS : DIVISION_OPTIONS)
+                .filter(d => !form.divisions.includes(d))
+                .map(d => <option key={d} value={d}>{d}</option>)
+              }
+            </select>
+
+            {/* Selected items */}
+            {form.divisions.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {form.divisions.map(div => (
+                  <span
+                    key={div}
+                    className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-green-700 text-white"
+                  >
+                    {div}
+                    <button
+                      type="button"
+                      onClick={() => toggleDivision(div)}
+                      className="hover:text-green-200 leading-none"
+                    >✕</button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Add custom trade / material */}
+            <div className="flex gap-2 mt-2">
+              <input
+                type="text"
+                value={customInput}
+                onChange={e => setCustomInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustom() } }}
+                placeholder={`Add custom ${recordType === 'vendor' ? 'material' : 'trade'}…`}
+                className="input text-xs flex-1"
+              />
+              <button
+                type="button"
+                onClick={addCustom}
+                disabled={!customInput.trim()}
+                className="px-3 py-1.5 text-xs rounded-lg bg-green-700 text-white font-medium hover:bg-green-800 disabled:opacity-40 transition-colors"
+              >
+                + Add
+              </button>
             </div>
           </div>
 
