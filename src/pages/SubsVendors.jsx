@@ -850,35 +850,6 @@ function SubModal({ form, setForm, isEdit, onSave, onClose, onDelete, saving, er
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
 
-          {/* Type toggle */}
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-2">Type</label>
-            <div className="flex rounded-lg overflow-hidden border border-gray-200">
-              <button
-                type="button"
-                onClick={() => setForm(f => ({ ...f, type: 'sub' }))}
-                className={`flex-1 py-2.5 text-sm font-semibold transition-colors ${
-                  form.type === 'sub'
-                    ? 'bg-green-700 text-white'
-                    : 'bg-white text-gray-500 hover:bg-gray-50'
-                }`}
-              >
-                🔨 Subcontractor
-              </button>
-              <button
-                type="button"
-                onClick={() => setForm(f => ({ ...f, type: 'vendor' }))}
-                className={`flex-1 py-2.5 text-sm font-semibold border-l border-gray-200 transition-colors ${
-                  form.type === 'vendor'
-                    ? 'bg-green-700 text-white'
-                    : 'bg-white text-gray-500 hover:bg-gray-50'
-                }`}
-              >
-                🛒 Vendor
-              </button>
-            </div>
-          </div>
-
           {/* Company name */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Company Name <span className="text-red-400">*</span></label>
