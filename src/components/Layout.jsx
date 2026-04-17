@@ -4,12 +4,13 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 
 const navItems = [
-  { path: '/',            label: 'Dashboard',   icon: '🏠' },
-  { path: '/clients',     label: 'Clients',     icon: '👥' },
-  { path: '/bids',        label: 'Bids',        icon: '📋' },
-  { path: '/jobs',        label: 'Jobs',        icon: '🔨' },
-  { path: '/collections', label: 'Collections', icon: '💰' },
-  { path: '/statistics',  label: 'Statistics',  icon: '📈' },
+  { path: '/',              label: 'Dashboard',    icon: '🏠' },
+  { path: '/clients',       label: 'Clients',      icon: '👥' },
+  { path: '/bids',          label: 'Bids',         icon: '📋' },
+  { path: '/jobs',          label: 'Jobs',         icon: '🔨' },
+  { path: '/collections',   label: 'Collections',  icon: '💰' },
+  { path: '/statistics',    label: 'Statistics',   icon: '📈' },
+  { path: '/portal/subs',   label: 'Subs & Vendors', icon: '🔧' },
 ]
 
 const forestGreen = '#3A5038'
@@ -96,7 +97,7 @@ export default function Layout() {
           {/* Top bar is screen-specific — nav lives in the left sidebar */}
           <div className="flex-1" />
 
-          {/* Right side: Archive (admin) + Admin + Settings + user */}
+          {/* Right side: portal links + Admin + user */}
           <div className="flex items-center gap-1 ml-auto">
             <Link
               to="/admin"

@@ -18,6 +18,16 @@ import MasterRates from './pages/MasterRates'
 import Statistics from './pages/Statistics'
 import Profile from './pages/Profile'
 
+function PortalPlaceholder({ label, icon }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full text-gray-400 py-20">
+      <p className="text-5xl mb-3">{icon}</p>
+      <p className="text-lg font-semibold text-gray-600">{label} Portal</p>
+      <p className="text-sm mt-1 text-gray-400">Coming soon</p>
+    </div>
+  )
+}
+
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
   if (loading) return (
@@ -58,6 +68,8 @@ function AppRoutes() {
         <Route path="master-rates" element={<MasterRates />} />
         <Route path="statistics" element={<Statistics />} />
         <Route path="profile" element={<Profile />} />
+        <Route path="portal/internal" element={<PortalPlaceholder label="Internal Users" icon="👥" />} />
+        <Route path="portal/subs" element={<PortalPlaceholder label="Subs & Vendors" icon="🔧" />} />
       </Route>
     </Routes>
   )
