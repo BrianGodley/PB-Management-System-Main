@@ -12,6 +12,12 @@ const DIVISION_OPTIONS = [
   'Shotcrete', 'Stucco', 'Tile', 'Waterproofing', 'Other',
 ]
 
+const MATERIAL_OPTIONS = [
+  'Electrical', 'Fencing', 'HVAC', 'Plumbing', 'Pool Coping',
+  'Pool Equipment', 'Pool Steel', 'Roofing', 'Shotcrete',
+  'Stucco', 'Tile', 'Waterproofing', 'Other',
+]
+
 const STATUS_OPTIONS = [
   { value: 'no_email',  label: 'No Email',       cls: 'bg-gray-100 text-gray-600 border-gray-200' },
   { value: 'ready',     label: 'Ready to Invite', cls: 'bg-teal-50 text-teal-700 border-teal-200'  },
@@ -873,7 +879,7 @@ function SubModal({ form, setForm, isEdit, onSave, onClose, onDelete, saving, er
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-2">{recordType === 'vendor' ? 'Materials' : 'Trades'}</label>
             <div className="flex flex-wrap gap-1.5">
-              {DIVISION_OPTIONS.map(div => (
+              {(recordType === 'vendor' ? MATERIAL_OPTIONS : DIVISION_OPTIONS).map(div => (
                 <button
                   key={div}
                   type="button"
