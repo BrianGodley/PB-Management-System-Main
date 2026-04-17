@@ -104,7 +104,7 @@ export default function Collections() {
   const [financial,          setFinancial]          = useState([])
   const [loading,            setLoading]            = useState(true)
   const [creatingWeek,       setCreatingWeek]       = useState(false)
-  const [companyWeekEndDay,  setCompanyWeekEndDay]  = useState(5) // default Friday
+  const [companyWeekEndDay,  setCompanyWeekEndDay]  = useState(6) // default Saturday
 
   const selectedWeek = weeks[weekIdx] || null
 
