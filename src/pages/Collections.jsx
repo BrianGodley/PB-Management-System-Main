@@ -315,7 +315,7 @@ export default function Collections() {
                 ))}
                 <div className="flex-1" />
                 {(() => { const s = collSummary(collTab); return (
-                  <div className="flex items-center gap-4 text-xs text-gray-600">
+                  <div className="flex items-center gap-4 text-xs text-gray-600 mr-8">
                     <span>Subtotal Deposits: <strong className="text-gray-800">{fmtC(s.totDep)}</strong></span>
                     <span>Subtotal Invoices: <strong className="text-gray-800">{fmtC(s.totInv)}</strong></span>
                   </div>
@@ -475,9 +475,20 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
           {allGroups.map(([manager, mRows]) => (
             <>
               {manager && (
-                <tr key={'mgr-'+manager} className="bg-green-50">
-                  <td colSpan={14} className="px-3 py-1.5 font-bold text-green-800 text-[11px] uppercase tracking-wider">
-                    ▸ {manager}
+                <tr key={'mgr-'+manager} className="bg-green-50 group/mgr">
+                  <td colSpan={14} className="px-3 py-1 flex items-center gap-2">
+                    <span className="text-green-700 text-[11px] font-bold">▸</span>
+                    <input
+                      defaultValue={manager}
+                      onBlur={e => { const v = e.target.value.trim(); if (v && v !== manager) mRows.forEach(r => onUpdate(r.id,'manager',v)) }}
+                      onKeyDown={e => { if (e.key==='Enter') e.target.blur() }}
+                      className="text-[11px] font-bold text-green-800 uppercase tracking-wider bg-transparent border-b border-transparent hover:border-green-400 focus:border-green-600 focus:outline-none w-40"
+                    />
+                    <button
+                      onClick={() => { if (window.confirm(`Delete entire "${manager}" group and all its rows?`)) mRows.forEach(r => onDelete(r.id)) }}
+                      className="text-red-300 hover:text-red-600 text-xs opacity-0 group-hover/mgr:opacity-100 transition-opacity ml-1"
+                      title="Delete group"
+                    >✕ Delete Group</button>
                   </td>
                 </tr>
               )}
