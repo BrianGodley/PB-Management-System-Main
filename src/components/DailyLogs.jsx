@@ -427,6 +427,7 @@ function LogModal({
   saving, error, fileRef,
   selectedJob, jobs,
 }) {
+  const cameraRef = useRef(null)
   const jobMap = Object.fromEntries(jobs.map(j => [j.id, j.name || j.client_name]))
 
   return (
@@ -436,7 +437,7 @@ function LogModal({
     >
       <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-[680px] max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden">
 
-        {/* Modal header */}
+        {/* ── Header — always visible ── */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
           <div>
             <h2 className="text-base font-bold text-gray-900">{isEdit ? 'Edit Daily Log' : 'Daily Log'}</h2>
@@ -444,201 +445,217 @@ function LogModal({
               <p className="text-xs text-green-700 font-medium mt-0.5">{jobMap[selectedJob]}</p>
             )}
           </div>
-          <button onClick={onClose} className="text-gray-300 hover:text-gray-500 p-1">
+          <button onClick={onClose} className="text-gray-300 hover:text-gray-500 p-2">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        {/* Scrollable body */}
-        <div className="flex flex-col sm:flex-row flex-1 overflow-hidden">
+        {/* ── Scrollable body ── */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="flex flex-col sm:flex-row sm:min-h-full">
 
-          {/* Left column — full width on mobile, fixed width sidebar on desktop */}
-          <div className="w-full sm:w-64 flex-shrink-0 px-5 py-4 border-b sm:border-b-0 sm:border-r border-gray-100 overflow-y-auto space-y-4">
+            {/* Left column */}
+            <div className="w-full sm:w-64 flex-shrink-0 px-5 py-4 border-b sm:border-b-0 sm:border-r border-gray-100 space-y-4">
 
-            {/* Job selector (all-jobs mode) */}
-            {selectedJob === 'all' && (
+              {/* Job selector (all-jobs mode) */}
+              {selectedJob === 'all' && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Job</label>
+                  <select
+                    value={form.job_id || ''}
+                    onChange={e => setForm(f => ({ ...f, job_id: e.target.value || null }))}
+                    className="input text-sm w-full"
+                  >
+                    <option value="">— select job —</option>
+                    {jobs.map(j => (
+                      <option key={j.id} value={j.id}>{j.name || j.client_name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Date */}
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Job</label>
-                <select
-                  value={form.job_id || ''}
-                  onChange={e => setForm(f => ({ ...f, job_id: e.target.value || null }))}
-                  className="input text-sm w-full"
-                >
-                  <option value="">— select job —</option>
-                  {jobs.map(j => (
-                    <option key={j.id} value={j.id}>{j.name || j.client_name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* Date */}
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Date <span className="text-red-400">*</span></label>
-              <input
-                type="date"
-                value={form.date}
-                onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
-                className="input text-sm w-full"
-              />
-            </div>
-
-            {/* Title */}
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Title</label>
-              <input
-                type="text"
-                value={form.title}
-                onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                placeholder="Optional title…"
-                className="input text-sm w-full"
-              />
-            </div>
-
-            {/* Permissions */}
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-2">Permissions</label>
-              <div className="space-y-1">
-                {PERMISSION_OPTIONS.map(opt => (
-                  <label key={opt.key} className={`flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-colors ${
-                    form.permissions.includes(opt.key) ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-transparent hover:bg-gray-100'
-                  }`}>
-                    <span className="text-xs text-gray-700">{opt.icon} {opt.label}</span>
-                    <input
-                      type="checkbox"
-                      checked={form.permissions.includes(opt.key)}
-                      onChange={() => togglePermission(opt.key)}
-                      className="accent-green-700"
-                    />
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Weather */}
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-2">Weather</label>
-              <label className="flex items-center gap-2 cursor-pointer mb-2">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Date <span className="text-red-400">*</span></label>
                 <input
-                  type="checkbox"
-                  checked={form.weather_conditions}
-                  onChange={e => setForm(f => ({ ...f, weather_conditions: e.target.checked }))}
-                  className="accent-green-700"
+                  type="date"
+                  value={form.date}
+                  onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+                  className="input text-sm w-full"
                 />
-                <span className="text-xs text-gray-600">Include weather conditions</span>
-              </label>
-              {form.weather_conditions && (
+              </div>
+
+              {/* Title */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Title</label>
                 <input
                   type="text"
-                  value={form.weather_notes}
-                  onChange={e => setForm(f => ({ ...f, weather_notes: e.target.value }))}
-                  placeholder="e.g. Sunny, 78°F"
+                  value={form.title}
+                  onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                  placeholder="Optional title…"
                   className="input text-sm w-full"
                 />
-              )}
+              </div>
+
+              {/* Permissions */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-2">Permissions</label>
+                <div className="space-y-1">
+                  {PERMISSION_OPTIONS.map(opt => (
+                    <label key={opt.key} className={`flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
+                      form.permissions.includes(opt.key) ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-transparent hover:bg-gray-100'
+                    }`}>
+                      <span className="text-sm text-gray-700">{opt.icon} {opt.label}</span>
+                      <input
+                        type="checkbox"
+                        checked={form.permissions.includes(opt.key)}
+                        onChange={() => togglePermission(opt.key)}
+                        className="accent-green-700 w-4 h-4"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Weather */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-2">Weather</label>
+                <label className="flex items-center gap-2 cursor-pointer mb-2">
+                  <input
+                    type="checkbox"
+                    checked={form.weather_conditions}
+                    onChange={e => setForm(f => ({ ...f, weather_conditions: e.target.checked }))}
+                    className="accent-green-700 w-4 h-4"
+                  />
+                  <span className="text-sm text-gray-600">Include weather conditions</span>
+                </label>
+                {form.weather_conditions && (
+                  <input
+                    type="text"
+                    value={form.weather_notes}
+                    onChange={e => setForm(f => ({ ...f, weather_notes: e.target.value }))}
+                    placeholder="e.g. Sunny, 78°F"
+                    className="input text-sm w-full"
+                  />
+                )}
+              </div>
             </div>
-          </div>
 
-          {/* Right column */}
-          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Right column */}
+            <div className="flex-1 flex flex-col px-5 py-4 space-y-4">
 
-            {/* Attachments */}
-            <div className="px-5 pt-5 pb-3 border-b border-gray-50">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-medium text-gray-600">Attachments / Photos</p>
-                <button
-                  onClick={() => fileRef.current?.click()}
-                  className="text-xs px-3 py-1 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
-                >
-                  + Add Photos
-                </button>
+              {/* Photos — mobile gets Camera + Library buttons */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-medium text-gray-600">Photos</p>
+                  <div className="flex gap-2">
+                    {/* Camera button — mobile only */}
+                    <button
+                      onClick={() => cameraRef.current?.click()}
+                      className="sm:hidden text-xs px-3 py-1.5 rounded-lg bg-green-700 text-white active:bg-green-800 transition-colors flex items-center gap-1"
+                    >
+                      📷 Camera
+                    </button>
+                    {/* Gallery / file picker */}
+                    <button
+                      onClick={() => fileRef.current?.click()}
+                      className="text-xs px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                    >
+                      <span className="sm:hidden">🖼 Library</span>
+                      <span className="hidden sm:inline">+ Add Photos</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Hidden inputs */}
+                <input
+                  ref={cameraRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={onPhotoSelect}
+                />
                 <input
                   ref={fileRef}
                   type="file"
                   accept="image/*"
-                  capture={false}
                   multiple
                   className="hidden"
                   onChange={onPhotoSelect}
                 />
+
+                {/* Existing photos */}
+                {existingPhotos.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {existingPhotos.map(photo => (
+                      <div key={photo.id} className="relative w-16 h-16 rounded-lg overflow-hidden group">
+                        <img src={getPublicUrl(photo.storage_path)} alt="" className="w-full h-full object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* New previews */}
+                {photoPreviews.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {photoPreviews.map((url, idx) => (
+                      <div key={idx} className="relative w-16 h-16 rounded-lg overflow-hidden">
+                        <img src={url} alt="" className="w-full h-full object-cover" />
+                        <button
+                          onClick={() => onRemoveNew(idx)}
+                          className="absolute top-0.5 right-0.5 w-5 h-5 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center"
+                        >✕</button>
+                      </div>
+                    ))}
+                  </div>
+                ) : existingPhotos.length === 0 && (
+                  <button
+                    onClick={() => fileRef.current?.click()}
+                    className="w-full border-2 border-dashed border-gray-200 rounded-xl py-6 text-center text-xs text-gray-400 hover:border-green-300 hover:text-green-600 transition-colors"
+                  >
+                    <p className="text-2xl mb-1">📷</p>
+                    <span className="hidden sm:inline">Click or drag to add photos</span>
+                    <span className="sm:hidden">Tap Camera or Library above</span>
+                  </button>
+                )}
               </div>
 
-              {/* Existing photos (edit mode) */}
-              {existingPhotos.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-2">
-                  {existingPhotos.map(photo => (
-                    <div key={photo.id} className="relative w-16 h-16 rounded-lg overflow-hidden group">
-                      <img src={getPublicUrl(photo.storage_path)} alt="" className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-                        <span className="text-white text-[10px] opacity-0 group-hover:opacity-100">Saved</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {/* Notes */}
+              <div className="flex flex-col">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Notes</label>
+                <textarea
+                  value={form.notes}
+                  onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+                  placeholder="Describe today's work, observations, materials used…"
+                  rows={6}
+                  className="input text-sm resize-none leading-relaxed"
+                />
+              </div>
 
-              {/* New photo previews */}
-              {photoPreviews.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {photoPreviews.map((url, idx) => (
-                    <div key={idx} className="relative w-16 h-16 rounded-lg overflow-hidden group">
-                      <img src={url} alt="" className="w-full h-full object-cover" />
-                      <button
-                        onClick={() => onRemoveNew(idx)}
-                        className="absolute top-0.5 right-0.5 w-4 h-4 bg-red-500 text-white rounded-full text-[9px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                      >✕</button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {photoPreviews.length === 0 && existingPhotos.length === 0 && (
-                <button
-                  onClick={() => fileRef.current?.click()}
-                  className="w-full border-2 border-dashed border-gray-200 rounded-xl py-6 text-center text-xs text-gray-400 hover:border-green-300 hover:text-green-600 transition-colors"
-                >
-                  <p className="text-2xl mb-1">📷</p>
-                  Click or drag to add photos
-                </button>
-              )}
-            </div>
-
-            {/* Notes */}
-            <div className="flex-1 flex flex-col px-5 py-4">
-              <label className="block text-xs font-medium text-gray-600 mb-1">Notes</label>
-              <textarea
-                value={form.notes}
-                onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                placeholder="Describe today's work, observations, materials used…"
-                className="input text-sm flex-1 resize-none leading-relaxed"
-                autoFocus
-              />
-            </div>
-
-            {/* Error */}
-            {error && (
-              <p className="px-5 pb-2 text-xs text-red-500">{error}</p>
-            )}
-
-            {/* Footer */}
-            <div className="px-5 pb-5 flex gap-2 flex-shrink-0">
-              <button
-                onClick={onSave}
-                disabled={saving}
-                className="flex-1 btn-primary text-sm py-2.5 disabled:opacity-50"
-              >
-                {saving ? 'Saving…' : isEdit ? 'Update Log' : 'Save Log'}
-              </button>
-              <button
-                onClick={onClose}
-                className="px-5 py-2.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
+              {/* Error */}
+              {error && <p className="text-xs text-red-500">{error}</p>}
             </div>
           </div>
+        </div>
+
+        {/* ── Footer — always visible, never scrolls away ── */}
+        <div className="px-5 py-4 flex gap-2 flex-shrink-0 border-t border-gray-100 bg-white">
+          <button
+            onClick={onSave}
+            disabled={saving}
+            className="flex-1 btn-primary text-sm py-3 disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : isEdit ? 'Update Log' : 'Save Log'}
+          </button>
+          <button
+            onClick={onClose}
+            className="px-5 py-3 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
         </div>
       </div>
     </div>
