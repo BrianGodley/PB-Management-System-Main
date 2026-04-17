@@ -3197,49 +3197,13 @@ export default function Statistics() {
             </div>
           ) : (
             <>
-              {/* Chart header: print/share + nav */}
-              <div className="flex items-center px-6 py-3 bg-white border-b border-gray-200 flex-shrink-0">
-                {/* Left — flex-1 keeps center anchored */}
+              {/* Chart header: print/share + auto min/max + nav */}
+              <div className="relative flex items-center px-6 py-3 bg-white border-b border-gray-200 flex-shrink-0">
+                {/* Left — print, share, auto min/max */}
                 <div className="flex-1 flex items-center gap-2">
                   <button title="Print" className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-xl">🖨️</button>
                   <button title="Share" className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-xl">🔗</button>
-                </div>
-                {/* Center — stat name, never shifts */}
-                <span className="text-lg font-bold text-gray-800 max-w-xs truncate">
-                  {selectedStat.name}
-                </span>
-                {/* Right — flex-1 keeps center anchored; arrows and detail both fixed-width so neither shifts */}
-                <div className="flex-1 flex items-center justify-end">
-                  <div className="flex items-center gap-0.5 flex-shrink-0">
-                    <button
-                      onClick={() => goTo(-1)}
-                      disabled={!hasPrev}
-                      className="px-2 py-1 rounded text-blue-500 hover:bg-blue-50 disabled:opacity-30 text-xl font-black"
-                    >
-                      ⬆
-                    </button>
-                    <button
-                      onClick={() => goTo(1)}
-                      disabled={!hasNext}
-                      className="px-2 py-1 rounded text-blue-500 hover:bg-blue-50 disabled:opacity-30 text-xl font-black"
-                    >
-                      ⬇
-                    </button>
-                  </div>
-                  <div className="w-40 flex-shrink-0 flex items-center justify-end gap-1.5 text-xs text-gray-400 ml-3">
-                    <span className="capitalize font-medium">{selectedStat.tracking}</span>
-                    <span>·</span>
-                    <span className="capitalize">{selectedStat.stat_type}</span>
-                    {selectedStat.upside_down && <span>· ↕ Inv</span>}
-                  </div>
-                </div>
-              </div>
-
-              {/* Chart */}
-              <div className="flex-1 px-4 py-4 overflow-hidden relative">
-                {/* Auto Min / Max — float above top-left of chart (above Y-axis) */}
-                {selectedStat && (
-                  <div className="absolute top-1 left-4 flex gap-1 z-10">
+                  <div className="flex gap-1 ml-1">
                     {[['autoMin', autoMin, setAutoMin, 'Auto Min'], ['autoMax', autoMax, setAutoMax, 'Auto Max']].map(([k, val, setter, lbl]) => (
                       <button
                         key={k}
@@ -3254,7 +3218,44 @@ export default function Statistics() {
                       </button>
                     ))}
                   </div>
-                )}
+                </div>
+
+                {/* Center — absolutely centered so left/right content never shifts it */}
+                <span className="absolute left-1/2 -translate-x-1/2 text-lg font-bold text-gray-800 max-w-xs truncate text-center pointer-events-none">
+                  {selectedStat.name}
+                </span>
+
+                {/* Right — arrows tight against description, group pushed to far right */}
+                <div className="flex-1 flex items-center justify-end">
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-0.5">
+                      <button
+                        onClick={() => goTo(-1)}
+                        disabled={!hasPrev}
+                        className="px-2 py-1 rounded text-blue-500 hover:bg-blue-50 disabled:opacity-30 text-xl font-black"
+                      >
+                        ⬆
+                      </button>
+                      <button
+                        onClick={() => goTo(1)}
+                        disabled={!hasNext}
+                        className="px-2 py-1 rounded text-blue-500 hover:bg-blue-50 disabled:opacity-30 text-xl font-black"
+                      >
+                        ⬇
+                      </button>
+                    </div>
+                    <div className="w-36 flex items-center gap-1.5 text-xs text-gray-400">
+                      <span className="capitalize font-medium">{selectedStat.tracking}</span>
+                      <span>·</span>
+                      <span className="capitalize">{selectedStat.stat_type}</span>
+                      {selectedStat.upside_down && <span>· ↕ Inv</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Chart */}
+              <div className="flex-1 px-4 py-4 overflow-hidden relative">
 
                 {valuesStatId !== selectedId && prevDisplayRef.current.length === 0 ? (
                   // First-ever load for this stat — no previous frame to hold
