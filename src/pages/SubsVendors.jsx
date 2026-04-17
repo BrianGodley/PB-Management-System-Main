@@ -380,35 +380,6 @@ export default function SubsVendors() {
   return (
     <div className="flex flex-col h-full">
 
-      {/* ── Type toggle (Subcontractors / Vendors) ──────────── */}
-      <div className="flex items-center gap-2 mb-4 flex-shrink-0">
-        <div className="flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
-          <button
-            onClick={() => { setTypeView('sub'); setFilter('all') }}
-            className={`px-5 py-2.5 text-sm font-semibold transition-colors ${
-              typeView === 'sub'
-                ? 'bg-green-700 text-white'
-                : 'bg-white text-gray-500 hover:bg-gray-50'
-            }`}
-          >
-            🔨 Subcontractors
-          </button>
-          <button
-            onClick={() => { setTypeView('vendor'); setFilter('all') }}
-            className={`px-5 py-2.5 text-sm font-semibold border-l border-gray-200 transition-colors ${
-              typeView === 'vendor'
-                ? 'bg-green-700 text-white'
-                : 'bg-white text-gray-500 hover:bg-gray-50'
-            }`}
-          >
-            🛒 Vendors
-          </button>
-        </div>
-        <span className="text-xs text-gray-400 hidden sm:inline">
-          {subs.filter(s => (s.type || 'sub') === typeView).length} {typeView === 'sub' ? 'subcontractors' : 'vendors'}
-        </span>
-      </div>
-
       {/* ── Page header ─────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
         <h1 className="text-xl font-bold text-gray-900">
@@ -476,13 +447,14 @@ export default function SubsVendors() {
         />
       </div>
 
-      {/* ── Stats row ───────────────────────────────────────── */}
-      <div className="flex gap-2 mb-4 flex-shrink-0 overflow-x-auto pb-1">
+      {/* ── Stats row + Type toggle (same row) ──────────────── */}
+      <div className="flex items-center gap-2 mb-4 flex-shrink-0 overflow-x-auto pb-1">
+        {/* Stats pills */}
         {[
-          { label: 'Total',         count: subs.filter(s => (s.type||'sub') === typeView).length,                                                                           color: 'text-gray-700'   },
-          { label: 'Active',        count: subs.filter(s => (s.type||'sub') === typeView && s.status === 'active').length,                                                  color: 'text-green-700'  },
-          { label: 'Ready',         count: subs.filter(s => (s.type||'sub') === typeView && s.status === 'ready').length,                                                   color: 'text-teal-700'   },
-          { label: 'No Email',      count: subs.filter(s => (s.type||'sub') === typeView && s.status === 'no_email').length,                                                color: 'text-gray-500'   },
+          { label: 'Total',         count: subs.filter(s => (s.type||'sub') === typeView).length,                                                                            color: 'text-gray-700'   },
+          { label: 'Active',        count: subs.filter(s => (s.type||'sub') === typeView && s.status === 'active').length,                                                   color: 'text-green-700'  },
+          { label: 'Ready',         count: subs.filter(s => (s.type||'sub') === typeView && s.status === 'ready').length,                                                    color: 'text-teal-700'   },
+          { label: 'No Email',      count: subs.filter(s => (s.type||'sub') === typeView && s.status === 'no_email').length,                                                 color: 'text-gray-500'   },
           { label: 'Ins. Expiring', count: subs.filter(s => (s.type||'sub') === typeView && (isSoonExpiring(s.liability_exp) || isSoonExpiring(s.workers_comp_exp))).length, color: 'text-orange-600' },
         ].map(s => (
           <div key={s.label} className="flex-shrink-0 bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm flex items-center gap-2">
@@ -490,6 +462,33 @@ export default function SubsVendors() {
             <span className={`text-sm font-bold ${s.color}`}>{s.count}</span>
           </div>
         ))}
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Type toggle — right-aligned */}
+        <div className="flex-shrink-0 flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+          <button
+            onClick={() => { setTypeView('sub'); setFilter('all') }}
+            className={`px-4 py-1.5 text-xs font-semibold transition-colors ${
+              typeView === 'sub'
+                ? 'bg-green-700 text-white'
+                : 'bg-white text-gray-500 hover:bg-gray-50'
+            }`}
+          >
+            🔨 Subcontractors
+          </button>
+          <button
+            onClick={() => { setTypeView('vendor'); setFilter('all') }}
+            className={`px-4 py-1.5 text-xs font-semibold border-l border-gray-200 transition-colors ${
+              typeView === 'vendor'
+                ? 'bg-green-700 text-white'
+                : 'bg-white text-gray-500 hover:bg-gray-50'
+            }`}
+          >
+            🛒 Vendors
+          </button>
+        </div>
       </div>
 
       {loading ? (
