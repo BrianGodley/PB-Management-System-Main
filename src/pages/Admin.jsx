@@ -1537,7 +1537,9 @@ export default function Admin() {
 
       {/* ── COMPANY SETTINGS TAB ──────────────────────────────────────── */}
       {tab === 'settings' && (
-        <CompanySettings currentUserIsAdmin={currentUserIsAdmin} />
+        <div className="overflow-y-auto max-h-[calc(100vh-10rem)] pb-10">
+          <CompanySettings currentUserIsAdmin={currentUserIsAdmin} />
+        </div>
       )}
 
       {/* Edit User Modal */}

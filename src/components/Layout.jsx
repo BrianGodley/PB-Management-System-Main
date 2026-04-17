@@ -71,7 +71,7 @@ export default function Layout() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
+    <div className="h-screen flex flex-col bg-gray-50">
 
       {/* ── TOP BAR: full width across entire screen ── */}
       <header
