@@ -418,7 +418,7 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
     <div className="flex-1 overflow-auto rounded-xl border border-gray-200 shadow-sm">
       <table className="text-xs w-full table-fixed" style={{ minWidth: '1120px' }}>
         <colgroup>
-          <col style={{ width:'170px' }} />
+          <col style={{ width:'115px' }} />
           <col style={{ width:'88px'  }} />
           <col style={{ width:'88px'  }} />
           {DAYS.flatMap(() => [<col style={{ width:'78px' }} />, <col style={{ width:'78px' }} />])}
