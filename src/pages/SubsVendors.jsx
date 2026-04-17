@@ -832,6 +832,13 @@ export default function SubsVendors() {
 }
 
 // ── Add / Edit Modal ─────────────────────────────────────────
+function formatPhone(value) {
+  const digits = value.replace(/\D/g, '').slice(0, 10)
+  if (digits.length < 4) return digits
+  if (digits.length < 7) return `(${digits.slice(0,3)}) ${digits.slice(3)}`
+  return `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`
+}
+
 function SubModal({ form, setForm, isEdit, onSave, onClose, onDelete, saving, error, toggleDivision, recordType }) {
   const [customInput, setCustomInput] = useState('')
 
@@ -899,7 +906,7 @@ function SubModal({ form, setForm, isEdit, onSave, onClose, onDelete, saving, er
               }}
               className="input text-sm w-full"
             >
-              <option value="">— Select a {recordType === 'vendor' ? 'material' : 'trade'} —</option>
+              <option value="">— Select one or more {recordType === 'vendor' ? 'materials' : 'trades'} —</option>
               {(recordType === 'vendor' ? MATERIAL_OPTIONS : DIVISION_OPTIONS)
                 .filter(d => !form.divisions.includes(d))
                 .map(d => <option key={d} value={d}>{d}</option>)
@@ -963,14 +970,14 @@ function SubModal({ form, setForm, isEdit, onSave, onClose, onDelete, saving, er
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Cell</label>
               <input type="tel" value={form.cell}
-                onChange={e => setForm(f => ({ ...f, cell: e.target.value }))}
-                placeholder="+1 818-555-0000" className="input text-sm w-full" />
+                onChange={e => setForm(f => ({ ...f, cell: formatPhone(e.target.value) }))}
+                placeholder="(818) 555-0000" className="input text-sm w-full" maxLength={14} />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Phone</label>
               <input type="tel" value={form.phone}
-                onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                placeholder="818-555-0000" className="input text-sm w-full" />
+                onChange={e => setForm(f => ({ ...f, phone: formatPhone(e.target.value) }))}
+                placeholder="(818) 555-0000" className="input text-sm w-full" maxLength={14} />
             </div>
           </div>
 
