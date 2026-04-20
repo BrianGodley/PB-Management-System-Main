@@ -199,6 +199,7 @@ export default function Collections() {
       const { data: existingRows } = await supabase
         .from('collection_rows').select('id').eq('week_id', targetWeek.id).limit(1)
       if (!existingRows?.length) {
+        // ── Copy collection rows ──────────────────────────────────────────
         const { data: sourceRows } = await supabase
           .from('collection_rows').select('*').eq('week_id', lastDataWeek.id).order('sort_order')
         if (sourceRows?.length) {
@@ -218,6 +219,28 @@ export default function Collections() {
             fri_inv: 0, fri_dep: 0,
           }))
           await supabase.from('collection_rows').insert(newRows)
+        }
+
+        // ── Copy payables ─────────────────────────────────────────────────
+        const { data: sourcePayables } = await supabase
+          .from('collection_payables').select('*').eq('week_id', lastDataWeek.id).order('sort_order')
+        if (sourcePayables?.length) {
+          const newPayables = sourcePayables.map(({ id, week_id, created_at, updated_at, ...rest }) => ({
+            ...rest,
+            week_id: targetWeek.id,
+          }))
+          await supabase.from('collection_payables').insert(newPayables)
+        }
+
+        // ── Copy financial planning ───────────────────────────────────────
+        const { data: sourceFinancial } = await supabase
+          .from('collection_financial').select('*').eq('week_id', lastDataWeek.id).order('sort_order')
+        if (sourceFinancial?.length) {
+          const newFinancial = sourceFinancial.map(({ id, week_id, created_at, updated_at, ...rest }) => ({
+            ...rest,
+            week_id: targetWeek.id,
+          }))
+          await supabase.from('collection_financial').insert(newFinancial)
         }
       }
     }
@@ -397,6 +420,8 @@ export default function Collections() {
                   <p>✅ All client rows, manager groups, and sections</p>
                   <p>✅ Each row's <strong>New Balance → Starting Balance</strong> for the new week</p>
                   <p>✅ Previously Delivered carries over unchanged</p>
+                  <p>✅ All Payables rows copied over as-is</p>
+                  <p>✅ All Financial Planning rows copied over as-is</p>
                   <p>🔄 Invoice &amp; Deposit columns will start blank</p>
                 </div>
               )}
