@@ -197,7 +197,7 @@ export default function Collections() {
           client_name:      row.client_name,
           sort_order:       row.sort_order,
           notes:            '',
-          prev_delivered:   0,
+          prev_delivered:   row.prev_delivered ?? 0,
           starting_balance: calcEnd(row), // carry New Balance → Starting Balance
           mon_inv: 0, mon_dep: 0,
           tue_inv: 0, tue_dep: 0,
@@ -376,8 +376,8 @@ export default function Collections() {
                   <p className="font-semibold text-amber-800 mb-1">What will be copied:</p>
                   <p>✅ All client rows, manager groups, and sections</p>
                   <p>✅ Each row's <strong>New Balance → Starting Balance</strong> for the new week</p>
+                  <p>✅ Previously Delivered carries over unchanged</p>
                   <p>🔄 Invoice &amp; Deposit columns will start blank</p>
-                  <p>🔄 Previously Delivered will start at zero</p>
                 </div>
               )}
             </div>
