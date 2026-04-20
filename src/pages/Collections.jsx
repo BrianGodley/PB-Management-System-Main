@@ -842,12 +842,11 @@ function FinancialTable({ sec, rows, total, onUpdate, onDelete, onAdd, canAdd = 
           ))}
         </tbody>
       </table>
-      <div className="px-3 py-2 border-t border-gray-100 bg-gray-50 flex items-center justify-between flex-shrink-0">
-        {canAdd
-          ? <button onClick={onAdd} className="text-xs text-green-700 hover:text-green-900 font-medium">+ Add row</button>
-          : <span />}
-        <span className="text-xs font-semibold text-gray-700">Total: {fmtC(total)}</span>
-      </div>
+      {canAdd && (
+        <div className="px-3 py-2 border-t border-gray-100 bg-gray-50 flex-shrink-0">
+          <button onClick={onAdd} className="text-xs text-green-700 hover:text-green-900 font-medium">+ Add row</button>
+        </div>
+      )}
     </div>
   )
 }
