@@ -60,6 +60,12 @@ function nextWeekEnd(weekEndingDay) {
   return d.toISOString().split('T')[0]
 }
 
+function addDays(isoDate, n) {
+  const d = new Date(isoDate + 'T12:00:00')
+  d.setDate(d.getDate() + n)
+  return d.toISOString().split('T')[0]
+}
+
 // ── Inline cell components ────────────────────────────────────────────────────
 function CellInput({ value, onSave, placeholder='' }) {
   const [local, setLocal] = useState(value ?? '')
@@ -122,6 +128,7 @@ export default function Collections() {
   const [loading,            setLoading]            = useState(true)
   const [creatingWeek,       setCreatingWeek]       = useState(false)
   const [companyWeekEndDay,  setCompanyWeekEndDay]  = useState(6) // default Saturday
+  const [newWeekModal,       setNewWeekModal]       = useState(null) // { lastDataWeek, nextDate }
 
   const selectedWeek = weeks[weekIdx] || null
 
@@ -152,12 +159,60 @@ export default function Collections() {
     })
   }, [selectedWeek?.id])
 
-  async function createWeek() {
+  // Step 1: figure out last week with data + proposed next date, then open confirmation modal
+  async function handleNewWeekClick() {
     setCreatingWeek(true)
-    const date = nextWeekEnd(companyWeekEndDay)
-    const { data, error } = await supabase.from('collection_weeks').insert({ week_ending: date }).select().single()
-    if (!error && data) { setWeeks(prev => [data, ...prev]); setWeekIdx(0) }
+    const { data: rowData } = await supabase
+      .from('collection_rows')
+      .select('week_id')
+      .in('week_id', weeks.map(w => w.id))
+    const weeksWithData = new Set((rowData || []).map(r => r.week_id))
+    // weeks is sorted descending — first match = most recent week with any rows
+    const lastDataWeek = weeks.find(w => weeksWithData.has(w.id)) || null
+    // New week date = most recent existing week + 7 days
+    const baseWeek = weeks[0]
+    const nextDate = baseWeek ? addDays(baseWeek.week_ending, 7) : nextWeekEnd(companyWeekEndDay)
     setCreatingWeek(false)
+    setNewWeekModal({ lastDataWeek, nextDate })
+  }
+
+  // Step 2: create the week and copy rows from lastDataWeek with cleared inv/dep + carried balances
+  async function confirmCreateWeek() {
+    if (!newWeekModal) return
+    const { lastDataWeek, nextDate } = newWeekModal
+    setCreatingWeek(true)
+
+    const { data: newWeek, error } = await supabase
+      .from('collection_weeks').insert({ week_ending: nextDate }).select().single()
+    if (error || !newWeek) { setCreatingWeek(false); setNewWeekModal(null); return }
+
+    if (lastDataWeek) {
+      const { data: sourceRows } = await supabase
+        .from('collection_rows').select('*').eq('week_id', lastDataWeek.id).order('sort_order')
+      if (sourceRows?.length) {
+        const newRows = sourceRows.map(row => ({
+          week_id:          newWeek.id,
+          section:          row.section,
+          manager:          row.manager,
+          client_name:      row.client_name,
+          sort_order:       row.sort_order,
+          notes:            '',
+          prev_delivered:   0,
+          starting_balance: calcEnd(row), // carry New Balance → Starting Balance
+          mon_inv: 0, mon_dep: 0,
+          tue_inv: 0, tue_dep: 0,
+          wed_inv: 0, wed_dep: 0,
+          thu_inv: 0, thu_dep: 0,
+          fri_inv: 0, fri_dep: 0,
+        }))
+        await supabase.from('collection_rows').insert(newRows)
+      }
+    }
+
+    setWeeks(prev => [newWeek, ...prev])
+    setWeekIdx(0)
+    setCreatingWeek(false)
+    setNewWeekModal(null)
   }
 
   // ── Row CRUD ────────────────────────────────────────────────────────────────
@@ -284,10 +339,62 @@ export default function Collections() {
         </div>
         <div className="flex-1" />
         <button
-          onClick={createWeek} disabled={creatingWeek}
+          onClick={handleNewWeekClick} disabled={creatingWeek}
           className="text-sm px-3 py-1.5 rounded-lg bg-green-700 text-white font-medium hover:bg-green-800 disabled:opacity-50 mr-16"
-        >+ New Week</button>
+        >{creatingWeek ? 'Loading…' : '+ New Week'}</button>
       </div>
+
+      {/* ── New Week Confirmation Modal ───────────────────────────────────── */}
+      {newWeekModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+            <div className="bg-green-700 px-6 py-4">
+              <h2 className="text-white font-bold text-lg">Create New Weekly Period</h2>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              {/* Last data week */}
+              <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Last Week With Data</p>
+                {newWeekModal.lastDataWeek ? (
+                  <p className="text-sm font-semibold text-gray-800">
+                    {prevWeekStart(newWeekModal.lastDataWeek.week_ending)} – {fmtWeekEnd(newWeekModal.lastDataWeek.week_ending)}
+                  </p>
+                ) : (
+                  <p className="text-sm text-gray-400 italic">No data found in any week</p>
+                )}
+              </div>
+              {/* New week */}
+              <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+                <p className="text-xs font-semibold text-green-600 uppercase tracking-wide mb-1">New Week To Be Created</p>
+                <p className="text-sm font-semibold text-green-900">
+                  {prevWeekStart(newWeekModal.nextDate)} – {fmtWeekEnd(newWeekModal.nextDate)}
+                </p>
+              </div>
+              {/* What will happen */}
+              {newWeekModal.lastDataWeek && (
+                <div className="text-xs text-gray-600 space-y-1.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                  <p className="font-semibold text-amber-800 mb-1">What will be copied:</p>
+                  <p>✅ All client rows, manager groups, and sections</p>
+                  <p>✅ Each row's <strong>New Balance → Starting Balance</strong> for the new week</p>
+                  <p>🔄 Invoice &amp; Deposit columns will start blank</p>
+                  <p>🔄 Previously Delivered will start at zero</p>
+                </div>
+              )}
+            </div>
+            <div className="px-6 pb-5 flex gap-3">
+              <button
+                onClick={() => setNewWeekModal(null)}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold border border-gray-300 text-gray-600 hover:bg-gray-50"
+              >Cancel</button>
+              <button
+                onClick={confirmCreateWeek}
+                disabled={creatingWeek}
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-green-700 hover:bg-green-800 disabled:opacity-50"
+              >{creatingWeek ? 'Creating…' : 'Create New Week'}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {!selectedWeek ? (
         <div className="flex-1 flex items-center justify-center text-gray-400">
