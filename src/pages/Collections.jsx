@@ -169,48 +169,66 @@ export default function Collections() {
     const weeksWithData = new Set((rowData || []).map(r => r.week_id))
     // weeks is sorted descending — first match = most recent week with any rows
     const lastDataWeek = weeks.find(w => weeksWithData.has(w.id)) || null
-    // New week date = most recent existing week + 7 days
-    const baseWeek = weeks[0]
-    const nextDate = baseWeek ? addDays(baseWeek.week_ending, 7) : nextWeekEnd(companyWeekEndDay)
+    // Next date = last week WITH DATA + 7 days (not just the most recent week in DB)
+    const nextDate = lastDataWeek
+      ? addDays(lastDataWeek.week_ending, 7)
+      : nextWeekEnd(companyWeekEndDay)
+    // Check if that week already exists in DB (e.g. was created but has no data yet)
+    const alreadyExists = weeks.find(w => w.week_ending === nextDate) || null
     setCreatingWeek(false)
-    setNewWeekModal({ lastDataWeek, nextDate })
+    setNewWeekModal({ lastDataWeek, nextDate, alreadyExists })
   }
 
-  // Step 2: create the week and copy rows from lastDataWeek with cleared inv/dep + carried balances
+  // Step 2: create (or reuse) the week and copy rows from lastDataWeek
   async function confirmCreateWeek() {
     if (!newWeekModal) return
-    const { lastDataWeek, nextDate } = newWeekModal
+    const { lastDataWeek, nextDate, alreadyExists } = newWeekModal
     setCreatingWeek(true)
 
-    const { data: newWeek, error } = await supabase
-      .from('collection_weeks').insert({ week_ending: nextDate }).select().single()
-    if (error || !newWeek) { setCreatingWeek(false); setNewWeekModal(null); return }
+    let targetWeek = alreadyExists
+    if (!targetWeek) {
+      const { data, error } = await supabase
+        .from('collection_weeks').insert({ week_ending: nextDate }).select().single()
+      if (error || !data) { setCreatingWeek(false); setNewWeekModal(null); return }
+      targetWeek = data
+      setWeeks(prev => [targetWeek, ...prev].sort((a,b) => b.week_ending.localeCompare(a.week_ending)))
+    }
 
     if (lastDataWeek) {
-      const { data: sourceRows } = await supabase
-        .from('collection_rows').select('*').eq('week_id', lastDataWeek.id).order('sort_order')
-      if (sourceRows?.length) {
-        const newRows = sourceRows.map(row => ({
-          week_id:          newWeek.id,
-          section:          row.section,
-          manager:          row.manager,
-          client_name:      row.client_name,
-          sort_order:       row.sort_order,
-          notes:            '',
-          prev_delivered:   row.prev_delivered ?? 0,
-          starting_balance: calcEnd(row), // carry New Balance → Starting Balance
-          mon_inv: 0, mon_dep: 0,
-          tue_inv: 0, tue_dep: 0,
-          wed_inv: 0, wed_dep: 0,
-          thu_inv: 0, thu_dep: 0,
-          fri_inv: 0, fri_dep: 0,
-        }))
-        await supabase.from('collection_rows').insert(newRows)
+      // Check if target week already has rows (avoid duplicating)
+      const { data: existingRows } = await supabase
+        .from('collection_rows').select('id').eq('week_id', targetWeek.id).limit(1)
+      if (!existingRows?.length) {
+        const { data: sourceRows } = await supabase
+          .from('collection_rows').select('*').eq('week_id', lastDataWeek.id).order('sort_order')
+        if (sourceRows?.length) {
+          const newRows = sourceRows.map(row => ({
+            week_id:          targetWeek.id,
+            section:          row.section,
+            manager:          row.manager,
+            client_name:      row.client_name,
+            sort_order:       row.sort_order,
+            notes:            '',
+            prev_delivered:   row.prev_delivered ?? 0,
+            starting_balance: calcEnd(row), // carry New Balance → Starting Balance
+            mon_inv: 0, mon_dep: 0,
+            tue_inv: 0, tue_dep: 0,
+            wed_inv: 0, wed_dep: 0,
+            thu_inv: 0, thu_dep: 0,
+            fri_inv: 0, fri_dep: 0,
+          }))
+          await supabase.from('collection_rows').insert(newRows)
+        }
       }
     }
 
-    setWeeks(prev => [newWeek, ...prev])
-    setWeekIdx(0)
+    // Navigate to the target week
+    setWeeks(prev => {
+      const updated = alreadyExists ? prev : prev // already set above
+      const idx = updated.findIndex(w => w.id === targetWeek.id)
+      setWeekIdx(idx >= 0 ? idx : 0)
+      return updated
+    })
     setCreatingWeek(false)
     setNewWeekModal(null)
   }
@@ -373,7 +391,9 @@ export default function Collections() {
               {/* What will happen */}
               {newWeekModal.lastDataWeek && (
                 <div className="text-xs text-gray-600 space-y-1.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-                  <p className="font-semibold text-amber-800 mb-1">What will be copied:</p>
+                  <p className="font-semibold text-amber-800 mb-1">
+                    {newWeekModal.alreadyExists ? 'This week exists but has no data — will populate it:' : 'What will be copied:'}
+                  </p>
                   <p>✅ All client rows, manager groups, and sections</p>
                   <p>✅ Each row's <strong>New Balance → Starting Balance</strong> for the new week</p>
                   <p>✅ Previously Delivered carries over unchanged</p>
