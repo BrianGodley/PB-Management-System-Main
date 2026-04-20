@@ -337,8 +337,7 @@ export default function Collections() {
   }
 
   function finTotal(sec) {
-    // Exclude formula rows — they are computed totals, not additive values
-    return financial.filter(f => f.section === sec && !f.is_formula)
+    return financial.filter(f => f.section === sec)
       .reduce((s,f) => s + (parseFloat(f.amount) || 0), 0)
   }
 
@@ -534,7 +533,6 @@ export default function Collections() {
                     onDelete={deleteFinancial}
                     onAdd={() => addFinancial(sec.key)}
                     canAdd={sec.allowAdd}
-                    cashOnHandTotal={cashOnHand}
                   />
                 ))}
 
@@ -817,20 +815,7 @@ function PayableTable({ cat, rows, subtotal, onUpdate, onDelete, onAdd }) {
 }
 
 // ── Financial Table ───────────────────────────────────────────────────────────
-function FinancialTable({ sec, rows, total, onUpdate, onDelete, onAdd, canAdd = false, cashOnHandTotal = 0 }) {
-  const dataRows    = rows.filter(r => !r.is_formula)
-  const formulaRows = rows.filter(r => r.is_formula)
-
-  function formulaValue(row) {
-    if (row.formula_type === 'pct_cash_on_hand') return cashOnHandTotal * 0.01
-    return total // default: section_total = sum of data rows
-  }
-
-  function formulaLabel(row) {
-    if (row.formula_type === 'pct_cash_on_hand') return `${row.label || 'Reserves 1%'} (1% of Cash On Hand)`
-    return row.label || 'Total'
-  }
-
+function FinancialTable({ sec, rows, total, onUpdate, onDelete, onAdd, canAdd = false }) {
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
       <div className="bg-blue-800 text-white px-4 py-2.5 flex items-center justify-between flex-shrink-0">
@@ -846,7 +831,7 @@ function FinancialTable({ sec, rows, total, onUpdate, onDelete, onAdd, canAdd = 
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
-          {dataRows.map(row => (
+          {rows.map(row => (
             <tr key={row.id} className="hover:bg-gray-50 group">
               <td className="px-2 py-1"><TextCell value={row.label||''} onSave={v => onUpdate(row.id,'label',v)} placeholder="Label…" /></td>
               <td className="px-2 py-1"><CellInput value={row.amount||''} onSave={v => onUpdate(row.id,'amount',v)} /></td>
@@ -855,31 +840,12 @@ function FinancialTable({ sec, rows, total, onUpdate, onDelete, onAdd, canAdd = 
               </td>
             </tr>
           ))}
-
-          {/* Add row button sits inside the table, just above the formula/total row */}
-          {canAdd && (
-            <tr className="bg-gray-50 border-t border-gray-100">
-              <td colSpan={3} className="px-3 py-1.5">
-                <button onClick={onAdd} className="text-xs text-green-700 hover:text-green-900 font-medium">+ Add row</button>
-              </td>
-            </tr>
-          )}
-
-          {formulaRows.map(row => (
-            <tr key={row.id} className="bg-blue-50 border-t-2 border-blue-200">
-              <td className="px-3 py-1.5 font-semibold text-blue-900 text-[11px] italic">
-                Σ {formulaLabel(row)}
-              </td>
-              <td className="px-3 py-1.5 text-right font-bold text-blue-900 text-[11px]">
-                {fmtC(formulaValue(row))}
-              </td>
-              <td />
-            </tr>
-          ))}
         </tbody>
       </table>
-      {/* Footer: total only, no add button */}
-      <div className="px-3 py-2 border-t border-gray-100 bg-gray-50 flex items-center justify-end flex-shrink-0">
+      <div className="px-3 py-2 border-t border-gray-100 bg-gray-50 flex items-center justify-between flex-shrink-0">
+        {canAdd
+          ? <button onClick={onAdd} className="text-xs text-green-700 hover:text-green-900 font-medium">+ Add row</button>
+          : <span />}
         <span className="text-xs font-semibold text-gray-700">Total: {fmtC(total)}</span>
       </div>
     </div>
