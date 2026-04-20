@@ -11,10 +11,10 @@ const DAYS = ['mon','tue','wed','thu','fri']
 const DAY_LABELS = { mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday', fri:'Friday' }
 
 const PAY_CATS = [
-  { key:'prelim',          label:'Prelims',             cols:['payee','amount_current'] },
-  { key:'credit_card',     label:'Credit Cards',        cols:['payee','amount_current','due_date','rate'] },
-  { key:'credit_account',  label:'Credit Accounts',     cols:['payee','amount_current','amount_future','due_date'] },
-  { key:'non_credit',      label:'Non-Credit Accounts', cols:['payee','amount_current','amount_future','due_date'] },
+  { key:'prelim',          label:'Prelims',             cols:['payee','amount_current'],                          subtotalCol:'amount_current' },
+  { key:'credit_card',     label:'Credit Cards',        cols:['payee','amount_current','due_date','rate'],        subtotalCol:'amount_current' },
+  { key:'credit_account',  label:'Credit Accounts',     cols:['payee','amount_current','amount_future','due_date'], subtotalCol:'amount_future'  },
+  { key:'non_credit',      label:'Non-Credit Accounts', cols:['payee','amount_current','amount_future','due_date'], subtotalCol:'amount_current' },
 ]
 
 const FIN_SECTIONS = [
@@ -332,8 +332,8 @@ export default function Collections() {
     return { totDep, totInv, totEnd }
   }
 
-  function paySubtotal(cat) {
-    return payables.filter(p => p.category === cat).reduce((s,p) => s + (parseFloat(p.amount_current) || 0), 0)
+  function paySubtotal(cat, col = 'amount_current') {
+    return payables.filter(p => p.category === cat).reduce((s,p) => s + (parseFloat(p[col]) || 0), 0)
   }
 
   function finTotal(sec, refTotal = 0) {
@@ -513,7 +513,7 @@ export default function Collections() {
                     key={cat.key}
                     cat={cat}
                     rows={payables.filter(p => p.category === cat.key)}
-                    subtotal={paySubtotal(cat.key)}
+                    subtotal={paySubtotal(cat.key, cat.subtotalCol)}
                     onUpdate={updatePayable}
                     onDelete={deletePayable}
                     onAdd={() => addPayable(cat.key)}
