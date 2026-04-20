@@ -336,10 +336,13 @@ export default function Collections() {
     return payables.filter(p => p.category === cat).reduce((s,p) => s + (parseFloat(p.amount_current) || 0), 0)
   }
 
-  function finTotal(sec) {
+  function finTotal(sec, refTotal = 0) {
     return financial
-      .filter(f => f.section === sec && f.formula_type !== 'pct_cash_on_hand')
-      .reduce((s,f) => s + (parseFloat(f.amount) || 0), 0)
+      .filter(f => f.section === sec)
+      .reduce((s, f) => {
+        if (f.formula_type === 'pct_cash_on_hand') return s + (refTotal * (f.formula_pct ?? 0.01))
+        return s + (parseFloat(f.amount) || 0)
+      }, 0)
   }
 
   const totalDeposited   = COLL_SECTIONS.reduce((s,sec) => s + collSummary(sec.key).totDep, 0)
@@ -347,7 +350,7 @@ export default function Collections() {
   const totalReceivables = rows.reduce((s,r) => s + calcEnd(r), 0)
   const totalPayables    = PAY_CATS.reduce((s,c) => s + paySubtotal(c.key), 0)
   const cashOnHand       = finTotal('cash_on_hand')
-  const autoAlloc        = finTotal('auto_alloc')
+  const autoAlloc        = finTotal('auto_alloc', cashOnHand)
   const payrollAlloc     = finTotal('payroll')
   const payablesAlloc    = finTotal('payables_alloc')
   const netTotal         = cashOnHand - autoAlloc - payrollAlloc - payablesAlloc
@@ -532,7 +535,7 @@ export default function Collections() {
                       key={sec.key}
                       sec={sec}
                       rows={financial.filter(f => f.section === sec.key)}
-                      total={finTotal(sec.key)}
+                      total={finTotal(sec.key, cashOnHand)}
                       onUpdate={updateFinancial}
                       onDelete={deleteFinancial}
                       onAdd={() => addFinancial(sec.key)}
