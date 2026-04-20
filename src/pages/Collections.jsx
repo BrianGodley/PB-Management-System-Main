@@ -522,57 +522,78 @@ export default function Collections() {
           {/* ── Financial Planning ─────────────────────────────────────────── */}
           {mainTab === 'financial' && (
             <div className="flex-1 overflow-y-auto">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pb-4 items-start">
-                {FIN_SECTIONS.map(sec => (
-                  <FinancialTable
-                    key={sec.key}
-                    sec={sec}
-                    rows={financial.filter(f => f.section === sec.key)}
-                    total={finTotal(sec.key)}
-                    onUpdate={updateFinancial}
-                    onDelete={deleteFinancial}
-                    onAdd={() => addFinancial(sec.key)}
-                    canAdd={sec.allowAdd}
-                  />
-                ))}
+              <div className="flex gap-4 pb-4 items-start">
 
-                {/* Totals summary card */}
-                <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                  <div className="bg-gray-700 text-white px-4 py-2.5">
-                    <h3 className="text-sm font-bold">5 — Financial Planning Totals</h3>
-                  </div>
-                  <div className="divide-y divide-gray-100">
-                    {[
-                      { label:'Cash On Hand',        value: cashOnHand,     color:'text-green-700' },
-                      { label:'Auto Allocations',    value: autoAlloc,      color:'text-red-600'   },
-                      { label:'Payroll Allocations', value: payrollAlloc,   color:'text-red-600'   },
-                      { label:'Payable Allocations', value: payablesAlloc,  color:'text-red-600'   },
-                    ].map(({ label, value, color }) => (
-                      <div key={label} className="flex items-center justify-between px-4 py-2 text-xs">
-                        <span className="text-gray-600">{label}</span>
-                        <span className={`font-medium ${color}`}>{fmtC(value)}</span>
+                {/* Left column: sections 1, 2, 3 + Totals — stacks tightly */}
+                <div className="flex-1 flex flex-col gap-4">
+                  {FIN_SECTIONS.filter(s => s.key !== 'payables_alloc').map(sec => (
+                    <FinancialTable
+                      key={sec.key}
+                      sec={sec}
+                      rows={financial.filter(f => f.section === sec.key)}
+                      total={finTotal(sec.key)}
+                      onUpdate={updateFinancial}
+                      onDelete={deleteFinancial}
+                      onAdd={() => addFinancial(sec.key)}
+                      canAdd={sec.allowAdd}
+                    />
+                  ))}
+
+                  {/* 5 — Financial Planning Totals */}
+                  <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                    <div className="bg-gray-700 text-white px-4 py-2.5">
+                      <h3 className="text-sm font-bold">5 — Financial Planning Totals</h3>
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                      {[
+                        { label:'Cash On Hand',        value: cashOnHand,    color:'text-green-700' },
+                        { label:'Auto Allocations',    value: autoAlloc,     color:'text-red-600'   },
+                        { label:'Payroll Allocations', value: payrollAlloc,  color:'text-red-600'   },
+                        { label:'Payable Allocations', value: payablesAlloc, color:'text-red-600'   },
+                      ].map(({ label, value, color }) => (
+                        <div key={label} className="flex items-center justify-between px-4 py-2 text-xs">
+                          <span className="text-gray-600">{label}</span>
+                          <span className={`font-medium ${color}`}>{fmtC(value)}</span>
+                        </div>
+                      ))}
+                      <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50">
+                        <span className="text-sm font-bold text-gray-800">Net Total</span>
+                        <span className={`text-sm font-bold ${netTotal >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmtC(netTotal)}</span>
                       </div>
-                    ))}
-                    <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50">
-                      <span className="text-sm font-bold text-gray-800">Net Total</span>
-                      <span className={`text-sm font-bold ${netTotal >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmtC(netTotal)}</span>
+                    </div>
+                    <div className="border-t border-gray-200 bg-gray-50/50 px-4 py-3 space-y-1.5 text-xs">
+                      {[
+                        { label:'Total Deposited (all sections)', value: totalDeposited,                       color:'text-gray-700'  },
+                        { label:'Total New Invoices',             value: totalNewInv,                          color:'text-gray-700'  },
+                        { label:'Total Receivables',              value: totalReceivables,                     color:'text-green-700' },
+                        { label:'Total Payables',                 value: totalPayables,                        color:'text-red-600'   },
+                        { label:'Receivables vs Payables',        value: totalReceivables - totalPayables,     color: totalReceivables - totalPayables >= 0 ? 'text-green-700' : 'text-red-600' },
+                      ].map(({ label, value, color }, i) => (
+                        <div key={label} className={`flex justify-between ${i === 4 ? 'font-bold border-t border-gray-200 pt-1.5' : ''}`}>
+                          <span className="text-gray-500">{label}</span>
+                          <span className={`font-semibold ${color}`}>{fmtC(value)}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                  <div className="border-t border-gray-200 bg-gray-50/50 px-4 py-3 space-y-1.5 text-xs">
-                    {[
-                      { label:'Total Deposited (all sections)', value: totalDeposited,              color:'text-gray-700' },
-                      { label:'Total New Invoices',             value: totalNewInv,                 color:'text-gray-700' },
-                      { label:'Total Receivables',             value: totalReceivables,            color:'text-green-700'},
-                      { label:'Total Payables',                value: totalPayables,               color:'text-red-600'  },
-                      { label:'Receivables vs Payables',       value: totalReceivables-totalPayables, color: totalReceivables-totalPayables >= 0 ? 'text-green-700' : 'text-red-600' },
-                    ].map(({ label, value, color }, i) => (
-                      <div key={label} className={`flex justify-between ${i === 4 ? 'font-bold border-t border-gray-200 pt-1.5' : ''}`}>
-                        <span className="text-gray-500">{label}</span>
-                        <span className={`font-semibold ${color}`}>{fmtC(value)}</span>
-                      </div>
-                    ))}
-                  </div>
                 </div>
+
+                {/* Right column: section 4 (Payables Allocations) only */}
+                <div className="flex-1 flex flex-col gap-4">
+                  {FIN_SECTIONS.filter(s => s.key === 'payables_alloc').map(sec => (
+                    <FinancialTable
+                      key={sec.key}
+                      sec={sec}
+                      rows={financial.filter(f => f.section === sec.key)}
+                      total={finTotal(sec.key)}
+                      onUpdate={updateFinancial}
+                      onDelete={deleteFinancial}
+                      onAdd={() => addFinancial(sec.key)}
+                      canAdd={sec.allowAdd}
+                    />
+                  ))}
+                </div>
+
               </div>
             </div>
           )}
