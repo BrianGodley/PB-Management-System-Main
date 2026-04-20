@@ -866,6 +866,12 @@ function CompanySettings({ currentUserIsAdmin }) {
   const [savingCompanyWeekDay,  setSavingCompanyWeekDay]  = useState(false)
   const [companyWeekMsg,        setCompanyWeekMsg]        = useState('')
 
+  // ── Company logo ──────────────────────────────────────────────────────────
+  const [logoUrl,      setLogoUrl]      = useState(null)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [logoMsg,      setLogoMsg]      = useState('')
+  const logoInputRef = useRef(null)
+
   useEffect(() => { loadSettings() }, [])
 
   async function loadSettings() {
@@ -886,8 +892,37 @@ function CompanySettings({ currentUserIsAdmin }) {
       const cwd = data.company_week_ending_day ?? 5
       setCompanyWeekDay(cwd)
       setPendingCompanyWeekDay(cwd)
+      if (data.logo_url) setLogoUrl(data.logo_url)
     }
     setLoadingCompany(false)
+  }
+
+  async function uploadLogo(file) {
+    if (!file) return
+    const ext = file.name.split('.').pop().toLowerCase()
+    if (!['png','jpg','jpeg','gif','svg','webp'].includes(ext)) {
+      setLogoMsg('error:Please upload a PNG, JPG, SVG, or WebP image.')
+      return
+    }
+    setUploadingLogo(true); setLogoMsg('')
+    const { error: upErr } = await supabase.storage
+      .from('company-assets')
+      .upload('logo', file, { upsert: true, contentType: file.type })
+    if (upErr) { setLogoMsg('error:' + upErr.message); setUploadingLogo(false); return }
+    const { data: { publicUrl } } = supabase.storage.from('company-assets').getPublicUrl('logo')
+    // append cache-buster so browser picks up the new image
+    const urlWithBust = publicUrl + '?t=' + Date.now()
+    const { data: existing } = await supabase.from('company_settings').select('id').maybeSingle()
+    const { error: dbErr } = await supabase.from('company_settings').upsert(
+      { id: existing?.id || 1, logo_url: urlWithBust, updated_at: new Date().toISOString() },
+      { onConflict: 'id' }
+    )
+    if (dbErr) { setLogoMsg('error:' + dbErr.message); setUploadingLogo(false); return }
+    setLogoUrl(urlWithBust)
+    window.dispatchEvent(new Event('company-logo-updated'))
+    setLogoMsg('ok:Logo uploaded and applied.')
+    setUploadingLogo(false)
+    setTimeout(() => setLogoMsg(''), 4000)
   }
 
   async function saveCompany(e) {
@@ -1087,6 +1122,40 @@ function CompanySettings({ currentUserIsAdmin }) {
         {currentUserIsAdmin && pendingCompanyWeekDay !== null && pendingCompanyWeekDay === companyWeekDay && !companyWeekMsg && (
           <p className="text-xs text-gray-400 mt-2">No changes to save.</p>
         )}
+      </div>
+
+      {/* ── Company Logo ─────────────────────────────────────────────────── */}
+      <div className="card">
+        <h3 className="font-semibold text-gray-800 mb-1">🖼️ Company Logo</h3>
+        <p className="text-sm text-gray-500 mb-4">Used as the app icon (favicon) in the browser tab. PNG, JPG, SVG or WebP recommended.</p>
+        <div className="flex items-center gap-4">
+          {logoUrl ? (
+            <img src={logoUrl} alt="Company logo" className="h-16 w-16 object-contain rounded-lg border border-gray-200 bg-gray-50 p-1" />
+          ) : (
+            <div className="h-16 w-16 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-300 text-2xl">🖼️</div>
+          )}
+          <div className="flex-1">
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/svg+xml,image/webp"
+              className="hidden"
+              onChange={e => uploadLogo(e.target.files?.[0])}
+              disabled={!currentUserIsAdmin}
+            />
+            {currentUserIsAdmin && (
+              <button
+                onClick={() => logoInputRef.current?.click()}
+                disabled={uploadingLogo}
+                className="px-4 py-2 rounded-xl text-sm font-bold text-white disabled:opacity-50"
+                style={{ backgroundColor: FG }}
+              >
+                {uploadingLogo ? 'Uploading…' : logoUrl ? 'Replace Logo' : 'Upload Logo'}
+              </button>
+            )}
+            {logoMsg && <div className="mt-2"><Msg m={logoMsg} /></div>}
+          </div>
+        </div>
       </div>
 
       {/* ── Period reference ──────────────────────────────────────────────── */}

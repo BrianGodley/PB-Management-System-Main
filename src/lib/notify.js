@@ -53,7 +53,7 @@ function baseTemplate({ title, body, buttonText, buttonUrl }) {
           <td style="background:${brandColor};padding:28px 32px;text-align:center;">
             <span style="font-size:28px;">🌿</span>
             <p style="margin:8px 0 0;color:#ffffff;font-size:18px;font-weight:700;letter-spacing:-0.3px;">
-              Picture Build Management System
+              Picture Build System
             </p>
           </td>
         </tr>
@@ -78,7 +78,7 @@ function baseTemplate({ title, body, buttonText, buttonUrl }) {
         <tr>
           <td style="padding:20px 32px;border-top:1px solid #f3f4f6;text-align:center;">
             <p style="margin:0;font-size:12px;color:#9ca3af;">
-              Picture Build Management System<br>
+              Picture Build System<br>
               You're receiving this because you have an account on this system.
             </p>
           </td>
@@ -97,12 +97,12 @@ function baseTemplate({ title, body, buttonText, buttonUrl }) {
  * Welcome email sent when an admin creates a new user account.
  */
 export async function sendWelcomeEmail({ to, fullName, username, password, loginUrl }) {
-  const subject = 'Welcome to Picture Build Management System'
+  const subject = 'Welcome to Picture Build System'
   const html = baseTemplate({
     title: `Welcome, ${fullName || 'there'}!`,
     body: `
       <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
-        Your account has been created on the Picture Build Management System.
+        Your account has been created on the Picture Build System.
         Here are your login credentials:
       </p>
       <table style="width:100%;background:#f9fafb;border-radius:10px;padding:16px;border:1px solid #e5e7eb;margin-bottom:16px;" cellpadding="0" cellspacing="0">

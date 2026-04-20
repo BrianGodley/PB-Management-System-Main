@@ -295,7 +295,7 @@ export default function Login() {
 
         {/* Footer */}
         <p className="text-center text-green-300/60 text-xs mt-6">
-          © {new Date().getFullYear()} Picture Build Management System
+          © {new Date().getFullYear()} Picture Build System
         </p>
       </div>
     </div>

@@ -17,6 +17,16 @@ const forestGreen = '#3A5038'
 const forestGreenDark = '#2E4030'
 const forestGreenHover = '#4A6347'
 
+function setFavicon(url) {
+  let link = document.querySelector("link[rel~='icon']")
+  if (!link) {
+    link = document.createElement('link')
+    link.rel = 'icon'
+    document.head.appendChild(link)
+  }
+  link.href = url
+}
+
 export default function Layout() {
   const { user, signOut } = useAuth()
   const location = useLocation()
@@ -25,6 +35,7 @@ export default function Layout() {
   const [showUserMenu,    setShowUserMenu]    = useState(false)
   const [isAdmin,         setIsAdmin]         = useState(false)
   const [avatarUrl,       setAvatarUrl]       = useState(null)
+  const [companyLogoUrl,  setCompanyLogoUrl]  = useState(null)
   const userMenuRef = useRef(null)
 
   // Fetch profile (admin status + avatar)
@@ -39,9 +50,28 @@ export default function Layout() {
       })
   }
 
+  // Fetch company logo and apply as favicon
+  const fetchCompanyLogo = () => {
+    supabase.from('company_settings').select('logo_url').maybeSingle()
+      .then(({ data }) => {
+        if (data?.logo_url) {
+          setCompanyLogoUrl(data.logo_url)
+          setFavicon(data.logo_url)
+        }
+      })
+  }
+
   useEffect(() => {
     fetchProfile()
+    fetchCompanyLogo()
   }, [user?.id])
+
+  // Listen for logo updates from Admin
+  useEffect(() => {
+    const handler = () => fetchCompanyLogo()
+    window.addEventListener('company-logo-updated', handler)
+    return () => window.removeEventListener('company-logo-updated', handler)
+  }, [])
 
   // Re-fetch when Profile page signals an update
   useEffect(() => {
@@ -84,13 +114,13 @@ export default function Layout() {
           {/* Logo + system name */}
           <Link to="/" className="flex items-center gap-2.5 flex-shrink-0">
             <img
-              src="/logo.png"
+              src={companyLogoUrl || '/logo.png'}
               alt="Logo"
-              className="h-9 w-9 object-contain"
+              className="h-9 w-9 object-contain rounded"
               onError={e => { e.target.style.display = 'none' }}
             />
             <span className="text-white font-semibold text-sm tracking-wide hidden sm:inline">
-              Picture Build Management System
+              Picture Build System
             </span>
           </Link>
 
