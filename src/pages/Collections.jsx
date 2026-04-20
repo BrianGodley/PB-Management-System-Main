@@ -565,6 +565,24 @@ export default function Collections() {
                     <div className="bg-gray-700 text-white px-4 py-2.5">
                       <h3 className="text-sm font-bold">5 — Financial Planning Totals</h3>
                     </div>
+
+                    {/* Collections summary — display only, not used in calculations below */}
+                    <div className="px-4 py-2 bg-blue-50 border-b-2 border-blue-200">
+                      <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wide mb-1.5">Collections Summary</p>
+                      <div className="space-y-1">
+                        {[
+                          { label:'Total Deposited (all sections)',    value: totalDeposited },
+                          { label:'Total New Invoices (all sections)', value: totalNewInv    },
+                        ].map(({ label, value }) => (
+                          <div key={label} className="flex justify-between text-xs">
+                            <span className="text-blue-700">{label}</span>
+                            <span className="font-semibold text-blue-900">{fmtC(value)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Cash allocation breakdown */}
                     <div className="divide-y divide-gray-100">
                       {[
                         { label:'Cash On Hand',        value: cashOnHand,    color:'text-green-700' },
@@ -582,15 +600,15 @@ export default function Collections() {
                         <span className={`text-sm font-bold ${netTotal >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmtC(netTotal)}</span>
                       </div>
                     </div>
+
+                    {/* Receivables vs Payables */}
                     <div className="border-t border-gray-200 bg-gray-50/50 px-4 py-3 space-y-1.5 text-xs">
                       {[
-                        { label:'Total Deposited (all sections)', value: totalDeposited,                       color:'text-gray-700'  },
-                        { label:'Total New Invoices',             value: totalNewInv,                          color:'text-gray-700'  },
-                        { label:'Total Receivables',              value: totalReceivables,                     color:'text-green-700' },
-                        { label:'Total Payables',                 value: totalPayables,                        color:'text-red-600'   },
-                        { label:'Receivables vs Payables',        value: totalReceivables - totalPayables,     color: totalReceivables - totalPayables >= 0 ? 'text-green-700' : 'text-red-600' },
+                        { label:'Total Receivables',        value: totalReceivables,                 color:'text-green-700' },
+                        { label:'Total Payables',           value: totalPayables,                    color:'text-red-600'   },
+                        { label:'Receivables vs Payables',  value: totalReceivables - totalPayables, color: totalReceivables - totalPayables >= 0 ? 'text-green-700' : 'text-red-600' },
                       ].map(({ label, value, color }, i) => (
-                        <div key={label} className={`flex justify-between ${i === 4 ? 'font-bold border-t border-gray-200 pt-1.5' : ''}`}>
+                        <div key={label} className={`flex justify-between ${i === 2 ? 'font-bold border-t border-gray-200 pt-1.5' : ''}`}>
                           <span className="text-gray-500">{label}</span>
                           <span className={`font-semibold ${color}`}>{fmtC(value)}</span>
                         </div>
