@@ -856,13 +856,19 @@ function FinancialTable({ sec, rows, total, onUpdate, onDelete, onAdd, canAdd = 
         </thead>
         <tbody className="divide-y divide-gray-100">
           {rows.map(row => {
-            if (row.formula_type === 'pct_cash_on_hand') return (
-              <tr key={row.id} className="bg-sky-50">
-                <td className="px-3 py-1.5 text-sky-800 font-semibold text-[11px] italic">{row.label || 'Reserves 1%'} <span className="font-normal text-sky-500">(1% of Cash On Hand)</span></td>
-                <td className="px-3 py-1.5 text-right font-bold text-sky-800 text-[11px]">{fmtC(cashOnHandTotal * 0.01)}</td>
-                <td />
-              </tr>
-            )
+            if (row.formula_type === 'pct_cash_on_hand') {
+              const pct = row.formula_pct ?? 0.01
+              const pctLabel = `${parseFloat((pct * 100).toPrecision(4))}%`
+              return (
+                <tr key={row.id} className="bg-sky-50">
+                  <td className="px-3 py-1.5 text-sky-800 font-semibold text-[11px] italic">
+                    {row.label} <span className="font-normal text-sky-500">({pctLabel} of Cash On Hand)</span>
+                  </td>
+                  <td className="px-3 py-1.5 text-right font-bold text-sky-800 text-[11px]">{fmtC(cashOnHandTotal * pct)}</td>
+                  <td />
+                </tr>
+              )
+            }
             return (
               <tr key={row.id} className="hover:bg-gray-50 group">
                 <td className="px-2 py-1"><TextCell value={row.label||''} onSave={v => onUpdate(row.id,'label',v)} placeholder="Label…" /></td>
