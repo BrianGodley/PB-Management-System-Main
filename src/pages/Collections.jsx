@@ -348,7 +348,7 @@ export default function Collections() {
   const totalDeposited   = COLL_SECTIONS.reduce((s,sec) => s + collSummary(sec.key).totDep, 0)
   const totalNewInv      = COLL_SECTIONS.reduce((s,sec) => s + collSummary(sec.key).totInv, 0)
   const totalReceivables = rows.reduce((s,r) => s + calcEnd(r), 0)
-  const totalPayables    = PAY_CATS.reduce((s,c) => s + paySubtotal(c.key), 0)
+  const totalPayables    = PAY_CATS.reduce((s,c) => s + paySubtotal(c.key, c.subtotalCol), 0)
   const cashOnHand       = finTotal('cash_on_hand')
   const autoAlloc        = finTotal('auto_alloc', cashOnHand)
   const payrollAlloc     = finTotal('payroll')
