@@ -239,6 +239,7 @@ export default function Collections() {
           const newFinancial = sourceFinancial.map(({ id, week_id, created_at, updated_at, ...rest }) => ({
             ...rest,
             week_id: targetWeek.id,
+            amount: rest.is_formula ? 0 : rest.amount, // formula rows are always computed dynamically
           }))
           await supabase.from('collection_financial').insert(newFinancial)
         }
@@ -336,7 +337,9 @@ export default function Collections() {
   }
 
   function finTotal(sec) {
-    return financial.filter(f => f.section === sec).reduce((s,f) => s + (parseFloat(f.amount) || 0), 0)
+    // Exclude formula rows — they are computed totals, not additive values
+    return financial.filter(f => f.section === sec && !f.is_formula)
+      .reduce((s,f) => s + (parseFloat(f.amount) || 0), 0)
   }
 
   const totalDeposited   = COLL_SECTIONS.reduce((s,sec) => s + collSummary(sec.key).totDep, 0)
@@ -813,6 +816,10 @@ function PayableTable({ cat, rows, subtotal, onUpdate, onDelete, onAdd }) {
 
 // ── Financial Table ───────────────────────────────────────────────────────────
 function FinancialTable({ sec, rows, total, onUpdate, onDelete, onAdd }) {
+  // Separate data rows from formula (auto-sum) rows
+  const dataRows    = rows.filter(r => !r.is_formula)
+  const formulaRows = rows.filter(r => r.is_formula)
+  // Formula rows always display the live sum of data rows (same as `total`)
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
       <div className="bg-blue-800 text-white px-4 py-2.5 flex items-center justify-between flex-shrink-0">
@@ -828,12 +835,25 @@ function FinancialTable({ sec, rows, total, onUpdate, onDelete, onAdd }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
-          {rows.map(row => (
+          {dataRows.map(row => (
             <tr key={row.id} className="hover:bg-gray-50 group">
               <td className="px-2 py-1"><TextCell value={row.label||''} onSave={v => onUpdate(row.id,'label',v)} placeholder="Label…" /></td>
               <td className="px-2 py-1"><CellInput value={row.amount||''} onSave={v => onUpdate(row.id,'amount',v)} /></td>
               <td className="px-1 text-center">
                 <button onClick={() => onDelete(row.id)} className="text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+              </td>
+            </tr>
+          ))}
+          {formulaRows.map(row => (
+            <tr key={row.id} className="bg-blue-50 border-t border-blue-200">
+              <td className="px-3 py-1.5 font-semibold text-blue-900 text-[11px]">
+                Σ {row.label || 'Total'}
+              </td>
+              <td className="px-3 py-1.5 text-right font-bold text-blue-900 text-[11px]">
+                {fmtC(total)}
+              </td>
+              <td className="px-1 text-center">
+                <button onClick={() => onDelete(row.id)} className="text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity text-[10px]">✕</button>
               </td>
             </tr>
           ))}
