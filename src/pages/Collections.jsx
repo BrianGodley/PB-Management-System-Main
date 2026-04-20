@@ -524,9 +524,25 @@ export default function Collections() {
             <div className="flex-1 overflow-y-auto">
               <div className="flex gap-4 pb-4 items-start">
 
-                {/* Left column: sections 1, 2, 3 + Totals — stacks tightly */}
+                {/* Left column: sections 1, 2, 3 */}
                 <div className="flex-1 flex flex-col gap-4">
                   {FIN_SECTIONS.filter(s => s.key !== 'payables_alloc').map(sec => (
+                    <FinancialTable
+                      key={sec.key}
+                      sec={sec}
+                      rows={financial.filter(f => f.section === sec.key)}
+                      total={finTotal(sec.key)}
+                      onUpdate={updateFinancial}
+                      onDelete={deleteFinancial}
+                      onAdd={() => addFinancial(sec.key)}
+                      canAdd={sec.allowAdd}
+                    />
+                  ))}
+                </div>
+
+                {/* Right column: section 4 + Totals */}
+                <div className="flex-1 flex flex-col gap-4">
+                  {FIN_SECTIONS.filter(s => s.key === 'payables_alloc').map(sec => (
                     <FinancialTable
                       key={sec.key}
                       sec={sec}
@@ -578,21 +594,6 @@ export default function Collections() {
                   </div>
                 </div>
 
-                {/* Right column: section 4 (Payables Allocations) only */}
-                <div className="flex-1 flex flex-col gap-4">
-                  {FIN_SECTIONS.filter(s => s.key === 'payables_alloc').map(sec => (
-                    <FinancialTable
-                      key={sec.key}
-                      sec={sec}
-                      rows={financial.filter(f => f.section === sec.key)}
-                      total={finTotal(sec.key)}
-                      onUpdate={updateFinancial}
-                      onDelete={deleteFinancial}
-                      onAdd={() => addFinancial(sec.key)}
-                      canAdd={sec.allowAdd}
-                    />
-                  ))}
-                </div>
 
               </div>
             </div>
