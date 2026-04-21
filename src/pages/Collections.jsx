@@ -573,7 +573,7 @@ export default function Collections() {
 
                   {/* 5 — Financial Planning */}
                   <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                    <div className="bg-purple-700 text-white px-4 py-2.5">
+                    <div className="bg-cyan-600 text-white px-4 py-2.5">
                       <h3 className="text-sm font-bold">5 — Financial Planning</h3>
                     </div>
 
@@ -629,7 +629,7 @@ export default function Collections() {
                       {[
                         { label:'Total Receivables',    value: totalReceivables, color:'text-green-700' },
                         { label:'Total Payables',       value: totalPayables,    color:'text-red-600'   },
-                        { label:'Total Available Cash', value: cashOnHand,       color: cashOnHand >= 0 ? 'text-green-700' : 'text-red-600' },
+                        { label:'Total Cash Minus Payroll', value: cashOnHand - payrollAlloc, color: (cashOnHand - payrollAlloc) >= 0 ? 'text-green-700' : 'text-red-600' },
                       ].map(({ label, value, color }) => (
                         <div key={label} className="flex justify-between">
                           <span className="text-gray-500">{label}</span>
