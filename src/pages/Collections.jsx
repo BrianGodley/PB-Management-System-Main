@@ -487,6 +487,9 @@ export default function Collections() {
                   <div className="flex items-center gap-4 text-xs text-gray-600 mr-8">
                     <span>Subtotal Deposits: <strong className="text-gray-800">{fmtC(s.totDep)}</strong></span>
                     <span>Subtotal Invoices: <strong className="text-gray-800">{fmtC(s.totInv)}</strong></span>
+                    <span className="text-gray-300">|</span>
+                    <span>Total Deposits: <strong className="text-blue-700">{fmtC(totalDeposited)}</strong></span>
+                    <span>Total Invoices: <strong className="text-blue-700">{fmtC(totalNewInv)}</strong></span>
                   </div>
                 )})()}
               </div>
