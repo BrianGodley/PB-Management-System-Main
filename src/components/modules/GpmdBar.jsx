@@ -1,9 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // GpmdBar — shared summary bar matching the Excel "GPMD bar"
-// GPMD cell is editable on the fly — changing it recalculates GP, Commission,
-// and Total Price in real time without touching saved data.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState } from 'react'
 
 const fmt  = v => `$${Math.round(v || 0).toLocaleString()}`
 const fmt2 = v => `$${(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -23,61 +20,20 @@ export default function GpmdBar({
   price      = 0,
   wrap       = false,
 }) {
-  const [localGpmd, setLocalGpmd] = useState(gpmd)
-  const [editing,   setEditing]   = useState(false)
-  const [draft,     setDraft]     = useState(gpmd)
-
   if (price <= 0) return null
 
-  // Recalculate derived values when localGpmd changes
-  const effectiveGp         = manDays * localGpmd
+  const effectiveGp         = manDays * gpmd
   const effectiveCommission = effectiveGp * 0.12
   const effectivePrice      = laborCost + burden + totalMat + (subCost || 0) + effectiveGp + effectiveCommission
 
-  function handleSave() {
-    const val = parseFloat(draft) || 425
-    setLocalGpmd(val)
-    setDraft(val)
-    setEditing(false)
-  }
-
-  function handleKeyDown(e) {
-    if (e.key === 'Enter') handleSave()
-    if (e.key === 'Escape') { setDraft(localGpmd); setEditing(false) }
-  }
-
-  // GPMD cell — rendered separately since it's interactive
+  // GPMD cell — static display
   function GpmdCell({ horizontal }) {
     return (
       <div className={`rounded-lg bg-amber-500/20 border border-amber-400/30 px-3 py-1 text-center ${horizontal ? 'min-w-[90px]' : ''}`}>
         <p className={`text-xs mb-0.5 ${horizontal ? 'whitespace-nowrap' : ''} text-amber-300`}>GPMD</p>
-        {editing ? (
-          <div className="flex items-center gap-1 justify-center">
-            <span className="text-amber-300 text-sm font-bold">$</span>
-            <input
-              type="number"
-              value={draft}
-              onChange={e => setDraft(e.target.value)}
-              onKeyDown={handleKeyDown}
-              autoFocus
-              className="w-16 bg-gray-800 text-white text-sm font-bold text-center rounded px-1 py-0 border border-amber-400 focus:outline-none"
-            />
-            <button onClick={handleSave}
-              className="text-[10px] text-amber-300 hover:text-white font-semibold whitespace-nowrap">
-              Save
-            </button>
-          </div>
-        ) : (
-          <>
-            <p className="font-bold tabular-nums text-sm text-amber-200">
-              ${localGpmd.toLocaleString()}
-            </p>
-            <button onClick={() => { setDraft(localGpmd); setEditing(true) }}
-              className="text-[10px] text-amber-400 hover:text-amber-200 underline whitespace-nowrap">
-              Change
-            </button>
-          </>
-        )}
+        <p className="font-bold tabular-nums text-sm text-amber-200">
+          ${gpmd.toLocaleString()}
+        </p>
       </div>
     )
   }
