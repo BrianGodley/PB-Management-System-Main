@@ -901,9 +901,9 @@ function PayablesAllocSection({ rows, total, onUpdate, onDelete, onAdd, paySubto
         const payTotal = paySubtotalFn(sub.key, sub.subtotalCol)
         return (
           <div key={sub.key} className="border-b border-gray-100 last:border-b-0">
-            <div className="bg-green-700 text-white px-3 py-1.5 flex items-center justify-between">
-              <span className="text-xs font-bold">{sub.label}</span>
-              <span className="text-xs text-green-100">{fmtC(payTotal)}</span>
+            <div className="bg-blue-50 border-b border-blue-100 px-3 py-1.5 flex items-center justify-between">
+              <span className="text-xs font-semibold text-blue-600">{sub.label}</span>
+              <span className="text-xs text-blue-500">{fmtC(payTotal)}</span>
             </div>
             <table className="w-full text-xs">
               <tbody className="divide-y divide-gray-100">
