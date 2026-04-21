@@ -841,7 +841,7 @@ const AMOUNT_COLS = new Set(['amount_current','amount_future'])
 
 function PayableTable({ cat, rows, subtotal, onUpdate, onDelete, onAdd }) {
   const getLabel = c => (cat.colLabels && cat.colLabels[c]) || COL_LABELS[c]
-  const visibleRows = rows.filter(r => r.payee || parseFloat(r.amount_current) || parseFloat(r.amount_future))
+  const visibleRows = rows.filter(r => (r.payee || '').trim() || (parseFloat(r.amount_current) > 0) || (parseFloat(r.amount_future) > 0))
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
       <div className="bg-green-800 text-white px-4 py-2.5 flex items-center justify-between flex-shrink-0">
