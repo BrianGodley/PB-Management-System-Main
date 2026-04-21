@@ -13,8 +13,8 @@ const DAY_LABELS = { mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday
 const PAY_CATS = [
   { key:'prelim',         label:'Prelims',         cols:['payee','amount_current'],                            subtotalCol:'amount_current' },
   { key:'credit_card',    label:'Credit Cards',    cols:['payee','amount_current','due_date','rate'],          subtotalCol:'amount_current' },
-  { key:'credit_account', label:'Credit Vendors',  cols:['payee','amount_current','amount_future','due_date'], subtotalCol:['amount_current','amount_future'], colLabels:{ amount_current:'Current', amount_future:'Future' } },
-  { key:'non_credit',     label:'Standard Vendors',cols:['payee','amount_current','amount_future','due_date'], subtotalCol:['amount_current','amount_future'], colLabels:{ amount_current:'Current', amount_future:'Future' } },
+  { key:'credit_account', label:'Credit Vendors',  cols:['payee','amount_current','amount_future','due_date'], subtotalCol:['amount_current','amount_future'], splitSubtotal:true, colLabels:{ amount_current:'Current', amount_future:'Future' } },
+  { key:'non_credit',     label:'Standard Vendors',cols:['payee','amount_current','amount_future','due_date'], subtotalCol:['amount_current','amount_future'], splitSubtotal:true, colLabels:{ amount_current:'Current', amount_future:'Future' } },
 ]
 
 const FIN_SECTIONS = [
@@ -518,6 +518,8 @@ export default function Collections() {
                     cat={cat}
                     rows={payables.filter(p => p.category === cat.key)}
                     subtotal={paySubtotal(cat.key, cat.subtotalCol)}
+                    subtotalCurrent={paySubtotal(cat.key, 'amount_current')}
+                    subtotalFuture={paySubtotal(cat.key, 'amount_future')}
                     onUpdate={updatePayable}
                     onDelete={deletePayable}
                     onAdd={() => addPayable(cat.key)}
@@ -840,14 +842,21 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
 const COL_LABELS = { payee:'Payee', amount_current:'Amount', amount_future:'Future', due_date:'Due Date', rate:'Rate' }
 const AMOUNT_COLS = new Set(['amount_current','amount_future'])
 
-function PayableTable({ cat, rows, subtotal, onUpdate, onDelete, onAdd }) {
+function PayableTable({ cat, rows, subtotal, subtotalCurrent, subtotalFuture, onUpdate, onDelete, onAdd }) {
   const getLabel = c => (cat.colLabels && cat.colLabels[c]) || COL_LABELS[c]
   const visibleRows = rows.filter(r => (r.payee || '').trim() || (parseFloat(r.amount_current) > 0) || (parseFloat(r.amount_future) > 0))
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
       <div className="bg-green-800 text-white px-4 py-2.5 flex items-center justify-between flex-shrink-0">
         <h3 className="text-sm font-bold">{cat.label}</h3>
-        <span className="text-xs font-semibold text-green-100">{fmtC(subtotal)}</span>
+        {cat.splitSubtotal
+          ? <div className="flex items-center gap-3 text-xs font-semibold text-green-100">
+              <span>Cur: {fmtC(subtotalCurrent)}</span>
+              <span className="text-green-400">|</span>
+              <span>Fut: {fmtC(subtotalFuture)}</span>
+            </div>
+          : <span className="text-xs font-semibold text-green-100">{fmtC(subtotal)}</span>
+        }
       </div>
       <table className="w-full text-xs">
         <thead className="bg-gray-50 border-b border-gray-200">
