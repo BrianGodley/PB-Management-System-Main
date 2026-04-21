@@ -930,7 +930,7 @@ function PayablesAllocSection({ rows, onUpdate, onDelete, onAddFromPayable, payS
                 >+</button>
               </div>
               {isOpen && (
-                <div className="absolute right-0 top-full z-30 bg-white border border-gray-200 rounded-lg shadow-xl min-w-[220px] max-h-52 overflow-y-auto">
+                <div className="absolute right-0 top-full z-30 bg-white border border-gray-200 rounded-lg shadow-xl min-w-[260px]">
                   <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-[10px] font-bold text-gray-400 uppercase tracking-wide">Select from {sub.label}</div>
                   {available.length === 0
                     ? <div className="px-3 py-2 text-xs text-gray-400 italic">All rows already added</div>
