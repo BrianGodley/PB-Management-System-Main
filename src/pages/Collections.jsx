@@ -571,13 +571,13 @@ export default function Collections() {
                     payablesByCategory={payablesByCategory}
                   />
 
-                  {/* 5 — Financial Planning Totals */}
+                  {/* 5 — Financial Planning */}
                   <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                    <div className="bg-gray-700 text-white px-4 py-2.5">
-                      <h3 className="text-sm font-bold">5 — Financial Planning Totals</h3>
+                    <div className="bg-purple-700 text-white px-4 py-2.5">
+                      <h3 className="text-sm font-bold">5 — Financial Planning</h3>
                     </div>
 
-                    {/* Collections summary — display only, not used in calculations below */}
+                    {/* Collections Summary */}
                     <div className="px-4 py-2 bg-blue-50 border-b-2 border-blue-200">
                       <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wide mb-1.5">Collections Summary</p>
                       <div className="space-y-1">
@@ -596,10 +596,13 @@ export default function Collections() {
                     {/* Gap */}
                     <div className="h-2 bg-gray-100 border-y border-gray-200" />
 
-                    {/* Cash allocation breakdown */}
+                    {/* Allocation Summary */}
+                    <div className="px-4 pt-2 pb-0 bg-blue-50 border-b border-blue-100">
+                      <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wide mb-1.5">Allocation Summary</p>
+                    </div>
                     <div className="divide-y divide-gray-100">
                       {[
-                        { label:'Cash On Hand',        value: cashOnHand,    color:'text-green-700' },
+                        { label:'Available Cash',      value: cashOnHand,    color:'text-green-700' },
                         { label:'Auto Allocations',    value: autoAlloc,     color:'text-red-600'   },
                         { label:'Payroll Allocations', value: payrollAlloc,  color:'text-red-600'   },
                         { label:'Payable Allocations', value: payablesAlloc, color:'text-red-600'   },
@@ -618,12 +621,15 @@ export default function Collections() {
                     {/* Gap */}
                     <div className="h-2 bg-gray-100 border-y border-gray-200" />
 
-                    {/* Receivables vs Payables */}
+                    {/* Solvency */}
+                    <div className="px-4 pt-2 pb-0 bg-blue-50 border-b border-blue-100">
+                      <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wide mb-1.5">Solvency</p>
+                    </div>
                     <div className="bg-gray-50/50 px-4 py-3 space-y-1.5 text-xs">
                       {[
                         { label:'Total Receivables',    value: totalReceivables, color:'text-green-700' },
                         { label:'Total Payables',       value: totalPayables,    color:'text-red-600'   },
-                        { label:'Total Available Cash', value: netTotal,         color: netTotal >= 0 ? 'text-green-700' : 'text-red-600' },
+                        { label:'Total Available Cash', value: cashOnHand,       color: cashOnHand >= 0 ? 'text-green-700' : 'text-red-600' },
                       ].map(({ label, value, color }) => (
                         <div key={label} className="flex justify-between">
                           <span className="text-gray-500">{label}</span>
@@ -631,10 +637,10 @@ export default function Collections() {
                         </div>
                       ))}
                       {(() => {
-                        const finalTotal = netTotal + totalReceivables - totalPayables
+                        const finalTotal = cashOnHand + totalReceivables - totalPayables
                         return (
                           <div className="flex justify-between border-t-2 border-gray-300 pt-2 mt-1">
-                            <span className="text-sm font-bold text-gray-800">Receivables vs Payables</span>
+                            <span className="text-sm font-bold text-gray-800">Cash + Receivables - Payables</span>
                             <span className={`text-sm font-bold ${finalTotal >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmtC(finalTotal)}</span>
                           </div>
                         )
