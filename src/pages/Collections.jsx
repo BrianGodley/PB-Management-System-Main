@@ -922,7 +922,6 @@ function PayablesAllocSection({ rows, onUpdate, onDelete, onAddFromPayable, payS
             <div className="bg-blue-50 border-b border-blue-100 px-3 py-1.5 flex items-center justify-between relative">
               <span className="text-xs font-semibold text-blue-600">{sub.label}</span>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-blue-500">{fmtC(payTotal)}</span>
                 <button
                   onClick={() => setOpenDropdown(isOpen ? null : sub.key)}
                   className="w-5 h-5 flex items-center justify-center rounded-full bg-blue-200 hover:bg-blue-300 text-blue-700 font-bold text-sm leading-none"
