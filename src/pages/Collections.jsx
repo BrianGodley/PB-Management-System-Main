@@ -613,7 +613,7 @@ export default function Collections() {
                         </div>
                       ))}
                       <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50">
-                        <span className="text-sm font-bold text-gray-800">Net Total</span>
+                        <span className="text-sm font-bold text-gray-800">Net Allocation</span>
                         <span className={`text-sm font-bold ${netTotal >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmtC(netTotal)}</span>
                       </div>
                     </div>
