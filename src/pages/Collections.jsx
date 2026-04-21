@@ -904,8 +904,8 @@ const PAY_ALLOC_SUBS = [
 function PayablesAllocSection({ rows, total, onUpdate, onDelete, onAddFromPayable, paySubtotalFn, payablesByCategory }) {
   const [openDropdown, setOpenDropdown] = useState(null)
   return (
-    <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
-      <div className="bg-blue-800 text-white px-4 py-2.5 flex items-center justify-between flex-shrink-0">
+    <div className="bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col">
+      <div className="bg-blue-800 text-white px-4 py-2.5 flex items-center justify-between flex-shrink-0 rounded-t-xl">
         <h3 className="text-sm font-bold">4 — Payables Allocations</h3>
         <span className="text-xs font-semibold text-blue-100">{fmtC(total)}</span>
       </div>
