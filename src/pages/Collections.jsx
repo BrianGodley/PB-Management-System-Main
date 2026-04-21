@@ -14,7 +14,7 @@ const PAY_CATS = [
   { key:'prelim',         label:'Prelims',         cols:['payee','amount_current'],                            subtotalCol:'amount_current' },
   { key:'credit_card',    label:'Credit Cards',    cols:['payee','amount_current','due_date','rate'],          subtotalCol:'amount_current' },
   { key:'credit_account', label:'Credit Vendors',  cols:['payee','amount_current','amount_future','due_date'], subtotalCol:'amount_future',  colLabels:{ amount_current:'Current', amount_future:'Future' } },
-  { key:'non_credit',     label:'Standard Vendors',cols:['payee','amount_current','amount_future','due_date'], subtotalCol:'amount_current', colLabels:{ amount_current:'Current', amount_future:'Future' } },
+  { key:'non_credit',     label:'Standard Vendors',cols:['payee','amount_current','amount_future','due_date'], subtotalCol:['amount_current','amount_future'], colLabels:{ amount_current:'Current', amount_future:'Future' } },
 ]
 
 const FIN_SECTIONS = [
@@ -333,7 +333,8 @@ export default function Collections() {
   }
 
   function paySubtotal(cat, col = 'amount_current') {
-    return payables.filter(p => p.category === cat).reduce((s,p) => s + (parseFloat(p[col]) || 0), 0)
+    const cols = Array.isArray(col) ? col : [col]
+    return payables.filter(p => p.category === cat).reduce((s,p) => s + cols.reduce((cs,c) => cs + (parseFloat(p[c]) || 0), 0), 0)
   }
 
   function finTotal(sec, refTotal = 0) {
