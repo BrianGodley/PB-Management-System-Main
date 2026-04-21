@@ -11,10 +11,10 @@ const DAYS = ['mon','tue','wed','thu','fri']
 const DAY_LABELS = { mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday', fri:'Friday' }
 
 const PAY_CATS = [
-  { key:'prelim',          label:'Prelims',             cols:['payee','amount_current'],                          subtotalCol:'amount_current' },
-  { key:'credit_card',     label:'Credit Cards',        cols:['payee','amount_current','due_date','rate'],        subtotalCol:'amount_current' },
-  { key:'credit_account',  label:'Credit Accounts',     cols:['payee','amount_current','amount_future','due_date'], subtotalCol:'amount_future'  },
-  { key:'non_credit',      label:'Non-Credit Accounts', cols:['payee','amount_current','amount_future','due_date'], subtotalCol:'amount_current' },
+  { key:'prelim',         label:'Prelims',         cols:['payee','amount_current'],                            subtotalCol:'amount_current' },
+  { key:'credit_card',    label:'Credit Cards',    cols:['payee','amount_current','due_date','rate'],          subtotalCol:'amount_current' },
+  { key:'credit_account', label:'Credit Vendors',  cols:['payee','amount_current','amount_future','due_date'], subtotalCol:'amount_future',  colLabels:{ amount_current:'Current', amount_future:'Future' } },
+  { key:'non_credit',     label:'Standard Vendors',cols:['payee','amount_current','amount_future','due_date'], subtotalCol:'amount_current', colLabels:{ amount_current:'Current', amount_future:'Future' } },
 ]
 
 const FIN_SECTIONS = [
@@ -67,7 +67,7 @@ function addDays(isoDate, n) {
 }
 
 // ── Inline cell components ────────────────────────────────────────────────────
-function CellInput({ value, onSave, placeholder='' }) {
+function CellInput({ value, onSave, placeholder='', align='right' }) {
   const [local, setLocal] = useState(value ?? '')
   const [focused, setFocused] = useState(false)
   useEffect(() => setLocal(value ?? ''), [value])
@@ -84,7 +84,7 @@ function CellInput({ value, onSave, placeholder='' }) {
       onBlur={() => { setFocused(false); if (String(local) !== String(value ?? '')) onSave(local) }}
       onKeyDown={e => { if (e.key==='Enter') e.target.blur() }}
       placeholder={placeholder}
-      className="w-full bg-transparent text-right text-xs px-1 py-0.5 focus:outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-300 rounded"
+      className={`w-full bg-transparent text-${align} text-xs px-1 py-0.5 focus:outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-300 rounded`}
     />
   )
 }
@@ -837,8 +837,11 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
 
 // ── Payable Table ─────────────────────────────────────────────────────────────
 const COL_LABELS = { payee:'Payee', amount_current:'Amount', amount_future:'Future', due_date:'Due Date', rate:'Rate' }
+const AMOUNT_COLS = new Set(['amount_current','amount_future'])
 
 function PayableTable({ cat, rows, subtotal, onUpdate, onDelete, onAdd }) {
+  const getLabel = c => (cat.colLabels && cat.colLabels[c]) || COL_LABELS[c]
+  const visibleRows = rows.filter(r => r.payee || parseFloat(r.amount_current) || parseFloat(r.amount_future))
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
       <div className="bg-green-800 text-white px-4 py-2.5 flex items-center justify-between flex-shrink-0">
@@ -848,18 +851,22 @@ function PayableTable({ cat, rows, subtotal, onUpdate, onDelete, onAdd }) {
       <table className="w-full text-xs">
         <thead className="bg-gray-50 border-b border-gray-200">
           <tr>
-            {cat.cols.map(c => <th key={c} className="px-3 py-2 text-left font-semibold text-gray-500">{COL_LABELS[c]}</th>)}
+            {cat.cols.map(c => (
+              <th key={c} className={`px-3 py-2 font-semibold text-gray-500 ${AMOUNT_COLS.has(c) ? 'text-center' : 'text-left'}`}>
+                {getLabel(c)}
+              </th>
+            ))}
             <th className="w-8" />
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
-          {rows.map(row => (
+          {visibleRows.map(row => (
             <tr key={row.id} className="hover:bg-gray-50 group">
               {cat.cols.map(c => (
-                <td key={c} className="px-2 py-1">
-                  {['amount_current','amount_future'].includes(c)
-                    ? <CellInput value={row[c]||''} onSave={v => onUpdate(row.id, c, v)} />
-                    : <TextCell  value={row[c]||''} onSave={v => onUpdate(row.id, c, v)} placeholder={COL_LABELS[c]} />}
+                <td key={c} className={`px-2 py-1 ${AMOUNT_COLS.has(c) ? 'text-center' : ''}`}>
+                  {AMOUNT_COLS.has(c)
+                    ? <CellInput value={row[c]||''} onSave={v => onUpdate(row.id, c, v)} align="center" />
+                    : <TextCell  value={row[c]||''} onSave={v => onUpdate(row.id, c, v)} placeholder={getLabel(c)} />}
                 </td>
               ))}
               <td className="px-1 text-center">
