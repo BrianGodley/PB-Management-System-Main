@@ -582,6 +582,9 @@ export default function Collections() {
                       </div>
                     </div>
 
+                    {/* Gap */}
+                    <div className="h-2 bg-gray-100 border-y border-gray-200" />
+
                     {/* Cash allocation breakdown */}
                     <div className="divide-y divide-gray-100">
                       {[
@@ -601,18 +604,30 @@ export default function Collections() {
                       </div>
                     </div>
 
+                    {/* Gap */}
+                    <div className="h-2 bg-gray-100 border-y border-gray-200" />
+
                     {/* Receivables vs Payables */}
-                    <div className="border-t border-gray-200 bg-gray-50/50 px-4 py-3 space-y-1.5 text-xs">
+                    <div className="bg-gray-50/50 px-4 py-3 space-y-1.5 text-xs">
                       {[
-                        { label:'Total Receivables',        value: totalReceivables,                 color:'text-green-700' },
-                        { label:'Total Payables',           value: totalPayables,                    color:'text-red-600'   },
-                        { label:'Receivables vs Payables',  value: totalReceivables - totalPayables, color: totalReceivables - totalPayables >= 0 ? 'text-green-700' : 'text-red-600' },
-                      ].map(({ label, value, color }, i) => (
-                        <div key={label} className={`flex justify-between ${i === 2 ? 'font-bold border-t border-gray-200 pt-1.5' : ''}`}>
+                        { label:'Total Receivables',    value: totalReceivables, color:'text-green-700' },
+                        { label:'Total Payables',       value: totalPayables,    color:'text-red-600'   },
+                        { label:'Total Available Cash', value: netTotal,         color: netTotal >= 0 ? 'text-green-700' : 'text-red-600' },
+                      ].map(({ label, value, color }) => (
+                        <div key={label} className="flex justify-between">
                           <span className="text-gray-500">{label}</span>
                           <span className={`font-semibold ${color}`}>{fmtC(value)}</span>
                         </div>
                       ))}
+                      {(() => {
+                        const finalTotal = netTotal + totalReceivables - totalPayables
+                        return (
+                          <div className="flex justify-between border-t-2 border-gray-300 pt-2 mt-1">
+                            <span className="text-sm font-bold text-gray-800">Receivables vs Payables</span>
+                            <span className={`text-sm font-bold ${finalTotal >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmtC(finalTotal)}</span>
+                          </div>
+                        )
+                      })()}
                     </div>
                   </div>
                 </div>
