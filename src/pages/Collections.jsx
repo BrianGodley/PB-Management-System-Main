@@ -364,7 +364,7 @@ export default function Collections() {
   const cashOnHand       = finTotal('cash_on_hand')
   const autoAlloc        = finTotal('auto_alloc', cashOnHand)
   const payrollAlloc     = finTotal('payroll')
-  const payablesAlloc    = finTotal('payables_alloc')
+  const payablesAlloc    = financial.filter(f => f.section === 'payables_alloc' && !f.is_formula && f.subsection).reduce((s,f) => s + (parseFloat(f.amount) || 0), 0)
   const netTotal         = cashOnHand - autoAlloc - payrollAlloc - payablesAlloc
 
   if (loading) return (
@@ -563,7 +563,7 @@ export default function Collections() {
                 {/* Right column: section 4 + Totals */}
                 <div className="flex-1 flex flex-col gap-4">
                   <PayablesAllocSection
-                    rows={financial.filter(f => f.section === 'payables_alloc' && !f.is_formula)}
+                    rows={financial.filter(f => f.section === 'payables_alloc' && !f.is_formula && f.subsection)}
                     onUpdate={updateFinancial}
                     onDelete={deleteFinancial}
                     onAddFromPayable={addFinancialFromPayable}
