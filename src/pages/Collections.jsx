@@ -556,7 +556,7 @@ export default function Collections() {
                     total={payablesAlloc}
                     onUpdate={updateFinancial}
                     onDelete={deleteFinancial}
-                    onAdd={(section, subsection) => addFinancial(section, subsection)}
+                    onAdd={addFinancial}
                     paySubtotalFn={paySubtotal}
                   />
 
@@ -964,4 +964,22 @@ function FinancialTable({ sec, rows, total, onUpdate, onDelete, onAdd, canAdd = 
               )
             }
             return (
-        
+              <tr key={row.id} className="hover:bg-gray-50 group">
+                <td className="px-2 py-1"><TextCell value={row.label||''} onSave={v => onUpdate(row.id,'label',v)} placeholder="Label…" /></td>
+                <td className="px-2 py-1"><CellInput value={row.amount||''} onSave={v => onUpdate(row.id,'amount',v)} /></td>
+                <td className="px-1 text-center">
+                  <button onClick={() => onDelete(row.id)} className="text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+      {canAdd && (
+        <div className="px-3 py-2 border-t border-gray-100 bg-gray-50 flex-shrink-0">
+          <button onClick={onAdd} className="text-xs text-green-700 hover:text-green-900 font-medium">+ Add row</button>
+        </div>
+      )}
+    </div>
+  )
+}
