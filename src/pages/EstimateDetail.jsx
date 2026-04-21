@@ -486,6 +486,22 @@ export default function EstimateDetail() {
   }, { manDays: 0, materialCost: 0, laborCost: 0, burden: 0, subCost: 0, gp: 0, commission: 0, price: 0 })
   const et = estimateTotals
 
+  // ── Per-project totals for selected project ────────────────────────────────
+  const projModules = selectedProject?.estimate_modules || []
+  const projectTotals = projModules.reduce((acc, mod) => {
+    const calc = mod.data?.calc || {}
+    acc.manDays     += parseFloat(mod.man_days      || 0)
+    acc.materialCost+= parseFloat(mod.material_cost || 0)
+    acc.laborCost   += parseFloat(mod.labor_cost    || calc.laborCost || 0)
+    acc.burden      += parseFloat(mod.labor_burden  || calc.burden    || 0)
+    acc.subCost     += parseFloat(mod.sub_cost      || calc.subCost   || 0)
+    acc.gp          += parseFloat(mod.gross_profit  || calc.gp        || 0)
+    acc.price       += parseFloat(mod.total_price   || calc.price     || 0)
+    return acc
+  }, { manDays: 0, materialCost: 0, laborCost: 0, burden: 0, subCost: 0, gp: 0, price: 0 })
+  const pt = projectTotals
+  const projGpmd = pt.manDays > 0 ? Math.round(pt.gp / pt.manDays) : 425
+
   return (
     <div className="flex flex-col h-full">
 
@@ -596,6 +612,31 @@ export default function EstimateDetail() {
           />
         )}
       </div>
+
+      {/* ── Per-project summary bar (shown when a project is selected) ── */}
+      {selectedProject && pt.price > 0 && (
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2 px-1">
+            <p className="text-xs font-bold uppercase tracking-wider text-gray-500">
+              {selectedProject.project_name} — Project Totals
+            </p>
+            <p className="text-xs text-gray-400">
+              {projModules.length} module{projModules.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+          <GpmdBar
+            totalMat={pt.materialCost}
+            totalHrs={pt.manDays * 8}
+            manDays={pt.manDays}
+            laborCost={pt.laborCost}
+            burden={pt.burden}
+            subCost={pt.subCost}
+            gpmd={projGpmd}
+            price={pt.price}
+            wrap={true}
+          />
+        </div>
+      )}
 
       {/* Three-panel layout */}
       <div className="flex gap-4 flex-1 min-h-0" style={{ minHeight: '500px' }}>
