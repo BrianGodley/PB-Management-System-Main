@@ -12,7 +12,7 @@ const DAY_LABELS = { mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday
 
 const PAY_CATS = [
   { key:'prelim',         label:'Prelims',         cols:['payee','amount_current'],                            subtotalCol:'amount_current' },
-  { key:'credit_card',    label:'Credit Cards',    cols:['payee','amount_current','due_date','rate'],          subtotalCol:'amount_current' },
+  { key:'credit_card',    label:'Credit Cards/Lines', cols:['payee','amount_current','due_date','rate'],        subtotalCol:'amount_current' },
   { key:'credit_account', label:'Credit Vendors',  cols:['payee','amount_current','amount_future','due_date'], subtotalCol:['amount_current','amount_future'], colLabels:{ amount_current:'Current', amount_future:'Future' } },
   { key:'non_credit',     label:'Standard Vendors',cols:['payee','amount_current','amount_future','due_date'], subtotalCol:['amount_current','amount_future'], colLabels:{ amount_current:'Current', amount_future:'Future' } },
 ]
@@ -855,7 +855,7 @@ const AMOUNT_COLS = new Set(['amount_current','amount_future'])
 
 function PayableTable({ cat, rows, subtotal, onUpdate, onDelete, onAdd }) {
   const getLabel = c => (cat.colLabels && cat.colLabels[c]) || COL_LABELS[c]
-  const visibleRows = rows.filter(r => (r.payee || '').trim() || (parseFloat(r.amount_current) > 0) || (parseFloat(r.amount_future) > 0))
+  const visibleRows = rows
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
       <div className="bg-green-800 text-white px-4 py-2.5 flex items-center justify-between flex-shrink-0">
