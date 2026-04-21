@@ -311,6 +311,16 @@ export default function Collections() {
     if (data) setFinancial(prev => [...prev, data])
   }
 
+  async function addFinancialFromPayable(subsection, payable, amount) {
+    const { data } = await supabase.from('collection_financial').insert({
+      week_id: selectedWeek.id, section: 'payables_alloc', subsection,
+      label: payable.payee, amount,
+      source_payable_id: payable.id,
+      sort_order: financial.filter(f => f.section === 'payables_alloc' && f.subsection === subsection).length,
+    }).select().single()
+    if (data) setFinancial(prev => [...prev, data])
+  }
+
   async function updateFinancial(id, field, value) {
     const parsed = field === 'amount' ? (parseFloat(value) || 0) : value
     setFinancial(prev => prev.map(f => f.id === id ? { ...f, [field]: parsed } : f))
@@ -350,6 +360,7 @@ export default function Collections() {
   const totalNewInv      = COLL_SECTIONS.reduce((s,sec) => s + collSummary(sec.key).totInv, 0)
   const totalReceivables = rows.reduce((s,r) => s + calcEnd(r), 0)
   const totalPayables    = PAY_CATS.reduce((s,c) => s + paySubtotal(c.key, c.subtotalCol), 0)
+  const payablesByCategory = PAY_CATS.reduce((acc,cat) => { acc[cat.key] = payables.filter(p => p.category === cat.key); return acc }, {})
   const cashOnHand       = finTotal('cash_on_hand')
   const autoAlloc        = finTotal('auto_alloc', cashOnHand)
   const payrollAlloc     = finTotal('payroll')
@@ -556,8 +567,9 @@ export default function Collections() {
                     total={payablesAlloc}
                     onUpdate={updateFinancial}
                     onDelete={deleteFinancial}
-                    onAdd={addFinancial}
+                    onAddFromPayable={addFinancialFromPayable}
                     paySubtotalFn={paySubtotal}
+                    payablesByCategory={payablesByCategory}
                   />
 
                   {/* 5 — Financial Planning Totals */}
@@ -889,7 +901,8 @@ const PAY_ALLOC_SUBS = [
   { key:'non_credit',     label:'Standard Vendors',subtotalCol:['amount_current','amount_future'] },
 ]
 
-function PayablesAllocSection({ rows, total, onUpdate, onDelete, onAdd, paySubtotalFn }) {
+function PayablesAllocSection({ rows, total, onUpdate, onDelete, onAddFromPayable, paySubtotalFn, payablesByCategory }) {
+  const [openDropdown, setOpenDropdown] = useState(null)
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
       <div className="bg-blue-800 text-white px-4 py-2.5 flex items-center justify-between flex-shrink-0">
@@ -899,32 +912,63 @@ function PayablesAllocSection({ rows, total, onUpdate, onDelete, onAdd, paySubto
       {PAY_ALLOC_SUBS.map(sub => {
         const subRows = rows.filter(r => r.subsection === sub.key)
         const payTotal = paySubtotalFn(sub.key, sub.subtotalCol)
+        const usedIds = new Set(subRows.map(r => r.source_payable_id).filter(Boolean))
+        const available = (payablesByCategory[sub.key] || []).filter(p =>
+          (p.payee || '').trim() && !usedIds.has(p.id)
+        )
+        const isOpen = openDropdown === sub.key
         return (
           <div key={sub.key} className="border-b border-gray-100 last:border-b-0">
-            <div className="bg-blue-50 border-b border-blue-100 px-3 py-1.5 flex items-center justify-between">
+            <div className="bg-blue-50 border-b border-blue-100 px-3 py-1.5 flex items-center justify-between relative">
               <span className="text-xs font-semibold text-blue-600">{sub.label}</span>
-              <span className="text-xs text-blue-500">{fmtC(payTotal)}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-blue-500">{fmtC(payTotal)}</span>
+                <button
+                  onClick={() => setOpenDropdown(isOpen ? null : sub.key)}
+                  className="w-5 h-5 flex items-center justify-center rounded-full bg-blue-200 hover:bg-blue-300 text-blue-700 font-bold text-sm leading-none"
+                  title="Add from payables"
+                >+</button>
+              </div>
+              {isOpen && (
+                <div className="absolute right-0 top-full z-30 bg-white border border-gray-200 rounded-lg shadow-xl min-w-[220px] max-h-52 overflow-y-auto">
+                  <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100 text-[10px] font-bold text-gray-400 uppercase tracking-wide">Select from {sub.label}</div>
+                  {available.length === 0
+                    ? <div className="px-3 py-2 text-xs text-gray-400 italic">All rows already added</div>
+                    : available.map(p => {
+                        const cols = Array.isArray(sub.subtotalCol) ? sub.subtotalCol : [sub.subtotalCol]
+                        const amt = cols.reduce((s,c) => s + (parseFloat(p[c]) || 0), 0)
+                        return (
+                          <button
+                            key={p.id}
+                            onClick={() => { onAddFromPayable(sub.key, p, amt); setOpenDropdown(null) }}
+                            className="w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 flex justify-between items-center gap-3 border-b border-gray-50 last:border-b-0"
+                          >
+                            <span className="text-gray-700">{p.payee}</span>
+                            <span className="text-gray-500 font-medium shrink-0">{fmtC(amt)}</span>
+                          </button>
+                        )
+                      })
+                  }
+                </div>
+              )}
             </div>
-            <table className="w-full text-xs">
-              <tbody className="divide-y divide-gray-100">
-                {subRows.map(row => (
-                  <tr key={row.id} className="hover:bg-gray-50 group">
-                    <td className="px-2 py-1">
-                      <TextCell value={row.label||''} onSave={v => onUpdate(row.id,'label',v)} placeholder="Label…" />
-                    </td>
-                    <td className="px-2 py-1 w-28">
-                      <CellInput value={row.amount||''} onSave={v => onUpdate(row.id,'amount',v)} />
-                    </td>
-                    <td className="px-1 text-center w-8">
-                      <button onClick={() => onDelete(row.id)} className="text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="px-3 py-1.5 bg-gray-50 border-t border-gray-100">
-              <button onClick={() => onAdd('payables_alloc', sub.key)} className="text-xs text-blue-700 hover:text-blue-900 font-medium">+ Add row</button>
-            </div>
+            {subRows.length > 0 && (
+              <table className="w-full text-xs">
+                <tbody className="divide-y divide-gray-100">
+                  {subRows.map(row => (
+                    <tr key={row.id} className="hover:bg-gray-50 group">
+                      <td className="px-3 py-1.5 text-gray-700">{row.label}</td>
+                      <td className="px-2 py-1 w-28">
+                        <CellInput value={row.amount||''} onSave={v => onUpdate(row.id,'amount',v)} />
+                      </td>
+                      <td className="px-1 text-center w-8">
+                        <button onClick={() => onDelete(row.id)} className="text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         )
       })}
