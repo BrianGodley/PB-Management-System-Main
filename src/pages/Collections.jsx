@@ -303,10 +303,10 @@ export default function Collections() {
   }
 
   // ── Financial CRUD ──────────────────────────────────────────────────────────
-  async function addFinancial(section) {
+  async function addFinancial(section, subsection = null) {
     const { data } = await supabase.from('collection_financial').insert({
-      week_id: selectedWeek.id, section,
-      sort_order: financial.filter(f => f.section === section).length,
+      week_id: selectedWeek.id, section, subsection,
+      sort_order: financial.filter(f => f.section === section && f.subsection === subsection).length,
     }).select().single()
     if (data) setFinancial(prev => [...prev, data])
   }
@@ -551,18 +551,14 @@ export default function Collections() {
 
                 {/* Right column: section 4 + Totals */}
                 <div className="flex-1 flex flex-col gap-4">
-                  {FIN_SECTIONS.filter(s => s.key === 'payables_alloc').map(sec => (
-                    <FinancialTable
-                      key={sec.key}
-                      sec={sec}
-                      rows={financial.filter(f => f.section === sec.key)}
-                      total={finTotal(sec.key)}
-                      onUpdate={updateFinancial}
-                      onDelete={deleteFinancial}
-                      onAdd={() => addFinancial(sec.key)}
-                      canAdd={sec.allowAdd}
-                    />
-                  ))}
+                  <PayablesAllocSection
+                    rows={financial.filter(f => f.section === 'payables_alloc' && !f.is_formula)}
+                    total={payablesAlloc}
+                    onUpdate={updateFinancial}
+                    onDelete={deleteFinancial}
+                    onAdd={(section, subsection) => addFinancial(section, subsection)}
+                    paySubtotalFn={paySubtotal}
+                  />
 
                   {/* 5 — Financial Planning Totals */}
                   <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
@@ -885,6 +881,57 @@ function PayableTable({ cat, rows, subtotal, onUpdate, onDelete, onAdd }) {
   )
 }
 
+// ── Payables Alloc Section ────────────────────────────────────────────────────
+const PAY_ALLOC_SUBS = [
+  { key:'prelim',         label:'Prelims',         subtotalCol:'amount_current' },
+  { key:'credit_card',    label:'Credit Cards',    subtotalCol:'amount_current' },
+  { key:'credit_account', label:'Credit Vendors',  subtotalCol:['amount_current','amount_future'] },
+  { key:'non_credit',     label:'Standard Vendors',subtotalCol:['amount_current','amount_future'] },
+]
+
+function PayablesAllocSection({ rows, total, onUpdate, onDelete, onAdd, paySubtotalFn }) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+      <div className="bg-blue-800 text-white px-4 py-2.5 flex items-center justify-between flex-shrink-0">
+        <h3 className="text-sm font-bold">4 — Payables Allocations</h3>
+        <span className="text-xs font-semibold text-blue-100">{fmtC(total)}</span>
+      </div>
+      {PAY_ALLOC_SUBS.map(sub => {
+        const subRows = rows.filter(r => r.subsection === sub.key)
+        const payTotal = paySubtotalFn(sub.key, sub.subtotalCol)
+        return (
+          <div key={sub.key} className="border-b border-gray-100 last:border-b-0">
+            <div className="bg-green-700 text-white px-3 py-1.5 flex items-center justify-between">
+              <span className="text-xs font-bold">{sub.label}</span>
+              <span className="text-xs text-green-100">{fmtC(payTotal)}</span>
+            </div>
+            <table className="w-full text-xs">
+              <tbody className="divide-y divide-gray-100">
+                {subRows.map(row => (
+                  <tr key={row.id} className="hover:bg-gray-50 group">
+                    <td className="px-2 py-1">
+                      <TextCell value={row.label||''} onSave={v => onUpdate(row.id,'label',v)} placeholder="Label…" />
+                    </td>
+                    <td className="px-2 py-1 w-28">
+                      <CellInput value={row.amount||''} onSave={v => onUpdate(row.id,'amount',v)} />
+                    </td>
+                    <td className="px-1 text-center w-8">
+                      <button onClick={() => onDelete(row.id)} className="text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="px-3 py-1.5 bg-gray-50 border-t border-gray-100">
+              <button onClick={() => onAdd('payables_alloc', sub.key)} className="text-xs text-blue-700 hover:text-blue-900 font-medium">+ Add row</button>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Financial Table ───────────────────────────────────────────────────────────
 function FinancialTable({ sec, rows, total, onUpdate, onDelete, onAdd, canAdd = false, cashOnHandTotal = 0 }) {
   return (
@@ -917,22 +964,4 @@ function FinancialTable({ sec, rows, total, onUpdate, onDelete, onAdd, canAdd = 
               )
             }
             return (
-              <tr key={row.id} className="hover:bg-gray-50 group">
-                <td className="px-2 py-1"><TextCell value={row.label||''} onSave={v => onUpdate(row.id,'label',v)} placeholder="Label…" /></td>
-                <td className="px-2 py-1"><CellInput value={row.amount||''} onSave={v => onUpdate(row.id,'amount',v)} /></td>
-                <td className="px-1 text-center">
-                  <button onClick={() => onDelete(row.id)} className="text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-      {canAdd && (
-        <div className="px-3 py-2 border-t border-gray-100 bg-gray-50 flex-shrink-0">
-          <button onClick={onAdd} className="text-xs text-green-700 hover:text-green-900 font-medium">+ Add row</button>
-        </div>
-      )}
-    </div>
-  )
-}
+        
