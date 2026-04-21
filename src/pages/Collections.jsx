@@ -637,10 +637,10 @@ export default function Collections() {
                         </div>
                       ))}
                       {(() => {
-                        const finalTotal = cashOnHand + totalReceivables - totalPayables
+                        const finalTotal = totalReceivables + (cashOnHand - payrollAlloc) - totalPayables
                         return (
                           <div className="flex justify-between border-t-2 border-gray-300 pt-2 mt-1">
-                            <span className="text-sm font-bold text-gray-800">Cash + Receivables - Payables</span>
+                            <span className="text-sm font-bold text-gray-800">Total Solvency</span>
                             <span className={`text-sm font-bold ${finalTotal >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmtC(finalTotal)}</span>
                           </div>
                         )
