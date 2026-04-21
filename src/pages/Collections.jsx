@@ -564,7 +564,6 @@ export default function Collections() {
                 <div className="flex-1 flex flex-col gap-4">
                   <PayablesAllocSection
                     rows={financial.filter(f => f.section === 'payables_alloc' && !f.is_formula)}
-                    total={payablesAlloc}
                     onUpdate={updateFinancial}
                     onDelete={deleteFinancial}
                     onAddFromPayable={addFinancialFromPayable}
@@ -901,13 +900,14 @@ const PAY_ALLOC_SUBS = [
   { key:'non_credit',     label:'Standard Vendors',subtotalCol:['amount_current','amount_future'] },
 ]
 
-function PayablesAllocSection({ rows, total, onUpdate, onDelete, onAddFromPayable, paySubtotalFn, payablesByCategory }) {
+function PayablesAllocSection({ rows, onUpdate, onDelete, onAddFromPayable, paySubtotalFn, payablesByCategory }) {
   const [openDropdown, setOpenDropdown] = useState(null)
+  const sectionTotal = rows.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0)
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col">
       <div className="bg-blue-800 text-white px-4 py-2.5 flex items-center justify-between flex-shrink-0 rounded-t-xl">
         <h3 className="text-sm font-bold">4 — Payables Allocations</h3>
-        <span className="text-xs font-semibold text-blue-100">{fmtC(total)}</span>
+        <span className="text-xs font-semibold text-blue-100">{fmtC(sectionTotal)}</span>
       </div>
       {PAY_ALLOC_SUBS.map(sub => {
         const subRows = rows.filter(r => r.subsection === sub.key)
