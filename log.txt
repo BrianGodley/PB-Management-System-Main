@@ -1,0 +1,5 @@
+103b6a0 Credit Vendors and Standard Vendors: split Current/Future subtotals in title bar
+6097dac Credit Vendors and Standard Vendors: title bar totals Current + Future
+08a17fb Standard Vendors: title bar total sums both Current and Future columns
+68719d6 Payables: fix card height stretching in grid layout
+4bd6ac3 Payables: filter blank rows more strictly in PayableTable
