@@ -18,7 +18,7 @@ const PAY_CATS = [
 ]
 
 const FIN_SECTIONS = [
-  { key:'cash_on_hand',   label:'1 — Cash On Hand',         allowAdd: false },
+  { key:'cash_on_hand',   label:'1 — Cash On Hand',         allowAdd: true  },
   { key:'auto_alloc',     label:'2 — Auto Allocations',     allowAdd: true  },
   { key:'payroll',        label:'3 — Payroll Allocations',  allowAdd: false },
   { key:'payables_alloc', label:'4 — Payables Allocations', allowAdd: true  },
