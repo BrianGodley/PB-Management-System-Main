@@ -1,6 +1,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // GpmdBar — shared summary bar matching the Excel "GPMD bar"
+// Pass onGpmdSave={fn} to make the GPMD cell editable; omit for read-only.
 // ─────────────────────────────────────────────────────────────────────────────
+import { useState } from 'react'
 
 const fmt  = v => `$${Math.round(v || 0).toLocaleString()}`
 const fmt2 = v => `$${(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -18,19 +20,56 @@ export default function GpmdBar({
   commission = 0,
   subCost    = 0,
   price      = 0,
-  wrap       = false,
+  onGpmdSave = null,   // if provided, GPMD cell becomes editable
 }) {
+  const [editing, setEditing] = useState(false)
+  const [draft,   setDraft]   = useState('')
+
   if (price <= 0) return null
 
   const effectiveGp         = manDays * gpmd
   const effectiveCommission = effectiveGp * 0.12
   const effectivePrice      = laborCost + burden + totalMat + (subCost || 0) + effectiveGp + effectiveCommission
 
-  // GPMD cell — static display
+  function startEdit() {
+    if (!onGpmdSave) return
+    setDraft(String(gpmd))
+    setEditing(true)
+  }
+
+  function commitEdit() {
+    const val = parseFloat(draft)
+    if (!isNaN(val) && val > 0) onGpmdSave(val)
+    setEditing(false)
+  }
+
+  // GPMD cell — editable when onGpmdSave provided, static otherwise
   function GpmdCell({ horizontal }) {
+    if (onGpmdSave && editing) {
+      return (
+        <div className={`rounded-lg bg-amber-500/20 border border-amber-400/50 px-3 py-1 text-center ${horizontal ? 'min-w-[90px]' : ''}`}>
+          <p className={`text-xs mb-0.5 ${horizontal ? 'whitespace-nowrap' : ''} text-amber-300`}>GPMD</p>
+          <input
+            autoFocus
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onBlur={commitEdit}
+            onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false) }}
+            className="w-16 bg-gray-800 border border-amber-400 rounded text-amber-200 text-sm font-bold text-center tabular-nums outline-none px-1"
+          />
+        </div>
+      )
+    }
+
     return (
-      <div className={`rounded-lg bg-amber-500/20 border border-amber-400/30 px-3 py-1 text-center ${horizontal ? 'min-w-[90px]' : ''}`}>
-        <p className={`text-xs mb-0.5 ${horizontal ? 'whitespace-nowrap' : ''} text-amber-300`}>GPMD</p>
+      <div
+        className={`rounded-lg bg-amber-500/20 border border-amber-400/30 px-3 py-1 text-center ${horizontal ? 'min-w-[90px]' : ''} ${onGpmdSave ? 'cursor-pointer hover:bg-amber-500/30 transition-colors' : ''}`}
+        onClick={startEdit}
+        title={onGpmdSave ? 'Click to edit GPMD' : undefined}
+      >
+        <p className={`text-xs mb-0.5 ${horizontal ? 'whitespace-nowrap' : ''} text-amber-300`}>
+          GPMD {onGpmdSave && <span className="text-amber-500 text-[10px]">✎</span>}
+        </p>
         <p className="font-bold tabular-nums text-sm text-amber-200">
           ${gpmd.toLocaleString()}
         </p>
@@ -50,37 +89,11 @@ export default function GpmdBar({
     { label: 'Total Price',  value: fmt(effectivePrice),                      dim: null,  green: true, big: true },
   ]
 
-  if (wrap) {
-    return (
-      <div className="bg-gray-900 text-white rounded-xl p-4 mt-2">
-        <div className="flex flex-wrap gap-y-4 gap-x-0">
-          {/* GPMD — editable, highlighted */}
-          <div className="text-center px-3" style={{ flexBasis: '20%', minWidth: '90px' }}>
-            <GpmdCell />
-          </div>
-          {staticCols.map(col => (
-            <div key={col.label} className="text-center px-3" style={{ flexBasis: '20%', minWidth: '90px' }}>
-              <p className="text-xs text-gray-400 mb-0.5">{col.label}</p>
-              <p className={`font-bold tabular-nums ${
-                col.big   ? 'text-lg text-green-400' :
-                col.green ? 'text-sm text-green-400' :
-                            'text-sm text-white'
-              }`}>
-                {col.value}
-              </p>
-              {col.dim && <p className="text-xs text-gray-500">{col.dim}</p>}
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="bg-gray-900 text-white rounded-xl p-4 mt-2">
       <div className="overflow-x-auto">
         <div className="flex gap-0 min-w-max divide-x divide-white/10">
-          {/* GPMD — editable, no left border divider */}
+          {/* GPMD cell — no left border divider */}
           <div className="pr-3">
             <GpmdCell horizontal />
           </div>

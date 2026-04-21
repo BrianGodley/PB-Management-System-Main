@@ -94,6 +94,9 @@ export default function EstimateDetail() {
     setEditingName(false)
   }
 
+  // Per-project GPMD overrides  { [projectId]: number }
+  const [projectGpmds, setProjectGpmds] = useState({})
+
   // Add / Edit module modals
   const [showModulePicker, setShowModulePicker] = useState(false)
   const [selectedType,     setSelectedType]     = useState(null)
@@ -120,6 +123,10 @@ export default function EstimateDetail() {
         .order('created_at')
       if (projs) {
         setProjects(projs)
+        // Initialise per-project GPMD overrides from DB
+        const overrides = {}
+        projs.forEach(p => { if (p.gpmd_override != null) overrides[p.id] = parseFloat(p.gpmd_override) })
+        setProjectGpmds(overrides)
         // Re-sync selected project/module if already selected
         if (selectedProject) {
           const refreshed = projs.find(p => p.id === selectedProject.id)
@@ -182,6 +189,12 @@ export default function EstimateDetail() {
       setSelectedProject(null)
       setSelectedModule(null)
     }
+  }
+
+  // ── Per-project GPMD override ─────────────────────
+  async function saveProjectGpmd(projectId, newVal) {
+    setProjectGpmds(prev => ({ ...prev, [projectId]: newVal }))
+    await supabase.from('estimate_projects').update({ gpmd_override: newVal }).eq('id', projectId)
   }
 
   // ── Modules ──────────────────────────────────────
@@ -486,6 +499,16 @@ export default function EstimateDetail() {
   }, { manDays: 0, materialCost: 0, laborCost: 0, burden: 0, subCost: 0, gp: 0, commission: 0, price: 0 })
   const et = estimateTotals
 
+  // Adjusted estimate GPMD — uses per-project override if set, otherwise natural module GP
+  const adjustedEstimateGP = projects.reduce((sum, proj) => {
+    const mods = proj.estimate_modules || []
+    const projManDays  = mods.reduce((s, m) => s + parseFloat(m.man_days || 0), 0)
+    const naturalGP    = mods.reduce((s, m) => { const c = m.data?.calc || {}; return s + parseFloat(m.gross_profit || c.gp || 0) }, 0)
+    const override     = projectGpmds[proj.id]
+    return sum + (override != null ? projManDays * override : naturalGP)
+  }, 0)
+  const adjustedEstimateGpmd = et.manDays > 0 ? Math.round(adjustedEstimateGP / et.manDays) : 425
+
   // ── Per-project totals for selected project ────────────────────────────────
   const projModules = selectedProject?.estimate_modules || []
   const projectTotals = projModules.reduce((acc, mod) => {
@@ -608,6 +631,7 @@ export default function EstimateDetail() {
             gp={et.gp}
             commission={et.commission}
             subCost={et.subCost}
+            gpmd={adjustedEstimateGpmd}
             price={et.price}
           />
         )}
@@ -617,9 +641,16 @@ export default function EstimateDetail() {
       {selectedProject && pt.price > 0 && (
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2 px-1">
-            <p className="text-xs font-bold uppercase tracking-wider text-gray-500">
-              {selectedProject.project_name} — Project Totals
-            </p>
+            <div className="flex items-center gap-3">
+              <p className="text-xs font-bold uppercase tracking-wider text-gray-500">
+                {selectedProject.project_name} — Project Totals
+              </p>
+              {projectGpmds[selectedProject.id] != null && projectGpmds[selectedProject.id] !== projGpmd && (
+                <span className="text-[10px] bg-amber-100 text-amber-700 border border-amber-300 rounded-full px-2 py-0.5 font-medium">
+                  ⚠ GPMD overridden from module average of ${projGpmd.toLocaleString()}
+                </span>
+              )}
+            </div>
             <p className="text-xs text-gray-400">
               {projModules.length} module{projModules.length !== 1 ? 's' : ''}
             </p>
@@ -631,9 +662,9 @@ export default function EstimateDetail() {
             laborCost={pt.laborCost}
             burden={pt.burden}
             subCost={pt.subCost}
-            gpmd={projGpmd}
+            gpmd={projectGpmds[selectedProject.id] ?? projGpmd}
             price={pt.price}
-            wrap={true}
+            onGpmdSave={val => saveProjectGpmd(selectedProject.id, val)}
           />
         </div>
       )}
