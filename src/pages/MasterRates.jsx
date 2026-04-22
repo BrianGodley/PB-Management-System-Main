@@ -343,13 +343,13 @@ const LABOR_COLUMNS = [
   { key: 'notes',    label: 'Notes',        placeholder: 'Optional notes' },
 ]
 
-const SUB_CATEGORY_OPTIONS = ['Concrete', 'Demo', 'General', 'Sub Haul']
+const SUB_CATEGORY_OPTIONS = ['Concrete', 'Demo', 'General', 'Pool', 'Sub Haul']
 
 const SUB_COLUMNS = [
   { key: 'company_name', label: 'Company / Name', placeholder: 'e.g. ABC Concrete Co.' },
   { key: 'trade',        label: 'Trade',          placeholder: 'e.g. Concrete, Irrigation' },
   { key: 'rate',         label: 'Rate ($)',        type: 'number', step: '0.01', prefix: '$' },
-  { key: 'unit',         label: 'Unit',            type: 'select', options: ['per day', 'per hour', 'per sqft', 'per linear ft', 'per unit', 'per cubic yard', 'per 400 sqft', 'lump sum', '$/SF', '$/CY', '$/1.5T'] },
+  { key: 'unit',         label: 'Unit',            type: 'select', options: ['per day', 'per hour', 'per sqft', 'per linear ft', 'per unit', 'per cubic yard', 'per 400 sqft', 'lump sum', '$/SF', '$/CY', '$/LF', '$/ea', 'each', '$/1.5T'] },
   { key: 'category',     label: 'Category',        type: 'select', options: SUB_CATEGORY_OPTIONS },
 ]
 

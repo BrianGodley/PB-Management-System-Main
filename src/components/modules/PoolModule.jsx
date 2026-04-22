@@ -201,7 +201,7 @@ function makeInitial(data = {}) {
 }
 
 // ── Main Calculation ──────────────────────────────────────────────────────────
-function calcPool(state, materialPrices, laborRates) {
+function calcPool(state, materialPrices, laborRates, subRates = {}) {
   const {
     pool, spa, basin, vault,
     excavation, shotcrete, tile, spillways, copingRows,
@@ -243,10 +243,10 @@ function calcPool(state, materialPrices, laborRates) {
   const excavHrs   = !isSubExcav && equipRate > 0 ? totalExcavCY / equipRate : 0
   const excavSub   = isSubExcav ? n(excavation.subCost) : 0
 
-  // ─ Shotcrete sub ─
-  const shotMatCY    = materialPrices['Shotcrete Material'] ?? SHOTCRETE_MAT_PER_CY
-  const shotLabCY    = materialPrices['Shotcrete Labor']    ?? SHOTCRETE_LABOR_PER_CY
-  const shotMin      = materialPrices['Shotcrete Minimum']  ?? SHOTCRETE_LABOR_MIN
+  // ─ Shotcrete sub (rates from subcontractor_rates, category='Pool') ─
+  const shotMatCY    = subRates['Shotcrete Material']        ?? SHOTCRETE_MAT_PER_CY
+  const shotLabCY    = subRates['Shotcrete Labor']           ?? SHOTCRETE_LABOR_PER_CY
+  const shotMin      = subRates['Shotcrete Minimum Labor']   ?? SHOTCRETE_LABOR_MIN
   const autoShotcreteSub = totalShotCY * shotMatCY + Math.max(shotMin, totalShotCY * shotLabCY)
   const shotcreteSub = n(shotcrete.manualSubCost) || autoShotcreteSub
 
@@ -304,7 +304,7 @@ function calcPool(state, materialPrices, laborRates) {
     raisedMat += sqft * matRate + corners * (def.mat * 0.2)
   })
 
-  // ─ Interior Finish ─
+  // ─ Interior Finish (rates from subcontractor_rates, category='Pool') ─
   let interiorSub = 0
   activeStructs.forEach(({ iKey, s }) => {
     const fin = interiorFinish[iKey] || {}
@@ -313,7 +313,7 @@ function calcPool(state, materialPrices, laborRates) {
       interiorSub += manSub
     } else {
       const sf = n(s.waterSF)
-      const priceSF = materialPrices[`Interior - ${fin.type}`] ?? INTERIOR_DEFAULTS[fin.type] ?? 45
+      const priceSF = subRates[`Interior Finish - ${fin.type}`] ?? INTERIOR_DEFAULTS[fin.type] ?? 45
       interiorSub += sf * priceSF
     }
   })
@@ -327,28 +327,28 @@ function calcPool(state, materialPrices, laborRates) {
     equipmentSub += qty * unitCost
   })
 
-  // ─ Plumbing ─
-  const plumbBase = PLUMBING_BASES[plumbing.baseType] ?? 4500
+  // ─ Plumbing (rates from subcontractor_rates, category='Pool') ─
+  const plumbBaseRate = subRates[`Plumbing ${plumbing.baseType}`] ?? PLUMBING_BASES[plumbing.baseType] ?? 4500
   let plumbSub
   if (n(plumbing.manualSubCost) > 0) {
     plumbSub = n(plumbing.manualSubCost)
   } else {
-    plumbSub = plumbBase
-      + (plumbing.over20ft  ? 300 : 0)
-      + (plumbing.remodel   ? 200 : 0)
-      + n(plumbing.extraLights)    * 150
-      + n(plumbing.sheerDescents)  * 450
+    plumbSub = plumbBaseRate
+      + (plumbing.over20ft  ? (subRates['Plumbing Over 20ft Add'] ?? 300) : 0)
+      + (plumbing.remodel   ? (subRates['Plumbing Remodel Add']   ?? 200) : 0)
+      + n(plumbing.extraLights)   * (subRates['Plumbing Extra Light']    ?? 150)
+      + n(plumbing.sheerDescents) * (subRates['Plumbing Sheer Descent']  ?? 450)
   }
 
-  // ─ Steel ─
+  // ─ Steel (rates from subcontractor_rates, category='Pool') ─
   let steelSub
   if (n(steel.manualSubCost) > 0) {
     steelSub = n(steel.manualSubCost)
   } else {
-    // Auto: pool perimeter × $8/LF + spa bonus
-    const poolPerim = n(pool.perimLF)
-    const spaBonus  = spa.enabled ? 200 : 0
-    steelSub = poolPerim * 8 + spaBonus
+    const poolPerim   = n(pool.perimLF)
+    const steelPerLF  = subRates['Steel Per LF']   ?? 8
+    const steelSpaBonus = subRates['Steel Spa Bonus'] ?? 200
+    steelSub = poolPerim * steelPerLF + (spa.enabled ? steelSpaBonus : 0)
   }
 
   // ─ Manual rows ─
@@ -463,20 +463,25 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
   const [state, setState] = useState(() => makeInitial(initialData))
   const [materialPrices, setMaterialPrices] = useState({})
   const [laborRates, setLaborRates]         = useState({})
+  const [subRates, setSubRates]             = useState({})
   const [loadingRates, setLoadingRates]     = useState(true)
 
   useEffect(() => {
     async function fetchRates() {
-      const [matRes, labRes] = await Promise.all([
+      const [matRes, labRes, subRes] = await Promise.all([
         supabase.from('material_rates').select('name,unit_cost').eq('category', 'Pool'),
         supabase.from('labor_rates').select('name,rate').eq('category', 'Pool'),
+        supabase.from('subcontractor_rates').select('trade,rate').eq('category', 'Pool'),
       ])
       const mp = {}
       ;(matRes.data || []).forEach(r => { mp[r.name] = parseFloat(r.unit_cost) })
       const lr = {}
       ;(labRes.data || []).forEach(r => { lr[r.name] = parseFloat(r.rate) })
+      const sr = {}
+      ;(subRes.data || []).forEach(r => { sr[r.trade] = parseFloat(r.rate) })
       setMaterialPrices(mp)
       setLaborRates(lr)
+      setSubRates(sr)
       setLoadingRates(false)
     }
     fetchRates()
@@ -485,7 +490,7 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
   const upd = (key, val) => setState(p => ({ ...p, [key]: val }))
   const updStruct = (key, val) => setState(p => ({ ...p, [key]: val }))
 
-  const calc = calcPool(state, materialPrices, laborRates)
+  const calc = calcPool(state, materialPrices, laborRates, subRates)
   const fmt2 = v => `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   function handleSave() {
@@ -493,6 +498,7 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
       ...state,
       materialPrices,
       laborRates,
+      subRates,
       calc,
     }
     onSave({
@@ -655,7 +661,7 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
           <div>
             <Label text="Auto Sub Total" />
             <div className="input text-sm py-1.5 bg-gray-50 text-gray-600">
-              {fmt2(calcPool(state, materialPrices, laborRates).shotcreteSub)}
+              {fmt2(calcPool(state, materialPrices, laborRates, subRates).shotcreteSub)}
               <span className="text-xs text-gray-400 ml-1">auto</span>
             </div>
           </div>
@@ -673,8 +679,10 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
           </div>
           <div className="flex items-end pb-1">
             <p className="text-xs text-gray-400">
-              {calc.totalShotCY.toFixed(1)} CY × ${SHOTCRETE_MAT_PER_CY}/CY mat
-              + max($3,500, {calc.totalShotCY.toFixed(1)} CY × ${SHOTCRETE_LABOR_PER_CY}/CY lab)
+              {calc.totalShotCY.toFixed(1)} CY
+              × ${(subRates['Shotcrete Material'] ?? SHOTCRETE_MAT_PER_CY)}/CY mat
+              + max(${(subRates['Shotcrete Minimum Labor'] ?? SHOTCRETE_LABOR_MIN).toLocaleString()},
+              CY × ${(subRates['Shotcrete Labor'] ?? SHOTCRETE_LABOR_PER_CY)}/CY lab)
             </p>
           </div>
         </div>
@@ -865,7 +873,7 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
             ['Infinity Basin', state.basin], ['Cover Vault', state.vault],
           ].filter(([,s]) => s.enabled).map(([k, s]) => {
             const fin = state.interiorFinish[k] || defaultInteriorStruct()
-            const priceSF = materialPrices[`Interior - ${fin.type}`] ?? INTERIOR_DEFAULTS[fin.type] ?? 45
+            const priceSF = subRates[`Interior Finish - ${fin.type}`] ?? INTERIOR_DEFAULTS[fin.type] ?? 45
             const autoSub = n(s.waterSF) * priceSF
             return (
               <div key={k} className="border border-gray-200 rounded-lg p-3">
@@ -879,7 +887,7 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
                     </select>
                   </div>
                   <div>
-                    <Label text="Auto Sub" />
+                    <Label text="Auto Sub" sub={`$${priceSF}/SF`} />
                     <div className="input text-sm py-1.5 bg-gray-50 text-gray-600">
                       {autoSub > 0 ? fmt2(autoSub) : '—'}
                     </div>
@@ -1000,6 +1008,7 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
           <div className="flex items-end pb-1">
             <p className="text-xs text-gray-400">
               Auto: {fmt2(calc.plumbSub)}
+              <br />Base: ${(subRates[`Plumbing ${state.plumbing.baseType}`] ?? PLUMBING_BASES[state.plumbing.baseType] ?? 4500).toLocaleString()}
             </p>
           </div>
         </div>
@@ -1030,7 +1039,7 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
           </div>
           <div className="flex items-end pb-1">
             <p className="text-xs text-gray-400">
-              Auto: pool perimeter × $8/LF{state.spa.enabled ? ' + $200 spa' : ''}
+              Auto: pool perimeter × ${subRates['Steel Per LF'] ?? 8}/LF{state.spa.enabled ? ` + $${subRates['Steel Spa Bonus'] ?? 200} spa` : ''}
             </p>
           </div>
         </div>
