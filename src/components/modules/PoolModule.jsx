@@ -1079,31 +1079,6 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
         </div>
       </div>
 
-      {/* ─── 13. Financial Settings ─── */}
-      <div>
-        <SectionHeader title="Financial Settings" />
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label text="Labor Rate" sub="$/hr" />
-            <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-              <NumInput
-                value={state.laborRatePerHour}
-                onChange={v => upd('laborRatePerHour', v)}
-                className="pl-6"
-              />
-            </div>
-          </div>
-          <div>
-            <Label text="GPMD" sub="$/man-day" />
-            <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-              <NumInput value={state.gpmd} onChange={v => upd('gpmd', v)} className="pl-6" />
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* ─── Summary bar ─── */}
       <GpmdBar
         totalMat={calc.totalMat}
