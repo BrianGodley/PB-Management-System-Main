@@ -55,6 +55,15 @@ const MODULE_TYPES = [
   'Finishes',
   'Drainage',
   'Lighting',
+  'Steps',
+]
+
+const MODULE_GROUPS = [
+  { label: 'Demo',        items: ['Hand Demo', 'Mini Skid Steer Demo', 'Skid Steer Demo'] },
+  { label: 'Underground', items: ['Utilities', 'Drainage'] },
+  { label: 'Flatwork',    items: ['Concrete', 'Pavers', 'Artificial Turf', 'Ground Treatments', 'Steps'] },
+  { label: 'Yard Features', items: ['Pool', 'Outdoor Kitchen', 'Fire Pit', 'Walls', 'Columns', 'Water Features', 'Lighting'] },
+  { label: 'Other',       items: ['Irrigation', 'Planting', 'Finishes'] },
 ]
 
 const TYPE_COLORS = {
@@ -1048,15 +1057,22 @@ export default function EstimateDetail() {
               <h2 className="text-xl font-bold text-gray-900">{selectedProject?.project_name}</h2>
               <p className="text-sm text-gray-500 mt-0.5">Select a module type</p>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-72 overflow-y-auto">
-              {MODULE_TYPES.map(type => (
-                <button
-                  key={type}
-                  onClick={() => setSelectedType(type)}
-                  className="text-left px-3 py-2.5 rounded-lg border border-gray-200 hover:border-green-500 hover:bg-green-50 text-sm font-medium text-gray-700 hover:text-green-800 transition-colors"
-                >
-                  {type}
-                </button>
+            <div className="space-y-4 max-h-[28rem] overflow-y-auto pr-1">
+              {MODULE_GROUPS.map(({ label, items }) => (
+                <div key={label}>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5 px-0.5">{label}</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {items.map(type => (
+                      <button
+                        key={type}
+                        onClick={() => setSelectedType(type)}
+                        className="text-left px-3 py-2.5 rounded-lg border border-gray-200 hover:border-green-500 hover:bg-green-50 text-sm font-medium text-gray-700 hover:text-green-800 transition-colors"
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
             <button onClick={closeModuleFlow} className="btn-secondary w-full mt-4 text-sm">Cancel</button>
