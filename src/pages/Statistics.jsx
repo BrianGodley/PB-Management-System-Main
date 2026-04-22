@@ -2963,7 +2963,7 @@ export default function Statistics() {
       )}
 
       {/* ── COMBINED MODULE HEADER + CONTROLS ───────────────────────────── */}
-      <div className="flex items-center gap-2 px-4 lg:px-6 py-2 bg-white border-b border-gray-200 flex-shrink-0 flex-wrap">
+      <div className="flex items-center gap-2 px-6 pt-6 pb-4 bg-gray-50 border-b border-gray-200 flex-shrink-0 flex-wrap">
 
         {/* Title */}
         <h1 className="text-xl font-bold text-gray-900 flex-shrink-0">Statistics</h1>
