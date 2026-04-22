@@ -9,19 +9,15 @@ import GpmdBar from './GpmdBar'
 // ─────────────────────────────────────────────────────────────────────────────
 
 const OK_RATES = {
-  // ── Structure ───────────────────────────────────────────────────────────────
+  // ── Material costs ──────────────────────────────────────────────────────────
   bbqBlock:         { dbName: 'BBQ Block',              fallback: 2.50   },  // $/block
   bbqRebar:         { dbName: 'BBQ Rebar',              fallback: 0.40   },  // $/LF
   bbqConcrete:      { dbName: 'BBQ Concrete',           fallback: 149.50 },  // $/CY (footing & counter)
   bbqFillMat:       { dbName: 'BBQ Fill Material',      fallback: 60.00  },  // $/CY grout/fill
-
-  // ── Appliances & Services ──────────────────────────────────────────────────
   applianceHardware:{ dbName: 'BBQ Appliance Hardware', fallback: 3.00   },  // $/appliance (misc hardware)
   gficOutlet:       { dbName: 'GFIC Outlet - BBQ',      fallback: 80.00  },  // $/outlet
   sinkPlumbing:     { dbName: 'Sink Plumbing - BBQ',    fallback: 115.00 },  // $ flat
   gasPipe:          { dbName: 'Gas Pipe - BBQ',         fallback: 3.00   },  // $/LF
-
-  // ── Wall Finishes ──────────────────────────────────────────────────────────
   sandStucco:       { dbName: 'Sand Stucco - BBQ',      fallback: 0.00   },  // $/SF
   smoothStucco:     { dbName: 'Smooth Stucco - BBQ',    fallback: 0.00   },  // $/SF
   ledgerstone:      { dbName: 'Ledgerstone - BBQ',      fallback: 10.00  },  // $/SF
@@ -29,6 +25,28 @@ const OK_RATES = {
   tile:             { dbName: 'Tile - BBQ',             fallback: 6.50   },  // $/SF
   realFlagstone:    { dbName: 'Real Flagstone - BBQ',   fallback: 400.00 },  // $/ton (default editable)
   realStone:        { dbName: 'Real Stone - BBQ',       fallback: 400.00 },  // $/ton (default editable)
+
+  // ── Labor productivity rates ────────────────────────────────────────────────
+  excavateLab:      { dbName: 'BBQ Excavate Labor Rate',        fallback: 5      },  // CF/hr
+  rebarLab:         { dbName: 'BBQ Rebar Labor Rate',           fallback: 146    },  // LF/day
+  pourFootingLab:   { dbName: 'BBQ Pour Footing Labor Rate',    fallback: 4      },  // hrs/CY
+  installBlockLab:  { dbName: 'BBQ Block Install Labor Rate',   fallback: 60     },  // blocks/day
+  fillBlockLab:     { dbName: 'BBQ Fill Block Labor Rate',      fallback: 146    },  // blocks/day (×80/75 factor in calc)
+  counterFormLab:   { dbName: 'BBQ Counter Form Labor Rate',    fallback: 20     },  // LF of form/hr (×2 LF/SF in calc)
+  counterPourLab:   { dbName: 'BBQ Counter Pour Labor Rate',    fallback: 50     },  // SF/day
+  counterBroomLab:  { dbName: 'BBQ Counter Broom Labor Rate',   fallback: 60     },  // SF/day
+  counterPolishLab: { dbName: 'BBQ Counter Polish Labor Rate',  fallback: 18     },  // SF/day
+  applianceLab:     { dbName: 'BBQ Appliance Labor Rate',       fallback: 2.75   },  // appliances/day
+  gficLab:          { dbName: 'BBQ GFIC Labor Rate',            fallback: 2      },  // hrs/unit
+  sinkLab:          { dbName: 'BBQ Sink Labor Rate',            fallback: 4      },  // hrs flat
+  gasTrenchLab:     { dbName: 'BBQ Gas Trench Labor Rate',      fallback: 35     },  // LF/day
+  sandStuccoLab:    { dbName: 'Sand Stucco - BBQ Labor Rate',   fallback: 92     },  // SF/day
+  smoothStuccoLab:  { dbName: 'Smooth Stucco - BBQ Labor Rate', fallback: 65     },  // SF/day
+  ledgerstoneLab:   { dbName: 'Ledgerstone - BBQ Labor Rate',   fallback: 24     },  // SF/day
+  stackedStoneLab:  { dbName: 'Stacked Stone - BBQ Labor Rate', fallback: 24     },  // SF/day
+  tileLab:          { dbName: 'Tile - BBQ Labor Rate',          fallback: 0.2867 },  // hrs/SF (layout+install combined)
+  flagstoneLab:     { dbName: 'Real Flagstone - BBQ Labor Rate',fallback: 0.4487 },  // hrs/SF (delivery+install+seal)
+  realStoneLab:     { dbName: 'Real Stone - BBQ Labor Rate',    fallback: 0.8954 },  // hrs/SF (transport+install+seal)
 }
 
 const DEFAULTS = {
@@ -73,38 +91,30 @@ function calcOutdoorKitchen(state, lrph = DEFAULTS.laborRatePerHour, mp = {}, gp
   const fillCY       = (n(bbqHeightIn) / 12) * n(bbqLengthLF) * 0.25 / 27 / 2
   const counterCY    = n(counterSF) * 0.33 / 27
 
-  // ── BBQ Install Labor Hours ─────────────────────────────────────────────────
-  const layoutLab         = n(layoutHrs)
-  const excavateLab       = totalLF > 0 ? (totalLF * footingAreaSF * 12) / 5 : 0
-  // ^^ cubic feet / 5 where footingAreaSF*12 = CF/LF... actually formula is:
-  // Q5 = (totalLF * (footingDepth_in * footingWidth_in / 144)) / 5
-  // = totalLF * footingAreaSF / 5  (in SF*LF = CF... no: LF * SF = CF? LF * SF/LF = SF... )
-  // Actually the Excel formula Q5 = (SUM(F7+F9)*(F11*E11)/144)/5
-  //   = totalLF * (footingW*footingD/144) / 5
-  //   This gives LF * SF/LF ... hmm units: LF * (in^2 / in^2/SF) = LF * SF ... ??
-  // Let me just use it as-is: (totalLF * footingAreaSF) / 5 hours
-  const excavateHrs       = totalLF > 0 ? (totalLF * footingAreaSF) / 5 : 0
-  const rebarHrs          = rebarLF > 0 ? (rebarLF / 146) * 8 : 0
-  const pourFootingHrs    = footingCY > 0 ? footingCY * 4 : 0
-  const installBlockHrs   = blockWaste > 0 ? (blockWaste / 60) * 8 : 0
-  const fillBlockHrs      = blockRaw > 0 ? ((80 / 75) * blockRaw / 146) * 8 : 0
-  const counterFormHrs    = n(counterSF) > 0 ? (n(counterSF) * 2) / 20 : 0
-  const counterPourHrs    = n(counterSF) > 0 ? (n(counterSF) / 50) * 8 : 0
-  const counterBroomHrs   = counterFinish === 'Broom Finish' ? (n(counterSF) / 60) * 8 : 0
-  const counterPolishHrs  = counterFinish === 'Polished Finish' ? (n(counterSF) / 18) * 8 : 0
-  const installAppHrs     = n(applianceCount) > 0 ? (n(applianceCount) / 2.75) * 8 : 0
-  const gficHrs           = n(gficCount) * 2
-  const sinkHrs           = sinkYN === 'Yes' ? 4 : 0
-  const gasHrs            = n(gasTrenchLF) > 0 ? (n(gasTrenchLF) / 35) * 8 : 0
+  // ── BBQ Install Labor Hours (all rates from DB) ──────────────────────────────
+  const layoutLab        = n(layoutHrs)
+  const excavateHrs      = totalLF > 0 ? (totalLF * footingAreaSF) / p(OK_RATES.excavateLab.dbName, OK_RATES.excavateLab.fallback) : 0
+  const rebarHrs         = rebarLF > 0 ? (rebarLF / p(OK_RATES.rebarLab.dbName, OK_RATES.rebarLab.fallback)) * 8 : 0
+  const pourFootingHrs   = footingCY > 0 ? footingCY * p(OK_RATES.pourFootingLab.dbName, OK_RATES.pourFootingLab.fallback) : 0
+  const installBlockHrs  = blockWaste > 0 ? (blockWaste / p(OK_RATES.installBlockLab.dbName, OK_RATES.installBlockLab.fallback)) * 8 : 0
+  const fillBlockHrs     = blockRaw > 0 ? ((80 / 75) * blockRaw / p(OK_RATES.fillBlockLab.dbName, OK_RATES.fillBlockLab.fallback)) * 8 : 0
+  const counterFormHrs   = n(counterSF) > 0 ? (n(counterSF) * 2) / p(OK_RATES.counterFormLab.dbName, OK_RATES.counterFormLab.fallback) : 0
+  const counterPourHrs   = n(counterSF) > 0 ? (n(counterSF) / p(OK_RATES.counterPourLab.dbName, OK_RATES.counterPourLab.fallback)) * 8 : 0
+  const counterBroomHrs  = counterFinish === 'Broom Finish' ? (n(counterSF) / p(OK_RATES.counterBroomLab.dbName, OK_RATES.counterBroomLab.fallback)) * 8 : 0
+  const counterPolishHrs = counterFinish === 'Polished Finish' ? (n(counterSF) / p(OK_RATES.counterPolishLab.dbName, OK_RATES.counterPolishLab.fallback)) * 8 : 0
+  const installAppHrs    = n(applianceCount) > 0 ? (n(applianceCount) / p(OK_RATES.applianceLab.dbName, OK_RATES.applianceLab.fallback)) * 8 : 0
+  const gficHrs          = n(gficCount) * p(OK_RATES.gficLab.dbName, OK_RATES.gficLab.fallback)
+  const sinkHrs          = sinkYN === 'Yes' ? p(OK_RATES.sinkLab.dbName, OK_RATES.sinkLab.fallback) : 0
+  const gasHrs           = n(gasTrenchLF) > 0 ? (n(gasTrenchLF) / p(OK_RATES.gasTrenchLab.dbName, OK_RATES.gasTrenchLab.fallback)) * 8 : 0
 
-  // ── Finish Labor Hours ──────────────────────────────────────────────────────
-  const sandStuccoHrs    = n(sandStuccoSF) > 0 ? (n(sandStuccoSF) / 92) * 8 : 0
-  const smoothStuccoHrs  = n(smoothStuccoSF) > 0 ? (n(smoothStuccoSF) / 65) * 8 : 0
-  const ledgerstoneHrs   = n(ledgerstoneSF) > 0 ? (n(ledgerstoneSF) / 24) * 8 : 0
-  const stackedStoneHrs  = n(stackedStoneSF) > 0 ? (n(stackedStoneSF) / 24) * 8 : 0
-  const realStoneHrs     = n(realStoneSF) > 0 ? (n(realStoneSF)/40 + n(realStoneSF)/13 + n(realStoneSF)/100) * 8 : 0
-  const tileHrs          = n(tileSF) > 0 ? (n(tileSF)/400 + n(tileSF)/30) * 8 : 0
-  const flagstoneHrs     = n(flagstoneSF) > 0 ? (n(flagstoneSF)/50 + n(flagstoneSF)/35 + n(flagstoneSF)/133) * 8 : 0
+  // ── Finish Labor Hours (all rates from DB) ────────────────────────────────
+  const sandStuccoHrs   = n(sandStuccoSF) > 0 ? (n(sandStuccoSF) / p(OK_RATES.sandStuccoLab.dbName, OK_RATES.sandStuccoLab.fallback)) * 8 : 0
+  const smoothStuccoHrs = n(smoothStuccoSF) > 0 ? (n(smoothStuccoSF) / p(OK_RATES.smoothStuccoLab.dbName, OK_RATES.smoothStuccoLab.fallback)) * 8 : 0
+  const ledgerstoneHrs  = n(ledgerstoneSF) > 0 ? (n(ledgerstoneSF) / p(OK_RATES.ledgerstoneLab.dbName, OK_RATES.ledgerstoneLab.fallback)) * 8 : 0
+  const stackedStoneHrs = n(stackedStoneSF) > 0 ? (n(stackedStoneSF) / p(OK_RATES.stackedStoneLab.dbName, OK_RATES.stackedStoneLab.fallback)) * 8 : 0
+  const tileHrs         = n(tileSF) > 0 ? n(tileSF) * p(OK_RATES.tileLab.dbName, OK_RATES.tileLab.fallback) : 0
+  const flagstoneHrs    = n(flagstoneSF) > 0 ? n(flagstoneSF) * p(OK_RATES.flagstoneLab.dbName, OK_RATES.flagstoneLab.fallback) : 0
+  const realStoneHrs    = n(realStoneSF) > 0 ? n(realStoneSF) * p(OK_RATES.realStoneLab.dbName, OK_RATES.realStoneLab.fallback) : 0
 
   // ── Material Costs ──────────────────────────────────────────────────────────
   const blockMat         = blockOrdered * p(OK_RATES.bbqBlock.dbName, OK_RATES.bbqBlock.fallback)
