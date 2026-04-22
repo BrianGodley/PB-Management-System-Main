@@ -728,16 +728,24 @@ function AddUserModal({ onClose, onCreated }) {
         throw new Error(`User created but profile setup failed: ${profileErr.message}`)
       }
 
-      // Send welcome email (non-blocking — don't fail if email fails)
-      sendWelcomeEmail({
+      // Send welcome email — non-blocking but surface Resend errors in UI
+      const { error: emailErr } = await sendWelcomeEmail({
         to:       form.email.trim().toLowerCase(),
         fullName: form.full_name.trim(),
         username: form.username.trim().toLowerCase(),
         password: form.password,
         loginUrl: window.location.origin + '/login',
-      }).catch(e => console.warn('[notify] Welcome email failed:', e))
+      })
 
-      setSuccess(`✅ User "${form.full_name}" created! A welcome email with their credentials has been sent to ${form.email}.`)
+      if (emailErr) {
+        setSuccess(
+          `✅ User "${form.full_name}" created! ` +
+          `⚠️ Welcome email could not be sent — ${emailErr.message}. ` +
+          `Please share the password manually.`
+        )
+      } else {
+        setSuccess(`✅ User "${form.full_name}" created! A welcome email with their credentials has been sent to ${form.email}.`)
+      }
       onCreated()
     } catch (e) {
       setErr(e.message || 'Failed to create user.')
