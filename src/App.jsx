@@ -18,6 +18,11 @@ import MasterRates from './pages/MasterRates'
 import Statistics from './pages/Statistics'
 import Profile from './pages/Profile'
 import SubsVendors from './pages/SubsVendors'
+import LMS from './pages/LMS'
+import HR from './pages/HR'
+import EmployeeDetail from './pages/EmployeeDetail'
+import ApplicantDetail from './pages/ApplicantDetail'
+import ApplyForm from './pages/ApplyForm'
 
 function PortalPlaceholder({ label, icon }) {
   return (
@@ -47,6 +52,8 @@ function AppRoutes() {
   const { user } = useAuth()
   return (
     <Routes>
+      {/* Public routes — no auth required */}
+      <Route path="/apply" element={<ApplyForm />} />
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/" element={
         <ProtectedRoute>
@@ -71,6 +78,10 @@ function AppRoutes() {
         <Route path="profile" element={<Profile />} />
         <Route path="portal/internal" element={<PortalPlaceholder label="Internal Users" icon="👥" />} />
         <Route path="portal/subs" element={<SubsVendors />} />
+        <Route path="training" element={<LMS />} />
+        <Route path="hr" element={<HR />} />
+        <Route path="hr/employee/:id" element={<EmployeeDetail />} />
+        <Route path="hr/applicant/:id" element={<ApplicantDetail />} />
       </Route>
     </Routes>
   )
