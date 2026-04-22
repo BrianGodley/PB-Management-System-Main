@@ -3195,7 +3195,7 @@ export default function Statistics() {
           ) : (
             <>
               {/* Chart header: print/share + auto min/max + nav */}
-              <div className="relative flex items-center px-6 py-3 bg-white border-b border-gray-200 flex-shrink-0">
+              <div className="relative flex items-center px-6 py-1.5 bg-white border-b border-gray-200 flex-shrink-0">
                 {/* Left — print, share, auto min/max */}
                 <div className="flex-1 flex items-center gap-2">
                   <button title="Print" className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-xl">🖨️</button>
@@ -3222,31 +3222,23 @@ export default function Statistics() {
                   {selectedStat.name}
                 </span>
 
-                {/* Right — arrows tight against description, group pushed to far right */}
-                <div className="flex-1 flex items-center justify-end">
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-0.5">
-                      <button
-                        onClick={() => goTo(-1)}
-                        disabled={!hasPrev}
-                        className="px-2 py-1 rounded text-blue-500 hover:bg-blue-50 disabled:opacity-30 text-xl font-black"
-                      >
-                        ⬆
-                      </button>
-                      <button
-                        onClick={() => goTo(1)}
-                        disabled={!hasNext}
-                        className="px-2 py-1 rounded text-blue-500 hover:bg-blue-50 disabled:opacity-30 text-xl font-black"
-                      >
-                        ⬇
-                      </button>
-                    </div>
-                    <div className="w-36 flex items-center gap-1.5 text-xs text-gray-400">
-                      <span className="capitalize font-medium">{selectedStat.tracking}</span>
-                      <span>·</span>
-                      <span className="capitalize">{selectedStat.stat_type}</span>
-                      {selectedStat.upside_down && <span>· ↕ Inv</span>}
-                    </div>
+                {/* Right — arrows flush right */}
+                <div className="flex-1 flex items-center justify-end pr-2">
+                  <div className="flex items-center gap-0">
+                    <button
+                      onClick={() => goTo(-1)}
+                      disabled={!hasPrev}
+                      className="px-1 py-0.5 rounded text-blue-500 hover:bg-blue-50 disabled:opacity-30 text-xl font-black"
+                    >
+                      ⬆
+                    </button>
+                    <button
+                      onClick={() => goTo(1)}
+                      disabled={!hasNext}
+                      className="px-1 py-0.5 rounded text-blue-500 hover:bg-blue-50 disabled:opacity-30 text-xl font-black"
+                    >
+                      ⬇
+                    </button>
                   </div>
                 </div>
               </div>
