@@ -5,25 +5,48 @@ import GpmdBar from './GpmdBar'
 // ─────────────────────────────────────────────────────────────────────────────
 // Utilities Module — fields and calculations from Excel estimator (Utilities Module tab)
 // Covers trenching, utility lines (gas/electrical), gas fixtures, and add-ons.
+//
+// All material costs AND labor time rates are stored in material_rates
+// (category = 'Utilities') so they are fully editable in Master Rates.
+// Hardcoded values here are fallbacks only, used when the DB row is absent.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// dbName must match the name column in material_rates exactly (category = 'Utilities')
+// dbName = name in material_rates for the material cost row
+// laborDbName = name in material_rates for the labor rate row (hrs per unit)
 const UTILITY_LINE_TYPES = {
-  'PVC Conduit with Electrical': { laborPerLF: 0.05,  costPerLF: 1.92, dbName: 'PVC Conduit with Electrical' },
-  '1" Black Iron Gas Pipe':      { laborPerLF: 0.15,  costPerLF: 2.76, dbName: '1" Black Iron Gas Pipe'      },
-  '1-1/2" Black Iron Gas Pipe':  { laborPerLF: 0.20,  costPerLF: 4.23, dbName: '1-1/2" Black Iron Gas Pipe'  },
+  'PVC Conduit with Electrical': {
+    costPerLF: 1.92,  dbName: 'PVC Conduit with Electrical',
+    laborPerLF: 0.05, laborDbName: 'PVC Conduit with Electrical - Labor Rate',
+  },
+  '1" Black Iron Gas Pipe': {
+    costPerLF: 2.76,  dbName: '1" Black Iron Gas Pipe',
+    laborPerLF: 0.15, laborDbName: '1" Black Iron Gas Pipe - Labor Rate',
+  },
+  '1-1/2" Black Iron Gas Pipe': {
+    costPerLF: 4.23,  dbName: '1-1/2" Black Iron Gas Pipe',
+    laborPerLF: 0.20, laborDbName: '1-1/2" Black Iron Gas Pipe - Labor Rate',
+  },
 }
 
 const FIXTURE_TYPES = {
-  '12" Single Gas Ring': { laborHrs: 2, cost: 61.75, dbName: '12" Single Gas Ring' },
+  '12" Single Gas Ring': {
+    cost: 61.75,  dbName: '12" Single Gas Ring',
+    laborHrs: 2,  laborDbName: '12" Single Gas Ring - Labor Rate',
+  },
 }
 
 // Minutes per cubic foot by equipment type (same as Drainage)
 const TRENCH_MINS_PER_CF = { Trench: 10, Hand: 12.5 }
 
 const ADD_ITEM_RATES = {
-  curbCore: { laborHrs: 2, matCost: 250, label: 'Curb Core *',                dbName: 'Curb Core'                },
-  hydrocut:  { laborHrs: 2, matCost: 50,  label: 'Hydrocut Under Hardscape *', dbName: 'Hydrocut Under Hardscape' },
+  curbCore: {
+    matCost: 250, dbName: 'Curb Core',                label: 'Curb Core *',
+    laborHrs: 2,  laborDbName: 'Curb Core - Labor Rate',
+  },
+  hydrocut: {
+    matCost: 50,  dbName: 'Hydrocut Under Hardscape', label: 'Hydrocut Under Hardscape *',
+    laborHrs: 2,  laborDbName: 'Hydrocut Under Hardscape - Labor Rate',
+  },
 }
 
 const DEFAULTS = {
@@ -57,9 +80,10 @@ function calcUtilities(state, laborRatePerHour = DEFAULTS.laborRatePerHour, mate
     const lf   = n(r.lf)
     const rate = UTILITY_LINE_TYPES[r.type]
     if (lf > 0 && rate) {
-      const costPerLF = materialPrices[rate.dbName] ?? rate.costPerLF
+      const costPerLF  = materialPrices[rate.dbName]      ?? rate.costPerLF
+      const laborPerLF = materialPrices[rate.laborDbName]  ?? rate.laborPerLF
       lineMat += lf * costPerLF
-      lineHrs += lf * rate.laborPerLF
+      lineHrs += lf * laborPerLF
     }
   })
 
@@ -67,17 +91,19 @@ function calcUtilities(state, laborRatePerHour = DEFAULTS.laborRatePerHour, mate
     const qty  = n(r.qty)
     const rate = FIXTURE_TYPES[r.type]
     if (qty > 0 && rate) {
-      const cost = materialPrices[rate.dbName] ?? rate.cost
+      const cost     = materialPrices[rate.dbName]      ?? rate.cost
+      const laborHrs = materialPrices[rate.laborDbName]  ?? rate.laborHrs
       fixMat += qty * cost
-      fixHrs += qty * rate.laborHrs
+      fixHrs += qty * laborHrs
     }
   })
 
   Object.entries(ADD_ITEM_RATES).forEach(([key, rate]) => {
     const qty = n(additionalItems[`${key}Qty`])
     if (qty > 0) {
-      const matCost = materialPrices[rate.dbName] ?? rate.matCost
-      addHrs += qty * rate.laborHrs
+      const matCost  = materialPrices[rate.dbName]      ?? rate.matCost
+      const laborHrs = materialPrices[rate.laborDbName]  ?? rate.laborHrs
+      addHrs += qty * laborHrs
       addMat += qty * matCost
     }
   })

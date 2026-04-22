@@ -5,20 +5,38 @@ import FinancialSummaryList from './FinancialSummaryList'
 // ─────────────────────────────────────────────────────────────────────────────
 
 const UTILITY_LINE_TYPES = {
-  'PVC Conduit with Electrical': { laborPerLF: 0.05,  costPerLF: 1.92, dbName: 'PVC Conduit with Electrical' },
-  '1" Black Iron Gas Pipe':      { laborPerLF: 0.15,  costPerLF: 2.76, dbName: '1" Black Iron Gas Pipe'      },
-  '1-1/2" Black Iron Gas Pipe':  { laborPerLF: 0.20,  costPerLF: 4.23, dbName: '1-1/2" Black Iron Gas Pipe'  },
+  'PVC Conduit with Electrical': {
+    costPerLF: 1.92,  dbName: 'PVC Conduit with Electrical',
+    laborPerLF: 0.05, laborDbName: 'PVC Conduit with Electrical - Labor Rate',
+  },
+  '1" Black Iron Gas Pipe': {
+    costPerLF: 2.76,  dbName: '1" Black Iron Gas Pipe',
+    laborPerLF: 0.15, laborDbName: '1" Black Iron Gas Pipe - Labor Rate',
+  },
+  '1-1/2" Black Iron Gas Pipe': {
+    costPerLF: 4.23,  dbName: '1-1/2" Black Iron Gas Pipe',
+    laborPerLF: 0.20, laborDbName: '1-1/2" Black Iron Gas Pipe - Labor Rate',
+  },
 }
 
 const FIXTURE_TYPES = {
-  '12" Single Gas Ring': { laborHrs: 2, cost: 61.75, dbName: '12" Single Gas Ring' },
+  '12" Single Gas Ring': {
+    cost: 61.75,  dbName: '12" Single Gas Ring',
+    laborHrs: 2,  laborDbName: '12" Single Gas Ring - Labor Rate',
+  },
 }
 
 const TRENCH_MINS_PER_CF = { Trench: 10, Hand: 12.5 }
 
 const ADD_ITEM_RATES = {
-  curbCore: { laborHrs: 2, matCost: 250, label: 'Curb Core *',                dbName: 'Curb Core'                },
-  hydrocut:  { laborHrs: 2, matCost: 50,  label: 'Hydrocut Under Hardscape *', dbName: 'Hydrocut Under Hardscape' },
+  curbCore: {
+    matCost: 250, dbName: 'Curb Core',                label: 'Curb Core *',
+    laborHrs: 2,  laborDbName: 'Curb Core - Labor Rate',
+  },
+  hydrocut: {
+    matCost: 50,  dbName: 'Hydrocut Under Hardscape', label: 'Hydrocut Under Hardscape *',
+    laborHrs: 2,  laborDbName: 'Hydrocut Under Hardscape - Labor Rate',
+  },
 }
 
 const n = (v) => parseFloat(v) || 0
@@ -80,9 +98,10 @@ export default function UtilitiesSummary({ module }) {
       const lf   = n(r.lf)
       const rate = UTILITY_LINE_TYPES[r.type]
       if (!lf || !rate) return null
-      const costPerLF = price(rate.dbName, rate.costPerLF)
-      const mat       = lf * costPerLF
-      const hrs       = lf * rate.laborPerLF
+      const costPerLF  = price(rate.dbName,      rate.costPerLF)
+      const laborPerLF = price(rate.laborDbName,  rate.laborPerLF)
+      const mat = lf * costPerLF
+      const hrs = lf * laborPerLF
       return { key: i, label: `${r.type} — ${lf} LF`,
                value: `$${mat.toFixed(2)}`,
                sub: `${hrs.toFixed(2)} hrs labor  ·  $${costPerLF.toFixed(2)}/LF` }
@@ -95,9 +114,10 @@ export default function UtilitiesSummary({ module }) {
       const qty  = n(r.qty)
       const rate = FIXTURE_TYPES[r.type]
       if (!qty || !rate) return null
-      const costEa = price(rate.dbName, rate.cost)
-      const mat    = qty * costEa
-      const hrs    = qty * rate.laborHrs
+      const costEa   = price(rate.dbName,      rate.cost)
+      const laborHrs = price(rate.laborDbName,  rate.laborHrs)
+      const mat = qty * costEa
+      const hrs = qty * laborHrs
       return { key: i, label: `${r.type} × ${qty}`,
                value: `$${mat.toFixed(2)}`,
                sub: `${hrs.toFixed(2)} hrs labor  ·  $${costEa.toFixed(2)}/ea` }
@@ -109,9 +129,10 @@ export default function UtilitiesSummary({ module }) {
     .map(([key, rate]) => {
       const qty = n(additionalItems[`${key}Qty`])
       if (!qty) return null
-      const matCostEa = price(rate.dbName, rate.matCost)
+      const matCostEa  = price(rate.dbName,      rate.matCost)
+      const laborHrsEa = price(rate.laborDbName,  rate.laborHrs)
       return { key, label: rate.label, qty,
-               laborHrs: qty * rate.laborHrs, matCost: qty * matCostEa, matCostEa }
+               laborHrs: qty * laborHrsEa, matCost: qty * matCostEa, matCostEa }
     })
     .filter(Boolean)
 
