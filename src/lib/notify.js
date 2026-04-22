@@ -85,12 +85,17 @@ export async function sendSMS({ to, message }) {
     return { data, error: new Error(msg) }
   }
 
-  if (data?.error) {
-    console.error('[notify] sendSMS Twilio error:', data.error)
-    return { data, error: new Error(data.error) }
+  // Surface Twilio-level errors (e.g. trial account restriction, bad number)
+  if (data?.error || data?.success === false) {
+    const msg = data?.error || 'Twilio rejected the message'
+    const hint = data?.code === 21608
+      ? ' (Twilio trial accounts can only text verified numbers — upgrade or verify the number in Twilio)'
+      : data?.code ? ` (Twilio code ${data.code})` : ''
+    console.error('[notify] sendSMS Twilio error:', msg, data)
+    return { data, error: new Error(msg + hint) }
   }
 
-  console.log('[notify] sendSMS ok:', data)
+  console.log('[notify] sendSMS ok — sid:', data?.sid, 'status:', data?.status)
   return { data, error: null }
 }
 

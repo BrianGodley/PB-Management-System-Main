@@ -43,7 +43,17 @@ serve(async (req) => {
     console.log('Twilio response status:', res.status)
     console.log('Twilio response:', JSON.stringify(data))
 
-    return new Response(JSON.stringify({ success: res.ok, data, error: res.ok ? null : data?.message }), {
+    // Return Twilio's message status and any error details so the UI can surface them
+    const twilioError = !res.ok ? (data?.message || data?.code || `Twilio error ${res.status}`) : null
+    if (twilioError) console.error('Twilio error:', twilioError, 'code:', data?.code)
+
+    return new Response(JSON.stringify({
+      success:  res.ok,
+      sid:      data?.sid   || null,
+      status:   data?.status || null,   // e.g. "queued", "failed", "undelivered"
+      error:    twilioError,
+      code:     data?.code  || null,    // Twilio error code, e.g. 21608 = trial restriction
+    }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
