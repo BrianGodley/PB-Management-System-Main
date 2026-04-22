@@ -1,391 +1,483 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// CoursePlayer — step-by-step course taking UI for employees
+// CoursePlayer — employee-facing step-by-step course player
+// Handles all 7 step types with appropriate viewer UIs
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 
-export default function CoursePlayer({
-  assignment,
-  courseSteps,
-  existingCompletions,
-  onClose,
-  onComplete,
-}) {
-  const completedIds = new Set(existingCompletions.map(c => c.step_id))
-  const firstIncomplete = courseSteps.findIndex(s => !completedIds.has(s.id))
+// Extract YouTube video ID from various URL formats
+function getYouTubeId(url) {
+  if (!url) return null
+  const m = url.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/)
+  return m ? m[1] : null
+}
 
-  const [currentIdx,    setCurrentIdx]    = useState(firstIncomplete >= 0 ? firstIncomplete : 0)
-  const [completed,     setCompleted]     = useState(new Set(completedIds))
-  const [checkedItems,  setCheckedItems]  = useState({})   // stepId → Set of item.id
-  const [quizAnswer,    setQuizAnswer]    = useState(null)
-  const [quizResult,    setQuizResult]    = useState(null) // 'correct' | 'wrong'
-  const [photoFile,     setPhotoFile]     = useState(null)
-  const [saving,        setSaving]        = useState(false)
-  const fileInputRef = useRef()
+// ── Step type badge ─────────────────────────────────────────────────────────
+const TYPE_META = {
+  read:           { label: 'Read',           icon: '📖', color: 'bg-blue-100 text-blue-700' },
+  watch:          { label: 'Watch',          icon: '▶️',  color: 'bg-red-100 text-red-700' },
+  special_drill:  { label: 'Special Drill',  icon: '🔧', color: 'bg-orange-100 text-orange-700' },
+  learning_drill: { label: 'Learning Drill', icon: '🔁', color: 'bg-purple-100 text-purple-700' },
+  quiz:           { label: 'Quiz',           icon: '📝', color: 'bg-yellow-100 text-yellow-700' },
+  final_test:     { label: 'Final Test',     icon: '🎓', color: 'bg-green-100 text-green-700' },
+  action:         { label: 'Action',         icon: '⚡', color: 'bg-pink-100 text-pink-700' },
+}
 
-  const step       = courseSteps[currentIdx]
-  const totalSteps = courseSteps.length
-  const doneCount  = completed.size
-  const progress   = totalSteps > 0 ? (doneCount / totalSteps) * 100 : 0
-  const isStepDone = step ? completed.has(step.id) : false
-  const allDone    = doneCount >= totalSteps
-  const isLast     = currentIdx === totalSteps - 1
+// ── Quiz / Test player ──────────────────────────────────────────────────────
+function QuizPlayer({ questions, passingScore, maxAttempts, attemptsUsed, onPass, onFail }) {
+  const [answers, setAnswers] = useState({})
+  const [submitted, setSubmitted] = useState(false)
+  const [score, setScore] = useState(null)
+  const [passed, setPassed] = useState(false)
 
-  // ── helpers ───────────────────────────────────────────────────────────────
-  async function markDone(responseData = {}) {
-    if (!step || completed.has(step.id)) return
-    setSaving(true)
-    await supabase.from('lms_step_completions').upsert(
-      { assignment_id: assignment.id, step_id: step.id, response_data: responseData },
-      { onConflict: 'assignment_id,step_id' }
+  const attemptsLeft = maxAttempts - attemptsUsed
+  const canAttempt = attemptsLeft > 0
+
+  const submit = async () => {
+    const correct = questions.filter((q, i) => answers[i] === q.correct_index).length
+    const pct = Math.round((correct / questions.length) * 100)
+    const didPass = pct >= passingScore
+    setScore(pct)
+    setPassed(didPass)
+    setSubmitted(true)
+    if (didPass) onPass(pct)
+    else onFail(pct)
+  }
+
+  const retry = () => {
+    setAnswers({})
+    setSubmitted(false)
+    setScore(null)
+    setPassed(false)
+  }
+
+  if (!canAttempt && !submitted) {
+    return (
+      <div className="text-center py-12">
+        <div className="text-5xl mb-3">🚫</div>
+        <h3 className="font-bold text-gray-900 text-lg mb-2">No attempts remaining</h3>
+        <p className="text-gray-500 text-sm">You've used all {maxAttempts} attempt{maxAttempts !== 1 ? 's' : ''}. Please speak with your trainer.</p>
+      </div>
     )
-    setCompleted(prev => new Set([...prev, step.id]))
-    setSaving(false)
   }
 
-  function goToStep(idx) {
-    setCurrentIdx(idx)
-    setQuizAnswer(null)
-    setQuizResult(null)
-    setPhotoFile(null)
+  if (submitted) {
+    return (
+      <div className="text-center py-12">
+        <div className="text-6xl mb-4">{passed ? '🎉' : '😔'}</div>
+        <h3 className="font-bold text-gray-900 text-xl mb-1">
+          {passed ? 'Passed!' : 'Not quite'}
+        </h3>
+        <p className="text-gray-500 mb-2">Your score: <span className={`font-bold text-lg ${passed ? 'text-green-600' : 'text-red-500'}`}>{score}%</span></p>
+        <p className="text-gray-400 text-sm mb-6">Passing score: {passingScore}%</p>
+        {!passed && attemptsLeft - 1 > 0 && (
+          <button onClick={retry}
+            className="px-6 py-2.5 bg-green-700 text-white rounded-xl font-medium hover:bg-green-800">
+            Try Again ({attemptsLeft - 1} attempt{attemptsLeft - 1 !== 1 ? 's' : ''} left)
+          </button>
+        )}
+        {!passed && attemptsLeft - 1 <= 0 && (
+          <p className="text-sm text-red-500">No more attempts remaining.</p>
+        )}
+      </div>
+    )
   }
 
-  function handleNext() {
-    if (!isLast) goToStep(currentIdx + 1)
-    else onComplete()
-  }
-
-  // ── step-type handlers ────────────────────────────────────────────────────
-  const handleTextComplete = () => markDone({ type: 'text' })
-
-  async function handleChecklistComplete() {
-    const items   = step.checklist_items || []
-    const checked = checkedItems[step.id] || new Set()
-    if (checked.size < items.length) return
-    await markDone({ type: 'checklist', checkedItems: [...checked] })
-  }
-
-  const handlePhotoComplete = () => markDone({ type: 'photo', filename: photoFile?.name || 'uploaded' })
-
-  async function handleQuizSubmit() {
-    if (quizAnswer === null) return
-    const correct = quizAnswer === step.quiz_correct_index
-    setQuizResult(correct ? 'correct' : 'wrong')
-    if (correct) await markDone({ type: 'quiz', answer: quizAnswer })
-  }
-
-  function toggleChecklistItem(stepId, itemId) {
-    setCheckedItems(prev => {
-      const set = new Set(prev[stepId] || [])
-      set.has(itemId) ? set.delete(itemId) : set.add(itemId)
-      return { ...prev, [stepId]: set }
-    })
-  }
-
-  // ── checklist readiness ───────────────────────────────────────────────────
-  const checklistItems   = step?.step_type === 'checklist' ? (step.checklist_items || []) : []
-  const checkedForStep   = checkedItems[step?.id] || new Set()
-  const allItemsChecked  = checkedForStep.size >= checklistItems.length && checklistItems.length > 0
-
-  if (!step && !allDone) return null
+  const allAnswered = questions.every((_, i) => answers[i] !== undefined)
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex">
-      <div className="flex-1 flex flex-col bg-white max-w-2xl mx-auto w-full shadow-2xl overflow-hidden">
-
-        {/* ── Header / progress ────────────────────────────────────────────── */}
-        <div className="bg-green-700 text-white px-6 py-4 flex-shrink-0">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <p className="text-xs text-green-200 mb-0.5">Training Course</p>
-              <h2 className="font-bold text-lg leading-tight">
-                {assignment.lms_courses?.title || 'Course'}
-              </h2>
-            </div>
-            <button
-              onClick={onClose}
-              className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-lg leading-none"
-            >
-              ✕
-            </button>
-          </div>
-          <div className="h-2 bg-green-800/60 rounded-full">
-            <div
-              className="h-full bg-white rounded-full transition-all duration-500"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <div className="flex justify-between mt-1.5">
-            <p className="text-xs text-green-200">
-              {allDone ? 'All steps complete!' : `Step ${currentIdx + 1} of ${totalSteps}`}
-            </p>
-            <p className="text-xs text-green-200">{doneCount} / {totalSteps} done</p>
+    <div className="space-y-6">
+      {attemptsUsed > 0 && (
+        <p className="text-xs text-orange-600 bg-orange-50 border border-orange-100 rounded-lg px-3 py-2">
+          Attempt {attemptsUsed + 1} of {maxAttempts} — Passing score: {passingScore}%
+        </p>
+      )}
+      {questions.map((q, qi) => (
+        <div key={qi} className="bg-gray-50 rounded-2xl p-5">
+          <p className="font-semibold text-gray-900 mb-4">{qi + 1}. {q.question}</p>
+          <div className="space-y-2">
+            {q.options.filter(o => o.trim()).map((opt, oi) => (
+              <label key={oi}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-colors ${
+                  answers[qi] === oi
+                    ? 'border-green-500 bg-green-50'
+                    : 'border-gray-200 hover:border-gray-300 bg-white'
+                }`}>
+                <input type="radio" name={`q${qi}`} checked={answers[qi] === oi}
+                  onChange={() => setAnswers(a => ({ ...a, [qi]: oi }))}
+                  className="accent-green-600" />
+                <span className="text-sm text-gray-800">{opt}</span>
+              </label>
+            ))}
           </div>
         </div>
+      ))}
+      <button onClick={submit} disabled={!allAnswered}
+        className="w-full py-3.5 bg-green-700 text-white rounded-2xl font-bold hover:bg-green-800 disabled:opacity-40">
+        Submit Answers
+      </button>
+    </div>
+  )
+}
 
-        {/* ── Step breadcrumb dots ──────────────────────────────────────────── */}
-        <div className="flex gap-1.5 px-4 py-2 bg-gray-50 border-b border-gray-200 overflow-x-auto">
-          {courseSteps.map((s, i) => (
-            <button
-              key={s.id}
-              onClick={() => goToStep(i)}
-              title={s.title}
-              className={`flex-shrink-0 w-7 h-7 rounded-full text-xs font-bold transition-colors ${
-                i === currentIdx
-                  ? 'bg-green-700 text-white'
-                  : completed.has(s.id)
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-gray-200 text-gray-500'
-              }`}
-            >
-              {completed.has(s.id) && i !== currentIdx ? '✓' : i + 1}
+// ── Document viewer modal ───────────────────────────────────────────────────
+function DocViewer({ readItem, onRead, onClose }) {
+  return (
+    <div className="fixed inset-0 bg-black/70 z-[70] flex flex-col">
+      <div className="flex items-center gap-3 px-5 py-3 bg-white border-b border-gray-200 flex-shrink-0">
+        <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-lg">✕</button>
+        <h3 className="font-semibold text-gray-900 flex-1 truncate">{readItem.title}</h3>
+        <a href={readItem.doc_url} target="_blank" rel="noreferrer"
+          className="text-xs text-blue-600 hover:underline flex-shrink-0">Open in new tab ↗</a>
+      </div>
+      <div className="flex-1 min-h-0">
+        <iframe src={readItem.doc_url} className="w-full h-full border-0" title={readItem.title} />
+      </div>
+      <div className="p-4 bg-white border-t border-gray-200 flex-shrink-0">
+        <button onClick={onRead}
+          className="w-full py-3.5 bg-green-700 text-white rounded-2xl font-bold text-lg hover:bg-green-800">
+          ✓ I have read this document
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── YouTube viewer modal ────────────────────────────────────────────────────
+function VideoViewer({ step, onComplete, onClose }) {
+  const videoId = getYouTubeId(step.youtube_url)
+  return (
+    <div className="fixed inset-0 bg-black/90 z-[70] flex flex-col">
+      <div className="flex items-center gap-3 px-5 py-3 bg-black/50 flex-shrink-0">
+        <button onClick={onClose} className="text-white/70 hover:text-white text-lg">✕</button>
+        <h3 className="font-semibold text-white flex-1 truncate">{step.title}</h3>
+      </div>
+      <div className="flex-1 min-h-0 flex items-center justify-center p-4">
+        {videoId ? (
+          <iframe
+            className="w-full max-w-4xl rounded-xl"
+            style={{ aspectRatio: '16/9' }}
+            src={`https://www.youtube.com/embed/${videoId}?rel=0`}
+            title={step.title}
+            allowFullScreen
+          />
+        ) : (
+          <div className="text-center text-white/60">
+            <p className="mb-2">Could not load video.</p>
+            <a href={step.youtube_url} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline">Open on YouTube ↗</a>
+          </div>
+        )}
+      </div>
+      <div className="p-4 flex-shrink-0">
+        <button onClick={onComplete}
+          className="w-full py-3.5 bg-green-600 text-white rounded-2xl font-bold text-lg hover:bg-green-700">
+          ✓ Video Watched — Mark Complete
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Main CoursePlayer ───────────────────────────────────────────────────────
+export default function CoursePlayer({ assignment, onClose }) {
+  const [steps, setSteps] = useState([])
+  const [completions, setCompletions] = useState([])  // set of step_ids
+  const [attempts, setAttempts] = useState([])         // all attempt rows
+  const [currentIdx, setCurrentIdx] = useState(0)
+  const [loading, setLoading] = useState(true)
+
+  // Viewer states
+  const [showDocViewer, setShowDocViewer] = useState(false)
+  const [showVideoViewer, setShowVideoViewer] = useState(false)
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true)
+      // Load steps with all linked library items via Supabase FK select
+      const { data: stepsData } = await supabase.from('lms_steps')
+        .select(`*,
+          read_item:lms_read_items(*),
+          learning_drill:lms_learning_drills(*),
+          quiz:lms_quizzes(*),
+          test:lms_tests(*),
+          action:lms_actions(*)
+        `)
+        .eq('course_id', assignment.course_id)
+        .order('step_order')
+
+      // Load completions
+      const { data: compData } = await supabase.from('lms_step_completions')
+        .select('step_id').eq('assignment_id', assignment.id)
+
+      // Load attempt history
+      const { data: attData } = await supabase.from('lms_quiz_attempts')
+        .select('*').eq('assignment_id', assignment.id)
+
+      setSteps(stepsData || [])
+      setCompletions(new Set((compData || []).map(c => c.step_id)))
+      setAttempts(attData || [])
+
+      // Advance to first incomplete step
+      const incomplete = (stepsData || []).findIndex(s => !(compData || []).some(c => c.step_id === s.id))
+      setCurrentIdx(incomplete >= 0 ? incomplete : 0)
+      setLoading(false)
+    }
+    load()
+  }, [assignment.id, assignment.course_id])
+
+  const completeStep = async (stepId, score = null) => {
+    await supabase.from('lms_step_completions').upsert({ assignment_id: assignment.id, step_id: stepId, score }, { onConflict: 'assignment_id,step_id' })
+    setCompletions(prev => new Set([...prev, stepId]))
+    if (currentIdx < steps.length - 1) {
+      setCurrentIdx(currentIdx + 1)
+    }
+  }
+
+  const recordAttempt = async (stepId, score, passed) => {
+    const { data } = await supabase.from('lms_quiz_attempts').insert({ assignment_id: assignment.id, step_id: stepId, score, passed }).select()
+    if (data?.[0]) setAttempts(prev => [...prev, data[0]])
+  }
+
+  const isComplete = (stepId) => completions.has(stepId)
+  const allDone = steps.length > 0 && steps.every(s => isComplete(s.id))
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-gray-50 z-50 flex items-center justify-center">
+        <p className="text-gray-400">Loading course…</p>
+      </div>
+    )
+  }
+
+  if (allDone) {
+    return (
+      <div className="fixed inset-0 bg-gray-50 z-50 flex flex-col items-center justify-center p-8">
+        <div className="text-7xl mb-4">🏆</div>
+        <h2 className="text-3xl font-bold text-gray-900 mb-2">Course Complete!</h2>
+        <p className="text-gray-500 mb-8 text-center">You've completed all steps in this checksheet.</p>
+        <button onClick={onClose} className="px-8 py-3 bg-green-700 text-white rounded-2xl font-bold text-lg hover:bg-green-800">
+          Done
+        </button>
+      </div>
+    )
+  }
+
+  const step = steps[currentIdx]
+  if (!step) return null
+
+  const stepDone = isComplete(step.id)
+  const stepAttempts = attempts.filter(a => a.step_id === step.id)
+  const tm = TYPE_META[step.step_type] || {}
+
+  const renderStepContent = () => {
+    switch (step.step_type) {
+      case 'read':
+        return (
+          <div className="space-y-6">
+            {step.read_item?.description && (
+              <p className="text-gray-600">{step.read_item.description}</p>
+            )}
+            {step.read_item?.doc_url ? (
+              <button onClick={() => setShowDocViewer(true)}
+                className="w-full flex items-center gap-4 p-5 bg-blue-50 border-2 border-blue-200 rounded-2xl hover:border-blue-400 transition-colors text-left">
+                <span className="text-4xl">📄</span>
+                <div>
+                  <p className="font-semibold text-blue-800">{step.read_item?.title || 'Open Document'}</p>
+                  <p className="text-sm text-blue-600 mt-0.5">Click to open and read — then mark as read</p>
+                </div>
+              </button>
+            ) : (
+              <p className="text-sm text-gray-400 italic">No document attached to this read item.</p>
+            )}
+            {!stepDone && step.read_item?.doc_url && (
+              <p className="text-xs text-gray-400 text-center">Open the document above, then click "I have read this document" at the bottom.</p>
+            )}
+          </div>
+        )
+
+      case 'watch':
+        return (
+          <div className="space-y-6">
+            <button onClick={() => setShowVideoViewer(true)}
+              className="w-full flex items-center gap-4 p-5 bg-red-50 border-2 border-red-200 rounded-2xl hover:border-red-400 transition-colors text-left">
+              <span className="text-4xl">▶️</span>
+              <div>
+                <p className="font-semibold text-red-800">Watch Video</p>
+                <p className="text-sm text-red-600 mt-0.5">Click to open the video player</p>
+              </div>
+            </button>
+          </div>
+        )
+
+      case 'special_drill':
+        return (
+          <div className="space-y-4">
+            <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5">
+              <p className="font-semibold text-orange-800 mb-2">🔧 Drill Instructions</p>
+              <p className="text-gray-700 whitespace-pre-wrap">{step.instructions}</p>
+            </div>
+            {!stepDone && (
+              <button onClick={() => completeStep(step.id)}
+                className="w-full py-3.5 bg-orange-600 text-white rounded-2xl font-bold text-lg hover:bg-orange-700">
+                ✓ Drill Complete — Mark Done
+              </button>
+            )}
+          </div>
+        )
+
+      case 'learning_drill':
+        return (
+          <div className="space-y-4">
+            {step.learning_drill?.description && (
+              <p className="text-gray-500 text-sm">{step.learning_drill.description}</p>
+            )}
+            <div className="bg-purple-50 border border-purple-200 rounded-2xl p-5">
+              <p className="text-gray-800 whitespace-pre-wrap">{step.learning_drill?.content || 'No content available.'}</p>
+            </div>
+            {!stepDone && (
+              <button onClick={() => completeStep(step.id)}
+                className="w-full py-3.5 bg-purple-600 text-white rounded-2xl font-bold text-lg hover:bg-purple-700">
+                ✓ Drill Complete — Mark Done
+              </button>
+            )}
+          </div>
+        )
+
+      case 'quiz':
+      case 'final_test': {
+        const item = step.step_type === 'quiz' ? step.quiz : step.test
+        if (!item) return <p className="text-gray-400">Quiz/test not found.</p>
+        if (stepDone) return (
+          <div className="text-center py-10">
+            <div className="text-5xl mb-3">✅</div>
+            <p className="font-bold text-green-700 text-lg">Passed!</p>
+            <p className="text-gray-400 text-sm mt-1">Score: {stepAttempts.find(a => a.passed)?.score ?? '—'}%</p>
+          </div>
+        )
+        return (
+          <QuizPlayer
+            questions={item.questions || []}
+            passingScore={item.passing_score}
+            maxAttempts={item.max_attempts}
+            attemptsUsed={stepAttempts.length}
+            onPass={async (score) => {
+              await recordAttempt(step.id, score, true)
+              await completeStep(step.id, score)
+            }}
+            onFail={async (score) => {
+              await recordAttempt(step.id, score, false)
+            }}
+          />
+        )
+      }
+
+      case 'action':
+        return (
+          <div className="space-y-4">
+            <div className="bg-pink-50 border border-pink-200 rounded-2xl p-5">
+              <p className="font-semibold text-pink-800 mb-2">⚡ Your Action</p>
+              <p className="text-gray-700 whitespace-pre-wrap">{step.action?.instructions || 'No instructions provided.'}</p>
+            </div>
+            {!stepDone && (
+              <button onClick={() => completeStep(step.id)}
+                className="w-full py-3.5 bg-pink-600 text-white rounded-2xl font-bold text-lg hover:bg-pink-700">
+                ✓ Action Complete — Mark Done
+              </button>
+            )}
+          </div>
+        )
+
+      default: return <p className="text-gray-400">Unknown step type.</p>
+    }
+  }
+
+  const progressPct = steps.length > 0 ? Math.round((completions.size / steps.length) * 100) : 0
+
+  return (
+    <div className="fixed inset-0 bg-gray-50 z-50 flex flex-col">
+      {/* Header */}
+      <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
+        <div className="flex items-center gap-4 mb-3">
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl leading-none">✕</button>
+          <div className="flex-1">
+            <h2 className="font-bold text-gray-900">{assignment.course?.title || 'Course'}</h2>
+            <p className="text-xs text-gray-500">{completions.size} of {steps.length} steps complete</p>
+          </div>
+          <span className="text-sm font-bold text-green-700">{progressPct}%</span>
+        </div>
+        {/* Progress bar */}
+        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div className="h-full bg-green-600 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
+        </div>
+        {/* Step dots */}
+        <div className="flex gap-1.5 mt-3 flex-wrap">
+          {steps.map((s, i) => (
+            <button key={s.id} onClick={() => setCurrentIdx(i)}
+              className={`w-6 h-6 rounded-full text-xs font-bold transition-all ${
+                isComplete(s.id) ? 'bg-green-600 text-white'
+                : i === currentIdx ? 'bg-green-200 text-green-800 ring-2 ring-green-500'
+                : 'bg-gray-200 text-gray-400'
+              }`}>
+              {i + 1}
             </button>
           ))}
         </div>
+      </div>
 
-        {/* ── Step content ──────────────────────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto p-6">
-
-          {allDone ? (
-            /* ── All done screen ── */
-            <div className="flex flex-col items-center justify-center h-full text-center py-12">
-              <div className="text-6xl mb-4">🎉</div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">Course Complete!</h3>
-              <p className="text-gray-500 mb-6">You've finished all {totalSteps} steps.</p>
-              <button
-                onClick={onComplete}
-                className="px-6 py-3 bg-green-700 text-white rounded-xl font-semibold hover:bg-green-800"
-              >
-                Finish &amp; Close
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-5">
-
-              {/* Step title + type badge */}
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
-                    {{ text: '📄 Instructions', checklist: '✅ Checklist', photo: '📷 Photo Upload', quiz: '❓ Quiz' }[step.step_type]}
-                  </span>
-                  {isStepDone && (
-                    <span className="text-xs text-green-700 font-medium">✓ Completed</span>
-                  )}
-                </div>
-                <h3 className="text-xl font-bold text-gray-900">{step.title}</h3>
+      {/* Step content */}
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="max-w-2xl mx-auto">
+          {/* Step header */}
+          <div className="mb-6">
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${tm.color || 'bg-gray-100 text-gray-600'}`}>
+              {tm.icon} {tm.label}
+            </span>
+            <h3 className="text-2xl font-bold text-gray-900 mt-3">{step.title}</h3>
+            {stepDone && step.step_type !== 'quiz' && step.step_type !== 'final_test' && (
+              <div className="flex items-center gap-2 mt-2 text-green-600">
+                <span className="text-lg">✅</span>
+                <span className="text-sm font-medium">Completed</span>
               </div>
+            )}
+          </div>
 
-              {/* ── TEXT step ── */}
-              {step.step_type === 'text' && (
-                <div className="space-y-4">
-                  <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-                    {step.content || 'Read this step and mark it complete when ready.'}
-                  </div>
-                  {!isStepDone && (
-                    <button
-                      onClick={handleTextComplete}
-                      disabled={saving}
-                      className="w-full py-3 bg-green-700 text-white rounded-xl font-semibold hover:bg-green-800 disabled:opacity-50"
-                    >
-                      {saving ? 'Saving…' : '✓ Mark Complete'}
-                    </button>
-                  )}
-                </div>
-              )}
+          {renderStepContent()}
 
-              {/* ── CHECKLIST step ── */}
-              {step.step_type === 'checklist' && (
-                <div className="space-y-4">
-                  {step.content && (
-                    <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-700 leading-relaxed">
-                      {step.content}
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    {checklistItems.map(item => {
-                      const checked = checkedForStep.has(item.id)
-                      return (
-                        <label
-                          key={item.id}
-                          className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
-                            checked ? 'bg-green-50 border-green-300' : 'bg-white border-gray-200 hover:border-gray-300'
-                          } ${isStepDone ? 'pointer-events-none' : ''}`}
-                        >
-                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                            checked ? 'bg-green-700 border-green-700' : 'border-gray-300'
-                          }`}>
-                            {checked && <span className="text-white text-xs font-bold">✓</span>}
-                          </div>
-                          <input
-                            type="checkbox"
-                            className="sr-only"
-                            checked={checked}
-                            onChange={() => !isStepDone && toggleChecklistItem(step.id, item.id)}
-                          />
-                          <span className={`text-sm ${checked ? 'text-green-700 line-through' : 'text-gray-700'}`}>
-                            {item.label}
-                          </span>
-                        </label>
-                      )
-                    })}
-                  </div>
-                  {!isStepDone && (
-                    <button
-                      onClick={handleChecklistComplete}
-                      disabled={!allItemsChecked || saving}
-                      className="w-full py-3 bg-green-700 text-white rounded-xl font-semibold hover:bg-green-800 disabled:opacity-50"
-                    >
-                      {saving ? 'Saving…' : `✓ All Checked — Mark Complete`}
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* ── PHOTO step ── */}
-              {step.step_type === 'photo' && (
-                <div className="space-y-4">
-                  {step.content && (
-                    <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-700 leading-relaxed">
-                      {step.content}
-                    </div>
-                  )}
-                  {!isStepDone ? (
-                    <>
-                      <div
-                        onClick={() => fileInputRef.current?.click()}
-                        className="flex flex-col items-center justify-center h-40 bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-green-400 hover:bg-green-50 transition-colors"
-                      >
-                        {photoFile ? (
-                          <div className="text-center">
-                            <p className="text-3xl mb-1">📎</p>
-                            <p className="text-sm font-medium text-gray-700">{photoFile.name}</p>
-                            <p className="text-xs text-gray-400 mt-1">Click to change</p>
-                          </div>
-                        ) : (
-                          <div className="text-center text-gray-400">
-                            <p className="text-3xl mb-1">📷</p>
-                            <p className="text-sm">Click to upload photo or file</p>
-                          </div>
-                        )}
-                      </div>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        className="sr-only"
-                        onChange={e => setPhotoFile(e.target.files?.[0] || null)}
-                      />
-                      <button
-                        onClick={handlePhotoComplete}
-                        disabled={!photoFile || saving}
-                        className="w-full py-3 bg-green-700 text-white rounded-xl font-semibold hover:bg-green-800 disabled:opacity-50"
-                      >
-                        {saving ? 'Saving…' : '✓ Submit & Complete'}
-                      </button>
-                    </>
-                  ) : (
-                    <div className="flex items-center gap-2 text-green-700 bg-green-50 rounded-xl p-4">
-                      <span className="text-lg">✓</span>
-                      <span className="text-sm font-medium">Photo submitted successfully</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* ── QUIZ step ── */}
-              {step.step_type === 'quiz' && (
-                <div className="space-y-4">
-                  <div className="bg-blue-50 rounded-xl p-4 text-sm font-semibold text-blue-900">
-                    {step.quiz_question || 'Answer the following question:'}
-                  </div>
-                  <div className="space-y-2">
-                    {(step.quiz_options || []).filter(o => o.trim()).map((opt, i) => {
-                      const isSelected = quizAnswer === i
-                      const isCorrect  = step.quiz_correct_index === i
-                      const showResult = quizResult !== null
-
-                      let cls = 'bg-white border-gray-200'
-                      if (!showResult && isSelected)          cls = 'bg-blue-50 border-blue-400'
-                      if (showResult  && isCorrect)           cls = 'bg-green-50 border-green-500'
-                      if (showResult  && isSelected && !isCorrect) cls = 'bg-red-50 border-red-400'
-
-                      return (
-                        <button
-                          key={i}
-                          onClick={() => !quizResult && !isStepDone && setQuizAnswer(i)}
-                          disabled={!!quizResult || isStepDone}
-                          className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-colors ${cls}`}
-                        >
-                          <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 text-xs font-bold ${
-                            !showResult && isSelected                   ? 'border-blue-500 bg-blue-500 text-white' :
-                            showResult  && isCorrect                    ? 'border-green-500 bg-green-500 text-white' :
-                            showResult  && isSelected && !isCorrect     ? 'border-red-400 bg-red-400 text-white' :
-                            'border-gray-300 text-gray-500'
-                          }`}>
-                            {showResult && isCorrect             ? '✓'
-                             : showResult && isSelected          ? '✕'
-                             : String.fromCharCode(65 + i)}
-                          </div>
-                          <span className="text-sm text-gray-800">{opt}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-
-                  {quizResult === 'correct' && (
-                    <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700 font-medium">
-                      🎉 Correct! Great job.
-                    </div>
-                  )}
-                  {quizResult === 'wrong' && (
-                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 flex items-center justify-between">
-                      <span>✕ Not quite — try again.</span>
-                      <button
-                        onClick={() => { setQuizAnswer(null); setQuizResult(null) }}
-                        className="underline font-medium ml-3"
-                      >
-                        Retry
-                      </button>
-                    </div>
-                  )}
-
-                  {!quizResult && !isStepDone && (
-                    <button
-                      onClick={handleQuizSubmit}
-                      disabled={quizAnswer === null || saving}
-                      className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      Submit Answer
-                    </button>
-                  )}
-                </div>
-              )}
-
+          {/* Next step button when done */}
+          {stepDone && currentIdx < steps.length - 1 && (
+            <div className="mt-6">
+              <button onClick={() => setCurrentIdx(currentIdx + 1)}
+                className="w-full py-3.5 bg-gray-900 text-white rounded-2xl font-bold hover:bg-gray-800">
+                Next Step →
+              </button>
             </div>
           )}
         </div>
-
-        {/* ── Footer navigation ─────────────────────────────────────────────── */}
-        {!allDone && (
-          <div className="px-6 py-4 bg-white border-t border-gray-200 flex items-center justify-between flex-shrink-0">
-            <button
-              onClick={() => goToStep(Math.max(0, currentIdx - 1))}
-              disabled={currentIdx === 0}
-              className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-30"
-            >
-              ← Previous
-            </button>
-            <span className="text-xs text-gray-400">{currentIdx + 1} / {totalSteps}</span>
-            <button
-              onClick={handleNext}
-              disabled={!isStepDone}
-              className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-30"
-            >
-              {isLast ? 'Finish ✓' : 'Next →'}
-            </button>
-          </div>
-        )}
-
       </div>
+
+      {/* Document viewer modal */}
+      {showDocViewer && step.read_item?.doc_url && (
+        <DocViewer
+          readItem={step.read_item}
+          onClose={() => setShowDocViewer(false)}
+          onRead={() => {
+            setShowDocViewer(false)
+            completeStep(step.id)
+          }}
+        />
+      )}
+
+      {/* Video viewer modal */}
+      {showVideoViewer && (
+        <VideoViewer
+          step={step}
+          onClose={() => setShowVideoViewer(false)}
+          onComplete={() => {
+            setShowVideoViewer(false)
+            completeStep(step.id)
+          }}
+        />
+      )}
     </div>
   )
 }
