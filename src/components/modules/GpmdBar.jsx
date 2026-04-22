@@ -145,47 +145,87 @@ export default function GpmdBar({
   }
 
   const cols = [
-    { label: 'Labor Hours',  value: fnum(totalHrs),                        dim: 'hrs'                                         },
-    { label: 'Man Days',     value: fnum(manDays),                         dim: 'MD'                                          },
-    { label: 'Materials',    value: fmt2(totalMat),                        dim: null                                          },
-    { label: 'Crew Labor',   value: fmt(laborCost),                        dim: `@ $${parseFloat(laborRatePerHour).toFixed(0)}/hr` },
-    { label: 'Labor Burden', value: fmt(burden),                           dim: '29%'                                         },
-    { label: 'Sub Cost',     value: subCost > 0 ? fmt(subCost) : '—',     dim: null                                          },
-    { label: 'Sub GP',       value: subGp > 0  ? fmt(subGp)   : '—',     dim: subGp > 0 ? `${displaySubPct}%` : null, blue: subGp > 0 },
-    { label: 'Gross Profit', value: fmt(effectiveGp),                      dim: null,                                green: true },
-    { label: 'Commission',   value: fmt(effectiveComm),                    dim: '12%'                                         },
-    { label: 'Total Price',  value: fmt(effectivePrice),                   dim: null,                                green: true, big: true },
+    { label: 'Labor Hours',  value: fnum(totalHrs),                    dim: 'hrs'                                         },
+    { label: 'Man Days',     value: fnum(manDays),                     dim: 'MD'                                          },
+    { label: 'Materials',    value: fmt2(totalMat),                    dim: null                                          },
+    { label: 'Crew Labor',   value: fmt(laborCost),                    dim: `@ $${parseFloat(laborRatePerHour).toFixed(0)}/hr` },
+    { label: 'Labor Burden', value: fmt(burden),                       dim: '29%'                                         },
+    { label: 'Sub Cost',     value: subCost > 0 ? fmt(subCost) : '—', dim: null                                          },
+    { label: 'Gross Profit', value: fmt(effectiveGp),                  dim: null,  green: true                           },
+    { label: 'Commission',   value: fmt(effectiveComm),                dim: '12%'                                         },
+    { label: 'Total Price',  value: fmt(effectivePrice),               dim: null,  green: true, big: true                },
   ]
+
+  // ── Sub GP column — rendered separately so the rate is inline-editable ─────
+  function SubGpCol() {
+    return (
+      <div className="px-3 flex-1 min-w-[80px] text-center">
+        <p className="text-xs text-gray-400 whitespace-nowrap mb-0.5">Sub GP</p>
+        <p className="font-bold whitespace-nowrap tabular-nums text-sm text-blue-400">
+          {subGp > 0 ? fmt(subGp) : '—'}
+        </p>
+        {/* Editable rate shown below the value */}
+        {editingSubPct ? (
+          <div className="flex items-center justify-center gap-0.5 mt-0.5">
+            <input
+              autoFocus
+              value={draftSubPct}
+              onChange={e => setDraftSubPct(e.target.value)}
+              onBlur={commitSubEdit}
+              onKeyDown={e => { if (e.key === 'Enter') commitSubEdit(); if (e.key === 'Escape') setEditingSubPct(false) }}
+              className="w-8 bg-gray-800 border border-blue-400 rounded text-blue-200 text-xs font-bold text-center tabular-nums outline-none px-0.5"
+            />
+            <span className="text-blue-300 text-xs font-bold">%</span>
+          </div>
+        ) : (
+          <p
+            className={`text-xs text-gray-500 whitespace-nowrap mt-0.5 ${onSubMarkupSave ? 'cursor-pointer hover:text-blue-400 transition-colors' : ''}`}
+            onClick={onSubMarkupSave ? startSubEdit : undefined}
+            title={onSubMarkupSave ? 'Click to edit Sub GP markup rate' : undefined}
+          >
+            {displaySubPct}%{onSubMarkupSave && <span className="ml-1 text-gray-600">✎</span>}
+          </p>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="bg-gray-900 text-white rounded-xl p-4 mt-2">
       <div className="overflow-x-auto">
         <div className="flex gap-0 min-w-max divide-x divide-white/10">
 
-          {/* Left: GPMD + Sub % editable cells */}
-          <div className="pr-3 flex gap-2">
+          {/* Left: GPMD editable cell */}
+          <div className="pr-3">
             <GpmdCell />
-            <SubMarkupCell />
           </div>
 
           {/* Data columns */}
-          {cols.map((col, i) => (
-            <div
-              key={col.label}
-              className={`px-3 flex-1 min-w-[80px] text-center ${i === cols.length - 1 ? 'pl-4' : ''}`}
-            >
-              <p className="text-xs text-gray-400 whitespace-nowrap mb-0.5">{col.label}</p>
-              <p className={`font-bold whitespace-nowrap tabular-nums ${
-                col.big   ? 'text-lg text-green-400' :
-                col.green ? 'text-sm text-green-400' :
-                col.blue  ? 'text-sm text-blue-400'  :
-                            'text-sm text-white'
-              }`}>
-                {col.value}
-              </p>
-              {col.dim && <p className="text-xs text-gray-500 whitespace-nowrap">{col.dim}</p>}
-            </div>
-          ))}
+          {cols.map((col, i) => {
+            const isAfterSubCost = col.label === 'Gross Profit'
+            return (
+              <>
+                {/* Inject Sub GP column right after Sub Cost */}
+                {isAfterSubCost && (
+                  <SubGpCol key="sub-gp" />
+                )}
+                <div
+                  key={col.label}
+                  className={`px-3 flex-1 min-w-[80px] text-center ${i === cols.length - 1 ? 'pl-4' : ''}`}
+                >
+                  <p className="text-xs text-gray-400 whitespace-nowrap mb-0.5">{col.label}</p>
+                  <p className={`font-bold whitespace-nowrap tabular-nums ${
+                    col.big   ? 'text-lg text-green-400' :
+                    col.green ? 'text-sm text-green-400' :
+                                'text-sm text-white'
+                  }`}>
+                    {col.value}
+                  </p>
+                  {col.dim && <p className="text-xs text-gray-500 whitespace-nowrap">{col.dim}</p>}
+                </div>
+              </>
+            )
+          })}
 
         </div>
       </div>
