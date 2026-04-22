@@ -305,7 +305,7 @@ const MATERIAL_COLUMNS = [
   { key: 'category',  label: 'Category',       placeholder: 'e.g. Hardscape, Irrigation' },
 ]
 
-const LABOR_CATEGORY_OPTIONS = ['Artificial Turf', 'Concrete', 'Demo', 'General', 'Irrigation']
+const LABOR_CATEGORY_OPTIONS = ['Artificial Turf', 'Concrete', 'Demo', 'General', 'Irrigation', 'Planting']
 
 const LABOR_UNIT_OPTIONS = [
   'per day',
@@ -318,8 +318,13 @@ const LABOR_UNIT_OPTIONS = [
   'hrs/zone',
   'tons/hr',
   'min/sq ft',
+  'min/ea',
+  'min/LF',
   'SF/hr',
   'LF/hr',
+  'plants/day',
+  'sqft/day',
+  'CY/day',
   '$/CY',
   '$/SF',
   '$/LF',
