@@ -194,28 +194,32 @@ function UserEditModal({ profile, currentUserId, onClose, onSaved }) {
   async function resetAndTextPassword() {
     const phone = (form.phone_cell || profile.phone_cell || '').trim()
     if (!phone) { setSmsMsg('error:No cell phone number on file for this user.'); return }
-    if (!confirm(`Reset ${profile.full_name || profile.email}'s password and text the new one to ${phone}?`)) return
+    if (!confirm(`Generate a new password for ${profile.full_name || profile.email} and text it to ${phone}?`)) return
     setResetTextSending(true); setSmsMsg('')
     const newPw = generatePassword()
-    // Reset password via Edge Function (uses service role)
-    const { data: resetData, error: resetErr } = await supabase.functions.invoke('reset-user-password', {
-      body: { userId: profile.id, newPassword: newPw },
-    })
-    if (resetErr || resetData?.error) {
-      setSmsMsg('error:Password reset failed — ' + (resetData?.error || resetErr?.message))
-      setResetTextSending(false); return
-    }
-    // Persist temp_password for future reference
+
+    // Save new password to profile so it's stored for reference
     await supabase.from('profiles').update({ temp_password: newPw }).eq('id', profile.id)
-    // Text the new password as Sam
+
+    // Try Edge Function to reset auth password (optional — may not be deployed)
+    try {
+      const { data: resetData, error: resetErr } = await supabase.functions.invoke('reset-user-password', {
+        body: { userId: profile.id, newPassword: newPw },
+      })
+      if (resetErr || resetData?.error) console.warn('Edge Function unavailable:', resetData?.error || resetErr?.message)
+    } catch (e) {
+      console.warn('reset-user-password Edge Function not available:', e)
+    }
+
+    // Text the new password as Sam regardless
     const firstName = (profile.full_name || '').split(' ')[0]
     const { error: smsErr } = await sendSMS({
       to:      phone,
       message: samMessage(firstName, profile.email, newPw, true),
     })
     setSmsMsg(smsErr
-      ? 'error:Password reset but SMS failed. New password: ' + newPw
-      : 'ok:Password reset and texted to ' + phone
+      ? 'error:SMS failed — ' + smsErr.message
+      : 'ok:New password texted to ' + phone + '. If their login does not work, also send a password reset email.'
     )
     setResetTextSending(false)
   }
