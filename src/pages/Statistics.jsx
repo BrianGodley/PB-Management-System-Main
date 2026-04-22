@@ -2937,7 +2937,6 @@ export default function Statistics() {
         {/* Left: title */}
         <div className="flex-shrink-0">
           <h1 className="text-xl font-bold text-gray-900">Statistics</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{myStats.length} stat{myStats.length !== 1 ? 's' : ''}</p>
         </div>
 
         {/* Spacer */}
