@@ -165,6 +165,13 @@ function UserEditModal({ profile, currentUserId, onClose, onSaved }) {
   }
 
   // ── Sam SMS helpers ────────────────────────────────────────────────────────
+  function formatPhone(raw) {
+    const digits = (raw || '').replace(/\D/g, '')
+    if (digits.length === 10) return '+1' + digits
+    if (digits.length === 11 && digits.startsWith('1')) return '+' + digits
+    return '+' + digits
+  }
+
   function samMessage(firstName, email, password, isReset = false) {
     const greeting = firstName ? `Hi ${firstName}, ` : 'Hi there, '
     const action   = isReset ? 'your password has been reset' : 'here are your login credentials'
@@ -178,8 +185,8 @@ function UserEditModal({ profile, currentUserId, onClose, onSaved }) {
   }
 
   async function sendPasswordViaSMS() {
-    const phone = (form.phone_cell || profile.phone_cell || '').trim()
-    if (!phone) { setSmsMsg('error:No cell phone number on file for this user.'); return }
+    const phone = formatPhone(form.phone_cell || profile.phone_cell || '')
+    if (!phone || phone === '+') { setSmsMsg('error:No cell phone number on file for this user.'); return }
     if (!profile.temp_password) { setSmsMsg('error:No stored password found. Use "Reset & Text New Password" instead.'); return }
     setSmsSending(true); setSmsMsg('')
     const firstName = (profile.full_name || '').split(' ')[0]
@@ -192,8 +199,8 @@ function UserEditModal({ profile, currentUserId, onClose, onSaved }) {
   }
 
   async function resetAndTextPassword() {
-    const phone = (form.phone_cell || profile.phone_cell || '').trim()
-    if (!phone) { setSmsMsg('error:No cell phone number on file for this user.'); return }
+    const phone = formatPhone(form.phone_cell || profile.phone_cell || '')
+    if (!phone || phone === '+') { setSmsMsg('error:No cell phone number on file for this user.'); return }
     if (!confirm(`Generate a new password for ${profile.full_name || profile.email} and text it to ${phone}?`)) return
     setResetTextSending(true); setSmsMsg('')
     const newPw = generatePassword()
