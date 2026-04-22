@@ -243,6 +243,12 @@ export default function EstimateDetail() {
     const updatedProj = { ...proj, estimate_modules: updatedMods }
     setProjects(prev => prev.map(p => p.id === projectId ? updatedProj : p))
     if (selectedProject?.id === projectId) setSelectedProject(updatedProj)
+
+    // Also refresh selectedModule so "Edit Module" gets the new gpmd in initialData
+    if (selectedModule) {
+      const refreshed = updatedMods.find(m => m.id === selectedModule.id)
+      if (refreshed) setSelectedModule(refreshed)
+    }
   }
 
   // ── Modules ──────────────────────────────────────
