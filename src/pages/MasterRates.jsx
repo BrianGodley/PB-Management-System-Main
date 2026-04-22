@@ -701,42 +701,85 @@ export default function MasterRates() {
         </p>
       </div>
 
-      {/* Three-panel layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* Three-panel layout
+          Row 1 (auto-height): all three filter bars in the same grid row so they
+          stretch to match the tallest one, ensuring panels always start at the
+          same vertical position regardless of how many category pills each has.
+          Row 2: the three panel cards. */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-4 gap-y-0">
 
-        {/* Materials panel with category filter */}
+        {/* ── Filter bar: Materials ── */}
+        {(() => {
+          const matCats = Array.from(new Set(materials.map(m => m.category).filter(Boolean))).sort()
+          const cats = ['All', ...matCats, 'Pavers']
+          return (
+            <div className="flex gap-1 flex-wrap pb-2 items-start content-start">
+              {cats.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setMatCategory(cat)}
+                  className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
+                    matCategory === cat
+                      ? 'bg-green-700 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {cat}
+                  {cat === 'Pavers' && <span className="ml-1 opacity-70">({paverPrices.length})</span>}
+                  {cat !== 'All' && cat !== 'Pavers' && (
+                    <span className="ml-1 opacity-70">({materials.filter(m => m.category === cat).length})</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )
+        })()}
+
+        {/* ── Filter bar: Labor ── */}
+        {(() => {
+          const cats = ['All', ...Array.from(new Set(labor.map(r => r.category).filter(Boolean))).sort()]
+          return (
+            <div className="flex gap-1 flex-wrap pb-2 items-start content-start">
+              {cats.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setLabCategory(cat)}
+                  className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
+                    labCategory === cat
+                      ? 'bg-green-700 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {cat}
+                  {cat !== 'All' && (
+                    <span className="ml-1 opacity-70">({labor.filter(r => r.category === cat).length})</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )
+        })()}
+
+        {/* ── Filter bar: Subs ── */}
+        {(() => {
+          const cats = ['All', ...Array.from(new Set(subs.map(r => r.category).filter(Boolean))).sort()]
+          return (
+            <div className="flex gap-1 flex-wrap pb-2 items-start content-start">
+              {cats.map(cat => (
+                <button key={cat} onClick={() => setSubCategory(cat)}
+                  className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
+                    subCategory === cat ? 'bg-green-700 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}>
+                  {cat}
+                  {cat !== 'All' && <span className="ml-1 opacity-70">({subs.filter(r => r.category === cat).length})</span>}
+                </button>
+              ))}
+            </div>
+          )
+        })()}
+
+        {/* ── Panel: Materials ── */}
         <div className="flex flex-col" style={{ minHeight: '500px' }}>
-          {/* Category filter tabs — includes hardcoded Pavers tab */}
-          {(() => {
-            const matCats = Array.from(new Set(materials.map(m => m.category).filter(Boolean))).sort()
-            const cats = ['All', ...matCats, 'Pavers']
-            return (
-              <div className="flex gap-1 flex-wrap mb-2">
-                {cats.map(cat => (
-                  <button
-                    key={cat}
-                    onClick={() => setMatCategory(cat)}
-                    className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
-                      matCategory === cat
-                        ? 'bg-green-700 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    {cat}
-                    {cat === 'Pavers' && (
-                      <span className="ml-1 opacity-70">({paverPrices.length})</span>
-                    )}
-                    {cat !== 'All' && cat !== 'Pavers' && (
-                      <span className="ml-1 opacity-70">
-                        ({materials.filter(m => m.category === cat).length})
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )
-          })()}
-
           {matCategory === 'Pavers' ? (
             <PaverPricesPanel
               paverPrices={paverPrices}
@@ -758,34 +801,8 @@ export default function MasterRates() {
           )}
         </div>
 
-        {/* Labor panel with category filter */}
+        {/* ── Panel: Labor ── */}
         <div className="flex flex-col" style={{ minHeight: '500px' }}>
-          {/* Category filter tabs */}
-          {!loading && labor.length > 0 && (() => {
-            const cats = ['All', ...Array.from(new Set(labor.map(r => r.category).filter(Boolean))).sort()]
-            return (
-              <div className="flex gap-1 flex-wrap mb-2">
-                {cats.map(cat => (
-                  <button
-                    key={cat}
-                    onClick={() => setLabCategory(cat)}
-                    className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
-                      labCategory === cat
-                        ? 'bg-green-700 text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    {cat}
-                    {cat !== 'All' && (
-                      <span className="ml-1 opacity-70">
-                        ({labor.filter(r => r.category === cat).length})
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )
-          })()}
           <RatesPanel
             title="Labor Rates & Amounts"
             rows={labCategory === 'All' ? labor : labor.filter(r => r.category === labCategory)}
@@ -803,24 +820,8 @@ export default function MasterRates() {
           />
         </div>
 
-        {/* Subs panel with category filter */}
+        {/* ── Panel: Subs ── */}
         <div className="flex flex-col" style={{ minHeight: '500px' }}>
-          {!loading && subs.length > 0 && (() => {
-            const cats = ['All', ...Array.from(new Set(subs.map(r => r.category).filter(Boolean))).sort()]
-            return (
-              <div className="flex gap-1 flex-wrap mb-2">
-                {cats.map(cat => (
-                  <button key={cat} onClick={() => setSubCategory(cat)}
-                    className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${
-                      subCategory === cat ? 'bg-green-700 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}>
-                    {cat}
-                    {cat !== 'All' && <span className="ml-1 opacity-70">({subs.filter(r => r.category === cat).length})</span>}
-                  </button>
-                ))}
-              </div>
-            )
-          })()}
           <RatesPanel
             title="Subcontractor Pricing"
             rows={subCategory === 'All' ? subs : subs.filter(r => r.category === subCategory)}
