@@ -536,6 +536,14 @@ export default function EstimateDetail() {
 
   const activeModules = selectedProject?.estimate_modules || []
 
+  // ── Module initialData: always inject the current project GPMD ────────────
+  // This ensures the module form shows the correct GPMD whether adding a new
+  // module or editing an existing one, regardless of what is stored in module.data.
+  const moduleInitialData = {
+    ...(editingModule?.data || {}),
+    gpmd: projectGpmds[selectedProject?.id] ?? (editingModule?.data?.gpmd ?? 425),
+  }
+
   // ── Estimate-wide totals across every module in every project ──────────────
   const allModules = projects.flatMap(p => p.estimate_modules || [])
   const estimateTotals = allModules.reduce((acc, mod) => {
@@ -1024,7 +1032,7 @@ export default function EstimateDetail() {
                     onSave={editingModule ? updateModule : saveModule}
                     onBack={editingModule ? closeModuleFlow : () => setSelectedType(null)}
                     saving={savingModule}
-                    initialData={editingModule?.data || null}
+                    initialData={moduleInitialData}
                   />
                 )}
                 {selectedType === 'Lighting' && (
@@ -1033,21 +1041,21 @@ export default function EstimateDetail() {
                     onSave={editingModule ? updateModule : saveModule}
                     onBack={editingModule ? closeModuleFlow : () => setSelectedType(null)}
                     saving={savingModule}
-                    initialData={editingModule?.data || null}
+                    initialData={moduleInitialData}
                   />
                 )}
                 {selectedType === 'Skid Steer Demo' && (
                   <SkidSteerDemoModule
                     onSave={editingModule ? updateModule : saveModule}
                     onCancel={closeModuleFlow}
-                    initialData={editingModule?.data || null}
+                    initialData={moduleInitialData}
                   />
                 )}
                 {selectedType === 'Mini Skid Steer Demo' && (
                   <MiniSkidSteerDemoModule
                     onSave={editingModule ? updateModule : saveModule}
                     onCancel={closeModuleFlow}
-                    initialData={editingModule?.data || null}
+                    initialData={moduleInitialData}
                   />
                 )}
                 {selectedType === 'Concrete' && (
@@ -1056,35 +1064,35 @@ export default function EstimateDetail() {
                     onSave={editingModule ? updateModule : saveModule}
                     onBack={editingModule ? closeModuleFlow : () => setSelectedType(null)}
                     saving={savingModule}
-                    initialData={editingModule?.data || null}
+                    initialData={moduleInitialData}
                   />
                 )}
                 {selectedType === 'Hand Demo' && (
                   <HandDemoModule
                     onSave={editingModule ? updateModule : saveModule}
                     onCancel={closeModuleFlow}
-                    initialData={editingModule?.data || null}
+                    initialData={moduleInitialData}
                   />
                 )}
                 {selectedType === 'Irrigation' && (
                   <IrrigationModule
                     onSave={editingModule ? updateModule : saveModule}
                     onCancel={closeModuleFlow}
-                    initialData={editingModule?.data || null}
+                    initialData={moduleInitialData}
                   />
                 )}
                 {selectedType === 'Artificial Turf' && (
                   <ArtificialTurfModule
                     onSave={editingModule ? updateModule : saveModule}
                     onCancel={closeModuleFlow}
-                    initialData={editingModule?.data || null}
+                    initialData={moduleInitialData}
                   />
                 )}
                 {selectedType === 'Pavers' && (
                   <PaverModule
                     onSave={editingModule ? updateModule : saveModule}
                     onCancel={closeModuleFlow}
-                    initialData={editingModule?.data || null}
+                    initialData={moduleInitialData}
                   />
                 )}
               </div>
