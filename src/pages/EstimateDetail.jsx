@@ -724,7 +724,6 @@ export default function EstimateDetail() {
             directGp={adjustedEstimateGP}
             price={et.price}
             subMarkupRate={subMarkupRate}
-            onSubMarkupSave={saveSubMarkupRate}
           />
         )}
       </div>
