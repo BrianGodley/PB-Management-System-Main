@@ -126,8 +126,8 @@ export default function Layout() {
             </span>
           </Link>
 
-          {/* Top bar is screen-specific — nav lives in the left sidebar */}
-          <div className="flex-1" />
+          {/* Centre slot — pages can portal content here */}
+          <div className="flex-1 flex justify-center items-center" id="app-header-center" />
 
           {/* Right side: portal links + Admin + user */}
           <div className="flex items-center gap-1 ml-auto">

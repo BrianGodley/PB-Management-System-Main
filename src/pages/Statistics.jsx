@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import {
@@ -2932,18 +2933,9 @@ export default function Statistics() {
   return (
     <div className="h-[calc(100vh-2.75rem)] -m-4 lg:-m-6 flex flex-col overflow-hidden bg-gray-50">
 
-      {/* ── MODULE HEADER — title left, mode tabs + button right ─── */}
-      <div className="flex items-center px-4 lg:px-6 pt-6 pb-4 bg-gray-50 flex-shrink-0">
-        {/* Left: title */}
-        <div className="flex-shrink-0">
-          <h1 className="text-xl font-bold text-gray-900">Statistics</h1>
-        </div>
-
-        {/* Spacer */}
-        <div className="flex-1" />
-
-        {/* Right: mode tabs + add button grouped together */}
-        <div className="flex items-center gap-1 flex-shrink-0">
+      {/* ── MODE TABS — portalled into the green app header bar ─── */}
+      {createPortal(
+        <div className="flex items-center gap-0.5">
           {[
             { id: 'graphs',         icon: '📈', label: 'Graphs'          },
             { id: 'multiple-entry', icon: '📝', label: 'Multiple Entry'  },
@@ -2951,37 +2943,37 @@ export default function Statistics() {
             { id: 'comparison',     icon: '⚖️',  label: 'Comparison'     },
             { id: 'import-export',  icon: '↕️',  label: 'Import / Export'},
             { id: 'archive',        icon: '📦', label: 'Archive'         },
-            { id: 'settings',       icon: '⚙️',  label: 'Settings'        },
+            { id: 'settings',       icon: '⚙️',  label: 'Settings'       },
           ].map(m => (
             <button
               key={m.id}
               onClick={() => setViewMode(m.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${
                 viewMode === m.id
-                  ? 'text-white'
-                  : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+                  ? 'bg-black/20 text-white'
+                  : 'text-white/70 hover:text-white hover:bg-black/15'
               }`}
-              style={viewMode === m.id ? { backgroundColor: FG } : {}}
             >
-              <span className="text-sm">{m.icon}</span>
+              <span>{m.icon}</span>
               <span>{m.label}</span>
             </button>
           ))}
-          <div className="w-px h-5 bg-gray-300 mx-1" />
-          <button onClick={() => setShowTypeSelector(true)} className="btn-primary text-sm px-3 py-1.5">
-            + Add Statistic
-          </button>
-        </div>
-      </div>
+        </div>,
+        document.getElementById('app-header-center')
+      )}
 
-      {/* ── TOP BAR (Graphs mode only) ───────────────────────────────────── */}
-      {viewMode === 'graphs' && (
-      <div className="flex items-center gap-2 px-4 py-2.5 bg-white border-b border-gray-200 flex-shrink-0 flex-wrap relative">
-        {/* Quick value entry — current period for selected stat */}
-        {selectedStat && (
+      {/* ── COMBINED MODULE HEADER + CONTROLS ───────────────────────────── */}
+      <div className="flex items-center gap-2 px-4 lg:px-6 py-2 bg-white border-b border-gray-200 flex-shrink-0 flex-wrap">
+
+        {/* Title */}
+        <h1 className="text-xl font-bold text-gray-900 flex-shrink-0">Statistics</h1>
+
+        {/* Quick value entry — graphs mode + stat selected */}
+        {viewMode === 'graphs' && selectedStat && (
           <div className="flex items-center gap-1.5 flex-shrink-0">
+            <div className="w-px h-5 bg-gray-200 mx-0.5 flex-shrink-0" />
             <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white">
-              <span className="w-44 flex-shrink-0 text-center px-2.5 text-xs text-gray-400 whitespace-nowrap border-r border-gray-200 bg-gray-50 py-1.5 select-none">
+              <span className="w-36 flex-shrink-0 text-center px-2 text-xs text-gray-400 whitespace-nowrap border-r border-gray-200 bg-gray-50 py-1.5 select-none">
                 {quickPeriod.label}
               </span>
               <input
@@ -2990,13 +2982,13 @@ export default function Statistics() {
                 onChange={e => setQuickValue(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleQuickSave()}
                 placeholder="Value"
-                className="w-24 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white"
+                className="w-20 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white"
               />
             </div>
             <button
               onClick={handleQuickSave}
               disabled={quickSaving}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold text-white disabled:opacity-50"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-white disabled:opacity-50"
               style={{ backgroundColor: FG }}
             >
               {quickSaving ? '…' : 'Save'}
@@ -3009,13 +3001,13 @@ export default function Statistics() {
                 setWeekEndingError(false)
                 setShowDateRangeSelector(true)
               }}
-              className="text-sm font-medium underline underline-offset-2 text-gray-500 hover:text-gray-800 transition-colors whitespace-nowrap ml-6"
+              className="text-xs font-medium underline underline-offset-2 text-gray-500 hover:text-gray-800 transition-colors whitespace-nowrap"
             >
               Edit Value History
             </button>
             <button
               onClick={handleEditStat}
-              className="text-sm font-medium underline underline-offset-2 text-gray-500 hover:text-gray-800 transition-colors whitespace-nowrap ml-4"
+              className="text-xs font-medium underline underline-offset-2 text-gray-500 hover:text-gray-800 transition-colors whitespace-nowrap"
             >
               Edit Statistic
             </button>
@@ -3027,59 +3019,62 @@ export default function Statistics() {
           </div>
         )}
 
-        {/* Aggregation tabs — centered over the right panel; only show periods ≥ native tracking */}
-        <div className="absolute left-64 right-0 flex justify-center pointer-events-none">
-          <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden pointer-events-auto">
-            {['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Yearly'].map(p => {
-              const pid        = p.toLowerCase()
-              const nativeIdx  = PERIOD_ORDER.indexOf(selectedStat?.tracking ?? 'daily')
-              const pidIdx     = PERIOD_ORDER.indexOf(pid)
-              const isDisabled = selectedStat && pidIdx < nativeIdx
-              const isActive   = viewPeriod === pid
-              return (
-                <button
-                  key={p}
-                  onClick={() => !isDisabled && setViewPeriod(pid)}
-                  disabled={isDisabled}
-                  title={isDisabled ? `Stat tracks ${selectedStat.tracking} — can't roll up to ${p}` : p}
-                  className={`px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
-                    isActive ? 'text-white' : 'text-gray-600 hover:bg-gray-50'
-                  }`}
-                  style={isActive ? { backgroundColor: FG } : {}}
-                >
-                  {p}
-                </button>
-              )
-            })}
+        {/* Spacer pushes right-side controls to the far right */}
+        <div className="flex-1 min-w-0" />
+
+        {/* Period tabs + FROM/TO — graphs mode only */}
+        {viewMode === 'graphs' && (
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+              {['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Yearly'].map(p => {
+                const pid        = p.toLowerCase()
+                const nativeIdx  = PERIOD_ORDER.indexOf(selectedStat?.tracking ?? 'daily')
+                const pidIdx     = PERIOD_ORDER.indexOf(pid)
+                const isDisabled = selectedStat && pidIdx < nativeIdx
+                const isActive   = viewPeriod === pid
+                return (
+                  <button
+                    key={p}
+                    onClick={() => !isDisabled && setViewPeriod(pid)}
+                    disabled={isDisabled}
+                    title={isDisabled ? `Stat tracks ${selectedStat.tracking} — can't roll up to ${p}` : p}
+                    className={`px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+                      isActive ? 'text-white' : 'text-gray-600 hover:bg-gray-50'
+                    }`}
+                    style={isActive ? { backgroundColor: FG } : {}}
+                  >
+                    {p}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-gray-500 font-medium">FROM</span>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={e => setFromDate(e.target.value)}
+                className="border border-gray-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-green-600"
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-gray-500 font-medium">TO</span>
+              <input
+                type="date"
+                value={toDate}
+                onChange={e => setToDate(e.target.value)}
+                className="border border-gray-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-green-600"
+              />
+            </div>
+            <div className="w-px h-5 bg-gray-200 flex-shrink-0" />
           </div>
-        </div>
+        )}
 
-        <div className="flex-1" />
-
-        {/* FROM date */}
-        <div className="flex items-center gap-1">
-          <span className="text-xs text-gray-500 font-medium">FROM</span>
-          <input
-            type="date"
-            value={fromDate}
-            onChange={e => setFromDate(e.target.value)}
-            className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-green-600"
-          />
-        </div>
-
-        {/* TO date */}
-        <div className="flex items-center gap-1">
-          <span className="text-xs text-gray-500 font-medium">TO</span>
-          <input
-            type="date"
-            value={toDate}
-            onChange={e => setToDate(e.target.value)}
-            className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-green-600"
-          />
-        </div>
+        {/* Add Statistic */}
+        <button onClick={() => setShowTypeSelector(true)} className="btn-primary text-sm px-3 py-1.5 flex-shrink-0">
+          + Add Statistic
+        </button>
       </div>
-
-      )} {/* end Graphs top bar */}
 
       {/* ── NON-GRAPH VIEWS ─────────────────────────────────────────────── */}
       {viewMode === 'multiple-entry' && (
