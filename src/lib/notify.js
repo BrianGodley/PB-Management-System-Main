@@ -23,11 +23,47 @@ export async function sendEmail({ to, subject, html, text }) {
 }
 
 export async function sendSMS({ to, message }) {
-  const { data, error } = await supabase.functions.invoke('send-sms', {
-    body: { to, message },
-  })
-  if (error) console.error('[notify] sendSMS error:', error)
-  return { data, error }
+  // Use direct fetch so we can see the real HTTP status + body on failure.
+  // supabase.functions.invoke swallows the response body when status != 2xx.
+  const supabaseUrl  = import.meta.env.VITE_SUPABASE_URL
+  const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+  // Get the current session JWT (falls back to anon key if not logged in)
+  const { data: { session } } = await supabase.auth.getSession()
+  const token = session?.access_token || supabaseAnon
+
+  let raw
+  try {
+    raw = await fetch(`${supabaseUrl}/functions/v1/send-sms`, {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${token}`,
+        'apikey':        supabaseAnon,
+      },
+      body: JSON.stringify({ to, message }),
+    })
+  } catch (networkErr) {
+    console.error('[notify] sendSMS network error:', networkErr)
+    return { data: null, error: networkErr }
+  }
+
+  let data
+  try { data = await raw.json() } catch { data = null }
+
+  if (!raw.ok) {
+    const msg = data?.error || data?.message || `HTTP ${raw.status}`
+    console.error('[notify] sendSMS non-2xx:', raw.status, data)
+    return { data, error: new Error(msg) }
+  }
+
+  if (data?.error) {
+    console.error('[notify] sendSMS Twilio error:', data.error)
+    return { data, error: new Error(data.error) }
+  }
+
+  console.log('[notify] sendSMS ok:', data)
+  return { data, error: null }
 }
 
 // ── Email templates ───────────────────────────────────────────────────────────
