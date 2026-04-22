@@ -23,6 +23,8 @@ import PaverModule              from '../components/modules/PaverModule'
 import PaverSummary             from '../components/modules/PaverSummary'
 import PlantingModule           from '../components/modules/PlantingModule'
 import PlantingSummary          from '../components/modules/PlantingSummary'
+import PoolModule               from '../components/modules/PoolModule'
+import PoolSummary              from '../components/modules/PoolSummary'
 import GpmdBar                  from '../components/modules/GpmdBar'
 
 const MODULE_TYPES = [
@@ -932,6 +934,8 @@ export default function EstimateDetail() {
                   <PaverSummary module={selectedModule} />
                 ) : selectedModule.module_type === 'Planting' ? (
                   <PlantingSummary module={selectedModule} />
+                ) : selectedModule.module_type === 'Pool' ? (
+                  <PoolSummary module={selectedModule} />
                 ) : (
                   /* Generic fallback for modules not yet built out */
                   <div className="space-y-3">
@@ -1016,8 +1020,8 @@ export default function EstimateDetail() {
           <div className="absolute inset-0 bg-black/40" onClick={closeModuleFlow} />
 
           {/* Wide scrollable modal for module-specific forms */}
-          {(selectedType === 'Drainage' || selectedType === 'Lighting' || selectedType === 'Skid Steer Demo' || selectedType === 'Mini Skid Steer Demo' || selectedType === 'Concrete' || selectedType === 'Hand Demo' || selectedType === 'Irrigation' || selectedType === 'Artificial Turf' || selectedType === 'Pavers' || selectedType === 'Planting') ? (
-            <div className={`relative bg-white rounded-2xl shadow-xl w-full mx-4 flex flex-col ${selectedType === 'Pavers' ? 'max-w-6xl' : 'max-w-5xl'}`}
+          {(selectedType === 'Drainage' || selectedType === 'Lighting' || selectedType === 'Skid Steer Demo' || selectedType === 'Mini Skid Steer Demo' || selectedType === 'Concrete' || selectedType === 'Hand Demo' || selectedType === 'Irrigation' || selectedType === 'Artificial Turf' || selectedType === 'Pavers' || selectedType === 'Planting' || selectedType === 'Pool') ? (
+            <div className={`relative bg-white rounded-2xl shadow-xl w-full mx-4 flex flex-col ${selectedType === 'Pavers' || selectedType === 'Pool' ? 'max-w-6xl' : 'max-w-5xl'}`}
                  style={{ maxHeight: '90vh' }}>
               <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-gray-200">
                 <div>
@@ -1101,6 +1105,15 @@ export default function EstimateDetail() {
                 )}
                 {selectedType === 'Planting' && (
                   <PlantingModule
+                    projectName={selectedProject?.project_name}
+                    onSave={editingModule ? updateModule : saveModule}
+                    onBack={editingModule ? closeModuleFlow : () => setSelectedType(null)}
+                    saving={savingModule}
+                    initialData={moduleInitialData}
+                  />
+                )}
+                {selectedType === 'Pool' && (
+                  <PoolModule
                     projectName={selectedProject?.project_name}
                     onSave={editingModule ? updateModule : saveModule}
                     onBack={editingModule ? closeModuleFlow : () => setSelectedType(null)}
