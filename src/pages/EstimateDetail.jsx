@@ -101,6 +101,9 @@ export default function EstimateDetail() {
   // Per-project GPMD overrides  { [projectId]: number }
   const [projectGpmds, setProjectGpmds] = useState({})
 
+  // Sub GP markup rate (global, stored in company_settings)
+  const [subMarkupRate, setSubMarkupRate] = useState(0.20)
+
   // Add / Edit module modals
   const [showModulePicker, setShowModulePicker] = useState(false)
   const [selectedType,     setSelectedType]     = useState(null)
@@ -112,6 +115,17 @@ export default function EstimateDetail() {
 
   async function fetchData() {
     setLoading(true)
+
+    // Fetch sub GP markup rate from company settings
+    const { data: settings } = await supabase
+      .from('company_settings')
+      .select('sub_gp_markup_rate')
+      .eq('id', 1)
+      .single()
+    if (settings?.sub_gp_markup_rate != null) {
+      setSubMarkupRate(parseFloat(settings.sub_gp_markup_rate))
+    }
+
     const { data: est } = await supabase
       .from('estimates')
       .select('*')
@@ -253,6 +267,15 @@ export default function EstimateDetail() {
       const refreshed = updatedMods.find(m => m.id === selectedModule.id)
       if (refreshed) setSelectedModule(refreshed)
     }
+  }
+
+  // ── Sub GP markup rate ────────────────────────────
+  async function saveSubMarkupRate(newVal) {
+    setSubMarkupRate(newVal)
+    await supabase
+      .from('company_settings')
+      .update({ sub_gp_markup_rate: newVal, updated_at: new Date().toISOString() })
+      .eq('id', 1)
   }
 
   // ── Modules ──────────────────────────────────────
@@ -700,6 +723,8 @@ export default function EstimateDetail() {
             subCost={et.subCost}
             directGp={adjustedEstimateGP}
             price={et.price}
+            subMarkupRate={subMarkupRate}
+            onSubMarkupSave={saveSubMarkupRate}
           />
         )}
       </div>
@@ -732,6 +757,8 @@ export default function EstimateDetail() {
             gpmd={projectGpmds[selectedProject.id] ?? projGpmd}
             price={pt.price}
             onGpmdSave={val => saveProjectGpmd(selectedProject.id, val)}
+            subMarkupRate={subMarkupRate}
+            onSubMarkupSave={saveSubMarkupRate}
           />
         </div>
       )}
