@@ -497,7 +497,6 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
   function handleSave() {
     const data = {
       ...state,
-      subGpMarkupRate,
       materialPrices,
       laborRates,
       subRates,

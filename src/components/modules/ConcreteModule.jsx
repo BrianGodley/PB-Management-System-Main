@@ -351,7 +351,7 @@ export default function ConcreteModule({ projectName, onSave, onBack, saving, in
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
       data: {
         ...state,
-        laborRatePerHour, gpmd, subGpMarkupRate,
+        laborRatePerHour, gpmd,
         laborRates,    // ← production rate snapshot
         materialRates, // ← material cost snapshot
         subRates,      // ← sub/equipment cost snapshot

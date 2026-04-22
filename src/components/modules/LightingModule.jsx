@@ -185,7 +185,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
     onSave({
       man_days:      parseFloat(calc.manDays.toFixed(2)),
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
-      data: { difficulty, fixtureQtys, transformerQtys, wireQtys, manualRows, laborRatePerHour, gpmd, subGpMarkupRate, materialPrices, calc },
+      data: { difficulty, fixtureQtys, transformerQtys, wireQtys, manualRows, laborRatePerHour, gpmd, materialPrices, calc },
     })
   }
 

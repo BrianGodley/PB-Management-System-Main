@@ -563,7 +563,8 @@ export default function EstimateDetail() {
   const moduleInitialData = {
     ...(editingModule?.data || {}),
     gpmd: projectGpmds[selectedProject?.id] ?? (editingModule?.data?.gpmd ?? 425),
-    subGpMarkupRate: projectSubRates[selectedProject?.id] ?? (editingModule?.data?.subGpMarkupRate ?? 0.20),
+    // Sub GP rate always comes from the project — never from stored module data
+    subGpMarkupRate: projectSubRates[selectedProject?.id] ?? 0.20,
   }
 
   // ── Estimate-wide totals across every module in every project ──────────────

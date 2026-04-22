@@ -230,7 +230,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
       sub_cost:     parseFloat(calc.subCost.toFixed(2)),
       total_price:  parseFloat(calc.price.toFixed(2)),
       data: {
-        ...state, laborRatePerHour, gpmd, subGpMarkupRate, materialPrices, laborRates, salesTax,
+        ...state, laborRatePerHour, gpmd, materialPrices, laborRates, salesTax,
         calc: {
           totalHrs: calc.totalHrs, manDays: calc.manDays,
           laborCost: calc.laborCost, burden: calc.burden,

@@ -359,7 +359,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
       sub_cost:      parseFloat(calc.subCost.toFixed(2)),
       total_price:   parseFloat(calc.price.toFixed(2)),
       data: {
-        ...state, laborRatePerHour, gpmd, subGpMarkupRate, materialPrices, laborRates,
+        ...state, laborRatePerHour, gpmd, materialPrices, laborRates,
         calc: {
           totalHrs: calc.totalHrs, manDays: calc.manDays,
           laborCost: calc.laborCost, burden: calc.burden,

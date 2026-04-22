@@ -354,7 +354,7 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
       data: {
         tillSqft, difficulty, smallPlantRows, largePlantRows, addons, manualRows,
-        laborRatePerHour, gpmd, subGpMarkupRate,
+        laborRatePerHour, gpmd,
         materialPrices,   // snapshot so summary always reflects save-time prices
         laborRates,       // snapshot so summary always reflects save-time rates
         calc,

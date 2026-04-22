@@ -432,7 +432,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel }) {
       gross_profit: parseFloat(calc.gp.toFixed(2)),
       sub_cost:     parseFloat(calc.subCost.toFixed(2)),
       total_price:  parseFloat(calc.price.toFixed(2)),
-      data: { ...state, laborRatePerHour, gpmd, subGpMarkupRate, materialPrices, laborRates,
+      data: { ...state, laborRatePerHour, gpmd, materialPrices, laborRates,
         calc: { totalHrs:calc.totalHrs, manDays:calc.manDays, laborCost:calc.laborCost,
                 burden:calc.burden, totalMat:calc.totalMat, subCost:calc.subCost,
                 gp:calc.gp, price:calc.price } },

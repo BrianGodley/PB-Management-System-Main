@@ -258,7 +258,7 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
       data: {
         difficulty, trenchRows, pipeRows, fixtureRows, additionalItems, manualRows,
-        laborRatePerHour, gpmd, subGpMarkupRate,
+        laborRatePerHour, gpmd,
         materialPrices,   // snapshot of prices used — so the summary always reflects save-time costs
         calc,
       },

@@ -483,7 +483,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       sub_cost:      parseFloat(calc.subCost.toFixed(2)),
       total_price:   parseFloat(calc.price.toFixed(2)),
       data: {
-        ...state, laborRatePerHour, gpmd, subGpMarkupRate, laborRates, materialRates, paverPrices,
+        ...state, laborRatePerHour, gpmd, laborRates, materialRates, paverPrices,
         calc: {
           totalHrs:   calc.totalHrs,
           manDays:    calc.manDays,
