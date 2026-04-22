@@ -257,9 +257,6 @@ export default function HR() {
           <span className="text-2xl">👥</span>
           <div>
             <h1 className="text-xl font-bold text-gray-900">Human Resources</h1>
-            <p className="text-xs text-gray-500">
-              {employees.filter(e => e.status === 'active').length} active employees · {applicants.filter(a => a.status === 'new').length} new applicants
-            </p>
           </div>
         </div>
         <div className="flex gap-2">

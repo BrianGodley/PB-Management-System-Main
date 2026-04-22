@@ -86,7 +86,6 @@ export default function Clients() {
       <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Clients</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{clients.length} total clients</p>
         </div>
         <button onClick={() => setShowForm(!showForm)} className="btn-primary text-sm px-3 py-1.5">
           {showForm ? 'Cancel' : '+ Add Client'}

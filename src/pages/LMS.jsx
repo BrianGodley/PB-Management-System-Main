@@ -469,8 +469,7 @@ export default function LMS() {
       {/* Page header */}
       <div className="flex items-center gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Training</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Learning Management System</p>
+          <h1 className="text-xl font-bold text-gray-900">Training</h1>
         </div>
         {isAdmin && (
           <div className="ml-auto flex gap-2 bg-gray-100 rounded-xl p-1">

@@ -83,6 +83,11 @@ export default function JobsList() {
   return (
     <div className="flex flex-col h-full">
 
+      {/* ── Page title ────────────────────────────────────────── */}
+      <div className="mb-4 flex-shrink-0">
+        <h1 className="text-xl font-bold text-gray-900">Jobs</h1>
+      </div>
+
       {/* ── Summary stats ─────────────────────────────────────── */}
       <div className="flex gap-2 mb-3 flex-shrink-0 overflow-x-auto pb-1">
         {[
