@@ -330,50 +330,22 @@ export default function GroundTreatmentsModule({ projectName, onSave, onBack, sa
         </div>
       </div>
 
-      {/* ── Surface Materials ── */}
+      {/* ── Soil Prep ── */}
       <div>
-        <SectionHeader title="Surface Materials" />
+        <SectionHeader title="Soil Prep" />
         <div className="space-y-0">
-
-          {/* Mulch */}
-          <LabeledRow label="Mulch">
-            <NumInput value={mulchSF} onChange={setMulchSF} placeholder="SF" className="w-28" />
-            <select
-              className="input text-sm py-1.5 w-24"
-              value={mulchDepth}
-              onChange={e => setMulchDepth(e.target.value)}
-            >
-              {['1','2','3','4'].map(d => <option key={d} value={d}>{d}" deep</option>)}
-            </select>
-            {n(mulchSF) > 0 && (
-              <span className="text-xs text-gray-400">
-                {((n(mulchSF)*(n(mulchDepth)/12)/27)).toFixed(2)} CY
-              </span>
-            )}
-          </LabeledRow>
-
-          {/* Plastic Edging */}
-          <LabeledRow label="Plastic Edging"
-            note={n(plasticEdgingLF) > 0 ? `$${(n(plasticEdgingLF)*p(GT_RATES.plasticEdgingMat.dbName,1.20)).toFixed(2)} mat` : null}>
-            <NumInput value={plasticEdgingLF} onChange={setPlasticEdgingLF} placeholder="LF" className="w-28" />
-            <span className="text-xs text-gray-400">${p(GT_RATES.plasticEdgingMat.dbName,1.20).toFixed(2)}/LF</span>
-          </LabeledRow>
-
-          {/* Metal Edging */}
-          <LabeledRow label="Metal Edging"
-            note={n(metalEdgingLF) > 0 ? `$${(n(metalEdgingLF)*p(GT_RATES.metalEdgingMat.dbName,4.00)).toFixed(2)} mat` : null}>
-            <NumInput value={metalEdgingLF} onChange={setMetalEdgingLF} placeholder="LF" className="w-28" />
-            <span className="text-xs text-gray-400">${p(GT_RATES.metalEdgingMat.dbName,4.00).toFixed(2)}/LF</span>
-          </LabeledRow>
-
-          {/* Soil Prep */}
           <LabeledRow label="Soil Prep"
             note={n(soilPrepSF) > 0 ? `$${(n(soilPrepSF)*p(GT_RATES.soilPrepMat.dbName,0.1558)).toFixed(2)} mat` : null}>
             <NumInput value={soilPrepSF} onChange={setSoilPrepSF} placeholder="SF" className="w-28" />
             <span className="text-xs text-gray-400">${p(GT_RATES.soilPrepMat.dbName,0.1558).toFixed(2)}/SF</span>
           </LabeledRow>
+        </div>
+      </div>
 
-          {/* Sod */}
+      {/* ── Sod ── */}
+      <div>
+        <SectionHeader title="Sod" />
+        <div className="space-y-0">
           <LabeledRow label="Sod">
             <NumInput value={sodSF} onChange={setSodSF} placeholder="SF" className="w-28" />
             <select className="input text-sm py-1.5 flex-1" value={sodType} onChange={e => setSodType(e.target.value)}>
@@ -390,69 +362,25 @@ export default function GroundTreatmentsModule({ projectName, onSave, onBack, sa
         </div>
       </div>
 
-      {/* ── Steppers ── */}
+      {/* ── Mulch ── */}
       <div>
-        <SectionHeader title="Steppers" />
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-xs text-gray-500 border-b border-gray-200">
-                <th className="text-left pb-1 pr-2 font-medium">Type</th>
-                <th className="text-left pb-1 pr-2 font-medium">Area (SF)</th>
-                <th className="text-left pb-1 pr-2 font-medium">$/Ton</th>
-                <th className="text-right pb-1 pr-2 font-medium text-gray-400">Tons</th>
-                <th className="text-right pb-1 font-medium text-gray-400">Material $</th>
-              </tr>
-            </thead>
-            <tbody>
-              {/* Flagstone */}
-              <tr className="border-b border-gray-100">
-                <td className="py-1 pr-2 text-xs text-gray-700">Flagstone Steppers</td>
-                <td className="py-1 pr-2"><NumInput value={flagstoneSF} onChange={setFlagstoneSF} /></td>
-                <td className="py-1 pr-2">
-                  <div className="relative">
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-                    <input
-                      type="number" step="any" min="0"
-                      className="input text-sm py-1.5 pl-5 w-24"
-                      placeholder={p(GT_RATES.flagstonePerTon.dbName, 500).toString()}
-                      value={flagstoneRate}
-                      onChange={e => setFlagstoneRate(e.target.value)}
-                    />
-                  </div>
-                </td>
-                <td className="py-1 text-right text-xs text-gray-400 pr-2">
-                  {n(flagstoneSF) > 0 ? (n(flagstoneSF)/80).toFixed(2) : '—'}
-                </td>
-                <td className="py-1 text-right text-xs text-gray-600">
-                  {n(flagstoneSF) > 0 ? `$${calc.flagMat.toFixed(2)}` : '—'}
-                </td>
-              </tr>
-              {/* Precast */}
-              <tr className="border-b border-gray-100">
-                <td className="py-1 pr-2 text-xs text-gray-700">Precast Steppers</td>
-                <td className="py-1 pr-2"><NumInput value={precastSF} onChange={setPrecastSF} /></td>
-                <td className="py-1 pr-2">
-                  <div className="relative">
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-                    <input
-                      type="number" step="any" min="0"
-                      className="input text-sm py-1.5 pl-5 w-24"
-                      placeholder={p(GT_RATES.precastPerTon.dbName, 200).toString()}
-                      value={precastRate}
-                      onChange={e => setPrecastRate(e.target.value)}
-                    />
-                  </div>
-                </td>
-                <td className="py-1 text-right text-xs text-gray-400 pr-2">
-                  {n(precastSF) > 0 ? (n(precastSF)/80).toFixed(2) : '—'}
-                </td>
-                <td className="py-1 text-right text-xs text-gray-600">
-                  {n(precastSF) > 0 ? `$${calc.precastMat.toFixed(2)}` : '—'}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <SectionHeader title="Mulch" />
+        <div className="space-y-0">
+          <LabeledRow label="Mulch">
+            <NumInput value={mulchSF} onChange={setMulchSF} placeholder="SF" className="w-28" />
+            <select
+              className="input text-sm py-1.5 w-24"
+              value={mulchDepth}
+              onChange={e => setMulchDepth(e.target.value)}
+            >
+              {['1','2','3','4'].map(d => <option key={d} value={d}>{d}" deep</option>)}
+            </select>
+            {n(mulchSF) > 0 && (
+              <span className="text-xs text-gray-400">
+                {((n(mulchSF)*(n(mulchDepth)/12)/27)).toFixed(2)} CY
+              </span>
+            )}
+          </LabeledRow>
         </div>
       </div>
 
@@ -549,6 +477,92 @@ export default function GroundTreatmentsModule({ projectName, onSave, onBack, sa
               })}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* ── Edging ── */}
+      <div>
+        <SectionHeader title="Edging" />
+        <div className="space-y-0">
+          {/* Plastic Edging */}
+          <LabeledRow label="Plastic Edging"
+            note={n(plasticEdgingLF) > 0 ? `$${(n(plasticEdgingLF)*p(GT_RATES.plasticEdgingMat.dbName,1.20)).toFixed(2)} mat` : null}>
+            <NumInput value={plasticEdgingLF} onChange={setPlasticEdgingLF} placeholder="LF" className="w-28" />
+            <span className="text-xs text-gray-400">${p(GT_RATES.plasticEdgingMat.dbName,1.20).toFixed(2)}/LF</span>
+          </LabeledRow>
+
+          {/* Metal Edging */}
+          <LabeledRow label="Metal Edging"
+            note={n(metalEdgingLF) > 0 ? `$${(n(metalEdgingLF)*p(GT_RATES.metalEdgingMat.dbName,4.00)).toFixed(2)} mat` : null}>
+            <NumInput value={metalEdgingLF} onChange={setMetalEdgingLF} placeholder="LF" className="w-28" />
+            <span className="text-xs text-gray-400">${p(GT_RATES.metalEdgingMat.dbName,4.00).toFixed(2)}/LF</span>
+          </LabeledRow>
+        </div>
+      </div>
+
+      {/* ── Steppers ── */}
+      <div>
+        <SectionHeader title="Steppers" />
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-gray-500 border-b border-gray-200">
+                <th className="text-left pb-1 pr-2 font-medium">Type</th>
+                <th className="text-left pb-1 pr-2 font-medium">Area (SF)</th>
+                <th className="text-left pb-1 pr-2 font-medium">$/Ton</th>
+                <th className="text-right pb-1 pr-2 font-medium text-gray-400">Tons</th>
+                <th className="text-right pb-1 font-medium text-gray-400">Material $</th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* Flagstone */}
+              <tr className="border-b border-gray-100">
+                <td className="py-1 pr-2 text-xs text-gray-700">Flagstone Steppers</td>
+                <td className="py-1 pr-2"><NumInput value={flagstoneSF} onChange={setFlagstoneSF} /></td>
+                <td className="py-1 pr-2">
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                    <input
+                      type="number" step="any" min="0"
+                      className="input text-sm py-1.5 pl-5 w-24"
+                      placeholder={p(GT_RATES.flagstonePerTon.dbName, 500).toString()}
+                      value={flagstoneRate}
+                      onChange={e => setFlagstoneRate(e.target.value)}
+                    />
+                  </div>
+                </td>
+                <td className="py-1 text-right text-xs text-gray-400 pr-2">
+                  {n(flagstoneSF) > 0 ? (n(flagstoneSF)/80).toFixed(2) : '—'}
+                </td>
+                <td className="py-1 text-right text-xs text-gray-600">
+                  {n(flagstoneSF) > 0 ? `$${calc.flagMat.toFixed(2)}` : '—'}
+                </td>
+              </tr>
+              {/* Precast */}
+              <tr className="border-b border-gray-100">
+                <td className="py-1 pr-2 text-xs text-gray-700">Precast Steppers</td>
+                <td className="py-1 pr-2"><NumInput value={precastSF} onChange={setPrecastSF} /></td>
+                <td className="py-1 pr-2">
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                    <input
+                      type="number" step="any" min="0"
+                      className="input text-sm py-1.5 pl-5 w-24"
+                      placeholder={p(GT_RATES.precastPerTon.dbName, 200).toString()}
+                      value={precastRate}
+                      onChange={e => setPrecastRate(e.target.value)}
+                    />
+                  </div>
+                </td>
+                <td className="py-1 text-right text-xs text-gray-400 pr-2">
+                  {n(precastSF) > 0 ? (n(precastSF)/80).toFixed(2) : '—'}
+                </td>
+                <td className="py-1 text-right text-xs text-gray-600">
+                  {n(precastSF) > 0 ? `$${calc.precastMat.toFixed(2)}` : '—'}
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 

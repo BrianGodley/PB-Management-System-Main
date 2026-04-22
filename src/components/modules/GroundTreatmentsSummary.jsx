@@ -69,63 +69,33 @@ export default function GroundTreatmentsSummary({ module }) {
 
   const mp = (dbName, fallback) => materialPrices[dbName] != null ? materialPrices[dbName] : fallback
 
-  // ── Surface Materials ────────────────────────────────────────────────────────
-  const surfaceLines = []
-
-  if (n(mulchSF) > 0) {
-    const CY  = n(mulchSF) * (n(mulchDepth) / 12) / 27
-    const mat = CY * mp(GT_RATES.mulchPerCY.dbName, GT_RATES.mulchPerCY.fallback)
-              + mp(GT_RATES.mulchDelivery.dbName, GT_RATES.mulchDelivery.fallback)
-    const hrs = (CY / 15) * 8 + (n(mulchSF) / 3200) * 8
-    surfaceLines.push({ label: `Mulch — ${n(mulchSF).toLocaleString()} SF × ${n(mulchDepth)}"`, value: fmt2(mat), sub: `${hrs.toFixed(2)} hrs · ${CY.toFixed(2)} CY` })
-  }
-
-  if (n(plasticEdgingLF) > 0) {
-    const mat = n(plasticEdgingLF) * mp(GT_RATES.plasticEdgingMat.dbName, GT_RATES.plasticEdgingMat.fallback)
-    const hrs = n(plasticEdgingLF) * mp(GT_RATES.plasticEdgingLab.dbName, GT_RATES.plasticEdgingLab.fallback)
-    surfaceLines.push({ label: `Plastic Edging — ${n(plasticEdgingLF).toLocaleString()} LF`, value: fmt2(mat), sub: `${hrs.toFixed(2)} hrs` })
-  }
-
-  if (n(metalEdgingLF) > 0) {
-    const mat = n(metalEdgingLF) * mp(GT_RATES.metalEdgingMat.dbName, GT_RATES.metalEdgingMat.fallback)
-    const hrs = n(metalEdgingLF) * mp(GT_RATES.metalEdgingLab.dbName, GT_RATES.metalEdgingLab.fallback)
-    surfaceLines.push({ label: `Metal Edging — ${n(metalEdgingLF).toLocaleString()} LF`, value: fmt2(mat), sub: `${hrs.toFixed(2)} hrs` })
-  }
-
+  // ── Soil Prep ────────────────────────────────────────────────────────────────
+  let soilPrepLine = null
   if (n(soilPrepSF) > 0) {
     const mat = n(soilPrepSF) * mp(GT_RATES.soilPrepMat.dbName, GT_RATES.soilPrepMat.fallback)
     const hrs = n(soilPrepSF) * mp(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)
-    surfaceLines.push({ label: `Soil Prep — ${n(soilPrepSF).toLocaleString()} SF`, value: fmt2(mat), sub: `${hrs.toFixed(2)} hrs` })
+    soilPrepLine = { label: `Soil Prep — ${n(soilPrepSF).toLocaleString()} SF`, value: fmt2(mat), sub: `${hrs.toFixed(2)} hrs` }
   }
 
+  // ── Sod ──────────────────────────────────────────────────────────────────────
+  let sodLine = null
   if (n(sodSF) > 0) {
     const rate = sodType === 'St. Augustine'
       ? mp(GT_RATES.sodStAugMat.dbName, GT_RATES.sodStAugMat.fallback)
       : mp(GT_RATES.sodMarathonMat.dbName, GT_RATES.sodMarathonMat.fallback)
     const mat = n(sodSF) * rate
     const hrs = n(sodSF) * mp(GT_RATES.sodLab.dbName, GT_RATES.sodLab.fallback)
-    surfaceLines.push({ label: `Sod (${sodType}) — ${n(sodSF).toLocaleString()} SF`, value: fmt2(mat), sub: `${hrs.toFixed(2)} hrs · ${fmt2(rate)}/SF` })
+    sodLine = { label: `Sod (${sodType}) — ${n(sodSF).toLocaleString()} SF`, value: fmt2(mat), sub: `${hrs.toFixed(2)} hrs · ${fmt2(rate)}/SF` }
   }
 
-  // ── Steppers ─────────────────────────────────────────────────────────────────
-  const stepperLines = []
-
-  if (n(flagstoneSF) > 0) {
-    const tons    = n(flagstoneSF) / 80
-    const rate    = n(flagstoneRate) || mp(GT_RATES.flagstonePerTon.dbName, GT_RATES.flagstonePerTon.fallback)
-    const sfPerDay = mp(GT_RATES.flagstoneLab.dbName, GT_RATES.flagstoneLab.fallback)
-    const mat     = tons * rate
-    const hrs     = (n(flagstoneSF) / sfPerDay) * 8
-    stepperLines.push({ label: `Flagstone Steppers — ${n(flagstoneSF).toLocaleString()} SF`, value: fmt2(mat), sub: `${hrs.toFixed(2)} hrs · ${tons.toFixed(2)} tons · ${fmt2(rate)}/ton` })
-  }
-
-  if (n(precastSF) > 0) {
-    const tons    = n(precastSF) / 80
-    const rate    = n(precastRate) || mp(GT_RATES.precastPerTon.dbName, GT_RATES.precastPerTon.fallback)
-    const sfPerDay = mp(GT_RATES.precastLab.dbName, GT_RATES.precastLab.fallback)
-    const mat     = tons * rate
-    const hrs     = (n(precastSF) / sfPerDay) * 8
-    stepperLines.push({ label: `Precast Steppers — ${n(precastSF).toLocaleString()} SF`, value: fmt2(mat), sub: `${hrs.toFixed(2)} hrs · ${tons.toFixed(2)} tons · ${fmt2(rate)}/ton` })
+  // ── Mulch ─────────────────────────────────────────────────────────────────────
+  let mulchLine = null
+  if (n(mulchSF) > 0) {
+    const CY  = n(mulchSF) * (n(mulchDepth) / 12) / 27
+    const mat = CY * mp(GT_RATES.mulchPerCY.dbName, GT_RATES.mulchPerCY.fallback)
+              + mp(GT_RATES.mulchDelivery.dbName, GT_RATES.mulchDelivery.fallback)
+    const hrs = (CY / 15) * 8 + (n(mulchSF) / 3200) * 8
+    mulchLine = { label: `Mulch — ${n(mulchSF).toLocaleString()} SF × ${n(mulchDepth)}"`, value: fmt2(mat), sub: `${hrs.toFixed(2)} hrs · ${CY.toFixed(2)} CY` }
   }
 
   // ── DG ────────────────────────────────────────────────────────────────────────
@@ -157,10 +127,46 @@ export default function GroundTreatmentsSummary({ module }) {
     })
     .filter(Boolean)
 
+  // ── Edging ────────────────────────────────────────────────────────────────────
+  const edgingLines = []
+
+  if (n(plasticEdgingLF) > 0) {
+    const mat = n(plasticEdgingLF) * mp(GT_RATES.plasticEdgingMat.dbName, GT_RATES.plasticEdgingMat.fallback)
+    const hrs = n(plasticEdgingLF) * mp(GT_RATES.plasticEdgingLab.dbName, GT_RATES.plasticEdgingLab.fallback)
+    edgingLines.push({ label: `Plastic Edging — ${n(plasticEdgingLF).toLocaleString()} LF`, value: fmt2(mat), sub: `${hrs.toFixed(2)} hrs` })
+  }
+
+  if (n(metalEdgingLF) > 0) {
+    const mat = n(metalEdgingLF) * mp(GT_RATES.metalEdgingMat.dbName, GT_RATES.metalEdgingMat.fallback)
+    const hrs = n(metalEdgingLF) * mp(GT_RATES.metalEdgingLab.dbName, GT_RATES.metalEdgingLab.fallback)
+    edgingLines.push({ label: `Metal Edging — ${n(metalEdgingLF).toLocaleString()} LF`, value: fmt2(mat), sub: `${hrs.toFixed(2)} hrs` })
+  }
+
+  // ── Steppers ─────────────────────────────────────────────────────────────────
+  const stepperLines = []
+
+  if (n(flagstoneSF) > 0) {
+    const tons    = n(flagstoneSF) / 80
+    const rate    = n(flagstoneRate) || mp(GT_RATES.flagstonePerTon.dbName, GT_RATES.flagstonePerTon.fallback)
+    const sfPerDay = mp(GT_RATES.flagstoneLab.dbName, GT_RATES.flagstoneLab.fallback)
+    const mat     = tons * rate
+    const hrs     = (n(flagstoneSF) / sfPerDay) * 8
+    stepperLines.push({ label: `Flagstone Steppers — ${n(flagstoneSF).toLocaleString()} SF`, value: fmt2(mat), sub: `${hrs.toFixed(2)} hrs · ${tons.toFixed(2)} tons · ${fmt2(rate)}/ton` })
+  }
+
+  if (n(precastSF) > 0) {
+    const tons    = n(precastSF) / 80
+    const rate    = n(precastRate) || mp(GT_RATES.precastPerTon.dbName, GT_RATES.precastPerTon.fallback)
+    const sfPerDay = mp(GT_RATES.precastLab.dbName, GT_RATES.precastLab.fallback)
+    const mat     = tons * rate
+    const hrs     = (n(precastSF) / sfPerDay) * 8
+    stepperLines.push({ label: `Precast Steppers — ${n(precastSF).toLocaleString()} SF`, value: fmt2(mat), sub: `${hrs.toFixed(2)} hrs · ${tons.toFixed(2)} tons · ${fmt2(rate)}/ton` })
+  }
+
   // ── Manual rows ────────────────────────────────────────────────────────────────
   const manualLines = (manualRows || []).filter(r => n(r.hours) > 0 || n(r.materials) > 0 || n(r.subCost) > 0)
 
-  const hasAnyLines = surfaceLines.length || stepperLines.length || dgLine || gravelLines.length || manualLines.length
+  const hasAnyLines = soilPrepLine || sodLine || mulchLine || dgLine || gravelLines.length || edgingLines.length || stepperLines.length || manualLines.length
 
   // ── Financials ────────────────────────────────────────────────────────────────
   const savedCalc  = calc || {}
@@ -207,17 +213,24 @@ export default function GroundTreatmentsSummary({ module }) {
         <p className="text-xs text-gray-400 text-center py-4">No line items entered.</p>
       ) : (
         <>
-          {surfaceLines.length > 0 && (
+          {soilPrepLine && (
             <>
-              <SectionLabel title="Surface Materials" />
-              {surfaceLines.map((l, i) => <LineRow key={i} label={l.label} value={l.value} sub={l.sub} />)}
+              <SectionLabel title="Soil Prep" />
+              <LineRow label={soilPrepLine.label} value={soilPrepLine.value} sub={soilPrepLine.sub} />
             </>
           )}
 
-          {stepperLines.length > 0 && (
+          {sodLine && (
             <>
-              <SectionLabel title="Steppers" />
-              {stepperLines.map((l, i) => <LineRow key={i} label={l.label} value={l.value} sub={l.sub} />)}
+              <SectionLabel title="Sod" />
+              <LineRow label={sodLine.label} value={sodLine.value} sub={sodLine.sub} />
+            </>
+          )}
+
+          {mulchLine && (
+            <>
+              <SectionLabel title="Mulch" />
+              <LineRow label={mulchLine.label} value={mulchLine.value} sub={mulchLine.sub} />
             </>
           )}
 
@@ -232,6 +245,20 @@ export default function GroundTreatmentsSummary({ module }) {
             <>
               <SectionLabel title="Gravel" />
               {gravelLines.map(l => <LineRow key={l.key} label={l.label} value={l.value} sub={l.sub} />)}
+            </>
+          )}
+
+          {edgingLines.length > 0 && (
+            <>
+              <SectionLabel title="Edging" />
+              {edgingLines.map((l, i) => <LineRow key={i} label={l.label} value={l.value} sub={l.sub} />)}
+            </>
+          )}
+
+          {stepperLines.length > 0 && (
+            <>
+              <SectionLabel title="Steppers" />
+              {stepperLines.map((l, i) => <LineRow key={i} label={l.label} value={l.value} sub={l.sub} />)}
             </>
           )}
 
