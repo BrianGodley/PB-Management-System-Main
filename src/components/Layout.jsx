@@ -111,7 +111,7 @@ export default function Layout() {
         className="w-full sticky top-0 z-50 shadow-md"
       >
         {/* Main top row */}
-        <div className="flex items-center h-9 px-4 gap-4">
+        <div className="flex items-center h-11 px-4 gap-4">
 
           {/* Logo + system name */}
           <Link to="/" className="flex items-center gap-2.5 flex-shrink-0">
@@ -227,7 +227,7 @@ export default function Layout() {
       <div className="flex flex-1 min-h-0">
 
         {/* LEFT SIDEBAR — white, no color */}
-        <aside className="hidden lg:flex flex-col w-32 bg-white border-r border-gray-200 sticky top-9 h-[calc(100vh-2.25rem)] overflow-y-auto">
+        <aside className="hidden lg:flex flex-col w-32 bg-white border-r border-gray-200 sticky top-11 h-[calc(100vh-2.75rem)] overflow-y-auto">
           <nav className="flex-1 px-1.5 py-3 space-y-0.5">
             {navItems.map(item => (
               <Link

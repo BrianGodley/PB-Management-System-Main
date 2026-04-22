@@ -2930,7 +2930,7 @@ export default function Statistics() {
   )
 
   return (
-    <div className="h-[calc(100vh-2.25rem)] -m-4 lg:-m-6 flex flex-col overflow-hidden bg-gray-50">
+    <div className="h-[calc(100vh-2.75rem)] -m-4 lg:-m-6 flex flex-col overflow-hidden bg-gray-50">
 
       {/* ── MODULE HEADER — title left, mode tabs + button right ─── */}
       <div className="flex items-center px-4 lg:px-6 pt-6 pb-4 bg-gray-50 flex-shrink-0">
