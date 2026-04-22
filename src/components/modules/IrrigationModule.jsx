@@ -176,6 +176,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
   const [salesTax,         setSalesTax]         = useState(initialData?.salesTax ?? RATE_DEFAULTS.salesTax)
   const [pricesLoading,    setPricesLoading]    = useState(!initialData?.materialPrices)
   const gpmd = initialData?.gpmd ?? 425
+  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
 
   useEffect(() => {
     if (initialData?.materialPrices && initialData?.laborRatePerHour) return
@@ -229,7 +230,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
       sub_cost:     parseFloat(calc.subCost.toFixed(2)),
       total_price:  parseFloat(calc.price.toFixed(2)),
       data: {
-        ...state, laborRatePerHour, gpmd, materialPrices, laborRates, salesTax,
+        ...state, laborRatePerHour, gpmd, subGpMarkupRate, materialPrices, laborRates, salesTax,
         calc: {
           totalHrs: calc.totalHrs, manDays: calc.manDays,
           laborCost: calc.laborCost, burden: calc.burden,
@@ -364,6 +365,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
         subCost={calc.subCost}
         gpmd={gpmd}
         price={calc.price}
+        subMarkupRate={subGpMarkupRate}
       />
 
       {/* Actions */}

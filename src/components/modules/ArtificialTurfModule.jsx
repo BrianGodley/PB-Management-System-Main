@@ -337,6 +337,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
     setState(p => ({ ...p, strips: { ...p.strips, [field]: val } })), [])
 
   const gpmd  = initialData?.gpmd ?? 425
+  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
   const calc  = calcTurf(state, laborRatePerHour, materialPrices, laborRates, gpmd)
   const fmt2  = v => `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   const fmt   = v => `$${Math.round(v).toLocaleString()}`
@@ -358,7 +359,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
       sub_cost:      parseFloat(calc.subCost.toFixed(2)),
       total_price:   parseFloat(calc.price.toFixed(2)),
       data: {
-        ...state, laborRatePerHour, gpmd, materialPrices, laborRates,
+        ...state, laborRatePerHour, gpmd, subGpMarkupRate, materialPrices, laborRates,
         calc: {
           totalHrs: calc.totalHrs, manDays: calc.manDays,
           laborCost: calc.laborCost, burden: calc.burden,
@@ -663,6 +664,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         subCost={calc.subCost}
         gpmd={gpmd}
         price={calc.price}
+        subMarkupRate={subGpMarkupRate}
       />
 
       {/* Actions */}

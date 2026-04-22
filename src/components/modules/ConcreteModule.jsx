@@ -335,6 +335,7 @@ export default function ConcreteModule({ projectName, onSave, onBack, saving, in
     baseRows, manualRows,
   }
   const gpmd = initialData?.gpmd ?? R.gpmd
+  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
   const calc = calcConcrete(state, laborRatePerHour, laborRates, materialRates, subRates, gpmd)
 
   function updateBaseRow(i, field, val) {
@@ -350,7 +351,7 @@ export default function ConcreteModule({ projectName, onSave, onBack, saving, in
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
       data: {
         ...state,
-        laborRatePerHour, gpmd,
+        laborRatePerHour, gpmd, subGpMarkupRate,
         laborRates,    // ← production rate snapshot
         materialRates, // ← material cost snapshot
         subRates,      // ← sub/equipment cost snapshot
@@ -561,6 +562,7 @@ export default function ConcreteModule({ projectName, onSave, onBack, saving, in
         subCost={calc.subCost}
         gpmd={gpmd}
         price={calc.price}
+        subMarkupRate={subGpMarkupRate}
       />
 
       {/* ── Actions ── */}

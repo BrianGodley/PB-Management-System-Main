@@ -310,6 +310,7 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
   }, [])
 
   const gpmd = initialData?.gpmd ?? WORKER_DEFAULTS.gpmd
+  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
 
   const [tillSqft,       setTillSqft]       = useState(initialData?.tillSqft       ?? '')
   const [difficulty,     setDifficulty]     = useState(initialData?.difficulty     ?? '')
@@ -353,7 +354,7 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
       data: {
         tillSqft, difficulty, smallPlantRows, largePlantRows, addons, manualRows,
-        laborRatePerHour, gpmd,
+        laborRatePerHour, gpmd, subGpMarkupRate,
         materialPrices,   // snapshot so summary always reflects save-time prices
         laborRates,       // snapshot so summary always reflects save-time rates
         calc,
@@ -686,6 +687,7 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
         subCost={calc.subCost}
         gpmd={gpmd}
         price={calc.price}
+        subMarkupRate={subGpMarkupRate}
       />
 
       <div className="flex gap-3 pt-2">

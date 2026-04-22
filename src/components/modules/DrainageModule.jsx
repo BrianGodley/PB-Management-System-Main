@@ -223,6 +223,7 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
   }, [])
 
   const gpmd = initialData?.gpmd ?? DEFAULTS.gpmd
+  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
 
   const [difficulty,      setDifficulty]     = useState(initialData?.difficulty      ?? '')
   const [trenchRows,      setTrenchRows]     = useState(initialData?.trenchRows      ?? DEFAULT_TRENCH_ROWS)
@@ -257,7 +258,7 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
       data: {
         difficulty, trenchRows, pipeRows, fixtureRows, additionalItems, manualRows,
-        laborRatePerHour, gpmd,
+        laborRatePerHour, gpmd, subGpMarkupRate,
         materialPrices,   // snapshot of prices used — so the summary always reflects save-time costs
         calc,
       },
@@ -491,6 +492,7 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
         subCost={calc.subCost}
         gpmd={gpmd}
         price={calc.price}
+        subMarkupRate={subGpMarkupRate}
       />
 
       {/* ── Actions ── */}

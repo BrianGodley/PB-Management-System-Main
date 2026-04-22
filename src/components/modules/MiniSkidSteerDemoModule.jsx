@@ -370,6 +370,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel 
   }), [])
 
   const gpmd = initialData?.gpmd ?? 425
+  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
   const calc = calcDemo(state, laborRatePerHour, materialPrices, laborRates, subMarkupRate, subRates, gpmd)
 
   const fmt2 = v => `$${n(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`
@@ -391,7 +392,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel 
       gross_profit: parseFloat(calc.gp.toFixed(2)),
       sub_cost:     parseFloat(calc.subCost.toFixed(2)),
       total_price:  parseFloat(calc.price.toFixed(2)),
-      data: { ...state, laborRatePerHour, gpmd, materialPrices, laborRates,
+      data: { ...state, laborRatePerHour, gpmd, subGpMarkupRate, materialPrices, laborRates,
         calc: { totalHrs:calc.totalHrs, manDays:calc.manDays, laborCost:calc.laborCost,
                 burden:calc.burden, totalMat:calc.totalMat, subCost:calc.subCost,
                 gp:calc.gp, price:calc.price } },
@@ -634,6 +635,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel 
         subCost={calc.subCost}
         gpmd={gpmd}
         price={calc.price}
+        subMarkupRate={subGpMarkupRate}
       />
 
       {/* Actions */}

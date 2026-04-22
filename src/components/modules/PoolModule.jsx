@@ -490,12 +490,14 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
   const upd = (key, val) => setState(p => ({ ...p, [key]: val }))
   const updStruct = (key, val) => setState(p => ({ ...p, [key]: val }))
 
+  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
   const calc = calcPool(state, materialPrices, laborRates, subRates)
   const fmt2 = v => `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   function handleSave() {
     const data = {
       ...state,
+      subGpMarkupRate,
       materialPrices,
       laborRates,
       subRates,
@@ -1092,6 +1094,7 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
         commission={calc.commission}
         price={calc.price}
         gpmd={n(state.gpmd)}
+        subMarkupRate={subGpMarkupRate}
       />
 
       {/* ─── Actions ─── */}

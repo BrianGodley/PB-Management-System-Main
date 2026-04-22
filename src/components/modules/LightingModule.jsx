@@ -167,6 +167,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
   }, [])
 
   const gpmd = initialData?.gpmd ?? DEFAULTS.gpmd
+  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
 
   const [difficulty,      setDifficulty]      = useState(initialData?.difficulty      ?? '')
   const [fixtureQtys,     setFixtureQtys]     = useState(initialData?.fixtureQtys     ?? blankFixtureQtys())
@@ -184,7 +185,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
     onSave({
       man_days:      parseFloat(calc.manDays.toFixed(2)),
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
-      data: { difficulty, fixtureQtys, transformerQtys, wireQtys, manualRows, laborRatePerHour, gpmd, materialPrices, calc },
+      data: { difficulty, fixtureQtys, transformerQtys, wireQtys, manualRows, laborRatePerHour, gpmd, subGpMarkupRate, materialPrices, calc },
     })
   }
 
@@ -414,6 +415,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
         subCost={calc.subCost}
         gpmd={gpmd}
         price={calc.price}
+        subMarkupRate={subGpMarkupRate}
       />
 
       {/* ── Actions ── */}

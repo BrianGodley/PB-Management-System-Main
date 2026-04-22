@@ -463,6 +463,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
   }), [])
 
   const gpmd = initialData?.gpmd ?? 425
+  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
   const calc = calcPaver(state, laborRatePerHour, laborRates, materialRates, paverPrices, gpmd)
 
   const fmt2 = v => `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -482,7 +483,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       sub_cost:      parseFloat(calc.subCost.toFixed(2)),
       total_price:   parseFloat(calc.price.toFixed(2)),
       data: {
-        ...state, laborRatePerHour, gpmd, laborRates, materialRates, paverPrices,
+        ...state, laborRatePerHour, gpmd, subGpMarkupRate, laborRates, materialRates, paverPrices,
         calc: {
           totalHrs:   calc.totalHrs,
           manDays:    calc.manDays,
@@ -841,6 +842,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         subCost={calc.subCost}
         gpmd={gpmd}
         price={calc.price}
+        subMarkupRate={subGpMarkupRate}
       />
 
       {/* ── Actions ───────────────────────────────────────────────────────────── */}
