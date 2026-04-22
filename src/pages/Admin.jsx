@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { sendWelcomeEmail } from '../lib/notify'
+import { sendWelcomeEmail, sendSMS } from '../lib/notify'
 
 const FG = '#3A5038'
 
@@ -85,8 +85,13 @@ function UserEditModal({ profile, currentUserId, onClose, onSaved }) {
   const [profileMsg,    setProfileMsg]    = useState('')
 
   // ── Password reset ─────────────────────────────────────────────────────────
-  const [resetSending, setResetSending] = useState(false)
-  const [resetMsg,     setResetMsg]     = useState('')
+  const [resetSending,     setResetSending]     = useState(false)
+  const [resetMsg,         setResetMsg]         = useState('')
+
+  // ── Sam SMS password ───────────────────────────────────────────────────────
+  const [smsSending,       setSmsSending]       = useState(false)
+  const [resetTextSending, setResetTextSending] = useState(false)
+  const [smsMsg,           setSmsMsg]           = useState('')
 
   // ── Permissions state ──────────────────────────────────────────────────────
   const [perms,        setPerms]        = useState(DEFAULT_PERMS)
@@ -157,6 +162,62 @@ function UserEditModal({ profile, currentUserId, onClose, onSaved }) {
     })
     setResetMsg(error ? 'error:' + error.message : 'ok:Reset email sent to ' + emailToReset)
     setResetSending(false)
+  }
+
+  // ── Sam SMS helpers ────────────────────────────────────────────────────────
+  function samMessage(firstName, email, password, isReset = false) {
+    const greeting = firstName ? `Hi ${firstName}, ` : 'Hi there, '
+    const action   = isReset ? 'your password has been reset' : 'here are your login credentials'
+    return (
+      `${greeting}this is Sam, the AI assistant from the Picture Build System — ${action}.\n\n` +
+      `Email: ${email}\n` +
+      `Password: ${password}\n\n` +
+      `Log in at: ${window.location.origin}/login\n\n` +
+      `For your security, please update your password after logging in.`
+    )
+  }
+
+  async function sendPasswordViaSMS() {
+    const phone = (form.phone_cell || profile.phone_cell || '').trim()
+    if (!phone) { setSmsMsg('error:No cell phone number on file for this user.'); return }
+    if (!profile.temp_password) { setSmsMsg('error:No stored password found. Use "Reset & Text New Password" instead.'); return }
+    setSmsSending(true); setSmsMsg('')
+    const firstName = (profile.full_name || '').split(' ')[0]
+    const { error } = await sendSMS({
+      to:      phone,
+      message: samMessage(firstName, profile.email, profile.temp_password),
+    })
+    setSmsMsg(error ? 'error:SMS failed — ' + error.message : 'ok:Password texted to ' + phone)
+    setSmsSending(false)
+  }
+
+  async function resetAndTextPassword() {
+    const phone = (form.phone_cell || profile.phone_cell || '').trim()
+    if (!phone) { setSmsMsg('error:No cell phone number on file for this user.'); return }
+    if (!confirm(`Reset ${profile.full_name || profile.email}'s password and text the new one to ${phone}?`)) return
+    setResetTextSending(true); setSmsMsg('')
+    const newPw = generatePassword()
+    // Reset password via Edge Function (uses service role)
+    const { data: resetData, error: resetErr } = await supabase.functions.invoke('reset-user-password', {
+      body: { userId: profile.id, newPassword: newPw },
+    })
+    if (resetErr || resetData?.error) {
+      setSmsMsg('error:Password reset failed — ' + (resetData?.error || resetErr?.message))
+      setResetTextSending(false); return
+    }
+    // Persist temp_password for future reference
+    await supabase.from('profiles').update({ temp_password: newPw }).eq('id', profile.id)
+    // Text the new password as Sam
+    const firstName = (profile.full_name || '').split(' ')[0]
+    const { error: smsErr } = await sendSMS({
+      to:      phone,
+      message: samMessage(firstName, profile.email, newPw, true),
+    })
+    setSmsMsg(smsErr
+      ? 'error:Password reset but SMS failed. New password: ' + newPw
+      : 'ok:Password reset and texted to ' + phone
+    )
+    setResetTextSending(false)
   }
 
   async function savePerms() {
@@ -322,6 +383,41 @@ function UserEditModal({ profile, currentUserId, onClose, onSaved }) {
                   className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50">
                   {resetSending ? 'Sending…' : '📧 Send Password Reset Email'}
                 </button>
+              </div>
+
+              {/* ── Text Password via Sam ─────────────────────────────── */}
+              <div className="border-t border-gray-100 pt-4">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="text-base">🤖</span>
+                  <label className={labelCls} style={{ margin: 0 }}>Text Password via Sam</label>
+                </div>
+                <p className="text-xs text-gray-500 mb-3">
+                  Sam, the AI assistant, will text the user their credentials via SMS.
+                  {!(form.phone_cell || profile.phone_cell) && (
+                    <span className="text-amber-600 font-medium"> No cell phone number on file — add one in the profile above.</span>
+                  )}
+                </p>
+                {smsMsg && <div className="mb-3"><Msg msg={smsMsg} /></div>}
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={sendPasswordViaSMS}
+                    disabled={smsSending || !(form.phone_cell || profile.phone_cell)}
+                    className="px-4 py-2 rounded-lg border border-blue-200 text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-40"
+                  >
+                    {smsSending ? 'Sending…' : '📱 Text Current Password'}
+                  </button>
+                  <button
+                    onClick={resetAndTextPassword}
+                    disabled={resetTextSending || !(form.phone_cell || profile.phone_cell)}
+                    className="px-4 py-2 rounded-lg border border-green-200 text-sm font-medium text-green-700 hover:bg-green-50 disabled:opacity-40"
+                  >
+                    {resetTextSending ? 'Resetting…' : '🔄 Reset & Text New Password'}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mt-2">
+                  "Text Current Password" sends the last admin-set password.
+                  "Reset & Text" generates a new password, resets their account, and texts it.
+                </p>
               </div>
             </div>
           )}
@@ -613,6 +709,7 @@ function AddUserModal({ onClose, onCreated }) {
           city:          form.city.trim()          || null,
           state:         form.state                || null,
           zip_code:      form.zip_code.trim()      || null,
+          temp_password: form.password,            // stored so Sam can text it later
         }, { onConflict: 'id' })
 
       if (profileErr) {
@@ -1529,54 +1626,4 @@ export default function Admin() {
 
                         {/* Edit chevron */}
                         <td className="px-4 py-3 text-right text-gray-300 text-sm">
-                          {currentUserIsAdmin && <span>›</span>}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          <p className="text-xs text-gray-400 mt-3">
-            To add or remove users, use the{' '}
-            <a
-              href="https://supabase.com/dashboard/project/jjlnpywpmoukgwmwczbz/auth/users"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline hover:text-gray-600"
-            >
-              Supabase Auth dashboard
-            </a>.
-          </p>
-        </>
-      )}
-
-      {/* ── COMPANY SETTINGS TAB ──────────────────────────────────────── */}
-      {tab === 'settings' && (
-        <div className="overflow-y-auto max-h-[calc(100vh-10rem)] pb-10">
-          <CompanySettings currentUserIsAdmin={currentUserIsAdmin} />
-        </div>
-      )}
-
-      {/* Edit User Modal */}
-      {editingUser && (
-        <UserEditModal
-          profile={editingUser}
-          currentUserId={user?.id}
-          onClose={() => setEditingUser(null)}
-          onSaved={() => { fetchUsers(); setEditingUser(null) }}
-        />
-      )}
-
-      {/* Add User Modal */}
-      {showAddUser && (
-        <AddUserModal
-          onClose={() => setShowAddUser(false)}
-          onCreated={() => { fetchUsers() }}
-        />
-      )}
-    </div>
-  )
-}
+      
