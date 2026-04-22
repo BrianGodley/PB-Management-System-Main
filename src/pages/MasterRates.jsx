@@ -249,10 +249,11 @@ function RatesPanel({ title, rows, columns, onAdd, onSave, onDelete, loading, pi
   return (
     <div className="flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden" style={{ minHeight: '500px' }}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
-        <h2 className="font-semibold text-gray-900 text-sm">{title}</h2>
+      <div className="relative px-4 py-3 bg-gray-50 border-b border-gray-200">
+        <h2 className="text-lg font-bold text-gray-900 text-center">{title}</h2>
         {!showAdd && (
-          <button onClick={() => setShowAdd(true)} className="text-xs text-green-700 font-semibold hover:underline">
+          <button onClick={() => setShowAdd(true)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-green-700 font-semibold hover:underline">
             + Add Row
           </button>
         )}
@@ -746,7 +747,7 @@ export default function MasterRates() {
             />
           ) : (
             <RatesPanel
-              title={matCategory === 'All' ? 'Materials Pricing' : `Materials — ${matCategory}`}
+              title="Materials"
               rows={matCategory === 'All' ? materials : materials.filter(m => m.category === matCategory)}
               columns={MATERIAL_COLUMNS}
               onAdd={addMaterial}
@@ -786,7 +787,7 @@ export default function MasterRates() {
             )
           })()}
           <RatesPanel
-            title={labCategory === 'All' ? 'Labor Rates & Amounts' : `Labor Rates — ${labCategory}`}
+            title="Labor Rates & Amounts"
             rows={labCategory === 'All' ? labor : labor.filter(r => r.category === labCategory)}
             columns={LABOR_COLUMNS}
             onAdd={addLabor}
@@ -821,7 +822,7 @@ export default function MasterRates() {
             )
           })()}
           <RatesPanel
-            title={subCategory === 'All' ? 'Subcontractor Pricing' : `Subcontractors — ${subCategory}`}
+            title="Subcontractor Pricing"
             rows={subCategory === 'All' ? subs : subs.filter(r => r.category === subCategory)}
             columns={SUB_COLUMNS}
             onAdd={addSub}
