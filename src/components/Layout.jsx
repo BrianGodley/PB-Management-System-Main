@@ -15,9 +15,9 @@ const navItems = [
   { path: '/hr',            label: 'HR',             icon: '🏢' },
 ]
 
-const forestGreen = '#3A5038'
-const forestGreenDark = '#2E4030'
-const forestGreenHover = '#4A6347'
+const forestGreen = '#4E7B4C'
+const forestGreenDark = '#3A5038'
+const forestGreenHover = '#5A8A57'
 
 function setFavicon(url) {
   let link = document.querySelector("link[rel~='icon']")
@@ -111,14 +111,14 @@ export default function Layout() {
         className="w-full sticky top-0 z-50 shadow-md"
       >
         {/* Main top row */}
-        <div className="flex items-center h-14 px-4 gap-4">
+        <div className="flex items-center h-9 px-4 gap-4">
 
           {/* Logo + system name */}
           <Link to="/" className="flex items-center gap-2.5 flex-shrink-0">
             <img
               src={companyLogoUrl || '/logo.png'}
               alt="Logo"
-              className="h-9 w-9 object-contain rounded"
+              className="h-6 w-6 object-contain rounded"
               onError={e => { e.target.style.display = 'none' }}
             />
             <span className="text-white font-semibold text-sm tracking-wide hidden sm:inline">
@@ -227,7 +227,7 @@ export default function Layout() {
       <div className="flex flex-1 min-h-0">
 
         {/* LEFT SIDEBAR — white, no color */}
-        <aside className="hidden lg:flex flex-col w-32 bg-white border-r border-gray-200 sticky top-14 h-[calc(100vh-3.5rem)] overflow-y-auto">
+        <aside className="hidden lg:flex flex-col w-32 bg-white border-r border-gray-200 sticky top-9 h-[calc(100vh-2.25rem)] overflow-y-auto">
           <nav className="flex-1 px-1.5 py-3 space-y-0.5">
             {navItems.map(item => (
               <Link

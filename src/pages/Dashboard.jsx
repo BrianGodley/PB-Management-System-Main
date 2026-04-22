@@ -105,9 +105,9 @@ export default function Dashboard() {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Jobs Dashboard</h1>
+          <h1 className="text-xl font-bold text-gray-900">Jobs Dashboard</h1>
           <p className="text-sm text-gray-500 mt-0.5">{jobs.filter(j => j.status === 'active').length} active jobs</p>
         </div>
         <Link to="/jobs/new" className="btn-primary hidden sm:block text-sm px-3 py-1.5">+ Add Job</Link>

@@ -207,7 +207,7 @@ export default function JobDetail() {
                 return (
                   <div key={mod.id} className="bg-gray-50 rounded-lg p-3 mb-2">
                     <div className="flex items-center justify-between mb-2">
-                      <p className="font-medium text-gray-800 text-sm">{mod.module_name}</p>
+                      <p className="font-medium text-gray-800 text-sm">{mod.module_name || mod.module_type}</p>
                       <span className={`text-xs px-2 py-0.5 rounded-full ${crewColors[mod.crew_type] || crewColors.General}`}>{mod.crew_type}</span>
                     </div>
                     <div className="grid grid-cols-2 gap-x-4 text-xs text-gray-600">

@@ -238,8 +238,8 @@ export default function Bids() {
         </div>
       )}
 
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Bids</h1>
+      <div className="mb-4 flex-shrink-0">
+        <h1 className="text-xl font-bold text-gray-900">Bids</h1>
         <p className="text-sm text-gray-500 mt-0.5">{bids.length} total · bids are generated from the Clients module</p>
       </div>
 

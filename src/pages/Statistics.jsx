@@ -2930,47 +2930,45 @@ export default function Statistics() {
   )
 
   return (
-    <div className="h-[calc(100vh-3.5rem)] -m-4 lg:-m-6 flex flex-col overflow-hidden bg-gray-50">
+    <div className="h-[calc(100vh-2.25rem)] -m-4 lg:-m-6 flex flex-col overflow-hidden bg-gray-50">
 
-      {/* ── MODULE HEADER — title left, mode tabs centre, button right ─── */}
+      {/* ── MODULE HEADER — title left, mode tabs + button right ─── */}
       <div className="flex items-center px-4 lg:px-6 pt-6 pb-4 bg-gray-50 flex-shrink-0">
         {/* Left: title */}
-        <div className="w-48 flex-shrink-0">
-          <h1 className="text-2xl font-bold text-gray-900">Statistics</h1>
+        <div className="flex-shrink-0">
+          <h1 className="text-xl font-bold text-gray-900">Statistics</h1>
           <p className="text-sm text-gray-500 mt-0.5">{myStats.length} stat{myStats.length !== 1 ? 's' : ''}</p>
         </div>
 
-        {/* Centre: mode tabs */}
-        <div className="flex-1 flex justify-center">
-          <div className="flex items-center gap-1">
-            {[
-              { id: 'graphs',         icon: '📈', label: 'Graphs'          },
-              { id: 'multiple-entry', icon: '📝', label: 'Multiple Entry'  },
-              { id: 'print-multiple', icon: '🖨️',  label: 'Print Multiple' },
-              { id: 'comparison',     icon: '⚖️',  label: 'Comparison'     },
-              { id: 'import-export',  icon: '↕️',  label: 'Import / Export'},
-              { id: 'archive',        icon: '📦', label: 'Archive'         },
-              { id: 'settings',       icon: '⚙️',  label: 'Settings'        },
-            ].map(m => (
-              <button
-                key={m.id}
-                onClick={() => setViewMode(m.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                  viewMode === m.id
-                    ? 'text-white'
-                    : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
-                }`}
-                style={viewMode === m.id ? { backgroundColor: FG } : {}}
-              >
-                <span className="text-sm">{m.icon}</span>
-                <span>{m.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* Spacer */}
+        <div className="flex-1" />
 
-        {/* Right: action button */}
-        <div className="w-48 flex-shrink-0 flex justify-end">
+        {/* Right: mode tabs + add button grouped together */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {[
+            { id: 'graphs',         icon: '📈', label: 'Graphs'          },
+            { id: 'multiple-entry', icon: '📝', label: 'Multiple Entry'  },
+            { id: 'print-multiple', icon: '🖨️',  label: 'Print Multiple' },
+            { id: 'comparison',     icon: '⚖️',  label: 'Comparison'     },
+            { id: 'import-export',  icon: '↕️',  label: 'Import / Export'},
+            { id: 'archive',        icon: '📦', label: 'Archive'         },
+            { id: 'settings',       icon: '⚙️',  label: 'Settings'        },
+          ].map(m => (
+            <button
+              key={m.id}
+              onClick={() => setViewMode(m.id)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                viewMode === m.id
+                  ? 'text-white'
+                  : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+              }`}
+              style={viewMode === m.id ? { backgroundColor: FG } : {}}
+            >
+              <span className="text-sm">{m.icon}</span>
+              <span>{m.label}</span>
+            </button>
+          ))}
+          <div className="w-px h-5 bg-gray-300 mx-1" />
           <button onClick={() => setShowTypeSelector(true)} className="btn-primary text-sm px-3 py-1.5">
             + Add Statistic
           </button>
