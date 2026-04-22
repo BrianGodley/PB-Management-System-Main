@@ -47,6 +47,7 @@ export default function ChecksheetBuilder({ course: initialCourse, onClose, onSa
   const [uploadFile, setUploadFile] = useState(null)   // direct doc upload for Read steps
   const [uploadMode, setUploadMode] = useState('library') // 'library' | 'upload'
   const [savingStep, setSavingStep] = useState(false)
+  const [stepError, setStepError] = useState('')
   const uploadRef = useRef()
   const [saving, setSaving] = useState(false)
 
@@ -95,31 +96,47 @@ export default function ChecksheetBuilder({ course: initialCourse, onClose, onSa
       read_item_id: step.read_item_id || '', learning_drill_id: step.learning_drill_id || '',
       quiz_id: step.quiz_id || '', test_id: step.test_id || '', action_id: step.action_id || '',
     })
+    setUploadFile(null)
+    setUploadMode('library')
+    setStepError('')
     setEditingStep(step)
   }
 
   const saveStep = async () => {
     if (!stepForm.title.trim()) return
     setSavingStep(true)
+    setStepError('')
 
     let read_item_id = stepForm.read_item_id || null
 
     // Direct file upload — create a Read Item automatically
     if (stepForm.step_type === 'read' && uploadMode === 'upload' && uploadFile) {
-      const path = `read-items/${Date.now()}_${uploadFile.name}`
-      const { error: upErr } = await supabase.storage.from('lms-documents').upload(path, uploadFile, { upsert: false })
-      if (!upErr) {
-        const { data: { publicUrl } } = supabase.storage.from('lms-documents').getPublicUrl(path)
-        const { data: newItem } = await supabase.from('lms_read_items').insert({
+      try {
+        const path = `read-items/${Date.now()}_${uploadFile.name}`
+        const { error: upErr } = await supabase.storage.from('lms-documents').upload(path, uploadFile, { upsert: false })
+        if (upErr) throw new Error(`Upload failed: ${upErr.message}`)
+
+        const { data: urlData } = supabase.storage.from('lms-documents').getPublicUrl(path)
+        const publicUrl = urlData?.publicUrl
+        if (!publicUrl) throw new Error('Could not get public URL for the uploaded file.')
+
+        const { data: newItem, error: insertErr } = await supabase.from('lms_read_items').insert({
           title: stepForm.title,
           doc_url: publicUrl,
           file_name: uploadFile.name,
           created_by_email: user?.email,
         }).select('id').single()
+        if (insertErr) throw new Error(`Could not save document record: ${insertErr.message}`)
+
         read_item_id = newItem?.id || null
+
         // Refresh library list
         const { data: ri } = await supabase.from('lms_read_items').select('id, title').order('title')
         setReadItems(ri || [])
+      } catch (err) {
+        setStepError(err.message || 'Upload failed. Check that the lms-documents storage bucket exists.')
+        setSavingStep(false)
+        return
       }
     }
 
@@ -140,6 +157,7 @@ export default function ChecksheetBuilder({ course: initialCourse, onClose, onSa
     setSavingStep(false)
     setUploadFile(null)
     setUploadMode('library')
+    setStepError('')
     setEditingStep(null)
   }
 
@@ -434,12 +452,16 @@ export default function ChecksheetBuilder({ course: initialCourse, onClose, onSa
 
             {renderStepFields()}
 
+            {stepError && (
+              <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{stepError}</p>
+            )}
             <div className="flex gap-3 pt-2">
-              <button onClick={saveStep} disabled={!stepForm.title.trim()}
+              <button onClick={saveStep} disabled={!stepForm.title.trim() || savingStep}
                 className="flex-1 py-2.5 bg-green-700 text-white rounded-xl font-medium hover:bg-green-800 disabled:opacity-50">
-                {editingStep?.id ? 'Update Step' : 'Add Step'}
+                {savingStep ? 'Uploading…' : editingStep?.id ? 'Update Step' : 'Add Step'}
               </button>
-              <button onClick={() => setEditingStep(null)} className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200">
+              <button onClick={() => { setEditingStep(null); setStepError('') }} disabled={savingStep}
+                className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 disabled:opacity-50">
                 Cancel
               </button>
             </div>
