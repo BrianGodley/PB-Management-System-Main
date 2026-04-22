@@ -2,7 +2,7 @@
 // ChecksheetBuilder — full-screen modal for creating/editing checksheets
 // 7 step types: read, watch, special_drill, learning_drill, quiz, final_test, action
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -44,6 +44,10 @@ export default function ChecksheetBuilder({ course: initialCourse, onClose, onSa
 
   const [editingStep, setEditingStep] = useState(null)
   const [stepForm, setStepForm] = useState({})
+  const [uploadFile, setUploadFile] = useState(null)   // direct doc upload for Read steps
+  const [uploadMode, setUploadMode] = useState('library') // 'library' | 'upload'
+  const [savingStep, setSavingStep] = useState(false)
+  const uploadRef = useRef()
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -77,7 +81,12 @@ export default function ChecksheetBuilder({ course: initialCourse, onClose, onSa
     read_item_id: '', learning_drill_id: '', quiz_id: '', test_id: '', action_id: '',
   })
 
-  const openNewStep = () => { setStepForm(blankStepForm()); setEditingStep({}) }
+  const openNewStep = () => {
+    setStepForm(blankStepForm())
+    setUploadFile(null)
+    setUploadMode('library')
+    setEditingStep({})
+  }
 
   const openEditStep = (step) => {
     setStepForm({
@@ -89,21 +98,48 @@ export default function ChecksheetBuilder({ course: initialCourse, onClose, onSa
     setEditingStep(step)
   }
 
-  const saveStep = () => {
+  const saveStep = async () => {
     if (!stepForm.title.trim()) return
+    setSavingStep(true)
+
+    let read_item_id = stepForm.read_item_id || null
+
+    // Direct file upload — create a Read Item automatically
+    if (stepForm.step_type === 'read' && uploadMode === 'upload' && uploadFile) {
+      const path = `read-items/${Date.now()}_${uploadFile.name}`
+      const { error: upErr } = await supabase.storage.from('lms-documents').upload(path, uploadFile, { upsert: false })
+      if (!upErr) {
+        const { data: { publicUrl } } = supabase.storage.from('lms-documents').getPublicUrl(path)
+        const { data: newItem } = await supabase.from('lms_read_items').insert({
+          title: stepForm.title,
+          doc_url: publicUrl,
+          file_name: uploadFile.name,
+          created_by_email: user?.email,
+        }).select('id').single()
+        read_item_id = newItem?.id || null
+        // Refresh library list
+        const { data: ri } = await supabase.from('lms_read_items').select('id, title').order('title')
+        setReadItems(ri || [])
+      }
+    }
+
     const payload = {
       ...stepForm,
-      read_item_id: stepForm.read_item_id || null,
+      read_item_id,
       learning_drill_id: stepForm.learning_drill_id || null,
       quiz_id: stepForm.quiz_id || null,
       test_id: stepForm.test_id || null,
       action_id: stepForm.action_id || null,
     }
+
     if (editingStep?.id) {
       setSteps(prev => prev.map(s => s.id === editingStep.id ? { ...s, ...payload } : s))
     } else {
       setSteps(prev => [...prev, { ...payload, id: crypto.randomUUID(), _new: true, step_order: prev.length }])
     }
+    setSavingStep(false)
+    setUploadFile(null)
+    setUploadMode('library')
     setEditingStep(null)
   }
 
@@ -151,14 +187,58 @@ export default function ChecksheetBuilder({ course: initialCourse, onClose, onSa
     switch (sf.step_type) {
       case 'read':
         return (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Read Item *</label>
-            {readItems.length === 0 ? warn('No read items yet — create some in the Read Items tab first.') :
-              <select value={sf.read_item_id} onChange={e => setSF('read_item_id', e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-green-500">
-                <option value="">— Select a Read Item —</option>
-                {readItems.map(r => <option key={r.id} value={r.id}>{r.title}</option>)}
-              </select>}
+          <div className="space-y-3">
+            {/* Mode toggle */}
+            <div className="flex gap-2 bg-gray-100 rounded-xl p-1">
+              <button type="button" onClick={() => { setUploadMode('upload'); setSF('read_item_id', '') }}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${uploadMode === 'upload' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                📎 Upload Document
+              </button>
+              <button type="button" onClick={() => { setUploadMode('library'); setUploadFile(null) }}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${uploadMode === 'library' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                📚 Pick from Library
+              </button>
+            </div>
+
+            {uploadMode === 'upload' ? (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Attach Document *</label>
+                <div
+                  onClick={() => uploadRef.current?.click()}
+                  className="flex flex-col items-center justify-center h-28 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-green-400 hover:bg-green-50 transition-colors"
+                >
+                  {uploadFile ? (
+                    <div className="text-center">
+                      <p className="text-2xl mb-0.5">📄</p>
+                      <p className="text-sm font-medium text-gray-800">{uploadFile.name}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Click to change</p>
+                    </div>
+                  ) : (
+                    <div className="text-center text-gray-400">
+                      <p className="text-3xl mb-1">📁</p>
+                      <p className="text-sm">Click to upload (PDF, DOC, DOCX…)</p>
+                    </div>
+                  )}
+                </div>
+                <input ref={uploadRef} type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt" className="sr-only"
+                  onChange={e => setUploadFile(e.target.files?.[0] || null)} />
+                {uploadFile && (
+                  <p className="text-xs text-green-600 mt-1.5">✓ Document will be saved when you click "Add Step"</p>
+                )}
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Read Item *</label>
+                {readItems.length === 0
+                  ? warn('No read items yet — upload a document above, or create items in the Read Items tab.')
+                  : <select value={sf.read_item_id} onChange={e => setSF('read_item_id', e.target.value)}
+                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-green-500">
+                      <option value="">— Select a Read Item —</option>
+                      {readItems.map(r => <option key={r.id} value={r.id}>{r.title}</option>)}
+                    </select>
+                }
+              </div>
+            )}
           </div>
         )
       case 'watch':

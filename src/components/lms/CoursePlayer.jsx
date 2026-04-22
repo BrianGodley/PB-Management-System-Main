@@ -125,7 +125,6 @@ function DocViewer({ readItem, onRead, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/70 z-[70] flex flex-col">
       <div className="flex items-center gap-3 px-5 py-3 bg-white border-b border-gray-200 flex-shrink-0">
-        <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-lg">✕</button>
         <h3 className="font-semibold text-gray-900 flex-1 truncate">{readItem.title}</h3>
         <a href={readItem.doc_url} target="_blank" rel="noreferrer"
           className="text-xs text-blue-600 hover:underline flex-shrink-0">Open in new tab ↗</a>
@@ -133,10 +132,14 @@ function DocViewer({ readItem, onRead, onClose }) {
       <div className="flex-1 min-h-0">
         <iframe src={readItem.doc_url} className="w-full h-full border-0" title={readItem.title} />
       </div>
-      <div className="p-4 bg-white border-t border-gray-200 flex-shrink-0">
+      <div className="p-4 bg-white border-t border-gray-200 flex-shrink-0 flex gap-3">
+        <button onClick={onClose}
+          className="flex-1 py-3.5 bg-gray-100 text-gray-700 rounded-2xl font-bold text-base hover:bg-gray-200 border border-gray-200">
+          ⏸ Pause — Return to Course
+        </button>
         <button onClick={onRead}
-          className="w-full py-3.5 bg-green-700 text-white rounded-2xl font-bold text-lg hover:bg-green-800">
-          ✓ I have read this document
+          className="flex-1 py-3.5 bg-green-700 text-white rounded-2xl font-bold text-base hover:bg-green-800">
+          ✓ Completed
         </button>
       </div>
     </div>
@@ -290,7 +293,7 @@ export default function CoursePlayer({ assignment, onClose }) {
               <p className="text-sm text-gray-400 italic">No document attached to this read item.</p>
             )}
             {!stepDone && step.read_item?.doc_url && (
-              <p className="text-xs text-gray-400 text-center">Open the document above, then click "I have read this document" at the bottom.</p>
+              <p className="text-xs text-gray-400 text-center">Open the document above, then click "Completed" when you're done reading.</p>
             )}
           </div>
         )
