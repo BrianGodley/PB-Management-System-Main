@@ -499,15 +499,18 @@ export default function EstimateDetail() {
   }, { manDays: 0, materialCost: 0, laborCost: 0, burden: 0, subCost: 0, gp: 0, commission: 0, price: 0 })
   const et = estimateTotals
 
-  // Adjusted estimate GPMD — uses per-project override if set, otherwise natural module GP
+  // Adjusted estimate GP — sum of each project bar's effective GP
+  // If a project has a GPMD override: GP = projManDays × override
+  // Otherwise: GP = natural sum of module gross profits
   const adjustedEstimateGP = projects.reduce((sum, proj) => {
-    const mods = proj.estimate_modules || []
-    const projManDays  = mods.reduce((s, m) => s + parseFloat(m.man_days || 0), 0)
-    const naturalGP    = mods.reduce((s, m) => { const c = m.data?.calc || {}; return s + parseFloat(m.gross_profit || c.gp || 0) }, 0)
-    const override     = projectGpmds[proj.id]
+    const mods        = proj.estimate_modules || []
+    const projManDays = mods.reduce((s, m) => s + parseFloat(m.man_days || 0), 0)
+    const naturalGP   = mods.reduce((s, m) => { const c = m.data?.calc || {}; return s + parseFloat(m.gross_profit || c.gp || 0) }, 0)
+    const override    = projectGpmds[proj.id]
     return sum + (override != null ? projManDays * override : naturalGP)
   }, 0)
-  const adjustedEstimateGpmd = et.manDays > 0 ? Math.round(adjustedEstimateGP / et.manDays) : 425
+  // Estimate GPMD is purely derived — never edited directly
+  // (displayed inside GpmdBar via directGp ÷ manDays)
 
   // ── Per-project totals for selected project ────────────────────────────────
   const projModules = selectedProject?.estimate_modules || []
@@ -628,10 +631,8 @@ export default function EstimateDetail() {
             laborCost={et.laborCost}
             laborRatePerHour={et.manDays > 0 && et.laborCost > 0 ? et.laborCost / (et.manDays * 8) : 35}
             burden={et.burden}
-            gp={et.gp}
-            commission={et.commission}
             subCost={et.subCost}
-            gpmd={adjustedEstimateGpmd}
+            directGp={adjustedEstimateGP}
             price={et.price}
           />
         )}

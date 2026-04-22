@@ -1,6 +1,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// GpmdBar — shared summary bar matching the Excel "GPMD bar"
-// Pass onGpmdSave={fn} to make the GPMD cell editable; omit for read-only.
+// GpmdBar — shared summary bar
+//
+// Two modes:
+//   PROJECT mode  — pass onGpmdSave={fn}  → GPMD cell is editable
+//                   GP is computed as manDays × gpmd (prop)
+//
+//   ESTIMATE mode — omit onGpmdSave, pass directGp={number}
+//                   GP = directGp (sum of all project GPs)
+//                   GPMD displayed = directGp / manDays (derived, read-only)
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState } from 'react'
 
@@ -9,28 +16,34 @@ const fmt2 = v => `$${(v || 0).toLocaleString(undefined, { minimumFractionDigits
 const fnum = v => (v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 export default function GpmdBar({
-  totalMat   = 0,
-  totalHrs   = 0,
-  manDays    = 0,
-  laborCost  = 0,
+  totalMat         = 0,
+  totalHrs         = 0,
+  manDays          = 0,
+  laborCost        = 0,
   laborRatePerHour = 35,
-  burden     = 0,
-  gpmd       = 425,
-  gp         = 0,
-  commission = 0,
-  subCost    = 0,
-  price      = 0,
-  onGpmdSave = null,   // if provided, GPMD cell becomes editable
+  burden           = 0,
+  gpmd             = 425,   // used in PROJECT mode: GP = manDays × gpmd
+  directGp         = null,  // ESTIMATE mode: pass actual GP total; GPMD is derived
+  subCost          = 0,
+  price            = 0,
+  onGpmdSave       = null,  // if provided → PROJECT mode (editable GPMD)
 }) {
   const [editing, setEditing] = useState(false)
   const [draft,   setDraft]   = useState('')
 
   if (price <= 0) return null
 
-  const effectiveGp         = manDays * gpmd
-  const effectiveCommission = effectiveGp * 0.12
-  const effectivePrice      = laborCost + burden + totalMat + (subCost || 0) + effectiveGp + effectiveCommission
+  // ── Core calculations ──────────────────────────────────────────────────────
+  // PROJECT mode: GP driven by the gpmd prop
+  // ESTIMATE mode: GP is the direct sum passed in; GPMD is back-calculated
+  const effectiveGp      = directGp != null ? directGp : manDays * gpmd
+  const displayGpmd      = directGp != null
+    ? (manDays > 0 ? Math.round(directGp / manDays) : 0)
+    : gpmd
+  const effectiveComm    = effectiveGp * 0.12
+  const effectivePrice   = laborCost + burden + totalMat + (subCost || 0) + effectiveGp + effectiveComm
 
+  // ── Edit handlers (PROJECT mode only) ─────────────────────────────────────
   function startEdit() {
     if (!onGpmdSave) return
     setDraft(String(gpmd))
@@ -43,12 +56,13 @@ export default function GpmdBar({
     setEditing(false)
   }
 
-  // GPMD cell — editable when onGpmdSave provided, static otherwise
-  function GpmdCell({ horizontal }) {
+  // ── GPMD cell ─────────────────────────────────────────────────────────────
+  function GpmdCell() {
+    // Editing state (PROJECT mode only)
     if (onGpmdSave && editing) {
       return (
-        <div className={`rounded-lg bg-amber-500/20 border border-amber-400/50 px-3 py-1 text-center ${horizontal ? 'min-w-[90px]' : ''}`}>
-          <p className={`text-xs mb-0.5 ${horizontal ? 'whitespace-nowrap' : ''} text-amber-300`}>GPMD</p>
+        <div className="rounded-lg bg-amber-500/20 border border-amber-400/50 px-3 py-1 text-center min-w-[90px]">
+          <p className="text-xs mb-0.5 whitespace-nowrap text-amber-300">GPMD</p>
           <input
             autoFocus
             value={draft}
@@ -63,44 +77,43 @@ export default function GpmdBar({
 
     return (
       <div
-        className={`rounded-lg bg-amber-500/20 border border-amber-400/30 px-3 py-1 text-center ${horizontal ? 'min-w-[90px]' : ''} ${onGpmdSave ? 'cursor-pointer hover:bg-amber-500/30 transition-colors' : ''}`}
+        className={`rounded-lg bg-amber-500/20 border border-amber-400/30 px-3 py-1 text-center min-w-[90px] ${onGpmdSave ? 'cursor-pointer hover:bg-amber-500/30 transition-colors' : ''}`}
         onClick={startEdit}
         title={onGpmdSave ? 'Click to edit GPMD' : undefined}
       >
-        <p className={`text-xs mb-0.5 ${horizontal ? 'whitespace-nowrap' : ''} text-amber-300`}>
-          GPMD {onGpmdSave && <span className="text-amber-500 text-[10px]">✎</span>}
+        <p className="text-xs mb-0.5 whitespace-nowrap text-amber-300">
+          GPMD{onGpmdSave && <span className="text-amber-500 text-[10px] ml-1">✎</span>}
         </p>
         <p className="font-bold tabular-nums text-sm text-amber-200">
-          ${gpmd.toLocaleString()}
+          ${displayGpmd.toLocaleString()}
         </p>
       </div>
     )
   }
 
-  const staticCols = [
-    { label: 'Labor Hours',  value: fnum(totalHrs),                           dim: 'hrs' },
-    { label: 'Man Days',     value: fnum(manDays),                            dim: 'MD' },
-    { label: 'Materials',    value: fmt2(totalMat),                           dim: null },
-    { label: 'Crew Labor',   value: fmt(laborCost),                           dim: `@ $${parseFloat(laborRatePerHour).toFixed(0)}/hr` },
-    { label: 'Labor Burden', value: fmt(burden),                              dim: '29%' },
-    { label: 'Sub Cost',     value: subCost > 0 ? fmt(subCost) : '—',        dim: null },
-    { label: 'Gross Profit', value: fmt(effectiveGp),                         dim: null,  green: true },
-    { label: 'Commission',   value: fmt(effectiveCommission),                 dim: '12%' },
-    { label: 'Total Price',  value: fmt(effectivePrice),                      dim: null,  green: true, big: true },
+  const cols = [
+    { label: 'Labor Hours',  value: fnum(totalHrs),                        dim: 'hrs' },
+    { label: 'Man Days',     value: fnum(manDays),                         dim: 'MD' },
+    { label: 'Materials',    value: fmt2(totalMat),                        dim: null },
+    { label: 'Crew Labor',   value: fmt(laborCost),                        dim: `@ $${parseFloat(laborRatePerHour).toFixed(0)}/hr` },
+    { label: 'Labor Burden', value: fmt(burden),                           dim: '29%' },
+    { label: 'Sub Cost',     value: subCost > 0 ? fmt(subCost) : '—',     dim: null },
+    { label: 'Gross Profit', value: fmt(effectiveGp),                      dim: null, green: true },
+    { label: 'Commission',   value: fmt(effectiveComm),                    dim: '12%' },
+    { label: 'Total Price',  value: fmt(effectivePrice),                   dim: null, green: true, big: true },
   ]
 
   return (
     <div className="bg-gray-900 text-white rounded-xl p-4 mt-2">
       <div className="overflow-x-auto">
         <div className="flex gap-0 min-w-max divide-x divide-white/10">
-          {/* GPMD cell — no left border divider */}
           <div className="pr-3">
-            <GpmdCell horizontal />
+            <GpmdCell />
           </div>
-          {staticCols.map((col, i) => (
+          {cols.map((col, i) => (
             <div
               key={col.label}
-              className={`px-3 flex-1 min-w-[80px] text-center ${i === staticCols.length - 1 ? 'pl-4' : ''}`}
+              className={`px-3 flex-1 min-w-[80px] text-center ${i === cols.length - 1 ? 'pl-4' : ''}`}
             >
               <p className="text-xs text-gray-400 whitespace-nowrap mb-0.5">{col.label}</p>
               <p className={`font-bold whitespace-nowrap tabular-nums ${
