@@ -17,16 +17,16 @@ import { supabase } from './supabase'
 export async function sendEmail({ to, subject, html, text }) {
   const supabaseUrl  = import.meta.env.VITE_SUPABASE_URL
   const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY
-  const { data: { session } } = await supabase.auth.getSession()
-  const token = session?.access_token || supabaseAnon
-
+  // Use the anon key as Bearer token — newer Supabase projects issue ES256
+  // session JWTs which the Edge Function gateway rejects. The anon key is
+  // always HS256 and is accepted for internal server-side functions.
   let raw
   try {
     raw = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
       method:  'POST',
       headers: {
         'Content-Type':  'application/json',
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${supabaseAnon}`,
         'apikey':        supabaseAnon,
       },
       body: JSON.stringify({ to, subject, html, text }),
@@ -55,22 +55,18 @@ export async function sendEmail({ to, subject, html, text }) {
 }
 
 export async function sendSMS({ to, message }) {
-  // Use direct fetch so we can see the real HTTP status + body on failure.
-  // supabase.functions.invoke swallows the response body when status != 2xx.
   const supabaseUrl  = import.meta.env.VITE_SUPABASE_URL
   const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY
-
-  // Get the current session JWT (falls back to anon key if not logged in)
-  const { data: { session } } = await supabase.auth.getSession()
-  const token = session?.access_token || supabaseAnon
-
+  // Use the anon key as Bearer token — newer Supabase projects issue ES256
+  // session JWTs which the Edge Function gateway rejects. The anon key is
+  // always HS256 and is accepted for internal server-side functions.
   let raw
   try {
     raw = await fetch(`${supabaseUrl}/functions/v1/send-sms`, {
       method:  'POST',
       headers: {
         'Content-Type':  'application/json',
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${supabaseAnon}`,
         'apikey':        supabaseAnon,
       },
       body: JSON.stringify({ to, message }),
