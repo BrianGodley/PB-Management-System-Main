@@ -465,7 +465,7 @@ export default function LMS() {
   }
 
   return (
-    <div className="p-6">
+    <div>
       {/* Page header */}
       <div className="flex items-center gap-4 mb-6">
         <div>
