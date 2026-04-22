@@ -59,11 +59,11 @@ const MODULE_TYPES = [
 ]
 
 const MODULE_GROUPS = [
-  { label: 'Demo',        items: ['Hand Demo', 'Mini Skid Steer Demo', 'Skid Steer Demo'] },
-  { label: 'Underground', items: ['Utilities', 'Drainage'] },
-  { label: 'Flatwork',    items: ['Concrete', 'Pavers', 'Artificial Turf', 'Ground Treatments', 'Steps'] },
-  { label: 'Yard Features', items: ['Pool', 'Outdoor Kitchen', 'Fire Pit', 'Walls', 'Columns', 'Water Features', 'Lighting'] },
-  { label: 'Other',       items: ['Irrigation', 'Planting', 'Finishes'] },
+  { label: 'Demo',          items: ['Hand Demo', 'Mini Skid Steer Demo', 'Skid Steer Demo'] },
+  { label: 'Underground',   items: ['Utilities', 'Drainage'] },
+  { label: 'Flatwork',      items: ['Concrete', 'Pavers', 'Artificial Turf', 'Ground Treatments', 'Steps'] },
+  { label: 'Yard Features', items: ['Pool', 'Outdoor Kitchen', 'Fire Pit', 'Walls', 'Columns', 'Water Features', 'Lighting', 'Finishes'] },
+  { label: 'Softscapes',    items: ['Irrigation', 'Planting'] },
 ]
 
 const TYPE_COLORS = {
@@ -1051,13 +1051,13 @@ export default function EstimateDetail() {
       {showModulePicker && !selectedType && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={closeModuleFlow} />
-          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6">
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-3xl mx-4 p-6">
             <div className="mb-4">
               <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-0.5">Add Module</p>
               <h2 className="text-xl font-bold text-gray-900">{selectedProject?.project_name}</h2>
               <p className="text-sm text-gray-500 mt-0.5">Select a module type</p>
             </div>
-            <div className="space-y-4 max-h-[28rem] overflow-y-auto pr-1">
+            <div className="space-y-4">
               {MODULE_GROUPS.map(({ label, items }) => (
                 <div key={label}>
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5 px-0.5">{label}</p>
