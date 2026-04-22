@@ -67,7 +67,7 @@ const n = v => parseFloat(v) || 0
 const sfToTons = (sf, depthIn) => (n(sf) / 200) * n(depthIn)
 const sfToCY   = (sf, depthIn) => (n(sf) * (n(depthIn) / 12)) / 27
 
-function calcDemo(state, laborRatePerHour, materialPrices, laborRates, subMarkupRate = 0.35, subRates = {}) {
+function calcDemo(state, laborRatePerHour, materialPrices, laborRates, subMarkupRate = 0.35, subRates = {}, gpmd = 425) {
   const mp      = materialPrices || {}
   const lr      = laborRates    || {}
   const sr      = subRates      || {}
@@ -251,7 +251,7 @@ function calcDemo(state, laborRatePerHour, materialPrices, laborRates, subMarkup
   const laborCost  = totalHrs * lrph
   const burden     = laborCost * 0.29
   // GP = labor component + Universal Sub Markup % on all sub costs
-  const gp         = (manDays * 425) + ((subDumpCost + subHaulCost) * subMarkupRate)
+  const gp         = (manDays * gpmd) + ((subDumpCost + subHaulCost) * subMarkupRate)
   const commission = gp * 0.12
   const subCost    = subDumpCost + subHaulCost + manualSub
   const price      = laborCost + burden + totalMat + gp + commission + subCost
@@ -404,7 +404,8 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel }) {
     const rows=[...p[sec]]; rows[i]={...rows[i],[f]:v}; return {...p,[sec]:rows}
   }), [])
 
-  const calc = calcDemo(state, laborRatePerHour, materialPrices, laborRates, subMarkupRate, subRates)
+  const gpmd = initialData?.gpmd ?? 425
+  const calc = calcDemo(state, laborRatePerHour, materialPrices, laborRates, subMarkupRate, subRates, gpmd)
 
   const fmt2 = v => `$${n(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`
   const fmt  = v => `$${Math.round(v).toLocaleString()}`
@@ -430,7 +431,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel }) {
       gross_profit: parseFloat(calc.gp.toFixed(2)),
       sub_cost:     parseFloat(calc.subCost.toFixed(2)),
       total_price:  parseFloat(calc.price.toFixed(2)),
-      data: { ...state, laborRatePerHour, materialPrices, laborRates,
+      data: { ...state, laborRatePerHour, gpmd, materialPrices, laborRates,
         calc: { totalHrs:calc.totalHrs, manDays:calc.manDays, laborCost:calc.laborCost,
                 burden:calc.burden, totalMat:calc.totalMat, subCost:calc.subCost,
                 gp:calc.gp, price:calc.price } },

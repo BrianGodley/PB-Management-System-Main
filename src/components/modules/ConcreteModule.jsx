@@ -64,7 +64,7 @@ const R = {
 
 const n = v => parseFloat(v) || 0
 
-function calcConcrete(state, laborRatePerHour = 35, lr = {}, mr = {}, sr = {}) {
+function calcConcrete(state, laborRatePerHour = 35, lr = {}, mr = {}, sr = {}, gpmd = R.gpmd) {
   const lrph = n(laborRatePerHour) || 35
 
   // ── Labor production rates (labor_rates) ─────────────────────────────────
@@ -206,7 +206,7 @@ function calcConcrete(state, laborRatePerHour = 35, lr = {}, mr = {}, sr = {}) {
                     colorMat + pumpMat + vaporMat + sealerMat + manMat
   const laborCost = totalHrs * lrph
   const burden     = laborCost * R.laborBurdenPct
-  const gp         = manDays * R.gpmd
+  const gp         = manDays * gpmd
   const commission = gp * R.commissionRate
   const subCost    = finishSubCost + manSub
   const price      = totalMat + laborCost + burden + gp + commission + subCost
@@ -334,7 +334,8 @@ export default function ConcreteModule({ projectName, onSave, onBack, saving, in
     finishType, colorYes, pumpYes, vaporBarrierSF, sealerSF, sealerType,
     baseRows, manualRows,
   }
-  const calc = calcConcrete(state, laborRatePerHour, laborRates, materialRates, subRates)
+  const gpmd = initialData?.gpmd ?? R.gpmd
+  const calc = calcConcrete(state, laborRatePerHour, laborRates, materialRates, subRates, gpmd)
 
   function updateBaseRow(i, field, val) {
     setBaseRows(rows => rows.map((r, idx) => idx === i ? { ...r, [field]: val } : r))
@@ -349,7 +350,7 @@ export default function ConcreteModule({ projectName, onSave, onBack, saving, in
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
       data: {
         ...state,
-        laborRatePerHour,
+        laborRatePerHour, gpmd,
         laborRates,    // ← production rate snapshot
         materialRates, // ← material cost snapshot
         subRates,      // ← sub/equipment cost snapshot

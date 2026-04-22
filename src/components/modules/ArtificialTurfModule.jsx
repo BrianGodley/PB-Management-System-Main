@@ -67,7 +67,7 @@ const RATE_DEFAULTS = {
 // ── Calculation engine ────────────────────────────────────────────────────────
 const n = v => parseFloat(v) || 0
 
-function calcTurf(state, laborRatePerHour, materialPrices, laborRates) {
+function calcTurf(state, laborRatePerHour, materialPrices, laborRates, gpmd = 425) {
   const mp   = materialPrices || {}
   const lr   = laborRates    || {}
   const lrph = n(laborRatePerHour) || 35
@@ -200,7 +200,7 @@ function calcTurf(state, laborRatePerHour, materialPrices, laborRates) {
   const manDays    = totalHrs / 8
   const laborCost  = totalHrs * lrph
   const burden     = laborCost * RATE_DEFAULTS.laborBurden   // 29% — Excel Module #1 O4
-  const gp         = manDays * 425
+  const gp         = manDays * gpmd
   const commission = gp * RATE_DEFAULTS.commissionRate       // 12% of GP — Excel Module #1 O3
   const price      = laborCost + burden + totalMat + gp + commission + subCost
 
@@ -336,7 +336,8 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
   const setStrips = useCallback((field, val) =>
     setState(p => ({ ...p, strips: { ...p.strips, [field]: val } })), [])
 
-  const calc  = calcTurf(state, laborRatePerHour, materialPrices, laborRates)
+  const gpmd  = initialData?.gpmd ?? 425
+  const calc  = calcTurf(state, laborRatePerHour, materialPrices, laborRates, gpmd)
   const fmt2  = v => `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   const fmt   = v => `$${Math.round(v).toLocaleString()}`
   const fh    = v => v > 0 ? v.toFixed(2) : '—'
@@ -357,7 +358,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
       sub_cost:      parseFloat(calc.subCost.toFixed(2)),
       total_price:   parseFloat(calc.price.toFixed(2)),
       data: {
-        ...state, laborRatePerHour, materialPrices, laborRates,
+        ...state, laborRatePerHour, gpmd, materialPrices, laborRates,
         calc: {
           totalHrs: calc.totalHrs, manDays: calc.manDays,
           laborCost: calc.laborCost, burden: calc.burden,

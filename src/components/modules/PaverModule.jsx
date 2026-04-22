@@ -77,7 +77,7 @@ const MAT_DEFAULTS = {
 }
 
 // ── Calculation engine ────────────────────────────────────────────────────────
-function calcPaver(state, laborRatePerHour, laborRates, materialRates, paverPrices) {
+function calcPaver(state, laborRatePerHour, laborRates, materialRates, paverPrices, gpmd = 425) {
   const lr = laborRates   || {}
   const mr = materialRates || {}
   const pp = paverPrices   || []
@@ -218,7 +218,7 @@ function calcPaver(state, laborRatePerHour, laborRates, materialRates, paverPric
   const lrph      = n(laborRatePerHour) || 35
   const laborCost = totalHrs * lrph
   const burden    = laborCost * 0.29
-  const gp        = manDays * 425
+  const gp        = manDays * gpmd
   const commission= gp * 0.12
   const subCost   = manualSub
   const price     = laborCost + burden + totalMat + gp + commission + subCost
@@ -462,7 +462,8 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
     const rows = [...p[sec]]; rows[i] = { ...rows[i], [f]: v }; return { ...p, [sec]: rows }
   }), [])
 
-  const calc = calcPaver(state, laborRatePerHour, laborRates, materialRates, paverPrices)
+  const gpmd = initialData?.gpmd ?? 425
+  const calc = calcPaver(state, laborRatePerHour, laborRates, materialRates, paverPrices, gpmd)
 
   const fmt2 = v => `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   const fmt  = v => `$${Math.round(v).toLocaleString()}`
@@ -481,7 +482,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       sub_cost:      parseFloat(calc.subCost.toFixed(2)),
       total_price:   parseFloat(calc.price.toFixed(2)),
       data: {
-        ...state, laborRatePerHour, laborRates, materialRates, paverPrices,
+        ...state, laborRatePerHour, gpmd, laborRates, materialRates, paverPrices,
         calc: {
           totalHrs:   calc.totalHrs,
           manDays:    calc.manDays,

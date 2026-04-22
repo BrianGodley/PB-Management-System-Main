@@ -193,8 +193,56 @@ export default function EstimateDetail() {
 
   // ── Per-project GPMD override ─────────────────────
   async function saveProjectGpmd(projectId, newVal) {
+    // Update local GPMD state immediately
     setProjectGpmds(prev => ({ ...prev, [projectId]: newVal }))
+
+    // Persist project override
     await supabase.from('estimate_projects').update({ gpmd_override: newVal }).eq('id', projectId)
+
+    // Cascade to every module in the project
+    const proj = projects.find(p => p.id === projectId)
+    if (!proj) return
+    const mods = proj.estimate_modules || []
+
+    const updatedMods = await Promise.all(mods.map(async mod => {
+      const manDays    = parseFloat(mod.man_days || 0)
+      const laborCost  = parseFloat(mod.labor_cost   || mod.data?.calc?.laborCost || 0)
+      const burden     = parseFloat(mod.labor_burden || mod.data?.calc?.burden    || 0)
+      const mat        = parseFloat(mod.material_cost || 0)
+      const subCost    = parseFloat(mod.sub_cost      || mod.data?.calc?.subCost  || 0)
+
+      // Preserve any sub-haul / markup GP contribution that isn't manDays×gpmd
+      const oldGpmd        = parseFloat(mod.data?.gpmd ?? 425)
+      const oldTotalGP     = parseFloat(mod.gross_profit || mod.data?.calc?.gp || 0)
+      const subContrib     = oldTotalGP - (manDays * oldGpmd)   // non-zero for demo modules
+      const newGP          = (manDays * newVal) + subContrib
+      const newCommission  = newGP * 0.12
+      const newPrice       = laborCost + burden + mat + subCost + newGP + newCommission
+
+      const updatedData = {
+        ...(mod.data || {}),
+        gpmd: newVal,
+        calc: {
+          ...(mod.data?.calc || {}),
+          gp:         newGP,
+          commission: newCommission,
+          price:      newPrice,
+        },
+      }
+
+      await supabase.from('estimate_modules').update({
+        gross_profit: parseFloat(newGP.toFixed(2)),
+        total_price:  parseFloat(newPrice.toFixed(2)),
+        data:         updatedData,
+      }).eq('id', mod.id)
+
+      return { ...mod, gross_profit: newGP, total_price: newPrice, data: updatedData }
+    }))
+
+    // Update local state so bars re-render immediately
+    const updatedProj = { ...proj, estimate_modules: updatedMods }
+    setProjects(prev => prev.map(p => p.id === projectId ? updatedProj : p))
+    if (selectedProject?.id === projectId) setSelectedProject(updatedProj)
   }
 
   // ── Modules ──────────────────────────────────────

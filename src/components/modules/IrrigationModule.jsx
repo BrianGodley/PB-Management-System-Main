@@ -51,7 +51,7 @@ const RATE_DEFAULTS = {
 // ── Calculation engine ────────────────────────────────────────────────────────
 const n = v => parseFloat(v) || 0
 
-function calcIrrigation(state, laborRatePerHour, materialPrices, laborRates, salesTax) {
+function calcIrrigation(state, laborRatePerHour, materialPrices, laborRates, salesTax, gpmd = 425) {
   const mp   = materialPrices || {}
   const lr   = laborRates    || {}
   const lrph = n(laborRatePerHour) || 35
@@ -108,7 +108,7 @@ function calcIrrigation(state, laborRatePerHour, materialPrices, laborRates, sal
   const manDays    = totalHrs / 8
   const laborCost  = totalHrs * lrph
   const burden     = laborCost * 0.29          // 29% — Excel Module #1 O4
-  const gp         = manDays * 425
+  const gp         = manDays * gpmd
   const commission = gp * 0.12                 // 12% of GP — Excel Module #1 O3
   const price      = laborCost + burden + totalMat + gp + commission + subCost
 
@@ -175,6 +175,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
   const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? 35)
   const [salesTax,         setSalesTax]         = useState(initialData?.salesTax ?? RATE_DEFAULTS.salesTax)
   const [pricesLoading,    setPricesLoading]    = useState(!initialData?.materialPrices)
+  const gpmd = initialData?.gpmd ?? 425
 
   useEffect(() => {
     if (initialData?.materialPrices && initialData?.laborRatePerHour) return
@@ -209,7 +210,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
     const rows = [...p.manualRows]; rows[i] = { ...rows[i], [f]: v }; return { ...p, manualRows: rows }
   }), [])
 
-  const calc = calcIrrigation(state, laborRatePerHour, materialPrices, laborRates, salesTax)
+  const calc = calcIrrigation(state, laborRatePerHour, materialPrices, laborRates, salesTax, gpmd)
 
   const fmt2 = v => `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   const fmt  = v => `$${Math.round(v).toLocaleString()}`
@@ -228,7 +229,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
       sub_cost:     parseFloat(calc.subCost.toFixed(2)),
       total_price:  parseFloat(calc.price.toFixed(2)),
       data: {
-        ...state, laborRatePerHour, materialPrices, laborRates, salesTax,
+        ...state, laborRatePerHour, gpmd, materialPrices, laborRates, salesTax,
         calc: {
           totalHrs: calc.totalHrs, manDays: calc.manDays,
           laborCost: calc.laborCost, burden: calc.burden,

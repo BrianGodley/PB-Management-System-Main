@@ -57,7 +57,7 @@ const DEFAULTS = {
 const n = (v) => parseFloat(v) || 0
 
 // materialPrices — { 'dbName': unit_cost, ... } fetched from material_rates
-function calcDrainage(state, laborRatePerHour = DEFAULTS.laborRatePerHour, materialPrices = {}) {
+function calcDrainage(state, laborRatePerHour = DEFAULTS.laborRatePerHour, materialPrices = {}, gpmd = DEFAULTS.gpmd) {
   const { difficulty, trenchRows, pipeRows, fixtureRows, additionalItems, manualRows } = state
 
   let trenchHrs = 0, pipeHrs = 0, pipeMat = 0
@@ -118,7 +118,7 @@ function calcDrainage(state, laborRatePerHour = DEFAULTS.laborRatePerHour, mater
   const totalMat = pipeMat + fixMat + drainFittingFee + addMat + manMat
   const laborCost = totalHrs * laborRatePerHour
   const burden     = laborCost * DEFAULTS.laborBurdenPct
-  const gp         = manDays * DEFAULTS.gpmd
+  const gp         = manDays * gpmd
   const commission = gp * DEFAULTS.commissionRate
   const subCost    = manSub
   const price      = totalMat + laborCost + burden + gp + commission + subCost
@@ -222,6 +222,8 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
       })
   }, [])
 
+  const gpmd = initialData?.gpmd ?? DEFAULTS.gpmd
+
   const [difficulty,      setDifficulty]     = useState(initialData?.difficulty      ?? '')
   const [trenchRows,      setTrenchRows]     = useState(initialData?.trenchRows      ?? DEFAULT_TRENCH_ROWS)
   const [pipeRows,        setPipeRows]       = useState(initialData?.pipeRows        ?? DEFAULT_PIPE_ROWS)
@@ -233,6 +235,7 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
     { difficulty, trenchRows, pipeRows, fixtureRows, additionalItems, manualRows },
     laborRatePerHour,
     materialPrices,
+    gpmd,
   )
 
   function updateTrench(i, field, val) {
@@ -254,7 +257,7 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
       data: {
         difficulty, trenchRows, pipeRows, fixtureRows, additionalItems, manualRows,
-        laborRatePerHour,
+        laborRatePerHour, gpmd,
         materialPrices,   // snapshot of prices used — so the summary always reflects save-time costs
         calc,
       },

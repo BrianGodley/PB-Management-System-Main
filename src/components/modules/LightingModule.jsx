@@ -49,7 +49,7 @@ const n = (v) => parseFloat(v) || 0
 
 // ── Calculation ──────────────────────────────────────────────────────────────
 // materialPrices: { [dbName]: unit_cost } — overrides hardcoded defaults when available
-function calcLighting(state, laborRatePerHour = DEFAULTS.laborRatePerHour, materialPrices = {}) {
+function calcLighting(state, laborRatePerHour = DEFAULTS.laborRatePerHour, materialPrices = {}, gpmd = DEFAULTS.gpmd) {
   const { difficulty, fixtureQtys, transformerQtys, wireQtys, manualRows } = state
 
   let fixHrs = 0, fixMat = 0, totalWatts = 0, totalVA = 0
@@ -100,7 +100,7 @@ function calcLighting(state, laborRatePerHour = DEFAULTS.laborRatePerHour, mater
   const totalMat  = markedUpMat + manMat
   const laborCost = totalHrs * laborRatePerHour
   const burden     = laborCost * DEFAULTS.laborBurdenPct
-  const gp         = manDays * DEFAULTS.gpmd
+  const gp         = manDays * gpmd
   const commission = gp * DEFAULTS.commissionRate
   const subCost    = manSub
   const price      = totalMat + laborCost + burden + gp + commission + subCost
@@ -166,13 +166,15 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
       })
   }, [])
 
+  const gpmd = initialData?.gpmd ?? DEFAULTS.gpmd
+
   const [difficulty,      setDifficulty]      = useState(initialData?.difficulty      ?? '')
   const [fixtureQtys,     setFixtureQtys]     = useState(initialData?.fixtureQtys     ?? blankFixtureQtys())
   const [transformerQtys, setTransformerQtys] = useState(initialData?.transformerQtys ?? blankTransformerQtys())
   const [wireQtys,        setWireQtys]        = useState(initialData?.wireQtys        ?? blankWireQtys())
   const [manualRows,      setManualRows]       = useState(initialData?.manualRows      ?? DEFAULT_MANUAL_ROWS)
 
-  const calc = calcLighting({ difficulty, fixtureQtys, transformerQtys, wireQtys, manualRows }, laborRatePerHour, materialPrices)
+  const calc = calcLighting({ difficulty, fixtureQtys, transformerQtys, wireQtys, manualRows }, laborRatePerHour, materialPrices, gpmd)
 
   function updateManual(i, field, val) {
     setManualRows(rows => rows.map((r, idx) => idx === i ? { ...r, [field]: val } : r))
@@ -182,7 +184,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
     onSave({
       man_days:      parseFloat(calc.manDays.toFixed(2)),
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
-      data: { difficulty, fixtureQtys, transformerQtys, wireQtys, manualRows, laborRatePerHour, materialPrices, calc },
+      data: { difficulty, fixtureQtys, transformerQtys, wireQtys, manualRows, laborRatePerHour, gpmd, materialPrices, calc },
     })
   }
 
