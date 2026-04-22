@@ -1626,4 +1626,39 @@ export default function Admin() {
 
                         {/* Edit chevron */}
                         <td className="px-4 py-3 text-right text-gray-300 text-sm">
-      
+                          {currentUserIsAdmin ? '›' : ''}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Modals */}
+          {showAddUser && (
+            <AddUserModal
+              onClose={() => setShowAddUser(false)}
+              onCreated={() => { fetchUsers(); setShowAddUser(false) }}
+            />
+          )}
+          {editingUser && (
+            <UserEditModal
+              profile={editingUser}
+              currentUserId={user?.id}
+              onClose={() => setEditingUser(null)}
+              onSaved={() => { fetchUsers(); setEditingUser(null) }}
+            />
+          )}
+        </>
+      )}
+
+      {/* ── SETTINGS TAB ──────────────────────────────────────────────────── */}
+      {tab === 'settings' && (
+        <CompanySettings currentUserIsAdmin={currentUserIsAdmin} />
+      )}
+
+    </div>
+  )
+}
