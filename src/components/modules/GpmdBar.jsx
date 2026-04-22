@@ -12,6 +12,9 @@
 // Sub GP:
 //   subGp = subCost × subMarkupRate (default 20%)
 //   onSubMarkupSave — if provided, the Sub % cell is editable
+//
+// Commission:
+//   effectiveComm = (effectiveGp + subGp) × 12%  ← includes sub GP in base
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState } from 'react'
 
@@ -46,10 +49,10 @@ export default function GpmdBar({
   const displayGpmd    = directGp != null
     ? (manDays > 0 ? Math.round(directGp / manDays) : 0)
     : gpmd
-  const effectiveComm  = effectiveGp * 0.12
   const subGp          = (subCost || 0) * (subMarkupRate || 0)
   const displaySubPct  = Math.round((subMarkupRate || 0) * 100)
-  const effectivePrice = laborCost + burden + totalMat + (subCost || 0) + effectiveGp + effectiveComm
+  const effectiveComm  = (effectiveGp + subGp) * 0.12
+  const effectivePrice = laborCost + burden + totalMat + (subCost || 0) + effectiveGp + subGp + effectiveComm
 
   // ── GPMD edit handlers ─────────────────────────────────────────────────────
   function startGpmdEdit() {
