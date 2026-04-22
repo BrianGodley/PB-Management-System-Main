@@ -31,6 +31,8 @@ import ColumnsModule            from '../components/modules/ColumnsModule'
 import ColumnsSummary           from '../components/modules/ColumnsSummary'
 import GroundTreatmentsModule   from '../components/modules/GroundTreatmentsModule'
 import GroundTreatmentsSummary  from '../components/modules/GroundTreatmentsSummary'
+import OutdoorKitchenModule     from '../components/modules/OutdoorKitchenModule'
+import OutdoorKitchenSummary    from '../components/modules/OutdoorKitchenSummary'
 import GpmdBar                  from '../components/modules/GpmdBar'
 
 const MODULE_TYPES = [
@@ -980,6 +982,8 @@ export default function EstimateDetail() {
                   <ColumnsSummary module={selectedModule} />
                 ) : selectedModule.module_type === 'Ground Treatments' ? (
                   <GroundTreatmentsSummary module={selectedModule} />
+                ) : selectedModule.module_type === 'Outdoor Kitchen' ? (
+                  <OutdoorKitchenSummary module={selectedModule} />
                 ) : selectedModule.module_type === 'Pool' ? (
                   <PoolSummary module={selectedModule} />
                 ) : (
@@ -1066,7 +1070,7 @@ export default function EstimateDetail() {
           <div className="absolute inset-0 bg-black/40" onClick={closeModuleFlow} />
 
           {/* Wide scrollable modal for module-specific forms */}
-          {(selectedType === 'Drainage' || selectedType === 'Lighting' || selectedType === 'Skid Steer Demo' || selectedType === 'Mini Skid Steer Demo' || selectedType === 'Concrete' || selectedType === 'Hand Demo' || selectedType === 'Irrigation' || selectedType === 'Artificial Turf' || selectedType === 'Pavers' || selectedType === 'Planting' || selectedType === 'Pool' || selectedType === 'Utilities' || selectedType === 'Columns' || selectedType === 'Ground Treatments') ? (
+          {(selectedType === 'Drainage' || selectedType === 'Lighting' || selectedType === 'Skid Steer Demo' || selectedType === 'Mini Skid Steer Demo' || selectedType === 'Concrete' || selectedType === 'Hand Demo' || selectedType === 'Irrigation' || selectedType === 'Artificial Turf' || selectedType === 'Pavers' || selectedType === 'Planting' || selectedType === 'Pool' || selectedType === 'Utilities' || selectedType === 'Columns' || selectedType === 'Ground Treatments' || selectedType === 'Outdoor Kitchen') ? (
             <div className={`relative bg-white rounded-2xl shadow-xl w-full mx-4 flex flex-col ${selectedType === 'Pavers' || selectedType === 'Pool' ? 'max-w-6xl' : 'max-w-5xl'}`}
                  style={{ maxHeight: '90vh' }}>
               <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-gray-200">
@@ -1187,6 +1191,15 @@ export default function EstimateDetail() {
                 )}
                 {selectedType === 'Ground Treatments' && (
                   <GroundTreatmentsModule
+                    projectName={selectedProject?.project_name}
+                    onSave={editingModule ? updateModule : saveModule}
+                    onBack={editingModule ? closeModuleFlow : () => setSelectedType(null)}
+                    saving={savingModule}
+                    initialData={moduleInitialData}
+                  />
+                )}
+                {selectedType === 'Outdoor Kitchen' && (
+                  <OutdoorKitchenModule
                     projectName={selectedProject?.project_name}
                     onSave={editingModule ? updateModule : saveModule}
                     onBack={editingModule ? closeModuleFlow : () => setSelectedType(null)}
