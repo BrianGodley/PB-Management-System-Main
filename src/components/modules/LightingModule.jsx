@@ -412,6 +412,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
         gp={calc.gp}
         commission={calc.commission}
         subCost={calc.subCost}
+        gpmd={gpmd}
         price={calc.price}
       />
 

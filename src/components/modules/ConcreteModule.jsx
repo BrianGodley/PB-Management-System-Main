@@ -559,6 +559,7 @@ export default function ConcreteModule({ projectName, onSave, onBack, saving, in
         gp={calc.gp}
         commission={calc.commission}
         subCost={calc.subCost}
+        gpmd={gpmd}
         price={calc.price}
       />
 

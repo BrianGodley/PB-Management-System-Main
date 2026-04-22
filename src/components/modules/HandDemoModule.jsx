@@ -641,6 +641,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel }) {
         gp={calc.gp}
         commission={calc.commission}
         subCost={calc.subCost}
+        gpmd={gpmd}
         price={calc.price}
       />
 

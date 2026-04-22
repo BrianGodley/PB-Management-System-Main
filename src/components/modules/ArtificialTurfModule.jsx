@@ -661,6 +661,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         gp={calc.gp}
         commission={calc.commission}
         subCost={calc.subCost}
+        gpmd={gpmd}
         price={calc.price}
       />
 
