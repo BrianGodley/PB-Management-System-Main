@@ -101,8 +101,8 @@ export default function EstimateDetail() {
   // Per-project GPMD overrides  { [projectId]: number }
   const [projectGpmds, setProjectGpmds] = useState({})
 
-  // Sub GP markup rate (global, stored in company_settings)
-  const [subMarkupRate, setSubMarkupRate] = useState(0.20)
+  // Per-project sub GP markup rates  { [projectId]: number }
+  const [projectSubRates, setProjectSubRates] = useState({})
 
   // Add / Edit module modals
   const [showModulePicker, setShowModulePicker] = useState(false)
@@ -115,16 +115,6 @@ export default function EstimateDetail() {
 
   async function fetchData() {
     setLoading(true)
-
-    // Fetch sub GP markup rate from company settings
-    const { data: settings } = await supabase
-      .from('company_settings')
-      .select('sub_gp_markup_rate')
-      .eq('id', 1)
-      .single()
-    if (settings?.sub_gp_markup_rate != null) {
-      setSubMarkupRate(parseFloat(settings.sub_gp_markup_rate))
-    }
 
     const { data: est } = await supabase
       .from('estimates')
@@ -145,6 +135,10 @@ export default function EstimateDetail() {
         const overrides = {}
         projs.forEach(p => { if (p.gpmd_override != null) overrides[p.id] = parseFloat(p.gpmd_override) })
         setProjectGpmds(overrides)
+        // Initialise per-project sub GP rates from DB
+        const subRates = {}
+        projs.forEach(p => { if (p.sub_gp_markup_rate != null) subRates[p.id] = parseFloat(p.sub_gp_markup_rate) })
+        setProjectSubRates(subRates)
         // Re-sync selected project/module if already selected
         if (selectedProject) {
           const refreshed = projs.find(p => p.id === selectedProject.id)
@@ -269,13 +263,13 @@ export default function EstimateDetail() {
     }
   }
 
-  // ── Sub GP markup rate ────────────────────────────
-  async function saveSubMarkupRate(newVal) {
-    setSubMarkupRate(newVal)
+  // ── Per-project sub GP markup rate ────────────────────────────
+  async function saveProjectSubRate(projectId, newVal) {
+    setProjectSubRates(prev => ({ ...prev, [projectId]: newVal }))
     await supabase
-      .from('company_settings')
-      .update({ sub_gp_markup_rate: newVal, updated_at: new Date().toISOString() })
-      .eq('id', 1)
+      .from('estimate_projects')
+      .update({ sub_gp_markup_rate: newVal })
+      .eq('id', projectId)
   }
 
   // ── Modules ──────────────────────────────────────
@@ -601,6 +595,16 @@ export default function EstimateDetail() {
   // Estimate GPMD is purely derived — never edited directly
   // (displayed inside GpmdBar via directGp ÷ manDays)
 
+  // Estimate-level Sub GP: sum each project's sub cost × that project's own rate
+  const estimateTotalSubGp = projects.reduce((sum, proj) => {
+    const mods = proj.estimate_modules || []
+    const projSubCost = mods.reduce((s, m) => s + parseFloat(m.sub_cost || m.data?.calc?.subCost || 0), 0)
+    const projRate = projectSubRates[proj.id] ?? 0.20
+    return sum + projSubCost * projRate
+  }, 0)
+  // Derived blended rate for display in the Estimate Totals bar (read-only)
+  const derivedEstSubRate = et.subCost > 0 ? estimateTotalSubGp / et.subCost : 0.20
+
   // ── Per-project totals for selected project ────────────────────────────────
   const projModules = selectedProject?.estimate_modules || []
   const projectTotals = projModules.reduce((acc, mod) => {
@@ -723,7 +727,7 @@ export default function EstimateDetail() {
             subCost={et.subCost}
             directGp={adjustedEstimateGP}
             price={et.price}
-            subMarkupRate={subMarkupRate}
+            subMarkupRate={derivedEstSubRate}
           />
         )}
       </div>
@@ -756,8 +760,8 @@ export default function EstimateDetail() {
             gpmd={projectGpmds[selectedProject.id] ?? projGpmd}
             price={pt.price}
             onGpmdSave={val => saveProjectGpmd(selectedProject.id, val)}
-            subMarkupRate={subMarkupRate}
-            onSubMarkupSave={saveSubMarkupRate}
+            subMarkupRate={projectSubRates[selectedProject.id] ?? 0.20}
+            onSubMarkupSave={val => saveProjectSubRate(selectedProject.id, val)}
           />
         </div>
       )}
