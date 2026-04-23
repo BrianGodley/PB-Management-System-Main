@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import ScheduleCalendar from '../components/ScheduleCalendar'
 import DailyLogs from '../components/DailyLogs'
@@ -15,10 +15,11 @@ function lastName(name = '') {
 const ALL_JOBS = '__all__'
 
 export default function JobsList() {
+  const [searchParams] = useSearchParams()
   const [jobs,       setJobs]       = useState([])
   const [loading,    setLoading]    = useState(true)
   const [selectedJob,setSelectedJob]= useState(ALL_JOBS)
-  const [tab,        setTab]        = useState('schedule')
+  const [tab,        setTab]        = useState(() => searchParams.get('tab') || 'schedule')
   const [jobModal,   setJobModal]   = useState(null)
   const [search,     setSearch]     = useState('')
   const [stages,          setStages]          = useState([])
@@ -28,6 +29,12 @@ export default function JobsList() {
   const [exceptionsCount, setExceptionsCount] = useState(0)
 
   useEffect(() => { fetchJobs(); fetchStages() }, [])
+
+  // Sync tab when dock link changes the ?tab= URL param
+  useEffect(() => {
+    const t = searchParams.get('tab')
+    if (t) setTab(t)
+  }, [searchParams])
 
   async function fetchStages() {
     const { data } = await supabase.from('job_stages').select('*').order('sort_order')

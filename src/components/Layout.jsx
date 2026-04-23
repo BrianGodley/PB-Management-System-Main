@@ -4,16 +4,27 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 
 const navItems = [
-  { path: '/',              label: 'Dashboard',    icon: '🏠' },
-  { path: '/clients',       label: 'Clients',      icon: '👥' },
-  { path: '/bids',          label: 'Bids',         icon: '📋' },
-  { path: '/jobs',          label: 'Jobs',         icon: '🔨' },
-  { path: '/collections',   label: 'Finance',      icon: '🏦' },
-  { path: '/statistics',    label: 'Statistics',   icon: '📈' },
+  { path: '/',              label: 'Dashboard',      icon: '🏠' },
+  { path: '/clients',       label: 'Clients',        icon: '👥' },
+  { path: '/bids',          label: 'Bids',           icon: '📋' },
+  { path: '/jobs',          label: 'Jobs',           icon: '🔨' },
+  { path: '/collections',   label: 'Finance',        icon: '🏦' },
+  { path: '/statistics',    label: 'Statistics',     icon: '📈' },
   { path: '/portal/subs',   label: 'Subs & Vendors', icon: '🔧' },
   { path: '/training',      label: 'Training',       icon: '🎓' },
   { path: '/hr',            label: 'HR',             icon: '🏢' },
   { path: '/accounting',   label: 'Accounting',     icon: '💼' },
+]
+
+// Mobile hamburger nav — hides back-office sections not needed in the field
+const MOBILE_HIDDEN = new Set(['/collections', '/training', '/hr', '/accounting'])
+const mobileNavItems = navItems.filter(item => !MOBILE_HIDDEN.has(item.path))
+
+// Bottom dock — quick-access for field use
+const DOCK_ITEMS = [
+  { to: '/jobs?tab=daily-logs', label: 'Daily Logs', icon: '📋' },
+  { to: '/jobs?tab=timeclock',  label: 'Time Clock', icon: '⏱️' },
+  { to: '/jobs',                label: 'Info',        icon: 'ℹ️' },
 ]
 
 const forestGreen = '#4E7B4C'
@@ -212,7 +223,7 @@ export default function Layout() {
             style={{ backgroundColor: forestGreenDark, borderTop: '1px solid rgba(255,255,255,0.1)' }}
             className="lg:hidden px-4 py-2 space-y-0.5"
           >
-            {navItems.map(item => (
+            {mobileNavItems.map(item => (
               <Link
                 key={item.path}
                 to={item.path}
@@ -264,11 +275,47 @@ export default function Layout() {
           </div>
         </aside>
 
-        {/* MAIN CONTENT */}
-        <main className="flex-1 min-w-0 overflow-y-auto p-6">
+        {/* MAIN CONTENT — extra bottom padding on mobile for the dock */}
+        <main className="flex-1 min-w-0 overflow-y-auto p-6 pb-24 lg:pb-6">
           <Outlet />
         </main>
       </div>
+
+      {/* ── MOBILE BOTTOM DOCK ─────────────────────────────────────
+           Fixed to the bottom of the screen on phones only.
+           Provides quick access to the most-used field features.
+      ─────────────────────────────────────────────────────────── */}
+      <nav
+        className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-white border-t border-gray-200 flex"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        {DOCK_ITEMS.map(item => {
+          const href   = item.to
+          const isJob  = location.pathname === '/jobs'
+          const search = location.search
+
+          // Determine active: Info is active when on /jobs with no recognised tab,
+          // others match their specific ?tab= param
+          const active = item.to === '/jobs'
+            ? isJob && !search.includes('tab=daily-logs') && !search.includes('tab=timeclock')
+            : isJob && search.includes(item.to.split('?')[1] || '')
+
+          return (
+            <Link
+              key={item.to}
+              to={href}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-xs font-medium transition-colors ${
+                active
+                  ? 'text-green-700 bg-green-50'
+                  : 'text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              <span className="text-xl leading-none">{item.icon}</span>
+              <span>{item.label}</span>
+            </Link>
+          )
+        })}
+      </nav>
     </div>
   )
 }
