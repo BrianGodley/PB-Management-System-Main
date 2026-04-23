@@ -493,7 +493,7 @@ export default function MasterCrews() {
       <div className="flex gap-0 border-b border-gray-200 mb-5 flex-shrink-0">
         {[
           { key: 'internal', label: `Internal Crews (${crews.length})` },
-          { key: 'sub',      label: `Subcontractor Crews (${subs.length})` },
+          { key: 'sub',      label: `Subcontractor Crews (${subCrews.length})` },
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
