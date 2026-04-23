@@ -173,6 +173,13 @@ export default function Layout() {
                   >
                     📊 Master Rates
                   </Link>
+                  <Link
+                    to="/master-crews"
+                    onClick={() => setShowUserMenu(false)}
+                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    👷 Master Crews
+                  </Link>
                   <div className="border-t border-gray-100 my-1" />
                   <button
                     onClick={() => { setShowUserMenu(false); handleSignOut() }}

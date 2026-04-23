@@ -15,6 +15,7 @@ import Settings from './pages/Settings'
 import Admin from './pages/Admin'
 import EstimateDetail from './pages/EstimateDetail'
 import MasterRates from './pages/MasterRates'
+import MasterCrews from './pages/MasterCrews'
 import Statistics from './pages/Statistics'
 import Profile from './pages/Profile'
 import SubsVendors from './pages/SubsVendors'
@@ -74,6 +75,7 @@ function AppRoutes() {
         <Route path="settings" element={<Settings />} />
         <Route path="admin" element={<Admin />} />
         <Route path="master-rates" element={<MasterRates />} />
+        <Route path="master-crews" element={<MasterCrews />} />
         <Route path="statistics" element={<Statistics />} />
         <Route path="profile" element={<Profile />} />
         <Route path="portal/internal" element={<PortalPlaceholder label="Internal Users" icon="👥" />} />
