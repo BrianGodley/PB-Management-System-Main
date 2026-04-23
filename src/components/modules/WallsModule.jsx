@@ -378,15 +378,16 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
         .then(({ data }) => { if (data) setLaborRatePerHour(parseFloat(data.value) || DEFAULTS.laborRatePerHour) })
     }
     if (initialData?.materialPrices) { setPricesLoading(false); return }
-    supabase.from('material_rates').select('name, unit_cost').eq('category', 'Walls')
-      .then(({ data }) => {
-        if (data) {
-          const p = {}
-          data.forEach(row => { p[row.name] = parseFloat(row.unit_cost) || 0 })
-          setMaterialPrices(p)
-        }
-        setPricesLoading(false)
-      })
+    Promise.all([
+      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Walls'),
+      supabase.from('labor_rates').select('name, rate').eq('category', 'Walls'),
+    ]).then(([matRes, labRes]) => {
+      const p = {}
+      ;(matRes.data || []).forEach(row => { p[row.name] = parseFloat(row.unit_cost) || 0 })
+      ;(labRes.data  || []).forEach(row => { p[row.name] = parseFloat(row.rate)     || 0 })
+      setMaterialPrices(p)
+      setPricesLoading(false)
+    })
   }, [])
 
   const gpmd            = initialData?.gpmd            ?? DEFAULTS.gpmd
