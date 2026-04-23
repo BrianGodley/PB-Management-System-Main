@@ -85,26 +85,48 @@ function dateStr(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
 
-function addWorkDays(startDate, workDays) {
+// Returns true if the date counts as a working day given exceptions + per-item weekend flags
+function isWorkingDay(date, exceptions = [], includeSat = false, includeSun = false) {
+  const dow = date.getDay()
+  if (dow === 6 && !includeSat) return false
+  if (dow === 0 && !includeSun) return false
+  const ds = dateStr(date)
+  return !exceptions.some(ex =>
+    (ex.type === 'day_of_week'   && ex.day_of_week    === dow) ||
+    (ex.type === 'specific_date' && ex.exception_date === ds)
+  )
+}
+
+function addWorkDays(startDate, workDays, exceptions = [], includeSat = false, includeSun = false) {
   if (!workDays || workDays < 1) return startDate
   let d = new Date(startDate), added = 0
   while (added < workDays - 1) {
     d.setDate(d.getDate() + 1)
-    const dow = d.getDay()
-    if (dow !== 0 && dow !== 6) added++
+    if (isWorkingDay(d, exceptions, includeSat, includeSun)) added++
   }
   return d
 }
 
-function countWorkDays(start, end) {
+function countWorkDays(start, end, exceptions = [], includeSat = false, includeSun = false) {
   if (!start || !end) return 0
   let d = new Date(start), e = new Date(end), count = 0
   while (d <= e) {
-    const dow = d.getDay()
-    if (dow !== 0 && dow !== 6) count++
+    if (isWorkingDay(d, exceptions, includeSat, includeSun)) count++
     d.setDate(d.getDate() + 1)
   }
   return count
+}
+
+// Returns true if a calendar cell should be shaded as a non-work day (for display)
+function isCellException(date, exceptions) {
+  if (!date) return false
+  const dow = date.getDay()
+  if (dow === 0 || dow === 6) return true   // weekends always shaded by default
+  const ds = dateStr(date)
+  return exceptions.some(ex =>
+    (ex.type === 'day_of_week'   && ex.day_of_week    === dow) ||
+    (ex.type === 'specific_date' && ex.exception_date === ds)
+  )
 }
 
 function fmtDate(ds) {
@@ -115,10 +137,13 @@ const EMPTY_FORM = {
   title: '', display_color: '#15803d', assignee_color: '', assignees: '',
   start_date: '', end_date: '', work_days: '', progress: 0, reminder: 'None', notes: '',
   crew_id: '', sub_id: '',
+  include_saturday: false, include_sunday: false,
 }
 
+const DOW_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+
 // ── WeekRow: renders one 7-day row with spanning item bars ───
-function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, onDayClick, onItemClick }) {
+function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, onDayClick, onItemClick, exceptions = [] }) {
   const weekDates = weekDays.map(day => day ? new Date(year, month, day) : null)
   const validDates = weekDates.filter(Boolean)
   if (validDates.length === 0) return null
@@ -175,13 +200,17 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
           const ds = day
             ? `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
             : null
-          const isToday = ds === todayStr
+          const cellDate  = day ? new Date(year, month, day) : null
+          const isExcept  = cellDate ? isCellException(cellDate, exceptions) : false
+          const isToday   = ds === todayStr
           return (
             <div
               key={col}
               onClick={() => day && onDayClick(day)}
               className={`border-r border-gray-200 pt-1 px-1 select-none
-                ${day ? 'hover:bg-green-50 cursor-pointer' : 'bg-gray-50 cursor-default'}`}
+                ${!day        ? 'bg-gray-50 cursor-default'
+                : isExcept    ? 'bg-gray-100 cursor-pointer'
+                :               'hover:bg-green-50 cursor-pointer'}`}
             >
               {day && (
                 <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-medium
@@ -356,6 +385,147 @@ function CrewSubPicker({ label, emptyMsg, options, selectedId, onSelect }) {
   )
 }
 
+// ── Workday Exceptions Modal ──────────────────────────────────
+function WorkdayExceptionsModal({ exceptions, onAdd, onDelete, onClose }) {
+  const [type,      setType]      = useState('day_of_week')
+  const [dayOfWeek, setDayOfWeek] = useState(1)
+  const [date,      setDate]      = useState('')
+  const [label,     setLabel]     = useState('')
+  const [saving,    setSaving]    = useState(false)
+
+  async function handleAdd() {
+    if (type === 'specific_date' && !date) return
+    setSaving(true)
+    await onAdd({
+      type,
+      day_of_week:    type === 'day_of_week'   ? +dayOfWeek : null,
+      exception_date: type === 'specific_date' ? date       : null,
+      label: label.trim() || null,
+    })
+    setSaving(false)
+    setDate(''); setLabel('')
+  }
+
+  const recurring = exceptions.filter(e => e.type === 'day_of_week')
+  const specific  = exceptions.filter(e => e.type === 'specific_date')
+
+  return (
+    <ModalOverlay onClose={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 flex flex-col" style={{ maxHeight: '88vh' }}>
+
+        {/* Header */}
+        <div className="px-6 pt-5 pb-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+          <div>
+            <h3 className="text-base font-bold text-gray-800">Workday Exceptions</h3>
+            <p className="text-xs text-gray-400 mt-0.5">Days that are greyed out and skipped in scheduling</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 ml-4">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+
+          {/* Info note */}
+          <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2.5 text-xs text-blue-700">
+            Saturday and Sunday are excluded by default. You can override them per schedule item using the "Include Saturdays / Sundays" toggle in each item's details.
+          </div>
+
+          {/* Add form */}
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
+            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Add Exception</p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
+                <select value={type} onChange={e => setType(e.target.value)} className="input text-sm w-full">
+                  <option value="day_of_week">Recurring Day</option>
+                  <option value="specific_date">Specific Date</option>
+                </select>
+              </div>
+              {type === 'day_of_week' ? (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Day of Week</label>
+                  <select value={dayOfWeek} onChange={e => setDayOfWeek(+e.target.value)} className="input text-sm w-full">
+                    {DOW_NAMES.map((n, i) => <option key={i} value={i}>{n}</option>)}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Date</label>
+                  <input type="date" value={date} onChange={e => setDate(e.target.value)} className="input text-sm w-full" />
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Label <span className="text-gray-400 font-normal">(optional)</span></label>
+              <input type="text" value={label} onChange={e => setLabel(e.target.value)}
+                placeholder="e.g. Holiday, Company day off…" className="input text-sm w-full" />
+            </div>
+
+            <button onClick={handleAdd} disabled={saving || (type === 'specific_date' && !date)}
+              className="btn-primary text-sm px-4 py-2 disabled:opacity-50">
+              {saving ? 'Adding…' : 'Add Exception'}
+            </button>
+          </div>
+
+          {/* Recurring exceptions */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Recurring Days</p>
+            {recurring.length === 0 ? (
+              <p className="text-xs text-gray-400 italic py-2">None added — Sat & Sun are always excluded by default.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {recurring.map(ex => (
+                  <div key={ex.id} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">Every {DOW_NAMES[ex.day_of_week]}</p>
+                      {ex.label && <p className="text-xs text-gray-500">{ex.label}</p>}
+                    </div>
+                    <button onClick={() => onDelete(ex.id)} className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Specific date exceptions */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Specific Dates</p>
+            {specific.length === 0 ? (
+              <p className="text-xs text-gray-400 italic py-2">No specific dates added.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {specific.map(ex => (
+                  <div key={ex.id} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">{fmtDate(ex.exception_date)}</p>
+                      {ex.label && <p className="text-xs text-gray-500">{ex.label}</p>}
+                    </div>
+                    <button onClick={() => onDelete(ex.id)} className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+        </div>
+      </div>
+    </ModalOverlay>
+  )
+}
+
 export default function ScheduleCalendar({ jobs = [], selectedJob }) {
   const today = new Date()
   const [year,  setYear]  = useState(today.getFullYear())
@@ -374,11 +544,13 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
   const [employees,          setEmployees]          = useState([])
   const [subs,               setSubs]               = useState([])
   const [defaultSchedColor,  setDefaultSchedColor]  = useState('#15803d')
+  const [exceptions,         setExceptions]         = useState([])
+  const [showExceptions,     setShowExceptions]     = useState(false)
 
   // crew color lookup: { crewId: hexColor }
   const crewColorMap = Object.fromEntries(crews.map(c => [c.id, c.color || '#15803d']))
 
-  // Fetch crews, employees, subs + default schedule color on mount
+  // Fetch crews, employees, subs, default color, and workday exceptions on mount
   useEffect(() => {
     supabase.from('crews').select('*').order('label')
       .then(({ data }) => { if (data) setCrews(data) })
@@ -390,7 +562,23 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
       .then(({ data }) => { if (data) setSubs(data) })
     supabase.from('company_settings').select('value').eq('key', 'default_schedule_color').single()
       .then(({ data }) => { if (data?.value) setDefaultSchedColor(data.value) })
+    fetchExceptions()
   }, [])
+
+  async function fetchExceptions() {
+    const { data } = await supabase.from('workday_exceptions').select('*').order('created_at')
+    if (data) setExceptions(data)
+  }
+
+  async function addException(payload) {
+    const { data } = await supabase.from('workday_exceptions').insert(payload).select().single()
+    if (data) setExceptions(prev => [...prev, data])
+  }
+
+  async function deleteException(id) {
+    await supabase.from('workday_exceptions').delete().eq('id', id)
+    setExceptions(prev => prev.filter(e => e.id !== id))
+  }
 
   useEffect(() => { fetchItems() }, [year, month, selectedJob])
 
@@ -464,8 +652,10 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
       progress:       item.progress       ?? 0,
       reminder:       item.reminder       || 'None',
       notes:          item.notes          || '',
-      crew_id:        item.crew_id        || '',
-      sub_id:         item.sub_id         || '',
+      crew_id:          item.crew_id          || '',
+      sub_id:           item.sub_id           || '',
+      include_saturday: item.include_saturday || false,
+      include_sunday:   item.include_sunday   || false,
     })
     setPhase('details')
   }
@@ -477,14 +667,17 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
   function updateField(key, val) {
     setForm(prev => {
       const next = { ...prev, [key]: val }
-      if (key === 'start_date' && next.work_days && +next.work_days > 0) {
-        next.end_date = dateStr(addWorkDays(new Date(next.start_date), +next.work_days))
+      const excs   = exceptions
+      const incSat = key === 'include_saturday' ? val : next.include_saturday
+      const incSun = key === 'include_sunday'   ? val : next.include_sunday
+      if ((key === 'start_date' || key === 'include_saturday' || key === 'include_sunday') && next.work_days && +next.work_days > 0 && next.start_date) {
+        next.end_date = dateStr(addWorkDays(new Date(next.start_date), +next.work_days, excs, incSat, incSun))
       }
       if (key === 'work_days' && next.start_date && +val > 0) {
-        next.end_date = dateStr(addWorkDays(new Date(next.start_date), +val))
+        next.end_date = dateStr(addWorkDays(new Date(next.start_date), +val, excs, incSat, incSun))
       }
       if (key === 'end_date' && next.start_date) {
-        next.work_days = countWorkDays(next.start_date, val)
+        next.work_days = countWorkDays(next.start_date, val, excs, incSat, incSun)
       }
       return next
     })
@@ -504,9 +697,11 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
       progress:      +form.progress  || 0,
       reminder:      form.reminder,
       notes:         form.notes,
-      crew_id:        entryMode === 'crew' ? (form.crew_id || null) : null,
-      sub_id:         entryMode === 'sub'  ? (form.sub_id  || null) : null,
-      assignee_color: form.assignee_color || null,
+      crew_id:          entryMode === 'crew' ? (form.crew_id || null) : null,
+      sub_id:           entryMode === 'sub'  ? (form.sub_id  || null) : null,
+      assignee_color:   form.assignee_color || null,
+      include_saturday: form.include_saturday || false,
+      include_sunday:   form.include_sunday   || false,
     }
     const { error } = editItem
       ? await supabase.from('schedule_items').update(payload).eq('id', editItem.id)
@@ -600,17 +795,33 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
 
         {/* Month navigation + day headers — sticky */}
         <div className="sticky top-0 z-10 bg-white pb-0">
-          <div className="flex items-center justify-between mb-2">
-            <button onClick={prevMonth} className="p-1.5 rounded hover:bg-gray-100 text-gray-600">
+          <div className="flex items-center justify-between mb-2 gap-2">
+            <button onClick={prevMonth} className="p-1.5 rounded hover:bg-gray-100 text-gray-600 flex-shrink-0">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
             <h3 className="text-sm font-bold text-gray-800">{MONTH_NAMES[month]} {year}</h3>
-            <button onClick={nextMonth} className="p-1.5 rounded hover:bg-gray-100 text-gray-600">
+            <button onClick={nextMonth} className="p-1.5 rounded hover:bg-gray-100 text-gray-600 flex-shrink-0">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
+            </button>
+            <button
+              onClick={() => setShowExceptions(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors flex-shrink-0 ml-2"
+              title="Manage workday exceptions"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+              </svg>
+              Exceptions
+              {exceptions.length > 0 && (
+                <span className="bg-gray-200 text-gray-700 rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none">
+                  {exceptions.length}
+                </span>
+              )}
             </button>
           </div>
 
@@ -642,6 +853,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
                 todayStr={todayStr}
                 onDayClick={handleDayClick}
                 onItemClick={handleItemClick}
+                exceptions={exceptions}
               />
             ))}
           </div>
@@ -649,6 +861,16 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
       </div>
 
       {/* ── Modals (shared by both mobile and desktop) ────────── */}
+
+      {/* Workday Exceptions */}
+      {showExceptions && (
+        <WorkdayExceptionsModal
+          exceptions={exceptions}
+          onAdd={addException}
+          onDelete={deleteException}
+          onClose={() => setShowExceptions(false)}
+        />
+      )}
 
       {/* Job Selector */}
       {phase === 'job-select' && (
@@ -881,6 +1103,22 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
                       <label className="block text-xs font-medium text-gray-600 mb-1">End</label>
                       <input type="date" value={form.end_date} onChange={e => updateField('end_date', e.target.value)} className="input text-sm w-full" />
                     </div>
+                  </div>
+
+                  {/* Weekend overrides */}
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
+                      <input type="checkbox" checked={!!form.include_saturday}
+                        onChange={e => updateField('include_saturday', e.target.checked)}
+                        className="rounded border-gray-300 text-green-700 focus:ring-green-600" />
+                      Include Saturdays
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
+                      <input type="checkbox" checked={!!form.include_sunday}
+                        onChange={e => updateField('include_sunday', e.target.checked)}
+                        className="rounded border-gray-300 text-green-700 focus:ring-green-600" />
+                      Include Sundays
+                    </label>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">
