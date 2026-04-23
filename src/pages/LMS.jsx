@@ -467,10 +467,8 @@ export default function LMS() {
   return (
     <div>
       {/* Page header */}
-      <div className="flex items-center gap-4 mb-6">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Training</h1>
-        </div>
+      <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
+        <h1 className="text-xl font-bold text-gray-900">Training</h1>
         {isAdmin && (
           <div className="ml-auto flex gap-2 bg-gray-100 rounded-xl p-1">
             <button onClick={() => setMainTab('admin')}

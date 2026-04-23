@@ -238,7 +238,7 @@ export default function Bids() {
         </div>
       )}
 
-      <div className="mb-4 flex-shrink-0">
+      <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
         <h1 className="text-xl font-bold text-gray-900">Bids</h1>
       </div>
 
