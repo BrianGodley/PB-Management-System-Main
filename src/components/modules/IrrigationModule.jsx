@@ -243,6 +243,25 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
 
   return (
     <div className="space-y-4">
+      {/* ── Sticky GPMD bar ── */}
+      <div className="sticky top-0 z-20 -mx-6 -mt-5 px-6 pt-2 pb-2 bg-gray-900 shadow-lg">
+      {/* GPMD summary bar */}
+      <GpmdBar
+          sticky
+        totalMat={calc.totalMat}
+        totalHrs={calc.totalHrs}
+        manDays={calc.manDays}
+        laborCost={calc.laborCost}
+        laborRatePerHour={laborRatePerHour}
+        burden={calc.burden}
+        gp={calc.gp}
+        commission={calc.commission}
+        subCost={calc.subCost}
+        gpmd={gpmd}
+        price={calc.price}
+        subMarkupRate={subGpMarkupRate}
+      />
+      </div>
       {pricesLoading && (
         <div className="text-xs text-amber-700 bg-amber-50 rounded px-3 py-2">Loading current rates…</div>
       )}
@@ -352,21 +371,6 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
         </table>
       </div>
 
-      {/* GPMD summary bar */}
-      <GpmdBar
-        totalMat={calc.totalMat}
-        totalHrs={calc.totalHrs}
-        manDays={calc.manDays}
-        laborCost={calc.laborCost}
-        laborRatePerHour={laborRatePerHour}
-        burden={calc.burden}
-        gp={calc.gp}
-        commission={calc.commission}
-        subCost={calc.subCost}
-        gpmd={gpmd}
-        price={calc.price}
-        subMarkupRate={subGpMarkupRate}
-      />
 
       {/* Actions */}
       <div className="flex gap-3 pt-2">

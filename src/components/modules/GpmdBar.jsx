@@ -36,6 +36,7 @@ export default function GpmdBar({
   onGpmdSave       = null,  // if provided → PROJECT mode (editable GPMD)
   subMarkupRate    = 0.20,  // Sub GP = subCost × subMarkupRate
   onSubMarkupSave  = null,  // if provided → Sub % cell is editable
+  sticky           = false, // when true: renders with sticky positioning (handled by parent wrapper)
 }) {
   const [editingGpmd,    setEditingGpmd]    = useState(false)
   const [draftGpmd,      setDraftGpmd]      = useState('')
@@ -82,7 +83,7 @@ export default function GpmdBar({
   function GpmdCell() {
     if (onGpmdSave && editingGpmd) {
       return (
-        <div className="rounded-lg bg-amber-500/20 border border-amber-400/50 px-3 py-1 text-center min-w-[90px]">
+        <div className="rounded-lg bg-amber-500/20 border border-amber-400/50 px-3 py-1 text-center min-w-[68px]">
           <p className="text-xs mb-0.5 whitespace-nowrap text-amber-300">GPMD</p>
           <input
             autoFocus
@@ -97,7 +98,7 @@ export default function GpmdBar({
     }
     return (
       <div
-        className={`rounded-lg bg-amber-500/20 border border-amber-400/30 px-3 py-1 text-center min-w-[90px] ${onGpmdSave ? 'cursor-pointer hover:bg-amber-500/30 transition-colors' : ''}`}
+        className={`rounded-lg bg-amber-500/20 border border-amber-400/30 px-3 py-1 text-center min-w-[68px] ${onGpmdSave ? 'cursor-pointer hover:bg-amber-500/30 transition-colors' : ''}`}
         onClick={startGpmdEdit}
         title={onGpmdSave ? 'Click to edit GPMD' : undefined}
       >
@@ -115,7 +116,7 @@ export default function GpmdBar({
   function SubMarkupCell() {
     if (onSubMarkupSave && editingSubPct) {
       return (
-        <div className="rounded-lg bg-blue-500/20 border border-blue-400/50 px-3 py-1 text-center min-w-[72px]">
+        <div className="rounded-lg bg-blue-500/20 border border-blue-400/50 px-3 py-1 text-center min-w-[58px]">
           <p className="text-xs mb-0.5 whitespace-nowrap text-blue-300">Sub %</p>
           <div className="flex items-center justify-center gap-0.5">
             <input
@@ -133,7 +134,7 @@ export default function GpmdBar({
     }
     return (
       <div
-        className={`rounded-lg bg-blue-500/20 border border-blue-400/30 px-3 py-1 text-center min-w-[72px] ${onSubMarkupSave ? 'cursor-pointer hover:bg-blue-500/30 transition-colors' : ''}`}
+        className={`rounded-lg bg-blue-500/20 border border-blue-400/30 px-3 py-1 text-center min-w-[58px] ${onSubMarkupSave ? 'cursor-pointer hover:bg-blue-500/30 transition-colors' : ''}`}
         onClick={startSubEdit}
         title={onSubMarkupSave ? 'Click to edit Sub GP markup rate' : undefined}
       >
@@ -162,7 +163,7 @@ export default function GpmdBar({
   // ── Sub GP column — rendered separately so the rate is inline-editable ─────
   function SubGpCol() {
     return (
-      <div className="px-3 flex-1 min-w-[80px] text-center">
+      <div className="px-3 flex-1 flex-1 min-w-0 text-center">
         <p className="text-xs text-gray-400 whitespace-nowrap mb-0.5">Sub GP</p>
         <p className="font-bold whitespace-nowrap tabular-nums text-sm text-blue-400">
           {subGp > 0 ? fmt(subGp) : '—'}
@@ -193,44 +194,43 @@ export default function GpmdBar({
     )
   }
 
+  const containerCls = sticky
+    ? 'bg-gray-900 text-white py-2 px-2'
+    : 'bg-gray-900 text-white rounded-xl p-3 mt-2'
+
   return (
-    <div className="bg-gray-900 text-white rounded-xl p-4 mt-2">
-      <div className="overflow-x-auto">
-        <div className="flex gap-0 min-w-max divide-x divide-white/10">
+    <div className={containerCls}>
+      <div className="flex gap-0 divide-x divide-white/10 flex-wrap">
 
-          {/* Left: GPMD editable cell */}
-          <div className="pr-3">
-            <GpmdCell />
-          </div>
-
-          {/* Data columns */}
-          {cols.map((col, i) => {
-            const isAfterSubCost = col.label === 'Gross Profit'
-            return (
-              <>
-                {/* Inject Sub GP column right after Sub Cost */}
-                {isAfterSubCost && (
-                  <SubGpCol key="sub-gp" />
-                )}
-                <div
-                  key={col.label}
-                  className={`px-3 flex-1 min-w-[80px] text-center ${i === cols.length - 1 ? 'pl-4' : ''}`}
-                >
-                  <p className="text-xs text-gray-400 whitespace-nowrap mb-0.5">{col.label}</p>
-                  <p className={`font-bold whitespace-nowrap tabular-nums ${
-                    col.big   ? 'text-lg text-green-400' :
-                    col.green ? 'text-sm text-green-400' :
-                                'text-sm text-white'
-                  }`}>
-                    {col.value}
-                  </p>
-                  {col.dim && <p className="text-xs text-gray-500 whitespace-nowrap">{col.dim}</p>}
-                </div>
-              </>
-            )
-          })}
-
+        {/* Left: GPMD editable cell */}
+        <div className="pr-2 shrink-0">
+          <GpmdCell />
         </div>
+
+        {/* Data columns — flex-1 so they share width evenly */}
+        {cols.map((col, i) => {
+          const isAfterSubCost = col.label === 'Gross Profit'
+          return (
+            <>
+              {isAfterSubCost && <SubGpCol key="sub-gp" />}
+              <div
+                key={col.label}
+                className="px-1.5 flex-1 min-w-0 text-center"
+              >
+                <p className="text-[10px] text-gray-400 truncate mb-0.5">{col.label}</p>
+                <p className={`font-bold tabular-nums truncate ${
+                  col.big   ? 'text-base text-green-400' :
+                  col.green ? 'text-sm text-green-400' :
+                              'text-sm text-white'
+                }`}>
+                  {col.value}
+                </p>
+                {col.dim && <p className="text-[10px] text-gray-500 truncate">{col.dim}</p>}
+              </div>
+            </>
+          )
+        })}
+
       </div>
     </div>
   )

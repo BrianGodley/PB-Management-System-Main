@@ -364,6 +364,25 @@ export default function ConcreteModule({ projectName, onSave, onBack, saving, in
 
   return (
     <div className="space-y-5">
+      {/* ── Sticky GPMD bar ── */}
+      <div className="sticky top-0 z-20 -mx-6 -mt-5 px-6 pt-2 pb-2 bg-gray-900 shadow-lg">
+      {/* GPMD summary bar */}
+      <GpmdBar
+          sticky
+        totalMat={calc.totalMat}
+        totalHrs={calc.totalHrs}
+        manDays={calc.manDays}
+        laborCost={calc.laborCost}
+        laborRatePerHour={laborRatePerHour}
+        burden={calc.burden}
+        gp={calc.gp}
+        commission={calc.commission}
+        subCost={calc.subCost}
+        gpmd={gpmd}
+        price={calc.price}
+        subMarkupRate={subGpMarkupRate}
+      />
+      </div>
 
       {/* ── Global Settings ── */}
       <div>
@@ -549,21 +568,6 @@ export default function ConcreteModule({ projectName, onSave, onBack, saving, in
         </div>
       </div>
 
-      {/* GPMD summary bar */}
-      <GpmdBar
-        totalMat={calc.totalMat}
-        totalHrs={calc.totalHrs}
-        manDays={calc.manDays}
-        laborCost={calc.laborCost}
-        laborRatePerHour={laborRatePerHour}
-        burden={calc.burden}
-        gp={calc.gp}
-        commission={calc.commission}
-        subCost={calc.subCost}
-        gpmd={gpmd}
-        price={calc.price}
-        subMarkupRate={subGpMarkupRate}
-      />
 
       {/* ── Actions ── */}
       <div className="flex gap-3 pt-2">

@@ -693,6 +693,24 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
       <div>
         <SectionHeader title="Waterline Tile" />
         <div className="space-y-3">
+      {/* ── Sticky GPMD bar ── */}
+      <div className="sticky top-0 z-20 -mx-6 -mt-5 px-6 pt-2 pb-2 bg-gray-900 shadow-lg">
+      <GpmdBar
+          sticky
+        totalMat={calc.totalMat}
+        totalHrs={calc.totalHrs}
+        manDays={calc.manDays}
+        laborCost={calc.laborCost}
+        lrph={n(state.laborRatePerHour)}
+        burden={calc.burden}
+        subCost={calc.subCost}
+        gp={calc.gp}
+        commission={calc.commission}
+        price={calc.price}
+        gpmd={n(state.gpmd)}
+        subMarkupRate={subGpMarkupRate}
+      />
+      </div>
           {[
             ['Pool', state.pool], ['Spa', state.spa],
             ['Infinity Basin', state.basin], ['Cover Vault', state.vault],
@@ -1081,20 +1099,6 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
       </div>
 
       {/* ─── Summary bar ─── */}
-      <GpmdBar
-        totalMat={calc.totalMat}
-        totalHrs={calc.totalHrs}
-        manDays={calc.manDays}
-        laborCost={calc.laborCost}
-        lrph={n(state.laborRatePerHour)}
-        burden={calc.burden}
-        subCost={calc.subCost}
-        gp={calc.gp}
-        commission={calc.commission}
-        price={calc.price}
-        gpmd={n(state.gpmd)}
-        subMarkupRate={subGpMarkupRate}
-      />
 
       {/* ─── Actions ─── */}
       <div className="flex gap-3 pt-2">
