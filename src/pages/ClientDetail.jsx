@@ -3,10 +3,12 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import NewEstimateModal from '../components/NewEstimateModal'
 
-const STATUS_STYLES = {
-  pending: 'bg-yellow-100 text-yellow-800',
-  sold:    'bg-green-100  text-green-800',
-  lost:    'bg-red-100    text-red-800',
+// Match exactly the badge colours used in Bids.jsx
+const BID_STATUS_STYLES = {
+  pending:   'bg-yellow-50  text-yellow-800 border border-yellow-300',
+  presented: 'bg-blue-50    text-blue-800   border border-blue-300',
+  sold:      'bg-green-50   text-green-800  border border-green-400',
+  lost:      'bg-red-50     text-red-800    border border-red-300',
 }
 
 // Display name: "Last, First" when available, else legacy name field
@@ -23,6 +25,7 @@ export default function ClientDetail() {
   const navigate = useNavigate()
   const [client,    setClient]    = useState(null)
   const [estimates, setEstimates] = useState([])
+  const [bids,      setBids]      = useState([])
   const [soldJobs,  setSoldJobs]  = useState([])
   const [loading,   setLoading]   = useState(true)
   const [showEstimateModal, setShowEstimateModal] = useState(false)
@@ -69,7 +72,16 @@ export default function ClientDetail() {
 
       if (estData) setEstimates(estData)
 
-      // Fetch sold bids
+      // Fetch bids from the bids table — same source as the Bids page
+      const { data: bidsData } = await supabase
+        .from('bids')
+        .select('id, client_name, status, bid_amount, estimate_id, date_submitted, projects, gross_profit, gpmd')
+        .eq('client_name', clientData.name)
+        .order('date_submitted', { ascending: false })
+
+      if (bidsData) setBids(bidsData)
+
+      // Fetch jobs (sold/active work)
       const { data: jobsData } = await supabase
         .from('jobs')
         .select('*')
@@ -324,8 +336,8 @@ export default function ClientDetail() {
             <p className="text-2xl font-bold text-gray-900">{estimates.length}</p>
           </div>
           <div className="card text-center">
-            <p className="text-xs text-gray-500 mb-1">Bids Sold</p>
-            <p className="text-2xl font-bold text-green-700">{soldJobs.length}</p>
+            <p className="text-xs text-gray-500 mb-1">Bids</p>
+            <p className="text-2xl font-bold text-green-700">{bids.length}</p>
           </div>
           <div className="card text-center">
             <p className="text-xs text-gray-500 mb-1">Total Revenue</p>
@@ -407,31 +419,89 @@ export default function ClientDetail() {
           <div>
             <h2 className="font-bold text-gray-900 text-lg mb-3">Bids</h2>
 
-            {soldJobs.length === 0 ? (
+            {bids.length === 0 ? (
               <div className="card text-center py-6 text-gray-400 text-sm">
                 No bids yet for this client.
               </div>
             ) : (
               <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-                <table className="w-full text-sm min-w-[640px]">
+                <table className="w-full text-sm min-w-[500px]">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                      <th className="px-4 py-2.5 text-left">Bid Name</th>
+                      <th className="px-4 py-2.5 text-left">Bid</th>
+                      <th className="px-3 py-2.5 text-right">Date</th>
+                      <th className="px-3 py-2.5 text-right">Gross Profit</th>
+                      <th className="px-3 py-2.5 text-right">Bid Amount</th>
+                      <th className="px-3 py-2.5 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {bids.map(bid => {
+                      const status = bid.status || 'pending'
+                      return (
+                        <tr key={bid.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3">
+                            {bid.estimate_id ? (
+                              <Link to={`/estimates/${bid.estimate_id}`}
+                                className="font-semibold text-green-700 hover:underline">
+                                {bid.client_name}
+                              </Link>
+                            ) : (
+                              <p className="font-semibold text-gray-800">{bid.client_name}</p>
+                            )}
+                            {bid.projects && bid.projects.length > 0 && (
+                              <p className="text-xs text-gray-400 mt-0.5">{bid.projects.join(', ')}</p>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 text-right text-gray-500 text-xs whitespace-nowrap">
+                            {bid.date_submitted ? new Date(bid.date_submitted).toLocaleDateString() : '—'}
+                          </td>
+                          <td className="px-3 py-3 text-right font-medium text-green-700">
+                            {bid.gross_profit > 0 ? `$${Math.round(bid.gross_profit).toLocaleString()}` : '—'}
+                          </td>
+                          <td className="px-3 py-3 text-right font-bold text-gray-900 whitespace-nowrap">
+                            ${parseFloat(bid.bid_amount || 0).toLocaleString()}
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${BID_STATUS_STYLES[status] || BID_STATUS_STYLES.pending}`}>
+                              {status.charAt(0).toUpperCase() + status.slice(1)}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* ── Jobs ── */}
+          <div>
+            <h2 className="font-bold text-gray-900 text-lg mb-3">Jobs</h2>
+
+            {soldJobs.length === 0 ? (
+              <div className="card text-center py-6 text-gray-400 text-sm">
+                No jobs yet for this client.
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+                <table className="w-full text-sm min-w-[560px]">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      <th className="px-4 py-2.5 text-left">Job Name</th>
                       <th className="px-3 py-2.5 text-right">Sold Date</th>
                       <th className="px-3 py-2.5 text-right">Man Days</th>
                       <th className="px-3 py-2.5 text-right">Materials</th>
                       <th className="px-3 py-2.5 text-right">Gross Profit</th>
                       <th className="px-3 py-2.5 text-right">Total Price</th>
-                      <th className="px-3 py-2.5 text-center">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {soldJobs.map(job => (
                       <tr key={job.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3">
-                          <p className="font-semibold text-gray-800">{job.name}</p>
-                        </td>
-                        <td className="px-3 py-3 text-right text-gray-500 text-xs">
+                        <td className="px-4 py-3 font-semibold text-gray-800">{job.name}</td>
+                        <td className="px-3 py-3 text-right text-gray-500 text-xs whitespace-nowrap">
                           {job.sold_date ? new Date(job.sold_date).toLocaleDateString() : '—'}
                         </td>
                         <td className="px-3 py-3 text-right text-gray-700">
@@ -440,11 +510,6 @@ export default function ClientDetail() {
                         <td className="px-3 py-3 text-right text-gray-700">{fmt(job.material_cost)}</td>
                         <td className="px-3 py-3 text-right font-medium text-green-700">{fmt(job.gross_profit)}</td>
                         <td className="px-3 py-3 text-right font-bold text-gray-900">{fmt(job.total_price)}</td>
-                        <td className="px-3 py-3 text-center">
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_STYLES[job.status] || STATUS_STYLES.sold}`}>
-                            {job.status ? job.status.charAt(0).toUpperCase() + job.status.slice(1) : 'Sold'}
-                          </span>
-                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -458,27 +523,14 @@ export default function ClientDetail() {
                         <td className="px-3 py-2.5 text-right">
                           {fmt(soldJobs.reduce((s, j) => s + parseFloat(j.material_cost || 0), 0))}
                         </td>
-                        <td className="px-3 py-2.5 text-right text-green-700">
-                          {fmt(totalGP)}
-                        </td>
-                        <td className="px-3 py-2.5 text-right font-bold text-gray-900">
-                          {fmt(totalRevenue)}
-                        </td>
-                        <td />
+                        <td className="px-3 py-2.5 text-right text-green-700">{fmt(totalGP)}</td>
+                        <td className="px-3 py-2.5 text-right font-bold text-gray-900">{fmt(totalRevenue)}</td>
                       </tr>
                     </tfoot>
                   )}
                 </table>
               </div>
             )}
-          </div>
-
-          {/* ── Jobs ── */}
-          <div>
-            <h2 className="font-bold text-gray-900 text-lg mb-3">Jobs</h2>
-            <div className="bg-white rounded-xl border border-gray-200 border-dashed text-center py-8 text-gray-400 text-sm">
-              Jobs coming soon.
-            </div>
           </div>
 
           {/* ── Change Orders ── */}
