@@ -16,10 +16,10 @@ const REMINDERS  = ['None', '1 day before', '2 days before', '3 days before', '1
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const DAY_NAMES   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 
-const LANE_H    = 24
+const LANE_H    = 56   // tall enough for 3 lines of wrapped text
 const DAY_H     = 30
 const ROW_PAD   = 8
-const MIN_ROW_H = 160
+const MIN_ROW_H = 120
 
 // ── Date helpers ─────────────────────────────────────────────
 function daysInMonth(y, m) { return new Date(y, m + 1, 0).getDate() }
@@ -76,7 +76,7 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
       const e = new Date(item.end_date   + 'T00:00:00').getTime()
       return s <= weekMaxMs && e >= weekMinMs
     })
-    .sort((a, b) => new Date(a.start_date) - new Date(b.start_date))
+    .sort((a, b) => (a.title || '').localeCompare(b.title || ''))
 
   const itemInfo = {}
   const laneRanges = []
@@ -159,6 +159,11 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
             : isItemEnd   ? '0 4px 4px 0'
             : '0'
 
+          const clientName = jobMap[item.job_id] || ''
+          const displayText = clientName
+            ? `${item.title} (${clientName})`
+            : item.title
+
           return (
             <div
               key={item.id}
@@ -173,10 +178,10 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
                 borderRadius:    radius,
                 pointerEvents:   'auto',
               }}
-              className="flex items-center px-1.5 text-white text-[10px] font-medium cursor-pointer hover:opacity-80 overflow-hidden whitespace-nowrap"
-              title={item.title + (selectedJob === 'all' ? ` — ${jobMap[item.job_id] || ''}` : '')}
+              className="flex items-start px-1.5 pt-1 text-white text-[10px] font-medium cursor-pointer hover:opacity-80 overflow-hidden leading-tight"
+              title={displayText}
             >
-              {item.title}
+              <span className="break-words min-w-0">{displayText}</span>
             </div>
           )
         })}
