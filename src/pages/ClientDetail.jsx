@@ -337,23 +337,23 @@ export default function ClientDetail() {
           </div>
         </div>
 
-        {/* ── RIGHT: Bids + Jobs + Change Orders ── */}
+        {/* ── RIGHT: Estimates + Bids + Jobs + Change Orders ── */}
         <div className="flex-1 space-y-6 min-w-0">
 
-          {/* ── Bids ── */}
+          {/* ── Estimates ── */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h2 className="font-bold text-gray-900 text-lg">Bids</h2>
+              <h2 className="font-bold text-gray-900 text-lg">Estimates</h2>
               <button onClick={() => setShowEstimateModal(true)} className="btn-primary text-sm">
-                + New Bid
+                + New Estimate
               </button>
             </div>
 
             {estimates.length === 0 ? (
               <div className="card text-center py-8 text-gray-400">
-                <p className="mb-3">No bids yet for this client.</p>
+                <p className="mb-3">No estimates yet for this client.</p>
                 <button onClick={() => setShowEstimateModal(true)} className="btn-primary text-sm inline-block">
-                  Create First Bid
+                  Create First Estimate
                 </button>
               </div>
             ) : (
@@ -361,7 +361,7 @@ export default function ClientDetail() {
                 <table className="w-full text-sm min-w-[640px]">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                      <th className="px-4 py-2.5 text-left">Bid Name</th>
+                      <th className="px-4 py-2.5 text-left">Estimate</th>
                       <th className="px-3 py-2.5 text-right">Man Days</th>
                       <th className="px-3 py-2.5 text-right">Labor Burden</th>
                       <th className="px-3 py-2.5 text-right">Materials</th>
@@ -403,25 +403,26 @@ export default function ClientDetail() {
             )}
           </div>
 
-          {/* ── Jobs ── */}
+          {/* ── Bids ── */}
           <div>
-            <h2 className="font-bold text-gray-900 text-lg mb-3">Jobs</h2>
+            <h2 className="font-bold text-gray-900 text-lg mb-3">Bids</h2>
 
             {soldJobs.length === 0 ? (
               <div className="card text-center py-6 text-gray-400 text-sm">
-                No jobs yet for this client.
+                No bids yet for this client.
               </div>
             ) : (
               <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-                <table className="w-full text-sm min-w-[600px]">
+                <table className="w-full text-sm min-w-[640px]">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                      <th className="px-4 py-2.5 text-left">Job Name</th>
+                      <th className="px-4 py-2.5 text-left">Bid Name</th>
                       <th className="px-3 py-2.5 text-right">Sold Date</th>
                       <th className="px-3 py-2.5 text-right">Man Days</th>
                       <th className="px-3 py-2.5 text-right">Materials</th>
                       <th className="px-3 py-2.5 text-right">Gross Profit</th>
                       <th className="px-3 py-2.5 text-right">Total Price</th>
+                      <th className="px-3 py-2.5 text-center">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -439,6 +440,11 @@ export default function ClientDetail() {
                         <td className="px-3 py-3 text-right text-gray-700">{fmt(job.material_cost)}</td>
                         <td className="px-3 py-3 text-right font-medium text-green-700">{fmt(job.gross_profit)}</td>
                         <td className="px-3 py-3 text-right font-bold text-gray-900">{fmt(job.total_price)}</td>
+                        <td className="px-3 py-3 text-center">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_STYLES[job.status] || STATUS_STYLES.sold}`}>
+                            {job.status ? job.status.charAt(0).toUpperCase() + job.status.slice(1) : 'Sold'}
+                          </span>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -458,12 +464,21 @@ export default function ClientDetail() {
                         <td className="px-3 py-2.5 text-right font-bold text-gray-900">
                           {fmt(totalRevenue)}
                         </td>
+                        <td />
                       </tr>
                     </tfoot>
                   )}
                 </table>
               </div>
             )}
+          </div>
+
+          {/* ── Jobs ── */}
+          <div>
+            <h2 className="font-bold text-gray-900 text-lg mb-3">Jobs</h2>
+            <div className="bg-white rounded-xl border border-gray-200 border-dashed text-center py-8 text-gray-400 text-sm">
+              Jobs coming soon.
+            </div>
           </div>
 
           {/* ── Change Orders ── */}
