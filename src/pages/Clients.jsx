@@ -329,36 +329,36 @@ export default function Clients() {
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full text-left table-fixed">
+          <table className="table-fixed w-full text-xs">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 {activeCols.map(col => (
                   <th
                     key={col.key}
-                    className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide truncate"
+                    className="px-4 py-2 text-left font-semibold text-gray-600 uppercase truncate"
                     style={{ width: colWidth(col.key) }}
                   >
                     {col.label}
                   </th>
                 ))}
                 {/* Actions column */}
-                <th className="px-3 py-2 w-16" />
+                <th className="px-4 py-2 w-16" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map(client => (
-                <tr key={client.id} className="hover:bg-gray-50 transition-colors">
+                <tr key={client.id} className="hover:bg-gray-50 transition-colors cursor-pointer">
                   {activeCols.map(col => (
-                    <td key={col.key} className="px-3 py-1.5 min-w-0 max-w-0 overflow-hidden">
+                    <td key={col.key} className="px-4 py-2 min-w-0 max-w-0 overflow-hidden text-gray-600">
                       {cellContent(col, client)}
                     </td>
                   ))}
-                  <td className="px-3 py-1.5 w-16">
+                  <td className="px-4 py-2 w-16">
                     <div className="flex items-center justify-end gap-2">
-                      <Link to={`/clients/${client.id}`} className="text-xs text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                      <Link to={`/clients/${client.id}`} className="text-gray-500 hover:text-gray-700 whitespace-nowrap">
                         View →
                       </Link>
-                      <button onClick={() => deleteClient(client.id)} className="text-red-300 hover:text-red-500 text-xs">✕</button>
+                      <button onClick={() => deleteClient(client.id)} className="text-red-300 hover:text-red-500">✕</button>
                     </div>
                   </td>
                 </tr>
