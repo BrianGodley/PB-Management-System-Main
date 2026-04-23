@@ -9,8 +9,6 @@
 //   Paver - Sleeves          10 LF/hr
 //   Paver - Vertical Soldier  8 LF/hr
 //   Paver - Sealer          200 SF/hr
-//   Paver - Step Straight    1.5 LF/hr
-//   Paver - Step Curved      1.0 LF/hr
 //   Paver - 80mm Add         0.15 (multiplier × install SF / install rate)
 //   Paver - Stone Add        0.05 hrs/ea
 //   Paver - Color Add        0.05 hrs/ea
@@ -52,8 +50,6 @@ const LABOR_DEFAULTS = {
   sleeves:        10,
   vertSoldier:     8,
   sealer:        200,
-  stepStraight:   1.5,
-  stepCurved:     1.0,
   add80mm:        0.15,
   addStone:       0.05,
   addColor:       0.05,
@@ -90,8 +86,6 @@ function calcPaver(state, laborRatePerHour, laborRates, materialRates, paverPric
   const sleevesRate      = lr['Paver - Sleeves']          ?? LABOR_DEFAULTS.sleeves
   const vertSoldierRate  = lr['Paver - Vertical Soldier'] ?? LABOR_DEFAULTS.vertSoldier
   const sealerRate       = lr['Paver - Sealer']           ?? LABOR_DEFAULTS.sealer
-  const stepStraightRate = lr['Paver - Step Straight']    ?? LABOR_DEFAULTS.stepStraight
-  const stepCurvedRate   = lr['Paver - Step Curved']      ?? LABOR_DEFAULTS.stepCurved
   const add80mmMult      = lr['Paver - 80mm Add']         ?? LABOR_DEFAULTS.add80mm
   const addStonePer      = lr['Paver - Stone Add']        ?? LABOR_DEFAULTS.addStone
   const addColorPer      = lr['Paver - Color Add']        ?? LABOR_DEFAULTS.addColor
@@ -157,25 +151,13 @@ function calcPaver(state, laborRatePerHour, laborRates, materialRates, paverPric
   const addStoneHrs    = n(state.numStones) * addStonePer
   const addColorHrs    = n(state.numColors) * addColorPer
 
-  // ── Steps ────────────────────────────────────────────────────────────────────
-  const stepStraightHrs = n(state.stepStraightLF) > 0
-    ? n(state.stepStraightLF) / stepStraightRate : 0
-  const stepCurvedHrs   = n(state.stepCurvedLF) > 0
-    ? n(state.stepCurvedLF) / stepCurvedRate : 0
-  const stepPaverData   = pp.find(p => p.brand === state.stepPaverBrand && p.name === state.stepPaverName)
-  const stepPricePerSF  = stepPaverData?.price_per_sf  || 0
-  const stepSFPerPallet = stepPaverData?.sf_per_pallet || 0
-  const stepPaverSF     = n(state.stepPaverSF)
-  const stepPaverCost   = stepPaverSF * stepPricePerSF
-  const stepPallets     = stepPaverSF > 0 && stepSFPerPallet > 0
-    ? Math.ceil(stepPaverSF / stepSFPerPallet) : 0
 
   // ── Vertical soldier ─────────────────────────────────────────────────────────
   const vertPaverData  = pp.find(p => p.brand === state.vertPaverBrand && p.name === state.vertPaverName)
   const vertPricePerLF = vertPaverData?.price_per_lf_vert || 0
   const vertPaverCost  = n(state.vertSoldierLF) * vertPricePerLF
 
-  const totalPallets = totalAreaPallets + stepPallets
+  const totalPallets = totalAreaPallets
 
   // ── Manual rows ──────────────────────────────────────────────────────────────
   const manualRows = (state.manualRows || []).filter(r =>
@@ -190,7 +172,7 @@ function calcPaver(state, laborRatePerHour, laborRates, materialRates, paverPric
   const hrsAdj = n(state.hoursAdj)
   const rawInstallHrs = installHrs + add80mmHrs + straightCutHrs + curvedCutHrs +
     restraintsHrs + sleevesHrs + vertSoldierHrs + sealerHrs + polySandHrs +
-    addStoneHrs + addColorHrs + stepStraightHrs + stepCurvedHrs
+    addStoneHrs + addColorHrs
   const adjustedInstallHrs = rawInstallHrs * diff + hrsAdj
   const totalHrs = adjustedInstallHrs + totalBaseHrs + manualHrs
 
@@ -206,9 +188,9 @@ function calcPaver(state, laborRatePerHour, laborRates, materialRates, paverPric
   const deliveryCost     = state.includeDelivery ? deliveryFlat : 0
   const shipping         = n(state.shippingCharge)
   const salesTaxRate     = n(state.salesTax) / 100
-  const salesTaxCost     = (totalPaverCost + stepPaverCost + vertPaverCost) * salesTaxRate
+  const salesTaxCost     = (totalPaverCost + vertPaverCost) * salesTaxRate
 
-  const totalMat = totalPaverCost + stepPaverCost + vertPaverCost +
+  const totalMat = totalPaverCost + vertPaverCost +
     baseRockCost + beddingSandCost + jointSandCost + polySandCost +
     sealerMatCost + restraintMatCost + sleevesMatCost + palletCost +
     deliveryCost + shipping + salesTaxCost + manualMat
@@ -226,20 +208,20 @@ function calcPaver(state, laborRatePerHour, laborRates, materialRates, paverPric
   return {
     totalHrs, adjustedInstallHrs, totalBaseHrs, rawInstallHrs,
     manDays, laborCost, burden, totalMat, subCost, gp, commission, price,
-    areas, totalInstallSF, totalBaseTons, totalPallets, totalAreaPallets, stepPallets,
+    areas, totalInstallSF, totalBaseTons, totalPallets, totalAreaPallets,
     installHrs, add80mmHrs, straightCutHrs, curvedCutHrs,
     restraintsHrs, sleevesHrs, vertSoldierHrs, sealerHrs, polySandHrs,
-    addStoneHrs, addColorHrs, stepStraightHrs, stepCurvedHrs,
+    addStoneHrs, addColorHrs,
     baseRockCost, beddingSandCost, jointSandCost, polySandCost,
     sealerMatCost, restraintMatCost, sleevesMatCost, palletCost,
-    deliveryCost, shipping, salesTaxCost, totalPaverCost, stepPaverCost, vertPaverCost,
+    deliveryCost, shipping, salesTaxCost, totalPaverCost, vertPaverCost,
     manualHrs, manualMat, manualSub,
     installRate, straightCutRate, curvedCutRate, restraintRate,
-    sleevesRate, vertSoldierRate, sealerRate, stepStraightRate, stepCurvedRate,
+    sleevesRate, vertSoldierRate, sealerRate,
     baseBobcatGood, baseBobcatOK, baseMiniBobcat, baseHand,
     baseRockPerTon, beddingSandPerTon, jointSandPerSF, polySandPerSF,
     sealerMatPerSF, restraintConcrLF, sleevesMatLF, palletCharge, deliveryFlat,
-    stepPricePerSF, stepPaverSF, vertPricePerLF,
+    vertPricePerLF,
   }
 }
 
@@ -265,11 +247,6 @@ const DEFAULT_STATE = {
   is80mm: false,
   polySand: false,
   includeDelivery: false,
-  stepStraightLF: '',
-  stepCurvedLF: '',
-  stepPaverBrand: '',
-  stepPaverName: '',
-  stepPaverSF: '',
   salesTax: 0,
   shippingCharge: '',
   manualRows: [
@@ -729,43 +706,6 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         </div>
       </div>
 
-      {/* ── Steps ─────────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <SecHdr
-          title="Paver Steps"
-          sub={`straight ${calc.stepStraightRate} LF/hr · curved ${calc.stepCurvedRate} LF/hr`}
-        />
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">Straight Steps (LF)</p>
-          <Inp value={state.stepStraightLF} onChange={e => set('stepStraightLF', e.target.value)} />
-          {calc.stepStraightHrs > 0 && <p className="text-xs text-gray-400 mt-0.5">{calc.stepStraightHrs.toFixed(2)} hrs</p>}
-        </div>
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">Curved Steps (LF)</p>
-          <Inp value={state.stepCurvedLF} onChange={e => set('stepCurvedLF', e.target.value)} />
-          {calc.stepCurvedHrs > 0 && <p className="text-xs text-gray-400 mt-0.5">{calc.stepCurvedHrs.toFixed(2)} hrs</p>}
-        </div>
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">Step Paver SF (for cost)</p>
-          <Inp value={state.stepPaverSF} onChange={e => set('stepPaverSF', e.target.value)} />
-          {calc.stepPallets > 0 && <p className="text-xs text-gray-400 mt-0.5">{calc.stepPallets} pallet{calc.stepPallets !== 1 ? 's' : ''}</p>}
-        </div>
-        <div className="sm:col-span-1">
-          <p className="text-xs text-gray-500 mb-0.5">Step Paver Selection</p>
-          <PaverPicker
-            brand={state.stepPaverBrand}
-            name={state.stepPaverName}
-            onSelect={(b, nm) => { set('stepPaverBrand', b); set('stepPaverName', nm) }}
-            paverPrices={paverPrices}
-          />
-          {calc.stepPaverCost > 0 && (
-            <p className="text-xs text-gray-400 mt-0.5">
-              {calc.stepPaverSF} SF × {fmt2(calc.stepPricePerSF)}/SF = {fmt2(calc.stepPaverCost)}
-            </p>
-          )}
-        </div>
-      </div>
-
       {/* ── Material Options ──────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <SecHdr title="Material Options" />
@@ -793,7 +733,6 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           <p className="font-semibold text-gray-600 uppercase tracking-wide text-xs mb-2">Materials Breakdown</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-gray-600">
             {calc.totalPaverCost    > 0 && <span>Paver Material: <strong>{fmt2(calc.totalPaverCost)}</strong></span>}
-            {calc.stepPaverCost     > 0 && <span>Step Pavers: <strong>{fmt2(calc.stepPaverCost)}</strong></span>}
             {calc.vertPaverCost     > 0 && <span>Vert Soldier: <strong>{fmt2(calc.vertPaverCost)}</strong></span>}
             {calc.baseRockCost      > 0 && <span>Base Rock ({calc.totalBaseTons.toFixed(1)}T): <strong>{fmt2(calc.baseRockCost)}</strong></span>}
             {calc.beddingSandCost   > 0 && <span>Bedding Sand: <strong>{fmt2(calc.beddingSandCost)}</strong></span>}

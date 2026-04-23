@@ -39,6 +39,8 @@ import WallsModule              from '../components/modules/WallsModule'
 import WallsSummary             from '../components/modules/WallsSummary'
 import FinishesModule           from '../components/modules/FinishesModule'
 import FinishesSummary          from '../components/modules/FinishesSummary'
+import StepsModule              from '../components/modules/StepsModule'
+import StepsSummary             from '../components/modules/StepsSummary'
 import GpmdBar                  from '../components/modules/GpmdBar'
 
 const MODULE_TYPES = [
@@ -1005,6 +1007,8 @@ export default function EstimateDetail() {
                   <WallsSummary module={selectedModule} />
                 ) : selectedModule.module_type === 'Finishes' ? (
                   <FinishesSummary module={selectedModule} />
+                ) : selectedModule.module_type === 'Steps' ? (
+                  <StepsSummary module={selectedModule} />
                 ) : selectedModule.module_type === 'Pool' ? (
                   <PoolSummary module={selectedModule} />
                 ) : (
@@ -1098,7 +1102,7 @@ export default function EstimateDetail() {
           <div className="absolute inset-0 bg-black/40" onClick={closeModuleFlow} />
 
           {/* Wide scrollable modal for module-specific forms */}
-          {(selectedType === 'Drainage' || selectedType === 'Lighting' || selectedType === 'Skid Steer Demo' || selectedType === 'Mini Skid Steer Demo' || selectedType === 'Concrete' || selectedType === 'Hand Demo' || selectedType === 'Irrigation' || selectedType === 'Artificial Turf' || selectedType === 'Pavers' || selectedType === 'Planting' || selectedType === 'Pool' || selectedType === 'Utilities' || selectedType === 'Columns' || selectedType === 'Ground Treatments' || selectedType === 'Outdoor Kitchen' || selectedType === 'Fire Pit' || selectedType === 'Walls' || selectedType === 'Finishes') ? (
+          {(selectedType === 'Drainage' || selectedType === 'Lighting' || selectedType === 'Skid Steer Demo' || selectedType === 'Mini Skid Steer Demo' || selectedType === 'Concrete' || selectedType === 'Hand Demo' || selectedType === 'Irrigation' || selectedType === 'Artificial Turf' || selectedType === 'Pavers' || selectedType === 'Planting' || selectedType === 'Pool' || selectedType === 'Utilities' || selectedType === 'Columns' || selectedType === 'Ground Treatments' || selectedType === 'Outdoor Kitchen' || selectedType === 'Fire Pit' || selectedType === 'Walls' || selectedType === 'Finishes' || selectedType === 'Steps') ? (
             <div className={`relative bg-white rounded-2xl shadow-xl w-full mx-4 flex flex-col ${selectedType === 'Pavers' || selectedType === 'Pool' ? 'max-w-6xl' : 'max-w-5xl'}`}
                  style={{ maxHeight: '90vh' }}>
               <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-gray-200">
@@ -1255,6 +1259,15 @@ export default function EstimateDetail() {
                 )}
                 {selectedType === 'Finishes' && (
                   <FinishesModule
+                    projectName={selectedProject?.project_name}
+                    onSave={editingModule ? updateModule : saveModule}
+                    onBack={editingModule ? closeModuleFlow : () => setSelectedType(null)}
+                    saving={savingModule}
+                    initialData={moduleInitialData}
+                  />
+                )}
+                {selectedType === 'Steps' && (
+                  <StepsModule
                     projectName={selectedProject?.project_name}
                     onSave={editingModule ? updateModule : saveModule}
                     onBack={editingModule ? closeModuleFlow : () => setSelectedType(null)}
