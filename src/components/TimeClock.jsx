@@ -151,6 +151,15 @@ export default function TimeClock({ jobs = [], selectedJob }) {
     setEntries(prev => prev.filter(e => e.id !== entry.id))
   }
 
+  async function clockOut(entry) {
+    const now = new Date()
+    const timeOut = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
+    await supabase.from('time_entries')
+      .update({ time_out: timeOut, updated_at: new Date().toISOString() })
+      .eq('id', entry.id)
+    fetchEntries()
+  }
+
   // Group by date for mobile cards
   const grouped = entries.reduce((acc, e) => {
     if (!acc[e.date]) acc[e.date] = []
@@ -193,48 +202,93 @@ export default function TimeClock({ jobs = [], selectedJob }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
-                  {['Date', 'Name', 'Time In', 'Time Out', 'Regular', 'OT', 'Total', 'Job', ''].map(h => (
-                    <th key={h} className={`px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide ${
-                      ['Regular','OT','Total'].includes(h) ? 'text-right' : 'text-left'
-                    }`}>{h}</th>
-                  ))}
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left">Date</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left">Employee</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left">Job</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left">Time In</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left">Time Out</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right">Total</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right">Overtime</th>
+                  <th className="px-4 py-3 w-16" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 bg-white">
                 {entries.map((entry, idx) => {
-                  const { total, regular, ot } = calcTimes(entry.time_in, entry.time_out)
+                  const { total, ot } = calcTimes(entry.time_in, entry.time_out)
                   const showDate = idx === 0 || entries[idx - 1].date !== entry.date
+                  const isClockedIn = !entry.time_out
                   return (
-                    <tr key={entry.id} className="hover:bg-gray-50 transition-colors group">
+                    <tr key={entry.id} className={`transition-colors group ${isClockedIn ? 'bg-green-50/40' : 'hover:bg-gray-50'}`}>
+
+                      {/* Date */}
                       <td className="px-4 py-3 whitespace-nowrap">
                         {showDate
                           ? <span className="text-blue-600 font-medium text-xs">{fmtDateLabel(entry.date)}</span>
-                          : null}
+                          : <span className="text-gray-200 text-xs select-none">″</span>}
                       </td>
-                      <td className="px-4 py-3 font-medium text-gray-800">{entry.employee_name}</td>
-                      <td className="px-4 py-3 text-gray-600">{fmt12h(entry.time_in)}</td>
-                      <td className="px-4 py-3 text-gray-600">{fmt12h(entry.time_out)}</td>
-                      <td className="px-4 py-3 text-right font-mono text-gray-700">{fmtMins(regular)}</td>
-                      <td className="px-4 py-3 text-right font-mono">
-                        <span className={ot > 0 ? 'text-orange-600 font-semibold' : 'text-gray-300'}>
-                          {ot > 0 ? fmtMins(ot) : '—'}
-                        </span>
+
+                      {/* Employee */}
+                      <td className="px-4 py-3 font-medium text-gray-800">
+                        {entry.employee_name}
+                        {isClockedIn && (
+                          <span className="ml-2 text-[10px] font-semibold text-green-700 bg-green-100 px-1.5 py-0.5 rounded-full">
+                            Active
+                          </span>
+                        )}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono font-semibold text-gray-800">{fmtMins(total)}</td>
-                      <td className="px-4 py-3 text-gray-500 max-w-[200px] truncate">
+
+                      {/* Job */}
+                      <td className="px-4 py-3 text-gray-500 max-w-[180px] truncate">
                         {jobMap[entry.job_id] || <span className="text-gray-300 italic text-xs">No job</span>}
                       </td>
+
+                      {/* Time In */}
+                      <td className="px-4 py-3 text-gray-700 font-mono text-sm">{fmt12h(entry.time_in)}</td>
+
+                      {/* Time Out — or Clock Out link */}
+                      <td className="px-4 py-3">
+                        {isClockedIn ? (
+                          <button
+                            onClick={() => clockOut(entry)}
+                            className="text-xs font-semibold text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 border border-red-200 rounded-md px-2.5 py-1 transition-colors"
+                          >
+                            Clock Out
+                          </button>
+                        ) : (
+                          <span className="text-gray-700 font-mono text-sm">{fmt12h(entry.time_out)}</span>
+                        )}
+                      </td>
+
+                      {/* Total */}
+                      <td className="px-4 py-3 text-right font-mono font-semibold text-gray-800">
+                        {isClockedIn ? <span className="text-gray-300">—</span> : fmtMins(total)}
+                      </td>
+
+                      {/* Overtime */}
+                      <td className="px-4 py-3 text-right font-mono">
+                        {isClockedIn ? (
+                          <span className="text-gray-300">—</span>
+                        ) : ot > 0 ? (
+                          <span className="text-orange-600 font-semibold">{fmtMins(ot)}</span>
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
+                      </td>
+
+                      {/* Actions */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                           <button onClick={() => openEdit(entry)}
-                            className="p-1.5 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-700">
+                            className="p-1.5 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-700"
+                            title="Edit">
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                 d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 0l.172.172a2 2 0 010 2.828L12 16H9v-3z" />
                             </svg>
                           </button>
                           <button onClick={() => deleteEntry(entry)}
-                            className="p-1.5 rounded hover:bg-red-100 text-gray-400 hover:text-red-500">
+                            className="p-1.5 rounded hover:bg-red-100 text-gray-400 hover:text-red-500"
+                            title="Delete">
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                 d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
