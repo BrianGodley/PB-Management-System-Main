@@ -9,6 +9,15 @@ const STATUS_STYLES = {
   lost:    'bg-red-100    text-red-800',
 }
 
+// Display name: "Last, First" when available, else legacy name field
+function displayName(c) {
+  if (!c) return ''
+  if (c.last_name || c.first_name) {
+    return [c.last_name, c.first_name].filter(Boolean).join(', ')
+  }
+  return c.name || ''
+}
+
 export default function ClientDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -77,19 +86,25 @@ export default function ClientDetail() {
   async function handleSave(e) {
     e.preventDefault()
     setSaving(true)
+    const combined = [form.first_name?.trim(), form.last_name?.trim()].filter(Boolean).join(' ')
     const { error } = await supabase.from('clients').update({
-      name:   form.name?.trim(),
-      email:  form.email?.trim(),
-      phone:  form.phone?.trim(),
-      street: form.street?.trim(),
-      city:   form.city?.trim(),
-      state:  form.state,
-      zip:    form.zip?.trim(),
-      notes:  form.notes?.trim(),
+      first_name:       form.first_name?.trim()       || null,
+      last_name:        form.last_name?.trim()        || null,
+      name:             combined || form.name?.trim(),   // keep for backward compat
+      company_name:     form.company_name?.trim()     || null,
+      company_position: form.company_position?.trim() || null,
+      email:            form.email?.trim()            || null,
+      phone:            form.phone?.trim()            || null,
+      street:           form.street?.trim()           || null,
+      city:             form.city?.trim()             || null,
+      state:            form.state                    || null,
+      zip:              form.zip?.trim()              || null,
+      notes:            form.notes?.trim()            || null,
     }).eq('id', id)
     setSaving(false)
     if (!error) {
-      setClient({ ...client, ...form })
+      const updated = { ...client, ...form, name: combined || form.name?.trim() }
+      setClient(updated)
       setEditing(false)
     }
   }
@@ -160,7 +175,7 @@ export default function ClientDetail() {
       <div className="flex items-center gap-2 mb-5 text-sm">
         <Link to="/clients" className="text-gray-400 hover:text-gray-600">← Clients</Link>
         <span className="text-gray-300">/</span>
-        <span className="text-gray-700 font-medium">{client.name}</span>
+        <span className="text-gray-700 font-medium">{displayName(client) || client.name}</span>
       </div>
 
       {/* ── Client Info Card — full width ── */}
@@ -168,10 +183,17 @@ export default function ClientDetail() {
         <div className="flex items-start justify-between gap-4 mb-4">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-xl font-bold text-green-700 flex-shrink-0">
-              {client.name?.[0]?.toUpperCase()}
+              {(client.last_name || client.first_name || client.name || '?')[0].toUpperCase()}
             </div>
             {!editing && (
-              <h2 className="text-xl font-bold text-gray-900">{client.name}</h2>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">{displayName(client) || client.name}</h2>
+                {client.company_name && (
+                  <p className="text-sm text-gray-500 mt-0.5">
+                    {client.company_name}{client.company_position ? ` · ${client.company_position}` : ''}
+                  </p>
+                )}
+              </div>
             )}
           </div>
           <div className="flex gap-2 flex-shrink-0">
@@ -189,10 +211,32 @@ export default function ClientDetail() {
 
         {editing ? (
           <form onSubmit={handleSave} className="grid grid-cols-2 md:grid-cols-3 gap-3">
+
+            {/* Name row */}
             <div>
-              <label className="label text-xs">Name</label>
-              <input className="input text-sm" value={form.name || ''} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} required />
+              <label className="label text-xs">First Name</label>
+              <input className="input text-sm" value={form.first_name || ''} onChange={e => setForm(p => ({ ...p, first_name: e.target.value }))} placeholder="First name" />
             </div>
+            <div>
+              <label className="label text-xs">Last Name *</label>
+              <input className="input text-sm" value={form.last_name || ''} onChange={e => setForm(p => ({ ...p, last_name: e.target.value }))} placeholder="Last name" required />
+            </div>
+            <div>
+              {/* spacer on md+ so company row starts fresh */}
+            </div>
+
+            {/* Company row */}
+            <div>
+              <label className="label text-xs">Company Name</label>
+              <input className="input text-sm" value={form.company_name || ''} onChange={e => setForm(p => ({ ...p, company_name: e.target.value }))} placeholder="Company or organization" />
+            </div>
+            <div>
+              <label className="label text-xs">Company Position</label>
+              <input className="input text-sm" value={form.company_position || ''} onChange={e => setForm(p => ({ ...p, company_position: e.target.value }))} placeholder="Title or role" />
+            </div>
+            <div />
+
+            {/* Contact row */}
             <div>
               <label className="label text-xs">Email</label>
               <input className="input text-sm" type="email" value={form.email || ''} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} />
@@ -201,6 +245,9 @@ export default function ClientDetail() {
               <label className="label text-xs">Phone</label>
               <input className="input text-sm" value={form.phone || ''} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} />
             </div>
+            <div />
+
+            {/* Address */}
             <div>
               <label className="label text-xs">Street</label>
               <input className="input text-sm" value={form.street || ''} onChange={e => setForm(p => ({ ...p, street: e.target.value }))} />
@@ -222,10 +269,13 @@ export default function ClientDetail() {
                 <input className="input text-sm" value={form.zip || ''} onChange={e => setForm(p => ({ ...p, zip: e.target.value }))} />
               </div>
             </div>
+
+            {/* Notes */}
             <div className="col-span-2 md:col-span-3">
               <label className="label text-xs">Notes</label>
               <textarea className="input text-sm resize-none" rows={2} value={form.notes || ''} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} />
             </div>
+
             <div className="col-span-2 md:col-span-3">
               <button type="submit" disabled={saving} className="btn-primary text-sm">
                 {saving ? 'Saving...' : 'Save Changes'}
