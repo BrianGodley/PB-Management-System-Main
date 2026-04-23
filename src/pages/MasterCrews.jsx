@@ -32,7 +32,7 @@ function empLabel(emp) {
 }
 
 // ── Crew Form Modal ───────────────────────────────────────────────────────────
-function CrewModal({ crew, employees, usedLabels, onClose, onSave }) {
+function CrewModal({ crew, employees, usedLabels, onClose, onSave, onDelete }) {
   const isNew = !crew?.id
 
   // Next available label for new crews
@@ -101,7 +101,7 @@ function CrewModal({ crew, employees, usedLabels, onClose, onSave }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
          onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col"
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col"
            style={{ maxHeight: '92vh' }}>
 
         {/* Header */}
@@ -252,83 +252,63 @@ function CrewModal({ crew, employees, usedLabels, onClose, onSave }) {
             className="px-4 py-2 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">
             Cancel
           </button>
+          {!isNew && onDelete && (
+            <button onClick={() => onDelete(crew)}
+              className="px-4 py-2 text-sm rounded-lg border border-red-200 text-red-500 hover:bg-red-50 hover:border-red-300 transition-colors">
+              Delete
+            </button>
+          )}
         </div>
       </div>
     </div>
   )
 }
 
-// ── Crew Card ─────────────────────────────────────────────────────────────────
-function CrewCard({ crew, employees, onEdit, onDelete }) {
-  const empById = id => employees.find(e => e.id === id)
-
-  const chief    = empById(crew.crew_chief_id)
-  const journey  = empById(crew.journeyman_id)
-  const laborers = [crew.laborer_1_id, crew.laborer_2_id, crew.laborer_3_id]
-    .filter(Boolean)
-    .map(id => empById(id))
-    .filter(Boolean)
+// ── Crew Table Row ────────────────────────────────────────────────────────────
+function CrewRow({ crew, employees, onClick }) {
+  const empById  = id => employees.find(e => e.id === id)
+  const empShort = id => { const e = empById(id); return e ? `${e.first_name} ${e.last_name}` : '—' }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4 hover:border-green-300 transition-colors">
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-green-700 text-white flex items-center justify-center text-lg font-bold flex-shrink-0">
-            {crew.label}
-          </div>
-          <div>
-            <p className="font-semibold text-gray-900 text-sm">
-              {chief ? empName(chief) : <span className="text-gray-400">No chief</span>}
-            </p>
-            <p className="text-xs text-gray-400">Crew Chief</p>
-          </div>
+    <tr onClick={onClick}
+      className="hover:bg-green-50 cursor-pointer transition-colors border-b border-gray-100">
+      {/* Label */}
+      <td className="px-4 py-3 w-16">
+        <div className="w-9 h-9 rounded-lg bg-green-700 text-white flex items-center justify-center text-sm font-bold">
+          {crew.label}
         </div>
-        <div className="flex gap-1.5">
-          <button onClick={() => onEdit(crew)}
-            className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors">
-            Edit
-          </button>
-          <button onClick={() => onDelete(crew)}
-            className="text-xs px-2.5 py-1 rounded-lg border border-red-100 text-red-400 hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition-colors">
-            Delete
-          </button>
-        </div>
-      </div>
-
-      {/* Members */}
-      <div className="space-y-1 mb-3">
-        {journey && (
-          <div className="flex items-center gap-2 text-xs text-gray-600">
-            <span className="text-gray-400 w-20 shrink-0">Journeyman</span>
-            <span>{empName(journey)}</span>
-          </div>
-        )}
-        {laborers.map((lab, i) => (
-          <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
-            <span className="text-gray-400 w-20 shrink-0">Laborer {i + 1}</span>
-            <span>{empName(lab)}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Skill badges */}
-      {crew.skills?.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {crew.skills.map(s => (
-            <span key={s.type}
-              className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border font-medium ${SKILL_COLORS[s.type] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-              {s.type}
-              <span className={`w-2 h-2 rounded-full inline-block ${LEVEL_DOT[s.level]}`} />
-              <span className="font-normal opacity-75">Lv{s.level}</span>
-            </span>
-          ))}
-        </div>
-      )}
-
-      {crew.notes && (
-        <p className="text-xs text-gray-400 mt-2 italic truncate">{crew.notes}</p>
-      )}
-    </div>
+      </td>
+      {/* Chief */}
+      <td className="px-4 py-3 text-sm font-medium text-green-700 hover:underline whitespace-nowrap">
+        {empById(crew.crew_chief_id) ? empShort(crew.crew_chief_id) : <span className="text-gray-300 italic font-normal">None</span>}
+      </td>
+      {/* Journeyman */}
+      <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
+        {crew.journeyman_id ? empShort(crew.journeyman_id) : <span className="text-gray-300">—</span>}
+      </td>
+      {/* Laborers */}
+      {[crew.laborer_1_id, crew.laborer_2_id, crew.laborer_3_id].map((id, i) => (
+        <td key={i} className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
+          {id ? empShort(id) : <span className="text-gray-300">—</span>}
+        </td>
+      ))}
+      {/* Skill columns */}
+      {SKILL_TYPES.map(type => {
+        const skill = (crew.skills || []).find(s => s.type === type)
+        return (
+          <td key={type} className="px-4 py-3 text-center">
+            {skill ? (
+              <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border font-medium ${SKILL_COLORS[type]}`}>
+                <span className={`w-2 h-2 rounded-full ${LEVEL_DOT[skill.level]}`} />
+                Lv{skill.level}
+              </span>
+            ) : (
+              <span className="text-gray-200 text-xs">—</span>
+            )}
+          </td>
+        )
+      })}
+    </tr>
   )
 }
 
@@ -434,16 +414,32 @@ export default function MasterCrews() {
                   <p className="text-sm mt-1">Click + New Crew to build your first crew.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {sortedCrews.map(crew => (
-                    <CrewCard
-                      key={crew.id}
-                      crew={crew}
-                      employees={employees}
-                      onEdit={c => setModal(c)}
-                      onDelete={handleDeleteCrew}
-                    />
-                  ))}
+                <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        <th className="px-4 py-2.5 text-left w-16">Crew</th>
+                        <th className="px-4 py-2.5 text-left">Crew Chief</th>
+                        <th className="px-4 py-2.5 text-left">Journeyman</th>
+                        <th className="px-4 py-2.5 text-left">Laborer 1</th>
+                        <th className="px-4 py-2.5 text-left">Laborer 2</th>
+                        <th className="px-4 py-2.5 text-left">Laborer 3</th>
+                        {SKILL_TYPES.map(t => (
+                          <th key={t} className="px-4 py-2.5 text-center">{t}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedCrews.map(crew => (
+                        <CrewRow
+                          key={crew.id}
+                          crew={crew}
+                          employees={employees}
+                          onClick={() => setModal(crew)}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
@@ -534,6 +530,12 @@ export default function MasterCrews() {
           usedLabels={modal === 'new' ? usedLabels : usedLabels.filter(l => l !== modal?.label)}
           onClose={() => setModal(null)}
           onSave={handleCrewSaved}
+          onDelete={async crew => {
+            if (!confirm(`Delete Crew ${crew.label}? This cannot be undone.`)) return
+            await supabase.from('crews').delete().eq('id', crew.id)
+            setCrews(prev => prev.filter(c => c.id !== crew.id))
+            setModal(null)
+          }}
         />
       )}
     </div>
