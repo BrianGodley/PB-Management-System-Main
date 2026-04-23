@@ -718,7 +718,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
                       primary: s.company_name,
                       secondary: s.divisions?.join(' · ') || '',
                       searchText: `${s.company_name} ${(s.divisions||[]).join(' ')}`.toLowerCase(),
-                      autoTitle: s.company_name,
+                      autoTitle: `S - ${s.company_name}`,
                     }))}
                     selectedId={form.sub_id}
                     onSelect={opt => {
