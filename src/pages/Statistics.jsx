@@ -2967,7 +2967,8 @@ export default function Statistics() {
         <h1 className="text-xl font-bold text-gray-900 flex-shrink-0">Statistics</h1>
         {viewMode === 'graphs' && selectedStat && (
           <>
-            <div className="w-px h-5 bg-gray-300 mx-1 flex-shrink-0" />
+            {/* Spacer sized to push edit links flush with the left-panel / right-panel divider */}
+            <div className="w-32 xl:w-40 flex-shrink-0" />
             <button
               onClick={() => {
                 if (selectedStat?.tracking === 'weekly' && weekEndingDay === null) {
@@ -3210,6 +3211,7 @@ export default function Statistics() {
                     )
                   })}
                 </div>
+                <div className="w-24 flex-shrink-0" />
                 <div className="flex items-center gap-1">
                   <span className="text-xs text-gray-500 font-medium">FROM</span>
                   <input
