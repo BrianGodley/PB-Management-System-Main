@@ -271,6 +271,10 @@ export default function JobsList() {
           job={jobModal}
           onClose={() => setJobModal(null)}
           onSaveName={updateJobName}
+          onDelete={async (id, name) => {
+            await deleteJob(id, name)
+            setJobModal(null)
+          }}
         />
       )}
     </div>
@@ -346,7 +350,7 @@ function ComingSoon({ label }) {
 }
 
 // ── Job Info / Edit Modal ─────────────────────────────────────
-function JobInfoModal({ job, onClose, onSaveName }) {
+function JobInfoModal({ job, onClose, onSaveName, onDelete }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft]     = useState(job.name || job.client_name || '')
   const [saving, setSaving]   = useState(false)
@@ -474,6 +478,12 @@ function JobInfoModal({ job, onClose, onSaveName }) {
               </button>
               <button onClick={onClose} className="px-4 py-2 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">
                 Close
+              </button>
+              <button
+                onClick={() => onDelete(job.id, job.name || job.client_name)}
+                className="px-4 py-2 text-sm rounded-lg border border-red-200 text-red-500 hover:bg-red-50 hover:border-red-300 transition-colors"
+              >
+                Delete
               </button>
             </>
           )}
