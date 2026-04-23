@@ -17,7 +17,7 @@ const REMINDERS  = ['None', '1 day before', '2 days before', '3 days before', '1
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const DAY_NAMES   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 
-const LANE_H    = 68   // tall enough for 3 lines of wrapped text at larger font
+const LANE_H    = 28   // base single-line height; bars grow taller when text wraps
 const DAY_H     = 30
 const ROW_PAD   = 8
 const MIN_ROW_H = 120
