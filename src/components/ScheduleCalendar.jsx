@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { COLOR_PALETTE } from '../pages/JobsList'
 
 // ── Constants ────────────────────────────────────────────────
 const COLORS = [
@@ -56,7 +57,7 @@ function fmtDate(ds) {
 }
 
 const EMPTY_FORM = {
-  title: '', display_color: '#15803d', assignees: '',
+  title: '', display_color: '#15803d', assignee_color: '', assignees: '',
   start_date: '', end_date: '', work_days: '', progress: 0, reminder: 'None', notes: '',
   crew_id: '', sub_id: '',
 }
@@ -178,9 +179,13 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
                 borderRadius:    radius,
                 pointerEvents:   'auto',
               }}
-              className="flex items-start px-1.5 pt-1 text-white text-[10px] font-medium cursor-pointer hover:opacity-80 overflow-hidden leading-tight"
+              className="flex items-start gap-1 px-1.5 pt-1 text-white text-[10px] font-medium cursor-pointer hover:opacity-80 overflow-hidden leading-tight"
               title={displayText}
             >
+              {item.assignee_color && (
+                <span className="flex-shrink-0 w-3 h-3 rounded-full border border-white/40 mt-0.5"
+                      style={{ backgroundColor: item.assignee_color }} />
+              )}
               <span className="break-words min-w-0">{displayText}</span>
             </div>
           )
@@ -308,12 +313,16 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
   const [form,        setForm]        = useState(EMPTY_FORM)
   const [modalJobId,  setModalJobId]  = useState(null)
   const [saving,      setSaving]      = useState(false)
-  const [entryMode,   setEntryMode]   = useState('custom') // 'crew' | 'sub' | 'custom'
-  const [crews,       setCrews]       = useState([])
-  const [employees,   setEmployees]   = useState([])
-  const [subs,        setSubs]        = useState([])
+  const [entryMode,          setEntryMode]          = useState('custom')
+  const [crews,              setCrews]              = useState([])
+  const [employees,          setEmployees]          = useState([])
+  const [subs,               setSubs]               = useState([])
+  const [defaultSchedColor,  setDefaultSchedColor]  = useState('#15803d')
 
-  // Fetch crews, employees, subs once for the modal
+  // crew color lookup: { crewId: hexColor }
+  const crewColorMap = Object.fromEntries(crews.map(c => [c.id, c.color || '#15803d']))
+
+  // Fetch crews, employees, subs + default schedule color on mount
   useEffect(() => {
     supabase.from('crews').select('*').order('label')
       .then(({ data }) => { if (data) setCrews(data) })
@@ -323,6 +332,8 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
     supabase.from('subs_vendors').select('id, company_name, divisions, status')
       .eq('type', 'sub').order('company_name')
       .then(({ data }) => { if (data) setSubs(data) })
+    supabase.from('company_settings').select('value').eq('key', 'default_schedule_color').single()
+      .then(({ data }) => { if (data?.value) setDefaultSchedColor(data.value) })
   }, [])
 
   useEffect(() => { fetchItems() }, [year, month, selectedJob])
@@ -359,7 +370,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
   function handleDayClick(day) {
     const ds = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
     setClickedDate(ds)
-    setForm({ ...EMPTY_FORM, start_date: ds, end_date: ds, work_days: 1 })
+    setForm({ ...EMPTY_FORM, display_color: defaultSchedColor, start_date: ds, end_date: ds, work_days: 1 })
     setEditItem(null)
     if (selectedJob === 'all') {
       setModalJobId(null); setPhase('job-select')
@@ -371,7 +382,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
   function handleAddNew() {
     const ds = dateStr(today)
     setClickedDate(ds)
-    setForm({ ...EMPTY_FORM, start_date: ds, end_date: ds, work_days: 1 })
+    setForm({ ...EMPTY_FORM, display_color: defaultSchedColor, start_date: ds, end_date: ds, work_days: 1 })
     setEditItem(null)
     if (selectedJob === 'all') {
       setModalJobId(null); setPhase('job-select')
@@ -387,17 +398,18 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
     const mode = item.crew_id ? 'crew' : item.sub_id ? 'sub' : 'custom'
     setEntryMode(mode)
     setForm({
-      title:         item.title         || '',
-      display_color: item.display_color || '#15803d',
-      assignees:     item.assignees     || '',
-      start_date:    item.start_date    || '',
-      end_date:      item.end_date      || '',
-      work_days:     item.work_days     ?? '',
-      progress:      item.progress      ?? 0,
-      reminder:      item.reminder      || 'None',
-      notes:         item.notes         || '',
-      crew_id:       item.crew_id       || '',
-      sub_id:        item.sub_id        || '',
+      title:          item.title          || '',
+      display_color:  item.display_color  || defaultSchedColor,
+      assignee_color: item.assignee_color || '',
+      assignees:      item.assignees      || '',
+      start_date:     item.start_date     || '',
+      end_date:       item.end_date       || '',
+      work_days:      item.work_days      ?? '',
+      progress:       item.progress       ?? 0,
+      reminder:       item.reminder       || 'None',
+      notes:          item.notes          || '',
+      crew_id:        item.crew_id        || '',
+      sub_id:         item.sub_id         || '',
     })
     setPhase('details')
   }
@@ -436,8 +448,9 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
       progress:      +form.progress  || 0,
       reminder:      form.reminder,
       notes:         form.notes,
-      crew_id:       entryMode === 'crew' ? (form.crew_id || null) : null,
-      sub_id:        entryMode === 'sub'  ? (form.sub_id  || null) : null,
+      crew_id:        entryMode === 'crew' ? (form.crew_id || null) : null,
+      sub_id:         entryMode === 'sub'  ? (form.sub_id  || null) : null,
+      assignee_color: form.assignee_color || null,
     }
     const { error } = editItem
       ? await supabase.from('schedule_items').update(payload).eq('id', editItem.id)
@@ -697,6 +710,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
                       updateField('crew_id', opt.id)
                       updateField('sub_id', '')
                       updateField('title', opt.autoTitle)
+                      updateField('assignee_color', crewColorMap[opt.id] || '#15803d')
                     }}
                   />
                 )
@@ -730,6 +744,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
                       updateField('sub_id', opt.id)
                       updateField('crew_id', '')
                       updateField('title', opt.autoTitle)
+                      updateField('assignee_color', '#000000')
                     }}
                   />
                   {form.sub_id && (
@@ -765,15 +780,44 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
                 <div className="space-y-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1.5">Display Color</label>
-                    <div className="flex gap-2 flex-wrap">
-                      {COLORS.map(c => (
-                        <button key={c.value} onClick={() => updateField('display_color', c.value)}
-                          style={{ backgroundColor: c.value }}
-                          className={`w-7 h-7 rounded-full transition-transform ${form.display_color === c.value ? 'ring-2 ring-offset-1 ring-gray-400 scale-110' : 'hover:scale-105'}`}
-                          title={c.label} />
+                    <div className="flex gap-1.5 flex-wrap">
+                      {COLOR_PALETTE.map(c => (
+                        <button key={c} onClick={() => updateField('display_color', c)}
+                          style={{ backgroundColor: c }}
+                          className={`w-6 h-6 rounded-full transition-transform ${form.display_color === c ? 'ring-2 ring-offset-1 ring-gray-500 scale-110' : 'hover:scale-110'}`}
+                          title={c} />
                       ))}
                     </div>
                   </div>
+
+                  {/* Assignee Color */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <label className="text-xs font-medium text-gray-600">Assignee Color</label>
+                      {form.assignee_color && (
+                        <span className="w-4 h-4 rounded-full border border-gray-300"
+                              style={{ backgroundColor: form.assignee_color }} />
+                      )}
+                      {entryMode === 'sub' && (
+                        <span className="text-[10px] text-gray-400">Auto: black for subs</span>
+                      )}
+                      {entryMode === 'crew' && form.crew_id && (
+                        <span className="text-[10px] text-gray-400">Auto: crew color</span>
+                      )}
+                    </div>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {COLOR_PALETTE.map(c => (
+                        <button key={c} onClick={() => updateField('assignee_color', c)}
+                          style={{ backgroundColor: c }}
+                          className={`w-6 h-6 rounded-full transition-transform ${form.assignee_color === c ? 'ring-2 ring-offset-1 ring-gray-500 scale-110' : 'hover:scale-110'}`}
+                          title={c} />
+                      ))}
+                      <button onClick={() => updateField('assignee_color', '')}
+                        className="w-6 h-6 rounded-full border-2 border-dashed border-gray-300 text-gray-400 text-[9px] flex items-center justify-center hover:border-gray-500 transition-colors"
+                        title="No assignee color">✕</button>
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Assignees</label>
                     <input type="text" value={form.assignees} onChange={e => updateField('assignees', e.target.value)}

@@ -86,6 +86,7 @@ export default function JobsList() {
     { key: 'tracking',   label: 'Tracking'   },
     { key: 'timeclock',  label: 'Time Clock' },
     { key: 'templates',  label: 'Templates'  },
+    { key: 'settings',   label: '⚙️ Settings' },
   ]
 
   return (
@@ -250,6 +251,7 @@ export default function JobsList() {
             />
           )}
           {tab === 'templates'  && <ComingSoon label="Templates" />}
+          {tab === 'settings'   && <JobScheduleSettings />}
           {tab === 'tracking'   && (
             selectedJobObj ? (
               <div className="flex flex-col items-center justify-center h-full gap-4">
@@ -342,6 +344,74 @@ function JobDetail({ job, onDelete, price, onEdit }) {
             <p className="font-medium text-gray-700">{parseFloat(job.total_man_days).toFixed(1)}</p>
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ── 50-color palette (exported for use in MasterCrews + ScheduleCalendar) ────
+export const COLOR_PALETTE = [
+  '#ef4444','#dc2626','#b91c1c','#f97316','#ea580c','#c2410c',
+  '#f59e0b','#d97706','#b45309','#eab308','#ca8a04','#92400e',
+  '#84cc16','#65a30d','#4d7c0f','#22c55e','#16a34a','#166534',
+  '#10b981','#059669','#065f46','#14b8a6','#0d9488','#0f766e',
+  '#06b6d4','#0891b2','#155e75','#0ea5e9','#0284c7','#075985',
+  '#3b82f6','#2563eb','#1d4ed8','#6366f1','#4f46e5','#4338ca',
+  '#8b5cf6','#7c3aed','#6d28d9','#a855f7','#9333ea','#7e22ce',
+  '#d946ef','#c026d3','#a21caf','#ec4899','#db2777','#be185d',
+  '#f43f5e','#000000',
+]
+
+// ── Job Schedule Settings ─────────────────────────────────────────────────────
+function JobScheduleSettings() {
+  const [defaultColor,  setDefaultColor]  = useState('#15803d')
+  const [saving,        setSaving]        = useState(false)
+  const [saved,         setSaved]         = useState(false)
+
+  useEffect(() => {
+    supabase.from('company_settings').select('value').eq('key', 'default_schedule_color').single()
+      .then(({ data }) => { if (data?.value) setDefaultColor(data.value) })
+  }, [])
+
+  async function handleSave() {
+    setSaving(true); setSaved(false)
+    await supabase.from('company_settings').upsert({ key: 'default_schedule_color', value: defaultColor })
+    setSaving(false); setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
+
+  return (
+    <div className="max-w-2xl">
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <h2 className="text-base font-bold text-gray-800 mb-1">Schedule Item Default Color</h2>
+        <p className="text-sm text-gray-500 mb-5">
+          This color will be used as the default background color for new schedule items.
+        </p>
+
+        <div className="flex flex-wrap gap-2 mb-5">
+          {COLOR_PALETTE.map(c => (
+            <button
+              key={c}
+              onClick={() => setDefaultColor(c)}
+              style={{ backgroundColor: c }}
+              className={`w-9 h-9 rounded-full transition-transform ${
+                defaultColor === c
+                  ? 'ring-2 ring-offset-2 ring-gray-600 scale-110'
+                  : 'hover:scale-110'
+              }`}
+              title={c}
+            />
+          ))}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full border border-gray-200" style={{ backgroundColor: defaultColor }} />
+          <span className="text-sm text-gray-600 font-mono">{defaultColor}</span>
+          <button onClick={handleSave} disabled={saving}
+            className="ml-auto btn-primary text-sm px-4 py-2 disabled:opacity-50">
+            {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save Default Color'}
+          </button>
+        </div>
       </div>
     </div>
   )

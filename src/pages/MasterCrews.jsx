@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { COLOR_PALETTE } from './JobsList'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Master Crews
@@ -46,6 +47,7 @@ function CrewModal({ crew, employees, usedLabels, onClose, onSave, onDelete }) {
   const [lab2Id,      setLab2Id]      = useState(crew?.laborer_2_id || '')
   const [lab3Id,      setLab3Id]      = useState(crew?.laborer_3_id || '')
   const [skills,      setSkills]      = useState(crew?.skills || [])
+  const [crewColor,   setCrewColor]   = useState(crew?.color  || '#15803d')
   const [notes,       setNotes]       = useState(crew?.notes || '')
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState('')
@@ -77,6 +79,7 @@ function CrewModal({ crew, employees, usedLabels, onClose, onSave, onDelete }) {
       laborer_2_id:  lab2Id     || null,
       laborer_3_id:  lab3Id     || null,
       skills,
+      color: crewColor || null,
       notes,
     }
 
@@ -217,6 +220,28 @@ function CrewModal({ crew, employees, usedLabels, onClose, onSave, onDelete }) {
                   </div>
                 )
               })}
+            </div>
+          </div>
+
+          {/* Crew Color */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              Crew Color
+            </label>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {COLOR_PALETTE.map(c => (
+                <button key={c} onClick={() => setCrewColor(c)}
+                  style={{ backgroundColor: c }}
+                  className={`w-7 h-7 rounded-full transition-transform ${
+                    crewColor === c ? 'ring-2 ring-offset-1 ring-gray-500 scale-110' : 'hover:scale-110'
+                  }`}
+                  title={c}
+                />
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full border border-gray-200" style={{ backgroundColor: crewColor }} />
+              <span className="text-xs text-gray-500 font-mono">{crewColor}</span>
             </div>
           </div>
 
@@ -400,6 +425,11 @@ function CrewRow({ crew, employees, onClick }) {
           {crew.label}
         </div>
       </td>
+      {/* Color */}
+      <td className="px-4 py-3 text-center">
+        <div className="w-6 h-6 rounded-full border border-gray-200 mx-auto"
+             style={{ backgroundColor: crew.color || '#15803d' }} />
+      </td>
       {/* Chief */}
       <td className="px-4 py-3 text-sm font-medium text-green-700 hover:underline whitespace-nowrap">
         {empById(crew.crew_chief_id) ? empShort(crew.crew_chief_id) : <span className="text-gray-300 italic font-normal">None</span>}
@@ -543,6 +573,7 @@ export default function MasterCrews() {
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
                         <th className="px-4 py-2.5 text-left w-16">Crew</th>
+                        <th className="px-4 py-2.5 text-center w-16">Color</th>
                         <th className="px-4 py-2.5 text-left">Crew Chief</th>
                         <th className="px-4 py-2.5 text-left">Journeyman</th>
                         <th className="px-4 py-2.5 text-left">Laborer 1</th>
