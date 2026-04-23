@@ -190,41 +190,10 @@ export default function ClientDetail() {
         <span className="text-gray-700 font-medium">{displayName(client) || client.name}</span>
       </div>
 
-      {/* ── Client Info Card — full width ── */}
-      <div className="card mb-6">
-        <div className="flex items-start justify-between gap-4 mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-xl font-bold text-green-700 flex-shrink-0">
-              {(client.last_name || client.first_name || client.name || '?')[0].toUpperCase()}
-            </div>
-            {!editing && (
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">{displayName(client) || client.name}</h2>
-                {client.company_name && (
-                  <p className="text-sm text-gray-500 mt-0.5">
-                    {client.company_name}{client.company_position ? ` · ${client.company_position}` : ''}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-          <div className="flex gap-2 flex-shrink-0">
-            <button
-              onClick={() => setEditing(!editing)}
-              className="btn-secondary text-xs px-3 py-1.5"
-            >
-              {editing ? 'Cancel' : '✏️ Edit'}
-            </button>
-            <button onClick={handleDelete} className="text-red-400 hover:text-red-600 text-xs px-2">
-              Delete
-            </button>
-          </div>
-        </div>
-
+      {/* ── Client Info Card ── */}
+      <div className="card mb-4">
         {editing ? (
           <form onSubmit={handleSave} className="grid grid-cols-2 md:grid-cols-3 gap-3">
-
-            {/* Name row */}
             <div>
               <label className="label text-xs">First Name</label>
               <input className="input text-sm" value={form.first_name || ''} onChange={e => setForm(p => ({ ...p, first_name: e.target.value }))} placeholder="First name" />
@@ -233,11 +202,7 @@ export default function ClientDetail() {
               <label className="label text-xs">Last Name *</label>
               <input className="input text-sm" value={form.last_name || ''} onChange={e => setForm(p => ({ ...p, last_name: e.target.value }))} placeholder="Last name" required />
             </div>
-            <div>
-              {/* spacer on md+ so company row starts fresh */}
-            </div>
-
-            {/* Company row */}
+            <div />
             <div>
               <label className="label text-xs">Company Name</label>
               <input className="input text-sm" value={form.company_name || ''} onChange={e => setForm(p => ({ ...p, company_name: e.target.value }))} placeholder="Company or organization" />
@@ -247,8 +212,6 @@ export default function ClientDetail() {
               <input className="input text-sm" value={form.company_position || ''} onChange={e => setForm(p => ({ ...p, company_position: e.target.value }))} placeholder="Title or role" />
             </div>
             <div />
-
-            {/* Contact row */}
             <div>
               <label className="label text-xs">Email</label>
               <input className="input text-sm" type="email" value={form.email || ''} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} />
@@ -258,8 +221,6 @@ export default function ClientDetail() {
               <input className="input text-sm" value={form.phone || ''} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} />
             </div>
             <div />
-
-            {/* Address */}
             <div>
               <label className="label text-xs">Street</label>
               <input className="input text-sm" value={form.street || ''} onChange={e => setForm(p => ({ ...p, street: e.target.value }))} />
@@ -281,76 +242,93 @@ export default function ClientDetail() {
                 <input className="input text-sm" value={form.zip || ''} onChange={e => setForm(p => ({ ...p, zip: e.target.value }))} />
               </div>
             </div>
-
-            {/* Notes */}
             <div className="col-span-2 md:col-span-3">
               <label className="label text-xs">Notes</label>
               <textarea className="input text-sm resize-none" rows={2} value={form.notes || ''} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} />
             </div>
-
-            <div className="col-span-2 md:col-span-3">
+            <div className="col-span-2 md:col-span-3 flex gap-2">
               <button type="submit" disabled={saving} className="btn-primary text-sm">
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>
+              <button type="button" onClick={() => setEditing(false)} className="btn-secondary text-sm">Cancel</button>
             </div>
           </form>
         ) : (
-          <div className="flex flex-wrap gap-x-8 gap-y-2">
-            {client.email && (
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <span className="text-gray-400">✉️</span>
-                <a href={`mailto:${client.email}`} className="hover:underline text-green-700">{client.email}</a>
+          <div className="flex items-center gap-4 flex-wrap">
+
+            {/* Avatar + Name */}
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-xl font-bold text-green-700 flex-shrink-0">
+                {(client.last_name || client.first_name || client.name || '?')[0].toUpperCase()}
               </div>
-            )}
-            {client.phone && (
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <span className="text-gray-400">📞</span>
-                <a href={`tel:${client.phone}`} className="hover:underline">{client.phone}</a>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 leading-tight">{displayName(client) || client.name}</h2>
+                {client.company_name && (
+                  <p className="text-sm text-gray-500">
+                    {client.company_name}{client.company_position ? ` · ${client.company_position}` : ''}
+                  </p>
+                )}
               </div>
-            )}
-            {(client.street || client.city) && (
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <span className="text-gray-400">📍</span>
-                <span>{[client.street, client.city, client.state, client.zip].filter(Boolean).join(', ')}</span>
-              </div>
-            )}
-            {client.notes && (
-              <div className="flex items-center gap-2 text-sm text-gray-500 italic w-full">
-                <span className="text-gray-400">📝</span>
-                <span>{client.notes}</span>
-              </div>
-            )}
-            <div className="text-xs text-gray-400 w-full pt-1 border-t border-gray-100">
-              Client since {new Date(client.created_at).toLocaleDateString()}
+            </div>
+
+            {/* Contact info — centered */}
+            <div className="flex-1 flex items-center justify-center gap-6 flex-wrap">
+              {client.email && (
+                <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                  <span>✉️</span>
+                  <a href={`mailto:${client.email}`} className="hover:underline text-green-700">{client.email}</a>
+                </div>
+              )}
+              {client.phone && (
+                <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                  <span>📞</span>
+                  <a href={`tel:${client.phone}`} className="hover:underline">{client.phone}</a>
+                </div>
+              )}
+              {(client.street || client.city) && (
+                <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                  <span>📍</span>
+                  <span>{[client.street, client.city, client.state, client.zip].filter(Boolean).join(', ')}</span>
+                </div>
+              )}
+              {client.notes && (
+                <div className="flex items-center gap-1.5 text-sm text-gray-500 italic">
+                  <span>📝</span>
+                  <span>{client.notes}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 flex-shrink-0">
+              <button onClick={() => setEditing(true)} className="btn-secondary text-xs px-3 py-1.5">✏️ Edit</button>
+              <button onClick={handleDelete} className="text-red-400 hover:text-red-600 text-xs px-2">Delete</button>
             </div>
           </div>
         )}
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6">
-
-        {/* ── LEFT: Summary Stats ── */}
-        <div className="lg:w-56 flex-shrink-0 space-y-3">
-          <div className="card text-center">
-            <p className="text-xs text-gray-500 mb-1">Estimates</p>
-            <p className="text-2xl font-bold text-gray-900">{estimates.length}</p>
-          </div>
-          <div className="card text-center">
-            <p className="text-xs text-gray-500 mb-1">Bids</p>
-            <p className="text-2xl font-bold text-green-700">{bids.length}</p>
-          </div>
-          <div className="card text-center">
-            <p className="text-xs text-gray-500 mb-1">Total Revenue</p>
-            <p className="text-lg font-bold text-gray-900">{fmt(totalRevenue)}</p>
-          </div>
-          <div className="card text-center">
-            <p className="text-xs text-gray-500 mb-1">Total GP</p>
-            <p className="text-lg font-bold text-green-700">{fmt(totalGP)}</p>
-          </div>
+      {/* ── Stats Bar ── */}
+      <div className="bg-white rounded-xl border border-gray-200 mb-6 overflow-hidden">
+        <div className="grid grid-cols-3 md:grid-cols-6 divide-x divide-gray-100">
+          {[
+            { label: 'Estimates',         value: estimates.length,  fmt: v => v,          color: 'text-gray-900' },
+            { label: 'Bids',              value: bids.length,       fmt: v => v,          color: 'text-gray-900' },
+            { label: 'Total Revenue',     value: totalRevenue,      fmt: v => fmt(v),     color: 'text-gray-900' },
+            { label: 'Total GP',          value: totalGP,           fmt: v => fmt(v),     color: 'text-green-700' },
+            { label: 'Actual Gross Profit', value: null,            fmt: () => '—',       color: 'text-gray-400' },
+            { label: 'Actual GPMD',       value: null,              fmt: () => '—',       color: 'text-gray-400' },
+          ].map(stat => (
+            <div key={stat.label} className="px-4 py-4 text-center">
+              <p className="text-xs text-gray-500 mb-1 leading-tight">{stat.label}</p>
+              <p className={`text-lg font-bold ${stat.color}`}>{stat.fmt(stat.value)}</p>
+            </div>
+          ))}
         </div>
+      </div>
 
-        {/* ── RIGHT: Estimates + Bids + Jobs + Change Orders ── */}
-        <div className="flex-1 space-y-6 min-w-0">
+      {/* ── Tables: full width ── */}
+      <div className="space-y-6">
 
           {/* ── Estimates ── */}
           <div>
