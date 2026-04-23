@@ -50,6 +50,14 @@ export default function JobsList() {
     return true
   }
 
+  async function updateJob(id, fields) {
+    const { error } = await supabase.from('jobs').update(fields).eq('id', id)
+    if (error) { console.error('updateJob:', error); return false }
+    setJobs(prev => prev.map(j => j.id === id ? { ...j, ...fields } : j))
+    setJobModal(prev => prev ? { ...prev, ...fields } : prev)
+    return true
+  }
+
   const price = j => parseFloat(j.total_price || j.contract_price || 0)
 
   const underConstruction = jobs.filter(j => (j.status || 'active') === 'active').reduce((s, j) => s + price(j), 0)
@@ -270,7 +278,7 @@ export default function JobsList() {
         <JobInfoModal
           job={jobModal}
           onClose={() => setJobModal(null)}
-          onSaveName={updateJobName}
+          onSave={updateJob}
           onDelete={async (id, name) => {
             await deleteJob(id, name)
             setJobModal(null)
@@ -349,54 +357,66 @@ function ComingSoon({ label }) {
   )
 }
 
-// ── Job Info / Edit Modal ─────────────────────────────────────
-function JobInfoModal({ job, onClose, onSaveName, onDelete }) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft]     = useState(job.name || job.client_name || '')
-  const [saving, setSaving]   = useState(false)
-  const [error,  setError]    = useState('')
+// ── Job Info / Edit Modal — 3-tab design ──────────────────────
+function JobInfoModal({ job, onClose, onSave, onDelete }) {
+  const [activeTab, setActiveTab] = useState('info')
+  const [saving,    setSaving]    = useState(false)
+  const [error,     setError]     = useState('')
+  const [employees, setEmployees] = useState([])
 
-  const gpmd    = parseFloat(job.gpmd) || 0
-  const target  = 500
-  const pct     = Math.min(100, Math.round((gpmd / target) * 100))
-  const barColor = pct >= 80 ? '#22c55e' : pct >= 50 ? '#eab308' : '#ef4444'
+  // Job Info tab fields
+  const [status,         setStatus]         = useState(job.status || 'active')
+  const [jobTitle,       setJobTitle]        = useState(job.name || job.client_name || '')
+  const [address,        setAddress]         = useState(job.job_address || '')
+  const [consultant,     setConsultant]      = useState(job.consultant || '')
+  const [projectManager, setProjectManager]  = useState(job.project_manager || '')
+
+  useEffect(() => {
+    supabase.from('employees')
+      .select('id, first_name, last_name')
+      .eq('status', 'active')
+      .order('last_name')
+      .then(({ data }) => { if (data) setEmployees(data) })
+  }, [])
+
+  const employeeOptions = employees.map(e => ({
+    value: `${e.first_name} ${e.last_name}`.trim(),
+    label: `${e.last_name}, ${e.first_name}`.trim(),
+  }))
 
   async function handleSave() {
-    const name = draft.trim()
-    if (!name) { setError('Name cannot be empty.'); return }
+    if (!jobTitle.trim()) { setError('Job title cannot be empty.'); return }
     setSaving(true)
-    const ok = await onSaveName(job.id, name)
+    setError('')
+    const ok = await onSave(job.id, {
+      name:            jobTitle.trim(),
+      status,
+      job_address:     address.trim(),
+      consultant:      consultant || null,
+      project_manager: projectManager || null,
+    })
     setSaving(false)
-    if (ok) { setEditing(false); setError('') }
-    else setError('Failed to save. Please try again.')
+    if (!ok) setError('Failed to save. Please try again.')
   }
+
+  const TABS = [
+    { key: 'info',      label: 'Job Info' },
+    { key: 'client',    label: 'Client' },
+    { key: 'employees', label: 'Employees' },
+  ]
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
       onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-[420px] overflow-hidden">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-[480px] overflow-hidden flex flex-col" style={{ maxHeight: '90vh' }}>
 
         {/* Header */}
-        <div className="px-5 pt-5 pb-4 border-b border-gray-100 flex items-start justify-between">
+        <div className="px-5 pt-5 pb-3 border-b border-gray-100 flex items-start justify-between flex-shrink-0">
           <div className="min-w-0 flex-1">
-            <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1">Job Info</p>
-            {editing ? (
-              <div className="flex items-center gap-2">
-                <input
-                  autoFocus
-                  type="text"
-                  value={draft}
-                  onChange={e => { setDraft(e.target.value); setError('') }}
-                  onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') { setEditing(false); setDraft(job.name || job.client_name || '') } }}
-                  className="input text-base font-bold text-gray-900 py-1 w-full"
-                />
-              </div>
-            ) : (
-              <h2 className="text-lg font-bold text-gray-900">{job.name || job.client_name}</h2>
-            )}
-            {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+            <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-0.5">Job</p>
+            <h2 className="text-lg font-bold text-gray-900 truncate">{job.name || job.client_name}</h2>
           </div>
           <button onClick={onClose} className="text-gray-300 hover:text-gray-500 ml-3 mt-0.5 flex-shrink-0">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -405,88 +425,179 @@ function JobInfoModal({ job, onClose, onSaveName, onDelete }) {
           </button>
         </div>
 
-        {/* Body */}
-        <div className="px-5 py-4 space-y-4">
-          {job.client_name && job.client_name !== (job.name || '') && (
-            <div>
-              <p className="text-xs text-gray-400 mb-0.5">Client</p>
-              <p className="text-sm text-gray-700">{job.client_name}</p>
+        {/* Tab bar */}
+        <div className="flex border-b border-gray-100 px-5 flex-shrink-0">
+          {TABS.map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`py-2.5 mr-5 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === tab.key
+                  ? 'border-green-600 text-green-700'
+                  : 'border-transparent text-gray-400 hover:text-gray-700'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab content */}
+        <div className="overflow-y-auto flex-1">
+
+          {/* ── Job Info tab ── */}
+          {activeTab === 'info' && (
+            <div className="px-5 py-4 space-y-5">
+
+              {/* Main Details */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Main Details</p>
+                <div className="space-y-3">
+
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Status</label>
+                    <select
+                      value={status}
+                      onChange={e => setStatus(e.target.value)}
+                      className="input text-sm w-full"
+                    >
+                      <option value="active">Open</option>
+                      <option value="completed">Closed</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Job Title</label>
+                    <input
+                      type="text"
+                      value={jobTitle}
+                      onChange={e => { setJobTitle(e.target.value); setError('') }}
+                      className="input text-sm w-full"
+                      placeholder="Job name"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Address</label>
+                    <input
+                      type="text"
+                      value={address}
+                      onChange={e => setAddress(e.target.value)}
+                      className="input text-sm w-full"
+                      placeholder="Job address"
+                    />
+                  </div>
+
+                </div>
+              </div>
+
+              {/* More Details */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">More Details</p>
+                <div className="space-y-3">
+
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Consultant</label>
+                    <select
+                      value={consultant}
+                      onChange={e => setConsultant(e.target.value)}
+                      className="input text-sm w-full"
+                    >
+                      <option value="">— Select consultant —</option>
+                      {employeeOptions.map(o => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Project Manager</label>
+                    <select
+                      value={projectManager}
+                      onChange={e => setProjectManager(e.target.value)}
+                      className="input text-sm w-full"
+                    >
+                      <option value="">— Select project manager —</option>
+                      {employeeOptions.map(o => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                </div>
+              </div>
+
+              {error && <p className="text-xs text-red-500">{error}</p>}
             </div>
           )}
-          <div>
-            <p className="text-xs text-gray-400 mb-0.5">Job Address</p>
-            <p className="text-sm text-gray-700">{job.job_address || <span className="text-gray-300 italic">Not set</span>}</p>
-          </div>
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-xs text-gray-400">Estimated GPMD</p>
-              <p className="text-sm font-bold text-gray-800">
-                {gpmd > 0 ? `$${Math.round(gpmd).toLocaleString()} / day` : '—'}
-              </p>
+
+          {/* ── Client tab ── */}
+          {activeTab === 'client' && (
+            <div className="px-5 py-4 space-y-3">
+              {job.client_name && (
+                <div>
+                  <p className="text-xs text-gray-400 mb-0.5">Client</p>
+                  <p className="text-sm font-medium text-gray-800">{job.client_name}</p>
+                </div>
+              )}
+              {job.job_address && (
+                <div>
+                  <p className="text-xs text-gray-400 mb-0.5">Job Address</p>
+                  <p className="text-sm text-gray-700">{job.job_address}</p>
+                </div>
+              )}
+              <p className="text-xs text-gray-400 italic pt-2">Additional client details coming soon.</p>
             </div>
-            <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
-              <div
-                className="h-3 rounded-full transition-all duration-500"
-                style={{ width: `${pct}%`, backgroundColor: barColor }}
-              />
+          )}
+
+          {/* ── Employees tab ── */}
+          {activeTab === 'employees' && (
+            <div className="px-5 py-4">
+              {(consultant || projectManager) ? (
+                <div className="space-y-3">
+                  {consultant && (
+                    <div>
+                      <p className="text-xs text-gray-400 mb-0.5">Consultant</p>
+                      <p className="text-sm font-medium text-gray-800">{consultant}</p>
+                    </div>
+                  )}
+                  {projectManager && (
+                    <div>
+                      <p className="text-xs text-gray-400 mb-0.5">Project Manager</p>
+                      <p className="text-sm font-medium text-gray-800">{projectManager}</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400 italic">No employees assigned yet. Set them in the Job Info tab.</p>
+              )}
+              <p className="text-xs text-gray-400 italic pt-4">Full employee assignment coming soon.</p>
             </div>
-            <div className="flex justify-between text-[10px] text-gray-400 mt-0.5">
-              <span>$0</span>
-              <span className="text-gray-300">Target: $500/day</span>
-              <span>$500+</span>
-            </div>
-          </div>
-          <div className="flex gap-3">
-            {job.sold_date && (
-              <div className="flex-1 bg-gray-50 rounded-lg p-3">
-                <p className="text-xs text-gray-400 mb-0.5">Sold Date</p>
-                <p className="text-sm font-medium text-gray-700">{new Date(job.sold_date).toLocaleDateString()}</p>
-              </div>
-            )}
-            <div className="flex-1 bg-gray-50 rounded-lg p-3">
-              <p className="text-xs text-gray-400 mb-0.5">Status</p>
-              <p className="text-sm font-medium text-gray-700 capitalize">{(job.status || 'active').replace('_', ' ')}</p>
-            </div>
-          </div>
+          )}
+
         </div>
 
         {/* Footer */}
-        <div className="px-5 pb-5 flex gap-2">
-          {editing ? (
-            <>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="flex-1 btn-primary text-sm py-2 disabled:opacity-50"
-              >
-                {saving ? 'Saving…' : 'Save Name'}
-              </button>
-              <button
-                onClick={() => { setEditing(false); setDraft(job.name || job.client_name || ''); setError('') }}
-                className="px-4 py-2 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={() => { setDraft(job.name || job.client_name || ''); setEditing(true) }}
-                className="flex-1 btn-primary text-sm py-2"
-              >
-                Edit Name
-              </button>
-              <button onClick={onClose} className="px-4 py-2 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">
-                Close
-              </button>
-              <button
-                onClick={() => onDelete(job.id, job.name || job.client_name)}
-                className="px-4 py-2 text-sm rounded-lg border border-red-200 text-red-500 hover:bg-red-50 hover:border-red-300 transition-colors"
-              >
-                Delete
-              </button>
-            </>
-          )}
+        <div className="px-5 py-4 border-t border-gray-100 flex gap-2 flex-shrink-0">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex-1 btn-primary text-sm py-2 disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
+          >
+            Close
+          </button>
+          <button
+            onClick={() => onDelete(job.id, job.name || job.client_name)}
+            className="px-4 py-2 text-sm rounded-lg border border-red-200 text-red-500 hover:bg-red-50 hover:border-red-300 transition-colors"
+          >
+            Delete
+          </button>
         </div>
       </div>
     </div>
