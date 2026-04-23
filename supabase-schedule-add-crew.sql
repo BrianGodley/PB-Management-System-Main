@@ -5,4 +5,5 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 
 ALTER TABLE schedule_items
-  ADD COLUMN IF NOT EXISTS crew_id UUID REFERENCES crews(id) ON DELETE SET NULL;
+  ADD COLUMN IF NOT EXISTS crew_id UUID REFERENCES crews(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS sub_id  UUID REFERENCES subs_vendors(id) ON DELETE SET NULL;

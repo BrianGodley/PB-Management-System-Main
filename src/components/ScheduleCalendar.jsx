@@ -58,7 +58,7 @@ function fmtDate(ds) {
 const EMPTY_FORM = {
   title: '', display_color: '#15803d', assignees: '',
   start_date: '', end_date: '', work_days: '', progress: 0, reminder: 'None', notes: '',
-  crew_id: '', crew_entry: '',
+  crew_id: '', sub_id: '',
 }
 
 // ── WeekRow: renders one 7-day row with spanning item bars ───
@@ -247,17 +247,21 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
   const [form,        setForm]        = useState(EMPTY_FORM)
   const [modalJobId,  setModalJobId]  = useState(null)
   const [saving,      setSaving]      = useState(false)
-  const [entryMode,   setEntryMode]   = useState('custom') // 'crew' | 'custom'
+  const [entryMode,   setEntryMode]   = useState('custom') // 'crew' | 'sub' | 'custom'
   const [crews,       setCrews]       = useState([])
   const [employees,   setEmployees]   = useState([])
+  const [subs,        setSubs]        = useState([])
 
-  // Fetch crews + employees once for the modal dropdowns
+  // Fetch crews, employees, subs once for the modal
   useEffect(() => {
     supabase.from('crews').select('*').order('label')
       .then(({ data }) => { if (data) setCrews(data) })
     supabase.from('employees').select('id, first_name, last_name')
       .eq('status', 'active').order('last_name')
       .then(({ data }) => { if (data) setEmployees(data) })
+    supabase.from('subs_vendors').select('id, company_name, divisions, status')
+      .eq('type', 'sub').order('company_name')
+      .then(({ data }) => { if (data) setSubs(data) })
   }, [])
 
   useEffect(() => { fetchItems() }, [year, month, selectedJob])
@@ -319,8 +323,8 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
     if (e) e.stopPropagation()
     setEditItem(item)
     setModalJobId(item.job_id)
-    const hasCrew = !!item.crew_id
-    setEntryMode(hasCrew ? 'crew' : 'custom')
+    const mode = item.crew_id ? 'crew' : item.sub_id ? 'sub' : 'custom'
+    setEntryMode(mode)
     setForm({
       title:         item.title         || '',
       display_color: item.display_color || '#15803d',
@@ -332,7 +336,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
       reminder:      item.reminder      || 'None',
       notes:         item.notes         || '',
       crew_id:       item.crew_id       || '',
-      crew_entry:    hasCrew ? (item.title || '') : '',
+      sub_id:        item.sub_id        || '',
     })
     setPhase('details')
   }
@@ -358,12 +362,11 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
   }
 
   async function saveItem() {
-    const finalTitle = entryMode === 'crew' ? form.crew_entry.trim() : form.title.trim()
-    if (!finalTitle) return
+    if (!form.title.trim()) return
     setSaving(true)
     const payload = {
       job_id:        modalJobId,
-      title:         finalTitle,
+      title:         form.title.trim(),
       display_color: form.display_color,
       assignees:     form.assignees,
       start_date:    form.start_date,
@@ -373,6 +376,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
       reminder:      form.reminder,
       notes:         form.notes,
       crew_id:       entryMode === 'crew' ? (form.crew_id || null) : null,
+      sub_id:        entryMode === 'sub'  ? (form.sub_id  || null) : null,
     }
     const { error } = editItem
       ? await supabase.from('schedule_items').update(payload).eq('id', editItem.id)
@@ -541,162 +545,253 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
       {/* Schedule Item Details */}
       {phase === 'details' && (
         <ModalOverlay onClose={closeModal}>
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-[420px] mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="px-5 pt-5 pb-4 border-b border-gray-100">
-              <h3 className="text-sm font-bold text-gray-800">
-                {editItem ? 'Edit Schedule Item' : 'Schedule Item Details'}
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 flex flex-col" style={{ maxHeight: '92vh' }}>
+
+            {/* Header */}
+            <div className="px-6 pt-5 pb-4 border-b border-gray-100 flex-shrink-0">
+              <h3 className="text-base font-bold text-gray-800">
+                {editItem ? 'Edit Schedule Item' : 'New Schedule Item'}
               </h3>
               {modalJobId && (
                 <p className="text-xs text-green-700 font-medium mt-0.5">{jobMap[modalJobId]}</p>
               )}
             </div>
 
-            <div className="px-5 py-4 space-y-3">
-              {/* Entry Mode */}
-              <div className="space-y-2.5">
+            <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
 
-                {/* Crew Entry */}
-                <div className={`rounded-lg border p-3 transition-colors ${entryMode === 'crew' ? 'border-green-400 bg-green-50/40' : 'border-gray-200 bg-gray-50/40'}`}>
-                  <label className="flex items-center gap-2.5 cursor-pointer mb-2.5">
-                    <input type="radio" name="entryMode" value="crew"
-                      checked={entryMode === 'crew'}
-                      onChange={() => setEntryMode('crew')}
-                      className="accent-green-700 w-4 h-4"
-                    />
-                    <span className="text-xs font-semibold text-gray-700">Crew Entry</span>
-                  </label>
-                  <div className="space-y-1.5 ml-6">
-                    <select
-                      value={form.crew_id}
-                      onChange={e => {
-                        const id = e.target.value
-                        const crew = crews.find(c => c.id === id)
-                        let label = ''
-                        if (crew) {
-                          const chief = employees.find(em => em.id === crew.crew_chief_id)
-                          label = `Crew ${crew.label}${chief ? ` — ${chief.first_name} ${chief.last_name}` : ''}`
-                        }
-                        updateField('crew_id', id)
-                        updateField('crew_entry', label)
-                        setEntryMode('crew')
-                      }}
-                      disabled={entryMode !== 'crew'}
-                      className="input text-sm w-full disabled:opacity-50"
-                    >
-                      <option value="">— Select a crew —</option>
-                      {crews.map(c => {
-                        const chief = employees.find(em => em.id === c.crew_chief_id)
-                        return (
-                          <option key={c.id} value={c.id}>
-                            Crew {c.label}{chief ? ` — ${chief.last_name}, ${chief.first_name}` : ''}
-                            {c.skills?.length ? ` (${c.skills.map(s => s.type).join(', ')})` : ''}
-                          </option>
-                        )
-                      })}
-                    </select>
-                    <input
-                      type="text"
-                      value={form.crew_entry}
-                      onChange={e => updateField('crew_entry', e.target.value)}
-                      placeholder="Crew label (auto-filled, editable)"
-                      disabled={entryMode !== 'crew'}
-                      className="input text-sm w-full disabled:opacity-50"
-                    />
-                  </div>
-                </div>
-
-                {/* Custom Entry */}
-                <div className={`rounded-lg border p-3 transition-colors ${entryMode === 'custom' ? 'border-green-400 bg-green-50/40' : 'border-gray-200 bg-gray-50/40'}`}>
-                  <label className="flex items-center gap-2.5 cursor-pointer mb-2.5">
-                    <input type="radio" name="entryMode" value="custom"
-                      checked={entryMode === 'custom'}
-                      onChange={() => setEntryMode('custom')}
-                      className="accent-green-700 w-4 h-4"
-                    />
-                    <span className="text-xs font-semibold text-gray-700">
-                      Custom Entry <span className="text-red-400">*</span>
-                    </span>
-                  </label>
-                  <div className="ml-6">
-                    <input
-                      type="text"
-                      value={form.title}
-                      onChange={e => { updateField('title', e.target.value); setEntryMode('custom') }}
-                      placeholder="e.g. Install pavers"
-                      disabled={entryMode !== 'custom'}
-                      className="input text-sm w-full disabled:opacity-50"
-                      autoFocus={entryMode === 'custom'}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Display Color */}
+              {/* ── Mode selector ── */}
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1.5">Display Color</label>
-                <div className="flex gap-2 flex-wrap">
-                  {COLORS.map(c => (
-                    <button key={c.value} onClick={() => updateField('display_color', c.value)}
-                      style={{ backgroundColor: c.value }}
-                      className={`w-8 h-8 rounded-full transition-transform ${form.display_color === c.value ? 'ring-2 ring-offset-1 ring-gray-400 scale-110' : 'hover:scale-105'}`}
-                      title={c.label} />
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Select Entry Type</p>
+                <div className="flex gap-2">
+                  {[
+                    { key: 'crew', label: 'Crew' },
+                    { key: 'sub',  label: 'Subcontractor' },
+                    { key: 'custom', label: 'Custom' },
+                  ].map(opt => (
+                    <button key={opt.key} onClick={() => {
+                      setEntryMode(opt.key)
+                      updateField('crew_id', '')
+                      updateField('sub_id', '')
+                      if (opt.key !== 'custom') updateField('title', '')
+                    }}
+                      className={`flex-1 py-2 rounded-lg text-sm font-semibold border-2 transition-colors ${
+                        entryMode === opt.key
+                          ? 'bg-green-700 text-white border-green-700'
+                          : 'border-gray-200 text-gray-500 hover:border-green-400 hover:text-green-700'
+                      }`}>
+                      {opt.label}
+                    </button>
                   ))}
                 </div>
               </div>
 
-              {/* Assignees */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Assignees</label>
-                <input type="text" value={form.assignees} onChange={e => updateField('assignees', e.target.value)}
-                  placeholder="e.g. Mike, Sarah" className="input text-sm w-full" />
-              </div>
-
-              {/* Start / Work Days / End — stacked on very small screens */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {/* ── Crew list ── */}
+              {entryMode === 'crew' && (
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Start Date</label>
-                  <input type="date" value={form.start_date} onChange={e => updateField('start_date', e.target.value)} className="input text-sm w-full" />
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                    Select Crew {form.crew_id && <span className="text-green-700 normal-case font-normal">— selected</span>}
+                  </p>
+                  {crews.length === 0 ? (
+                    <p className="text-sm text-gray-400 italic py-4 text-center">No crews built yet. Add crews in Master Crews.</p>
+                  ) : (
+                    <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                      {crews.map(crew => {
+                        const selected = form.crew_id === crew.id
+                        const empName = id => {
+                          const e = employees.find(em => em.id === id)
+                          return e ? `${e.first_name} ${e.last_name}` : null
+                        }
+                        const members = [
+                          crew.crew_chief_id && { role: 'Chief',      name: empName(crew.crew_chief_id) },
+                          crew.journeyman_id && { role: 'Journeyman', name: empName(crew.journeyman_id) },
+                          crew.laborer_1_id  && { role: 'Laborer',    name: empName(crew.laborer_1_id) },
+                          crew.laborer_2_id  && { role: 'Laborer',    name: empName(crew.laborer_2_id) },
+                          crew.laborer_3_id  && { role: 'Laborer',    name: empName(crew.laborer_3_id) },
+                        ].filter(m => m && m.name)
+
+                        return (
+                          <button key={crew.id} onClick={() => {
+                            const chief = members.find(m => m.role === 'Chief')
+                            const autoTitle = `Crew ${crew.label}${chief ? ` — ${chief.name}` : ''}`
+                            updateField('crew_id', crew.id)
+                            updateField('sub_id', '')
+                            updateField('title', autoTitle)
+                          }}
+                            className={`w-full text-left rounded-xl border-2 px-4 py-3 transition-colors ${
+                              selected
+                                ? 'border-green-500 bg-green-50'
+                                : 'border-gray-200 hover:border-green-300 hover:bg-gray-50'
+                            }`}>
+                            <div className="flex items-start gap-3">
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold flex-shrink-0 ${selected ? 'bg-green-700 text-white' : 'bg-gray-100 text-gray-700'}`}>
+                                {crew.label}
+                              </div>
+                              <div className="min-w-0">
+                                {members.map((m, i) => (
+                                  <p key={i} className="text-sm text-gray-800 leading-snug">
+                                    <span className="text-xs text-gray-400 w-20 inline-block">{m.role}</span>
+                                    {m.name}
+                                  </p>
+                                ))}
+                                {members.length === 0 && <p className="text-sm text-gray-400 italic">No members assigned</p>}
+                                {crew.skills?.length > 0 && (
+                                  <div className="flex gap-1 mt-1 flex-wrap">
+                                    {crew.skills.map(s => (
+                                      <span key={s.type} className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded-full">
+                                        {s.type} Lv{s.level}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                  {form.crew_id && (
+                    <div className="mt-2">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Schedule Item Label <span className="text-gray-400 font-normal">(auto-filled, editable)</span></label>
+                      <input type="text" value={form.title}
+                        onChange={e => updateField('title', e.target.value)}
+                        className="input text-sm w-full" />
+                    </div>
+                  )}
                 </div>
+              )}
+
+              {/* ── Subcontractor list ── */}
+              {entryMode === 'sub' && (
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Work Days</label>
-                  <input type="number" min="1" value={form.work_days} onChange={e => updateField('work_days', e.target.value)} className="input text-sm w-full" />
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                    Select Subcontractor {form.sub_id && <span className="text-green-700 normal-case font-normal">— selected</span>}
+                  </p>
+                  {subs.length === 0 ? (
+                    <p className="text-sm text-gray-400 italic py-4 text-center">No subcontractors found. Add them in Subs &amp; Vendors.</p>
+                  ) : (
+                    <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                      {subs.map(sub => {
+                        const selected = form.sub_id === sub.id
+                        return (
+                          <button key={sub.id} onClick={() => {
+                            updateField('sub_id', sub.id)
+                            updateField('crew_id', '')
+                            updateField('title', sub.company_name)
+                          }}
+                            className={`w-full text-left rounded-xl border-2 px-4 py-3 transition-colors ${
+                              selected
+                                ? 'border-green-500 bg-green-50'
+                                : 'border-gray-200 hover:border-green-300 hover:bg-gray-50'
+                            }`}>
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className={`text-sm font-semibold ${selected ? 'text-green-800' : 'text-gray-800'}`}>
+                                  {sub.company_name}
+                                </p>
+                                {sub.divisions?.length > 0 && (
+                                  <p className="text-xs text-gray-400 mt-0.5">{sub.divisions.join(' · ')}</p>
+                                )}
+                              </div>
+                              {selected && <span className="text-green-600 text-lg flex-shrink-0">✓</span>}
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                  {form.sub_id && (
+                    <div className="mt-2">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Schedule Item Label <span className="text-gray-400 font-normal">(auto-filled, editable)</span></label>
+                      <input type="text" value={form.title}
+                        onChange={e => updateField('title', e.target.value)}
+                        className="input text-sm w-full" />
+                    </div>
+                  )}
                 </div>
+              )}
+
+              {/* ── Custom entry ── */}
+              {entryMode === 'custom' && (
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">End Date</label>
-                  <input type="date" value={form.end_date} onChange={e => updateField('end_date', e.target.value)} className="input text-sm w-full" />
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                    Schedule Item Label <span className="text-red-400">*</span>
+                  </label>
+                  <input type="text" value={form.title}
+                    onChange={e => updateField('title', e.target.value)}
+                    placeholder="e.g. Install pavers, Concrete pour, Site prep…"
+                    className="input text-sm w-full" autoFocus />
                 </div>
-              </div>
+              )}
 
-              {/* Progress */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Progress — <span className="text-green-700 font-bold">{form.progress}%</span>
-                </label>
-                <input type="range" min="0" max="100" step="5" value={form.progress}
-                  onChange={e => updateField('progress', e.target.value)} className="w-full accent-green-700" />
-                <div className="flex justify-between text-[10px] text-gray-400 mt-0.5">
-                  <span>0%</span><span>50%</span><span>100%</span>
+              {/* ── Schedule Details ── */}
+              <div className="border-t border-gray-100 pt-4 grid grid-cols-2 gap-4">
+
+                {/* Left column */}
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1.5">Display Color</label>
+                    <div className="flex gap-2 flex-wrap">
+                      {COLORS.map(c => (
+                        <button key={c.value} onClick={() => updateField('display_color', c.value)}
+                          style={{ backgroundColor: c.value }}
+                          className={`w-7 h-7 rounded-full transition-transform ${form.display_color === c.value ? 'ring-2 ring-offset-1 ring-gray-400 scale-110' : 'hover:scale-105'}`}
+                          title={c.label} />
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Assignees</label>
+                    <input type="text" value={form.assignees} onChange={e => updateField('assignees', e.target.value)}
+                      placeholder="e.g. Mike, Sarah" className="input text-sm w-full" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Reminder</label>
+                    <select value={form.reminder} onChange={e => updateField('reminder', e.target.value)} className="input text-sm w-full">
+                      {REMINDERS.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                  </div>
                 </div>
-              </div>
 
-              {/* Reminder */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Reminder</label>
-                <select value={form.reminder} onChange={e => updateField('reminder', e.target.value)} className="input text-sm w-full">
-                  {REMINDERS.map(r => <option key={r} value={r}>{r}</option>)}
-                </select>
-              </div>
+                {/* Right column */}
+                <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Start</label>
+                      <input type="date" value={form.start_date} onChange={e => updateField('start_date', e.target.value)} className="input text-sm w-full" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Days</label>
+                      <input type="number" min="1" value={form.work_days} onChange={e => updateField('work_days', e.target.value)} className="input text-sm w-full" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">End</label>
+                      <input type="date" value={form.end_date} onChange={e => updateField('end_date', e.target.value)} className="input text-sm w-full" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Progress — <span className="text-green-700 font-bold">{form.progress}%</span>
+                    </label>
+                    <input type="range" min="0" max="100" step="5" value={form.progress}
+                      onChange={e => updateField('progress', e.target.value)} className="w-full accent-green-700" />
+                    <div className="flex justify-between text-[10px] text-gray-400 mt-0.5">
+                      <span>0%</span><span>50%</span><span>100%</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Notes</label>
+                    <textarea value={form.notes} onChange={e => updateField('notes', e.target.value)}
+                      rows={3} placeholder="Optional notes…" className="input text-sm w-full resize-none" />
+                  </div>
+                </div>
 
-              {/* Notes */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Notes</label>
-                <textarea value={form.notes} onChange={e => updateField('notes', e.target.value)}
-                  rows={3} placeholder="Optional notes…" className="input text-sm w-full resize-none" />
               </div>
             </div>
 
-            <div className="px-5 pb-5 flex items-center gap-2">
-              <button onClick={saveItem} disabled={saving || (entryMode === 'crew' ? !form.crew_entry.trim() : !form.title.trim())}
+            {/* Footer */}
+            <div className="px-6 pb-5 pt-3 border-t border-gray-100 flex items-center gap-2 flex-shrink-0">
+              <button onClick={saveItem} disabled={saving || !form.title.trim()}
                 className="flex-1 btn-primary text-sm py-2.5 disabled:opacity-50">
                 {saving ? 'Saving…' : editItem ? 'Update' : 'Save'}
               </button>
