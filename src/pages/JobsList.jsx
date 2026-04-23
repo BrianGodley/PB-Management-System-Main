@@ -15,14 +15,53 @@ function lastName(name = '') {
 const ALL_JOBS = '__all__'
 
 export default function JobsList() {
-  const [jobs, setJobs] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [selectedJob, setSelectedJob] = useState(ALL_JOBS)
-  const [tab, setTab] = useState('jobs')
-  const [jobModal, setJobModal] = useState(null)
-  const [search, setSearch] = useState('')
+  const [jobs,       setJobs]       = useState([])
+  const [loading,    setLoading]    = useState(true)
+  const [selectedJob,setSelectedJob]= useState(ALL_JOBS)
+  const [tab,        setTab]        = useState('jobs')
+  const [jobModal,   setJobModal]   = useState(null)
+  const [search,     setSearch]     = useState('')
+  const [stages,     setStages]     = useState([])
+  const [dragJobId,  setDragJobId]  = useState(null)
+  const [dragOverStage, setDragOverStage] = useState(null)
 
-  useEffect(() => { fetchJobs() }, [])
+  useEffect(() => { fetchJobs(); fetchStages() }, [])
+
+  async function fetchStages() {
+    const { data } = await supabase.from('job_stages').select('*').order('sort_order')
+    if (data) setStages(data)
+  }
+
+  async function addStage(name) {
+    const maxOrder = stages.reduce((m, s) => Math.max(m, s.sort_order), 0)
+    const { data } = await supabase.from('job_stages').insert({ name, sort_order: maxOrder + 1 }).select().single()
+    if (data) setStages(prev => [...prev, data])
+  }
+
+  async function updateStage(id, name) {
+    await supabase.from('job_stages').update({ name }).eq('id', id)
+    setStages(prev => prev.map(s => s.id === id ? { ...s, name } : s))
+  }
+
+  async function deleteStage(id) {
+    if (!confirm('Delete this stage? Jobs in this stage will become unassigned.')) return
+    await supabase.from('jobs').update({ stage_id: null }).eq('stage_id', id)
+    await supabase.from('job_stages').delete().eq('id', id)
+    setStages(prev => prev.filter(s => s.id !== id))
+    setJobs(prev => prev.map(j => j.stage_id === id ? { ...j, stage_id: null } : j))
+  }
+
+  async function reorderStages(reordered) {
+    setStages(reordered)
+    await Promise.all(reordered.map((s, i) =>
+      supabase.from('job_stages').update({ sort_order: i + 1 }).eq('id', s.id)
+    ))
+  }
+
+  async function moveJobToStage(jobId, stageId) {
+    await supabase.from('jobs').update({ stage_id: stageId }).eq('id', jobId)
+    setJobs(prev => prev.map(j => j.id === jobId ? { ...j, stage_id: stageId } : j))
+  }
 
   async function fetchJobs() {
     setLoading(true)
@@ -152,7 +191,7 @@ export default function JobsList() {
       <div className="flex gap-2 flex-1 min-h-0">
 
         {/* Jobs sidebar — desktop only */}
-        <div className="hidden lg:flex w-52 flex-shrink-0 flex-col min-h-0 -ml-6 pl-3">
+        <div className="hidden lg:flex w-56 flex-shrink-0 flex-col min-h-0 -ml-6 pl-3">
           <input
             type="text"
             placeholder="Search jobs…"
@@ -165,50 +204,95 @@ export default function JobsList() {
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-700" />
             </div>
           ) : (
-            <div className="overflow-y-auto flex-1 space-y-0.5">
+            <div className="overflow-y-auto flex-1">
+              {/* All Jobs button */}
               <button
                 onClick={() => setSelectedJob(ALL_JOBS)}
-                className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors border ${
+                className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors border mb-1 ${
                   selectedJob === ALL_JOBS ? 'bg-green-50 border-green-200 text-green-800' : 'border-transparent text-gray-500 hover:bg-gray-100 hover:text-gray-700'
                 }`}
               >
                 All Jobs
               </button>
-              <div className="border-t border-gray-100 my-1" />
-              {sorted.map(job => (
-                <div
-                  key={job.id}
-                  className={`flex items-center gap-1 rounded-lg transition-colors ${
-                    selectedJob === job.id ? 'bg-green-50 border border-green-200' : 'hover:bg-gray-100 border border-transparent'
-                  }`}
-                >
-                  <button
-                    onClick={() => setSelectedJob(job.id)}
-                    className="flex-1 text-left pl-2 pr-1 py-2 text-sm min-w-0"
+
+              {/* Stage groups */}
+              {(() => {
+                // Build lookup: stageId → jobs
+                const byStage = {}
+                stages.forEach(s => { byStage[s.id] = [] })
+                byStage['__none__'] = []
+                sorted.forEach(job => {
+                  const key = job.stage_id && byStage[job.stage_id] ? job.stage_id : '__none__'
+                  byStage[key].push(job)
+                })
+
+                const JobItem = ({ job }) => (
+                  <div
+                    key={job.id}
+                    draggable
+                    onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; setDragJobId(job.id) }}
+                    onDragEnd={() => { setDragJobId(null); setDragOverStage(null) }}
+                    className={`flex items-center gap-1 rounded-lg transition-colors cursor-grab active:cursor-grabbing ${
+                      selectedJob === job.id ? 'bg-green-50 border border-green-200' : 'hover:bg-gray-100 border border-transparent'
+                    } ${dragJobId === job.id ? 'opacity-40' : ''}`}
                   >
-                    <p className={`font-medium truncate ${selectedJob === job.id ? 'text-green-800' : 'text-gray-700'}`}>
-                      {job.name || job.client_name}
-                    </p>
-                  </button>
-                  <button
-                    onClick={e => { e.stopPropagation(); setJobModal(job) }}
-                    className={`flex-shrink-0 p-1.5 mr-1 rounded transition-colors ${
-                      selectedJob === job.id
-                        ? 'text-green-500 hover:text-green-800 hover:bg-green-100'
-                        : 'text-gray-500 hover:text-gray-800 hover:bg-gray-200'
-                    }`}
-                    title="View / edit job"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 0l.172.172a2 2 0 010 2.828L12 16H9v-3z" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
-              {sorted.length === 0 && (
-                <p className="text-xs text-gray-400 text-center py-6">No jobs found.</p>
-              )}
+                    <button onClick={() => setSelectedJob(job.id)} className="flex-1 text-left pl-2 pr-1 py-1.5 text-xs min-w-0">
+                      <p className={`font-medium truncate ${selectedJob === job.id ? 'text-green-800' : 'text-gray-700'}`}>
+                        {job.name || job.client_name}
+                      </p>
+                    </button>
+                    <button
+                      onClick={e => { e.stopPropagation(); setJobModal(job) }}
+                      className={`flex-shrink-0 p-1 mr-1 rounded transition-colors ${
+                        selectedJob === job.id ? 'text-green-500 hover:text-green-800 hover:bg-green-100' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                          d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 0l.172.172a2 2 0 010 2.828L12 16H9v-3z" />
+                      </svg>
+                    </button>
+                  </div>
+                )
+
+                const StageSection = ({ stageId, label }) => {
+                  const stageJobs = byStage[stageId] || []
+                  const isOver = dragOverStage === stageId && dragJobId
+                  return (
+                    <div
+                      onDragOver={e => { e.preventDefault(); setDragOverStage(stageId) }}
+                      onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverStage(null) }}
+                      onDrop={e => {
+                        e.preventDefault()
+                        if (dragJobId) moveJobToStage(dragJobId, stageId === '__none__' ? null : stageId)
+                        setDragJobId(null); setDragOverStage(null)
+                      }}
+                      className={`mb-1 rounded-lg transition-colors ${isOver ? 'bg-green-50 ring-1 ring-green-300' : ''}`}
+                    >
+                      <div className="flex items-center gap-1.5 px-2 pt-2 pb-1">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide truncate flex-1">{label}</span>
+                        {stageJobs.length > 0 && (
+                          <span className="text-[10px] font-semibold text-gray-400 bg-gray-100 rounded-full px-1.5 py-0.5 leading-none">{stageJobs.length}</span>
+                        )}
+                      </div>
+                      <div className="space-y-0.5 px-0.5 min-h-[4px]">
+                        {stageJobs.map(job => <JobItem key={job.id} job={job} />)}
+                        {stageJobs.length === 0 && isOver && (
+                          <div className="h-6 rounded border-2 border-dashed border-green-300 mx-1" />
+                        )}
+                      </div>
+                    </div>
+                  )
+                }
+
+                return (
+                  <>
+                    {byStage['__none__'].length > 0 && <StageSection stageId="__none__" label="Unassigned" />}
+                    {stages.map(s => <StageSection key={s.id} stageId={s.id} label={s.name} />)}
+                    {sorted.length === 0 && <p className="text-xs text-gray-400 text-center py-6">No jobs found.</p>}
+                  </>
+                )
+              })()}
             </div>
           )}
         </div>
@@ -251,7 +335,15 @@ export default function JobsList() {
             />
           )}
           {tab === 'templates'  && <ComingSoon label="Templates" />}
-          {tab === 'settings'   && <JobScheduleSettings />}
+          {tab === 'settings'   && (
+            <JobScheduleSettings
+              stages={stages}
+              onAddStage={addStage}
+              onUpdateStage={updateStage}
+              onDeleteStage={deleteStage}
+              onReorderStages={reorderStages}
+            />
+          )}
           {tab === 'tracking'   && (
             selectedJobObj ? (
               <div className="flex flex-col items-center justify-center h-full gap-4">
@@ -407,42 +499,153 @@ function ColorDropdown({ value, onChange }) {
 }
 
 // ── Job Schedule Settings ─────────────────────────────────────────────────────
-function JobScheduleSettings() {
+function JobScheduleSettings({ stages = [], onAddStage, onUpdateStage, onDeleteStage, onReorderStages }) {
   const [defaultColor,  setDefaultColor]  = useState('#15803d')
   const [saving,        setSaving]        = useState(false)
   const [saved,         setSaved]         = useState(false)
+  const [newStage,      setNewStage]      = useState('')
+  const [editingId,     setEditingId]     = useState(null)
+  const [editingName,   setEditingName]   = useState('')
+  const [dragIdx,       setDragIdx]       = useState(null)
+  const [dragOverIdx,   setDragOverIdx]   = useState(null)
 
   useEffect(() => {
     supabase.from('company_settings').select('value').eq('key', 'default_schedule_color').single()
       .then(({ data }) => { if (data?.value) setDefaultColor(data.value) })
   }, [])
 
-  async function handleSave() {
+  async function handleSaveColor() {
     setSaving(true); setSaved(false)
     await supabase.from('company_settings').upsert({ key: 'default_schedule_color', value: defaultColor })
     setSaving(false); setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
 
+  function handleStageDragStart(idx) { setDragIdx(idx) }
+
+  function handleStageDrop(toIdx) {
+    if (dragIdx === null || dragIdx === toIdx) return
+    const reordered = [...stages]
+    const [moved] = reordered.splice(dragIdx, 1)
+    reordered.splice(toIdx, 0, moved)
+    onReorderStages(reordered)
+    setDragIdx(null); setDragOverIdx(null)
+  }
+
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-2xl space-y-6">
+
+      {/* Default color */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h2 className="text-base font-bold text-gray-800 mb-1">Schedule Item Default Color</h2>
-        <p className="text-sm text-gray-500 mb-5">
-          This color will be used as the default background color for new schedule items.
-        </p>
-
-        <div className="flex items-center gap-4 mb-5">
+        <p className="text-sm text-gray-500 mb-4">Default background color for new schedule items.</p>
+        <div className="flex items-center gap-4">
           <ColorDropdown value={defaultColor} onChange={setDefaultColor} />
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button onClick={handleSave} disabled={saving}
+          <button onClick={handleSaveColor} disabled={saving}
             className="btn-primary text-sm px-4 py-2 disabled:opacity-50">
-            {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save Default Color'}
+            {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save'}
           </button>
         </div>
       </div>
+
+      {/* Job Stages */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <h2 className="text-base font-bold text-gray-800 mb-1">Job Stages</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Stages group jobs in the sidebar. Drag to reorder.
+        </p>
+
+        {/* Add new stage */}
+        <div className="flex gap-2 mb-4">
+          <input
+            type="text"
+            value={newStage}
+            onChange={e => setNewStage(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && newStage.trim()) { onAddStage(newStage.trim()); setNewStage('') } }}
+            placeholder="New stage name…"
+            className="input text-sm flex-1"
+          />
+          <button
+            onClick={() => { if (newStage.trim()) { onAddStage(newStage.trim()); setNewStage('') } }}
+            className="btn-primary text-sm px-4 py-2"
+          >
+            Add
+          </button>
+        </div>
+
+        {/* Stage list */}
+        <div className="space-y-1.5">
+          {stages.map((stage, idx) => (
+            <div
+              key={stage.id}
+              draggable
+              onDragStart={() => handleStageDragStart(idx)}
+              onDragOver={e => { e.preventDefault(); setDragOverIdx(idx) }}
+              onDragLeave={() => setDragOverIdx(null)}
+              onDrop={() => handleStageDrop(idx)}
+              onDragEnd={() => { setDragIdx(null); setDragOverIdx(null) }}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
+                dragOverIdx === idx && dragIdx !== idx
+                  ? 'border-green-400 bg-green-50'
+                  : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+              } ${dragIdx === idx ? 'opacity-40' : ''}`}
+            >
+              {/* Drag handle */}
+              <span className="text-gray-300 cursor-grab active:cursor-grabbing flex-shrink-0" title="Drag to reorder">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                </svg>
+              </span>
+
+              {/* Sort order badge */}
+              <span className="text-[10px] font-bold text-gray-400 w-4 text-center flex-shrink-0">{idx + 1}</span>
+
+              {/* Name / edit field */}
+              {editingId === stage.id ? (
+                <input
+                  autoFocus
+                  type="text"
+                  value={editingName}
+                  onChange={e => setEditingName(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') { onUpdateStage(stage.id, editingName.trim()); setEditingId(null) }
+                    if (e.key === 'Escape') setEditingId(null)
+                  }}
+                  onBlur={() => { onUpdateStage(stage.id, editingName.trim()); setEditingId(null) }}
+                  className="input text-sm flex-1 py-0.5"
+                />
+              ) : (
+                <span className="flex-1 text-sm font-medium text-gray-700">{stage.name}</span>
+              )}
+
+              {/* Edit / Delete */}
+              <button
+                onClick={() => { setEditingId(stage.id); setEditingName(stage.name) }}
+                className="text-gray-400 hover:text-gray-700 p-1 rounded hover:bg-gray-200 transition-colors"
+                title="Rename"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 0l.172.172a2 2 0 010 2.828L12 16H9v-3z" />
+                </svg>
+              </button>
+              <button
+                onClick={() => onDeleteStage(stage.id)}
+                className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"
+                title="Delete"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          ))}
+          {stages.length === 0 && (
+            <p className="text-sm text-gray-400 italic text-center py-4">No stages yet — add one above.</p>
+          )}
+        </div>
+      </div>
+
     </div>
   )
 }
