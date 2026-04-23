@@ -10,6 +10,14 @@ const US_STATES = [
   'VA','WA','WV','WI','WY'
 ]
 
+// Display name helper: "Last, First" when available, else legacy name field
+function displayName(c) {
+  if (c.last_name || c.first_name) {
+    return [c.last_name, c.first_name].filter(Boolean).join(', ')
+  }
+  return c.name || '—'
+}
+
 export default function Clients() {
   const { user } = useAuth()
   const [clients, setClients] = useState([])
@@ -19,7 +27,9 @@ export default function Clients() {
   const [saveError, setSaveError] = useState('')
   const [search, setSearch] = useState('')
   const [form, setForm] = useState({
-    name: '', email: '', phone: '',
+    first_name: '', last_name: '',
+    company_name: '', company_position: '',
+    email: '', phone: '',
     street: '', city: '', state: '', zip: '',
     notes: ''
   })
@@ -31,33 +41,45 @@ export default function Clients() {
     const { data, error } = await supabase
       .from('clients')
       .select('*')
-      .order('name')
     if (error) console.error('fetchClients error:', error.message)
-    if (data) setClients(data)
+    setClients(data || [])
     setLoading(false)
   }
 
   async function handleSave(e) {
     e.preventDefault()
-    if (!form.name.trim()) return
+    if (!form.last_name.trim() && !form.first_name.trim()) return
     setSaving(true)
     setSaveError('')
+
+    const combined = [form.first_name.trim(), form.last_name.trim()].filter(Boolean).join(' ')
+
     const { error } = await supabase.from('clients').insert({
-      name:   form.name.trim(),
-      email:  form.email.trim(),
-      phone:  form.phone.trim(),
-      street: form.street.trim(),
-      city:   form.city.trim(),
-      state:  form.state,
-      zip:    form.zip.trim(),
-      notes:  form.notes.trim(),
-      created_by: user?.id,
+      first_name:       form.first_name.trim(),
+      last_name:        form.last_name.trim(),
+      name:             combined,                       // keep for backward compat
+      company_name:     form.company_name.trim(),
+      company_position: form.company_position.trim(),
+      email:            form.email.trim(),
+      phone:            form.phone.trim(),
+      street:           form.street.trim(),
+      city:             form.city.trim(),
+      state:            form.state,
+      zip:              form.zip.trim(),
+      notes:            form.notes.trim(),
+      created_by:       user?.id,
     })
     setSaving(false)
     if (error) {
       setSaveError(error.message)
     } else {
-      setForm({ name: '', email: '', phone: '', street: '', city: '', state: '', zip: '', notes: '' })
+      setForm({
+        first_name: '', last_name: '',
+        company_name: '', company_position: '',
+        email: '', phone: '',
+        street: '', city: '', state: '', zip: '',
+        notes: ''
+      })
       setShowForm(false)
       setSaveError('')
       fetchClients()
@@ -70,16 +92,32 @@ export default function Clients() {
     fetchClients()
   }
 
-  const fullAddress = (c) => [c.street, c.city, c.state, c.zip].filter(Boolean).join(', ')
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
 
-  const filtered = clients.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    (c.email || '').toLowerCase().includes(search.toLowerCase()) ||
-    (c.phone || '').includes(search) ||
-    (c.city || '').toLowerCase().includes(search.toLowerCase())
+  // Sort by last_name → first_name (case-insensitive), fallback to legacy name
+  const sorted = [...clients].sort((a, b) => {
+    const la = (a.last_name || a.name || '').toLowerCase()
+    const lb = (b.last_name || b.name || '').toLowerCase()
+    if (la !== lb) return la.localeCompare(lb)
+    return (a.first_name || '').toLowerCase().localeCompare((b.first_name || '').toLowerCase())
+  })
+
+  const filtered = sorted.filter(c => {
+    const q = search.toLowerCase()
+    return (
+      displayName(c).toLowerCase().includes(q) ||
+      (c.company_name || '').toLowerCase().includes(q) ||
+      (c.email || '').toLowerCase().includes(q) ||
+      (c.phone || '').includes(search) ||
+      (c.city || '').toLowerCase().includes(q)
+    )
+  })
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-20">
+      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-700" />
+    </div>
   )
-
-  if (loading) return <div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-700"></div></div>
 
   return (
     <div>
@@ -92,59 +130,71 @@ export default function Clients() {
         </button>
       </div>
 
-      {/* Add client form */}
+      {/* ── Add client form ── */}
       {showForm && (
         <form onSubmit={handleSave} className="card mb-6">
           <h2 className="font-semibold text-gray-900 mb-4">New Client</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
-            {/* Name */}
-            <div className="sm:col-span-2">
-              <label className="label">Client Name *</label>
-              <input className="input" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Full name or company" required />
+            {/* First / Last name */}
+            <div>
+              <label className="label">First Name *</label>
+              <input className="input" value={form.first_name} onChange={e => set('first_name', e.target.value)} placeholder="First name" />
+            </div>
+            <div>
+              <label className="label">Last Name *</label>
+              <input className="input" value={form.last_name} onChange={e => set('last_name', e.target.value)} placeholder="Last name" required />
+            </div>
+
+            {/* Company Name / Position */}
+            <div>
+              <label className="label">Company Name</label>
+              <input className="input" value={form.company_name} onChange={e => set('company_name', e.target.value)} placeholder="Company or organization" />
+            </div>
+            <div>
+              <label className="label">Company Position</label>
+              <input className="input" value={form.company_position} onChange={e => set('company_position', e.target.value)} placeholder="Title or role" />
             </div>
 
             {/* Email + Phone */}
             <div>
               <label className="label">Email</label>
-              <input className="input" type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} placeholder="email@example.com" />
+              <input className="input" type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="email@example.com" />
             </div>
             <div>
               <label className="label">Phone</label>
-              <input className="input" type="tel" value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} placeholder="(555) 555-5555" />
+              <input className="input" type="tel" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(555) 555-5555" />
             </div>
 
             {/* Street */}
             <div className="sm:col-span-2">
               <label className="label">Street Address</label>
-              <input className="input" value={form.street} onChange={e => setForm(p => ({ ...p, street: e.target.value }))} placeholder="123 Main St" />
+              <input className="input" value={form.street} onChange={e => set('street', e.target.value)} placeholder="123 Main St" />
             </div>
 
-            {/* City */}
+            {/* City + State + Zip */}
             <div>
               <label className="label">City</label>
-              <input className="input" value={form.city} onChange={e => setForm(p => ({ ...p, city: e.target.value }))} placeholder="City" />
+              <input className="input" value={form.city} onChange={e => set('city', e.target.value)} placeholder="City" />
             </div>
-
-            {/* State + Zip */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="label">State</label>
-                <select className="input" value={form.state} onChange={e => setForm(p => ({ ...p, state: e.target.value }))}>
+                <select className="input" value={form.state} onChange={e => set('state', e.target.value)}>
                   <option value="">-- State --</option>
                   {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
               <div>
                 <label className="label">Zip Code</label>
-                <input className="input" value={form.zip} onChange={e => setForm(p => ({ ...p, zip: e.target.value }))} placeholder="00000" maxLength={10} />
+                <input className="input" value={form.zip} onChange={e => set('zip', e.target.value)} placeholder="00000" maxLength={10} />
               </div>
             </div>
 
             {/* Notes */}
             <div className="sm:col-span-2">
               <label className="label">Notes</label>
-              <textarea className="input resize-none" rows={2} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Any notes about this client..." />
+              <textarea className="input resize-none" rows={2} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any notes about this client..." />
             </div>
           </div>
 
@@ -163,13 +213,13 @@ export default function Clients() {
       {/* Search */}
       <input
         type="text"
-        placeholder="Search by name, email, phone or city..."
+        placeholder="Search by name, company, email, phone or city..."
         value={search}
         onChange={e => setSearch(e.target.value)}
         className="input mb-4 max-w-sm"
       />
 
-      {/* Client list */}
+      {/* ── Client list ── */}
       {filtered.length === 0 ? (
         <div className="card text-center py-12">
           <p className="text-4xl mb-3">👥</p>
@@ -179,13 +229,13 @@ export default function Clients() {
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           {/* Table header */}
-          <div className="grid grid-cols-12 gap-3 px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          <div className="grid grid-cols-12 gap-3 px-4 py-2 bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
             <div className="col-span-2">Name</div>
+            <div className="col-span-2">Company</div>
             <div className="col-span-2">Phone</div>
             <div className="col-span-2">Email</div>
-            <div className="col-span-3">Street</div>
+            <div className="col-span-2">Street</div>
             <div className="col-span-1">City</div>
-            <div className="col-span-1">ST</div>
             <div className="col-span-1"></div>
           </div>
 
@@ -193,26 +243,37 @@ export default function Clients() {
           {filtered.map((client, i) => (
             <div
               key={client.id}
-              className={`grid grid-cols-12 gap-3 px-4 py-3 items-center hover:bg-gray-50 transition-colors ${i !== filtered.length - 1 ? 'border-b border-gray-100' : ''}`}
+              className={`grid grid-cols-12 gap-3 px-4 py-1.5 items-center hover:bg-gray-50 transition-colors ${i !== filtered.length - 1 ? 'border-b border-gray-100' : ''}`}
             >
               <div className="col-span-2 min-w-0">
-                <Link to={`/clients/${client.id}`} className="font-semibold text-green-700 hover:underline truncate block">{client.name}</Link>
-                {client.notes && <p className="text-xs text-gray-400 italic truncate">{client.notes}</p>}
+                <Link
+                  to={`/clients/${client.id}`}
+                  className="text-sm font-medium text-green-700 hover:underline truncate block"
+                >
+                  {displayName(client)}
+                </Link>
               </div>
               <div className="col-span-2 min-w-0">
-                <p className="text-sm text-gray-600 truncate">{client.phone || '—'}</p>
+                {client.company_name ? (
+                  <>
+                    <p className="text-xs font-medium text-gray-700 truncate">{client.company_name}</p>
+                    {client.company_position && <p className="text-xs text-gray-400 truncate">{client.company_position}</p>}
+                  </>
+                ) : (
+                  <p className="text-xs text-gray-300">—</p>
+                )}
               </div>
               <div className="col-span-2 min-w-0">
-                <p className="text-sm text-gray-600 truncate">{client.email || '—'}</p>
+                <p className="text-xs text-gray-600 truncate">{client.phone || '—'}</p>
               </div>
-              <div className="col-span-3 min-w-0">
-                <p className="text-sm text-gray-500 truncate">{client.street || '—'}</p>
+              <div className="col-span-2 min-w-0">
+                <p className="text-xs text-gray-600 truncate">{client.email || '—'}</p>
+              </div>
+              <div className="col-span-2 min-w-0">
+                <p className="text-xs text-gray-500 truncate">{client.street || '—'}</p>
               </div>
               <div className="col-span-1 min-w-0">
-                <p className="text-sm text-gray-500 truncate">{client.city || '—'}</p>
-              </div>
-              <div className="col-span-1">
-                <p className="text-sm text-gray-500">{client.state || '—'}</p>
+                <p className="text-xs text-gray-500 truncate">{client.city ? `${client.city}${client.state ? ', ' + client.state : ''}` : '—'}</p>
               </div>
               <div className="col-span-1 flex items-center justify-end gap-2">
                 <Link to={`/clients/${client.id}`} className="text-xs text-gray-500 hover:text-gray-700 whitespace-nowrap">
@@ -224,7 +285,6 @@ export default function Clients() {
           ))}
         </div>
       )}
-
     </div>
   )
 }
