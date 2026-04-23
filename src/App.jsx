@@ -25,6 +25,8 @@ import EmployeeDetail from './pages/EmployeeDetail'
 import ApplicantDetail from './pages/ApplicantDetail'
 import ApplyForm from './pages/ApplyForm'
 import Accounting from './pages/Accounting'
+import TimeClockPage from './pages/TimeClockPage'
+import DailyLogsPage from './pages/DailyLogsPage'
 
 function PortalPlaceholder({ label, icon }) {
   return (
@@ -86,6 +88,8 @@ function AppRoutes() {
         <Route path="hr/employee/:id" element={<EmployeeDetail />} />
         <Route path="hr/applicant/:id" element={<ApplicantDetail />} />
         <Route path="accounting" element={<Accounting />} />
+        <Route path="timeclock" element={<TimeClockPage />} />
+        <Route path="daily-logs" element={<DailyLogsPage />} />
       </Route>
     </Routes>
   )
