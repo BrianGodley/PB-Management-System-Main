@@ -274,11 +274,13 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
 
       {/* ── Layer 3: bars — CSS grid, rows auto-size so every bar is fully visible ── */}
       <div
-        className="relative pointer-events-none pb-2"
+        className="relative pointer-events-none"
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(7, 1fr)',
           gridAutoRows: 'minmax(30px, auto)',
+          rowGap: '3px',
+          paddingBottom: '10px',
         }}
       >
         {weekItems.flatMap(item => {
@@ -309,7 +311,7 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
                   gridColumn:      `${seg.startCol + 1} / ${seg.endCol + 2}`,
                   backgroundColor: item.display_color,
                   borderRadius:    radius,
-                  margin:          '2px 3px',
+                  margin:          '0 3px',
                   minHeight:       24,
                   pointerEvents:   'auto',
                   alignSelf:       'stretch',
