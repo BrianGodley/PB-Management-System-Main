@@ -1111,7 +1111,7 @@ export default function EstimateDetail() {
                 </div>
                 <button onClick={closeModuleFlow} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
               </div>
-              <div className="overflow-y-auto px-6 py-5 flex-1">
+              <div className="overflow-y-auto px-6 pb-6 flex-1">
                 {selectedType === 'Drainage' && (
                   <DrainageModule
                     projectName={selectedProject?.project_name}

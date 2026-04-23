@@ -694,7 +694,7 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
         <SectionHeader title="Waterline Tile" />
         <div className="space-y-3">
       {/* ── Sticky GPMD bar ── */}
-      <div className="sticky top-0 z-20 -mx-6 -mt-5 px-6 pt-2 pb-2 bg-gray-900 shadow-lg">
+      <div className="sticky top-0 z-20 -mx-6 px-6 pt-2 pb-2 bg-gray-900 shadow-lg">
       <GpmdBar
           sticky
         totalMat={calc.totalMat}
