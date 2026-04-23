@@ -91,10 +91,14 @@ function isWorkingDay(date, exceptions = [], includeSat = false, includeSun = fa
   if (dow === 6 && !includeSat) return false
   if (dow === 0 && !includeSun) return false
   const ds = dateStr(date)
-  return !exceptions.some(ex =>
-    (ex.type === 'day_of_week'   && ex.day_of_week    === dow) ||
-    (ex.type === 'specific_date' && ex.exception_date === ds)
-  )
+  return !exceptions.some(ex => {
+    if (ex.type === 'day_of_week') return ex.day_of_week === dow
+    if (ex.type === 'specific_date') {
+      const end = ex.exception_date_end || ex.exception_date
+      return ds >= ex.exception_date && ds <= end
+    }
+    return false
+  })
 }
 
 function addWorkDays(startDate, workDays, exceptions = [], includeSat = false, includeSun = false) {
@@ -123,10 +127,14 @@ function isCellException(date, exceptions) {
   const dow = date.getDay()
   if (dow === 0 || dow === 6) return true   // weekends always shaded by default
   const ds = dateStr(date)
-  return exceptions.some(ex =>
-    (ex.type === 'day_of_week'   && ex.day_of_week    === dow) ||
-    (ex.type === 'specific_date' && ex.exception_date === ds)
-  )
+  return exceptions.some(ex => {
+    if (ex.type === 'day_of_week') return ex.day_of_week === dow
+    if (ex.type === 'specific_date') {
+      const end = ex.exception_date_end || ex.exception_date
+      return ds >= ex.exception_date && ds <= end
+    }
+    return false
+  })
 }
 
 function fmtDate(ds) {
@@ -386,24 +394,26 @@ function CrewSubPicker({ label, emptyMsg, options, selectedId, onSelect }) {
 }
 
 // ── Workday Exceptions Modal ──────────────────────────────────
-function WorkdayExceptionsModal({ exceptions, onAdd, onDelete, onClose }) {
+function WorkdayExceptionsModal({ exceptions, onAdd, onDelete, onClose, recalculating }) {
   const [type,      setType]      = useState('day_of_week')
   const [dayOfWeek, setDayOfWeek] = useState(1)
-  const [date,      setDate]      = useState('')
+  const [dateStart, setDateStart] = useState('')
+  const [dateEnd,   setDateEnd]   = useState('')
   const [label,     setLabel]     = useState('')
   const [saving,    setSaving]    = useState(false)
 
   async function handleAdd() {
-    if (type === 'specific_date' && !date) return
+    if (type === 'specific_date' && !dateStart) return
     setSaving(true)
     await onAdd({
       type,
-      day_of_week:    type === 'day_of_week'   ? +dayOfWeek : null,
-      exception_date: type === 'specific_date' ? date       : null,
+      day_of_week:        type === 'day_of_week'   ? +dayOfWeek  : null,
+      exception_date:     type === 'specific_date' ? dateStart    : null,
+      exception_date_end: type === 'specific_date' && dateEnd && dateEnd > dateStart ? dateEnd : null,
       label: label.trim() || null,
     })
     setSaving(false)
-    setDate(''); setLabel('')
+    setDateStart(''); setDateEnd(''); setLabel('')
   }
 
   const recurring = exceptions.filter(e => e.type === 'day_of_week')
@@ -454,11 +464,21 @@ function WorkdayExceptionsModal({ exceptions, onAdd, onDelete, onClose }) {
                 </div>
               ) : (
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Date</label>
-                  <input type="date" value={date} onChange={e => setDate(e.target.value)} className="input text-sm w-full" />
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Start Date</label>
+                  <input type="date" value={dateStart} onChange={e => setDateStart(e.target.value)} className="input text-sm w-full" />
                 </div>
               )}
             </div>
+
+            {type === 'specific_date' && (
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  End Date <span className="text-gray-400 font-normal">(optional — leave blank for single day)</span>
+                </label>
+                <input type="date" value={dateEnd} min={dateStart}
+                  onChange={e => setDateEnd(e.target.value)} className="input text-sm w-full" />
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Label <span className="text-gray-400 font-normal">(optional)</span></label>
@@ -466,10 +486,18 @@ function WorkdayExceptionsModal({ exceptions, onAdd, onDelete, onClose }) {
                 placeholder="e.g. Holiday, Company day off…" className="input text-sm w-full" />
             </div>
 
-            <button onClick={handleAdd} disabled={saving || (type === 'specific_date' && !date)}
-              className="btn-primary text-sm px-4 py-2 disabled:opacity-50">
-              {saving ? 'Adding…' : 'Add Exception'}
-            </button>
+            <div className="flex items-center gap-3">
+              <button onClick={handleAdd} disabled={saving || (type === 'specific_date' && !dateStart)}
+                className="btn-primary text-sm px-4 py-2 disabled:opacity-50">
+                {saving ? 'Adding…' : 'Add Exception'}
+              </button>
+              {recalculating && (
+                <span className="text-xs text-gray-400 flex items-center gap-1.5">
+                  <span className="inline-block w-3 h-3 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+                  Updating schedule items…
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Recurring exceptions */}
@@ -506,7 +534,11 @@ function WorkdayExceptionsModal({ exceptions, onAdd, onDelete, onClose }) {
                 {specific.map(ex => (
                   <div key={ex.id} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
                     <div>
-                      <p className="text-sm font-semibold text-gray-800">{fmtDate(ex.exception_date)}</p>
+                      <p className="text-sm font-semibold text-gray-800">
+                        {ex.exception_date_end
+                          ? `${fmtDate(ex.exception_date)} – ${fmtDate(ex.exception_date_end)}`
+                          : fmtDate(ex.exception_date)}
+                      </p>
                       {ex.label && <p className="text-xs text-gray-500">{ex.label}</p>}
                     </div>
                     <button onClick={() => onDelete(ex.id)} className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors">
@@ -546,6 +578,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
   const [defaultSchedColor,  setDefaultSchedColor]  = useState('#15803d')
   const [exceptions,         setExceptions]         = useState([])
   const [showExceptions,     setShowExceptions]     = useState(false)
+  const [recalculating,      setRecalculating]      = useState(false)
 
   // crew color lookup: { crewId: hexColor }
   const crewColorMap = Object.fromEntries(crews.map(c => [c.id, c.color || '#15803d']))
@@ -570,14 +603,46 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
     if (data) setExceptions(data)
   }
 
+  async function recalculateScheduleItems(updatedExceptions) {
+    setRecalculating(true)
+    const { data: allItems } = await supabase.from('schedule_items').select('*')
+    if (!allItems) { setRecalculating(false); return }
+
+    const updates = allItems
+      .map(item => {
+        if (!item.start_date || !item.work_days) return null
+        const newEnd = dateStr(addWorkDays(
+          new Date(item.start_date + 'T00:00:00'),
+          item.work_days,
+          updatedExceptions,
+          item.include_saturday || false,
+          item.include_sunday   || false,
+        ))
+        return newEnd !== item.end_date ? { id: item.id, end_date: newEnd } : null
+      })
+      .filter(Boolean)
+
+    await Promise.all(updates.map(u =>
+      supabase.from('schedule_items').update({ end_date: u.end_date }).eq('id', u.id)
+    ))
+    setRecalculating(false)
+    fetchItems()
+  }
+
   async function addException(payload) {
     const { data } = await supabase.from('workday_exceptions').insert(payload).select().single()
-    if (data) setExceptions(prev => [...prev, data])
+    if (data) {
+      const updated = [...exceptions, data]
+      setExceptions(updated)
+      recalculateScheduleItems(updated)
+    }
   }
 
   async function deleteException(id) {
     await supabase.from('workday_exceptions').delete().eq('id', id)
-    setExceptions(prev => prev.filter(e => e.id !== id))
+    const updated = exceptions.filter(e => e.id !== id)
+    setExceptions(updated)
+    recalculateScheduleItems(updated)
   }
 
   useEffect(() => { fetchItems() }, [year, month, selectedJob])
@@ -869,6 +934,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
           onAdd={addException}
           onDelete={deleteException}
           onClose={() => setShowExceptions(false)}
+          recalculating={recalculating}
         />
       )}
 
