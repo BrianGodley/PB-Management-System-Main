@@ -392,7 +392,13 @@ export default function HR() {
 
   // ── Filtered lists ──────────────────────────────────────────────────────────
   const filteredEmps = employees
-    .filter(e => empFilter === 'all' || e.status === empFilter)
+    .filter(e => e.status === 'active')
+    .filter(e => search === '' ||
+      `${e.first_name} ${e.last_name} ${e.job_title} ${e.department}`.toLowerCase().includes(search.toLowerCase())
+    )
+
+  const filteredArchive = employees
+    .filter(e => e.status === 'archived')
     .filter(e => search === '' ||
       `${e.first_name} ${e.last_name} ${e.job_title} ${e.department}`.toLowerCase().includes(search.toLowerCase())
     )
@@ -455,7 +461,8 @@ export default function HR() {
         {[
           { key: 'employees', label: `Employees (${employees.filter(e => e.status === 'active').length})`, icon: '👤' },
           { key: 'applicants', label: `Applicants (${applicants.length})`, icon: '📋' },
-          { key: 'forms', label: `Review Forms (${reviewForms.length})`, icon: '⭐' },
+          { key: 'forms',      label: `Review Forms (${reviewForms.length})`, icon: '⭐' },
+          { key: 'archive',    label: `Archive (${employees.filter(e => e.status === 'archived').length})`, icon: '📦' },
         ].map(t => (
           <button
             key={t.key}
@@ -475,20 +482,9 @@ export default function HR() {
           type="text"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder={tab === 'employees' ? 'Search employees…' : tab === 'applicants' ? 'Search applicants…' : ''}
+          placeholder={tab === 'employees' ? 'Search employees…' : tab === 'archive' ? 'Search archive…' : tab === 'applicants' ? 'Search applicants…' : ''}
           className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-green-500"
         />
-
-        {tab === 'employees' && (
-          <div className="flex gap-1">
-            {[['active', 'Active'], ['archived', 'Archived'], ['all', 'All']].map(([val, label]) => (
-              <button key={val} onClick={() => setEmpFilter(val)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${empFilter === val ? 'bg-green-700 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
 
         {tab === 'applicants' && (
           <div className="flex gap-1 flex-wrap">
@@ -609,6 +605,48 @@ export default function HR() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )
+
+          /* ── ARCHIVE TAB ── */
+          ) : tab === 'archive' ? (
+            filteredArchive.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                <p className="text-4xl mb-3">📦</p>
+                <p className="font-medium">No archived employees</p>
+                <p className="text-sm mt-1 text-gray-400">Archived employees will appear here.</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <table className="table-fixed w-full text-xs">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="text-left px-4 py-2 font-semibold text-gray-600 uppercase">Name</th>
+                      <th className="text-left px-4 py-2 font-semibold text-gray-600 uppercase">Address</th>
+                      <th className="text-left px-4 py-2 font-semibold text-gray-600 uppercase">Cell Phone</th>
+                      <th className="text-left px-4 py-2 font-semibold text-gray-600 uppercase">Email</th>
+                      <th className="text-left px-4 py-2 font-semibold text-gray-600 uppercase">Position</th>
+                      <th className="text-left px-4 py-2 font-semibold text-gray-600 uppercase">Started</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {filteredArchive.map(emp => {
+                      const location = emp.address ? emp.address : (emp.city || emp.state ? `${emp.city || ''}, ${emp.state || ''}`.replace(/^,\s*/, '').replace(/,\s*$/, '') : '—')
+                      return (
+                        <tr key={emp.id} className="hover:bg-gray-50 transition-colors cursor-pointer opacity-70" onClick={() => navigate(`/hr/employee/${emp.id}`)}>
+                          <td className="px-4 py-2">
+                            <button className="text-green-700 hover:underline font-medium">{emp.first_name} {emp.last_name}</button>
+                          </td>
+                          <td className="px-4 py-2 text-gray-600">{location}</td>
+                          <td className="px-4 py-2 text-gray-600">{emp.phone || '—'}</td>
+                          <td className="px-4 py-2 text-gray-600">{emp.email || '—'}</td>
+                          <td className="px-4 py-2 text-gray-600">{emp.job_title || '—'}</td>
+                          <td className="px-4 py-2 text-gray-600">{emp.start_date ? new Date(emp.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '—'}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
               </div>
             )
 

@@ -382,13 +382,6 @@ export default function EmployeeDetail() {
         <button onClick={() => navigate('/hr')} className="text-sm text-gray-500 hover:text-gray-700">← HR</button>
         <span className="text-gray-300">/</span>
         <span className="text-sm font-medium text-gray-800">{employee.first_name} {employee.last_name}</span>
-        <div className="flex-1" />
-        <button onClick={toggleArchive} className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50">
-          {employee.status === 'active' ? '📦 Archive' : '✅ Restore'}
-        </button>
-        <button onClick={handleDelete} className="px-3 py-1.5 border border-red-200 rounded-lg text-xs font-medium text-red-600 hover:bg-red-50">
-          🗑️ Delete
-        </button>
       </div>
 
       {/* ── Hero section ── */}
@@ -423,11 +416,19 @@ export default function EmployeeDetail() {
           </div>
           <p className="text-gray-600">{employee.job_title || '—'}</p>
           {employee.department && <p className="text-sm text-gray-400">{employee.department}</p>}
-          <div className="flex gap-4 mt-2 text-sm text-gray-500">
-            {employee.email && <span>✉️ {employee.email}</span>}
-            {employee.phone && <span>📞 {employee.phone}</span>}
-            {employee.start_date && <span>📅 Since {formatDate(employee.start_date)}</span>}
-          </div>
+          {employee.start_date && <p className="text-sm text-gray-400 mt-1">📅 Since {formatDate(employee.start_date)}</p>}
+        </div>
+
+        {/* Archive + Delete buttons */}
+        <div className="flex gap-2 flex-shrink-0">
+          <button onClick={toggleArchive}
+            className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+            {employee.status === 'active' ? '📦 Archive' : '✅ Restore'}
+          </button>
+          <button onClick={handleDelete}
+            className="px-4 py-2 border border-red-200 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">
+            🗑️ Delete
+          </button>
         </div>
       </div>
 
