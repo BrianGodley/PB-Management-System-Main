@@ -202,18 +202,16 @@ export default function UtilitiesModule({ projectName, onSave, onBack, saving, i
     }
 
     if (initialData?.materialPrices) return
-    supabase
-      .from('material_rates')
-      .select('name, unit_cost')
-      .eq('category', 'Utilities')
-      .then(({ data }) => {
-        if (data) {
-          const prices = {}
-          data.forEach(r => { prices[r.name] = parseFloat(r.unit_cost) || 0 })
-          setMaterialPrices(prices)
-        }
-        setPricesLoading(false)
-      })
+    Promise.all([
+      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Utilities'),
+      supabase.from('labor_rates').select('name, rate').eq('category', 'Utilities'),
+    ]).then(([matRes, labRes]) => {
+      const prices = {}
+      ;(matRes.data || []).forEach(r => { prices[r.name] = parseFloat(r.unit_cost) || 0 })
+      ;(labRes.data  || []).forEach(r => { prices[r.name] = parseFloat(r.rate)     || 0 })
+      setMaterialPrices(prices)
+      setPricesLoading(false)
+    })
   }, [])
 
   const gpmd          = initialData?.gpmd ?? DEFAULTS.gpmd

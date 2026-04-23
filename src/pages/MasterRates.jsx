@@ -306,7 +306,7 @@ const MATERIAL_COLUMNS = [
   { key: 'category',  label: 'Category',       placeholder: 'e.g. Hardscape, Irrigation' },
 ]
 
-const LABOR_CATEGORY_OPTIONS = ['Artificial Turf', 'Concrete', 'Demo', 'Finishes', 'General', 'Irrigation', 'Planting', 'Pool', 'Walls']
+const LABOR_CATEGORY_OPTIONS = ['Artificial Turf', 'Columns', 'Concrete', 'Demo', 'Finishes', 'Fire Pit', 'General', 'Ground Treatments', 'Irrigation', 'Outdoor Kitchen', 'Planting', 'Pool', 'Utilities', 'Walls']
 
 const LABOR_UNIT_OPTIONS = [
   'per day',

@@ -59,20 +59,13 @@ INSERT INTO material_rates (name, unit, unit_cost, category) VALUES
   ('FP Gas Trench Labor Rate',   'LF/day',    35.0, 'Fire Pit')
 ON CONFLICT DO NOTHING;
 
--- ── Wall finish labor productivity rates ──────────────────────────────────────
--- Sand/Smooth Stucco: SF per day
---   formula: SF / rate × 8 = hours
--- Ledgerstone / Stacked Stone: SF per day
---   formula: SF / rate × 8 = hours
--- Tile: combined hrs/SF (layout 400 SF/day + install 30 SF/day → 0.2867 hrs/SF)
--- Real Flagstone: combined hrs/SF (delivery/50 + install/35 + seal/133 → 0.4487 hrs/SF)
--- Real Stone: combined hrs/SF (transport/40 + install/13 + seal/100 → 0.8954 hrs/SF)
-INSERT INTO material_rates (name, unit, unit_cost, category) VALUES
-  ('Sand Stucco - FP Labor Rate',    'SF/day', 92.00,   'Fire Pit'),
-  ('Smooth Stucco - FP Labor Rate',  'SF/day', 65.00,   'Fire Pit'),
-  ('Ledgerstone - FP Labor Rate',    'SF/day', 24.00,   'Fire Pit'),
-  ('Stacked Stone - FP Labor Rate',  'SF/day', 24.00,   'Fire Pit'),
-  ('Tile - FP Labor Rate',           'hrs/SF', 0.2867,  'Fire Pit'),
-  ('Real Flagstone - FP Labor Rate', 'hrs/SF', 0.4487,  'Fire Pit'),
-  ('Real Stone - FP Labor Rate',     'hrs/SF', 0.8954,  'Fire Pit')
+-- ── Wall finish labor productivity rates → labor_rates table ───────────────
+INSERT INTO labor_rates (name, rate, unit, category) VALUES
+  ('Sand Stucco - FP Labor Rate',    92.00,  'SF/day', 'Fire Pit'),
+  ('Smooth Stucco - FP Labor Rate',  65.00,  'SF/day', 'Fire Pit'),
+  ('Ledgerstone - FP Labor Rate',    24.00,  'SF/day', 'Fire Pit'),
+  ('Stacked Stone - FP Labor Rate',  24.00,  'SF/day', 'Fire Pit'),
+  ('Tile - FP Labor Rate',           0.2867, 'hrs/SF', 'Fire Pit'),
+  ('Real Flagstone - FP Labor Rate', 0.4487, 'hrs/SF', 'Fire Pit'),
+  ('Real Stone - FP Labor Rate',     0.8954, 'hrs/SF', 'Fire Pit')
 ON CONFLICT DO NOTHING;
