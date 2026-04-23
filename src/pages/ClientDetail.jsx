@@ -520,7 +520,6 @@ export default function ClientDetail() {
           </div>
 
         </div>
-      </div>
 
       {/* New Estimate modal */}
       {showEstimateModal && (
