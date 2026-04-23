@@ -24,6 +24,7 @@ import HR from './pages/HR'
 import EmployeeDetail from './pages/EmployeeDetail'
 import ApplicantDetail from './pages/ApplicantDetail'
 import ApplyForm from './pages/ApplyForm'
+import Accounting from './pages/Accounting'
 
 function PortalPlaceholder({ label, icon }) {
   return (
@@ -84,6 +85,7 @@ function AppRoutes() {
         <Route path="hr" element={<HR />} />
         <Route path="hr/employee/:id" element={<EmployeeDetail />} />
         <Route path="hr/applicant/:id" element={<ApplicantDetail />} />
+        <Route path="accounting" element={<Accounting />} />
       </Route>
     </Routes>
   )

@@ -13,6 +13,7 @@ const navItems = [
   { path: '/portal/subs',   label: 'Subs & Vendors', icon: '🔧' },
   { path: '/training',      label: 'Training',       icon: '🎓' },
   { path: '/hr',            label: 'HR',             icon: '🏢' },
+  { path: '/accounting',   label: 'Accounting',     icon: '💼' },
 ]
 
 const forestGreen = '#4E7B4C'
