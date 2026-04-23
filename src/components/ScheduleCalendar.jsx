@@ -111,9 +111,16 @@ function addWorkDays(startDate, workDays, exceptions = [], includeSat = false, i
   return d
 }
 
+// Parse a date string or Date to local midnight (avoids UTC-offset off-by-one)
+function toLocalDate(s) {
+  if (!s) return null
+  if (s instanceof Date) return s
+  return new Date(s + 'T00:00:00')
+}
+
 function countWorkDays(start, end, exceptions = [], includeSat = false, includeSun = false) {
   if (!start || !end) return 0
-  let d = new Date(start), e = new Date(end), count = 0
+  let d = toLocalDate(start), e = toLocalDate(end), count = 0
   while (d <= e) {
     if (isWorkingDay(d, exceptions, includeSat, includeSun)) count++
     d.setDate(d.getDate() + 1)
@@ -778,10 +785,10 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
       const incSat = key === 'include_saturday' ? val : next.include_saturday
       const incSun = key === 'include_sunday'   ? val : next.include_sunday
       if ((key === 'start_date' || key === 'include_saturday' || key === 'include_sunday') && next.work_days && +next.work_days > 0 && next.start_date) {
-        next.end_date = dateStr(addWorkDays(new Date(next.start_date), +next.work_days, excs, incSat, incSun))
+        next.end_date = dateStr(addWorkDays(toLocalDate(next.start_date), +next.work_days, excs, incSat, incSun))
       }
       if (key === 'work_days' && next.start_date && +val > 0) {
-        next.end_date = dateStr(addWorkDays(new Date(next.start_date), +val, excs, incSat, incSun))
+        next.end_date = dateStr(addWorkDays(toLocalDate(next.start_date), +val, excs, incSat, incSun))
       }
       if (key === 'end_date' && next.start_date) {
         next.work_days = countWorkDays(next.start_date, val, excs, incSat, incSun)
