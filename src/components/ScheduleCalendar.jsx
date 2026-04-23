@@ -433,14 +433,70 @@ function CrewSubPicker({ label, emptyMsg, options, selectedId, onSelect }) {
   )
 }
 
+// ── US Holiday helpers ────────────────────────────────────────
+function findNthWeekday(year, month, weekday, nth) {
+  let d = new Date(year, month, 1), count = 0
+  while (d.getMonth() === month) {
+    if (d.getDay() === weekday && ++count === nth) return new Date(d)
+    d.setDate(d.getDate() + 1)
+  }
+  return null
+}
+function findLastWeekday(year, month, weekday) {
+  let d = new Date(year, month + 1, 0)
+  while (d.getDay() !== weekday) d.setDate(d.getDate() - 1)
+  return new Date(d)
+}
+const US_HOLIDAYS = [
+  { name: "New Year's Day",         getDate: y => new Date(y, 0, 1) },
+  { name: 'Martin Luther King Day', getDate: y => findNthWeekday(y, 0, 1, 3) },
+  { name: "Presidents' Day",        getDate: y => findNthWeekday(y, 1, 1, 3) },
+  { name: 'Memorial Day',           getDate: y => findLastWeekday(y, 4, 1) },
+  { name: 'Juneteenth',             getDate: y => new Date(y, 5, 19) },
+  { name: 'Independence Day',       getDate: y => new Date(y, 6, 4) },
+  { name: 'Labor Day',              getDate: y => findNthWeekday(y, 8, 1, 1) },
+  { name: 'Columbus Day',           getDate: y => findNthWeekday(y, 9, 1, 2) },
+  { name: 'Veterans Day',           getDate: y => new Date(y, 10, 11) },
+  { name: 'Thanksgiving',           getDate: y => findNthWeekday(y, 10, 4, 4) },
+  { name: 'Christmas Day',          getDate: y => new Date(y, 11, 25) },
+]
+
 // ── Workday Exceptions Modal ──────────────────────────────────
 function WorkdayExceptionsModal({ exceptions, onAdd, onDelete, onClose, recalculating }) {
-  const [type,      setType]      = useState('day_of_week')
-  const [dayOfWeek, setDayOfWeek] = useState(1)
-  const [dateStart, setDateStart] = useState('')
-  const [dateEnd,   setDateEnd]   = useState('')
-  const [label,     setLabel]     = useState('')
-  const [saving,    setSaving]    = useState(false)
+  const [type,            setType]            = useState('day_of_week')
+  const [dayOfWeek,       setDayOfWeek]       = useState(1)
+  const [dateStart,       setDateStart]       = useState('')
+  const [dateEnd,         setDateEnd]         = useState('')
+  const [label,           setLabel]           = useState('')
+  const [saving,          setSaving]          = useState(false)
+  const [togglingHoliday, setTogglingHoliday] = useState(null)
+
+  const curYear = new Date().getFullYear()
+
+  function isHolidayActive(name) {
+    return exceptions.some(e => e.type === 'specific_date' && e.label === name)
+  }
+
+  async function toggleHoliday(holiday) {
+    const active = isHolidayActive(holiday.name)
+    setTogglingHoliday(holiday.name)
+    if (active) {
+      const toRemove = exceptions.filter(e => e.type === 'specific_date' && e.label === holiday.name)
+      for (const ex of toRemove) await onDelete(ex.id)
+    } else {
+      for (let y = curYear; y <= curYear + 2; y++) {
+        const d = holiday.getDate(y)
+        if (d) await onAdd({
+          type:               'specific_date',
+          day_of_week:        null,
+          exception_date:     dateStr(d),
+          exception_date_end: null,
+          label:              holiday.name,
+        })
+      }
+    }
+    setTogglingHoliday(null)
+  }
 
   async function handleAdd() {
     if (type === 'specific_date' && !dateStart) return
@@ -461,7 +517,7 @@ function WorkdayExceptionsModal({ exceptions, onAdd, onDelete, onClose, recalcul
 
   return (
     <ModalOverlay onClose={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 flex flex-col" style={{ maxHeight: '88vh' }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col" style={{ maxHeight: '92vh' }}>
 
         {/* Header */}
         <div className="px-6 pt-5 pb-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
@@ -537,6 +593,51 @@ function WorkdayExceptionsModal({ exceptions, onAdd, onDelete, onClose, recalcul
                   Updating schedule items…
                 </span>
               )}
+            </div>
+          </div>
+
+          {/* US National Holidays */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">🇺🇸 US National Holidays</p>
+              <span className="text-xs text-gray-400">{curYear}–{curYear + 2}</span>
+            </div>
+            <p className="text-xs text-gray-400 mb-3">
+              Select holidays to block them out on the calendar. Each checked holiday is added as an exception for {curYear}, {curYear + 1}, and {curYear + 2}.
+            </p>
+            <div className="rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
+              {US_HOLIDAYS.map(holiday => {
+                const active   = isHolidayActive(holiday.name)
+                const toggling = togglingHoliday === holiday.name
+                const d        = holiday.getDate(curYear)
+                return (
+                  <label
+                    key={holiday.name}
+                    className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${
+                      active   ? 'bg-red-50'
+                      : toggling ? 'bg-gray-50 opacity-60'
+                      : 'bg-white hover:bg-gray-50'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={active}
+                      disabled={!!togglingHoliday || recalculating}
+                      onChange={() => toggleHoliday(holiday)}
+                      className="w-4 h-4 flex-shrink-0 accent-red-600"
+                    />
+                    <span className={`flex-1 text-sm font-medium ${active ? 'text-red-700' : 'text-gray-700'}`}>
+                      {holiday.name}
+                    </span>
+                    <span className="text-xs text-gray-400 flex-shrink-0 tabular-nums">
+                      {d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+                    </span>
+                    {toggling && (
+                      <span className="w-3.5 h-3.5 border-2 border-gray-300 border-t-red-500 rounded-full animate-spin flex-shrink-0" />
+                    )}
+                  </label>
+                )
+              })}
             </div>
           </div>
 
