@@ -3311,25 +3311,11 @@ export default function Statistics() {
 
               {/* Week ending not configured warning */}
               {weekEndingError && selectedStat?.tracking === 'weekly' && (
-                <div className="mx-6 mb-0 mt-2 px-4 py-2.5 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between gap-3 text-sm text-amber-800">
+                <div className="mx-6 mb-2 mt-2 px-4 py-2.5 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between gap-3 text-sm text-amber-800">
                   <span>⚠️ <strong>Week ending day not configured.</strong> Go to <strong>Admin → Company Settings</strong> to set it before entering weekly values.</span>
                   <button onClick={() => setWeekEndingError(false)} className="text-amber-500 hover:text-amber-700 font-bold text-base leading-none flex-shrink-0">✕</button>
                 </div>
               )}
-
-              {/* Bottom action bar */}
-              <div className="flex items-center justify-end px-6 py-3 bg-white border-t border-gray-200 flex-shrink-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400">
-                    {displayChartData.length} data point{displayChartData.length !== 1 ? 's' : ''} in range
-                    {viewPeriod !== selectedStat.tracking && (
-                      <span className="ml-1 text-green-600 font-medium">
-                        · rolled up to {viewPeriod}
-                      </span>
-                    )}
-                  </span>
-                </div>
-              </div>
             </>
           )}
         </main>
