@@ -222,6 +222,7 @@ function calcTurf(state, laborRatePerHour, materialPrices, laborRates, gpmd = 42
 // ── Default state ─────────────────────────────────────────────────────────────
 const DEFAULT_STATE = {
   difficulty:  0,
+  crewType: 'Landscape',
   hoursAdj:    0,
   distanceLF:  0,    // avg distance from truck to work area
   demo: {
@@ -391,6 +392,18 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         price={calc.price}
         subMarkupRate={subGpMarkupRate}
       />
+      </div>
+
+      {/* Crew Type */}
+      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
+        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
+        <select value={state.crewType} onChange={e => set('crewType', e.target.value)} className="input text-sm py-1 w-36">
+          <option value="Demo">Demo</option>
+          <option value="Landscape">Landscape</option>
+          <option value="Masonry">Masonry</option>
+          <option value="Paver">Paver</option>
+          <option value="Specialty">Specialty</option>
+        </select>
       </div>
       {pricesLoading && (
         <div className="text-xs text-amber-700 bg-amber-50 rounded px-3 py-2">Loading current rates…</div>

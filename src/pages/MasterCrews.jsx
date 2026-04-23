@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase'
 // Subcontractor tab: read-only view from subs_vendors (type='sub')
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SKILL_TYPES   = ['Masonry', 'Demo', 'Paver', 'Landscape']
+const SKILL_TYPES   = ['Masonry', 'Demo', 'Paver', 'Landscape', 'Specialty']
 const SKILL_LABELS  = { 1: 'Lv 1 — Best', 2: 'Lv 2 — Good', 3: 'Lv 3 — Fair', 4: 'Lv 4 — Basic' }
 const LABEL_CHARS   = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
@@ -16,6 +16,7 @@ const SKILL_COLORS = {
   Demo:      'bg-red-100    text-red-800    border-red-200',
   Paver:     'bg-blue-100   text-blue-800   border-blue-200',
   Landscape: 'bg-green-100  text-green-800  border-green-200',
+  Specialty: 'bg-purple-100 text-purple-800 border-purple-200',
 }
 
 const LEVEL_DOT = { 1: 'bg-green-500', 2: 'bg-yellow-400', 3: 'bg-orange-400', 4: 'bg-red-400' }

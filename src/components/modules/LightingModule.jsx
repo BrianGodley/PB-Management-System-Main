@@ -170,6 +170,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
 
   const [difficulty,      setDifficulty]      = useState(initialData?.difficulty      ?? '')
+  const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Landscape')
   const [fixtureQtys,     setFixtureQtys]     = useState(initialData?.fixtureQtys     ?? blankFixtureQtys())
   const [transformerQtys, setTransformerQtys] = useState(initialData?.transformerQtys ?? blankTransformerQtys())
   const [wireQtys,        setWireQtys]        = useState(initialData?.wireQtys        ?? blankWireQtys())
@@ -210,6 +211,18 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
         price={calc.price}
         subMarkupRate={subGpMarkupRate}
       />
+      </div>
+
+      {/* Crew Type */}
+      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
+        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
+        <select value={crewType} onChange={e => setCrewType(e.target.value)} className="input text-sm py-1 w-36">
+          <option value="Demo">Demo</option>
+          <option value="Landscape">Landscape</option>
+          <option value="Masonry">Masonry</option>
+          <option value="Paver">Paver</option>
+          <option value="Specialty">Specialty</option>
+        </select>
       </div>
 
       {/* Difficulty */}

@@ -197,6 +197,7 @@ function makeInitial(data = {}) {
     manualRows: data.manualRows ?? [newManualRow()],
     laborRatePerHour: data.laborRatePerHour ?? 35,
     gpmd:             data.gpmd             ?? 425,
+    crewType:         data.crewType         ?? 'Specialty',
   }
 }
 
@@ -711,6 +712,19 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
         subMarkupRate={subGpMarkupRate}
       />
       </div>
+
+      {/* Crew Type */}
+      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
+        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
+        <select value={state.crewType} onChange={e => upd('crewType', e.target.value)} className="input text-sm py-1 w-36">
+          <option value="Demo">Demo</option>
+          <option value="Landscape">Landscape</option>
+          <option value="Masonry">Masonry</option>
+          <option value="Paver">Paver</option>
+          <option value="Specialty">Specialty</option>
+        </select>
+      </div>
+
           {[
             ['Pool', state.pool], ['Spa', state.spa],
             ['Infinity Basin', state.basin], ['Cover Vault', state.vault],
