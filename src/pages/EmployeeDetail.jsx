@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import ReviewModal from '../components/hr/ReviewModal'
+import { sendSMS } from '../lib/notify'
 
 const DEPARTMENTS = ['Operations', 'Landscaping', 'Pool', 'Admin', 'Sales', 'Other']
 
@@ -123,9 +124,14 @@ export default function EmployeeDetail() {
   const [showReview,  setShowReview]   = useState(false)
 
   // User tab state
-  const [userRole,      setUserRole]      = useState('user')
-  const [savingRole,    setSavingRole]    = useState(false)
-  const [roleMsg,       setRoleMsg]       = useState('')
+  const [userRole,         setUserRole]         = useState('user')
+  const [savingRole,       setSavingRole]       = useState(false)
+  const [roleMsg,          setRoleMsg]          = useState('')
+  const [resetSending,     setResetSending]     = useState(false)
+  const [resetMsg,         setResetMsg]         = useState('')
+  const [smsSending,       setSmsSending]       = useState(false)
+  const [resetTextSending, setResetTextSending] = useState(false)
+  const [smsMsg,           setSmsMsg]           = useState('')
 
   // Permissions tab state
   const [perms,         setPerms]         = useState(DEFAULT_PERMS)
@@ -135,6 +141,85 @@ export default function EmployeeDetail() {
 
   // Avatar
   const avatarInputRef = useRef()
+
+  // ── Password / SMS helpers (same as Admin UserEditModal) ──────────────────
+  function generatePassword() {
+    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$'
+    return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+  }
+
+  function formatPhone(raw) {
+    const digits = (raw || '').replace(/\D/g, '')
+    if (digits.length === 10) return '+1' + digits
+    if (digits.length === 11 && digits.startsWith('1')) return '+' + digits
+    return '+' + digits
+  }
+
+  function samMessage(firstName, email, password, isReset = false) {
+    const greeting = firstName ? `Hi ${firstName}, ` : 'Hi there, '
+    const action   = isReset ? 'your password has been reset' : 'here are your login credentials'
+    return (
+      `${greeting}this is Sam, the AI assistant from the Picture Build System — ${action}.\n\n` +
+      `Email: ${email}\n` +
+      `Password: ${password}\n\n` +
+      `Log in at: ${window.location.origin}/login\n\n` +
+      `For your security, please update your password after logging in.`
+    )
+  }
+
+  async function sendPasswordReset() {
+    if (!linkedProfile) return
+    setResetSending(true); setResetMsg('')
+    const emailToReset = linkedProfile.email || employee?.email || ''
+    const { error } = await supabase.auth.resetPasswordForEmail(emailToReset, {
+      redirectTo: window.location.origin + '/reset-password',
+    })
+    setResetMsg(error ? 'error:' + error.message : 'ok:Reset email sent to ' + emailToReset)
+    setResetSending(false)
+  }
+
+  async function sendPasswordViaSMS() {
+    if (!linkedProfile) return
+    const phone = formatPhone(employee?.phone || linkedProfile.phone_cell || '')
+    if (!phone || phone === '+') { setSmsMsg('error:No cell phone number on file for this employee.'); return }
+    if (!linkedProfile.temp_password) { setSmsMsg('error:No stored password found. Use "Reset & Text New Password" instead.'); return }
+    setSmsSending(true); setSmsMsg('')
+    const firstName = employee?.first_name || (linkedProfile.full_name || '').split(' ')[0]
+    const { error } = await sendSMS({
+      to:      phone,
+      message: samMessage(firstName, linkedProfile.email, linkedProfile.temp_password),
+    })
+    setSmsMsg(error ? 'error:SMS failed — ' + error.message : 'ok:Password texted to ' + phone)
+    setSmsSending(false)
+  }
+
+  async function resetAndTextPassword() {
+    if (!linkedProfile) return
+    const phone = formatPhone(employee?.phone || linkedProfile.phone_cell || '')
+    if (!phone || phone === '+') { setSmsMsg('error:No cell phone number on file for this employee.'); return }
+    if (!confirm(`Generate a new password for ${employee?.first_name || linkedProfile.full_name} and text it to ${phone}?`)) return
+    setResetTextSending(true); setSmsMsg('')
+    const newPw = generatePassword()
+    await supabase.from('profiles').update({ temp_password: newPw }).eq('id', linkedProfile.id)
+    try {
+      const { data: resetData, error: resetErr } = await supabase.functions.invoke('reset-user-password', {
+        body: { userId: linkedProfile.id, newPassword: newPw },
+      })
+      if (resetErr || resetData?.error) console.warn('Edge Function unavailable:', resetData?.error || resetErr?.message)
+    } catch (e) {
+      console.warn('reset-user-password Edge Function not available:', e)
+    }
+    const firstName = employee?.first_name || (linkedProfile.full_name || '').split(' ')[0]
+    const { error: smsErr } = await sendSMS({
+      to:      phone,
+      message: samMessage(firstName, linkedProfile.email, newPw, true),
+    })
+    setSmsMsg(smsErr
+      ? 'error:SMS failed — ' + smsErr.message
+      : 'ok:New password texted to ' + phone + '. If their login does not work, also send a password reset email.'
+    )
+    setResetTextSending(false)
+  }
 
   useEffect(() => { fetchAll() }, [id])
 
@@ -551,6 +636,58 @@ export default function EmployeeDetail() {
                     {savingRole ? 'Saving…' : 'Save Role'}
                   </button>
                 )}
+
+                {/* ── Password Reset ── */}
+                <div className="border-t border-gray-100 pt-5">
+                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Password Reset</p>
+                  <p className="text-xs text-gray-500 mb-3">
+                    Send a password reset link to <strong>{linkedProfile.email}</strong>. The user clicks the link to set a new password.
+                  </p>
+                  {resetMsg && (
+                    <div className={`text-sm px-3 py-2 rounded-lg border mb-2 ${resetMsg.startsWith('ok:') ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-700'}`}>
+                      {resetMsg.startsWith('ok:') ? '✅' : '⚠️'} {resetMsg.slice(3)}
+                    </div>
+                  )}
+                  <button onClick={sendPasswordReset} disabled={resetSending}
+                    className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                    {resetSending ? 'Sending…' : '📧 Send Password Reset Email'}
+                  </button>
+                </div>
+
+                {/* ── Text Password via Sam ── */}
+                <div className="border-t border-gray-100 pt-5">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="text-base">🤖</span>
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Text Password via Sam</p>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-3">
+                    Sam, the AI assistant, will text the employee their credentials via SMS.
+                    {!employee?.phone && (
+                      <span className="text-amber-600 font-medium"> No cell phone on file — add one in the Profile tab.</span>
+                    )}
+                  </p>
+                  {smsMsg && (
+                    <div className={`text-sm px-3 py-2 rounded-lg border mb-3 ${smsMsg.startsWith('ok:') ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-700'}`}>
+                      {smsMsg.startsWith('ok:') ? '✅' : '⚠️'} {smsMsg.slice(3)}
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <button onClick={sendPasswordViaSMS}
+                      disabled={smsSending || !employee?.phone}
+                      className="px-4 py-2 rounded-lg border border-blue-200 text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-40">
+                      {smsSending ? 'Sending…' : '📱 Text Current Password'}
+                    </button>
+                    <button onClick={resetAndTextPassword}
+                      disabled={resetTextSending || !employee?.phone}
+                      className="px-4 py-2 rounded-lg border border-green-200 text-sm font-medium text-green-700 hover:bg-green-50 disabled:opacity-40">
+                      {resetTextSending ? 'Resetting…' : '🔄 Reset & Text New Password'}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">
+                    "Text Current Password" sends the last admin-set password. "Reset &amp; Text" generates a new password and texts it.
+                  </p>
+                </div>
+
               </div>
             ) : (
               <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
