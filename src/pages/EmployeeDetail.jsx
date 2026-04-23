@@ -323,6 +323,9 @@ export default function EmployeeDetail() {
                       <Field key={key} label={label} value={draft[key]} editing={editing} onChange={v => set(key, v)} />
                     ))}
                     <div className="col-span-2">
+                      <Field label="Nickname (used on crew schedule labels)" value={draft.nickname} editing={editing} onChange={v => set('nickname', v)} />
+                    </div>
+                    <div className="col-span-2">
                       <Field label="Address" value={draft.address} editing={editing} onChange={v => set('address', v)} />
                     </div>
                     <Field label="City" value={draft.city} editing={editing} onChange={v => set('city', v)} />

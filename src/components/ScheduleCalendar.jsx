@@ -234,6 +234,62 @@ function MobileScheduleCard({ item, jobName, onClick }) {
 }
 
 // ── Main calendar component ──────────────────────────────────
+// ── Searchable picker used for both Crew and Sub selection ───────────────────
+function CrewSubPicker({ label, emptyMsg, options, selectedId, onSelect }) {
+  const [search, setSearch] = useState('')
+  const [open,   setOpen]   = useState(false)
+
+  const filtered = options.filter(o =>
+    !search || o.searchText.includes(search.toLowerCase()) ||
+    o.primary.toLowerCase().includes(search.toLowerCase())
+  )
+
+  const selected = options.find(o => o.id === selectedId)
+
+  return (
+    <div>
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{label}</p>
+      {options.length === 0 ? (
+        <p className="text-sm text-gray-400 italic py-3 text-center">{emptyMsg}</p>
+      ) : (
+        <div className="relative">
+          <input
+            type="text"
+            value={search || (selected && !open ? selected.primary : '')}
+            onChange={e => { setSearch(e.target.value); setOpen(true) }}
+            onFocus={() => { setSearch(''); setOpen(true) }}
+            onBlur={() => setTimeout(() => setOpen(false), 200)}
+            placeholder={`Search ${label.toLowerCase()}…`}
+            className="input text-sm w-full"
+          />
+          {selected && !open && (
+            <div className="mt-1.5 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-sm font-semibold text-green-800">{selected.primary}</p>
+              {selected.secondary && <p className="text-xs text-gray-500 mt-0.5">{selected.secondary}</p>}
+            </div>
+          )}
+          {open && (
+            <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-56 overflow-y-auto">
+              {filtered.length === 0 ? (
+                <p className="text-sm text-gray-400 px-4 py-3 italic">No results match "{search}"</p>
+              ) : filtered.map(opt => (
+                <button key={opt.id}
+                  onMouseDown={() => { onSelect(opt); setSearch(''); setOpen(false) }}
+                  className={`w-full text-left px-4 py-2.5 hover:bg-green-50 border-b border-gray-50 last:border-0 transition-colors ${selectedId === opt.id ? 'bg-green-50' : ''}`}>
+                  <p className={`text-sm font-semibold ${selectedId === opt.id ? 'text-green-800' : 'text-gray-800'}`}>
+                    {opt.primary}
+                  </p>
+                  {opt.secondary && <p className="text-xs text-gray-400 mt-0.5 truncate">{opt.secondary}</p>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function ScheduleCalendar({ jobs = [], selectedJob }) {
   const today = new Date()
   const [year,  setYear]  = useState(today.getFullYear())
@@ -256,7 +312,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
   useEffect(() => {
     supabase.from('crews').select('*').order('label')
       .then(({ data }) => { if (data) setCrews(data) })
-    supabase.from('employees').select('id, first_name, last_name')
+    supabase.from('employees').select('id, first_name, last_name, nickname')
       .eq('status', 'active').order('last_name')
       .then(({ data }) => { if (data) setEmployees(data) })
     supabase.from('subs_vendors').select('id, company_name, divisions, status')
@@ -585,130 +641,103 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
                 </div>
               </div>
 
-              {/* ── Crew list ── */}
-              {entryMode === 'crew' && (
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                    Select Crew {form.crew_id && <span className="text-green-700 normal-case font-normal">— selected</span>}
-                  </p>
-                  {crews.length === 0 ? (
-                    <p className="text-sm text-gray-400 italic py-4 text-center">No crews built yet. Add crews in Master Crews.</p>
-                  ) : (
-                    <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                      {crews.map(crew => {
-                        const selected = form.crew_id === crew.id
-                        const empName = id => {
-                          const e = employees.find(em => em.id === id)
-                          return e ? `${e.first_name} ${e.last_name}` : null
-                        }
-                        const members = [
-                          crew.crew_chief_id && { role: 'Chief',      name: empName(crew.crew_chief_id) },
-                          crew.journeyman_id && { role: 'Journeyman', name: empName(crew.journeyman_id) },
-                          crew.laborer_1_id  && { role: 'Laborer',    name: empName(crew.laborer_1_id) },
-                          crew.laborer_2_id  && { role: 'Laborer',    name: empName(crew.laborer_2_id) },
-                          crew.laborer_3_id  && { role: 'Laborer',    name: empName(crew.laborer_3_id) },
-                        ].filter(m => m && m.name)
+              {/* ── Crew searchable dropdown ── */}
+              {entryMode === 'crew' && (() => {
+                // nickname || first_name for calendar display
+                const empDisplay = id => {
+                  const e = employees.find(em => em.id === id)
+                  return e ? (e.nickname?.trim() || e.first_name) : null
+                }
+                const empFull = id => {
+                  const e = employees.find(em => em.id === id)
+                  return e ? `${e.first_name} ${e.last_name}` : null
+                }
+                const crewLabel = crew => {
+                  const names = [
+                    crew.crew_chief_id, crew.journeyman_id,
+                    crew.laborer_1_id, crew.laborer_2_id, crew.laborer_3_id
+                  ].filter(Boolean).map(empDisplay).filter(Boolean)
+                  return `${crew.label} - ${names.join(', ')}`
+                }
+                const crewSearch = crew => {
+                  const allNames = [
+                    crew.crew_chief_id, crew.journeyman_id,
+                    crew.laborer_1_id, crew.laborer_2_id, crew.laborer_3_id
+                  ].filter(Boolean).map(empFull).filter(Boolean).join(' ')
+                  return `${crew.label} ${allNames}`.toLowerCase()
+                }
 
-                        return (
-                          <button key={crew.id} onClick={() => {
-                            const chief = members.find(m => m.role === 'Chief')
-                            const autoTitle = `Crew ${crew.label}${chief ? ` — ${chief.name}` : ''}`
-                            updateField('crew_id', crew.id)
-                            updateField('sub_id', '')
-                            updateField('title', autoTitle)
-                          }}
-                            className={`w-full text-left rounded-xl border-2 px-4 py-3 transition-colors ${
-                              selected
-                                ? 'border-green-500 bg-green-50'
-                                : 'border-gray-200 hover:border-green-300 hover:bg-gray-50'
-                            }`}>
-                            <div className="flex items-start gap-3">
-                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold flex-shrink-0 ${selected ? 'bg-green-700 text-white' : 'bg-gray-100 text-gray-700'}`}>
-                                {crew.label}
-                              </div>
-                              <div className="min-w-0">
-                                {members.map((m, i) => (
-                                  <p key={i} className="text-sm text-gray-800 leading-snug">
-                                    <span className="text-xs text-gray-400 w-20 inline-block">{m.role}</span>
-                                    {m.name}
-                                  </p>
-                                ))}
-                                {members.length === 0 && <p className="text-sm text-gray-400 italic">No members assigned</p>}
-                                {crew.skills?.length > 0 && (
-                                  <div className="flex gap-1 mt-1 flex-wrap">
-                                    {crew.skills.map(s => (
-                                      <span key={s.type} className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded-full">
-                                        {s.type} Lv{s.level}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  )}
-                  {form.crew_id && (
-                    <div className="mt-2">
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Schedule Item Label <span className="text-gray-400 font-normal">(auto-filled, editable)</span></label>
-                      <input type="text" value={form.title}
-                        onChange={e => updateField('title', e.target.value)}
-                        className="input text-sm w-full" />
-                    </div>
-                  )}
+                return (
+                  <CrewSubPicker
+                    label="Select Crew"
+                    emptyMsg="No crews built yet. Add crews in Master Crews."
+                    options={crews.map(c => ({
+                      id: c.id,
+                      primary: `Crew ${c.label}`,
+                      secondary: (() => {
+                        const members = [
+                          c.crew_chief_id && { role: 'Chief',      name: empFull(c.crew_chief_id) },
+                          c.journeyman_id && { role: 'Journeyman', name: empFull(c.journeyman_id) },
+                          c.laborer_1_id  && { role: 'Laborer 1',  name: empFull(c.laborer_1_id) },
+                          c.laborer_2_id  && { role: 'Laborer 2',  name: empFull(c.laborer_2_id) },
+                          c.laborer_3_id  && { role: 'Laborer 3',  name: empFull(c.laborer_3_id) },
+                        ].filter(m => m && m.name)
+                        return members.map(m => `${m.role}: ${m.name}`).join('  ·  ')
+                      })(),
+                      searchText: crewSearch(c),
+                      autoTitle: crewLabel(c),
+                    }))}
+                    selectedId={form.crew_id}
+                    onSelect={opt => {
+                      updateField('crew_id', opt.id)
+                      updateField('sub_id', '')
+                      updateField('title', opt.autoTitle)
+                    }}
+                  />
+                )
+              })()}
+              {entryMode === 'crew' && form.crew_id && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                    Schedule Item Label <span className="text-gray-400 font-normal">(auto-filled, editable)</span>
+                  </label>
+                  <input type="text" value={form.title}
+                    onChange={e => updateField('title', e.target.value)}
+                    className="input text-sm w-full" />
                 </div>
               )}
 
-              {/* ── Subcontractor list ── */}
+              {/* ── Subcontractor searchable dropdown ── */}
               {entryMode === 'sub' && (
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                    Select Subcontractor {form.sub_id && <span className="text-green-700 normal-case font-normal">— selected</span>}
-                  </p>
-                  {subs.length === 0 ? (
-                    <p className="text-sm text-gray-400 italic py-4 text-center">No subcontractors found. Add them in Subs &amp; Vendors.</p>
-                  ) : (
-                    <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
-                      {subs.map(sub => {
-                        const selected = form.sub_id === sub.id
-                        return (
-                          <button key={sub.id} onClick={() => {
-                            updateField('sub_id', sub.id)
-                            updateField('crew_id', '')
-                            updateField('title', sub.company_name)
-                          }}
-                            className={`w-full text-left rounded-xl border-2 px-4 py-3 transition-colors ${
-                              selected
-                                ? 'border-green-500 bg-green-50'
-                                : 'border-gray-200 hover:border-green-300 hover:bg-gray-50'
-                            }`}>
-                            <div className="flex items-center justify-between gap-3">
-                              <div>
-                                <p className={`text-sm font-semibold ${selected ? 'text-green-800' : 'text-gray-800'}`}>
-                                  {sub.company_name}
-                                </p>
-                                {sub.divisions?.length > 0 && (
-                                  <p className="text-xs text-gray-400 mt-0.5">{sub.divisions.join(' · ')}</p>
-                                )}
-                              </div>
-                              {selected && <span className="text-green-600 text-lg flex-shrink-0">✓</span>}
-                            </div>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  )}
+                <>
+                  <CrewSubPicker
+                    label="Select Subcontractor"
+                    emptyMsg="No subcontractors found. Add them in Subs & Vendors."
+                    options={subs.map(s => ({
+                      id: s.id,
+                      primary: s.company_name,
+                      secondary: s.divisions?.join(' · ') || '',
+                      searchText: `${s.company_name} ${(s.divisions||[]).join(' ')}`.toLowerCase(),
+                      autoTitle: s.company_name,
+                    }))}
+                    selectedId={form.sub_id}
+                    onSelect={opt => {
+                      updateField('sub_id', opt.id)
+                      updateField('crew_id', '')
+                      updateField('title', opt.autoTitle)
+                    }}
+                  />
                   {form.sub_id && (
-                    <div className="mt-2">
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Schedule Item Label <span className="text-gray-400 font-normal">(auto-filled, editable)</span></label>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Schedule Item Label <span className="text-gray-400 font-normal">(auto-filled, editable)</span>
+                      </label>
                       <input type="text" value={form.title}
                         onChange={e => updateField('title', e.target.value)}
                         className="input text-sm w-full" />
                     </div>
                   )}
-                </div>
+                </>
               )}
 
               {/* ── Custom entry ── */}

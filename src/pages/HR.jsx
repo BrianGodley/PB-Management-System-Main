@@ -27,7 +27,7 @@ const STATUS_LABELS = {
 // ── Add Employee Modal ────────────────────────────────────────────────────────
 function AddEmployeeModal({ onSave, onClose }) {
   const [form, setForm] = useState({
-    first_name: '', last_name: '', email: '', phone: '',
+    first_name: '', last_name: '', nickname: '', email: '', phone: '',
     job_title: '', department: '', start_date: '', pay_rate: '', pay_type: 'hourly',
   })
   const [saving, setSaving] = useState(false)
@@ -65,6 +65,14 @@ function AddEmployeeModal({ onSave, onClose }) {
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Last Name *</label>
             <input value={form.last_name} onChange={e => set('last_name', e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
+          </div>
+          <div className="col-span-2">
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Nickname <span className="text-gray-400 font-normal">(used on crew schedule labels instead of first name)</span>
+            </label>
+            <input value={form.nickname} onChange={e => set('nickname', e.target.value)}
+              placeholder="e.g. Max, Papa, Chief"
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
           </div>
           <div>
