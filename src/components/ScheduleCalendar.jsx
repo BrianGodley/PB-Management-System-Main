@@ -58,6 +58,7 @@ function fmtDate(ds) {
 const EMPTY_FORM = {
   title: '', display_color: '#15803d', assignees: '',
   start_date: '', end_date: '', work_days: '', progress: 0, reminder: 'None', notes: '',
+  crew_id: '', crew_entry: '',
 }
 
 // ── WeekRow: renders one 7-day row with spanning item bars ───
@@ -246,6 +247,18 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
   const [form,        setForm]        = useState(EMPTY_FORM)
   const [modalJobId,  setModalJobId]  = useState(null)
   const [saving,      setSaving]      = useState(false)
+  const [entryMode,   setEntryMode]   = useState('custom') // 'crew' | 'custom'
+  const [crews,       setCrews]       = useState([])
+  const [employees,   setEmployees]   = useState([])
+
+  // Fetch crews + employees once for the modal dropdowns
+  useEffect(() => {
+    supabase.from('crews').select('*').order('label')
+      .then(({ data }) => { if (data) setCrews(data) })
+    supabase.from('employees').select('id, first_name, last_name')
+      .eq('status', 'active').order('last_name')
+      .then(({ data }) => { if (data) setEmployees(data) })
+  }, [])
 
   useEffect(() => { fetchItems() }, [year, month, selectedJob])
 
@@ -306,6 +319,8 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
     if (e) e.stopPropagation()
     setEditItem(item)
     setModalJobId(item.job_id)
+    const hasCrew = !!item.crew_id
+    setEntryMode(hasCrew ? 'crew' : 'custom')
     setForm({
       title:         item.title         || '',
       display_color: item.display_color || '#15803d',
@@ -316,12 +331,14 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
       progress:      item.progress      ?? 0,
       reminder:      item.reminder      || 'None',
       notes:         item.notes         || '',
+      crew_id:       item.crew_id       || '',
+      crew_entry:    hasCrew ? (item.title || '') : '',
     })
     setPhase('details')
   }
 
   function closeModal() {
-    setPhase(null); setEditItem(null); setForm(EMPTY_FORM); setModalJobId(null)
+    setPhase(null); setEditItem(null); setForm(EMPTY_FORM); setModalJobId(null); setEntryMode('custom')
   }
 
   function updateField(key, val) {
@@ -341,11 +358,12 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
   }
 
   async function saveItem() {
-    if (!form.title.trim()) return
+    const finalTitle = entryMode === 'crew' ? form.crew_entry.trim() : form.title.trim()
+    if (!finalTitle) return
     setSaving(true)
     const payload = {
       job_id:        modalJobId,
-      title:         form.title.trim(),
+      title:         finalTitle,
       display_color: form.display_color,
       assignees:     form.assignees,
       start_date:    form.start_date,
@@ -354,6 +372,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
       progress:      +form.progress  || 0,
       reminder:      form.reminder,
       notes:         form.notes,
+      crew_id:       entryMode === 'crew' ? (form.crew_id || null) : null,
     }
     const { error } = editItem
       ? await supabase.from('schedule_items').update(payload).eq('id', editItem.id)
@@ -533,11 +552,83 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
             </div>
 
             <div className="px-5 py-4 space-y-3">
-              {/* Title */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Title <span className="text-red-400">*</span></label>
-                <input type="text" value={form.title} onChange={e => updateField('title', e.target.value)}
-                  placeholder="e.g. Install pavers" className="input text-sm w-full" autoFocus />
+              {/* Entry Mode */}
+              <div className="space-y-2.5">
+
+                {/* Crew Entry */}
+                <div className={`rounded-lg border p-3 transition-colors ${entryMode === 'crew' ? 'border-green-400 bg-green-50/40' : 'border-gray-200 bg-gray-50/40'}`}>
+                  <label className="flex items-center gap-2.5 cursor-pointer mb-2.5">
+                    <input type="radio" name="entryMode" value="crew"
+                      checked={entryMode === 'crew'}
+                      onChange={() => setEntryMode('crew')}
+                      className="accent-green-700 w-4 h-4"
+                    />
+                    <span className="text-xs font-semibold text-gray-700">Crew Entry</span>
+                  </label>
+                  <div className="space-y-1.5 ml-6">
+                    <select
+                      value={form.crew_id}
+                      onChange={e => {
+                        const id = e.target.value
+                        const crew = crews.find(c => c.id === id)
+                        let label = ''
+                        if (crew) {
+                          const chief = employees.find(em => em.id === crew.crew_chief_id)
+                          label = `Crew ${crew.label}${chief ? ` — ${chief.first_name} ${chief.last_name}` : ''}`
+                        }
+                        updateField('crew_id', id)
+                        updateField('crew_entry', label)
+                        setEntryMode('crew')
+                      }}
+                      disabled={entryMode !== 'crew'}
+                      className="input text-sm w-full disabled:opacity-50"
+                    >
+                      <option value="">— Select a crew —</option>
+                      {crews.map(c => {
+                        const chief = employees.find(em => em.id === c.crew_chief_id)
+                        return (
+                          <option key={c.id} value={c.id}>
+                            Crew {c.label}{chief ? ` — ${chief.last_name}, ${chief.first_name}` : ''}
+                            {c.skills?.length ? ` (${c.skills.map(s => s.type).join(', ')})` : ''}
+                          </option>
+                        )
+                      })}
+                    </select>
+                    <input
+                      type="text"
+                      value={form.crew_entry}
+                      onChange={e => updateField('crew_entry', e.target.value)}
+                      placeholder="Crew label (auto-filled, editable)"
+                      disabled={entryMode !== 'crew'}
+                      className="input text-sm w-full disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+
+                {/* Custom Entry */}
+                <div className={`rounded-lg border p-3 transition-colors ${entryMode === 'custom' ? 'border-green-400 bg-green-50/40' : 'border-gray-200 bg-gray-50/40'}`}>
+                  <label className="flex items-center gap-2.5 cursor-pointer mb-2.5">
+                    <input type="radio" name="entryMode" value="custom"
+                      checked={entryMode === 'custom'}
+                      onChange={() => setEntryMode('custom')}
+                      className="accent-green-700 w-4 h-4"
+                    />
+                    <span className="text-xs font-semibold text-gray-700">
+                      Custom Entry <span className="text-red-400">*</span>
+                    </span>
+                  </label>
+                  <div className="ml-6">
+                    <input
+                      type="text"
+                      value={form.title}
+                      onChange={e => { updateField('title', e.target.value); setEntryMode('custom') }}
+                      placeholder="e.g. Install pavers"
+                      disabled={entryMode !== 'custom'}
+                      className="input text-sm w-full disabled:opacity-50"
+                      autoFocus={entryMode === 'custom'}
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Display Color */}
@@ -605,7 +696,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
             </div>
 
             <div className="px-5 pb-5 flex items-center gap-2">
-              <button onClick={saveItem} disabled={saving || !form.title.trim()}
+              <button onClick={saveItem} disabled={saving || (entryMode === 'crew' ? !form.crew_entry.trim() : !form.title.trim())}
                 className="flex-1 btn-primary text-sm py-2.5 disabled:opacity-50">
                 {saving ? 'Saving…' : editItem ? 'Update' : 'Save'}
               </button>
