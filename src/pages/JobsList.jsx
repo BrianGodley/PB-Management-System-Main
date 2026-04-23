@@ -122,8 +122,10 @@ export default function JobsList() {
     { key: 'jobs',       label: 'Jobs'      },
     { key: 'schedule',   label: 'Schedule'  },
     { key: 'daily-logs', label: 'Daily Logs'},
-    { key: 'tasks',      label: 'Tasks'     },
-    { key: 'files',      label: 'Files'     },
+    { key: 'tasks',          label: 'Tasks'          },
+    { key: 'change-orders',  label: 'Change Orders'  },
+    { key: 'finance',        label: 'Finance'        },
+    { key: 'files',          label: 'Files'          },
     { key: 'tracking',   label: 'Tracking'   },
     { key: 'timeclock',  label: 'Time Clock' },
     { key: 'templates',  label: 'Templates'  },
@@ -345,8 +347,10 @@ export default function JobsList() {
               selectedJob={selectedJob === ALL_JOBS ? 'all' : selectedJob}
             />
           )}
-          {tab === 'tasks'      && <ComingSoon label="Tasks" />}
-          {tab === 'files'      && <ComingSoon label="Files" />}
+          {tab === 'tasks'          && <ComingSoon label="Tasks" />}
+          {tab === 'change-orders'  && <ComingSoon label="Change Orders" />}
+          {tab === 'finance'        && <ComingSoon label="Finance" />}
+          {tab === 'files'          && <ComingSoon label="Files" />}
           {tab === 'timeclock'  && (
             <TimeClock
               jobs={jobs}
