@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // EmployeeDetail — full employee profile page
-// Tabs: Profile | Documents | Certifications | Training | Reviews | Testing
+// Tabs: Profile | User | Permissions | Documents | Certifications | Training | Reviews | Testing
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
@@ -8,6 +8,58 @@ import { supabase } from '../lib/supabase'
 import ReviewModal from '../components/hr/ReviewModal'
 
 const DEPARTMENTS = ['Operations', 'Landscaping', 'Pool', 'Admin', 'Sales', 'Other']
+
+// Permission groups and defaults (copied from Admin.jsx)
+const PERM_GROUPS = [
+  {
+    label: 'Statistics',
+    icon:  '📈',
+    perms: [
+      { key: 'can_create_stats',      label: 'Create statistics' },
+      { key: 'can_share_stats',       label: 'Share statistics with other users' },
+      { key: 'can_make_stats_public', label: 'Mark statistics as public' },
+    ],
+  },
+  {
+    label: 'Financial',
+    icon:  '💰',
+    perms: [
+      { key: 'can_view_financials', label: 'View collections & invoicing' },
+      { key: 'can_view_reports',    label: 'View financial reports' },
+    ],
+  },
+  {
+    label: 'Jobs & Bids',
+    icon:  '🔨',
+    perms: [
+      { key: 'can_create_jobs', label: 'Create new jobs' },
+      { key: 'can_edit_jobs',   label: 'Edit existing jobs' },
+      { key: 'can_delete_jobs', label: 'Delete jobs' },
+      { key: 'can_create_bids', label: 'Create bids' },
+      { key: 'can_edit_bids',   label: 'Edit bids' },
+    ],
+  },
+  {
+    label: 'Module Access',
+    icon:  '🗂️',
+    perms: [
+      { key: 'access_tracker',      label: 'Tracker' },
+      { key: 'access_collections',  label: 'Collections' },
+      { key: 'access_statistics',   label: 'Statistics' },
+      { key: 'access_master_rates', label: 'Master Rates' },
+      { key: 'access_admin',        label: 'Admin panel' },
+    ],
+  },
+]
+
+const DEFAULT_PERMS = {
+  can_create_stats: true,  can_share_stats: false, can_make_stats_public: false,
+  can_view_financials: true, can_view_reports: false,
+  can_create_jobs: true, can_edit_jobs: true, can_delete_jobs: false,
+  can_create_bids: true, can_edit_bids: true,
+  access_tracker: true, access_collections: true, access_statistics: true,
+  access_master_rates: false, access_admin: false,
+}
 const DOC_CATEGORIES = [
   { key: 'records', label: 'Personnel Records', icon: '📁' },
   { key: 'id',      label: 'ID Documents',      icon: '🪪' },
@@ -38,14 +90,15 @@ export default function EmployeeDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
 
-  const [employee,  setEmployee]  = useState(null)
-  const [docs,      setDocs]      = useState([])
-  const [certs,     setCerts]     = useState([])
-  const [training,  setTraining]  = useState([])  // lms_assignments with steps
-  const [reviews,   setReviews]   = useState([])
-  const [reviewForms, setReviewForms] = useState([])
-  const [loading,   setLoading]   = useState(true)
-  const [tab,       setTab]       = useState('profile')
+  const [employee,      setEmployee]      = useState(null)
+  const [linkedProfile, setLinkedProfile] = useState(null)
+  const [docs,          setDocs]          = useState([])
+  const [certs,         setCerts]         = useState([])
+  const [training,      setTraining]      = useState([])  // lms_assignments with steps
+  const [reviews,       setReviews]       = useState([])
+  const [reviewForms,   setReviewForms]   = useState([])
+  const [loading,       setLoading]       = useState(true)
+  const [tab,           setTab]           = useState('profile')
 
   // Profile edit state
   const [editing,   setEditing]   = useState(false)
@@ -68,6 +121,17 @@ export default function EmployeeDetail() {
 
   // Review state
   const [showReview,  setShowReview]   = useState(false)
+
+  // User tab state
+  const [userRole,      setUserRole]      = useState('user')
+  const [savingRole,    setSavingRole]    = useState(false)
+  const [roleMsg,       setRoleMsg]       = useState('')
+
+  // Permissions tab state
+  const [perms,         setPerms]         = useState(DEFAULT_PERMS)
+  const [loadingPerms,  setLoadingPerms]  = useState(true)
+  const [savingPerms,   setSavingPerms]   = useState(false)
+  const [permsMsg,      setPermsMsg]      = useState('')
 
   // Avatar
   const avatarInputRef = useRef()
@@ -98,6 +162,24 @@ export default function EmployeeDetail() {
     setTraining(trainingData || [])
     setReviews(reviewsData || [])
     setReviewForms(formsData || [])
+
+    // Fetch linked profile by email
+    if (emp?.email) {
+      const { data: prof } = await supabase.from('profiles').select('*').eq('email', emp.email).single()
+      if (prof) {
+        setLinkedProfile(prof)
+        setUserRole(prof.role || 'user')
+        // Fetch permissions
+        const { data: permsData } = await supabase
+          .from('user_permissions')
+          .select('*')
+          .eq('user_id', prof.id)
+          .single()
+        if (permsData) setPerms(prev => ({ ...prev, ...permsData }))
+      }
+    }
+
+    setLoadingPerms(false)
     setLoading(false)
   }
 
@@ -265,14 +347,16 @@ export default function EmployeeDetail() {
       </div>
 
       {/* ── Tab bar ── */}
-      <div className="bg-white border-b border-gray-200 px-6 flex gap-0 flex-shrink-0">
+      <div className="bg-white border-b border-gray-200 px-6 flex gap-0 flex-shrink-0 overflow-x-auto">
         {[
-          { key: 'profile',  label: 'Profile',       icon: '👤' },
-          { key: 'docs',     label: `Documents (${docs.length})`,     icon: '📁' },
-          { key: 'certs',    label: `Certifications (${certs.length})`, icon: '🏅' },
-          { key: 'training', label: `Training (${training.length})`,  icon: '🎓' },
-          { key: 'reviews',  label: `Reviews (${reviews.length})`,   icon: '⭐' },
-          { key: 'testing',  label: 'Testing',       icon: '🔬' },
+          { key: 'profile',      label: 'Profile',       icon: '👤' },
+          { key: 'user',         label: 'User',          icon: '🔐' },
+          { key: 'permissions',  label: 'Permissions',   icon: '🔑' },
+          { key: 'docs',         label: `Documents (${docs.length})`,     icon: '📁' },
+          { key: 'certs',        label: `Certifications (${certs.length})`, icon: '🏅' },
+          { key: 'training',     label: `Training (${training.length})`,  icon: '🎓' },
+          { key: 'reviews',      label: `Reviews (${reviews.length})`,   icon: '⭐' },
+          { key: 'testing',      label: 'Testing',       icon: '🔬' },
         ].map(t => (
           <button
             key={t.key}
@@ -291,7 +375,7 @@ export default function EmployeeDetail() {
 
         {/* ── PROFILE ── */}
         {tab === 'profile' && (
-          <div className="max-w-2xl space-y-5">
+          <div className="max-w-6xl space-y-5">
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <div className="flex items-center justify-between mb-5">
                 <h3 className="font-semibold text-gray-800">Employee Info</h3>
@@ -404,6 +488,149 @@ export default function EmployeeDetail() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ── USER ── */}
+        {tab === 'user' && (
+          <div className="max-w-2xl">
+            {linkedProfile ? (
+              <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+                <h3 className="font-semibold text-gray-800">System Account</h3>
+
+                {/* Current role */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 uppercase mb-2">Current Role</label>
+                  <div className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold" style={{
+                    backgroundColor: userRole === 'admin' ? '#dcfce7' : '#f3f4f6',
+                    color: userRole === 'admin' ? '#166534' : '#374151',
+                  }}>
+                    {userRole === 'admin' ? '🛡️ Admin' : '👤 User'}
+                  </div>
+                </div>
+
+                {/* Role change */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 uppercase mb-3">Change Role</label>
+                  <div className="flex gap-3">
+                    {['user', 'admin'].map(r => (
+                      <label key={r} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input type="radio" name="user-role" checked={userRole === r}
+                          onChange={() => setUserRole(r)}
+                          className="accent-green-700" />
+                        {r === 'admin' ? '🛡️ Admin' : '👤 User'}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {roleMsg && (
+                  <div className={`text-sm px-3 py-2.5 rounded-lg border ${
+                    roleMsg.startsWith('ok:')
+                      ? 'bg-green-50 border-green-200 text-green-800'
+                      : 'bg-red-50 border-red-200 text-red-700'
+                  }`}>
+                    {roleMsg.startsWith('ok:') ? '✅' : '⚠️'} {roleMsg.slice(3)}
+                  </div>
+                )}
+
+                {userRole !== linkedProfile.role && (
+                  <button onClick={async () => {
+                    setSavingRole(true)
+                    setRoleMsg('')
+                    const { error } = await supabase.from('profiles').update({ role: userRole }).eq('id', linkedProfile.id)
+                    if (error) {
+                      setRoleMsg('error:' + error.message)
+                    } else {
+                      setRoleMsg('ok:Role updated.')
+                      setLinkedProfile(p => ({ ...p, role: userRole }))
+                    }
+                    setSavingRole(false)
+                  }} disabled={savingRole}
+                    className="px-4 py-2.5 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-50">
+                    {savingRole ? 'Saving…' : 'Save Role'}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+                <p className="text-gray-600 mb-3">No system account linked</p>
+                <p className="text-sm text-gray-500">This employee can be added to the system from the Admin panel.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── PERMISSIONS ── */}
+        {tab === 'permissions' && (
+          <div className="max-w-2xl">
+            {linkedProfile ? (
+              <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+                {linkedProfile.role === 'admin' && (
+                  <div className="bg-green-50 border border-green-200 text-green-800 text-sm px-4 py-3 rounded-xl">
+                    🛡️ This user is an <strong>Admin</strong> — they have full access to everything regardless of these settings.
+                  </div>
+                )}
+
+                {loadingPerms ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-700"></div>
+                  </div>
+                ) : (
+                  <>
+                    {PERM_GROUPS.map(group => (
+                      <div key={group.label}>
+                        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                          {group.icon} {group.label}
+                        </h3>
+                        <div className="space-y-2 pl-1">
+                          {group.perms.map(p => (
+                            <label key={p.key} className="flex items-center gap-3 cursor-pointer group">
+                              <input
+                                type="checkbox"
+                                checked={!!perms[p.key]}
+                                onChange={e => setPerms(prev => ({ ...prev, [p.key]: e.target.checked }))}
+                                className="w-4 h-4 rounded accent-green-700"
+                              />
+                              <span className="text-sm text-gray-700 group-hover:text-gray-900">{p.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+
+                    {permsMsg && (
+                      <div className={`text-sm px-3 py-2.5 rounded-lg border ${
+                        permsMsg.startsWith('ok:')
+                          ? 'bg-green-50 border-green-200 text-green-800'
+                          : 'bg-red-50 border-red-200 text-red-700'
+                      }`}>
+                        {permsMsg.startsWith('ok:') ? '✅' : '⚠️'} {permsMsg.slice(3)}
+                      </div>
+                    )}
+
+                    <button onClick={async () => {
+                      setSavingPerms(true)
+                      setPermsMsg('')
+                      const { error } = await supabase
+                        .from('user_permissions')
+                        .upsert({ ...perms, user_id: linkedProfile.id },
+                                 { onConflict: 'user_id' })
+                      setPermsMsg(error ? 'error:' + error.message : 'ok:Permissions saved.')
+                      setSavingPerms(false)
+                    }} disabled={savingPerms}
+                      className="w-full py-2.5 rounded-lg text-sm font-semibold text-white bg-green-700 hover:bg-green-800 disabled:opacity-50">
+                      {savingPerms ? 'Saving…' : 'Save Permissions'}
+                    </button>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+                <p className="text-gray-600 mb-3">This employee does not have a system account</p>
+                <p className="text-sm text-gray-500">Add one from the Admin panel to manage permissions.</p>
+              </div>
+            )}
           </div>
         )}
 
