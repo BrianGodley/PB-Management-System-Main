@@ -19,7 +19,8 @@ const SKILL_COLORS = {
   Specialty: 'bg-purple-100 text-purple-800 border-purple-200',
 }
 
-const LEVEL_DOT = { 4: 'bg-green-500', 3: 'bg-yellow-400', 2: 'bg-orange-400', 1: 'bg-red-400' }
+const LEVEL_DOT   = { 4: 'bg-green-500',  3: 'bg-yellow-400',  2: 'bg-orange-400',  1: 'bg-red-400' }
+const LEVEL_BADGE = { 4: 'bg-green-100 text-green-800 border-green-300', 3: 'bg-yellow-100 text-yellow-800 border-yellow-300', 2: 'bg-orange-100 text-orange-800 border-orange-300', 1: 'bg-red-100 text-red-800 border-red-300' }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function empName(emp) {
@@ -419,8 +420,7 @@ function CrewRow({ crew, employees, onClick }) {
         return (
           <td key={type} className="px-4 py-3 text-center">
             {skill ? (
-              <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border font-medium ${SKILL_COLORS[type]}`}>
-                <span className={`w-2 h-2 rounded-full ${LEVEL_DOT[skill.level]}`} />
+              <span className={`inline-flex items-center text-xs px-2 py-0.5 rounded-full border font-medium ${LEVEL_BADGE[skill.level]}`}>
                 Lv{skill.level}
               </span>
             ) : (
