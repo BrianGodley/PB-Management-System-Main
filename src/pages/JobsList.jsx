@@ -18,7 +18,7 @@ export default function JobsList() {
   const [jobs,       setJobs]       = useState([])
   const [loading,    setLoading]    = useState(true)
   const [selectedJob,setSelectedJob]= useState(ALL_JOBS)
-  const [tab,        setTab]        = useState('jobs')
+  const [tab,        setTab]        = useState('schedule')
   const [jobModal,   setJobModal]   = useState(null)
   const [search,     setSearch]     = useState('')
   const [stages,          setStages]          = useState([])
@@ -119,7 +119,6 @@ export default function JobsList() {
   const selectedJobObj = selectedJob === ALL_JOBS ? null : jobs.find(j => j.id === selectedJob) || null
 
   const TABS = [
-    { key: 'jobs',       label: 'Jobs'      },
     { key: 'schedule',   label: 'Schedule'  },
     { key: 'daily-logs', label: 'Daily Logs'},
     { key: 'tasks',          label: 'Tasks'          },
@@ -317,19 +316,6 @@ export default function JobsList() {
 
         {/* Right panel — only thing that scrolls */}
         <div className="flex-1 min-w-0 overflow-y-auto lg:-mr-6">
-
-          {tab === 'jobs' && (
-            selectedJobObj ? (
-              <JobDetail job={selectedJobObj} onDelete={deleteJob} price={price} onEdit={() => setJobModal(selectedJobObj)} />
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-gray-400 py-20">
-                <p className="text-4xl mb-3">👆</p>
-                <p className="text-sm">
-                  {selectedJob === ALL_JOBS ? 'Select a job from the list to view details' : 'Select a job from the list'}
-                </p>
-              </div>
-            )
-          )}
 
           {tab === 'schedule' && (
             <ScheduleCalendar
