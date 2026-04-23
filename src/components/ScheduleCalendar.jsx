@@ -611,7 +611,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
   const [form,        setForm]        = useState(EMPTY_FORM)
   const [modalJobId,  setModalJobId]  = useState(null)
   const [saving,      setSaving]      = useState(false)
-  const [entryMode,          setEntryMode]          = useState('custom')
+  const [entryMode,          setEntryMode]          = useState('crew')
   const [crews,              setCrews]              = useState([])
   const [employees,          setEmployees]          = useState([])
   const [subs,               setSubs]               = useState([])
@@ -775,7 +775,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
   }
 
   function closeModal() {
-    setPhase(null); setEditItem(null); setForm(EMPTY_FORM); setModalJobId(null); setEntryMode('custom')
+    setPhase(null); setEditItem(null); setForm(EMPTY_FORM); setModalJobId(null); setEntryMode('crew')
   }
 
   function updateField(key, val) {
