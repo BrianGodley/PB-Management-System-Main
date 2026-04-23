@@ -67,6 +67,28 @@ function calcElapsed(timeIn, now) {
   return hh > 0 ? `${hh}h ${mm}m` : `${mm}m`
 }
 
+// Compute week start/end dates given a start-day (0=Sun … 6=Sat)
+function getWeekRange(startDay) {
+  const today = new Date()
+  const diff = (today.getDay() - startDay + 7) % 7
+  const start = new Date(today)
+  start.setDate(today.getDate() - diff)
+  start.setHours(0, 0, 0, 0)
+  const end = new Date(start)
+  end.setDate(start.getDate() + 6)
+  return { weekStart: start, weekEnd: end }
+}
+
+function fmtWeekRange(start, end) {
+  const fmt = d => d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })
+  return `${fmt(start)} – ${fmt(end)}`
+}
+
+function fmtHours(mins) {
+  if (!mins) return '0h 0m'
+  return `${Math.floor(mins / 60)}h ${mins % 60}m`
+}
+
 // ── Main Component ───────────────────────────────────────────
 export default function TimeClock({ jobs = [], selectedJob }) {
   const { user } = useAuth()
@@ -77,8 +99,10 @@ export default function TimeClock({ jobs = [], selectedJob }) {
   const [form,        setForm]        = useState(EMPTY_FORM)
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState('')
-  const [profileName, setProfileName] = useState('')
-  const [nowTime,     setNowTime]     = useState(new Date())
+  const [profileName,      setProfileName]      = useState('')
+  const [nowTime,          setNowTime]          = useState(new Date())
+  const [payrollWeekStart, setPayrollWeekStart] = useState(0)   // 0=Sunday
+  const [myWeekEntries,    setMyWeekEntries]    = useState([])
 
   const jobMap = Object.fromEntries(jobs.map(j => [j.id, j.name || j.client_name]))
 
@@ -95,6 +119,26 @@ export default function TimeClock({ jobs = [], selectedJob }) {
       })
   }, [user?.id])
 
+  // Load payroll week start from company_settings
+  useEffect(() => {
+    supabase.from('company_settings').select('value').eq('key', 'payroll_week_start').maybeSingle()
+      .then(({ data }) => { if (data?.value != null) setPayrollWeekStart(parseInt(data.value, 10)) })
+  }, [])
+
+  // Fetch this user's time entries for the current payroll week (all jobs)
+  useEffect(() => {
+    if (!user?.id) return
+    const { weekStart, weekEnd } = getWeekRange(payrollWeekStart)
+    const start = weekStart.toISOString().split('T')[0]
+    const end   = weekEnd.toISOString().split('T')[0]
+    supabase.from('time_entries')
+      .select('*')
+      .eq('created_by', user.id)
+      .gte('date', start)
+      .lte('date', end)
+      .then(({ data }) => { if (data) setMyWeekEntries(data) })
+  }, [user?.id, payrollWeekStart])
+
   // Live elapsed timer — updates every 30 s while clocked in
   useEffect(() => {
     const t = setInterval(() => setNowTime(new Date()), 30000)
@@ -108,6 +152,18 @@ export default function TimeClock({ jobs = [], selectedJob }) {
     e => e.created_by === user?.id && !e.time_out && e.date === todayDate()
   )
   const isClockedIn = !!myOpenEntry
+
+  // Personal time stats for mobile UI
+  const { weekStart, weekEnd } = getWeekRange(payrollWeekStart)
+  const weekRangeLabel = fmtWeekRange(weekStart, weekEnd)
+
+  const myTodayMins = myWeekEntries
+    .filter(e => e.date === todayDate() && e.time_out)
+    .reduce((sum, e) => sum + (diffMins(e.time_in, e.time_out) || 0), 0)
+
+  const myWeekMins = myWeekEntries
+    .filter(e => e.time_out)
+    .reduce((sum, e) => sum + (diffMins(e.time_in, e.time_out) || 0), 0)
 
   async function fetchEntries() {
     setLoading(true)
@@ -123,6 +179,17 @@ export default function TimeClock({ jobs = [], selectedJob }) {
     if (error) console.error('fetchEntries:', error)
     if (data) setEntries(data)
     setLoading(false)
+
+    // Also refresh personal week totals
+    if (user?.id) {
+      const { weekStart: ws, weekEnd: we } = getWeekRange(payrollWeekStart)
+      const { data: wd } = await supabase.from('time_entries')
+        .select('*')
+        .eq('created_by', user.id)
+        .gte('date', ws.toISOString().split('T')[0])
+        .lte('date', we.toISOString().split('T')[0])
+      if (wd) setMyWeekEntries(wd)
+    }
   }
 
   function openNew() {
@@ -244,12 +311,12 @@ export default function TimeClock({ jobs = [], selectedJob }) {
           Time Clock {entries.length > 0 && <span className="text-gray-400 font-normal">({entries.length} entries)</span>}
         </h2>
 
-        {/* Right: clock-in/out button + manual add */}
-        <div className="flex items-center gap-3 ml-auto">
+        {/* Right: clock-in/out button + manual add — desktop only (mobile uses the hero button) */}
+        <div className="hidden lg:flex items-center gap-3 ml-auto">
 
           {/* Live status when clocked in */}
           {isClockedIn && myOpenEntry && (
-            <div className="text-xs text-gray-500 hidden sm:block">
+            <div className="text-xs text-gray-500">
               In at <span className="font-semibold text-green-700">{fmt12h(myOpenEntry.time_in)}</span>
               <span className="mx-1.5 text-gray-300">·</span>
               <span className="font-mono text-gray-600">{calcElapsed(myOpenEntry.time_in, nowTime)}</span>
@@ -284,12 +351,28 @@ export default function TimeClock({ jobs = [], selectedJob }) {
           <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-green-700" />
         </div>
       ) : entries.length === 0 ? (
-        <div className="flex flex-col items-center justify-center flex-1 text-gray-400 py-20">
-          <p className="text-5xl mb-3">⏱️</p>
-          <p className="text-sm font-medium text-gray-500">No time entries yet</p>
-          <p className="text-xs mt-1 mb-4">Track employee hours by job</p>
-          <button onClick={openNew} className="btn-primary text-sm px-4 py-2">Add First Entry</button>
-        </div>
+        <>
+          {/* Mobile hero shown even with no entries */}
+          <MobileHero
+            isClockedIn={isClockedIn}
+            myOpenEntry={myOpenEntry}
+            nowTime={nowTime}
+            myTodayMins={myTodayMins}
+            myWeekMins={myWeekMins}
+            weekRangeLabel={weekRangeLabel}
+            myWeekEntries={myWeekEntries}
+            jobMap={jobMap}
+            onClockIn={handleClockIn}
+            onClockOut={handleClockOut}
+            onManualShift={openNew}
+          />
+          <div className="hidden lg:flex flex-col items-center justify-center flex-1 text-gray-400 py-20">
+            <p className="text-5xl mb-3">⏱️</p>
+            <p className="text-sm font-medium text-gray-500">No time entries yet</p>
+            <p className="text-xs mt-1 mb-4">Track employee hours by job</p>
+            <button onClick={openNew} className="btn-primary text-sm px-4 py-2">Add First Entry</button>
+          </div>
+        </>
       ) : (
         <>
           {/* ── Desktop table ─────────────────────────────────── */}
@@ -398,67 +481,20 @@ export default function TimeClock({ jobs = [], selectedJob }) {
             </table>
           </div>
 
-          {/* ── Mobile card list ───────────────────────────────── */}
-          <div className="lg:hidden space-y-4 overflow-y-auto flex-1 pb-4">
-            {dates.map(date => (
-              <div key={date}>
-                <p className="text-xs font-semibold text-blue-600 mb-2 px-1">{fmtDateLabel(date)}</p>
-                <div className="space-y-2">
-                  {grouped[date].map(entry => {
-                    const { total, regular, ot } = calcTimes(entry.time_in, entry.time_out)
-                    return (
-                      <div key={entry.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="font-semibold text-gray-900 text-sm">{entry.employee_name}</p>
-                            {entry.job_id && (
-                              <p className="text-xs text-green-700 mt-0.5 truncate">{jobMap[entry.job_id]}</p>
-                            )}
-                          </div>
-                          <div className="flex gap-1 flex-shrink-0">
-                            <button onClick={() => openEdit(entry)}
-                              className="p-2 rounded-lg bg-gray-100 text-gray-500 active:bg-gray-200">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                                  d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 0l.172.172a2 2 0 010 2.828L12 16H9v-3z" />
-                              </svg>
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2 mt-3">
-                          <div className="bg-gray-50 rounded-lg px-3 py-2">
-                            <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Time In</p>
-                            <p className="text-sm font-semibold text-gray-800">{fmt12h(entry.time_in)}</p>
-                          </div>
-                          <div className="bg-gray-50 rounded-lg px-3 py-2">
-                            <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Time Out</p>
-                            <p className="text-sm font-semibold text-gray-800">{fmt12h(entry.time_out)}</p>
-                          </div>
-                        </div>
-
-                        {total != null && (
-                          <div className="flex gap-3 mt-2 pt-2 border-t border-gray-100">
-                            <span className="text-xs text-gray-500">
-                              Regular: <span className="font-mono font-semibold text-gray-700">{fmtMins(regular)}</span>
-                            </span>
-                            {ot > 0 && (
-                              <span className="text-xs font-semibold text-orange-600">
-                                OT: <span className="font-mono">{fmtMins(ot)}</span>
-                              </span>
-                            )}
-                            <span className="text-xs text-gray-500 ml-auto">
-                              Total: <span className="font-mono font-bold text-gray-800">{fmtMins(total)}</span>
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
+          {/* ── Mobile UI ─────────────────────────────────────── */}
+          <MobileHero
+            isClockedIn={isClockedIn}
+            myOpenEntry={myOpenEntry}
+            nowTime={nowTime}
+            myTodayMins={myTodayMins}
+            myWeekMins={myWeekMins}
+            weekRangeLabel={weekRangeLabel}
+            myWeekEntries={myWeekEntries}
+            jobMap={jobMap}
+            onClockIn={handleClockIn}
+            onClockOut={handleClockOut}
+            onManualShift={openNew}
+          />
         </>
       )}
 
@@ -476,6 +512,104 @@ export default function TimeClock({ jobs = [], selectedJob }) {
           onDelete={editEntry ? () => { deleteEntry(editEntry); closeModal() } : null}
         />
       )}
+    </div>
+  )
+}
+
+// ── Mobile Hero — big clock button + stats ───────────────────
+function MobileHero({
+  isClockedIn, myOpenEntry, nowTime,
+  myTodayMins, myWeekMins, weekRangeLabel,
+  myWeekEntries, jobMap,
+  onClockIn, onClockOut, onManualShift,
+}) {
+  return (
+    <div className="lg:hidden flex flex-col gap-4">
+
+      {/* Big clock button */}
+      <button
+        onClick={isClockedIn ? onClockOut : onClockIn}
+        className={`w-full py-10 rounded-2xl text-2xl font-black shadow-lg flex flex-col items-center gap-2 transition-all active:scale-95 select-none ${
+          isClockedIn ? 'bg-red-600 text-white' : 'bg-green-700 text-white'
+        }`}
+      >
+        <span className={`w-4 h-4 rounded-full bg-white/70 ${isClockedIn ? 'animate-pulse' : ''}`} />
+        {isClockedIn ? 'Clock Out' : 'Clock In'}
+        {isClockedIn && myOpenEntry && (
+          <span className="text-sm font-normal text-white/80 mt-1">
+            In at {fmt12h(myOpenEntry.time_in)} · {calcElapsed(myOpenEntry.time_in, nowTime)} elapsed
+          </span>
+        )}
+      </button>
+
+      {/* Stats: Today + This Week */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-white border border-gray-200 rounded-2xl p-4 text-center shadow-sm">
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Today</p>
+          <p className="text-3xl font-black text-gray-900">{fmtHours(myTodayMins)}</p>
+          <p className="text-[10px] text-gray-400 mt-1">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+          </p>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-2xl p-4 text-center shadow-sm">
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1">This Week</p>
+          <p className={`text-3xl font-black ${myWeekMins >= 2400 ? 'text-orange-600' : 'text-gray-900'}`}>
+            {fmtHours(myWeekMins)}
+          </p>
+          <p className="text-[10px] text-gray-400 mt-1">{weekRangeLabel}</p>
+        </div>
+      </div>
+
+      {/* Recent shifts this week */}
+      {myWeekEntries.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 px-1">My Shifts This Week</p>
+          <div className="space-y-2">
+            {[...myWeekEntries]
+              .sort((a, b) => b.date.localeCompare(a.date) || (b.time_in || '').localeCompare(a.time_in || ''))
+              .slice(0, 7)
+              .map(entry => {
+                const { total, ot } = calcTimes(entry.time_in, entry.time_out)
+                return (
+                  <div key={entry.id} className="bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-blue-600">{fmtDateLabel(entry.date)}</p>
+                      {entry.job_id && (
+                        <p className="text-xs text-green-700 truncate">{jobMap[entry.job_id]}</p>
+                      )}
+                      <p className="text-sm text-gray-600 mt-0.5">
+                        {fmt12h(entry.time_in)}
+                        {' – '}
+                        {entry.time_out
+                          ? fmt12h(entry.time_out)
+                          : <span className="text-green-700 font-semibold">Active</span>
+                        }
+                      </p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      {total != null ? (
+                        <>
+                          <p className="text-base font-bold text-gray-900">{fmtMins(total)}</p>
+                          {ot > 0 && <p className="text-[10px] text-orange-600 font-semibold">OT {fmtMins(ot)}</p>}
+                        </>
+                      ) : (
+                        <span className="text-xs text-green-700 font-semibold">In progress</span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+          </div>
+        </div>
+      )}
+
+      {/* Manual Shift shortcut */}
+      <button
+        onClick={onManualShift}
+        className="w-full py-3 rounded-xl border-2 border-dashed border-gray-300 text-sm font-medium text-gray-500 hover:border-green-400 hover:text-green-700 transition-colors"
+      >
+        + Manual Shift
+      </button>
     </div>
   )
 }

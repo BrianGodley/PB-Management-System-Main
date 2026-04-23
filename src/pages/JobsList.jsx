@@ -514,20 +514,36 @@ function ColorDropdown({ value, onChange }) {
   )
 }
 
+const WEEK_DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+
+function getWeekRangeStr(startDay) {
+  const today = new Date()
+  const diff = (today.getDay() - startDay + 7) % 7
+  const start = new Date(today); start.setDate(today.getDate() - diff); start.setHours(0,0,0,0)
+  const end   = new Date(start); end.setDate(start.getDate() + 6)
+  const fmt = d => d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })
+  return `${fmt(start)} – ${fmt(end)}`
+}
+
 // ── Job Schedule Settings ─────────────────────────────────────────────────────
 function JobScheduleSettings({ stages = [], onAddStage, onUpdateStage, onDeleteStage, onReorderStages }) {
-  const [defaultColor,  setDefaultColor]  = useState('#15803d')
-  const [saving,        setSaving]        = useState(false)
-  const [saved,         setSaved]         = useState(false)
-  const [newStage,      setNewStage]      = useState('')
-  const [editingId,     setEditingId]     = useState(null)
-  const [editingName,   setEditingName]   = useState('')
-  const [dragIdx,       setDragIdx]       = useState(null)
-  const [dragOverIdx,   setDragOverIdx]   = useState(null)
+  const [defaultColor,    setDefaultColor]    = useState('#15803d')
+  const [saving,          setSaving]          = useState(false)
+  const [saved,           setSaved]           = useState(false)
+  const [payrollWeekStart,setPayrollWeekStart] = useState(0)
+  const [savingPayroll,   setSavingPayroll]   = useState(false)
+  const [savedPayroll,    setSavedPayroll]    = useState(false)
+  const [newStage,        setNewStage]        = useState('')
+  const [editingId,       setEditingId]       = useState(null)
+  const [editingName,     setEditingName]     = useState('')
+  const [dragIdx,         setDragIdx]         = useState(null)
+  const [dragOverIdx,     setDragOverIdx]     = useState(null)
 
   useEffect(() => {
     supabase.from('company_settings').select('value').eq('key', 'default_schedule_color').single()
       .then(({ data }) => { if (data?.value) setDefaultColor(data.value) })
+    supabase.from('company_settings').select('value').eq('key', 'payroll_week_start').maybeSingle()
+      .then(({ data }) => { if (data?.value != null) setPayrollWeekStart(parseInt(data.value, 10)) })
   }, [])
 
   async function handleSaveColor() {
@@ -535,6 +551,13 @@ function JobScheduleSettings({ stages = [], onAddStage, onUpdateStage, onDeleteS
     await supabase.from('company_settings').upsert({ key: 'default_schedule_color', value: defaultColor })
     setSaving(false); setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  async function handleSavePayroll() {
+    setSavingPayroll(true); setSavedPayroll(false)
+    await supabase.from('company_settings').upsert({ key: 'payroll_week_start', value: String(payrollWeekStart) })
+    setSavingPayroll(false); setSavedPayroll(true)
+    setTimeout(() => setSavedPayroll(false), 2000)
   }
 
   function handleStageDragStart(idx) { setDragIdx(idx) }
@@ -562,6 +585,35 @@ function JobScheduleSettings({ stages = [], onAddStage, onUpdateStage, onDeleteS
             {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save'}
           </button>
         </div>
+      </div>
+
+      {/* Payroll Week */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <h2 className="text-base font-bold text-gray-800 mb-1">Payroll Week</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Select the day your work week begins. Weekly hour totals on the time clock are calculated from this day.
+        </p>
+        <div className="flex items-center gap-4 flex-wrap">
+          <select
+            value={payrollWeekStart}
+            onChange={e => setPayrollWeekStart(Number(e.target.value))}
+            className="input text-sm"
+          >
+            {WEEK_DAYS.map((d, i) => (
+              <option key={i} value={i}>{d}</option>
+            ))}
+          </select>
+          <button
+            onClick={handleSavePayroll}
+            disabled={savingPayroll}
+            className="btn-primary text-sm px-4 py-2 disabled:opacity-50"
+          >
+            {savingPayroll ? 'Saving…' : savedPayroll ? '✓ Saved' : 'Save'}
+          </button>
+        </div>
+        <p className="text-xs text-gray-400 mt-3">
+          Current week: <span className="font-medium text-gray-600">{getWeekRangeStr(payrollWeekStart)}</span>
+        </p>
       </div>
 
       {/* Job Stages */}
