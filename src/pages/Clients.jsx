@@ -202,8 +202,8 @@ export default function Clients() {
       {/* ── Active / Inactive tabs ── */}
       <div className="flex border-b border-gray-200 mb-4 gap-1">
         {[
-          { key: 'active',   label: 'Active',   count: sorted.filter(c => (c.status || 'active') === 'active').length },
-          { key: 'inactive', label: 'Inactive', count: sorted.filter(c => (c.status || 'active') === 'inactive').length },
+          { key: 'active',   label: 'Current', count: sorted.filter(c => (c.status || 'active') === 'active').length },
+          { key: 'inactive', label: 'Past',    count: sorted.filter(c => (c.status || 'active') === 'inactive').length },
         ].map(t => (
           <button
             key={t.key}
@@ -359,8 +359,8 @@ export default function Clients() {
             {search
               ? 'No results match your search.'
               : tab === 'inactive'
-              ? 'No inactive clients.'
-              : clients.length === 0 ? 'No clients yet.' : 'No active clients.'}
+              ? 'No past clients.'
+              : clients.length === 0 ? 'No clients yet.' : 'No current clients.'}
           </p>
           {tab === 'active' && clients.length === 0 && (
             <button onClick={() => setShowForm(true)} className="btn-primary">Add Your First Client</button>
