@@ -72,10 +72,7 @@ const REMINDERS  = ['None', '1 day before', '2 days before', '3 days before', '1
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const DAY_NAMES   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 
-const LANE_H    = 28   // base single-line height; bars grow taller when text wraps
-const DAY_H     = 30
-const ROW_PAD   = 8
-const MIN_ROW_H = 120
+const DAY_H = 30  // height of the day-number header row in px
 
 // ── Date helpers ─────────────────────────────────────────────
 function daysInMonth(y, m) { return new Date(y, m + 1, 0).getDate() }
@@ -234,28 +231,36 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
     }
   })
 
-  const numLanes = laneRanges.length
-  const rowH = Math.max(MIN_ROW_H, DAY_H + numLanes * LANE_H + ROW_PAD)
-
   return (
-    <div className="relative border-b border-gray-200" style={{ height: rowH }}>
+    <div className="relative border-b border-gray-200">
+
+      {/* ── Layer 1: day cell backgrounds + click targets (absolute, fills full row height) ── */}
       <div className="absolute inset-0 grid grid-cols-7">
         {weekDays.map((day, col) => {
-          const ds = day
-            ? `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
-            : null
           const cellDate = day ? new Date(year, month, day) : null
           const isExcept = cellDate ? isCellException(cellDate, exceptions) : false
-          const isToday  = ds === todayStr
           return (
             <div
               key={col}
               onClick={() => day && onDayClick(day)}
-              className={`border-r border-gray-200 pt-1 px-1 select-none
-                ${!day        ? 'bg-white cursor-default'
-                : isExcept    ? 'bg-gray-100 cursor-pointer'
-                :               'bg-white hover:bg-green-50 cursor-pointer'}`}
-            >
+              className={`border-r border-gray-200
+                ${!day     ? 'bg-white cursor-default'
+                : isExcept ? 'bg-gray-100 cursor-pointer'
+                :             'bg-white hover:bg-green-50 cursor-pointer'}`}
+            />
+          )
+        })}
+      </div>
+
+      {/* ── Layer 2: day number headers (normal flow — sets the top DAY_H px of the row) ── */}
+      <div className="relative grid grid-cols-7 pointer-events-none" style={{ height: DAY_H }}>
+        {weekDays.map((day, col) => {
+          const ds = day
+            ? `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
+            : null
+          const isToday = ds === todayStr
+          return (
+            <div key={col} className="pt-1 px-1">
               {day && (
                 <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-medium
                   ${isToday ? 'bg-green-700 text-white' : 'text-gray-500'}`}>
@@ -267,7 +272,15 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
         })}
       </div>
 
-      <div className="absolute inset-x-0 pointer-events-none" style={{ top: DAY_H }}>
+      {/* ── Layer 3: bars — CSS grid, rows auto-size so every bar is fully visible ── */}
+      <div
+        className="relative pointer-events-none pb-2"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(7, 1fr)',
+          gridAutoRows: 'minmax(30px, auto)',
+        }}
+      >
         {weekItems.flatMap(item => {
           const info = itemInfo[item.id]
           if (!info) return []
@@ -280,10 +293,6 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
             const isFirst = segIdx === 0
             const isLast  = segIdx === segments.length - 1
 
-            const leftPct  = seg.startCol / 7 * 100
-            const widthPct = (seg.endCol - seg.startCol + 1) / 7 * 100
-
-            // Round left edge only on actual item start; round right edge only on actual item end
             const roundLeft  = isFirst && isItemStart
             const roundRight = isLast  && isItemEnd
             const radius = roundLeft && roundRight ? '4px'
@@ -296,27 +305,25 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
                 key={`${item.id}-s${segIdx}`}
                 onClick={e => { e.stopPropagation(); onItemClick(e, item) }}
                 style={{
-                  position:        'absolute',
-                  left:            `calc(${leftPct}% + 3px)`,
-                  width:           `calc(${widthPct}% - 6px)`,
-                  top:             lane * LANE_H + 2,
-                  minHeight:       LANE_H - 4,
-                  height:          'auto',
+                  gridRow:         lane + 1,
+                  gridColumn:      `${seg.startCol + 1} / ${seg.endCol + 2}`,
                   backgroundColor: item.display_color,
                   borderRadius:    radius,
+                  margin:          '2px 3px',
+                  minHeight:       24,
                   pointerEvents:   'auto',
+                  alignSelf:       'stretch',
                 }}
-                className="inline-flex items-start gap-1.5 px-2 pt-1.5 pb-1.5 text-white text-sm font-semibold cursor-pointer hover:opacity-80 leading-snug overflow-hidden"
+                className="flex items-start gap-1.5 px-2 pt-1.5 pb-1.5 text-white text-sm font-semibold cursor-pointer hover:opacity-80 leading-snug"
                 title={displayText}
               >
-                {/* Only show label + dot in the first segment */}
                 {isFirst && (
                   <>
                     {item.assignee_color && (
                       <span className="flex-shrink-0 w-4 h-4 rounded-full border border-white/50 mt-0.5"
                             style={{ backgroundColor: item.assignee_color }} />
                     )}
-                    <span style={{ wordBreak: 'break-word', whiteSpace: 'normal', minWidth: 0 }}>{displayText}</span>
+                    <span className="min-w-0 break-words">{displayText}</span>
                   </>
                 )}
               </div>
@@ -324,6 +331,7 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
           })
         })}
       </div>
+
     </div>
   )
 }
