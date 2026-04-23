@@ -8,7 +8,7 @@ import { supabase } from '../lib/supabase'
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SKILL_TYPES   = ['Masonry', 'Demo', 'Paver', 'Landscape', 'Specialty']
-const SKILL_LABELS  = { 1: 'Lv 1 — Best', 2: 'Lv 2 — Good', 3: 'Lv 3 — Fair', 4: 'Lv 4 — Basic' }
+const SKILL_LABELS  = { 4: 'Lv 4 — Best', 3: 'Lv 3 — Good', 2: 'Lv 2 — Fair', 1: 'Lv 1 — Basic' }
 const LABEL_CHARS   = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
 const SKILL_COLORS = {
@@ -19,7 +19,7 @@ const SKILL_COLORS = {
   Specialty: 'bg-purple-100 text-purple-800 border-purple-200',
 }
 
-const LEVEL_DOT = { 1: 'bg-green-500', 2: 'bg-yellow-400', 3: 'bg-orange-400', 4: 'bg-red-400' }
+const LEVEL_DOT = { 4: 'bg-green-500', 3: 'bg-yellow-400', 2: 'bg-orange-400', 1: 'bg-red-400' }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function empName(emp) {
@@ -178,7 +178,7 @@ function CrewModal({ crew, employees, usedLabels, onClose, onSave, onDelete }) {
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
               Crew Skills
-              <span className="ml-1 font-normal normal-case text-gray-400">(1 = best · 4 = basic)</span>
+              <span className="ml-1 font-normal normal-case text-gray-400">(4 = best · 1 = basic)</span>
             </label>
             <div className="space-y-2">
               {SKILL_TYPES.map(type => {
