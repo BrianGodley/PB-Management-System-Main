@@ -172,21 +172,23 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
               style={{
                 position:        'absolute',
                 left:            `calc(${leftPct}% + 3px)`,
-                width:           `calc(${widthPct}% - 6px)`,
+                maxWidth:        `calc(${widthPct}% - 6px)`,
+                width:           'max-content',
                 top:             lane * LANE_H + 2,
-                height:          LANE_H - 4,
+                minHeight:       LANE_H - 4,
+                height:          'auto',
                 backgroundColor: item.display_color,
-                borderRadius:    radius,
+                borderRadius:    '4px',
                 pointerEvents:   'auto',
               }}
-              className="flex items-start gap-1.5 px-2 pt-1.5 text-white text-xs font-semibold cursor-pointer hover:opacity-80 overflow-hidden leading-snug"
+              className="inline-flex items-start gap-1.5 px-2 pt-1.5 pb-1.5 text-white text-xs font-semibold cursor-pointer hover:opacity-80 leading-snug"
               title={displayText}
             >
               {item.assignee_color && (
                 <span className="flex-shrink-0 w-4 h-4 rounded-full border border-white/50 mt-0.5"
                       style={{ backgroundColor: item.assignee_color }} />
               )}
-              <span className="break-words min-w-0">{displayText}</span>
+              <span style={{ wordBreak: 'break-word', whiteSpace: 'normal', minWidth: 0 }}>{displayText}</span>
             </div>
           )
         })}
