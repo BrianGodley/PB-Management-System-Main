@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useLang } from '../contexts/LanguageContext'
 import DailyLogs from '../components/DailyLogs'
 
 export default function DailyLogsPage() {
+  const { t } = useLang()
   const [jobs,        setJobs]        = useState([])
   const [selectedJob, setSelectedJob] = useState('all')
   const [loading,     setLoading]     = useState(true)
@@ -17,14 +19,14 @@ export default function DailyLogsPage() {
 
       {/* Minimal header with job filter */}
       <div className="flex-shrink-0 mb-4">
-        <h1 className="text-lg font-bold text-gray-900 mb-3">Daily Logs</h1>
+        <h1 className="text-lg font-bold text-gray-900 mb-3">{t('dailyLogsTitle')}</h1>
         {!loading && (
           <select
             value={selectedJob}
             onChange={e => setSelectedJob(e.target.value)}
             className="input text-sm w-full"
           >
-            <option value="all">All Jobs</option>
+            <option value="all">{t('allJobs')}</option>
             {jobs.map(j => (
               <option key={j.id} value={j.id}>{j.name || j.client_name}</option>
             ))}

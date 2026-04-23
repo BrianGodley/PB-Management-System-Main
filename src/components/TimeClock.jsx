@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useLang } from '../contexts/LanguageContext'
 
 // ── Time helpers ─────────────────────────────────────────────
 function fmt12h(t) {
@@ -534,6 +535,7 @@ function MobileHero({
   myWeekEntries, jobMap, jobs = [], selectedJob,
   onClockIn, onClockOut, onManualShift, onEditEntry,
 }) {
+  const { t } = useLang()
   const noJobPicked = !selectedJob || selectedJob === 'all'
   const clockedInJobName = myOpenEntry?.job_id ? jobMap[myOpenEntry.job_id] : null
 
@@ -553,11 +555,11 @@ function MobileHero({
         }`}
       >
         <span className={`w-4 h-4 rounded-full ${isClockedIn ? 'bg-white/70 animate-pulse' : noJobPicked ? 'bg-gray-300' : 'bg-white/70'}`} />
-        {isClockedIn ? 'Clock Out' : 'Clock In'}
+        {isClockedIn ? t('clockOut') : t('clockIn')}
         {isClockedIn && myOpenEntry && (
           <span className="text-sm font-normal text-white/80 mt-1 text-center px-4">
             {clockedInJobName && <span className="block font-semibold text-white">{clockedInJobName}</span>}
-            In at {fmt12h(myOpenEntry.time_in)} · {calcElapsed(myOpenEntry.time_in, nowTime)} elapsed
+            {t('inAt')} {fmt12h(myOpenEntry.time_in)} · {calcElapsed(myOpenEntry.time_in, nowTime)} {t('elapsed')}
           </span>
         )}
       </button>
@@ -565,14 +567,14 @@ function MobileHero({
       {/* Stats: Today + This Week */}
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-white border border-gray-200 rounded-2xl p-4 text-center shadow-sm">
-          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Today</p>
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1">{t('today')}</p>
           <p className="text-3xl font-black text-gray-900">{fmtHours(myTodayMins)}</p>
           <p className="text-[10px] text-gray-400 mt-1">
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
           </p>
         </div>
         <div className="bg-white border border-gray-200 rounded-2xl p-4 text-center shadow-sm">
-          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1">This Week</p>
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1">{t('thisWeek')}</p>
           <p className={`text-3xl font-black ${myWeekMins >= 2400 ? 'text-orange-600' : 'text-gray-900'}`}>
             {fmtHours(myWeekMins)}
           </p>
@@ -583,7 +585,7 @@ function MobileHero({
       {/* Recent shifts this week */}
       {myWeekEntries.length > 0 && (
         <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 px-1">My Shifts This Week</p>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 px-1">{t('myShiftsThisWeek')}</p>
           <div className="space-y-2">
             {[...myWeekEntries]
               .sort((a, b) => b.date.localeCompare(a.date) || (b.time_in || '').localeCompare(a.time_in || ''))
@@ -620,7 +622,7 @@ function MobileHero({
                           {ot > 0 && <p className="text-[10px] text-orange-600 font-semibold">OT {fmtMins(ot)}</p>}
                         </>
                       ) : (
-                        <span className="text-xs text-green-700 font-semibold">In progress</span>
+                        <span className="text-xs text-green-700 font-semibold">{t('inProgress')}</span>
                       )}
                       {/* Chevron hint */}
                       <p className="text-gray-300 text-xs mt-1">›</p>
@@ -637,7 +639,7 @@ function MobileHero({
         onClick={onManualShift}
         className="w-full py-3 rounded-xl border-2 border-dashed border-gray-300 text-sm font-medium text-gray-500 hover:border-green-400 hover:text-green-700 transition-colors"
       >
-        + Manual Shift
+        {t('manualShift')}
       </button>
     </div>
   )

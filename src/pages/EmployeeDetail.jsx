@@ -9,6 +9,10 @@ import ReviewModal from '../components/hr/ReviewModal'
 import { sendSMS } from '../lib/notify'
 
 const DEPARTMENTS = ['Operations', 'Landscaping', 'Pool', 'Admin', 'Sales', 'Other']
+const LANGUAGES   = [
+  { value: 'en', label: 'English' },
+  { value: 'es', label: 'Español (Spanish)' },
+]
 
 // Permission groups and defaults (copied from Admin.jsx)
 const PERM_GROUPS = [
@@ -289,8 +293,16 @@ export default function EmployeeDetail() {
       start_date: draft.start_date || null,
       updated_at: new Date().toISOString(),
     }).eq('id', id)
+    if (err) { setSaving(false); alert(err.message); return }
+
+    // Sync preferred_language to the linked auth profile so the UI updates
+    if (linkedProfile?.id && draft.preferred_language) {
+      await supabase.from('profiles')
+        .update({ preferred_language: draft.preferred_language })
+        .eq('id', linkedProfile.id)
+    }
+
     setSaving(false)
-    if (err) { alert(err.message); return }
     setEditing(false)
     fetchAll()
   }
@@ -522,6 +534,23 @@ export default function EmployeeDetail() {
                       </div>
                     ) : (
                       <Field label="Department" value={draft.department} editing={false} onChange={() => {}} />
+                    )}
+                    {/* Preferred Language */}
+                    {editing ? (
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Preferred Language</label>
+                        <select value={draft.preferred_language || 'en'} onChange={e => set('preferred_language', e.target.value)}
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500">
+                          {LANGUAGES.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+                        </select>
+                      </div>
+                    ) : (
+                      <Field
+                        label="Preferred Language"
+                        value={LANGUAGES.find(l => l.value === (draft.preferred_language || 'en'))?.label}
+                        editing={false}
+                        onChange={() => {}}
+                      />
                     )}
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Start Date</label>

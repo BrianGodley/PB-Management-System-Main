@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useLang } from '../contexts/LanguageContext'
 import TimeClock from '../components/TimeClock'
 
 export default function TimeClockPage() {
+  const { t } = useLang()
   const [jobs,        setJobs]        = useState([])
   const [selectedJob, setSelectedJob] = useState('all')
   const [loading,     setLoading]     = useState(true)
@@ -17,7 +19,7 @@ export default function TimeClockPage() {
 
       {/* Minimal header with job filter */}
       <div className="flex-shrink-0 mb-4">
-        <h1 className="text-lg font-bold text-gray-900 mb-3">Time Clock</h1>
+        <h1 className="text-lg font-bold text-gray-900 mb-3">{t('timeClockTitle')}</h1>
         {!loading && (
           <>
             <select
@@ -25,14 +27,14 @@ export default function TimeClockPage() {
               onChange={e => setSelectedJob(e.target.value)}
               className={`input text-sm w-full ${selectedJob === 'all' ? 'border-red-300' : ''}`}
             >
-              <option value="all">— Select a job —</option>
+              <option value="all">{t('selectJob')}</option>
               {jobs.map(j => (
                 <option key={j.id} value={j.id}>{j.name || j.client_name}</option>
               ))}
             </select>
             {selectedJob === 'all' && (
               <p className="text-xs text-red-500 mt-1.5 px-0.5">
-                A job must be selected before clocking in.
+                {t('jobRequired')}
               </p>
             )}
           </>

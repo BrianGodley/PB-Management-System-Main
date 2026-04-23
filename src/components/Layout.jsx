@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { useLang } from '../contexts/LanguageContext'
 import { supabase } from '../lib/supabase'
 
 const navItems = [
@@ -16,24 +17,8 @@ const navItems = [
   { path: '/accounting',   label: 'Accounting',     icon: '💼' },
 ]
 
-// Bottom dock — quick-access for field use (mobile only)
-// 'key: main' is a special item that opens the nav sheet instead of navigating
-const DOCK_ITEMS = [
-  { to: '/daily-logs', label: 'Daily Logs', icon: '📋' },
-  { to: '/timeclock',  label: 'Time Clock', icon: '⏱️' },
-  { to: '/jobs',       label: 'Info',        icon: 'ℹ️' },
-  { key: 'main',       label: 'Main',        icon: '⊞' },
-]
-
-// Links shown in the mobile Main nav sheet
-const MAIN_MENU_ITEMS = [
-  { path: '/',            label: 'Dashboard',      icon: '🏠' },
-  { path: '/clients',     label: 'Clients',        icon: '👥' },
-  { path: '/bids',        label: 'Bids',           icon: '📋' },
-  { path: '/jobs',        label: 'Jobs',           icon: '🔨' },
-  { path: '/statistics',  label: 'Statistics',     icon: '📈' },
-  { path: '/portal/subs', label: 'Subs & Vendors', icon: '🔧' },
-]
+// Dock and main menu labels are computed inside the component via t()
+// so they update when the user's language changes.
 
 const forestGreen = '#4E7B4C'
 const forestGreenDark = '#3A5038'
@@ -50,9 +35,27 @@ function setFavicon(url) {
 
 export default function Layout() {
   const { user, signOut } = useAuth()
+  const { t } = useLang()
   const location = useLocation()
   const navigate = useNavigate()
   const [showUserMenu,   setShowUserMenu]   = useState(false)
+
+  // Translated dock + main-menu items (re-computed whenever t() changes)
+  const DOCK_ITEMS = [
+    { to: '/daily-logs', label: t('dailyLogs'), icon: '📋' },
+    { to: '/timeclock',  label: t('timeClock'), icon: '⏱️' },
+    { to: '/jobs',       label: t('info'),       icon: 'ℹ️' },
+    { key: 'main',       label: t('main'),       icon: '⊞' },
+  ]
+
+  const MAIN_MENU_ITEMS = [
+    { path: '/',            label: t('dashboard'),   icon: '🏠' },
+    { path: '/clients',     label: t('clients'),     icon: '👥' },
+    { path: '/bids',        label: t('bids'),        icon: '📋' },
+    { path: '/jobs',        label: t('jobs'),        icon: '🔨' },
+    { path: '/statistics',  label: t('statistics'),  icon: '📈' },
+    { path: '/portal/subs', label: t('subsVendors'), icon: '🔧' },
+  ]
   const [showMainMenu,   setShowMainMenu]   = useState(false)
   const [avatarUrl,      setAvatarUrl]      = useState(null)
   const [companyLogoUrl, setCompanyLogoUrl] = useState(null)
@@ -307,7 +310,7 @@ export default function Layout() {
             style={{ marginBottom: 'env(safe-area-inset-bottom)' }}
           >
             <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 px-1">Main Menu</p>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 px-1">{t('mainMenu')}</p>
 
             <div className="grid grid-cols-3 gap-3">
               {MAIN_MENU_ITEMS.map(item => (
@@ -332,7 +335,7 @@ export default function Layout() {
               onClick={() => { setShowMainMenu(false); handleSignOut() }}
               className="w-full mt-4 py-3 rounded-xl border border-red-100 text-sm font-medium text-red-500 hover:bg-red-50 transition-colors"
             >
-              🚪 Sign Out
+              🚪 {t('signOut')}
             </button>
           </div>
         </>
