@@ -269,13 +269,12 @@ export default function TimeClock({ jobs = [], selectedJob }) {
             {isClockedIn ? 'Clock Out' : 'Clock In'}
           </button>
 
-          {/* Manual entry button */}
+          {/* Manual Shift button */}
           <button onClick={openNew} className="btn-secondary text-sm px-3 py-1.5 flex items-center gap-1.5">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            <span className="hidden sm:inline">Manual Entry</span>
-            <span className="sm:hidden">Manual</span>
+            Manual Shift
           </button>
         </div>
       </div>
