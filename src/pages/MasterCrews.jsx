@@ -263,6 +263,8 @@ function SubCrewModal({ sub, onClose, onSave, onDelete }) {
   const isNew = !sub?.id
   const [name,      setName]      = useState(sub?.name      || '')
   const [divisions, setDivisions] = useState((sub?.divisions || []).join(', '))
+  const [cell,      setCell]      = useState(sub?.cell      || '')
+  const [phone,     setPhone]     = useState(sub?.phone     || '')
   const [rating,    setRating]    = useState(sub?.rating     ?? 5)
   const [notes,     setNotes]     = useState(sub?.notes      || '')
   const [saving,    setSaving]    = useState(false)
@@ -272,7 +274,7 @@ function SubCrewModal({ sub, onClose, onSave, onDelete }) {
     if (!name.trim()) { setError('Company name is required.'); return }
     setSaving(true); setError('')
     const divArr = divisions.split(',').map(d => d.trim()).filter(Boolean)
-    const payload = { name: name.trim(), divisions: divArr, rating: +rating, notes: notes.trim() }
+    const payload = { name: name.trim(), divisions: divArr, cell: cell.trim() || null, phone: phone.trim() || null, rating: +rating, notes: notes.trim() }
     const { error: err } = isNew
       ? await supabase.from('master_sub_crews').insert(payload)
       : await supabase.from('master_sub_crews').update(payload).eq('id', sub.id)
@@ -315,6 +317,19 @@ function SubCrewModal({ sub, onClose, onSave, onDelete }) {
             </label>
             <input type="text" value={divisions} onChange={e => setDivisions(e.target.value)}
               placeholder="e.g. Masonry, Concrete, Tile" className="input text-sm w-full" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Cell</label>
+              <input type="tel" value={cell} onChange={e => setCell(e.target.value)}
+                placeholder="(555) 867-5309" className="input text-sm w-full" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Office Phone</label>
+              <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
+                placeholder="(555) 867-5309" className="input text-sm w-full" />
+            </div>
           </div>
 
           <div>
@@ -579,6 +594,8 @@ export default function MasterCrews() {
                       <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
                         <th className="px-4 py-2.5 text-left">Company</th>
                         <th className="px-4 py-2.5 text-left">Divisions / Trade</th>
+                        <th className="px-4 py-2.5 text-left">Cell</th>
+                        <th className="px-4 py-2.5 text-left">Office Phone</th>
                         <th className="px-4 py-2.5 text-center">Rating</th>
                         <th className="px-4 py-2.5 text-left">Notes</th>
                       </tr>
@@ -602,6 +619,12 @@ export default function MasterCrews() {
                             ) : (
                               <span className="text-gray-300 text-xs italic">—</span>
                             )}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
+                            {sub.cell || <span className="text-gray-300 text-xs">—</span>}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
+                            {sub.phone || <span className="text-gray-300 text-xs">—</span>}
                           </td>
                           <td className="px-4 py-3 text-center">
                             {sub.rating ? (
