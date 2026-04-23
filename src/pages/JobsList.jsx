@@ -21,9 +21,11 @@ export default function JobsList() {
   const [tab,        setTab]        = useState('jobs')
   const [jobModal,   setJobModal]   = useState(null)
   const [search,     setSearch]     = useState('')
-  const [stages,     setStages]     = useState([])
-  const [dragJobId,  setDragJobId]  = useState(null)
-  const [dragOverStage, setDragOverStage] = useState(null)
+  const [stages,          setStages]          = useState([])
+  const [dragJobId,       setDragJobId]       = useState(null)
+  const [dragOverStage,   setDragOverStage]   = useState(null)
+  const [showExceptions,  setShowExceptions]  = useState(false)
+  const [exceptionsCount, setExceptionsCount] = useState(0)
 
   useEffect(() => { fetchJobs(); fetchStages() }, [])
 
@@ -136,24 +138,6 @@ export default function JobsList() {
         <h1 className="text-xl font-bold text-gray-900">Jobs</h1>
       </div>
 
-      {/* ── Summary stats ─────────────────────────────────────── */}
-      <div className="flex gap-2 mb-3 flex-shrink-0 overflow-x-auto pb-1">
-        {[
-          { label: 'Under Construction', value: underConstruction, count: jobs.filter(j => (j.status||'active')==='active').length,    color: 'text-green-700' },
-          { label: 'All Open Jobs',       value: allOpen,           count: jobs.filter(j => ['active','on_hold'].includes(j.status||'active')).length, color: 'text-blue-700'  },
-          { label: 'Completed',           value: completedTotal,    count: jobs.filter(j => j.status==='completed').length,              color: 'text-gray-600'  },
-        ].map(s => (
-          <div key={s.label} className="flex-shrink-0 sm:flex-1 flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm min-w-[160px]">
-            <span className="text-xs text-gray-600 font-medium">{s.label}</span>
-            <div className="text-right ml-2">
-              <span className={`text-sm font-bold ${s.color}`}>${s.value.toLocaleString()}</span>
-              <span className="text-xs text-gray-500 ml-1">({s.count})</span>
-            </div>
-          </div>
-        ))}
-        <Link to="/jobs/new" className="btn-primary text-sm px-3 flex items-center whitespace-nowrap flex-shrink-0">+ Add Job</Link>
-      </div>
-
       {/* ── Mobile: job selector dropdown ─────────────────────── */}
       <div className="lg:hidden mb-2 flex-shrink-0">
         <select
@@ -192,6 +176,23 @@ export default function JobsList() {
 
         {/* Jobs sidebar — desktop only */}
         <div className="hidden lg:flex w-56 flex-shrink-0 flex-col min-h-0 -ml-6 pl-3">
+          {/* Workday Exceptions button */}
+          <button
+            onClick={() => setShowExceptions(true)}
+            className="w-full flex items-center gap-1.5 px-2.5 py-1.5 mb-2 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors flex-shrink-0"
+          >
+            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+            </svg>
+            <span className="flex-1 text-left">Workday Exceptions</span>
+            {exceptionsCount > 0 && (
+              <span className="bg-gray-200 text-gray-700 rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none">
+                {exceptionsCount}
+              </span>
+            )}
+          </button>
+
           <input
             type="text"
             placeholder="Search jobs…"
@@ -332,6 +333,9 @@ export default function JobsList() {
             <ScheduleCalendar
               jobs={jobs}
               selectedJob={selectedJob === ALL_JOBS ? 'all' : selectedJob}
+              showExceptionsExternal={showExceptions}
+              onSetShowExceptions={setShowExceptions}
+              onExceptionsLoaded={setExceptionsCount}
             />
           )}
 

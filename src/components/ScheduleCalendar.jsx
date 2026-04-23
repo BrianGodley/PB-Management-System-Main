@@ -558,7 +558,7 @@ function WorkdayExceptionsModal({ exceptions, onAdd, onDelete, onClose, recalcul
   )
 }
 
-export default function ScheduleCalendar({ jobs = [], selectedJob }) {
+export default function ScheduleCalendar({ jobs = [], selectedJob, showExceptionsExternal, onSetShowExceptions, onExceptionsLoaded }) {
   const today = new Date()
   const [year,  setYear]  = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
@@ -577,8 +577,12 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
   const [subs,               setSubs]               = useState([])
   const [defaultSchedColor,  setDefaultSchedColor]  = useState('#15803d')
   const [exceptions,         setExceptions]         = useState([])
-  const [showExceptions,     setShowExceptions]     = useState(false)
+  const [localShowExceptions, setLocalShowExceptions] = useState(false)
   const [recalculating,      setRecalculating]      = useState(false)
+
+  // Support controlled (from parent sidebar button) or uncontrolled mode
+  const showExceptions    = showExceptionsExternal !== undefined ? showExceptionsExternal : localShowExceptions
+  const setShowExceptions = onSetShowExceptions    !== undefined ? onSetShowExceptions    : setLocalShowExceptions
 
   // crew color lookup: { crewId: hexColor }
   const crewColorMap = Object.fromEntries(crews.map(c => [c.id, c.color || '#15803d']))
@@ -600,7 +604,10 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
 
   async function fetchExceptions() {
     const { data } = await supabase.from('workday_exceptions').select('*').order('created_at')
-    if (data) setExceptions(data)
+    if (data) {
+      setExceptions(data)
+      onExceptionsLoaded?.(data.length)
+    }
   }
 
   async function recalculateScheduleItems(updatedExceptions) {
@@ -634,6 +641,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
     if (data) {
       const updated = [...exceptions, data]
       setExceptions(updated)
+      onExceptionsLoaded?.(updated.length)
       recalculateScheduleItems(updated)
     }
   }
@@ -642,6 +650,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
     await supabase.from('workday_exceptions').delete().eq('id', id)
     const updated = exceptions.filter(e => e.id !== id)
     setExceptions(updated)
+    onExceptionsLoaded?.(updated.length)
     recalculateScheduleItems(updated)
   }
 
@@ -871,22 +880,6 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
-            </button>
-            <button
-              onClick={() => setShowExceptions(true)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors flex-shrink-0 ml-2"
-              title="Manage workday exceptions"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-              </svg>
-              Exceptions
-              {exceptions.length > 0 && (
-                <span className="bg-gray-200 text-gray-700 rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none">
-                  {exceptions.length}
-                </span>
-              )}
             </button>
           </div>
 
