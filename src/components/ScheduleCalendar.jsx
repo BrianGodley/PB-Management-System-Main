@@ -180,7 +180,7 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
                 borderRadius:    '4px',
                 pointerEvents:   'auto',
               }}
-              className="inline-flex items-start gap-1.5 px-2 pt-1.5 pb-1.5 text-white text-xs font-semibold cursor-pointer hover:opacity-80 leading-snug"
+              className="inline-flex items-start gap-1.5 px-2 pt-1.5 pb-1.5 text-white text-sm font-semibold cursor-pointer hover:opacity-80 leading-snug"
               title={displayText}
             >
               {item.assignee_color && (
