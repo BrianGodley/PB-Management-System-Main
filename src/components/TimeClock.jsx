@@ -370,6 +370,7 @@ export default function TimeClock({ jobs = [], selectedJob }) {
             onClockIn={handleClockIn}
             onClockOut={handleClockOut}
             onManualShift={openNew}
+            onEditEntry={openEdit}
           />
           <div className="hidden lg:flex flex-col items-center justify-center flex-1 text-gray-400 py-20">
             <p className="text-5xl mb-3">⏱️</p>
@@ -396,18 +397,20 @@ export default function TimeClock({ jobs = [], selectedJob }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 bg-white">
-                {entries.map((entry, idx) => {
+                {entries.map((entry) => {
                   const { total, ot } = calcTimes(entry.time_in, entry.time_out)
-                  const showDate = idx === 0 || entries[idx - 1].date !== entry.date
                   const isClockedIn = !entry.time_out
                   return (
                     <tr key={entry.id} className={`transition-colors group ${isClockedIn ? 'bg-green-50/40' : 'hover:bg-gray-50'}`}>
 
-                      {/* Date */}
+                      {/* Date — always shown, clickable link to edit modal */}
                       <td className="px-4 py-3 whitespace-nowrap">
-                        {showDate
-                          ? <span className="text-blue-600 font-medium text-xs">{fmtDateLabel(entry.date)}</span>
-                          : <span className="text-gray-200 text-xs select-none">″</span>}
+                        <button
+                          onClick={() => openEdit(entry)}
+                          className="text-blue-600 hover:text-blue-800 hover:underline font-medium text-xs text-left"
+                        >
+                          {fmtDateLabel(entry.date)}
+                        </button>
                       </td>
 
                       {/* Employee */}
@@ -501,6 +504,7 @@ export default function TimeClock({ jobs = [], selectedJob }) {
             onClockIn={handleClockIn}
             onClockOut={handleClockOut}
             onManualShift={openNew}
+            onEditEntry={openEdit}
           />
         </>
       )}
@@ -528,7 +532,7 @@ function MobileHero({
   isClockedIn, myOpenEntry, nowTime,
   myTodayMins, myWeekMins, weekRangeLabel,
   myWeekEntries, jobMap, jobs = [], selectedJob,
-  onClockIn, onClockOut, onManualShift,
+  onClockIn, onClockOut, onManualShift, onEditEntry,
 }) {
   // Local job selection — pre-fill from selectedJob if a specific job is already chosen
   const [pickedJobId, setPickedJobId] = useState(
@@ -617,11 +621,18 @@ function MobileHero({
               .map(entry => {
                 const { total, ot } = calcTimes(entry.time_in, entry.time_out)
                 return (
-                  <div key={entry.id} className="bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm flex items-center gap-3">
+                  <button
+                    key={entry.id}
+                    onClick={() => onEditEntry(entry)}
+                    className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm flex items-center gap-3 text-left active:bg-gray-50 transition-colors"
+                  >
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-blue-600">{fmtDateLabel(entry.date)}</p>
+                      {/* Date — styled as hyperlink, whole card is tappable */}
+                      <p className="text-xs font-semibold text-blue-600 underline underline-offset-2">
+                        {fmtDateLabel(entry.date)}
+                      </p>
                       {entry.job_id && (
-                        <p className="text-xs text-green-700 truncate">{jobMap[entry.job_id]}</p>
+                        <p className="text-xs text-green-700 truncate mt-0.5">{jobMap[entry.job_id]}</p>
                       )}
                       <p className="text-sm text-gray-600 mt-0.5">
                         {fmt12h(entry.time_in)}
@@ -641,8 +652,10 @@ function MobileHero({
                       ) : (
                         <span className="text-xs text-green-700 font-semibold">In progress</span>
                       )}
+                      {/* Chevron hint */}
+                      <p className="text-gray-300 text-xs mt-1">›</p>
                     </div>
-                  </div>
+                  </button>
                 )
               })}
           </div>
@@ -674,7 +687,7 @@ function TimeEntryModal({ form, setForm, isEdit, jobs, onSave, onClose, saving, 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
           <h2 className="text-base font-bold text-gray-900">
-            {isEdit ? 'Edit Time Entry' : 'Add Time Entry'}
+            {isEdit ? 'Shift Details' : 'Add Time Entry'}
           </h2>
           <button onClick={onClose} className="text-gray-300 hover:text-gray-500 p-2">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
