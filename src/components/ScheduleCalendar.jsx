@@ -17,7 +17,7 @@ const REMINDERS  = ['None', '1 day before', '2 days before', '3 days before', '1
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December']
 const DAY_NAMES   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 
-const LANE_H    = 56   // tall enough for 3 lines of wrapped text
+const LANE_H    = 68   // tall enough for 3 lines of wrapped text at larger font
 const DAY_H     = 30
 const ROW_PAD   = 8
 const MIN_ROW_H = 120
@@ -179,11 +179,11 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
                 borderRadius:    radius,
                 pointerEvents:   'auto',
               }}
-              className="flex items-start gap-1 px-1.5 pt-1 text-white text-[10px] font-medium cursor-pointer hover:opacity-80 overflow-hidden leading-tight"
+              className="flex items-start gap-1.5 px-2 pt-1.5 text-white text-xs font-semibold cursor-pointer hover:opacity-80 overflow-hidden leading-snug"
               title={displayText}
             >
               {item.assignee_color && (
-                <span className="flex-shrink-0 w-3 h-3 rounded-full border border-white/40 mt-0.5"
+                <span className="flex-shrink-0 w-4 h-4 rounded-full border border-white/50 mt-0.5"
                       style={{ backgroundColor: item.assignee_color }} />
               )}
               <span className="break-words min-w-0">{displayText}</span>
