@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import ScheduleCalendar from '../components/ScheduleCalendar'
@@ -362,6 +362,50 @@ export const COLOR_PALETTE = [
   '#f43f5e','#000000',
 ]
 
+// ── Color Dropdown Picker ─────────────────────────────────────────────────────
+function ColorDropdown({ value, onChange }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    function handleClick(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  return (
+    <div ref={ref} className="relative inline-block">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-2 px-2.5 py-1.5 border border-gray-300 rounded-lg bg-white hover:border-gray-400 transition-colors"
+      >
+        <span className="w-5 h-5 rounded-full border border-gray-200 flex-shrink-0" style={{ backgroundColor: value }} />
+        <span className="font-mono text-gray-700 text-xs">{value}</span>
+        <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 left-0 bg-white border border-gray-200 rounded-xl shadow-lg p-3 w-52">
+          <div className="flex flex-wrap gap-1.5">
+            {COLOR_PALETTE.map(c => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => { onChange(c); setOpen(false) }}
+                style={{ backgroundColor: c }}
+                className={`w-6 h-6 rounded-full transition-transform hover:scale-110 ${value === c ? 'ring-2 ring-offset-1 ring-gray-600 scale-110' : ''}`}
+                title={c}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Job Schedule Settings ─────────────────────────────────────────────────────
 function JobScheduleSettings() {
   const [defaultColor,  setDefaultColor]  = useState('#15803d')
@@ -388,27 +432,13 @@ function JobScheduleSettings() {
           This color will be used as the default background color for new schedule items.
         </p>
 
-        <div className="flex flex-wrap gap-2 mb-5">
-          {COLOR_PALETTE.map(c => (
-            <button
-              key={c}
-              onClick={() => setDefaultColor(c)}
-              style={{ backgroundColor: c }}
-              className={`w-9 h-9 rounded-full transition-transform ${
-                defaultColor === c
-                  ? 'ring-2 ring-offset-2 ring-gray-600 scale-110'
-                  : 'hover:scale-110'
-              }`}
-              title={c}
-            />
-          ))}
+        <div className="flex items-center gap-4 mb-5">
+          <ColorDropdown value={defaultColor} onChange={setDefaultColor} />
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full border border-gray-200" style={{ backgroundColor: defaultColor }} />
-          <span className="text-sm text-gray-600 font-mono">{defaultColor}</span>
           <button onClick={handleSave} disabled={saving}
-            className="ml-auto btn-primary text-sm px-4 py-2 disabled:opacity-50">
+            className="btn-primary text-sm px-4 py-2 disabled:opacity-50">
             {saving ? 'Saving…' : saved ? '✓ Saved' : 'Save Default Color'}
           </button>
         </div>

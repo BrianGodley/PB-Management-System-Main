@@ -1,6 +1,61 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { COLOR_PALETTE } from '../pages/JobsList'
+
+// ── Color Dropdown Picker ─────────────────────────────────────
+function ColorDropdown({ value, onChange, allowClear = false }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    function handleClick(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  return (
+    <div ref={ref} className="relative inline-block">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-2 px-2.5 py-1.5 border border-gray-300 rounded-lg bg-white hover:border-gray-400 transition-colors text-sm"
+      >
+        {value
+          ? <span className="w-5 h-5 rounded-full border border-gray-200 flex-shrink-0" style={{ backgroundColor: value }} />
+          : <span className="w-5 h-5 rounded-full border-2 border-dashed border-gray-300 flex-shrink-0" />}
+        <span className="font-mono text-gray-700 text-xs">{value || 'None'}</span>
+        <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute z-50 mt-1 left-0 bg-white border border-gray-200 rounded-xl shadow-lg p-3 w-52">
+          <div className="flex flex-wrap gap-1.5">
+            {COLOR_PALETTE.map(c => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => { onChange(c); setOpen(false) }}
+                style={{ backgroundColor: c }}
+                className={`w-6 h-6 rounded-full transition-transform hover:scale-110 ${value === c ? 'ring-2 ring-offset-1 ring-gray-600 scale-110' : ''}`}
+                title={c}
+              />
+            ))}
+            {allowClear && (
+              <button
+                type="button"
+                onClick={() => { onChange(''); setOpen(false) }}
+                className="w-6 h-6 rounded-full border-2 border-dashed border-gray-300 text-gray-400 text-[9px] flex items-center justify-center hover:border-gray-500 transition-colors"
+                title="No color"
+              >✕</button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ── Constants ────────────────────────────────────────────────
 const COLORS = [
@@ -781,24 +836,13 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
                 <div className="space-y-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1.5">Display Color</label>
-                    <div className="flex gap-1.5 flex-wrap">
-                      {COLOR_PALETTE.map(c => (
-                        <button key={c} onClick={() => updateField('display_color', c)}
-                          style={{ backgroundColor: c }}
-                          className={`w-6 h-6 rounded-full transition-transform ${form.display_color === c ? 'ring-2 ring-offset-1 ring-gray-500 scale-110' : 'hover:scale-110'}`}
-                          title={c} />
-                      ))}
-                    </div>
+                    <ColorDropdown value={form.display_color} onChange={c => updateField('display_color', c)} />
                   </div>
 
                   {/* Assignee Color */}
                   <div>
                     <div className="flex items-center gap-2 mb-1.5">
                       <label className="text-xs font-medium text-gray-600">Assignee Color</label>
-                      {form.assignee_color && (
-                        <span className="w-4 h-4 rounded-full border border-gray-300"
-                              style={{ backgroundColor: form.assignee_color }} />
-                      )}
                       {entryMode === 'sub' && (
                         <span className="text-[10px] text-gray-400">Auto: black for subs</span>
                       )}
@@ -806,17 +850,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob }) {
                         <span className="text-[10px] text-gray-400">Auto: crew color</span>
                       )}
                     </div>
-                    <div className="flex gap-1.5 flex-wrap">
-                      {COLOR_PALETTE.map(c => (
-                        <button key={c} onClick={() => updateField('assignee_color', c)}
-                          style={{ backgroundColor: c }}
-                          className={`w-6 h-6 rounded-full transition-transform ${form.assignee_color === c ? 'ring-2 ring-offset-1 ring-gray-500 scale-110' : 'hover:scale-110'}`}
-                          title={c} />
-                      ))}
-                      <button onClick={() => updateField('assignee_color', '')}
-                        className="w-6 h-6 rounded-full border-2 border-dashed border-gray-300 text-gray-400 text-[9px] flex items-center justify-center hover:border-gray-500 transition-colors"
-                        title="No assignee color">✕</button>
-                    </div>
+                    <ColorDropdown value={form.assignee_color} onChange={c => updateField('assignee_color', c)} allowClear />
                   </div>
 
                   <div>
