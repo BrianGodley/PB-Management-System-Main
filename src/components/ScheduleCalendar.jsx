@@ -217,7 +217,7 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
               onClick={() => day && onDayClick(day)}
               className={`border-r border-gray-200 pt-1 px-1 select-none
                 ${!day        ? 'bg-white cursor-default'
-                : isExcept    ? 'bg-gray-200 cursor-pointer'
+                : isExcept    ? 'bg-gray-100 cursor-pointer'
                 :               'bg-white hover:bg-green-50 cursor-pointer'}`}
             >
               {day && (
