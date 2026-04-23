@@ -267,12 +267,15 @@ export default function TimeClock({ jobs = [], selectedJob }) {
   }
 
   // ── Personal clock-in / clock-out button handlers ─────────
-  async function handleClockIn() {
+  // jobId is required — mobile hero enforces selection before calling this
+  async function handleClockIn(jobId) {
+    const resolvedJobId = jobId || (selectedJob !== 'all' ? selectedJob : null)
+    if (!resolvedJobId) return   // safety guard — should never reach this on mobile
     const now = new Date()
     const timeIn = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
     await supabase.from('time_entries').insert({
       employee_name: profileName,
-      job_id:        selectedJob !== 'all' ? selectedJob : null,
+      job_id:        resolvedJobId,
       date:          todayDate(),
       time_in:       timeIn,
       time_out:      null,
@@ -362,6 +365,8 @@ export default function TimeClock({ jobs = [], selectedJob }) {
             weekRangeLabel={weekRangeLabel}
             myWeekEntries={myWeekEntries}
             jobMap={jobMap}
+            jobs={jobs}
+            selectedJob={selectedJob}
             onClockIn={handleClockIn}
             onClockOut={handleClockOut}
             onManualShift={openNew}
@@ -491,6 +496,8 @@ export default function TimeClock({ jobs = [], selectedJob }) {
             weekRangeLabel={weekRangeLabel}
             myWeekEntries={myWeekEntries}
             jobMap={jobMap}
+            jobs={jobs}
+            selectedJob={selectedJob}
             onClockIn={handleClockIn}
             onClockOut={handleClockOut}
             onManualShift={openNew}
@@ -520,23 +527,62 @@ export default function TimeClock({ jobs = [], selectedJob }) {
 function MobileHero({
   isClockedIn, myOpenEntry, nowTime,
   myTodayMins, myWeekMins, weekRangeLabel,
-  myWeekEntries, jobMap,
+  myWeekEntries, jobMap, jobs = [], selectedJob,
   onClockIn, onClockOut, onManualShift,
 }) {
+  // Local job selection — pre-fill from selectedJob if a specific job is already chosen
+  const [pickedJobId, setPickedJobId] = useState(
+    selectedJob && selectedJob !== 'all' ? selectedJob : ''
+  )
+  const noJobPicked = !pickedJobId
+
+  // If user was clocked in, show which job they clocked into
+  const clockedInJobName = myOpenEntry?.job_id ? jobMap[myOpenEntry.job_id] : null
+
   return (
     <div className="lg:hidden flex flex-col gap-4">
 
+      {/* Job picker — required before clock in, hidden once clocked in */}
+      {!isClockedIn && (
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+            Select Job <span className="text-red-400">*</span>
+          </label>
+          <select
+            value={pickedJobId}
+            onChange={e => setPickedJobId(e.target.value)}
+            className={`w-full rounded-xl border px-4 py-3 text-sm font-medium bg-white focus:outline-none focus:ring-2 focus:ring-green-500 ${
+              noJobPicked ? 'border-red-300 text-gray-400' : 'border-gray-300 text-gray-900'
+            }`}
+          >
+            <option value="">— Choose a job to clock in —</option>
+            {jobs.map(j => (
+              <option key={j.id} value={j.id}>{j.name || j.client_name}</option>
+            ))}
+          </select>
+          {noJobPicked && (
+            <p className="text-xs text-red-500 mt-1 px-1">A job must be selected before clocking in.</p>
+          )}
+        </div>
+      )}
+
       {/* Big clock button */}
       <button
-        onClick={isClockedIn ? onClockOut : onClockIn}
-        className={`w-full py-10 rounded-2xl text-2xl font-black shadow-lg flex flex-col items-center gap-2 transition-all active:scale-95 select-none ${
-          isClockedIn ? 'bg-red-600 text-white' : 'bg-green-700 text-white'
+        onClick={isClockedIn ? onClockOut : () => { if (!noJobPicked) onClockIn(pickedJobId) }}
+        disabled={!isClockedIn && noJobPicked}
+        className={`w-full py-10 rounded-2xl text-2xl font-black shadow-lg flex flex-col items-center gap-2 transition-all select-none ${
+          isClockedIn
+            ? 'bg-red-600 text-white active:scale-95'
+            : noJobPicked
+              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              : 'bg-green-700 text-white active:scale-95'
         }`}
       >
-        <span className={`w-4 h-4 rounded-full bg-white/70 ${isClockedIn ? 'animate-pulse' : ''}`} />
+        <span className={`w-4 h-4 rounded-full ${isClockedIn ? 'bg-white/70 animate-pulse' : noJobPicked ? 'bg-gray-300' : 'bg-white/70'}`} />
         {isClockedIn ? 'Clock Out' : 'Clock In'}
         {isClockedIn && myOpenEntry && (
-          <span className="text-sm font-normal text-white/80 mt-1">
+          <span className="text-sm font-normal text-white/80 mt-1 text-center px-4">
+            {clockedInJobName && <span className="block font-semibold text-white">{clockedInJobName}</span>}
             In at {fmt12h(myOpenEntry.time_in)} · {calcElapsed(myOpenEntry.time_in, nowTime)} elapsed
           </span>
         )}
