@@ -5,8 +5,13 @@ import GpmdBar from './GpmdBar'
 // ─────────────────────────────────────────────────────────────────────────────
 // Steps Module
 // Labor rates (category='Steps') from labor_rates:
-//   Steps - Straight    1.5 LF/hr
-//   Steps - Curved      1.0 LF/hr
+//   Steps - Straight          1.5 LF/hr  (paver steps)
+//   Steps - Curved            1.0 LF/hr  (paver steps)
+//   Steps - Concrete Straight 1.0 LF/hr  (concrete steps)
+//   Steps - Concrete Curved   0.5 LF/hr  (concrete steps)
+//
+// Material rates (category='Steps') from material_rates:
+//   Steps - Concrete          $12.00/LF
 //
 // Paver material selection pulled from paver_prices table (same as PaverModule).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -15,18 +20,25 @@ const DEFAULTS = { laborRatePerHour: 35, laborBurdenPct: 0.29, gpmd: 425, commis
 const n = v => parseFloat(v) || 0
 
 // ── Calculation engine ────────────────────────────────────────────────────────
-function calcSteps(state, lrph, laborRates, paverPrices, gpmd = DEFAULTS.gpmd) {
-  const lr = laborRates || {}
-  const pp = paverPrices || []
+function calcSteps(state, lrph, laborRates, materialRates, paverPrices, gpmd = DEFAULTS.gpmd) {
+  const lr = laborRates   || {}
+  const mr = materialRates || {}
+  const pp = paverPrices   || []
 
+  // Paver step rates
   const straightRate = lr['Steps - Straight'] ?? 1.5  // LF/hr
   const curvedRate   = lr['Steps - Curved']   ?? 1.0  // LF/hr
 
-  // Step labor hours
+  // Concrete step rates
+  const concStraightRate = lr['Steps - Concrete Straight'] ?? 1.0   // LF/hr
+  const concCurvedRate   = lr['Steps - Concrete Curved']   ?? 0.5   // LF/hr
+  const concMatPerLF     = mr['Steps - Concrete']          ?? 12.00 // $/LF
+
+  // Paver step labor hours
   const straightHrs = n(state.straightLF) > 0 ? n(state.straightLF) / straightRate : 0
   const curvedHrs   = n(state.curvedLF)   > 0 ? n(state.curvedLF)   / curvedRate   : 0
 
-  // Step paver material cost
+  // Paver step material cost
   const stepPaverData = pp.find(p => p.brand === state.paverBrand && p.name === state.paverName)
   const pricePerSF  = stepPaverData?.price_per_sf  || 0
   const sfPerPallet = stepPaverData?.sf_per_pallet || 0
@@ -34,17 +46,23 @@ function calcSteps(state, lrph, laborRates, paverPrices, gpmd = DEFAULTS.gpmd) {
   const paverCost   = paverSF * pricePerSF
   const pallets     = paverSF > 0 && sfPerPallet > 0 ? Math.ceil(paverSF / sfPerPallet) : 0
 
+  // Concrete step labor hours + material
+  const concStraightHrs  = n(state.concStraightLF) > 0 ? n(state.concStraightLF) / concStraightRate : 0
+  const concCurvedHrs    = n(state.concCurvedLF)   > 0 ? n(state.concCurvedLF)   / concCurvedRate   : 0
+  const concTotalLF      = n(state.concStraightLF) + n(state.concCurvedLF)
+  const concMat          = concTotalLF * concMatPerLF
+
   // Manual entry
   let manHrs = 0, manMat = 0, manSub = 0
   ;(state.manualRows || []).forEach(r => {
     manHrs += n(r.hours); manMat += n(r.materials); manSub += n(r.subCost)
   })
 
-  const baseHrs   = straightHrs + curvedHrs + manHrs
+  const baseHrs   = straightHrs + curvedHrs + concStraightHrs + concCurvedHrs + manHrs
   const diffMod   = 1 + n(state.difficulty) / 100
   const totalHrs  = baseHrs * diffMod + n(state.hoursAdj)
   const manDays   = totalHrs / 8
-  const totalMat  = paverCost + manMat
+  const totalMat  = paverCost + concMat + manMat
 
   const laborCost  = totalHrs * (n(lrph) || DEFAULTS.laborRatePerHour)
   const burden     = laborCost * DEFAULTS.laborBurdenPct
@@ -57,6 +75,8 @@ function calcSteps(state, lrph, laborRates, paverPrices, gpmd = DEFAULTS.gpmd) {
     totalHrs, manDays, totalMat, laborCost, burden, gp, commission, subCost, price,
     straightHrs, curvedHrs, paverCost, pallets, pricePerSF,
     straightRate, curvedRate,
+    concStraightHrs, concCurvedHrs, concMat, concMatPerLF,
+    concStraightRate, concCurvedRate,
   }
 }
 
@@ -153,9 +173,10 @@ const DEFAULT_MANUAL_ROWS = [
 // ── Main component ────────────────────────────────────────────────────────────
 export default function StepsModule({ projectName, onSave, onBack, saving, initialData }) {
   const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? DEFAULTS.laborRatePerHour)
-  const [laborRates,   setLaborRates]   = useState(initialData?.laborRates   || {})
-  const [paverPrices,  setPaverPrices]  = useState(initialData?.paverPrices  || [])
-  const [loading,      setLoading]      = useState(true)
+  const [laborRates,    setLaborRates]    = useState(initialData?.laborRates    || {})
+  const [materialRates, setMaterialRates] = useState(initialData?.materialRates || {})
+  const [paverPrices,   setPaverPrices]   = useState(initialData?.paverPrices   || [])
+  const [loading,       setLoading]       = useState(true)
 
   useEffect(() => {
     let gone = false
@@ -172,6 +193,14 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
             const m = {}
             data.forEach(r => { m[r.name] = parseFloat(r.rate) })
             setLaborRates(m)
+          }
+        }),
+      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Steps')
+        .then(({ data }) => {
+          if (!gone && data) {
+            const m = {}
+            data.forEach(r => { m[r.name] = parseFloat(r.unit_cost) })
+            setMaterialRates(m)
           }
         }),
       supabase.from('paver_prices').select('brand, name, price_per_sf, sf_per_pallet')
@@ -196,6 +225,10 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
   const [paverName,   setPaverName]   = useState(initialData?.paverName   ?? '')
   const [paverSF,     setPaverSF]     = useState(initialData?.paverSF     ?? '')
 
+  // Concrete Steps
+  const [concStraightLF, setConcStraightLF] = useState(initialData?.concStraightLF ?? '')
+  const [concCurvedLF,   setConcCurvedLF]   = useState(initialData?.concCurvedLF   ?? '')
+
   // Manual entry
   const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
 
@@ -203,10 +236,11 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
     difficulty, hoursAdj,
     straightLF, curvedLF, groutedBullnose,
     paverBrand, paverName, paverSF,
+    concStraightLF, concCurvedLF,
     manualRows,
   }
 
-  const calc = calcSteps(state, laborRatePerHour, laborRates, paverPrices, gpmd)
+  const calc = calcSteps(state, laborRatePerHour, laborRates, materialRates, paverPrices, gpmd)
 
   function updateManual(i, field, val) {
     setManualRows(rows => rows.map((row, idx) => idx === i ? { ...row, [field]: val } : row))
@@ -216,7 +250,7 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
     onSave({
       man_days:      parseFloat(calc.manDays.toFixed(2)),
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
-      data: { ...state, laborRatePerHour, gpmd, laborRates, paverPrices, calc },
+      data: { ...state, laborRatePerHour, gpmd, laborRates, materialRates, paverPrices, calc },
     })
   }
 
@@ -323,6 +357,35 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
             </p>
           )}
         </div>
+      </div>
+
+      {/* ── Concrete Steps ── */}
+      <div>
+        <SectionHeader
+          title="Concrete Steps"
+          sub={`straight ${calc.concStraightRate} LF/hr · curved ${calc.concCurvedRate} LF/hr · $${calc.concMatPerLF}/LF mat`}
+        />
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Straight Steps (LF)</label>
+            <NumInput value={concStraightLF} onChange={setConcStraightLF} placeholder="0" />
+            {calc.concStraightHrs > 0 && (
+              <p className="text-xs text-gray-400 mt-0.5">{calc.concStraightHrs.toFixed(2)} hrs</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Curved Steps (LF)</label>
+            <NumInput value={concCurvedLF} onChange={setConcCurvedLF} placeholder="0" />
+            {calc.concCurvedHrs > 0 && (
+              <p className="text-xs text-gray-400 mt-0.5">{calc.concCurvedHrs.toFixed(2)} hrs</p>
+            )}
+          </div>
+        </div>
+        {calc.concMat > 0 && (
+          <p className="text-xs text-gray-400 mt-2">
+            {n(concStraightLF) + n(concCurvedLF)} LF × {fmt2(calc.concMatPerLF)}/LF = {fmt2(calc.concMat)}
+          </p>
+        )}
       </div>
 
       {/* ── Manual Entry ── */}
