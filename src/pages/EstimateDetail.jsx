@@ -1094,7 +1094,7 @@ export default function EstimateDetail() {
           <div className="absolute inset-0 bg-black/40" onClick={closeModuleFlow} />
 
           {/* Wide scrollable modal for module-specific forms */}
-          {(selectedType === 'Drainage' || selectedType === 'Lighting' || selectedType === 'Skid Steer Demo' || selectedType === 'Mini Skid Steer Demo' || selectedType === 'Concrete' || selectedType === 'Hand Demo' || selectedType === 'Irrigation' || selectedType === 'Artificial Turf' || selectedType === 'Pavers' || selectedType === 'Planting' || selectedType === 'Pool' || selectedType === 'Utilities' || selectedType === 'Columns' || selectedType === 'Ground Treatments' || selectedType === 'Outdoor Kitchen' || selectedType === 'Fire Pit') ? (
+          {(selectedType === 'Drainage' || selectedType === 'Lighting' || selectedType === 'Skid Steer Demo' || selectedType === 'Mini Skid Steer Demo' || selectedType === 'Concrete' || selectedType === 'Hand Demo' || selectedType === 'Irrigation' || selectedType === 'Artificial Turf' || selectedType === 'Pavers' || selectedType === 'Planting' || selectedType === 'Pool' || selectedType === 'Utilities' || selectedType === 'Columns' || selectedType === 'Ground Treatments' || selectedType === 'Outdoor Kitchen' || selectedType === 'Fire Pit' || selectedType === 'Walls') ? (
             <div className={`relative bg-white rounded-2xl shadow-xl w-full mx-4 flex flex-col ${selectedType === 'Pavers' || selectedType === 'Pool' ? 'max-w-6xl' : 'max-w-5xl'}`}
                  style={{ maxHeight: '90vh' }}>
               <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-gray-200">
