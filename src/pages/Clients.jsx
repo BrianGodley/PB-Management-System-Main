@@ -40,6 +40,7 @@ export default function Clients() {
   const [saving,     setSaving]     = useState(false)
   const [saveError,  setSaveError]  = useState('')
   const [search,     setSearch]     = useState('')
+  const [tab,        setTab]        = useState('active')
   const [visibleCols, setVisibleCols] = useState(DEFAULT_VISIBLE)
   const [colPickerOpen, setColPickerOpen] = useState(false)
   const colPickerRef = useRef(null)
@@ -109,6 +110,11 @@ export default function Clients() {
     fetchClients()
   }
 
+  async function setClientStatus(id, status) {
+    await supabase.from('clients').update({ status }).eq('id', id)
+    fetchClients()
+  }
+
   function toggleCol(key) {
     setVisibleCols(prev => {
       const next = new Set(prev)
@@ -127,7 +133,9 @@ export default function Clients() {
     return (a.first_name || '').toLowerCase().localeCompare((b.first_name || '').toLowerCase())
   })
 
-  const filtered = sorted.filter(c => {
+  const tabClients = sorted.filter(c => (c.status || 'active') === tab)
+
+  const filtered = tabClients.filter(c => {
     const q = search.toLowerCase()
     return (
       displayName(c).toLowerCase().includes(q) ||
@@ -189,6 +197,29 @@ export default function Clients() {
         <button onClick={() => setShowForm(!showForm)} className="btn-primary text-sm px-3 py-1.5">
           {showForm ? 'Cancel' : '+ Add Client'}
         </button>
+      </div>
+
+      {/* ── Active / Inactive tabs ── */}
+      <div className="flex border-b border-gray-200 mb-4 gap-1">
+        {[
+          { key: 'active',   label: 'Active',   count: sorted.filter(c => (c.status || 'active') === 'active').length },
+          { key: 'inactive', label: 'Inactive', count: sorted.filter(c => (c.status || 'active') === 'inactive').length },
+        ].map(t => (
+          <button
+            key={t.key}
+            onClick={() => { setTab(t.key); setSearch('') }}
+            className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors flex items-center gap-1.5 ${
+              tab === t.key
+                ? 'border-green-700 text-green-700 bg-green-50'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            {t.label}
+            <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
+              tab === t.key ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+            }`}>{t.count}</span>
+          </button>
+        ))}
       </div>
 
       {/* ── New client form ── */}
@@ -324,8 +355,16 @@ export default function Clients() {
       {filtered.length === 0 ? (
         <div className="card text-center py-12">
           <p className="text-4xl mb-3">👥</p>
-          <p className="text-gray-500 mb-4">{clients.length === 0 ? 'No clients yet.' : 'No results match your search.'}</p>
-          {clients.length === 0 && <button onClick={() => setShowForm(true)} className="btn-primary">Add Your First Client</button>}
+          <p className="text-gray-500 mb-4">
+            {search
+              ? 'No results match your search.'
+              : tab === 'inactive'
+              ? 'No inactive clients.'
+              : clients.length === 0 ? 'No clients yet.' : 'No active clients.'}
+          </p>
+          {tab === 'active' && clients.length === 0 && (
+            <button onClick={() => setShowForm(true)} className="btn-primary">Add Your First Client</button>
+          )}
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -353,12 +392,31 @@ export default function Clients() {
                       {cellContent(col, client)}
                     </td>
                   ))}
-                  <td className="px-4 py-2 w-16">
+                  <td className="px-4 py-2 w-28">
                     <div className="flex items-center justify-end gap-2">
-                      <Link to={`/clients/${client.id}`} className="text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                      <Link to={`/clients/${client.id}`} className="text-gray-500 hover:text-gray-700 whitespace-nowrap text-xs">
                         View →
                       </Link>
-                      <button onClick={() => deleteClient(client.id)} className="text-red-300 hover:text-red-500">✕</button>
+                      {tab === 'active' ? (
+                        <button
+                          onClick={() => setClientStatus(client.id, 'inactive')}
+                          className="text-xs text-gray-400 hover:text-yellow-600 whitespace-nowrap"
+                          title="Mark inactive"
+                        >
+                          Deactivate
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => setClientStatus(client.id, 'active')}
+                            className="text-xs text-green-600 hover:text-green-800 whitespace-nowrap"
+                            title="Mark active"
+                          >
+                            Reactivate
+                          </button>
+                          <button onClick={() => deleteClient(client.id)} className="text-red-300 hover:text-red-500 text-xs">✕</button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
