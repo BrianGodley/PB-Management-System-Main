@@ -217,13 +217,20 @@ export default function JobsList() {
 
               {/* Stage groups */}
               {(() => {
-                // Build lookup: stageId → jobs
+                // Build lookup: stageId → jobs, then alpha-numeric sort within each stage
                 const byStage = {}
                 stages.forEach(s => { byStage[s.id] = [] })
                 byStage['__none__'] = []
                 sorted.forEach(job => {
                   const key = job.stage_id && byStage[job.stage_id] ? job.stage_id : '__none__'
                   byStage[key].push(job)
+                })
+                Object.keys(byStage).forEach(key => {
+                  byStage[key].sort((a, b) =>
+                    (a.name || a.client_name || '').localeCompare(
+                      b.name || b.client_name || '', undefined, { numeric: true, sensitivity: 'base' }
+                    )
+                  )
                 })
 
                 const JobItem = ({ job }) => (
@@ -232,11 +239,19 @@ export default function JobsList() {
                     draggable
                     onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; setDragJobId(job.id) }}
                     onDragEnd={() => { setDragJobId(null); setDragOverStage(null) }}
-                    className={`flex items-center gap-1 rounded-lg transition-colors cursor-grab active:cursor-grabbing ${
+                    className={`flex items-center gap-0.5 rounded-lg transition-colors ${
                       selectedJob === job.id ? 'bg-green-50 border border-green-200' : 'hover:bg-gray-100 border border-transparent'
                     } ${dragJobId === job.id ? 'opacity-40' : ''}`}
                   >
-                    <button onClick={() => setSelectedJob(job.id)} className="flex-1 text-left pl-2 pr-1 py-1.5 text-xs min-w-0">
+                    {/* Drag handle */}
+                    <span className="flex-shrink-0 pl-1.5 pr-0.5 py-2 text-gray-300 hover:text-gray-400 cursor-grab active:cursor-grabbing" title="Drag to move">
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
+                        <circle cx="5" cy="3" r="1.2"/><circle cx="11" cy="3" r="1.2"/>
+                        <circle cx="5" cy="8" r="1.2"/><circle cx="11" cy="8" r="1.2"/>
+                        <circle cx="5" cy="13" r="1.2"/><circle cx="11" cy="13" r="1.2"/>
+                      </svg>
+                    </span>
+                    <button onClick={() => setSelectedJob(job.id)} className="flex-1 text-left pr-1 py-1.5 text-xs min-w-0">
                       <p className={`font-medium truncate ${selectedJob === job.id ? 'text-green-800' : 'text-gray-700'}`}>
                         {job.name || job.client_name}
                       </p>
