@@ -2962,115 +2962,10 @@ export default function Statistics() {
         document.getElementById('app-header-center')
       )}
 
-      {/* ── COMBINED MODULE HEADER + CONTROLS ───────────────────────────── */}
-      <div className="flex items-center gap-2 px-6 pt-6 pb-4 bg-gray-50 border-b border-gray-200 flex-shrink-0 flex-wrap">
-
-        {/* Title */}
+      {/* ── COMBINED MODULE HEADER ───────────────────────────────────────── */}
+      <div className="flex items-center gap-2 px-6 pt-6 pb-4 bg-gray-50 border-b border-gray-200 flex-shrink-0">
         <h1 className="text-xl font-bold text-gray-900 flex-shrink-0">Statistics</h1>
-
-        {/* Quick value entry — graphs mode + stat selected */}
-        {viewMode === 'graphs' && selectedStat && (
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            <div className="w-px h-5 bg-gray-200 mx-0.5 flex-shrink-0" />
-            <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white">
-              <span className="w-36 flex-shrink-0 text-center px-2 text-xs text-gray-400 whitespace-nowrap border-r border-gray-200 bg-gray-50 py-1.5 select-none">
-                {quickPeriod.label}
-              </span>
-              <input
-                type="number"
-                value={quickValue}
-                onChange={e => setQuickValue(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleQuickSave()}
-                placeholder="Value"
-                className="w-20 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white"
-              />
-            </div>
-            <button
-              onClick={handleQuickSave}
-              disabled={quickSaving}
-              className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-white disabled:opacity-50"
-              style={{ backgroundColor: FG }}
-            >
-              {quickSaving ? '…' : 'Save'}
-            </button>
-            <button
-              onClick={() => {
-                if (selectedStat?.tracking === 'weekly' && weekEndingDay === null) {
-                  setWeekEndingError(true); return
-                }
-                setWeekEndingError(false)
-                setShowDateRangeSelector(true)
-              }}
-              className="text-xs font-medium underline underline-offset-2 text-gray-500 hover:text-gray-800 transition-colors whitespace-nowrap"
-            >
-              Edit Value History
-            </button>
-            <button
-              onClick={handleEditStat}
-              className="text-xs font-medium underline underline-offset-2 text-gray-500 hover:text-gray-800 transition-colors whitespace-nowrap"
-            >
-              Edit Statistic
-            </button>
-            {quickSaveMsg && (
-              <span className={`text-xs font-semibold ${quickSaveMsg.startsWith('⚠️') ? 'text-red-500' : 'text-green-600'}`}>
-                {quickSaveMsg}
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Spacer pushes right-side controls to the far right */}
         <div className="flex-1 min-w-0" />
-
-        {/* Period tabs + FROM/TO — graphs mode only */}
-        {viewMode === 'graphs' && (
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
-              {['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Yearly'].map(p => {
-                const pid        = p.toLowerCase()
-                const nativeIdx  = PERIOD_ORDER.indexOf(selectedStat?.tracking ?? 'daily')
-                const pidIdx     = PERIOD_ORDER.indexOf(pid)
-                const isDisabled = selectedStat && pidIdx < nativeIdx
-                const isActive   = viewPeriod === pid
-                return (
-                  <button
-                    key={p}
-                    onClick={() => !isDisabled && setViewPeriod(pid)}
-                    disabled={isDisabled}
-                    title={isDisabled ? `Stat tracks ${selectedStat.tracking} — can't roll up to ${p}` : p}
-                    className={`px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
-                      isActive ? 'text-white' : 'text-gray-600 hover:bg-gray-50'
-                    }`}
-                    style={isActive ? { backgroundColor: FG } : {}}
-                  >
-                    {p}
-                  </button>
-                )
-              })}
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-gray-500 font-medium">FROM</span>
-              <input
-                type="date"
-                value={fromDate}
-                onChange={e => setFromDate(e.target.value)}
-                className="border border-gray-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-green-600"
-              />
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-gray-500 font-medium">TO</span>
-              <input
-                type="date"
-                value={toDate}
-                onChange={e => setToDate(e.target.value)}
-                className="border border-gray-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-green-600"
-              />
-            </div>
-            <div className="w-px h-5 bg-gray-200 flex-shrink-0" />
-          </div>
-        )}
-
-        {/* Add Statistic */}
         <button onClick={() => setShowTypeSelector(true)} className="btn-primary text-sm px-3 py-1.5 flex-shrink-0">
           + Add Statistic
         </button>
@@ -3217,8 +3112,37 @@ export default function Statistics() {
                   {selectedStat.name}
                 </span>
 
-                {/* Right — arrows flush right */}
-                <div className="flex-1 flex items-center justify-end pr-2">
+                {/* Right — quick entry + arrows flush right */}
+                <div className="flex-1 flex items-center justify-end pr-2 gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white">
+                      <span className="w-36 flex-shrink-0 text-center px-2 text-xs text-gray-400 whitespace-nowrap border-r border-gray-200 bg-gray-50 py-1.5 select-none">
+                        {quickPeriod.label}
+                      </span>
+                      <input
+                        type="number"
+                        value={quickValue}
+                        onChange={e => setQuickValue(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleQuickSave()}
+                        placeholder="Value"
+                        className="w-20 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white"
+                      />
+                    </div>
+                    <button
+                      onClick={handleQuickSave}
+                      disabled={quickSaving}
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-white disabled:opacity-50"
+                      style={{ backgroundColor: FG }}
+                    >
+                      {quickSaving ? '…' : 'Save'}
+                    </button>
+                    {quickSaveMsg && (
+                      <span className={`text-xs font-semibold ${quickSaveMsg.startsWith('⚠️') ? 'text-red-500' : 'text-green-600'}`}>
+                        {quickSaveMsg}
+                      </span>
+                    )}
+                    <div className="w-px h-5 bg-gray-200 mx-0.5 flex-shrink-0" />
+                  </div>
                   <div className="flex items-center gap-0">
                     <button
                       onClick={() => goTo(-1)}
@@ -3238,8 +3162,75 @@ export default function Statistics() {
                 </div>
               </div>
 
+              {/* Period tabs + FROM/TO — centered over chart */}
+              <div className="flex items-center justify-center gap-2 py-2 bg-white border-b border-gray-100 flex-shrink-0 flex-wrap">
+                <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+                  {['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Yearly'].map(p => {
+                    const pid        = p.toLowerCase()
+                    const nativeIdx  = PERIOD_ORDER.indexOf(selectedStat?.tracking ?? 'daily')
+                    const pidIdx     = PERIOD_ORDER.indexOf(pid)
+                    const isDisabled = selectedStat && pidIdx < nativeIdx
+                    const isActive   = viewPeriod === pid
+                    return (
+                      <button
+                        key={p}
+                        onClick={() => !isDisabled && setViewPeriod(pid)}
+                        disabled={isDisabled}
+                        title={isDisabled ? `Stat tracks ${selectedStat.tracking} — can't roll up to ${p}` : p}
+                        className={`px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+                          isActive ? 'text-white' : 'text-gray-600 hover:bg-gray-50'
+                        }`}
+                        style={isActive ? { backgroundColor: FG } : {}}
+                      >
+                        {p}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-gray-500 font-medium">FROM</span>
+                  <input
+                    type="date"
+                    value={fromDate}
+                    onChange={e => setFromDate(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-green-600"
+                  />
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-gray-500 font-medium">TO</span>
+                  <input
+                    type="date"
+                    value={toDate}
+                    onChange={e => setToDate(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-green-600"
+                  />
+                </div>
+              </div>
+
+              {/* Edit links — left-aligned with chart panel */}
+              <div className="flex items-center gap-6 px-6 py-2 bg-white border-b border-gray-100 flex-shrink-0">
+                <button
+                  onClick={() => {
+                    if (selectedStat?.tracking === 'weekly' && weekEndingDay === null) {
+                      setWeekEndingError(true); return
+                    }
+                    setWeekEndingError(false)
+                    setShowDateRangeSelector(true)
+                  }}
+                  className="text-sm font-medium text-blue-600 hover:text-blue-800 underline underline-offset-2 transition-colors"
+                >
+                  Edit Value History
+                </button>
+                <button
+                  onClick={handleEditStat}
+                  className="text-sm font-medium text-blue-600 hover:text-blue-800 underline underline-offset-2 transition-colors"
+                >
+                  Edit Statistic
+                </button>
+              </div>
+
               {/* Chart */}
-              <div className="flex-1 px-4 py-4 overflow-hidden relative">
+              <div className="flex-1 px-4 py-4 overflow-hidden relative bg-white">
 
                 {valuesStatId !== selectedId && prevDisplayRef.current.length === 0 ? (
                   // First-ever load for this stat — no previous frame to hold
