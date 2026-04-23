@@ -151,6 +151,8 @@ const EMPTY_FORM = {
 const DOW_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
 
 // ── WeekRow: renders one 7-day row with spanning item bars ───
+// Bars skip over exception days — rendered as multiple segments
+// so gaps appear on weekends / holidays instead of solid spans.
 function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, onDayClick, onItemClick, exceptions = [] }) {
   const weekDates = weekDays.map(day => day ? new Date(year, month, day) : null)
   const validDates = weekDates.filter(Boolean)
@@ -173,29 +175,56 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
   weekItems.forEach(item => {
     const iStart = new Date(item.start_date + 'T00:00:00')
     const iEnd   = new Date(item.end_date   + 'T00:00:00')
+    const incSat = item.include_saturday || false
+    const incSun = item.include_sunday   || false
 
-    let startCol = -1, endCol = -1
+    // Build contiguous working-day segments within this week row.
+    // Exception days (and non-working days) break the bar — no rendering on those cols.
+    const segments = []
+    let segStart = -1, lastWorkingCol = -1
+
     weekDates.forEach((date, col) => {
-      if (!date) return
-      if (date >= iStart && date <= iEnd) {
-        if (startCol === -1) startCol = col
-        endCol = col
+      if (!date) {
+        if (segStart !== -1) { segments.push({ startCol: segStart, endCol: lastWorkingCol }); segStart = -1 }
+        return
+      }
+      const inRange   = date >= iStart && date <= iEnd
+      const isWorking = inRange && isWorkingDay(date, exceptions, incSat, incSun)
+      if (isWorking) {
+        if (segStart === -1) segStart = col
+        lastWorkingCol = col
+      } else {
+        if (segStart !== -1) { segments.push({ startCol: segStart, endCol: lastWorkingCol }); segStart = -1 }
       }
     })
-    if (startCol === -1) return
+    if (segStart !== -1) segments.push({ startCol: segStart, endCol: lastWorkingCol })
+    if (segments.length === 0) return
+
+    // Use overall first→last col for lane conflict detection
+    const overallStart = segments[0].startCol
+    const overallEnd   = segments[segments.length - 1].endCol
 
     let lane = 0
     while (true) {
       const occupied = laneRanges[lane] || []
-      const conflict = occupied.some(r => !(endCol < r.s || startCol > r.e))
+      const conflict = occupied.some(r => !(overallEnd < r.s || overallStart > r.e))
       if (!conflict) {
         if (!laneRanges[lane]) laneRanges[lane] = []
-        laneRanges[lane].push({ s: startCol, e: endCol })
+        laneRanges[lane].push({ s: overallStart, e: overallEnd })
         break
       }
       lane++
     }
-    itemInfo[item.id] = { startCol, endCol, lane }
+
+    // isItemStart/End: does this week's first/last segment touch the item's actual start/end date?
+    const firstSegDate = weekDates[segments[0].startCol]
+    const lastSegDate  = weekDates[segments[segments.length - 1].endCol]
+    itemInfo[item.id] = {
+      segments,
+      lane,
+      isItemStart: firstSegDate && firstSegDate.getTime() === iStart.getTime(),
+      isItemEnd:   lastSegDate  && lastSegDate.getTime()  === iEnd.getTime(),
+    }
   })
 
   const numLanes = laneRanges.length
@@ -208,9 +237,9 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
           const ds = day
             ? `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
             : null
-          const cellDate  = day ? new Date(year, month, day) : null
-          const isExcept  = cellDate ? isCellException(cellDate, exceptions) : false
-          const isToday   = ds === todayStr
+          const cellDate = day ? new Date(year, month, day) : null
+          const isExcept = cellDate ? isCellException(cellDate, exceptions) : false
+          const isToday  = ds === todayStr
           return (
             <div
               key={col}
@@ -232,56 +261,60 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
       </div>
 
       <div className="absolute inset-x-0 pointer-events-none" style={{ top: DAY_H }}>
-        {weekItems.map(item => {
+        {weekItems.flatMap(item => {
           const info = itemInfo[item.id]
-          if (!info) return null
-          const { startCol, endCol, lane } = info
+          if (!info) return []
+          const { segments, lane, isItemStart, isItemEnd } = info
 
-          const iStart     = new Date(item.start_date + 'T00:00:00')
-          const iEnd       = new Date(item.end_date   + 'T00:00:00')
-          const cellStart  = weekDates[startCol]
-          const cellEnd    = weekDates[endCol]
-          const isItemStart = cellStart && iStart.getTime() === cellStart.getTime()
-          const isItemEnd   = cellEnd   && iEnd.getTime()   === cellEnd.getTime()
+          const clientName  = jobMap[item.job_id] || ''
+          const displayText = clientName ? `${item.title} (${clientName})` : item.title
 
-          const leftPct  = startCol / 7 * 100
-          const widthPct = (endCol - startCol + 1) / 7 * 100
+          return segments.map((seg, segIdx) => {
+            const isFirst = segIdx === 0
+            const isLast  = segIdx === segments.length - 1
 
-          const radius = isItemStart && isItemEnd ? '4px'
-            : isItemStart ? '4px 0 0 4px'
-            : isItemEnd   ? '0 4px 4px 0'
-            : '0'
+            const leftPct  = seg.startCol / 7 * 100
+            const widthPct = (seg.endCol - seg.startCol + 1) / 7 * 100
 
-          const clientName = jobMap[item.job_id] || ''
-          const displayText = clientName
-            ? `${item.title} (${clientName})`
-            : item.title
+            // Round left edge only on actual item start; round right edge only on actual item end
+            const roundLeft  = isFirst && isItemStart
+            const roundRight = isLast  && isItemEnd
+            const radius = roundLeft && roundRight ? '4px'
+              : roundLeft  ? '4px 0 0 4px'
+              : roundRight ? '0 4px 4px 0'
+              : '0'
 
-          return (
-            <div
-              key={item.id}
-              onClick={e => { e.stopPropagation(); onItemClick(e, item) }}
-              style={{
-                position:        'absolute',
-                left:            `calc(${leftPct}% + 3px)`,
-                width:           `calc(${widthPct}% - 6px)`,
-                top:             lane * LANE_H + 2,
-                minHeight:       LANE_H - 4,
-                height:          'auto',
-                backgroundColor: item.display_color,
-                borderRadius:    '4px',
-                pointerEvents:   'auto',
-              }}
-              className="inline-flex items-start gap-1.5 px-2 pt-1.5 pb-1.5 text-white text-sm font-semibold cursor-pointer hover:opacity-80 leading-snug"
-              title={displayText}
-            >
-              {item.assignee_color && (
-                <span className="flex-shrink-0 w-4 h-4 rounded-full border border-white/50 mt-0.5"
-                      style={{ backgroundColor: item.assignee_color }} />
-              )}
-              <span style={{ wordBreak: 'break-word', whiteSpace: 'normal', minWidth: 0 }}>{displayText}</span>
-            </div>
-          )
+            return (
+              <div
+                key={`${item.id}-s${segIdx}`}
+                onClick={e => { e.stopPropagation(); onItemClick(e, item) }}
+                style={{
+                  position:        'absolute',
+                  left:            `calc(${leftPct}% + 3px)`,
+                  width:           `calc(${widthPct}% - 6px)`,
+                  top:             lane * LANE_H + 2,
+                  minHeight:       LANE_H - 4,
+                  height:          'auto',
+                  backgroundColor: item.display_color,
+                  borderRadius:    radius,
+                  pointerEvents:   'auto',
+                }}
+                className="inline-flex items-start gap-1.5 px-2 pt-1.5 pb-1.5 text-white text-sm font-semibold cursor-pointer hover:opacity-80 leading-snug overflow-hidden"
+                title={displayText}
+              >
+                {/* Only show label + dot in the first segment */}
+                {isFirst && (
+                  <>
+                    {item.assignee_color && (
+                      <span className="flex-shrink-0 w-4 h-4 rounded-full border border-white/50 mt-0.5"
+                            style={{ backgroundColor: item.assignee_color }} />
+                    )}
+                    <span style={{ wordBreak: 'break-word', whiteSpace: 'normal', minWidth: 0 }}>{displayText}</span>
+                  </>
+                )}
+              </div>
+            )
+          })
         })}
       </div>
     </div>
