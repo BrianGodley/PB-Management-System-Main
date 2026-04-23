@@ -55,20 +55,59 @@ const EMPTY_FORM = {
   notes: '',
 }
 
+// Returns "Xh Ym" elapsed from a time_in string to a Date object
+function calcElapsed(timeIn, now) {
+  if (!timeIn) return ''
+  const [h, m] = timeIn.split(':').map(Number)
+  const start = new Date(now)
+  start.setHours(h, m, 0, 0)
+  const mins = Math.max(0, Math.floor((now - start) / 60000))
+  const hh = Math.floor(mins / 60)
+  const mm = mins % 60
+  return hh > 0 ? `${hh}h ${mm}m` : `${mm}m`
+}
+
 // ── Main Component ───────────────────────────────────────────
 export default function TimeClock({ jobs = [], selectedJob }) {
   const { user } = useAuth()
-  const [entries,   setEntries]   = useState([])
-  const [loading,   setLoading]   = useState(false)
-  const [showModal, setShowModal] = useState(false)
-  const [editEntry, setEditEntry] = useState(null)
-  const [form,      setForm]      = useState(EMPTY_FORM)
-  const [saving,    setSaving]    = useState(false)
-  const [error,     setError]     = useState('')
+  const [entries,     setEntries]     = useState([])
+  const [loading,     setLoading]     = useState(false)
+  const [showModal,   setShowModal]   = useState(false)
+  const [editEntry,   setEditEntry]   = useState(null)
+  const [form,        setForm]        = useState(EMPTY_FORM)
+  const [saving,      setSaving]      = useState(false)
+  const [error,       setError]       = useState('')
+  const [profileName, setProfileName] = useState('')
+  const [nowTime,     setNowTime]     = useState(new Date())
 
   const jobMap = Object.fromEntries(jobs.map(j => [j.id, j.name || j.client_name]))
 
+  // Fetch current user's display name for clock-in
+  useEffect(() => {
+    if (!user?.id) return
+    supabase.from('profiles').select('*').eq('id', user.id).single()
+      .then(({ data }) => {
+        const name = (data && (
+          [data.first_name, data.last_name].filter(Boolean).join(' ') ||
+          data.full_name || data.display_name || data.name
+        )) || user.email || 'Unknown'
+        setProfileName(name)
+      })
+  }, [user?.id])
+
+  // Live elapsed timer — updates every 30 s while clocked in
+  useEffect(() => {
+    const t = setInterval(() => setNowTime(new Date()), 30000)
+    return () => clearInterval(t)
+  }, [])
+
   useEffect(() => { fetchEntries() }, [selectedJob])
+
+  // Derive the current user's open (not yet clocked-out) entry for today
+  const myOpenEntry = entries.find(
+    e => e.created_by === user?.id && !e.time_out && e.date === todayDate()
+  )
+  const isClockedIn = !!myOpenEntry
 
   async function fetchEntries() {
     setLoading(true)
@@ -155,8 +194,34 @@ export default function TimeClock({ jobs = [], selectedJob }) {
     const now = new Date()
     const timeOut = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
     await supabase.from('time_entries')
-      .update({ time_out: timeOut, updated_at: new Date().toISOString() })
+      .update({ time_out: timeOut, updated_at: now.toISOString() })
       .eq('id', entry.id)
+    fetchEntries()
+  }
+
+  // ── Personal clock-in / clock-out button handlers ─────────
+  async function handleClockIn() {
+    const now = new Date()
+    const timeIn = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
+    await supabase.from('time_entries').insert({
+      employee_name: profileName,
+      job_id:        selectedJob !== 'all' ? selectedJob : null,
+      date:          todayDate(),
+      time_in:       timeIn,
+      time_out:      null,
+      created_by:    user?.id,
+      updated_at:    now.toISOString(),
+    })
+    fetchEntries()
+  }
+
+  async function handleClockOut() {
+    if (!myOpenEntry) return
+    const now = new Date()
+    const timeOut = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
+    await supabase.from('time_entries')
+      .update({ time_out: timeOut, updated_at: now.toISOString() })
+      .eq('id', myOpenEntry.id)
     fetchEntries()
   }
 
@@ -172,16 +237,47 @@ export default function TimeClock({ jobs = [], selectedJob }) {
     <div className="flex flex-col h-full">
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-4 flex-shrink-0">
-        <h2 className="text-sm font-semibold text-gray-700">
+      <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-4 flex-wrap">
+
+        {/* Left: title + entry count */}
+        <h2 className="text-sm font-semibold text-gray-700 flex-shrink-0">
           Time Clock {entries.length > 0 && <span className="text-gray-400 font-normal">({entries.length} entries)</span>}
         </h2>
-        <button onClick={openNew} className="btn-primary text-sm px-3 py-1.5 flex items-center gap-1.5">
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Add Entry
-        </button>
+
+        {/* Right: clock-in/out button + manual add */}
+        <div className="flex items-center gap-3 ml-auto">
+
+          {/* Live status when clocked in */}
+          {isClockedIn && myOpenEntry && (
+            <div className="text-xs text-gray-500 hidden sm:block">
+              In at <span className="font-semibold text-green-700">{fmt12h(myOpenEntry.time_in)}</span>
+              <span className="mx-1.5 text-gray-300">·</span>
+              <span className="font-mono text-gray-600">{calcElapsed(myOpenEntry.time_in, nowTime)}</span>
+            </div>
+          )}
+
+          {/* The dynamic Clock In / Clock Out button */}
+          <button
+            onClick={isClockedIn ? handleClockOut : handleClockIn}
+            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold shadow-sm transition-all ${
+              isClockedIn
+                ? 'bg-red-600 hover:bg-red-700 text-white'
+                : 'bg-green-700 hover:bg-green-800 text-white'
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full bg-white ${isClockedIn ? 'animate-pulse' : ''}`} />
+            {isClockedIn ? 'Clock Out' : 'Clock In'}
+          </button>
+
+          {/* Manual entry button */}
+          <button onClick={openNew} className="btn-secondary text-sm px-3 py-1.5 flex items-center gap-1.5">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            <span className="hidden sm:inline">Manual Entry</span>
+            <span className="sm:hidden">Manual</span>
+          </button>
+        </div>
       </div>
 
       {loading ? (
