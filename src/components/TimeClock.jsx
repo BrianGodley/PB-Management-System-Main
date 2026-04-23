@@ -534,45 +534,15 @@ function MobileHero({
   myWeekEntries, jobMap, jobs = [], selectedJob,
   onClockIn, onClockOut, onManualShift, onEditEntry,
 }) {
-  // Local job selection — pre-fill from selectedJob if a specific job is already chosen
-  const [pickedJobId, setPickedJobId] = useState(
-    selectedJob && selectedJob !== 'all' ? selectedJob : ''
-  )
-  const noJobPicked = !pickedJobId
-
-  // If user was clocked in, show which job they clocked into
+  const noJobPicked = !selectedJob || selectedJob === 'all'
   const clockedInJobName = myOpenEntry?.job_id ? jobMap[myOpenEntry.job_id] : null
 
   return (
     <div className="lg:hidden flex flex-col gap-4">
 
-      {/* Job picker — required before clock in, hidden once clocked in */}
-      {!isClockedIn && (
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
-            Select Job <span className="text-red-400">*</span>
-          </label>
-          <select
-            value={pickedJobId}
-            onChange={e => setPickedJobId(e.target.value)}
-            className={`w-full rounded-xl border px-4 py-3 text-sm font-medium bg-white focus:outline-none focus:ring-2 focus:ring-green-500 ${
-              noJobPicked ? 'border-red-300 text-gray-400' : 'border-gray-300 text-gray-900'
-            }`}
-          >
-            <option value="">— Choose a job to clock in —</option>
-            {jobs.map(j => (
-              <option key={j.id} value={j.id}>{j.name || j.client_name}</option>
-            ))}
-          </select>
-          {noJobPicked && (
-            <p className="text-xs text-red-500 mt-1 px-1">A job must be selected before clocking in.</p>
-          )}
-        </div>
-      )}
-
       {/* Big clock button */}
       <button
-        onClick={isClockedIn ? onClockOut : () => { if (!noJobPicked) onClockIn(pickedJobId) }}
+        onClick={isClockedIn ? onClockOut : () => { if (!noJobPicked) onClockIn(selectedJob) }}
         disabled={!isClockedIn && noJobPicked}
         className={`w-full py-10 rounded-2xl text-2xl font-black shadow-lg flex flex-col items-center gap-2 transition-all select-none ${
           isClockedIn
