@@ -35,6 +35,8 @@ import OutdoorKitchenModule     from '../components/modules/OutdoorKitchenModule
 import OutdoorKitchenSummary    from '../components/modules/OutdoorKitchenSummary'
 import FirePitModule            from '../components/modules/FirePitModule'
 import FirePitSummary           from '../components/modules/FirePitSummary'
+import WallsModule              from '../components/modules/WallsModule'
+import WallsSummary             from '../components/modules/WallsSummary'
 import GpmdBar                  from '../components/modules/GpmdBar'
 
 const MODULE_TYPES = [
@@ -997,6 +999,8 @@ export default function EstimateDetail() {
                   <OutdoorKitchenSummary module={selectedModule} />
                 ) : selectedModule.module_type === 'Fire Pit' ? (
                   <FirePitSummary module={selectedModule} />
+                ) : selectedModule.module_type === 'Walls' ? (
+                  <WallsSummary module={selectedModule} />
                 ) : selectedModule.module_type === 'Pool' ? (
                   <PoolSummary module={selectedModule} />
                 ) : (
@@ -1229,6 +1233,15 @@ export default function EstimateDetail() {
                 )}
                 {selectedType === 'Fire Pit' && (
                   <FirePitModule
+                    projectName={selectedProject?.project_name}
+                    onSave={editingModule ? updateModule : saveModule}
+                    onBack={editingModule ? closeModuleFlow : () => setSelectedType(null)}
+                    saving={savingModule}
+                    initialData={moduleInitialData}
+                  />
+                )}
+                {selectedType === 'Walls' && (
+                  <WallsModule
                     projectName={selectedProject?.project_name}
                     onSave={editingModule ? updateModule : saveModule}
                     onBack={editingModule ? closeModuleFlow : () => setSelectedType(null)}
