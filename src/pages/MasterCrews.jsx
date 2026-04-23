@@ -122,32 +122,26 @@ function CrewModal({ crew, employees, usedLabels, onClose, onSave, onDelete }) {
         {/* Body */}
         <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
 
-          {/* Label */}
+          {/* Label — editable in both new and edit mode */}
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
               Crew Label
             </label>
-            {isNew ? (
-              <div className="flex gap-2 flex-wrap">
-                {availableLabels.map(c => (
-                  <button key={c} onClick={() => setLabel(c)}
-                    className={`w-9 h-9 rounded-lg text-sm font-bold border-2 transition-colors ${
-                      label === c
-                        ? 'bg-green-700 text-white border-green-700'
-                        : 'border-gray-200 text-gray-600 hover:border-green-400 hover:text-green-700'
-                    }`}>
-                    {c}
-                  </button>
-                ))}
-                {availableLabels.length === 0 && (
-                  <p className="text-sm text-red-500">All labels A–Z are in use.</p>
-                )}
-              </div>
-            ) : (
-              <div className="w-12 h-12 rounded-xl bg-green-700 text-white flex items-center justify-center text-xl font-bold">
-                {label}
-              </div>
-            )}
+            <div className="flex gap-2 flex-wrap">
+              {availableLabels.map(c => (
+                <button key={c} onClick={() => setLabel(c)}
+                  className={`w-9 h-9 rounded-lg text-sm font-bold border-2 transition-colors ${
+                    label === c
+                      ? 'bg-green-700 text-white border-green-700'
+                      : 'border-gray-200 text-gray-600 hover:border-green-400 hover:text-green-700'
+                  }`}>
+                  {c}
+                </button>
+              ))}
+              {availableLabels.length === 0 && (
+                <p className="text-sm text-red-500">All labels A–Z are in use.</p>
+              )}
+            </div>
           </div>
 
           {/* Members */}
@@ -264,6 +258,118 @@ function CrewModal({ crew, employees, usedLabels, onClose, onSave, onDelete }) {
   )
 }
 
+// ── Sub Crew Modal (standalone — not linked to subs_vendors) ─────────────────
+function SubCrewModal({ sub, onClose, onSave, onDelete }) {
+  const isNew = !sub?.id
+  const [name,      setName]      = useState(sub?.name      || '')
+  const [divisions, setDivisions] = useState((sub?.divisions || []).join(', '))
+  const [rating,    setRating]    = useState(sub?.rating     ?? 5)
+  const [notes,     setNotes]     = useState(sub?.notes      || '')
+  const [saving,    setSaving]    = useState(false)
+  const [error,     setError]     = useState('')
+
+  async function handleSave() {
+    if (!name.trim()) { setError('Company name is required.'); return }
+    setSaving(true); setError('')
+    const divArr = divisions.split(',').map(d => d.trim()).filter(Boolean)
+    const payload = { name: name.trim(), divisions: divArr, rating: +rating, notes: notes.trim() }
+    const { error: err } = isNew
+      ? await supabase.from('master_sub_crews').insert(payload)
+      : await supabase.from('master_sub_crews').update(payload).eq('id', sub.id)
+    setSaving(false)
+    if (err) { setError(err.message); return }
+    onSave()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+         onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col"
+           style={{ maxHeight: '88vh' }}>
+        {/* Header */}
+        <div className="px-6 pt-5 pb-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+          <div>
+            <p className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-0.5">
+              {isNew ? 'Add Subcontractor' : 'Edit Subcontractor'}
+            </p>
+            <h2 className="text-lg font-bold text-gray-900">{isNew ? 'New Sub Crew' : name}</h2>
+          </div>
+          <button onClick={onClose} className="text-gray-300 hover:text-gray-500">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Company Name *</label>
+            <input type="text" value={name} onChange={e => setName(e.target.value)}
+              placeholder="e.g. Acme Masonry" className="input text-sm w-full" autoFocus />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+              Divisions / Trades <span className="font-normal normal-case text-gray-400">(comma-separated)</span>
+            </label>
+            <input type="text" value={divisions} onChange={e => setDivisions(e.target.value)}
+              placeholder="e.g. Masonry, Concrete, Tile" className="input text-sm w-full" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              Sub Rating: <span className="text-green-700 font-bold">{rating} / 10</span>
+            </label>
+            <div className="flex gap-1.5 flex-wrap">
+              {[1,2,3,4,5,6,7,8,9,10].map(n => (
+                <button key={n} onClick={() => setRating(n)}
+                  className={`w-9 h-9 rounded-lg text-sm font-bold border-2 transition-colors ${
+                    rating === n
+                      ? n >= 8 ? 'bg-green-600 text-white border-green-600'
+                        : n >= 5 ? 'bg-yellow-500 text-white border-yellow-500'
+                        : 'bg-red-500 text-white border-red-500'
+                      : 'border-gray-200 text-gray-500 hover:border-gray-400'
+                  }`}>
+                  {n}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-1">10 = highest · 1 = lowest</p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Notes</label>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)}
+              className="input text-sm resize-none w-full" rows={3}
+              placeholder="Optional notes…" />
+          </div>
+
+          {error && <p className="text-sm text-red-500">{error}</p>}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-100 flex gap-2 flex-shrink-0">
+          <button onClick={handleSave} disabled={saving}
+            className="flex-1 btn-primary text-sm py-2 disabled:opacity-50">
+            {saving ? 'Saving…' : isNew ? 'Add Sub' : 'Save Changes'}
+          </button>
+          <button onClick={onClose}
+            className="px-4 py-2 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">
+            Cancel
+          </button>
+          {!isNew && onDelete && (
+            <button onClick={() => onDelete(sub)}
+              className="px-4 py-2 text-sm rounded-lg border border-red-200 text-red-500 hover:bg-red-50 hover:border-red-300 transition-colors">
+              Delete
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Crew Table Row ────────────────────────────────────────────────────────────
 function CrewRow({ crew, employees, onClick }) {
   const empById  = id => employees.find(e => e.id === id)
@@ -314,17 +420,16 @@ function CrewRow({ crew, employees, onClick }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function MasterCrews() {
-  const [tab,       setTab]       = useState('internal') // 'internal' | 'sub'
-  const [crews,     setCrews]     = useState([])
-  const [employees, setEmployees] = useState([])
-  const [subs,      setSubs]      = useState([])
-  const [loading,   setLoading]   = useState(true)
-  const [modal,     setModal]     = useState(null)  // null | 'new' | crew object
-  const [subSearch, setSubSearch] = useState('')
+  const [tab,        setTab]        = useState('internal') // 'internal' | 'sub'
+  const [crews,      setCrews]      = useState([])
+  const [employees,  setEmployees]  = useState([])
+  const [subCrews,   setSubCrews]   = useState([])
+  const [loading,    setLoading]    = useState(true)
+  const [modal,      setModal]      = useState(null)     // null | 'new' | crew object
+  const [subModal,   setSubModal]   = useState(null)     // null | 'new' | sub object
+  const [subSearch,  setSubSearch]  = useState('')
 
-  useEffect(() => {
-    loadAll()
-  }, [])
+  useEffect(() => { loadAll() }, [])
 
   async function loadAll() {
     setLoading(true)
@@ -334,34 +439,35 @@ export default function MasterCrews() {
       supabase.from('employees').select('id, first_name, last_name, job_title')
         .eq('status', 'active').order('last_name')
         .then(({ data }) => { if (data) setEmployees(data) }),
-      supabase.from('subs_vendors').select('id, company_name, divisions, status, notes')
-        .eq('type', 'sub').order('company_name')
-        .then(({ data }) => { if (data) setSubs(data) }),
+      supabase.from('master_sub_crews').select('*').order('name')
+        .then(({ data }) => { if (data) setSubCrews(data) }),
     ])
     setLoading(false)
   }
 
-  async function handleDeleteCrew(crew) {
-    if (!confirm(`Delete Crew ${crew.label}? This cannot be undone.`)) return
-    await supabase.from('crews').delete().eq('id', crew.id)
-    setCrews(prev => prev.filter(c => c.id !== crew.id))
+  function handleCrewSaved() { setModal(null); loadAll() }
+  function handleSubSaved()  { setSubModal(null); loadAll() }
+
+  async function handleDeleteSub(sub) {
+    if (!confirm(`Delete ${sub.name}? This cannot be undone.`)) return
+    await supabase.from('master_sub_crews').delete().eq('id', sub.id)
+    setSubCrews(prev => prev.filter(s => s.id !== sub.id))
+    setSubModal(null)
   }
 
-  function handleCrewSaved() {
-    setModal(null)
-    loadAll()
-  }
+  const usedLabels  = crews.map(c => c.label)
+  const sortedCrews = [...crews].sort((a, b) => a.label.localeCompare(b.label))
 
-  const usedLabels = crews.map(c => c.label)
-
-  const filteredSubs = subs.filter(s =>
+  const filteredSubs = subCrews.filter(s =>
     !subSearch ||
-    s.company_name?.toLowerCase().includes(subSearch.toLowerCase()) ||
+    s.name?.toLowerCase().includes(subSearch.toLowerCase()) ||
     (s.divisions || []).some(d => d.toLowerCase().includes(subSearch.toLowerCase()))
   )
 
-  // Sort crews alphabetically by label
-  const sortedCrews = [...crews].sort((a, b) => a.label.localeCompare(b.label))
+  const RATING_COLOR = r =>
+    r >= 8 ? 'bg-green-100 text-green-800' :
+    r >= 5 ? 'bg-yellow-100 text-yellow-800' :
+             'bg-red-100 text-red-800'
 
   return (
     <div className="flex flex-col h-full">
@@ -370,12 +476,15 @@ export default function MasterCrews() {
       <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
         <h1 className="text-xl font-bold text-gray-900">Master Crews</h1>
         {tab === 'internal' && (
-          <button
-            onClick={() => setModal('new')}
-            disabled={usedLabels.length >= 26}
-            className="btn-primary text-sm px-3 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
+          <button onClick={() => setModal('new')} disabled={usedLabels.length >= 26}
+            className="btn-primary text-sm px-3 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
             + New Crew
+          </button>
+        )}
+        {tab === 'sub' && (
+          <button onClick={() => setSubModal('new')}
+            className="btn-primary text-sm px-3 py-1.5">
+            + Add Sub
           </button>
         )}
       </div>
@@ -448,23 +557,18 @@ export default function MasterCrews() {
           {/* ── Subcontractor Crews ── */}
           {tab === 'sub' && (
             <div className="flex-1 overflow-y-auto">
-              {/* Search */}
               <div className="mb-4">
-                <input
-                  type="text"
-                  value={subSearch}
-                  onChange={e => setSubSearch(e.target.value)}
+                <input type="text" value={subSearch} onChange={e => setSubSearch(e.target.value)}
                   placeholder="Search by company or division…"
-                  className="input text-sm w-full max-w-xs"
-                />
+                  className="input text-sm w-full max-w-xs" />
               </div>
 
               {filteredSubs.length === 0 ? (
                 <div className="text-center py-12 text-gray-400">
                   <p className="text-3xl mb-2">🔧</p>
                   <p className="text-sm">
-                    {subs.length === 0
-                      ? 'No subcontractors found. Add them in Subs & Vendors.'
+                    {subCrews.length === 0
+                      ? 'No subs yet. Click + Add Sub to get started.'
                       : 'No results match your search.'}
                   </p>
                 </div>
@@ -475,38 +579,39 @@ export default function MasterCrews() {
                       <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
                         <th className="px-4 py-2.5 text-left">Company</th>
                         <th className="px-4 py-2.5 text-left">Divisions / Trade</th>
-                        <th className="px-4 py-2.5 text-left">Status</th>
+                        <th className="px-4 py-2.5 text-center">Rating</th>
+                        <th className="px-4 py-2.5 text-left">Notes</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {filteredSubs.map(sub => (
-                        <tr key={sub.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 font-medium text-gray-800">
-                            {sub.company_name}
+                        <tr key={sub.id} className="hover:bg-green-50 cursor-pointer transition-colors"
+                          onClick={() => setSubModal(sub)}>
+                          <td className="px-4 py-3">
+                            <span className="font-semibold text-green-700 hover:underline">
+                              {sub.name}
+                            </span>
                           </td>
                           <td className="px-4 py-3">
                             {sub.divisions?.length > 0 ? (
                               <div className="flex flex-wrap gap-1">
                                 {sub.divisions.map((d, i) => (
-                                  <span key={i}
-                                    className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
-                                    {d}
-                                  </span>
+                                  <span key={i} className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">{d}</span>
                                 ))}
                               </div>
                             ) : (
-                              <span className="text-gray-300 text-xs italic">No divisions listed</span>
+                              <span className="text-gray-300 text-xs italic">—</span>
                             )}
                           </td>
-                          <td className="px-4 py-3">
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                              sub.status === 'active'      ? 'bg-green-100 text-green-700' :
-                              sub.status === 'no_email'    ? 'bg-yellow-100 text-yellow-700' :
-                              sub.status === 'do_not_use'  ? 'bg-red-100 text-red-700' :
-                                                             'bg-gray-100 text-gray-600'
-                            }`}>
-                              {sub.status?.replace(/_/g, ' ') || 'unknown'}
-                            </span>
+                          <td className="px-4 py-3 text-center">
+                            {sub.rating ? (
+                              <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${RATING_COLOR(sub.rating)}`}>
+                                {sub.rating}/10
+                              </span>
+                            ) : <span className="text-gray-300 text-xs">—</span>}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-gray-500 max-w-xs truncate">
+                            {sub.notes || <span className="text-gray-300">—</span>}
                           </td>
                         </tr>
                       ))}
@@ -514,9 +619,6 @@ export default function MasterCrews() {
                   </table>
                 </div>
               )}
-              <p className="text-xs text-gray-400 mt-3">
-                Subcontractor data is managed in <strong>Subs &amp; Vendors</strong>. Changes made there are reflected here automatically.
-              </p>
             </div>
           )}
         </>
@@ -536,6 +638,15 @@ export default function MasterCrews() {
             setCrews(prev => prev.filter(c => c.id !== crew.id))
             setModal(null)
           }}
+        />
+      )}
+
+      {subModal && (
+        <SubCrewModal
+          sub={subModal === 'new' ? null : subModal}
+          onClose={() => setSubModal(null)}
+          onSave={handleSubSaved}
+          onDelete={handleDeleteSub}
         />
       )}
     </div>
