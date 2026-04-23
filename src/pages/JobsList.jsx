@@ -542,8 +542,8 @@ function JobScheduleSettings({ stages = [], onAddStage, onUpdateStage, onDeleteS
   useEffect(() => {
     supabase.from('company_settings').select('value').eq('key', 'default_schedule_color').single()
       .then(({ data }) => { if (data?.value) setDefaultColor(data.value) })
-    supabase.from('company_settings').select('value').eq('key', 'payroll_week_start').maybeSingle()
-      .then(({ data }) => { if (data?.value != null) setPayrollWeekStart(parseInt(data.value, 10)) })
+    supabase.from('company_settings').select('payroll_week_start').maybeSingle()
+      .then(({ data }) => { if (data?.payroll_week_start != null) setPayrollWeekStart(data.payroll_week_start) })
   }, [])
 
   async function handleSaveColor() {
@@ -555,7 +555,7 @@ function JobScheduleSettings({ stages = [], onAddStage, onUpdateStage, onDeleteS
 
   async function handleSavePayroll() {
     setSavingPayroll(true); setSavedPayroll(false)
-    await supabase.from('company_settings').upsert({ key: 'payroll_week_start', value: String(payrollWeekStart) })
+    await supabase.from('company_settings').update({ payroll_week_start: payrollWeekStart }).not('id', 'is', null)
     setSavingPayroll(false); setSavedPayroll(true)
     setTimeout(() => setSavedPayroll(false), 2000)
   }

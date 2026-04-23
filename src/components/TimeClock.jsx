@@ -121,8 +121,8 @@ export default function TimeClock({ jobs = [], selectedJob }) {
 
   // Load payroll week start from company_settings
   useEffect(() => {
-    supabase.from('company_settings').select('value').eq('key', 'payroll_week_start').maybeSingle()
-      .then(({ data }) => { if (data?.value != null) setPayrollWeekStart(parseInt(data.value, 10)) })
+    supabase.from('company_settings').select('payroll_week_start').maybeSingle()
+      .then(({ data }) => { if (data?.payroll_week_start != null) setPayrollWeekStart(data.payroll_week_start) })
   }, [])
 
   // Fetch this user's time entries for the current payroll week (all jobs)
