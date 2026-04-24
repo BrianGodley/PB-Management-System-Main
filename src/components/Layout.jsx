@@ -5,7 +5,6 @@ import { useLang } from '../contexts/LanguageContext'
 import { supabase } from '../lib/supabase'
 
 const navItems = [
-  { path: '/',             label: 'Dashboard',      icon: '🏠' },
   { path: '/clients',      label: 'Clients',        icon: '👥' },
   { path: '/bids',         label: 'Bids',           icon: '📋' },
   { path: '/jobs',         label: 'Jobs',           icon: '🔨' },
@@ -49,12 +48,12 @@ export default function Layout() {
   ]
 
   const MAIN_MENU_ITEMS = [
-    { path: '/',            label: t('dashboard'),   icon: '🏠' },
     { path: '/clients',     label: t('clients'),     icon: '👥' },
     { path: '/bids',        label: t('bids'),        icon: '📋' },
     { path: '/jobs',        label: t('jobs'),        icon: '🔨' },
     { path: '/statistics',  label: t('statistics'),  icon: '📈' },
     { path: '/portal/subs', label: t('subsVendors'), icon: '🔧' },
+    { path: '/hr',          label: t('hr') || 'HR',  icon: '🏢' },
   ]
   const [showMainMenu,   setShowMainMenu]   = useState(false)
   const [avatarUrl,      setAvatarUrl]      = useState(null)

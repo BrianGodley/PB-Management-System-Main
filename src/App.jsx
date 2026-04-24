@@ -65,7 +65,7 @@ function AppRoutes() {
           <Layout />
         </ProtectedRoute>
       }>
-        <Route index element={<Dashboard />} />
+        <Route index element={<Clients />} />
         <Route path="clients" element={<Clients />} />
         <Route path="clients/:id" element={<ClientDetail />} />
         <Route path="jobs" element={<JobsList />} />

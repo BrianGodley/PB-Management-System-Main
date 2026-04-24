@@ -15,6 +15,7 @@ export const translations = {
     jobs:           'Jobs',
     statistics:     'Statistics',
     subsVendors:    'Subs & Vendors',
+    hr:             'HR',
     signOut:        'Sign Out',
 
     // TimeClockPage
@@ -54,6 +55,7 @@ export const translations = {
     jobs:           'Trabajos',
     statistics:     'Estadísticas',
     subsVendors:    'Proveedores',
+    hr:             'RRHH',
     signOut:        'Cerrar Sesión',
 
     // TimeClockPage

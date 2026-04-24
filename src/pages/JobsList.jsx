@@ -19,7 +19,7 @@ export default function JobsList() {
   const [jobs,       setJobs]       = useState([])
   const [loading,    setLoading]    = useState(true)
   const [selectedJob,setSelectedJob]= useState(ALL_JOBS)
-  const [tab,        setTab]        = useState(() => searchParams.get('tab') || 'schedule')
+  const [tab,        setTab]        = useState(() => searchParams.get('tab') || 'tracking')
   const [jobModal,   setJobModal]   = useState(null)
   const [search,     setSearch]     = useState('')
   const [stages,          setStages]          = useState([])
