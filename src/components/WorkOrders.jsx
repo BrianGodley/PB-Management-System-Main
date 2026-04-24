@@ -164,68 +164,53 @@ function WorkOrderCard({ wo, equipment, onStatusChange }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Crew Group (all work orders of the same module_type)
 // ─────────────────────────────────────────────────────────────────────────────
-const CREW_HEADER_STYLES = {
-  demo:      { bar: 'bg-red-600',    badge: 'bg-red-100 text-red-800 border-red-200',    label: 'Demolition' },
-  specialty: { bar: 'bg-purple-600', badge: 'bg-purple-100 text-purple-800 border-purple-200', label: 'Specialty' },
-  masonry:   { bar: 'bg-orange-500', badge: 'bg-orange-100 text-orange-800 border-orange-200', label: 'Masonry' },
-  default:   { bar: 'bg-green-700',  badge: 'bg-green-50 text-green-800 border-green-200', label: null },
-}
-
-function crewHeaderStyle(moduleType = '') {
-  const l = moduleType.toLowerCase()
-  if (l.includes('demo') || l.includes('demolition')) return CREW_HEADER_STYLES.demo
-  if (l.includes('specialty'))                         return CREW_HEADER_STYLES.specialty
-  if (l.includes('masonry'))                           return CREW_HEADER_STYLES.masonry
-  return CREW_HEADER_STYLES.default
-}
-
-function CrewGroup({ moduleType, workOrders, equipment, onStatusChange }) {
+function CrewGroup({ moduleType, color, workOrders, equipment, onStatusChange }) {
   const crewWOs = workOrders.filter(wo => !wo.is_subcontractor)
   const subWOs  = workOrders.filter(wo =>  wo.is_subcontractor)
+  const total   = crewWOs.length + subWOs.length
 
   const totalMD  = crewWOs.reduce((s, w) => s + parseFloat(w.man_days || 0), 0)
   const totalHrs = crewWOs.reduce((s, w) => s + parseFloat(w.labor_hours || 0), 0)
   const totalMat = crewWOs.reduce((s, w) => s + parseFloat(w.material_cost || 0), 0)
   const totalSub = subWOs.reduce((s,  w) => s + parseFloat(w.sub_cost || 0), 0)
 
-  const style = crewHeaderStyle(moduleType)
-
   return (
     <div className="mb-8">
-      {/* Section header */}
+      {/* Section header — color driven by DB */}
       <div className="flex items-center gap-0 mb-4">
-        {/* Color bar */}
-        <div className={`w-1 self-stretch rounded-l-full mr-3 ${style.bar}`} />
-        <div className="flex-1">
+        <div className="w-1 self-stretch rounded-full mr-3 flex-shrink-0" style={{ backgroundColor: color }} />
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-base font-bold text-gray-900 uppercase tracking-wide">
-              {moduleType}
-            </h3>
-            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${style.badge}`}>
-              {crewWOs.length + subWOs.length} work order{crewWOs.length + subWOs.length !== 1 ? 's' : ''}
+            <h3 className="text-base font-bold text-gray-900 uppercase tracking-wide">{moduleType}</h3>
+            <span
+              className="text-xs font-semibold px-2 py-0.5 rounded-full border"
+              style={{ backgroundColor: color + '18', color, borderColor: color + '44' }}
+            >
+              {total} work order{total !== 1 ? 's' : ''}
             </span>
           </div>
-          {/* Totals row */}
           <div className="flex flex-wrap gap-3 mt-0.5">
             {totalMD  > 0 && <span className="text-xs text-gray-500">{fmtDays(totalMD)}</span>}
             {totalHrs > 0 && <span className="text-xs text-gray-500">{fmtHrs(totalHrs)}</span>}
             {totalMat > 0 && <span className="text-xs text-gray-500">Mat {fmt(totalMat)}</span>}
             {totalSub > 0 && <span className="text-xs text-orange-600 font-medium">Sub {fmt(totalSub)}</span>}
+            {total === 0  && <span className="text-xs text-gray-300 italic">No work orders for this job</span>}
           </div>
         </div>
       </div>
 
       {/* Cards */}
-      <div className="space-y-3 pl-4">
-        {crewWOs.map(wo => (
-          <WorkOrderCard key={wo.id} wo={wo} equipment={equipment} onStatusChange={onStatusChange} />
-        ))}
-        {subWOs.map(wo => (
-          <WorkOrderCard key={wo.id} wo={wo} equipment={[]} onStatusChange={onStatusChange} />
-        ))}
-      </div>
+      {total > 0 && (
+        <div className="space-y-3 pl-4">
+          {crewWOs.map(wo => (
+            <WorkOrderCard key={wo.id} wo={wo} equipment={equipment} onStatusChange={onStatusChange} />
+          ))}
+          {subWOs.map(wo => (
+            <WorkOrderCard key={wo.id} wo={wo} equipment={[]} onStatusChange={onStatusChange} />
+          ))}
+        </div>
+      )}
 
-      {/* Divider between groups */}
       <div className="border-b border-gray-100 mt-6" />
     </div>
   )
@@ -236,6 +221,7 @@ function CrewGroup({ moduleType, workOrders, equipment, onStatusChange }) {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function WorkOrders({ jobs, selectedJob }) {
   const [workOrders,    setWorkOrders]    = useState([])
+  const [crewTypes,     setCrewTypes]     = useState([])
   const [equipmentMap,  setEquipmentMap]  = useState({})
   const [loading,       setLoading]       = useState(true)
   const [error,         setError]         = useState(null)
@@ -257,8 +243,9 @@ export default function WorkOrders({ jobs, selectedJob }) {
     setLoading(true)
     setError(null)
 
-    const [woRes, mapRes, equipRes] = await Promise.all([
+    const [woRes, ctRes, mapRes, equipRes] = await Promise.all([
       supabase.from('work_orders').select('*').eq('job_id', jobId).order('module_type').order('is_subcontractor'),
+      supabase.from('crew_types').select('*').order('sort_order').order('name'),
       supabase.from('module_equipment_map').select('module_type, equipment_id'),
       supabase.from('master_equipment').select('*'),
     ])
@@ -270,6 +257,7 @@ export default function WorkOrders({ jobs, selectedJob }) {
     }
 
     setWorkOrders(woRes.data || [])
+    setCrewTypes(ctRes.data || [])
 
     // Build moduleType → equipment[] lookup
     if (!mapRes.error && !equipRes.error) {
@@ -286,6 +274,28 @@ export default function WorkOrders({ jobs, selectedJob }) {
     }
 
     setLoading(false)
+  }
+
+  // Match a work order to a crew type name using direct field or pattern fallback
+  function resolveCrewType(wo, types) {
+    if (wo.crew_type) {
+      const direct = types.find(ct => ct.name === wo.crew_type)
+      if (direct) return direct.name
+    }
+    // Pattern fallback for older records
+    const mt = (wo.module_type || '').toLowerCase()
+    for (const ct of types) {
+      const n = ct.name.toLowerCase()
+      if (n === 'demolition' && (mt.includes('demo') || mt.includes('demolition'))) return ct.name
+      if (n === 'masonry'    && (mt.includes('mason') || mt.includes('wall') || mt.includes('column'))) return ct.name
+      if (n === 'paver'      && (mt.includes('paver') || mt.includes('turf') || mt.includes('step'))) return ct.name
+      if (n === 'landscape'  && (mt.includes('landscape') || mt.includes('plant') || mt.includes('irrig') || mt.includes('drainage') || mt.includes('utili'))) return ct.name
+      if (n === 'specialty') continue // catch-all, applied last
+      if (mt.includes(n)) return ct.name
+    }
+    // Fall back to Specialty if it exists, else first type, else 'Other'
+    const specialty = types.find(ct => ct.name.toLowerCase() === 'specialty')
+    return specialty?.name || types[0]?.name || 'Other'
   }
 
   // Generate work orders from the job's estimate on demand
@@ -363,22 +373,12 @@ export default function WorkOrders({ jobs, selectedJob }) {
     ? workOrders
     : workOrders.filter(w => w.status === statusFilter)
 
-  // Group by module_type with custom crew-type ordering:
-  // 1. Demolition (any type containing "demo"), 2. Specialty, 3. Masonry, 4. rest alpha
-  function crewTypePriority(t = '') {
-    const l = t.toLowerCase()
-    if (l.includes('demo') || l.includes('demolition')) return 0
-    if (l.includes('specialty'))                         return 1
-    if (l.includes('masonry'))                           return 2
-    return 3
-  }
-
-  const moduleTypes = [...new Set(filtered.map(w => w.module_type))]
-    .sort((a, b) => {
-      const pa = crewTypePriority(a), pb = crewTypePriority(b)
-      if (pa !== pb) return pa - pb
-      return a.localeCompare(b)
-    })
+  // Build sections: ALL crew types shown as headers (in DB sort_order),
+  // each containing the work orders that resolve to that type
+  const sections = crewTypes.map(ct => ({
+    crewType: ct,
+    workOrders: filtered.filter(wo => resolveCrewType(wo, crewTypes) === ct.name),
+  }))
 
   // ── No job selected ──
   if (!jobId) {
@@ -484,20 +484,17 @@ export default function WorkOrders({ jobs, selectedJob }) {
         </div>
       </div>
 
-      {/* Groups */}
-      {moduleTypes.length === 0 ? (
-        <p className="text-center text-sm text-gray-400 py-10">No work orders match this filter.</p>
-      ) : (
-        moduleTypes.map(moduleType => (
-          <CrewGroup
-            key={moduleType}
-            moduleType={moduleType}
-            workOrders={filtered.filter(w => w.module_type === moduleType)}
-            equipment={equipmentMap[moduleType] || []}
-            onStatusChange={handleStatusChange}
-          />
-        ))
-      )}
+      {/* Sections — one per crew type, always shown */}
+      {sections.map(({ crewType, workOrders: sectionWOs }) => (
+        <CrewGroup
+          key={crewType.id}
+          moduleType={crewType.name}
+          color={crewType.color}
+          workOrders={sectionWOs}
+          equipment={equipmentMap[crewType.name] || []}
+          onStatusChange={handleStatusChange}
+        />
+      ))}
     </div>
   )
 }

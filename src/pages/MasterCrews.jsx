@@ -463,9 +463,194 @@ function CrewRow({ crew, employees, onClick }) {
   )
 }
 
+// ── Crew Types Tab ────────────────────────────────────────────────────────────
+const COLOR_OPTIONS = [
+  { label: 'Red',    value: '#dc2626' },
+  { label: 'Orange', value: '#f97316' },
+  { label: 'Yellow', value: '#ca8a04' },
+  { label: 'Green',  value: '#16a34a' },
+  { label: 'Blue',   value: '#3b82f6' },
+  { label: 'Purple', value: '#9333ea' },
+  { label: 'Pink',   value: '#db2777' },
+  { label: 'Gray',   value: '#6b7280' },
+]
+
+function CrewTypesTab() {
+  const [crewTypes,   setCrewTypes]   = useState([])
+  const [loading,     setLoading]     = useState(true)
+  const [editingId,   setEditingId]   = useState(null)
+  const [editName,    setEditName]    = useState('')
+  const [editColor,   setEditColor]   = useState('#15803d')
+  const [showAdd,     setShowAdd]     = useState(false)
+  const [newName,     setNewName]     = useState('')
+  const [newColor,    setNewColor]    = useState('#15803d')
+  const [saving,      setSaving]      = useState(false)
+  const [error,       setError]       = useState('')
+
+  useEffect(() => { load() }, [])
+
+  async function load() {
+    setLoading(true)
+    const { data } = await supabase.from('crew_types').select('*').order('sort_order').order('name')
+    if (data) setCrewTypes(data)
+    setLoading(false)
+  }
+
+  async function handleAdd() {
+    if (!newName.trim()) { setError('Name is required.'); return }
+    setSaving(true); setError('')
+    const maxOrder = crewTypes.reduce((m, ct) => Math.max(m, ct.sort_order), -1)
+    const { data, error: err } = await supabase
+      .from('crew_types')
+      .insert({ name: newName.trim(), color: newColor, sort_order: maxOrder + 1 })
+      .select().single()
+    if (err) { setError(err.message); setSaving(false); return }
+    setCrewTypes(prev => [...prev, data])
+    setNewName(''); setNewColor('#15803d'); setShowAdd(false)
+    setSaving(false)
+  }
+
+  async function handleSaveEdit(id) {
+    if (!editName.trim()) { setError('Name is required.'); return }
+    setSaving(true); setError('')
+    const { data, error: err } = await supabase
+      .from('crew_types').update({ name: editName.trim(), color: editColor })
+      .eq('id', id).select().single()
+    if (err) { setError(err.message); setSaving(false); return }
+    setCrewTypes(prev => prev.map(ct => ct.id === id ? data : ct))
+    setEditingId(null); setSaving(false)
+  }
+
+  async function handleDelete(id) {
+    if (!confirm('Delete this crew type? Work orders using it will lose their crew type grouping.')) return
+    await supabase.from('crew_types').delete().eq('id', id)
+    setCrewTypes(prev => prev.filter(ct => ct.id !== id))
+  }
+
+  async function moveOrder(id, dir) {
+    const idx = crewTypes.findIndex(ct => ct.id === id)
+    const swapIdx = dir === 'up' ? idx - 1 : idx + 1
+    if (swapIdx < 0 || swapIdx >= crewTypes.length) return
+    const a = crewTypes[idx], b = crewTypes[swapIdx]
+    await Promise.all([
+      supabase.from('crew_types').update({ sort_order: b.sort_order }).eq('id', a.id),
+      supabase.from('crew_types').update({ sort_order: a.sort_order }).eq('id', b.id),
+    ])
+    load()
+  }
+
+  if (loading) return <div className="flex justify-center py-16"><div className="animate-spin rounded-full h-7 w-7 border-b-2 border-green-700" /></div>
+
+  return (
+    <div className="max-w-lg">
+      {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2 mb-3">{error}</p>}
+
+      <p className="text-xs text-gray-400 mb-4">
+        Crew types define the work order sections in the Jobs → Work Orders tab. Drag the order arrows to change display priority. All types always appear as section headers.
+      </p>
+
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-4">
+        {crewTypes.length === 0 && (
+          <p className="text-xs text-gray-400 text-center py-8">No crew types yet.</p>
+        )}
+        {crewTypes.map((ct, i) => (
+          <div key={ct.id} className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 last:border-0">
+            {/* Color swatch */}
+            <div className="w-3 h-8 rounded-full flex-shrink-0" style={{ backgroundColor: ct.color }} />
+
+            {editingId === ct.id ? (
+              <>
+                <input
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  className="input text-sm flex-1 py-1"
+                  autoFocus
+                />
+                <div className="flex gap-1 flex-shrink-0">
+                  {COLOR_OPTIONS.map(c => (
+                    <button
+                      key={c.value}
+                      onClick={() => setEditColor(c.value)}
+                      className={`w-5 h-5 rounded-full border-2 transition-all ${editColor === c.value ? 'border-gray-800 scale-125' : 'border-transparent'}`}
+                      style={{ backgroundColor: c.value }}
+                      title={c.label}
+                    />
+                  ))}
+                </div>
+                <button onClick={() => handleSaveEdit(ct.id)} disabled={saving}
+                  className="text-xs text-green-700 font-semibold hover:underline flex-shrink-0">Save</button>
+                <button onClick={() => setEditingId(null)}
+                  className="text-xs text-gray-400 hover:underline flex-shrink-0">Cancel</button>
+              </>
+            ) : (
+              <>
+                <span className="flex-1 text-sm font-medium text-gray-800">{ct.name}</span>
+                {/* Order arrows */}
+                <div className="flex flex-col gap-0.5 flex-shrink-0">
+                  <button onClick={() => moveOrder(ct.id, 'up')} disabled={i === 0}
+                    className="text-gray-300 hover:text-gray-600 disabled:opacity-20 leading-none text-xs">▲</button>
+                  <button onClick={() => moveOrder(ct.id, 'down')} disabled={i === crewTypes.length - 1}
+                    className="text-gray-300 hover:text-gray-600 disabled:opacity-20 leading-none text-xs">▼</button>
+                </div>
+                <button onClick={() => { setEditingId(ct.id); setEditName(ct.name); setEditColor(ct.color) }}
+                  className="text-xs text-gray-500 hover:text-blue-600 font-medium flex-shrink-0">Edit</button>
+                <button onClick={() => handleDelete(ct.id)}
+                  className="text-xs text-gray-400 hover:text-red-600 flex-shrink-0">Delete</button>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Add new */}
+      {showAdd ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+          <p className="text-xs font-semibold text-gray-600">New Crew Type</p>
+          <input
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            className="input text-sm w-full"
+            placeholder="e.g. Electrical, Plumbing"
+            autoFocus
+          />
+          <div>
+            <p className="text-xs text-gray-500 mb-1.5">Color</p>
+            <div className="flex gap-2 flex-wrap">
+              {COLOR_OPTIONS.map(c => (
+                <button
+                  key={c.value}
+                  onClick={() => setNewColor(c.value)}
+                  className={`w-7 h-7 rounded-full border-2 transition-all ${newColor === c.value ? 'border-gray-800 scale-110' : 'border-transparent'}`}
+                  style={{ backgroundColor: c.value }}
+                  title={c.label}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={handleAdd} disabled={saving}
+              className="btn-primary text-sm px-4 py-2 rounded-lg">
+              {saving ? 'Adding…' : 'Add Crew Type'}
+            </button>
+            <button onClick={() => { setShowAdd(false); setNewName(''); setError('') }}
+              className="btn-ghost text-sm px-4 py-2 rounded-lg border border-gray-200">
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setShowAdd(true)}
+          className="btn-primary text-sm px-4 py-2 rounded-lg">
+          + Add Crew Type
+        </button>
+      )}
+    </div>
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function MasterCrews() {
-  const [tab,        setTab]        = useState('internal') // 'internal' | 'sub'
+  const [tab,        setTab]        = useState('internal') // 'internal' | 'sub' | 'crew-types'
   const [crews,      setCrews]      = useState([])
   const [employees,  setEmployees]  = useState([])
   const [subCrews,   setSubCrews]   = useState([])
@@ -537,8 +722,9 @@ export default function MasterCrews() {
       {/* Tabs */}
       <div className="flex gap-0 border-b border-gray-200 mb-5 flex-shrink-0">
         {[
-          { key: 'internal', label: `Internal Crews (${crews.length})` },
-          { key: 'sub',      label: `Subcontractor Crews (${subCrews.length})` },
+          { key: 'internal',   label: `Internal Crews (${crews.length})` },
+          { key: 'sub',        label: `Subcontractor Crews (${subCrews.length})` },
+          { key: 'crew-types', label: 'Crew Types' },
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
@@ -673,6 +859,13 @@ export default function MasterCrews() {
                   </table>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ── Crew Types ── */}
+          {tab === 'crew-types' && (
+            <div className="flex-1 overflow-y-auto">
+              <CrewTypesTab />
             </div>
           )}
         </>
