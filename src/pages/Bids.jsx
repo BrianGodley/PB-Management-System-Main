@@ -85,7 +85,7 @@ export default function Bids() {
     setSavingJob(true)
 
     try {
-      // Create the job via RPC using the real jobs table column names
+      // Create the job via RPC
       const { data: jobId, error: jobErr } = await supabase.rpc('create_job_from_bid', {
         p_estimate_id:  bid.estimate_id || null,
         p_client_id:    null,
@@ -112,6 +112,76 @@ export default function Bids() {
           })
         }
       }
+
+      // ── Generate work orders from estimate modules ──────────────────────────
+      if (bid.estimate_id) {
+        const { data: estProjects } = await supabase
+          .from('estimate_projects')
+          .select('id, project_name, estimate_modules(*)')
+          .eq('estimate_id', bid.estimate_id)
+          .order('created_at')
+
+        if (estProjects?.length) {
+          const workOrderRows = []
+
+          for (const proj of estProjects) {
+            const modules = proj.estimate_modules || []
+            for (const mod of modules) {
+              const calc        = mod.data?.calc || {}
+              const laborHours  = parseFloat(calc.totalHrs   || 0)
+              const laborCost   = parseFloat(mod.labor_cost  || calc.laborCost || 0)
+              const laborBurden = parseFloat(mod.labor_burden || calc.burden   || 0)
+              const manDays     = parseFloat(mod.man_days    || 0)
+              const matCost     = parseFloat(mod.material_cost || calc.totalMat || 0)
+              const subCost     = parseFloat(mod.sub_cost    || calc.subCost   || 0)
+              const totalPrice  = parseFloat(mod.total_price || calc.price     || 0)
+
+              // Crew work order (always create if there's any labor or material)
+              if (laborCost > 0 || manDays > 0 || matCost > 0) {
+                workOrderRows.push({
+                  job_id:             job.id,
+                  estimate_module_id: mod.id,
+                  project_name:       proj.project_name,
+                  module_type:        mod.module_type,
+                  is_subcontractor:   false,
+                  man_days:           manDays,
+                  labor_hours:        laborHours,
+                  material_cost:      matCost,
+                  sub_cost:           0,
+                  labor_cost:         laborCost,
+                  labor_burden:       laborBurden,
+                  total_price:        totalPrice - subCost,
+                  status:             'pending',
+                })
+              }
+
+              // Subcontractor work order (separate card if sub cost exists)
+              if (subCost > 0) {
+                workOrderRows.push({
+                  job_id:             job.id,
+                  estimate_module_id: mod.id,
+                  project_name:       proj.project_name,
+                  module_type:        mod.module_type,
+                  is_subcontractor:   true,
+                  man_days:           0,
+                  labor_hours:        0,
+                  material_cost:      0,
+                  sub_cost:           subCost,
+                  labor_cost:         0,
+                  labor_burden:       0,
+                  total_price:        subCost,
+                  status:             'pending',
+                })
+              }
+            }
+          }
+
+          if (workOrderRows.length > 0) {
+            await supabase.from('work_orders').insert(workOrderRows)
+          }
+        }
+      }
+      // ── End work order generation ───────────────────────────────────────────
 
       // Mark bid as sold
       await supabase.from('bids').update({ status: 'sold' }).eq('id', bidId)

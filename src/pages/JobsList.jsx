@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import ScheduleCalendar from '../components/ScheduleCalendar'
 import DailyLogs from '../components/DailyLogs'
 import TimeClock from '../components/TimeClock'
+import WorkOrders from '../components/WorkOrders'
 
 function lastName(name = '') {
   const t = name.trim()
@@ -335,7 +336,12 @@ export default function JobsList() {
             />
           )}
 
-          {tab === 'work-orders' && <ComingSoon label="Work Orders" />}
+          {tab === 'work-orders' && (
+            <WorkOrders
+              jobs={jobs}
+              selectedJob={selectedJob === ALL_JOBS ? 'all' : selectedJob}
+            />
+          )}
 
           {tab === 'tracking'   && (
             selectedJobObj ? (
