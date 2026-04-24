@@ -3255,7 +3255,7 @@ export default function Statistics() {
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                       <XAxis
                         dataKey="label"
-                        tick={{ fontSize: 11, fill: '#6b7280', angle: -45, textAnchor: 'end', dx: -4, dy: 4 }}
+                        tick={{ fontSize: 11, fill: '#111827', fontWeight: 600, angle: -45, textAnchor: 'end', dx: -4, dy: 4 }}
                         tickLine={false}
                         axisLine={{ stroke: '#d1d5db' }}
                         height={70}
@@ -3264,7 +3264,7 @@ export default function Statistics() {
                       <YAxis
                         domain={yDomain}
                         ticks={yTicks}
-                        tick={{ fontSize: 11, fill: '#6b7280' }}
+                        tick={{ fontSize: 11, fill: '#111827', fontWeight: 600 }}
                         tickLine={false}
                         axisLine={false}
                         tickFormatter={v => {
