@@ -129,6 +129,10 @@ export default function EstimateDetail() {
   // Per-project sub GP markup rates  { [projectId]: number }
   const [projectSubRates, setProjectSubRates] = useState({})
 
+  // Cascade delete modal for estimate
+  const [estDeleteModal, setEstDeleteModal] = useState(null)
+  // { bidId, bidCount, woCount, jobIds, onConfirm, onKeepBid }
+
   // Add / Edit module modals
   const [showModulePicker, setShowModulePicker] = useState(false)
   const [selectedType,     setSelectedType]     = useState(null)
@@ -561,15 +565,44 @@ export default function EstimateDetail() {
 
   async function deleteEstimate() {
     if (estimate.status !== 'pending') return
-    if (!confirm(`Delete "${estimate.estimate_name}"? This will also remove all projects and modules inside it. This cannot be undone.`)) return
-    setStatusLoading(true)
-    await supabase.from('estimates').delete().eq('id', id)
-    // Navigate back to the client page if we have a client_id, otherwise clients list
-    if (estimate.client_id) {
-      navigate(`/clients/${estimate.client_id}`)
-    } else {
-      navigate('/clients')
+
+    // Look up any bids and associated work orders
+    const { data: bidsData } = await supabase.from('bids').select('id').eq('estimate_id', id)
+    const bidCount = bidsData?.length || 0
+
+    const { data: jobsData } = await supabase.from('jobs').select('id').eq('estimate_id', id)
+    let woCount = 0
+    const jobIds = jobsData?.map(j => j.id) || []
+    if (jobIds.length > 0) {
+      const { count } = await supabase
+        .from('work_orders').select('id', { count: 'exact', head: true })
+        .in('job_id', jobIds)
+      woCount = count || 0
     }
+
+    const bidIds = bidsData?.map(b => b.id) || []
+
+    setEstDeleteModal({
+      bidCount,
+      woCount,
+      // Delete all — bids + WOs + estimate
+      onConfirm: async () => {
+        setStatusLoading(true)
+        if (jobIds.length)  await supabase.from('work_orders').delete().in('job_id', jobIds)
+        if (bidIds.length)  await supabase.from('bids').delete().in('id', bidIds)
+        await supabase.from('estimates').delete().eq('id', id)
+        setEstDeleteModal(null)
+        navigate(estimate.client_id ? `/clients/${estimate.client_id}` : '/clients')
+      },
+      // Keep bid — only delete WOs + estimate, leave bids
+      onKeepBid: bidCount > 0 ? async () => {
+        setStatusLoading(true)
+        if (jobIds.length) await supabase.from('work_orders').delete().in('job_id', jobIds)
+        await supabase.from('estimates').delete().eq('id', id)
+        setEstDeleteModal(null)
+        navigate(estimate.client_id ? `/clients/${estimate.client_id}` : '/clients')
+      } : null,
+    })
   }
 
   // ── Render ────────────────────────────────────────
@@ -652,6 +685,60 @@ export default function EstimateDetail() {
 
   return (
     <div className="flex flex-col h-full">
+
+      {/* ── Estimate Delete Cascade Modal ── */}
+      {estDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-2xl">⚠️</span>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Delete This Estimate?</h2>
+                <p className="text-sm text-gray-500">"{estimate.estimate_name}"</p>
+              </div>
+            </div>
+
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 text-sm space-y-1.5">
+              <p className="text-gray-700">Deleting this estimate will also remove all projects and modules inside it.</p>
+              {estDeleteModal.bidCount > 0 && (
+                <p className="text-red-700 font-medium">
+                  ⚠️ {estDeleteModal.bidCount} Bid{estDeleteModal.bidCount !== 1 ? 's' : ''} associated with this estimate will also be deleted.
+                </p>
+              )}
+              {estDeleteModal.woCount > 0 && (
+                <p className="text-red-700 font-medium">
+                  ⚠️ {estDeleteModal.woCount} Work Order{estDeleteModal.woCount !== 1 ? 's' : ''} associated with this estimate's bid{estDeleteModal.bidCount !== 1 ? 's' : ''} will also be deleted.
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              {estDeleteModal.onKeepBid && (
+                <button
+                  onClick={estDeleteModal.onKeepBid}
+                  className="w-full px-4 py-2.5 rounded-lg bg-amber-50 border border-amber-300 text-amber-800 font-semibold hover:bg-amber-100 transition-colors text-sm"
+                >
+                  Delete Estimate Only — Keep Bid{estDeleteModal.bidCount !== 1 ? 's' : ''}
+                </button>
+              )}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setEstDeleteModal(null)}
+                  className="flex-1 px-4 py-2 rounded-lg border border-gray-300 text-gray-600 font-semibold hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={estDeleteModal.onConfirm}
+                  className="flex-1 bg-red-600 text-white font-semibold py-2 rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Delete Everything
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 mb-4 text-sm">

@@ -45,6 +45,9 @@ export default function Clients() {
   const [colPickerOpen, setColPickerOpen] = useState(false)
   const colPickerRef = useRef(null)
 
+  // Cascade delete modal: { client, estCount, bidCount, woCount, onConfirm }
+  const [deleteModal, setDeleteModal] = useState(null)
+
   const [form, setForm] = useState({
     first_name: '', last_name: '',
     company_name: '', company_position: '',
@@ -105,9 +108,45 @@ export default function Clients() {
   }
 
   async function deleteClient(id) {
-    if (!confirm('Delete this client? This will not delete their jobs.')) return
-    await supabase.from('clients').delete().eq('id', id)
-    fetchClients()
+    const client = clients.find(c => c.id === id)
+    const clientName = client ? (client.name || [client.first_name, client.last_name].filter(Boolean).join(' ')) : ''
+
+    // Count associated data
+    const [{ data: ests }, { data: bidsData }, { data: jobsData }] = await Promise.all([
+      supabase.from('estimates').select('id').or(`client_name.eq.${clientName},client_id.eq.${id}`),
+      supabase.from('bids').select('id').eq('client_name', clientName),
+      supabase.from('jobs').select('id').eq('client_name', clientName),
+    ])
+    const estCount = ests?.length || 0
+    const bidCount = bidsData?.length || 0
+    let woCount = 0
+    if (jobsData?.length) {
+      const jobIds = jobsData.map(j => j.id)
+      const { count } = await supabase.from('work_orders').select('id', { count: 'exact', head: true }).in('job_id', jobIds)
+      woCount = count || 0
+    }
+
+    setDeleteModal({
+      client,
+      estCount,
+      bidCount,
+      woCount,
+      onConfirm: async () => {
+        // Delete in cascade order: work_orders → bids → estimates → client
+        if (jobsData?.length) {
+          await supabase.from('work_orders').delete().in('job_id', jobsData.map(j => j.id))
+        }
+        if (bidsData?.length) {
+          await supabase.from('bids').delete().in('id', bidsData.map(b => b.id))
+        }
+        if (ests?.length) {
+          await supabase.from('estimates').delete().in('id', ests.map(e => e.id))
+        }
+        await supabase.from('clients').delete().eq('id', id)
+        setDeleteModal(null)
+        fetchClients()
+      },
+    })
   }
 
   async function setClientStatus(id, status) {
@@ -191,6 +230,57 @@ export default function Clients() {
 
   return (
     <div>
+      {/* ── Client Delete Cascade Modal ── */}
+      {deleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-2xl">⚠️</span>
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Delete Client?</h2>
+                <p className="text-sm text-gray-500">This cannot be undone.</p>
+              </div>
+            </div>
+
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 text-sm space-y-1.5">
+              <p className="text-gray-700 font-medium">
+                Deleting <span className="text-gray-900">{displayName(deleteModal.client)}</span> will permanently remove all associated data:
+              </p>
+              <ul className="text-red-700 space-y-0.5 mt-2">
+                {deleteModal.estCount > 0 && (
+                  <li>• {deleteModal.estCount} Estimate{deleteModal.estCount !== 1 ? 's' : ''}</li>
+                )}
+                {deleteModal.bidCount > 0 && (
+                  <li>• {deleteModal.bidCount} Bid{deleteModal.bidCount !== 1 ? 's' : ''}</li>
+                )}
+                {deleteModal.woCount > 0 && (
+                  <li>• {deleteModal.woCount} Work Order{deleteModal.woCount !== 1 ? 's' : ''}</li>
+                )}
+                {deleteModal.estCount === 0 && deleteModal.bidCount === 0 && deleteModal.woCount === 0 && (
+                  <li className="text-gray-500">No associated estimates, bids, or work orders.</li>
+                )}
+              </ul>
+              <p className="text-xs text-red-600 font-semibold mt-2">There is no option to keep any of this data if the client is deleted.</p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteModal(null)}
+                className="flex-1 px-4 py-2 rounded-lg border border-gray-300 text-gray-600 font-semibold hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={deleteModal.onConfirm}
+                className="flex-1 bg-red-600 text-white font-semibold py-2 rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Delete Everything
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Page header */}
       <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
         <h1 className="text-xl font-bold text-gray-900">Clients</h1>

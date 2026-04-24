@@ -20,14 +20,6 @@ const STATUS_DOT = {
   complete:    'bg-green-500',
 }
 
-const TYPE_COLORS = {
-  'Vehicle':     'bg-blue-100 text-blue-800',
-  'Trailer':     'bg-orange-100 text-orange-800',
-  'Large Power': 'bg-red-100 text-red-800',
-  'Small Power': 'bg-yellow-100 text-yellow-800',
-  'Hand Tool':   'bg-green-100 text-green-800',
-}
-
 function fieldHasValue(v) {
   if (v === undefined || v === null || v === '' || v === false) return false
   if (typeof v === 'number') return v !== 0
@@ -47,12 +39,392 @@ function fmtDays(n) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// New Work Order Modal
+// ─────────────────────────────────────────────────────────────────────────────
+function NewWorkOrderModal({ jobId, crewTypes, onSave, onClose }) {
+  const [form, setForm] = useState({
+    module_type: '', project_name: '', crew_type: '',
+    is_subcontractor: false,
+    man_days: '', labor_hours: '', labor_cost: '',
+    material_cost: '', sub_cost: '', total_price: '',
+    status: 'pending',
+  })
+  const [saving, setSaving] = useState(false)
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+
+  async function handleSave() {
+    if (!form.module_type.trim()) return
+    setSaving(true)
+    const { data, error } = await supabase
+      .from('work_orders')
+      .insert({
+        job_id:           jobId,
+        module_type:      form.module_type.trim(),
+        project_name:     form.project_name.trim() || null,
+        crew_type:        form.crew_type || null,
+        is_subcontractor: form.is_subcontractor,
+        man_days:         parseFloat(form.man_days)      || 0,
+        labor_hours:      parseFloat(form.labor_hours)   || 0,
+        labor_cost:       parseFloat(form.labor_cost)    || 0,
+        material_cost:    parseFloat(form.material_cost) || 0,
+        sub_cost:         parseFloat(form.sub_cost)      || 0,
+        total_price:      parseFloat(form.total_price)   || 0,
+        status:           form.status,
+        is_manual:        true,
+      })
+      .select()
+      .single()
+    setSaving(false)
+    if (!error && data) onSave(data)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto">
+
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">New Work Order</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Manually created — independent of estimate or bid</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+        </div>
+
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className="label text-xs">Module Type <span className="text-red-400">*</span></label>
+              <input
+                className="input"
+                value={form.module_type}
+                onChange={e => set('module_type', e.target.value)}
+                placeholder="e.g. Demolition, Masonry, Planting…"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="label text-xs">Project Name</label>
+              <input className="input" value={form.project_name} onChange={e => set('project_name', e.target.value)} placeholder="Optional" />
+            </div>
+            <div>
+              <label className="label text-xs">Crew Type</label>
+              <select className="input" value={form.crew_type} onChange={e => set('crew_type', e.target.value)}>
+                <option value="">— Select —</option>
+                {crewTypes.map(ct => <option key={ct.id} value={ct.name}>{ct.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 py-1">
+            <input
+              type="checkbox" id="new_is_sub"
+              checked={form.is_subcontractor}
+              onChange={e => set('is_subcontractor', e.target.checked)}
+              className="w-4 h-4 rounded accent-green-600"
+            />
+            <label htmlFor="new_is_sub" className="text-sm text-gray-700 cursor-pointer select-none">
+              Subcontractor work order
+            </label>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { k: 'man_days',      l: 'Man Days',      p: '0'   },
+              { k: 'labor_hours',   l: 'Labor Hours',   p: '0'   },
+              { k: 'labor_cost',    l: 'Labor Cost',    p: '$0'  },
+              { k: 'material_cost', l: 'Material Cost', p: '$0'  },
+              { k: 'sub_cost',      l: 'Sub Cost',      p: '$0'  },
+              { k: 'total_price',   l: 'Total Price',   p: '$0'  },
+            ].map(({ k, l, p }) => (
+              <div key={k}>
+                <label className="label text-xs">{l}</label>
+                <input
+                  type="number" min="0" step="0.01"
+                  className="input"
+                  value={form[k]}
+                  onChange={e => set(k, e.target.value)}
+                  placeholder={p}
+                />
+              </div>
+            ))}
+          </div>
+
+          <div>
+            <label className="label text-xs">Status</label>
+            <select className="input" value={form.status} onChange={e => set('status', e.target.value)}>
+              <option value="pending">Pending</option>
+              <option value="in_progress">In Progress</option>
+              <option value="complete">Complete</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-5">
+          <button onClick={onClose} className="flex-1 btn-secondary">Cancel</button>
+          <button
+            onClick={handleSave}
+            disabled={saving || !form.module_type.trim()}
+            className="flex-1 bg-green-700 text-white font-semibold py-2 rounded-lg hover:bg-green-800 transition-colors disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : '+ Save Work Order'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Work Order Detail / Edit Modal
+// ─────────────────────────────────────────────────────────────────────────────
+function WorkOrderDetailModal({ wo, crewTypes, onClose, onSaved, onDeleted }) {
+  const [editMode,       setEditMode]       = useState(false)
+  const [saving,         setSaving]         = useState(false)
+  const [deleting,       setDeleting]       = useState(false)
+  const [confirmDelete,  setConfirmDelete]  = useState(false)
+  const [form, setForm] = useState({
+    module_type:      wo.module_type      || '',
+    project_name:     wo.project_name     || '',
+    crew_type:        wo.crew_type        || '',
+    is_subcontractor: wo.is_subcontractor || false,
+    man_days:         wo.man_days         ?? '',
+    labor_hours:      wo.labor_hours      ?? '',
+    labor_cost:       wo.labor_cost       ?? '',
+    material_cost:    wo.material_cost    ?? '',
+    sub_cost:         wo.sub_cost         ?? '',
+    total_price:      wo.total_price      ?? '',
+    status:           wo.status           || 'pending',
+  })
+
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+
+  function hasChanges() {
+    const n = v => parseFloat(v) || 0
+    return (
+      form.module_type      !== (wo.module_type      || '') ||
+      form.project_name     !== (wo.project_name     || '') ||
+      form.crew_type        !== (wo.crew_type        || '') ||
+      form.is_subcontractor !== (wo.is_subcontractor || false) ||
+      n(form.man_days)      !== n(wo.man_days)      ||
+      n(form.labor_hours)   !== n(wo.labor_hours)   ||
+      n(form.labor_cost)    !== n(wo.labor_cost)    ||
+      n(form.material_cost) !== n(wo.material_cost) ||
+      n(form.sub_cost)      !== n(wo.sub_cost)      ||
+      n(form.total_price)   !== n(wo.total_price)   ||
+      form.status           !== (wo.status || 'pending')
+    )
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    const updates = {
+      module_type:      form.module_type.trim(),
+      project_name:     form.project_name.trim() || null,
+      crew_type:        form.crew_type || null,
+      is_subcontractor: form.is_subcontractor,
+      man_days:         parseFloat(form.man_days)      || 0,
+      labor_hours:      parseFloat(form.labor_hours)   || 0,
+      labor_cost:       parseFloat(form.labor_cost)    || 0,
+      material_cost:    parseFloat(form.material_cost) || 0,
+      sub_cost:         parseFloat(form.sub_cost)      || 0,
+      total_price:      parseFloat(form.total_price)   || 0,
+      status:           form.status,
+    }
+    // Flag as edited if values changed and work order was originally from an estimate
+    if (hasChanges() && !wo.is_manual) {
+      updates.edited_from_estimate = true
+    }
+    const { data, error } = await supabase
+      .from('work_orders').update(updates).eq('id', wo.id).select().single()
+    setSaving(false)
+    if (!error && data) { onSaved(data); onClose() }
+  }
+
+  async function handleDelete() {
+    setDeleting(true)
+    await supabase.from('work_orders').delete().eq('id', wo.id)
+    onDeleted(wo.id)
+    setDeleting(false)
+    onClose()
+  }
+
+  const roInput = `input text-sm bg-gray-50 text-gray-500 cursor-default`
+  const rwInput = `input text-sm`
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto">
+
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-lg font-bold text-gray-900 truncate">{wo.module_type}</h2>
+              {wo.is_manual && (
+                <span className="flex-shrink-0 text-[10px] font-bold px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full uppercase tracking-wide">
+                  Manual
+                </span>
+              )}
+              {wo.edited_from_estimate && (
+                <span className="flex-shrink-0 text-[10px] font-bold px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full uppercase tracking-wide">
+                  Edited
+                </span>
+              )}
+            </div>
+            {wo.project_name && <p className="text-xs text-gray-400 mt-0.5 truncate">{wo.project_name}</p>}
+          </div>
+          <button onClick={onClose} className="flex-shrink-0 text-gray-400 hover:text-gray-600 text-xl leading-none ml-4">✕</button>
+        </div>
+
+        {!editMode && (
+          <p className="text-xs text-gray-400 italic mb-3">Click <strong className="font-semibold text-gray-600">Edit</strong> to make changes to this work order.</p>
+        )}
+
+        {/* Fields */}
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className="label text-xs">Module Type</label>
+              <input
+                readOnly={!editMode}
+                className={editMode ? rwInput : roInput}
+                value={form.module_type}
+                onChange={e => set('module_type', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="label text-xs">Project Name</label>
+              <input
+                readOnly={!editMode}
+                className={editMode ? rwInput : roInput}
+                value={form.project_name}
+                onChange={e => set('project_name', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="label text-xs">Crew Type</label>
+              {editMode ? (
+                <select className="input text-sm" value={form.crew_type} onChange={e => set('crew_type', e.target.value)}>
+                  <option value="">— Select —</option>
+                  {crewTypes.map(ct => <option key={ct.id} value={ct.name}>{ct.name}</option>)}
+                </select>
+              ) : (
+                <input readOnly className={roInput} value={form.crew_type || '—'} />
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 py-1">
+            <input
+              type="checkbox" id="det_is_sub"
+              disabled={!editMode}
+              checked={form.is_subcontractor}
+              onChange={e => set('is_subcontractor', e.target.checked)}
+              className="w-4 h-4 rounded accent-green-600"
+            />
+            <label
+              htmlFor="det_is_sub"
+              className={`text-sm select-none ${editMode ? 'cursor-pointer text-gray-700' : 'cursor-default text-gray-400'}`}
+            >
+              Subcontractor work order
+            </label>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { k: 'man_days',      l: 'Man Days'      },
+              { k: 'labor_hours',   l: 'Labor Hours'   },
+              { k: 'labor_cost',    l: 'Labor Cost'    },
+              { k: 'material_cost', l: 'Material Cost' },
+              { k: 'sub_cost',      l: 'Sub Cost'      },
+              { k: 'total_price',   l: 'Total Price'   },
+            ].map(({ k, l }) => (
+              <div key={k}>
+                <label className="label text-xs">{l}</label>
+                <input
+                  type="number" min="0" step="0.01"
+                  readOnly={!editMode}
+                  className={editMode ? rwInput : roInput}
+                  value={form[k]}
+                  onChange={e => set(k, e.target.value)}
+                />
+              </div>
+            ))}
+          </div>
+
+          <div>
+            <label className="label text-xs">Status</label>
+            {editMode ? (
+              <select className="input text-sm" value={form.status} onChange={e => set('status', e.target.value)}>
+                <option value="pending">Pending</option>
+                <option value="in_progress">In Progress</option>
+                <option value="complete">Complete</option>
+              </select>
+            ) : (
+              <input readOnly className={roInput} value={STATUS_LABELS[form.status] || form.status} />
+            )}
+          </div>
+        </div>
+
+        {/* Actions */}
+        {confirmDelete ? (
+          <div className="mt-5 bg-red-50 border border-red-200 rounded-xl p-4">
+            <p className="text-sm font-semibold text-red-700 mb-1">Delete this work order?</p>
+            <p className="text-xs text-red-500 mb-3">This cannot be undone.</p>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmDelete(false)} className="flex-1 btn-secondary text-sm">Keep It</button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex-1 bg-red-600 text-white font-semibold py-2 rounded-lg hover:bg-red-700 text-sm transition-colors disabled:opacity-50"
+              >
+                {deleting ? 'Deleting…' : 'Yes, Delete'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 mt-5">
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="px-3 py-2 rounded-lg border border-red-200 text-red-400 text-sm hover:bg-red-50 hover:text-red-600 transition-colors"
+            >
+              Delete
+            </button>
+            <div className="flex-1" />
+            {editMode ? (
+              <>
+                <button onClick={() => setEditMode(false)} className="btn-secondary text-sm">Cancel</button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="bg-green-700 text-white font-semibold px-5 py-2 rounded-lg hover:bg-green-800 text-sm transition-colors disabled:opacity-50"
+                >
+                  {saving ? 'Saving…' : 'Save Changes'}
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => setEditMode(true)}
+                className="bg-green-700 text-white font-semibold px-5 py-2 rounded-lg hover:bg-green-800 text-sm transition-colors"
+              >
+                ✏️ Edit
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Module Row — one line inside a combined work order card
 // ─────────────────────────────────────────────────────────────────────────────
-function ModuleRow({ wo, jobsMap, onStatusChange }) {
+function ModuleRow({ wo, jobsMap, onStatusChange, onRowClick }) {
   const [updating, setUpdating] = useState(false)
 
-  async function cycleStatus() {
+  async function cycleStatus(e) {
+    e.stopPropagation()
     const next = { pending: 'in_progress', in_progress: 'complete', complete: 'pending' }
     const newStatus = next[wo.status] || 'pending'
     setUpdating(true)
@@ -64,7 +436,11 @@ function ModuleRow({ wo, jobsMap, onStatusChange }) {
   const jobName = jobsMap?.[wo.job_id]
 
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 border-b border-gray-100 last:border-0">
+    <div
+      className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 border-b border-gray-100 last:border-0 cursor-pointer"
+      onClick={onRowClick}
+      title="Click to view / edit"
+    >
       {/* Left: identifiers */}
       <div className="flex items-center gap-1.5 min-w-0 flex-1">
         {jobName && (
@@ -78,6 +454,16 @@ function ModuleRow({ wo, jobsMap, onStatusChange }) {
             <span className="text-gray-300 flex-shrink-0 text-[10px]">·</span>
             <span className="text-xs text-gray-500 truncate">{wo.project_name}</span>
           </>
+        )}
+        {wo.is_manual && (
+          <span className="flex-shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 uppercase tracking-wide">
+            Manual
+          </span>
+        )}
+        {wo.edited_from_estimate && (
+          <span className="flex-shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 uppercase tracking-wide">
+            Edited
+          </span>
         )}
       </div>
 
@@ -103,9 +489,9 @@ function ModuleRow({ wo, jobsMap, onStatusChange }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Combined Work Order Card — all crew modules for a crew type in one card
+// Combined Work Order Card
 // ─────────────────────────────────────────────────────────────────────────────
-function CombinedWorkOrderCard({ workOrders, requiredEquipFn, jobsMap, onStatusChange }) {
+function CombinedWorkOrderCard({ workOrders, requiredEquipFn, jobsMap, onStatusChange, onRowClick }) {
   const totalMD    = workOrders.reduce((s, w) => s + parseFloat(w.man_days     || 0), 0)
   const totalHrs   = workOrders.reduce((s, w) => s + parseFloat(w.labor_hours  || 0), 0)
   const totalLabor = workOrders.reduce((s, w) => s + parseFloat(w.labor_cost   || 0), 0)
@@ -113,7 +499,6 @@ function CombinedWorkOrderCard({ workOrders, requiredEquipFn, jobsMap, onStatusC
   const totalValue = workOrders.reduce((s, w) => s + parseFloat(w.total_price  || 0), 0)
   const doneCount  = workOrders.filter(w => w.status === 'complete').length
 
-  // Aggregate required equipment across all modules (deduplicated)
   const allReqEquip = [...new Set(workOrders.flatMap(wo => requiredEquipFn(wo)))]
 
   return (
@@ -136,14 +521,20 @@ function CombinedWorkOrderCard({ workOrders, requiredEquipFn, jobsMap, onStatusC
         </span>
       </div>
 
-      {/* Individual module rows */}
+      {/* Module rows */}
       <div>
         {workOrders.map(wo => (
-          <ModuleRow key={wo.id} wo={wo} jobsMap={jobsMap} onStatusChange={onStatusChange} />
+          <ModuleRow
+            key={wo.id}
+            wo={wo}
+            jobsMap={jobsMap}
+            onStatusChange={onStatusChange}
+            onRowClick={() => onRowClick(wo)}
+          />
         ))}
       </div>
 
-      {/* Required equipment (aggregated) */}
+      {/* Required equipment */}
       {allReqEquip.length > 0 && (
         <div className="px-3 py-1.5 border-t border-blue-50 bg-blue-50/40 flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wide flex-shrink-0">Req. Equip:</span>
@@ -159,12 +550,13 @@ function CombinedWorkOrderCard({ workOrders, requiredEquipFn, jobsMap, onStatusC
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Sub Work Order Card — individual card for subcontractor work orders
+// Sub Work Order Card
 // ─────────────────────────────────────────────────────────────────────────────
-function SubWorkOrderCard({ wo, requiredEquip, jobName, onStatusChange }) {
+function SubWorkOrderCard({ wo, requiredEquip, jobName, onStatusChange, onRowClick }) {
   const [updating, setUpdating] = useState(false)
 
-  async function cycleStatus() {
+  async function cycleStatus(e) {
+    e.stopPropagation()
     const next = { pending: 'in_progress', in_progress: 'complete', complete: 'pending' }
     const newStatus = next[wo.status] || 'pending'
     setUpdating(true)
@@ -174,7 +566,11 @@ function SubWorkOrderCard({ wo, requiredEquip, jobName, onStatusChange }) {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+    <div
+      className="bg-white border border-gray-200 rounded-lg overflow-hidden cursor-pointer hover:border-gray-300 transition-colors"
+      onClick={() => onRowClick(wo)}
+      title="Click to view / edit"
+    >
       <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50 border-b border-gray-100">
         <div className="flex items-center gap-2 min-w-0">
           <span className="flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">SUB</span>
@@ -187,6 +583,12 @@ function SubWorkOrderCard({ wo, requiredEquip, jobName, onStatusChange }) {
               <span className="text-gray-300 flex-shrink-0">·</span>
               <span className="text-xs text-gray-500 truncate">{wo.project_name}</span>
             </>
+          )}
+          {wo.is_manual && (
+            <span className="flex-shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 uppercase tracking-wide">Manual</span>
+          )}
+          {wo.edited_from_estimate && (
+            <span className="flex-shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 uppercase tracking-wide">Edited</span>
           )}
         </div>
         <button
@@ -217,7 +619,7 @@ function SubWorkOrderCard({ wo, requiredEquip, jobName, onStatusChange }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Crew Group
 // ─────────────────────────────────────────────────────────────────────────────
-function CrewGroup({ moduleType, color, workOrders, requiredEquipFn, jobsMap, onStatusChange }) {
+function CrewGroup({ moduleType, workOrders, requiredEquipFn, jobsMap, onStatusChange, onRowClick, isAllJobs }) {
   const crewWOs = workOrders.filter(wo => !wo.is_subcontractor)
   const subWOs  = workOrders.filter(wo =>  wo.is_subcontractor)
   const total   = crewWOs.length + subWOs.length
@@ -227,46 +629,90 @@ function CrewGroup({ moduleType, color, workOrders, requiredEquipFn, jobsMap, on
   const totalMat = crewWOs.reduce((s, w) => s + parseFloat(w.material_cost || 0), 0)
   const totalSub = subWOs.reduce((s,  w) => s + parseFloat(w.sub_cost || 0), 0)
 
+  // In All Jobs mode, bucket each WO by job so each job gets its own combined card
+  const jobBuckets = isAllJobs ? (() => {
+    const buckets = {}
+    for (const wo of [...crewWOs, ...subWOs]) {
+      if (!buckets[wo.job_id]) buckets[wo.job_id] = { crew: [], sub: [] }
+      wo.is_subcontractor ? buckets[wo.job_id].sub.push(wo) : buckets[wo.job_id].crew.push(wo)
+    }
+    return buckets
+  })() : null
+
   return (
     <div className="mb-4">
       {/* Section header bar */}
-      <div className="flex items-center gap-3 flex-wrap px-3 py-1.5 rounded-lg mb-2 bg-green-50 border-2 border-green-700">
-        <h3 className="text-sm font-bold uppercase tracking-widest text-green-900">{moduleType}</h3>
+      <div className="flex items-center gap-3 flex-wrap px-3 py-0.5 rounded-lg mb-2 bg-white border-2 border-green-700">
+        <h3 className="text-sm font-bold uppercase tracking-widest text-gray-800">{moduleType}</h3>
         {crewWOs.length > 0 && (
-          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-green-100 text-green-800">
+          <span className="text-xs font-semibold px-2.5 py-0 rounded-full bg-gray-100 text-gray-600">
             {crewWOs.length} module{crewWOs.length !== 1 ? 's' : ''}
           </span>
         )}
         <div className="flex gap-3">
-          {totalMD  > 0 && <span className="text-xs text-green-700">{fmtDays(totalMD)}</span>}
-          {totalHrs > 0 && <span className="text-xs text-green-700">{fmtHrs(totalHrs)}</span>}
-          {totalMat > 0 && <span className="text-xs text-green-700">Mat {fmt(totalMat)}</span>}
-          {totalSub > 0 && <span className="text-xs font-medium text-green-700">Sub {fmt(totalSub)}</span>}
-          {total === 0  && <span className="text-xs italic text-green-400">No work orders for this job</span>}
+          {totalMD  > 0 && <span className="text-xs text-gray-500">{fmtDays(totalMD)}</span>}
+          {totalHrs > 0 && <span className="text-xs text-gray-500">{fmtHrs(totalHrs)}</span>}
+          {totalMat > 0 && <span className="text-xs text-gray-500">Mat {fmt(totalMat)}</span>}
+          {totalSub > 0 && <span className="text-xs font-medium text-gray-500">Sub {fmt(totalSub)}</span>}
+          {total === 0  && <span className="text-xs italic text-gray-400">No work orders for this job</span>}
         </div>
       </div>
 
-      <div className="pl-2 space-y-1.5">
-        {/* ONE combined card for all crew modules */}
-        {crewWOs.length > 0 && (
-          <CombinedWorkOrderCard
-            workOrders={crewWOs}
-            requiredEquipFn={requiredEquipFn}
-            jobsMap={jobsMap}
-            onStatusChange={onStatusChange}
-          />
+      <div className="pl-2 space-y-2">
+        {isAllJobs && jobBuckets ? (
+          // ── All Jobs: one combined card per job, stacked ──────────────────
+          Object.entries(jobBuckets).map(([jobId, { crew, sub }]) => {
+            const jobName = jobsMap?.[jobId] || 'Job'
+            return (
+              <div key={jobId} className="space-y-1">
+                {/* Job name label above each job's card */}
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">{jobName}</p>
+                {crew.length > 0 && (
+                  <CombinedWorkOrderCard
+                    workOrders={crew}
+                    requiredEquipFn={requiredEquipFn}
+                    jobsMap={{}}
+                    onStatusChange={onStatusChange}
+                    onRowClick={onRowClick}
+                  />
+                )}
+                {sub.map(wo => (
+                  <SubWorkOrderCard
+                    key={wo.id}
+                    wo={wo}
+                    requiredEquip={requiredEquipFn(wo)}
+                    jobName={null}
+                    onStatusChange={onStatusChange}
+                    onRowClick={onRowClick}
+                  />
+                ))}
+              </div>
+            )
+          })
+        ) : (
+          // ── Single Job: one combined card for the whole crew type ─────────
+          <>
+            {crewWOs.length > 0 && (
+              <CombinedWorkOrderCard
+                workOrders={crewWOs}
+                requiredEquipFn={requiredEquipFn}
+                jobsMap={jobsMap}
+                onStatusChange={onStatusChange}
+                onRowClick={onRowClick}
+              />
+            )}
+            {subWOs.map(wo => (
+              <SubWorkOrderCard
+                key={wo.id}
+                wo={wo}
+                requiredEquip={requiredEquipFn(wo)}
+                jobName={jobsMap?.[wo.job_id]}
+                onStatusChange={onStatusChange}
+                onRowClick={onRowClick}
+              />
+            ))}
+          </>
         )}
-
-        {/* Individual card per sub work order */}
-        {subWOs.map(wo => (
-          <SubWorkOrderCard
-            key={wo.id}
-            wo={wo}
-            requiredEquip={requiredEquipFn(wo)}
-            jobName={jobsMap?.[wo.job_id]}
-            onStatusChange={onStatusChange}
-          />
-        ))}
       </div>
     </div>
   )
@@ -279,17 +725,19 @@ export default function WorkOrders({ jobs, selectedJob }) {
   const [workOrders,    setWorkOrders]    = useState([])
   const [crewTypes,     setCrewTypes]     = useState([])
   const [equipmentMap,  setEquipmentMap]  = useState({})
-  const [fieldEquipMap, setFieldEquipMap] = useState({}) // module_type → [{ field_key, equipment_type }]
-  const [moduleDataMap, setModuleDataMap] = useState({}) // estimate_module_id → data{}
+  const [fieldEquipMap, setFieldEquipMap] = useState({})
+  const [moduleDataMap, setModuleDataMap] = useState({})
   const [loading,       setLoading]       = useState(true)
   const [error,         setError]         = useState(null)
   const [statusFilter,  setStatusFilter]  = useState('all')
 
+  // Modal state
+  const [showNewWOModal, setShowNewWOModal] = useState(false)
+  const [detailWO,       setDetailWO]       = useState(null)
+
   const jobId = selectedJob === 'all' ? null : selectedJob
 
-  useEffect(() => {
-    fetchAll()
-  }, [jobId])
+  useEffect(() => { fetchAll() }, [jobId])
 
   async function fetchAll() {
     setLoading(true)
@@ -314,7 +762,6 @@ export default function WorkOrders({ jobs, selectedJob }) {
     setWorkOrders(wos)
     setCrewTypes(ctRes.data || [])
 
-    // Build moduleType → equipment[] lookup (module-level map, unchanged)
     if (!mapRes.error && !equipRes.error) {
       const maps  = mapRes.data  || []
       const equip = equipRes.data || []
@@ -328,7 +775,6 @@ export default function WorkOrders({ jobs, selectedJob }) {
       setEquipmentMap(lookup)
     }
 
-    // Build field-level equipment map: { module_type: [{ field_key, equipment_type }] }
     const fMap = {}
     for (const m of fieldMapRes.data || []) {
       if (!m.equipment_type) continue
@@ -337,7 +783,6 @@ export default function WorkOrders({ jobs, selectedJob }) {
     }
     setFieldEquipMap(fMap)
 
-    // Fetch estimate_module data for any work orders that have an estimate_module_id
     const moduleIds = [...new Set(wos.filter(w => w.estimate_module_id).map(w => w.estimate_module_id))]
     if (moduleIds.length > 0) {
       const { data: modData } = await supabase
@@ -352,13 +797,11 @@ export default function WorkOrders({ jobs, selectedJob }) {
     setLoading(false)
   }
 
-  // Match a work order to a crew type name using direct field or pattern fallback
   function resolveCrewType(wo, types) {
     if (wo.crew_type) {
       const direct = types.find(ct => ct.name === wo.crew_type)
       if (direct) return direct.name
     }
-    // Pattern fallback for older records
     const mt = (wo.module_type || '').toLowerCase()
     for (const ct of types) {
       const n = ct.name.toLowerCase()
@@ -366,15 +809,13 @@ export default function WorkOrders({ jobs, selectedJob }) {
       if (n === 'masonry'    && (mt.includes('mason') || mt.includes('wall') || mt.includes('column'))) return ct.name
       if (n === 'paver'      && (mt.includes('paver') || mt.includes('turf') || mt.includes('step'))) return ct.name
       if (n === 'landscape'  && (mt.includes('landscape') || mt.includes('plant') || mt.includes('irrig') || mt.includes('drainage') || mt.includes('utili'))) return ct.name
-      if (n === 'specialty') continue // catch-all, applied last
+      if (n === 'specialty') continue
       if (mt.includes(n)) return ct.name
     }
-    // Fall back to Specialty if it exists, else first type, else 'Other'
     const specialty = types.find(ct => ct.name.toLowerCase() === 'specialty')
     return specialty?.name || types[0]?.name || 'Other'
   }
 
-  // Generate work orders from the job's estimate on demand
   async function generateFromEstimate() {
     const job = jobs?.find(j => j.id === jobId)
     if (!job?.estimate_id) {
@@ -392,7 +833,7 @@ export default function WorkOrders({ jobs, selectedJob }) {
 
     if (projErr) { setError(projErr.message); setLoading(false); return }
     if (!estProjects?.length) {
-      setError('No estimate modules found for this job\'s estimate. Make sure the estimate has projects and modules.')
+      setError('No estimate modules found for this job\'s estimate.')
       setLoading(false)
       return
     }
@@ -440,12 +881,11 @@ export default function WorkOrders({ jobs, selectedJob }) {
     await fetchAll()
   }
 
-  // Returns required equipment names for a work order based on field mappings + estimate module data
   function getRequiredEquip(wo) {
     if (!wo.estimate_module_id) return []
-    const modData  = moduleDataMap[wo.estimate_module_id] || {}
+    const modData   = moduleDataMap[wo.estimate_module_id] || {}
     const fieldMaps = fieldEquipMap[wo.module_type] || []
-    const results = []
+    const results   = []
     for (const fm of fieldMaps) {
       if (fm.equipment_type && fieldHasValue(modData[fm.field_key])) {
         if (!results.includes(fm.equipment_type)) results.push(fm.equipment_type)
@@ -458,18 +898,30 @@ export default function WorkOrders({ jobs, selectedJob }) {
     setWorkOrders(prev => prev.map(w => w.id === woId ? { ...w, status: newStatus } : w))
   }
 
-  // Filter
+  function handleWOSaved(updatedWO) {
+    setWorkOrders(prev => {
+      const idx = prev.findIndex(w => w.id === updatedWO.id)
+      if (idx >= 0) {
+        const next = [...prev]; next[idx] = updatedWO; return next
+      }
+      return [...prev, updatedWO]
+    })
+  }
+
+  function handleWODeleted(id) {
+    setWorkOrders(prev => prev.filter(w => w.id !== id))
+  }
+
   const filtered = statusFilter === 'all'
     ? workOrders
     : workOrders.filter(w => w.status === statusFilter)
 
-  // Build sections: ALL crew types shown as headers (in DB sort_order),
-  // each containing the work orders that resolve to that type
   const sections = crewTypes.map(ct => ({
     crewType: ct,
     workOrders: filtered.filter(wo => resolveCrewType(wo, crewTypes) === ct.name),
   }))
 
+  // ─── Loading / error states ───────────────────────────────────────────────
   if (loading) {
     return (
       <div className="flex justify-center py-16">
@@ -503,23 +955,33 @@ export default function WorkOrders({ jobs, selectedJob }) {
     }
     const job = jobs?.find(j => j.id === jobId)
     return (
-      <div className="flex flex-col items-center justify-center h-full text-gray-400 py-20 text-center px-6">
-        <p className="text-4xl mb-3">📋</p>
-        <p className="text-sm font-medium text-gray-600 mb-1">No work orders for this job yet.</p>
-        {job?.estimate_id ? (
-          <>
-            <p className="text-xs text-gray-400 mb-4">This job has a linked estimate. Click below to generate work orders from it now.</p>
-            <button onClick={generateFromEstimate} className="btn-primary text-sm px-5 py-2 rounded-lg">
-              Generate Work Orders from Estimate
-            </button>
-          </>
-        ) : (
-          <p className="text-xs text-gray-400">
-            Work orders are generated automatically when a bid is marked sold.<br />
-            This job has no linked estimate.
-          </p>
+      <>
+        {showNewWOModal && (
+          <NewWorkOrderModal
+            jobId={jobId}
+            crewTypes={crewTypes}
+            onSave={wo => { handleWOSaved(wo); setShowNewWOModal(false) }}
+            onClose={() => setShowNewWOModal(false)}
+          />
         )}
-      </div>
+        <div className="flex flex-col items-center justify-center h-full text-gray-400 py-20 text-center px-6">
+          <p className="text-4xl mb-3">📋</p>
+          <p className="text-sm font-medium text-gray-600 mb-1">No work orders for this job yet.</p>
+          <div className="flex flex-wrap items-center justify-center gap-3 mt-4">
+            {job?.estimate_id && (
+              <button onClick={generateFromEstimate} className="btn-primary text-sm px-5 py-2 rounded-lg">
+                Generate from Estimate
+              </button>
+            )}
+            <button onClick={() => setShowNewWOModal(true)} className="btn-secondary text-sm px-5 py-2 rounded-lg">
+              + Add Work Order
+            </button>
+          </div>
+          {!job?.estimate_id && (
+            <p className="text-xs text-gray-400 mt-3">Work orders are generated automatically when a bid is marked sold.</p>
+          )}
+        </div>
+      </>
     )
   }
 
@@ -537,9 +999,27 @@ export default function WorkOrders({ jobs, selectedJob }) {
 
   return (
     <div>
+      {/* Modals */}
+      {showNewWOModal && (
+        <NewWorkOrderModal
+          jobId={jobId}
+          crewTypes={crewTypes}
+          onSave={wo => { handleWOSaved(wo); setShowNewWOModal(false) }}
+          onClose={() => setShowNewWOModal(false)}
+        />
+      )}
+      {detailWO && (
+        <WorkOrderDetailModal
+          wo={detailWO}
+          crewTypes={crewTypes}
+          onClose={() => setDetailWO(null)}
+          onSaved={updatedWO => { handleWOSaved(updatedWO); setDetailWO(null) }}
+          onDeleted={handleWODeleted}
+        />
+      )}
+
       {/* Summary bar */}
       <div className="mb-5 rounded-xl border-2 border-green-700 bg-white overflow-hidden shadow-sm">
-        {/* Top accent strip */}
         <div className="h-1 bg-green-700 w-full" />
         <div className="flex flex-wrap items-center gap-0 divide-x divide-gray-200">
           <div className="px-5 py-2 flex-1 min-w-[120px]">
@@ -566,25 +1046,36 @@ export default function WorkOrders({ jobs, selectedJob }) {
           </div>
         </div>
 
-        {/* Status filter row */}
-        <div className="flex gap-1.5 px-5 py-2.5 border-t border-gray-100 bg-gray-50">
-          {['all', 'pending', 'in_progress', 'complete'].map(s => (
+        {/* Filter row + add button */}
+        <div className="flex items-center justify-between gap-2 px-5 py-2.5 border-t border-gray-100 bg-gray-50">
+          <div className="flex gap-1.5 flex-wrap">
+            {['all', 'pending', 'in_progress', 'complete'].map(s => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                  statusFilter === s
+                    ? 'bg-green-700 text-white'
+                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                {s === 'all' ? 'All' : s === 'in_progress' ? 'In Progress' : s.charAt(0).toUpperCase() + s.slice(1)}
+              </button>
+            ))}
+          </div>
+          {/* + Work Order button — only for single job */}
+          {jobId && (
             <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
-                statusFilter === s
-                  ? 'bg-green-700 text-white'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-              }`}
+              onClick={() => setShowNewWOModal(true)}
+              className="flex-shrink-0 text-xs px-3 py-1.5 rounded-lg font-semibold bg-white border-2 border-green-700 text-green-700 hover:bg-green-50 transition-colors"
             >
-              {s === 'all' ? 'All' : s === 'in_progress' ? 'In Progress' : s.charAt(0).toUpperCase() + s.slice(1)}
+              + Work Order
             </button>
-          ))}
+          )}
         </div>
       </div>
 
-      {/* Sections — one per crew type, always shown */}
+      {/* Crew type sections */}
       {sections.map(({ crewType, workOrders: sectionWOs }) => (
         <CrewGroup
           key={crewType.id}
@@ -594,6 +1085,8 @@ export default function WorkOrders({ jobs, selectedJob }) {
           requiredEquipFn={getRequiredEquip}
           jobsMap={jobsMap}
           onStatusChange={handleStatusChange}
+          onRowClick={setDetailWO}
+          isAllJobs={!jobId}
         />
       ))}
     </div>

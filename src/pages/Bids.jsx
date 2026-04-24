@@ -46,6 +46,9 @@ export default function Bids() {
   const [soldModal, setSoldModal] = useState(null) // { bidId, bid, jobName }
   const [savingJob, setSavingJob] = useState(false)
 
+  // Cascade warning modal state
+  const [cascadeModal, setCascadeModal] = useState(null) // { type, title, body, woCount, onConfirm }
+
   useEffect(() => { fetchBids(); fetchProfiles() }, [])
 
   async function fetchBids() {
@@ -67,13 +70,55 @@ export default function Bids() {
     }
   }
 
+  // Helper: count work orders associated with a bid via its estimate_id → jobs → work_orders
+  async function getBidWOCount(bid) {
+    if (!bid?.estimate_id) return 0
+    const { data: jobs } = await supabase.from('jobs').select('id').eq('estimate_id', bid.estimate_id)
+    if (!jobs?.length) return 0
+    const { count } = await supabase
+      .from('work_orders')
+      .select('id', { count: 'exact', head: true })
+      .in('job_id', jobs.map(j => j.id))
+    return count || 0
+  }
+
+  // Helper: delete work orders for a bid's jobs
+  async function deleteBidWorkOrders(bid) {
+    if (!bid?.estimate_id) return
+    const { data: jobs } = await supabase.from('jobs').select('id').eq('estimate_id', bid.estimate_id)
+    if (!jobs?.length) return
+    await supabase.from('work_orders').delete().in('job_id', jobs.map(j => j.id))
+  }
+
   async function updateStatus(id, status) {
     if (status === 'sold') {
-      // Intercept — show modal instead of updating immediately
+      // Intercept — show Sold modal to create job
       const bid = bids.find(b => b.id === id)
       setSoldModal({ bidId: id, bid, jobName: formatJobName(bid?.client_name || '') })
       return
     }
+
+    // If current bid IS sold and user is changing it to something else → cascade warning
+    const bid = bids.find(b => b.id === id)
+    if (bid?.status === 'sold') {
+      const woCount = await getBidWOCount(bid)
+      setCascadeModal({
+        title: 'Mark Bid as Unsold?',
+        body: `Changing this bid from Sold to "${status.charAt(0).toUpperCase() + status.slice(1)}" will remove its sold status.`,
+        woCount,
+        confirmLabel: 'Yes, Mark Unsold',
+        onConfirm: async () => {
+          if (woCount > 0) await deleteBidWorkOrders(bid)
+          setUpdatingId(id)
+          await supabase.from('bids').update({ status }).eq('id', id)
+          setCascadeModal(null)
+          setUpdatingId(null)
+          await fetchBids()
+        },
+      })
+      return
+    }
+
     setUpdatingId(id)
     await supabase.from('bids').update({ status }).eq('id', id)
     await fetchBids()
@@ -225,9 +270,21 @@ export default function Bids() {
   }
 
   async function deleteBid(id) {
-    if (!confirm('Delete this bid?')) return
-    await supabase.from('bids').delete().eq('id', id)
-    fetchBids()
+    const bid = bids.find(b => b.id === id)
+    const woCount = await getBidWOCount(bid)
+    setCascadeModal({
+      title: 'Delete This Bid?',
+      body: 'This will permanently delete this bid. The associated job will remain in the Jobs table.',
+      woCount,
+      confirmLabel: 'Delete Bid',
+      confirmDanger: true,
+      onConfirm: async () => {
+        if (woCount > 0) await deleteBidWorkOrders(bid)
+        await supabase.from('bids').delete().eq('id', id)
+        setCascadeModal(null)
+        fetchBids()
+      },
+    })
   }
 
   const filtered = bids.filter(b => {
@@ -303,6 +360,46 @@ export default function Bids() {
                   Reverts bid to Presented
                 </p>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Cascade Warning Modal ─────────────────────────────────────── */}
+      {cascadeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-2xl">⚠️</span>
+              <h2 className="text-lg font-bold text-gray-900">{cascadeModal.title}</h2>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 space-y-2 text-sm">
+              <p className="text-gray-700">{cascadeModal.body}</p>
+              {cascadeModal.woCount > 0 && (
+                <p className="font-semibold text-red-600">
+                  ⚠️ {cascadeModal.woCount} Work Order{cascadeModal.woCount !== 1 ? 's' : ''} associated with this bid will also be deleted.
+                </p>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setCascadeModal(null)}
+                className="flex-1 px-4 py-2 rounded-lg border border-gray-300 text-gray-600 font-semibold hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={cascadeModal.onConfirm}
+                className={`flex-1 font-semibold py-2 rounded-lg transition-colors ${
+                  cascadeModal.confirmDanger
+                    ? 'bg-red-600 text-white hover:bg-red-700'
+                    : 'bg-amber-600 text-white hover:bg-amber-700'
+                }`}
+              >
+                {cascadeModal.confirmLabel}
+              </button>
             </div>
           </div>
         </div>
