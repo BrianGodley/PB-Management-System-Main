@@ -418,6 +418,249 @@ function WorkOrderDetailModal({ wo, crewTypes, onClose, onSaved, onDeleted }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Work Order Output Helpers — print / email / text
+// ─────────────────────────────────────────────────────────────────────────────
+
+function openPrintWindow(htmlBody, title) {
+  const w = window.open('', '_blank')
+  if (!w) return
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${title}</title>
+<style>
+  body { margin:0; font-family:Arial,sans-serif; }
+  @media print { @page { margin:0.75in; } }
+</style></head><body>${htmlBody}
+<script>window.addEventListener('load',function(){ setTimeout(function(){ window.print(); },300); });<\/script>
+</body></html>`)
+  w.document.close()
+}
+
+function buildPrintHTML({ workOrders, crewType, jobName, requiredEquipFn, isSub }) {
+  const today = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' })
+  const $  = n => new Intl.NumberFormat('en-US', { style:'currency', currency:'USD', maximumFractionDigits:0 }).format(parseFloat(n)||0)
+  const nv = v => parseFloat(v||0)
+  const B  = 'border:1px solid #d1d5db'
+  const BH = 'border:1px solid #9ca3af'
+  const td = (t, s='') => `<td style="padding:5px 8px;${B};font-size:10.5px;vertical-align:top;${s}">${t??'—'}</td>`
+  const th = (t, s='') => `<td style="padding:5px 8px;${BH};font-size:10.5px;font-weight:600;background:#f3f4f6;${s}">${t}</td>`
+  const sectionHdr = (label, cols) =>
+    `<tr><td colspan="${cols}" style="padding:6px 8px;${BH};font-size:11px;font-weight:700;background:#e5e7eb;">${label}</td></tr>`
+
+  const totalMD    = workOrders.reduce((s,w) => s+nv(w.man_days),0)
+  const totalHrs   = workOrders.reduce((s,w) => s+nv(w.labor_hours),0)
+  const totalLabor = workOrders.reduce((s,w) => s+nv(w.labor_cost),0)
+  const totalMat   = workOrders.reduce((s,w) => s+nv(w.material_cost),0)
+  const totalSub   = workOrders.reduce((s,w) => s+nv(w.sub_cost),0)
+  const totalVal   = workOrders.reduce((s,w) => s+nv(w.total_price),0)
+  const allEquip   = [...new Set(workOrders.flatMap(wo => requiredEquipFn(wo)))]
+
+  const hdr = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid #1f2937;">
+      <div>
+        <div style="font-size:22px;font-weight:700;color:#1f2937;letter-spacing:-0.5px;">WORK ORDER</div>
+        <div style="font-size:10px;color:#9ca3af;margin-top:3px;">Date: ${today}</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:11px;margin-bottom:3px;"><span style="color:#6b7280;">Job:</span> <strong>${jobName}</strong></div>
+        <div style="font-size:11px;"><span style="color:#6b7280;">Crew Type:</span> <strong>${crewType}</strong></div>
+      </div>
+    </div>`
+
+  if (isSub) {
+    const rows = workOrders.map(wo => `<tr>
+      ${td(wo.module_type+(wo.project_name?` — ${wo.project_name}`:'' ))}
+      ${td('—')}
+      ${td(nv(wo.sub_cost)>0?$(wo.sub_cost):'—','text-align:right')}
+    </tr>`).join('')
+    return `<div style="font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:32px;">
+      ${hdr}
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          ${sectionHdr('Subcontractor Module:   '+crewType, 3)}
+          <tr>${th('Module Item','width:45%')}${th('Subcontractor')}${th('Subcontractor Cost','text-align:right;width:22%')}</tr>
+        </thead>
+        <tbody>
+          ${rows}
+          <tr style="background:#f9fafb;">
+            ${td('<strong>TOTALS</strong>')}${td('')}
+            ${td('<strong>'+$(totalSub)+'</strong>','text-align:right;font-weight:700')}
+          </tr>
+        </tbody>
+      </table>
+      <div style="margin-top:12px;padding-top:10px;border-top:1px solid #e5e7eb;font-size:10.5px;">
+        <strong>Total Value:</strong> ${$(totalVal)}
+      </div>
+    </div>`
+  }
+
+  const moduleRows = workOrders.map(wo => `<tr>
+    ${td(wo.module_type+(wo.project_name?` — ${wo.project_name}`:'' ))}
+    ${td(nv(wo.man_days)>0?nv(wo.man_days).toFixed(2):'—','text-align:center')}
+    ${td('—')}
+    ${td(nv(wo.material_cost)>0?$(wo.material_cost):'—','text-align:right')}
+  </tr>`).join('')
+
+  const equipRows = workOrders.map(wo => {
+    const eq = requiredEquipFn(wo)
+    return `<tr>
+      ${td(wo.module_type+(wo.project_name?` — ${wo.project_name}`:'' ))}
+      ${td(eq.length>0?eq.join(', '):'—')}
+      ${td('—')}
+    </tr>`
+  }).join('')
+
+  return `<div style="font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:32px;">
+    ${hdr}
+    <table style="width:100%;border-collapse:collapse;margin-bottom:12px;">
+      <thead>
+        ${sectionHdr('In House Module:   '+crewType, 4)}
+        <tr>
+          ${th('Module Item','width:38%')}
+          ${th('Man Days','text-align:center;width:14%')}
+          ${th('Material Type','width:25%')}
+          ${th('Materials Cost','text-align:right;width:23%')}
+        </tr>
+      </thead>
+      <tbody>
+        ${moduleRows}
+        <tr style="background:#f9fafb;">
+          ${td('<strong>TOTALS</strong>')}
+          ${td('<strong>'+(totalMD>0?totalMD.toFixed(2):'—')+'</strong>','text-align:center;font-weight:700')}
+          ${td('<strong>'+(totalLabor>0?$(totalLabor):'—')+'</strong>','font-weight:700')}
+          ${td('<strong>'+(totalMat>0?$(totalMat):'—')+'</strong>','text-align:right;font-weight:700')}
+        </tr>
+      </tbody>
+    </table>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+      <thead>
+        <tr>
+          ${th('Module Item','width:30%')}
+          ${th('Equipment Needed','width:45%')}
+          ${th('Inspections Needed','width:25%')}
+        </tr>
+      </thead>
+      <tbody>${equipRows}</tbody>
+    </table>
+    <div style="display:flex;flex-wrap:wrap;gap:20px;padding-top:10px;border-top:1px solid #e5e7eb;font-size:10.5px;">
+      ${totalMD>0?`<span><strong>Man Days:</strong> ${totalMD.toFixed(2)}</span>`:''}
+      ${totalHrs>0?`<span><strong>Labor Hours:</strong> ${totalHrs.toFixed(1)}</span>`:''}
+      ${totalLabor>0?`<span><strong>Labor Cost:</strong> ${$(totalLabor)}</span>`:''}
+      <span><strong>Total Value:</strong> ${$(totalVal)}</span>
+      ${allEquip.length>0?`<span><strong>Equipment:</strong> ${allEquip.join(', ')}</span>`:''}
+    </div>
+  </div>`
+}
+
+function buildEmailText({ workOrders, crewType, jobName, requiredEquipFn, isSub }) {
+  const today = new Date().toLocaleDateString()
+  const $  = n => '$'+Math.round(parseFloat(n||0)).toLocaleString()
+  const nv = v => parseFloat(v||0)
+  const sep = '—'.repeat(38)
+  const lines = [
+    `WORK ORDER — ${crewType.toUpperCase()}`,
+    `Job: ${jobName}   Date: ${today}`,
+    sep,
+  ]
+  for (const wo of workOrders) {
+    const label = wo.module_type+(wo.project_name?` (${wo.project_name})`:'')
+    lines.push(label)
+    if (isSub) {
+      if (nv(wo.sub_cost)>0) lines.push(`  Sub Cost: ${$(wo.sub_cost)}`)
+    } else {
+      const parts = []
+      if (nv(wo.man_days)>0)      parts.push(`${nv(wo.man_days).toFixed(1)} Man Days`)
+      if (nv(wo.labor_cost)>0)    parts.push(`Labor: ${$(wo.labor_cost)}`)
+      if (nv(wo.material_cost)>0) parts.push(`Materials: ${$(wo.material_cost)}`)
+      if (parts.length) lines.push('  '+parts.join(' | '))
+      const eq = requiredEquipFn(wo)
+      if (eq.length) lines.push(`  Equipment: ${eq.join(', ')}`)
+    }
+  }
+  lines.push(sep)
+  const totalMD  = workOrders.reduce((s,w)=>s+nv(w.man_days),0)
+  const totalMat = workOrders.reduce((s,w)=>s+nv(w.material_cost),0)
+  const totalSub = workOrders.reduce((s,w)=>s+nv(w.sub_cost),0)
+  const totalVal = workOrders.reduce((s,w)=>s+nv(w.total_price),0)
+  const allEquip = [...new Set(workOrders.flatMap(wo=>requiredEquipFn(wo)))]
+  if (!isSub && totalMD>0)  lines.push(`Total Man Days: ${totalMD.toFixed(1)}`)
+  if (!isSub && totalMat>0) lines.push(`Total Materials: ${$(totalMat)}`)
+  if (isSub  && totalSub>0) lines.push(`Total Sub Cost: ${$(totalSub)}`)
+  lines.push(`Total Value: ${$(totalVal)}`)
+  if (allEquip.length) lines.push(`Equipment: ${allEquip.join(', ')}`)
+  return lines.join('\n')
+}
+
+function buildSMSText({ workOrders, crewType, jobName, requiredEquipFn, isSub }) {
+  const $  = n => '$'+Math.round(parseFloat(n||0)).toLocaleString()
+  const nv = v => parseFloat(v||0)
+  const lines = [`WO: ${crewType} – ${jobName}`]
+  for (const wo of workOrders) {
+    const label = wo.project_name?`${wo.module_type}/${wo.project_name}`:wo.module_type
+    const parts = []
+    if (isSub) {
+      parts.push(`Sub ${$(wo.sub_cost)}`)
+    } else {
+      if (nv(wo.man_days)>0)      parts.push(`${nv(wo.man_days).toFixed(1)}MD`)
+      if (nv(wo.material_cost)>0) parts.push(`Mat ${$(wo.material_cost)}`)
+    }
+    lines.push(`${label}: ${parts.join(' ')||'—'}`)
+  }
+  const totalVal = workOrders.reduce((s,w)=>s+nv(w.total_price),0)
+  const totalMD  = workOrders.reduce((s,w)=>s+nv(w.man_days),0)
+  const allEquip = [...new Set(workOrders.flatMap(wo=>requiredEquipFn(wo)))]
+  if (!isSub && totalMD>0) lines.push(`Total: ${totalMD.toFixed(1)}MD | ${$(totalVal)}`)
+  else lines.push(`Total: ${$(totalVal)}`)
+  if (allEquip.length) lines.push(`Equip: ${allEquip.join(', ')}`)
+  return lines.join('\n')
+}
+
+// Three small icon buttons — print / email / text
+function WOActionButtons({ workOrders, crewType, jobName, requiredEquipFn, isSub }) {
+  const [copied, setCopied] = useState(false)
+  const args = { workOrders, crewType, jobName, requiredEquipFn, isSub }
+
+  function handlePrint(e) {
+    e.stopPropagation()
+    openPrintWindow(buildPrintHTML(args), `Work Order — ${crewType} — ${jobName}`)
+  }
+  function handleEmail(e) {
+    e.stopPropagation()
+    const subject = encodeURIComponent(`Work Order — ${crewType} — ${jobName}`)
+    const body    = encodeURIComponent(buildEmailText(args))
+    window.open(`mailto:?subject=${subject}&body=${body}`, '_self')
+  }
+  function handleText(e) {
+    e.stopPropagation()
+    const text = buildSMSText(args)
+    navigator.clipboard.writeText(text)
+      .then(() => { setCopied(true); setTimeout(()=>setCopied(false), 2000) })
+      .catch(() => window.prompt('Copy this text:', text))
+  }
+
+  const btn = 'flex items-center justify-center w-5 h-5 rounded border border-gray-200 text-gray-400 hover:text-gray-700 hover:border-gray-400 hover:bg-white transition-colors flex-shrink-0'
+
+  return (
+    <div className="flex items-center gap-0.5 flex-shrink-0">
+      {copied && <span className="text-[9px] text-green-600 font-bold mr-1">Copied!</span>}
+      <button onClick={handlePrint} title="Print work order" className={btn}>
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+        </svg>
+      </button>
+      <button onClick={handleEmail} title="Email work order" className={btn}>
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+      </button>
+      <button onClick={handleText} title="Copy text for SMS" className={btn}>
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+        </svg>
+      </button>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Module Row — one line inside a combined work order card
 // ─────────────────────────────────────────────────────────────────────────────
 function ModuleRow({ wo, jobsMap, onStatusChange, onRowClick }) {
@@ -491,7 +734,7 @@ function ModuleRow({ wo, jobsMap, onStatusChange, onRowClick }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Combined Work Order Card
 // ─────────────────────────────────────────────────────────────────────────────
-function CombinedWorkOrderCard({ workOrders, requiredEquipFn, jobsMap, onStatusChange, onRowClick }) {
+function CombinedWorkOrderCard({ workOrders, requiredEquipFn, jobsMap, onStatusChange, onRowClick, crewType, jobName }) {
   const totalMD    = workOrders.reduce((s, w) => s + parseFloat(w.man_days     || 0), 0)
   const totalHrs   = workOrders.reduce((s, w) => s + parseFloat(w.labor_hours  || 0), 0)
   const totalLabor = workOrders.reduce((s, w) => s + parseFloat(w.labor_cost   || 0), 0)
@@ -506,8 +749,8 @@ function CombinedWorkOrderCard({ workOrders, requiredEquipFn, jobsMap, onStatusC
 
       {/* Aggregate header */}
       <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-200">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5">
-          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 min-w-0">
+          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide flex-shrink-0">
             {workOrders.length} module{workOrders.length !== 1 ? 's' : ''}
           </span>
           {totalMD    > 0 && <span className="text-xs text-gray-700"><span className="text-gray-400">MD </span>{fmtDays(totalMD)}</span>}
@@ -516,9 +759,20 @@ function CombinedWorkOrderCard({ workOrders, requiredEquipFn, jobsMap, onStatusC
           {totalMat   > 0 && <span className="text-xs text-gray-700"><span className="text-gray-400">Mat </span>{fmt(totalMat)}</span>}
           {totalValue > 0 && <span className="text-xs font-bold text-green-700">{fmt(totalValue)}</span>}
         </div>
-        <span className="flex-shrink-0 text-[10px] font-semibold text-gray-400 ml-4">
-          {doneCount}/{workOrders.length} complete
-        </span>
+        <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+          <span className="text-[10px] font-semibold text-gray-400">
+            {doneCount}/{workOrders.length} complete
+          </span>
+          {crewType && jobName && (
+            <WOActionButtons
+              workOrders={workOrders}
+              crewType={crewType}
+              jobName={jobName}
+              requiredEquipFn={requiredEquipFn}
+              isSub={false}
+            />
+          )}
+        </div>
       </div>
 
       {/* Module rows */}
@@ -552,7 +806,7 @@ function CombinedWorkOrderCard({ workOrders, requiredEquipFn, jobsMap, onStatusC
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub Work Order Card
 // ─────────────────────────────────────────────────────────────────────────────
-function SubWorkOrderCard({ wo, requiredEquip, jobName, onStatusChange, onRowClick }) {
+function SubWorkOrderCard({ wo, requiredEquip, jobName, onStatusChange, onRowClick, crewType }) {
   const [updating, setUpdating] = useState(false)
 
   async function cycleStatus(e) {
@@ -591,14 +845,25 @@ function SubWorkOrderCard({ wo, requiredEquip, jobName, onStatusChange, onRowCli
             <span className="flex-shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 uppercase tracking-wide">Edited</span>
           )}
         </div>
-        <button
-          onClick={cycleStatus}
-          disabled={updating}
-          className={`flex-shrink-0 flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-colors ${STATUS_STYLES[wo.status]}`}
-        >
-          <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATUS_DOT[wo.status]}`} />
-          {STATUS_LABELS[wo.status]}
-        </button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {crewType && jobName && (
+            <WOActionButtons
+              workOrders={[wo]}
+              crewType={crewType}
+              jobName={jobName}
+              requiredEquipFn={() => requiredEquip || []}
+              isSub={true}
+            />
+          )}
+          <button
+            onClick={cycleStatus}
+            disabled={updating}
+            className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-colors ${STATUS_STYLES[wo.status]}`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATUS_DOT[wo.status]}`} />
+            {STATUS_LABELS[wo.status]}
+          </button>
+        </div>
       </div>
       <div className="px-3 py-1.5 flex flex-wrap items-center gap-x-4 gap-y-0.5">
         {parseFloat(wo.sub_cost)   > 0 && <span className="text-xs text-gray-600"><span className="text-gray-400">Sub </span>{fmt(wo.sub_cost)}</span>}
@@ -619,7 +884,7 @@ function SubWorkOrderCard({ wo, requiredEquip, jobName, onStatusChange, onRowCli
 // ─────────────────────────────────────────────────────────────────────────────
 // Crew Group
 // ─────────────────────────────────────────────────────────────────────────────
-function CrewGroup({ moduleType, workOrders, requiredEquipFn, jobsMap, onStatusChange, onRowClick, isAllJobs }) {
+function CrewGroup({ moduleType, workOrders, requiredEquipFn, jobsMap, onStatusChange, onRowClick, isAllJobs, singleJobName }) {
   const crewWOs = workOrders.filter(wo => !wo.is_subcontractor)
   const subWOs  = workOrders.filter(wo =>  wo.is_subcontractor)
   const total   = crewWOs.length + subWOs.length
@@ -674,6 +939,8 @@ function CrewGroup({ moduleType, workOrders, requiredEquipFn, jobsMap, onStatusC
                     jobsMap={{}}
                     onStatusChange={onStatusChange}
                     onRowClick={onRowClick}
+                    crewType={moduleType}
+                    jobName={jobName}
                   />
                 )}
                 {sub.map(wo => (
@@ -684,6 +951,7 @@ function CrewGroup({ moduleType, workOrders, requiredEquipFn, jobsMap, onStatusC
                     jobName={null}
                     onStatusChange={onStatusChange}
                     onRowClick={onRowClick}
+                    crewType={moduleType}
                   />
                 ))}
               </div>
@@ -699,6 +967,8 @@ function CrewGroup({ moduleType, workOrders, requiredEquipFn, jobsMap, onStatusC
                 jobsMap={jobsMap}
                 onStatusChange={onStatusChange}
                 onRowClick={onRowClick}
+                crewType={moduleType}
+                jobName={singleJobName}
               />
             )}
             {subWOs.map(wo => (
@@ -709,6 +979,7 @@ function CrewGroup({ moduleType, workOrders, requiredEquipFn, jobsMap, onStatusC
                 jobName={jobsMap?.[wo.job_id]}
                 onStatusChange={onStatusChange}
                 onRowClick={onRowClick}
+                crewType={moduleType}
               />
             ))}
           </>
@@ -990,6 +1261,11 @@ export default function WorkOrders({ jobs, selectedJob }) {
     ? Object.fromEntries((jobs || []).map(j => [j.id, j.name || j.client_name || 'Job']))
     : {}
 
+  // Single-job name (for print/email/text on individual job view)
+  const singleJobName = jobId
+    ? (jobs?.find(j => j.id === jobId)?.name || jobs?.find(j => j.id === jobId)?.client_name || 'Job')
+    : null
+
   // Summary totals
   const totalMD    = workOrders.filter(w => !w.is_subcontractor).reduce((s, w) => s + parseFloat(w.man_days || 0), 0)
   const totalMat   = workOrders.filter(w => !w.is_subcontractor).reduce((s, w) => s + parseFloat(w.material_cost || 0), 0)
@@ -1087,6 +1363,7 @@ export default function WorkOrders({ jobs, selectedJob }) {
           onStatusChange={handleStatusChange}
           onRowClick={setDetailWO}
           isAllJobs={!jobId}
+          singleJobName={singleJobName}
         />
       ))}
     </div>
