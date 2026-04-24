@@ -175,33 +175,35 @@ function CrewGroup({ moduleType, color, workOrders, equipment, onStatusChange })
   const totalSub = subWOs.reduce((s,  w) => s + parseFloat(w.sub_cost || 0), 0)
 
   return (
-    <div className="mb-8">
-      {/* Section header — color driven by DB */}
-      <div className="flex items-center gap-0 mb-4">
-        <div className="w-1 self-stretch rounded-full mr-3 flex-shrink-0" style={{ backgroundColor: color }} />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-base font-bold text-gray-900 uppercase tracking-wide">{moduleType}</h3>
-            <span
-              className="text-xs font-semibold px-2 py-0.5 rounded-full border"
-              style={{ backgroundColor: color + '18', color, borderColor: color + '44' }}
-            >
-              {total} work order{total !== 1 ? 's' : ''}
-            </span>
-          </div>
-          <div className="flex flex-wrap gap-3 mt-0.5">
+    <div className="mb-6">
+      {/* Section header bar */}
+      <div
+        className="flex items-center justify-between px-4 py-3 rounded-xl mb-3"
+        style={{ backgroundColor: color + '18', borderLeft: `4px solid ${color}` }}
+      >
+        <div className="flex items-center gap-3 flex-wrap">
+          <h3 className="text-sm font-bold uppercase tracking-widest" style={{ color }}>
+            {moduleType}
+          </h3>
+          <span
+            className="text-xs font-semibold px-2.5 py-0.5 rounded-full"
+            style={{ backgroundColor: color + '28', color }}
+          >
+            {total} work order{total !== 1 ? 's' : ''}
+          </span>
+          <div className="flex gap-3">
             {totalMD  > 0 && <span className="text-xs text-gray-500">{fmtDays(totalMD)}</span>}
             {totalHrs > 0 && <span className="text-xs text-gray-500">{fmtHrs(totalHrs)}</span>}
             {totalMat > 0 && <span className="text-xs text-gray-500">Mat {fmt(totalMat)}</span>}
-            {totalSub > 0 && <span className="text-xs text-orange-600 font-medium">Sub {fmt(totalSub)}</span>}
-            {total === 0  && <span className="text-xs text-gray-300 italic">No work orders for this job</span>}
+            {totalSub > 0 && <span className="text-xs font-medium text-orange-600">Sub {fmt(totalSub)}</span>}
+            {total === 0  && <span className="text-xs italic text-gray-400">No work orders for this job</span>}
           </div>
         </div>
       </div>
 
       {/* Cards */}
       {total > 0 && (
-        <div className="space-y-3 pl-4">
+        <div className="space-y-3 pl-2 mb-2">
           {crewWOs.map(wo => (
             <WorkOrderCard key={wo.id} wo={wo} equipment={equipment} onStatusChange={onStatusChange} />
           ))}
@@ -210,8 +212,6 @@ function CrewGroup({ moduleType, color, workOrders, equipment, onStatusChange })
           ))}
         </div>
       )}
-
-      <div className="border-b border-gray-100 mt-6" />
     </div>
   )
 }
