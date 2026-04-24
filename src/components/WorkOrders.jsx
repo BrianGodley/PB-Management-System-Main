@@ -164,48 +164,69 @@ function WorkOrderCard({ wo, equipment, onStatusChange }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Crew Group (all work orders of the same module_type)
 // ─────────────────────────────────────────────────────────────────────────────
+const CREW_HEADER_STYLES = {
+  demo:      { bar: 'bg-red-600',    badge: 'bg-red-100 text-red-800 border-red-200',    label: 'Demolition' },
+  specialty: { bar: 'bg-purple-600', badge: 'bg-purple-100 text-purple-800 border-purple-200', label: 'Specialty' },
+  masonry:   { bar: 'bg-orange-500', badge: 'bg-orange-100 text-orange-800 border-orange-200', label: 'Masonry' },
+  default:   { bar: 'bg-green-700',  badge: 'bg-green-50 text-green-800 border-green-200', label: null },
+}
+
+function crewHeaderStyle(moduleType = '') {
+  const l = moduleType.toLowerCase()
+  if (l.includes('demo') || l.includes('demolition')) return CREW_HEADER_STYLES.demo
+  if (l.includes('specialty'))                         return CREW_HEADER_STYLES.specialty
+  if (l.includes('masonry'))                           return CREW_HEADER_STYLES.masonry
+  return CREW_HEADER_STYLES.default
+}
+
 function CrewGroup({ moduleType, workOrders, equipment, onStatusChange }) {
   const crewWOs = workOrders.filter(wo => !wo.is_subcontractor)
   const subWOs  = workOrders.filter(wo =>  wo.is_subcontractor)
 
-  const totalMD    = crewWOs.reduce((s, w) => s + parseFloat(w.man_days || 0), 0)
-  const totalHrs   = crewWOs.reduce((s, w) => s + parseFloat(w.labor_hours || 0), 0)
-  const totalMat   = crewWOs.reduce((s, w) => s + parseFloat(w.material_cost || 0), 0)
-  const totalSub   = subWOs.reduce((s,  w) => s + parseFloat(w.sub_cost || 0), 0)
+  const totalMD  = crewWOs.reduce((s, w) => s + parseFloat(w.man_days || 0), 0)
+  const totalHrs = crewWOs.reduce((s, w) => s + parseFloat(w.labor_hours || 0), 0)
+  const totalMat = crewWOs.reduce((s, w) => s + parseFloat(w.material_cost || 0), 0)
+  const totalSub = subWOs.reduce((s,  w) => s + parseFloat(w.sub_cost || 0), 0)
+
+  const style = crewHeaderStyle(moduleType)
 
   return (
-    <div className="mb-6">
-      {/* Group header */}
-      <div className="flex items-center gap-3 mb-3">
-        <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">{moduleType}</h3>
-        <div className="flex gap-3 text-xs text-gray-400">
-          {totalMD  > 0 && <span>{fmtDays(totalMD)} total</span>}
-          {totalHrs > 0 && <span>{fmtHrs(totalHrs)} total</span>}
-          {totalMat > 0 && <span>Mat {fmt(totalMat)}</span>}
-          {totalSub > 0 && <span className="text-orange-600">Sub {fmt(totalSub)}</span>}
+    <div className="mb-8">
+      {/* Section header */}
+      <div className="flex items-center gap-0 mb-4">
+        {/* Color bar */}
+        <div className={`w-1 self-stretch rounded-l-full mr-3 ${style.bar}`} />
+        <div className="flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="text-base font-bold text-gray-900 uppercase tracking-wide">
+              {moduleType}
+            </h3>
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${style.badge}`}>
+              {crewWOs.length + subWOs.length} work order{crewWOs.length + subWOs.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          {/* Totals row */}
+          <div className="flex flex-wrap gap-3 mt-0.5">
+            {totalMD  > 0 && <span className="text-xs text-gray-500">{fmtDays(totalMD)}</span>}
+            {totalHrs > 0 && <span className="text-xs text-gray-500">{fmtHrs(totalHrs)}</span>}
+            {totalMat > 0 && <span className="text-xs text-gray-500">Mat {fmt(totalMat)}</span>}
+            {totalSub > 0 && <span className="text-xs text-orange-600 font-medium">Sub {fmt(totalSub)}</span>}
+          </div>
         </div>
-        <div className="flex-1 border-t border-gray-200" />
       </div>
 
       {/* Cards */}
-      <div className="space-y-3">
+      <div className="space-y-3 pl-4">
         {crewWOs.map(wo => (
-          <WorkOrderCard
-            key={wo.id}
-            wo={wo}
-            equipment={equipment}
-            onStatusChange={onStatusChange}
-          />
+          <WorkOrderCard key={wo.id} wo={wo} equipment={equipment} onStatusChange={onStatusChange} />
         ))}
         {subWOs.map(wo => (
-          <WorkOrderCard
-            key={wo.id}
-            wo={wo}
-            equipment={[]}
-            onStatusChange={onStatusChange}
-          />
+          <WorkOrderCard key={wo.id} wo={wo} equipment={[]} onStatusChange={onStatusChange} />
         ))}
       </div>
+
+      {/* Divider between groups */}
+      <div className="border-b border-gray-100 mt-6" />
     </div>
   )
 }
@@ -342,8 +363,22 @@ export default function WorkOrders({ jobs, selectedJob }) {
     ? workOrders
     : workOrders.filter(w => w.status === statusFilter)
 
-  // Group by module_type
-  const moduleTypes = [...new Set(filtered.map(w => w.module_type))].sort()
+  // Group by module_type with custom crew-type ordering:
+  // 1. Demolition (any type containing "demo"), 2. Specialty, 3. Masonry, 4. rest alpha
+  function crewTypePriority(t = '') {
+    const l = t.toLowerCase()
+    if (l.includes('demo') || l.includes('demolition')) return 0
+    if (l.includes('specialty'))                         return 1
+    if (l.includes('masonry'))                           return 2
+    return 3
+  }
+
+  const moduleTypes = [...new Set(filtered.map(w => w.module_type))]
+    .sort((a, b) => {
+      const pa = crewTypePriority(a), pb = crewTypePriority(b)
+      if (pa !== pb) return pa - pb
+      return a.localeCompare(b)
+    })
 
   // ── No job selected ──
   if (!jobId) {
