@@ -176,28 +176,20 @@ function CrewGroup({ moduleType, color, workOrders, equipment, onStatusChange })
 
   return (
     <div className="mb-6">
-      {/* Section header bar */}
-      <div
-        className="flex items-center justify-between px-4 py-3 rounded-xl mb-3"
-        style={{ backgroundColor: color + '18', borderLeft: `4px solid ${color}` }}
-      >
-        <div className="flex items-center gap-3 flex-wrap">
-          <h3 className="text-sm font-bold uppercase tracking-widest" style={{ color }}>
-            {moduleType}
-          </h3>
-          <span
-            className="text-xs font-semibold px-2.5 py-0.5 rounded-full"
-            style={{ backgroundColor: color + '28', color }}
-          >
-            {total} work order{total !== 1 ? 's' : ''}
-          </span>
-          <div className="flex gap-3">
-            {totalMD  > 0 && <span className="text-xs text-gray-500">{fmtDays(totalMD)}</span>}
-            {totalHrs > 0 && <span className="text-xs text-gray-500">{fmtHrs(totalHrs)}</span>}
-            {totalMat > 0 && <span className="text-xs text-gray-500">Mat {fmt(totalMat)}</span>}
-            {totalSub > 0 && <span className="text-xs font-medium text-orange-600">Sub {fmt(totalSub)}</span>}
-            {total === 0  && <span className="text-xs italic text-gray-400">No work orders for this job</span>}
-          </div>
+      {/* Section header bar — uniform light green */}
+      <div className="flex items-center gap-3 flex-wrap px-4 py-3 rounded-xl mb-3 bg-green-50 border-l-4 border-green-700">
+        <h3 className="text-sm font-bold uppercase tracking-widest text-green-900">
+          {moduleType}
+        </h3>
+        <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-green-100 text-green-800">
+          {total} work order{total !== 1 ? 's' : ''}
+        </span>
+        <div className="flex gap-3">
+          {totalMD  > 0 && <span className="text-xs text-green-700">{fmtDays(totalMD)}</span>}
+          {totalHrs > 0 && <span className="text-xs text-green-700">{fmtHrs(totalHrs)}</span>}
+          {totalMat > 0 && <span className="text-xs text-green-700">Mat {fmt(totalMat)}</span>}
+          {totalSub > 0 && <span className="text-xs font-medium text-orange-600">Sub {fmt(totalSub)}</span>}
+          {total === 0  && <span className="text-xs italic text-green-400">No work orders for this job</span>}
         </div>
       </div>
 
