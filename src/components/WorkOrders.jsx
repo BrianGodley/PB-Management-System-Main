@@ -215,8 +215,9 @@ function CrewGroup({ moduleType, workOrders, equipment, onStatusChange }) {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function WorkOrders({ jobs, selectedJob }) {
   const [workOrders,    setWorkOrders]    = useState([])
-  const [equipmentMap,  setEquipmentMap]  = useState({}) // moduleType → [equipment]
+  const [equipmentMap,  setEquipmentMap]  = useState({})
   const [loading,       setLoading]       = useState(true)
+  const [error,         setError]         = useState(null)
   const [statusFilter,  setStatusFilter]  = useState('all')
 
   const jobId = selectedJob === 'all' ? null : selectedJob
@@ -224,6 +225,7 @@ export default function WorkOrders({ jobs, selectedJob }) {
   useEffect(() => {
     if (!jobId) {
       setWorkOrders([])
+      setError(null)
       setLoading(false)
       return
     }
@@ -232,17 +234,26 @@ export default function WorkOrders({ jobs, selectedJob }) {
 
   async function fetchAll() {
     setLoading(true)
+    setError(null)
 
-    const [{ data: wos }, { data: maps }, { data: equip }] = await Promise.all([
+    const [woRes, mapRes, equipRes] = await Promise.all([
       supabase.from('work_orders').select('*').eq('job_id', jobId).order('module_type').order('is_subcontractor'),
       supabase.from('module_equipment_map').select('module_type, equipment_id'),
       supabase.from('master_equipment').select('*'),
     ])
 
-    if (wos) setWorkOrders(wos)
+    if (woRes.error) {
+      setError(woRes.error.message)
+      setLoading(false)
+      return
+    }
+
+    setWorkOrders(woRes.data || [])
 
     // Build moduleType → equipment[] lookup
-    if (maps && equip) {
+    if (!mapRes.error && !equipRes.error) {
+      const maps  = mapRes.data  || []
+      const equip = equipRes.data || []
       const lookup = {}
       for (const m of maps) {
         const e = equip.find(eq => eq.id === m.equipment_id)
@@ -254,6 +265,72 @@ export default function WorkOrders({ jobs, selectedJob }) {
     }
 
     setLoading(false)
+  }
+
+  // Generate work orders from the job's estimate on demand
+  async function generateFromEstimate() {
+    const job = jobs?.find(j => j.id === jobId)
+    if (!job?.estimate_id) {
+      setError('This job has no linked estimate. Work orders can only be generated from jobs created via a sold bid.')
+      return
+    }
+    setLoading(true)
+    setError(null)
+
+    const { data: estProjects, error: projErr } = await supabase
+      .from('estimate_projects')
+      .select('id, project_name, estimate_modules(*)')
+      .eq('estimate_id', job.estimate_id)
+      .order('created_at')
+
+    if (projErr) { setError(projErr.message); setLoading(false); return }
+    if (!estProjects?.length) {
+      setError('No estimate modules found for this job\'s estimate. Make sure the estimate has projects and modules.')
+      setLoading(false)
+      return
+    }
+
+    const rows = []
+    for (const proj of estProjects) {
+      for (const mod of proj.estimate_modules || []) {
+        const calc        = mod.data?.calc || {}
+        const laborHours  = parseFloat(calc.totalHrs     || 0)
+        const laborCost   = parseFloat(mod.labor_cost    || calc.laborCost || 0)
+        const laborBurden = parseFloat(mod.labor_burden  || calc.burden    || 0)
+        const manDays     = parseFloat(mod.man_days      || 0)
+        const matCost     = parseFloat(mod.material_cost || calc.totalMat  || 0)
+        const subCost     = parseFloat(mod.sub_cost      || calc.subCost   || 0)
+        const totalPrice  = parseFloat(mod.total_price   || calc.price     || 0)
+
+        if (laborCost > 0 || manDays > 0 || matCost > 0) {
+          rows.push({
+            job_id: jobId, estimate_module_id: mod.id,
+            project_name: proj.project_name, module_type: mod.module_type,
+            is_subcontractor: false, man_days: manDays, labor_hours: laborHours,
+            material_cost: matCost, sub_cost: 0, labor_cost: laborCost,
+            labor_burden: laborBurden, total_price: totalPrice - subCost, status: 'pending',
+          })
+        }
+        if (subCost > 0) {
+          rows.push({
+            job_id: jobId, estimate_module_id: mod.id,
+            project_name: proj.project_name, module_type: mod.module_type,
+            is_subcontractor: true, man_days: 0, labor_hours: 0, material_cost: 0,
+            sub_cost: subCost, labor_cost: 0, labor_burden: 0, total_price: subCost, status: 'pending',
+          })
+        }
+      }
+    }
+
+    if (rows.length === 0) {
+      setError('The linked estimate has modules but no labor, materials, or sub costs were found.')
+      setLoading(false)
+      return
+    }
+
+    const { error: insertErr } = await supabase.from('work_orders').insert(rows)
+    if (insertErr) { setError(insertErr.message); setLoading(false); return }
+    await fetchAll()
   }
 
   function handleStatusChange(woId, newStatus) {
@@ -286,12 +363,41 @@ export default function WorkOrders({ jobs, selectedJob }) {
     )
   }
 
-  if (workOrders.length === 0) {
+  if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-gray-400 py-20">
+      <div className="flex flex-col items-center justify-center h-full py-20 text-center px-6">
+        <p className="text-4xl mb-3">⚠️</p>
+        <p className="text-sm font-semibold text-red-600 mb-1">Could not load work orders</p>
+        <p className="text-xs text-gray-500 max-w-sm mb-4">{error}</p>
+        <button onClick={fetchAll} className="btn-ghost text-xs px-4 py-2 rounded-lg border border-gray-200">
+          Try Again
+        </button>
+      </div>
+    )
+  }
+
+  if (workOrders.length === 0) {
+    const job = jobs?.find(j => j.id === jobId)
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-gray-400 py-20 text-center px-6">
         <p className="text-4xl mb-3">📋</p>
-        <p className="text-sm font-medium text-gray-500">No work orders for this job yet.</p>
-        <p className="text-xs mt-1 text-gray-400">Work orders are generated automatically when a bid is marked sold.</p>
+        <p className="text-sm font-medium text-gray-600 mb-1">No work orders for this job yet.</p>
+        {job?.estimate_id ? (
+          <>
+            <p className="text-xs text-gray-400 mb-4">This job has a linked estimate. Click below to generate work orders from it now.</p>
+            <button
+              onClick={generateFromEstimate}
+              className="btn-primary text-sm px-5 py-2 rounded-lg"
+            >
+              Generate Work Orders from Estimate
+            </button>
+          </>
+        ) : (
+          <p className="text-xs text-gray-400">
+            Work orders are generated automatically when a bid is marked sold.<br />
+            This job has no linked estimate.
+          </p>
+        )}
       </div>
     )
   }
