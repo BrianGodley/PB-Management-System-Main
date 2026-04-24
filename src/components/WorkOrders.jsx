@@ -49,7 +49,7 @@ function fmtDays(n) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Work Order Card
 // ─────────────────────────────────────────────────────────────────────────────
-function WorkOrderCard({ wo, equipment, requiredEquip, onStatusChange }) {
+function WorkOrderCard({ wo, equipment, requiredEquip, jobName, onStatusChange }) {
   const [updating, setUpdating] = useState(false)
 
   async function cycleStatus() {
@@ -70,6 +70,12 @@ function WorkOrderCard({ wo, equipment, requiredEquip, onStatusChange }) {
             <span className="flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">
               SUB
             </span>
+          )}
+          {jobName && (
+            <>
+              <span className="flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-100 text-green-800 truncate max-w-[120px]">{jobName}</span>
+              <span className="text-gray-300 flex-shrink-0">·</span>
+            </>
           )}
           <span className="text-xs font-bold text-gray-900 truncate">{wo.module_type}</span>
           {wo.project_name && (
@@ -141,7 +147,7 @@ function WorkOrderCard({ wo, equipment, requiredEquip, onStatusChange }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Crew Group (all work orders of the same module_type)
 // ─────────────────────────────────────────────────────────────────────────────
-function CrewGroup({ moduleType, color, workOrders, equipment, requiredEquipFn, onStatusChange }) {
+function CrewGroup({ moduleType, color, workOrders, equipment, requiredEquipFn, jobsMap, onStatusChange }) {
   const crewWOs = workOrders.filter(wo => !wo.is_subcontractor)
   const subWOs  = workOrders.filter(wo =>  wo.is_subcontractor)
   const total   = crewWOs.length + subWOs.length
@@ -174,10 +180,10 @@ function CrewGroup({ moduleType, color, workOrders, equipment, requiredEquipFn, 
       {total > 0 && (
         <div className="space-y-1.5 pl-2 mb-2">
           {crewWOs.map(wo => (
-            <WorkOrderCard key={wo.id} wo={wo} equipment={equipment} requiredEquip={requiredEquipFn(wo)} onStatusChange={onStatusChange} />
+            <WorkOrderCard key={wo.id} wo={wo} equipment={equipment} requiredEquip={requiredEquipFn(wo)} jobName={jobsMap[wo.job_id]} onStatusChange={onStatusChange} />
           ))}
           {subWOs.map(wo => (
-            <WorkOrderCard key={wo.id} wo={wo} equipment={[]} requiredEquip={requiredEquipFn(wo)} onStatusChange={onStatusChange} />
+            <WorkOrderCard key={wo.id} wo={wo} equipment={[]} requiredEquip={requiredEquipFn(wo)} jobName={jobsMap[wo.job_id]} onStatusChange={onStatusChange} />
           ))}
         </div>
       )}
@@ -201,12 +207,6 @@ export default function WorkOrders({ jobs, selectedJob }) {
   const jobId = selectedJob === 'all' ? null : selectedJob
 
   useEffect(() => {
-    if (!jobId) {
-      setWorkOrders([])
-      setError(null)
-      setLoading(false)
-      return
-    }
     fetchAll()
   }, [jobId])
 
@@ -214,8 +214,9 @@ export default function WorkOrders({ jobs, selectedJob }) {
     setLoading(true)
     setError(null)
 
+    const woBase = supabase.from('work_orders').select('*').order('module_type').order('is_subcontractor')
     const [woRes, ctRes, mapRes, equipRes, fieldMapRes] = await Promise.all([
-      supabase.from('work_orders').select('*').eq('job_id', jobId).order('module_type').order('is_subcontractor'),
+      jobId ? woBase.eq('job_id', jobId) : woBase,
       supabase.from('crew_types').select('*').order('sort_order').order('name'),
       supabase.from('module_equipment_map').select('module_type, equipment_id'),
       supabase.from('master_equipment').select('*'),
@@ -388,16 +389,6 @@ export default function WorkOrders({ jobs, selectedJob }) {
     workOrders: filtered.filter(wo => resolveCrewType(wo, crewTypes) === ct.name),
   }))
 
-  // ── No job selected ──
-  if (!jobId) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-gray-400 py-20">
-        <p className="text-4xl mb-3">📋</p>
-        <p className="text-sm">Select a job from the list to view its work orders.</p>
-      </div>
-    )
-  }
-
   if (loading) {
     return (
       <div className="flex justify-center py-16">
@@ -420,6 +411,15 @@ export default function WorkOrders({ jobs, selectedJob }) {
   }
 
   if (workOrders.length === 0) {
+    if (!jobId) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-gray-400 py-20 text-center px-6">
+          <p className="text-4xl mb-3">📋</p>
+          <p className="text-sm font-medium text-gray-600 mb-1">No work orders found across any jobs.</p>
+          <p className="text-xs text-gray-400">Work orders are generated automatically when a bid is marked sold.</p>
+        </div>
+      )
+    }
     const job = jobs?.find(j => j.id === jobId)
     return (
       <div className="flex flex-col items-center justify-center h-full text-gray-400 py-20 text-center px-6">
@@ -428,10 +428,7 @@ export default function WorkOrders({ jobs, selectedJob }) {
         {job?.estimate_id ? (
           <>
             <p className="text-xs text-gray-400 mb-4">This job has a linked estimate. Click below to generate work orders from it now.</p>
-            <button
-              onClick={generateFromEstimate}
-              className="btn-primary text-sm px-5 py-2 rounded-lg"
-            >
+            <button onClick={generateFromEstimate} className="btn-primary text-sm px-5 py-2 rounded-lg">
               Generate Work Orders from Estimate
             </button>
           </>
@@ -444,6 +441,11 @@ export default function WorkOrders({ jobs, selectedJob }) {
       </div>
     )
   }
+
+  // Job name lookup for all-jobs mode
+  const jobsMap = !jobId
+    ? Object.fromEntries((jobs || []).map(j => [j.id, j.name || j.client_name || 'Job']))
+    : {}
 
   // Summary totals
   const totalMD    = workOrders.filter(w => !w.is_subcontractor).reduce((s, w) => s + parseFloat(w.man_days || 0), 0)
@@ -510,6 +512,7 @@ export default function WorkOrders({ jobs, selectedJob }) {
           workOrders={sectionWOs}
           equipment={equipmentMap[crewType.name] || []}
           requiredEquipFn={getRequiredEquip}
+          jobsMap={jobsMap}
           onStatusChange={handleStatusChange}
         />
       ))}
