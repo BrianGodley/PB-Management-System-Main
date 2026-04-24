@@ -55,16 +55,16 @@ function WorkOrderCard({ wo, equipment, onStatusChange }) {
   }
 
   return (
-    <div className={`bg-white border rounded-xl overflow-hidden ${wo.is_subcontractor ? 'border-orange-200' : 'border-gray-200'}`}>
-      {/* Card header */}
-      <div className={`flex items-center justify-between px-4 py-3 ${wo.is_subcontractor ? 'bg-orange-50 border-b border-orange-100' : 'bg-gray-50 border-b border-gray-100'}`}>
+    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      {/* Card header — compact, uniform */}
+      <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50 border-b border-gray-100">
         <div className="flex items-center gap-2 min-w-0">
           {wo.is_subcontractor && (
-            <span className="flex-shrink-0 text-xs font-bold px-2 py-0.5 rounded-full bg-orange-200 text-orange-900">
-              🔧 SUB
+            <span className="flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">
+              SUB
             </span>
           )}
-          <span className="text-sm font-bold text-gray-900 truncate">{wo.module_type}</span>
+          <span className="text-xs font-bold text-gray-900 truncate">{wo.module_type}</span>
           {wo.project_name && (
             <>
               <span className="text-gray-300 flex-shrink-0">·</span>
@@ -72,12 +72,10 @@ function WorkOrderCard({ wo, equipment, onStatusChange }) {
             </>
           )}
         </div>
-
-        {/* Status toggle */}
         <button
           onClick={cycleStatus}
           disabled={updating}
-          className={`flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors ${STATUS_STYLES[wo.status]}`}
+          className={`flex-shrink-0 flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-colors ${STATUS_STYLES[wo.status]}`}
           title="Click to advance status"
         >
           <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATUS_DOT[wo.status]}`} />
@@ -85,76 +83,33 @@ function WorkOrderCard({ wo, equipment, onStatusChange }) {
         </button>
       </div>
 
-      {/* Card body */}
-      <div className="px-4 py-3 space-y-3">
-
-        {/* Metrics row */}
-        <div className="flex flex-wrap gap-4 text-sm">
-          {!wo.is_subcontractor && (
-            <>
-              {parseFloat(wo.labor_hours) > 0 && (
-                <div>
-                  <span className="text-xs text-gray-400 block">Labor Hours</span>
-                  <span className="font-semibold text-gray-800">{fmtHrs(wo.labor_hours)}</span>
-                </div>
-              )}
-              {parseFloat(wo.man_days) > 0 && (
-                <div>
-                  <span className="text-xs text-gray-400 block">Man Days</span>
-                  <span className="font-semibold text-gray-800">{fmtDays(wo.man_days)}</span>
-                </div>
-              )}
-              {parseFloat(wo.labor_cost) > 0 && (
-                <div>
-                  <span className="text-xs text-gray-400 block">Labor Cost</span>
-                  <span className="font-semibold text-gray-800">{fmt(wo.labor_cost)}</span>
-                </div>
-              )}
-              {parseFloat(wo.material_cost) > 0 && (
-                <div>
-                  <span className="text-xs text-gray-400 block">Materials</span>
-                  <span className="font-semibold text-gray-800">{fmt(wo.material_cost)}</span>
-                </div>
-              )}
-            </>
-          )}
-          {wo.is_subcontractor && parseFloat(wo.sub_cost) > 0 && (
-            <div>
-              <span className="text-xs text-gray-400 block">Sub Cost</span>
-              <span className="font-semibold text-orange-700">{fmt(wo.sub_cost)}</span>
-            </div>
-          )}
-          {parseFloat(wo.total_price) > 0 && (
-            <div>
-              <span className="text-xs text-gray-400 block">Total Value</span>
-              <span className="font-semibold text-green-700">{fmt(wo.total_price)}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Equipment list */}
-        {!wo.is_subcontractor && equipment.length > 0 && (
-          <div>
-            <span className="text-xs text-gray-400 block mb-1.5">Equipment</span>
-            <div className="flex flex-wrap gap-1.5">
-              {equipment.map(e => (
-                <span
-                  key={e.id}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200"
-                >
-                  <span className={`text-[10px] font-bold px-1 rounded ${TYPE_COLORS[e.type] || 'bg-gray-200 text-gray-700'}`}>
-                    {e.equipment_id}
-                  </span>
-                  {e.name}
-                </span>
-              ))}
-            </div>
-          </div>
+      {/* Card body — single compact row */}
+      <div className="px-3 py-1.5 flex flex-wrap items-center gap-x-4 gap-y-0.5">
+        {parseFloat(wo.labor_hours) > 0 && (
+          <span className="text-xs text-gray-600"><span className="text-gray-400">Hrs </span>{fmtHrs(wo.labor_hours)}</span>
         )}
-
-        {/* Notes */}
+        {parseFloat(wo.man_days) > 0 && (
+          <span className="text-xs text-gray-600"><span className="text-gray-400">MD </span>{fmtDays(wo.man_days)}</span>
+        )}
+        {parseFloat(wo.labor_cost) > 0 && (
+          <span className="text-xs text-gray-600"><span className="text-gray-400">Labor </span>{fmt(wo.labor_cost)}</span>
+        )}
+        {parseFloat(wo.material_cost) > 0 && (
+          <span className="text-xs text-gray-600"><span className="text-gray-400">Mat </span>{fmt(wo.material_cost)}</span>
+        )}
+        {parseFloat(wo.sub_cost) > 0 && (
+          <span className="text-xs text-gray-600"><span className="text-gray-400">Sub </span>{fmt(wo.sub_cost)}</span>
+        )}
+        {parseFloat(wo.total_price) > 0 && (
+          <span className="text-xs font-semibold text-green-700"><span className="font-normal text-gray-400">Total </span>{fmt(wo.total_price)}</span>
+        )}
+        {equipment.length > 0 && (
+          <span className="text-xs text-gray-400">
+            {equipment.map(e => e.equipment_id).join(', ')}
+          </span>
+        )}
         {wo.notes && (
-          <p className="text-xs text-gray-500 italic border-t border-gray-100 pt-2">{wo.notes}</p>
+          <span className="text-xs text-gray-400 italic truncate max-w-xs">{wo.notes}</span>
         )}
       </div>
     </div>
@@ -175,9 +130,9 @@ function CrewGroup({ moduleType, color, workOrders, equipment, onStatusChange })
   const totalSub = subWOs.reduce((s,  w) => s + parseFloat(w.sub_cost || 0), 0)
 
   return (
-    <div className="mb-6">
-      {/* Section header bar — uniform light green */}
-      <div className="flex items-center gap-3 flex-wrap px-4 py-3 rounded-xl mb-3 bg-green-50 border-l-4 border-green-700">
+    <div className="mb-4">
+      {/* Section header bar — uniform light green, compact */}
+      <div className="flex items-center gap-3 flex-wrap px-3 py-1.5 rounded-lg mb-2 bg-green-50 border-l-4 border-green-700">
         <h3 className="text-sm font-bold uppercase tracking-widest text-green-900">
           {moduleType}
         </h3>
@@ -188,14 +143,14 @@ function CrewGroup({ moduleType, color, workOrders, equipment, onStatusChange })
           {totalMD  > 0 && <span className="text-xs text-green-700">{fmtDays(totalMD)}</span>}
           {totalHrs > 0 && <span className="text-xs text-green-700">{fmtHrs(totalHrs)}</span>}
           {totalMat > 0 && <span className="text-xs text-green-700">Mat {fmt(totalMat)}</span>}
-          {totalSub > 0 && <span className="text-xs font-medium text-orange-600">Sub {fmt(totalSub)}</span>}
+          {totalSub > 0 && <span className="text-xs font-medium text-green-700">Sub {fmt(totalSub)}</span>}
           {total === 0  && <span className="text-xs italic text-green-400">No work orders for this job</span>}
         </div>
       </div>
 
       {/* Cards */}
       {total > 0 && (
-        <div className="space-y-3 pl-2 mb-2">
+        <div className="space-y-1.5 pl-2 mb-2">
           {crewWOs.map(wo => (
             <WorkOrderCard key={wo.id} wo={wo} equipment={equipment} onStatusChange={onStatusChange} />
           ))}
@@ -454,7 +409,7 @@ export default function WorkOrders({ jobs, selectedJob }) {
           {totalSub > 0 && (
             <div className="px-5 py-3 flex-1 min-w-[120px]">
               <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide block mb-0.5">Sub Costs</span>
-              <span className="text-lg font-bold text-orange-600">{fmt(totalSub)}</span>
+              <span className="text-lg font-bold text-gray-900">{fmt(totalSub)}</span>
             </div>
           )}
           <div className="px-5 py-3 flex-1 min-w-[140px] bg-green-50">
