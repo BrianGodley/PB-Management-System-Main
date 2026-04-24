@@ -132,7 +132,7 @@ function CrewGroup({ moduleType, color, workOrders, equipment, onStatusChange })
   return (
     <div className="mb-4">
       {/* Section header bar — uniform light green, compact */}
-      <div className="flex items-center gap-3 flex-wrap px-3 py-1.5 rounded-lg mb-2 bg-green-50 border-l-4 border-green-700">
+      <div className="flex items-center gap-3 flex-wrap px-3 py-1.5 rounded-lg mb-2 bg-green-50 border-2 border-green-700">
         <h3 className="text-sm font-bold uppercase tracking-widest text-green-900">
           {moduleType}
         </h3>
@@ -398,27 +398,27 @@ export default function WorkOrders({ jobs, selectedJob }) {
         {/* Top accent strip */}
         <div className="h-1 bg-green-700 w-full" />
         <div className="flex flex-wrap items-center gap-0 divide-x divide-gray-200">
-          <div className="px-5 py-3 flex-1 min-w-[120px]">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide block mb-0.5">Total Man Days</span>
-            <span className="text-lg font-bold text-gray-900">{fmtDays(totalMD)}</span>
+          <div className="px-5 py-2 flex-1 min-w-[120px]">
+            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block">Total Man Days</span>
+            <span className="text-base font-bold text-gray-900">{fmtDays(totalMD)}</span>
           </div>
-          <div className="px-5 py-3 flex-1 min-w-[120px]">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide block mb-0.5">Materials</span>
-            <span className="text-lg font-bold text-gray-900">{fmt(totalMat)}</span>
+          <div className="px-5 py-2 flex-1 min-w-[120px]">
+            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block">Materials</span>
+            <span className="text-base font-bold text-gray-900">{fmt(totalMat)}</span>
           </div>
           {totalSub > 0 && (
-            <div className="px-5 py-3 flex-1 min-w-[120px]">
-              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide block mb-0.5">Sub Costs</span>
-              <span className="text-lg font-bold text-gray-900">{fmt(totalSub)}</span>
+            <div className="px-5 py-2 flex-1 min-w-[120px]">
+              <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block">Sub Costs</span>
+              <span className="text-base font-bold text-gray-900">{fmt(totalSub)}</span>
             </div>
           )}
-          <div className="px-5 py-3 flex-1 min-w-[140px] bg-green-50">
-            <span className="text-xs font-semibold text-green-700 uppercase tracking-wide block mb-0.5">Total Value</span>
-            <span className="text-lg font-bold text-green-800">{fmt(totalValue)}</span>
+          <div className="px-5 py-2 flex-1 min-w-[140px] bg-green-50">
+            <span className="text-[10px] font-semibold text-green-700 uppercase tracking-wide block">Total Value</span>
+            <span className="text-base font-bold text-green-800">{fmt(totalValue)}</span>
           </div>
-          <div className="px-5 py-3 flex-1 min-w-[140px]">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide block mb-0.5">Completion</span>
-            <span className="text-lg font-bold text-gray-900">{complete} <span className="text-sm font-normal text-gray-400">/ {workOrders.length}</span></span>
+          <div className="px-5 py-2 flex-1 min-w-[140px]">
+            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block">Completion</span>
+            <span className="text-base font-bold text-gray-900">{complete} <span className="text-sm font-normal text-gray-400">/ {workOrders.length}</span></span>
           </div>
         </div>
 
