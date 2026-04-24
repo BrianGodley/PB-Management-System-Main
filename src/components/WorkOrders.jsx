@@ -28,6 +28,13 @@ const TYPE_COLORS = {
   'Hand Tool':   'bg-green-100 text-green-800',
 }
 
+function fieldHasValue(v) {
+  if (v === undefined || v === null || v === '' || v === false) return false
+  if (typeof v === 'number') return v !== 0
+  if (typeof v === 'string') return v.trim() !== ''
+  return true
+}
+
 function fmt(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n || 0)
 }
@@ -42,7 +49,7 @@ function fmtDays(n) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Work Order Card
 // ─────────────────────────────────────────────────────────────────────────────
-function WorkOrderCard({ wo, equipment, onStatusChange }) {
+function WorkOrderCard({ wo, equipment, requiredEquip, onStatusChange }) {
   const [updating, setUpdating] = useState(false)
 
   async function cycleStatus() {
@@ -112,6 +119,21 @@ function WorkOrderCard({ wo, equipment, onStatusChange }) {
           <span className="text-xs text-gray-400 italic truncate max-w-xs">{wo.notes}</span>
         )}
       </div>
+
+      {/* Required equipment from field mappings */}
+      {requiredEquip && requiredEquip.length > 0 && (
+        <div className="px-3 py-1.5 border-t border-blue-50 bg-blue-50/40 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wide flex-shrink-0">Req. Equip:</span>
+          {requiredEquip.map((eq, i) => (
+            <span
+              key={i}
+              className="text-[10px] font-semibold bg-white text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full"
+            >
+              {eq}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -119,7 +141,7 @@ function WorkOrderCard({ wo, equipment, onStatusChange }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Crew Group (all work orders of the same module_type)
 // ─────────────────────────────────────────────────────────────────────────────
-function CrewGroup({ moduleType, color, workOrders, equipment, onStatusChange }) {
+function CrewGroup({ moduleType, color, workOrders, equipment, requiredEquipFn, onStatusChange }) {
   const crewWOs = workOrders.filter(wo => !wo.is_subcontractor)
   const subWOs  = workOrders.filter(wo =>  wo.is_subcontractor)
   const total   = crewWOs.length + subWOs.length
@@ -152,10 +174,10 @@ function CrewGroup({ moduleType, color, workOrders, equipment, onStatusChange })
       {total > 0 && (
         <div className="space-y-1.5 pl-2 mb-2">
           {crewWOs.map(wo => (
-            <WorkOrderCard key={wo.id} wo={wo} equipment={equipment} onStatusChange={onStatusChange} />
+            <WorkOrderCard key={wo.id} wo={wo} equipment={equipment} requiredEquip={requiredEquipFn(wo)} onStatusChange={onStatusChange} />
           ))}
           {subWOs.map(wo => (
-            <WorkOrderCard key={wo.id} wo={wo} equipment={[]} onStatusChange={onStatusChange} />
+            <WorkOrderCard key={wo.id} wo={wo} equipment={[]} requiredEquip={requiredEquipFn(wo)} onStatusChange={onStatusChange} />
           ))}
         </div>
       )}
@@ -170,6 +192,8 @@ export default function WorkOrders({ jobs, selectedJob }) {
   const [workOrders,    setWorkOrders]    = useState([])
   const [crewTypes,     setCrewTypes]     = useState([])
   const [equipmentMap,  setEquipmentMap]  = useState({})
+  const [fieldEquipMap, setFieldEquipMap] = useState({}) // module_type → [{ field_key, equipment_type }]
+  const [moduleDataMap, setModuleDataMap] = useState({}) // estimate_module_id → data{}
   const [loading,       setLoading]       = useState(true)
   const [error,         setError]         = useState(null)
   const [statusFilter,  setStatusFilter]  = useState('all')
@@ -190,11 +214,12 @@ export default function WorkOrders({ jobs, selectedJob }) {
     setLoading(true)
     setError(null)
 
-    const [woRes, ctRes, mapRes, equipRes] = await Promise.all([
+    const [woRes, ctRes, mapRes, equipRes, fieldMapRes] = await Promise.all([
       supabase.from('work_orders').select('*').eq('job_id', jobId).order('module_type').order('is_subcontractor'),
       supabase.from('crew_types').select('*').order('sort_order').order('name'),
       supabase.from('module_equipment_map').select('module_type, equipment_id'),
       supabase.from('master_equipment').select('*'),
+      supabase.from('module_field_equipment_map').select('*'),
     ])
 
     if (woRes.error) {
@@ -203,10 +228,11 @@ export default function WorkOrders({ jobs, selectedJob }) {
       return
     }
 
-    setWorkOrders(woRes.data || [])
+    const wos = woRes.data || []
+    setWorkOrders(wos)
     setCrewTypes(ctRes.data || [])
 
-    // Build moduleType → equipment[] lookup
+    // Build moduleType → equipment[] lookup (module-level map, unchanged)
     if (!mapRes.error && !equipRes.error) {
       const maps  = mapRes.data  || []
       const equip = equipRes.data || []
@@ -218,6 +244,27 @@ export default function WorkOrders({ jobs, selectedJob }) {
         lookup[m.module_type].push(e)
       }
       setEquipmentMap(lookup)
+    }
+
+    // Build field-level equipment map: { module_type: [{ field_key, equipment_type }] }
+    const fMap = {}
+    for (const m of fieldMapRes.data || []) {
+      if (!m.equipment_type) continue
+      if (!fMap[m.module_type]) fMap[m.module_type] = []
+      fMap[m.module_type].push(m)
+    }
+    setFieldEquipMap(fMap)
+
+    // Fetch estimate_module data for any work orders that have an estimate_module_id
+    const moduleIds = [...new Set(wos.filter(w => w.estimate_module_id).map(w => w.estimate_module_id))]
+    if (moduleIds.length > 0) {
+      const { data: modData } = await supabase
+        .from('estimate_modules')
+        .select('id, data')
+        .in('id', moduleIds)
+      const mMap = {}
+      for (const m of modData || []) mMap[m.id] = m.data || {}
+      setModuleDataMap(mMap)
     }
 
     setLoading(false)
@@ -309,6 +356,20 @@ export default function WorkOrders({ jobs, selectedJob }) {
     const { error: insertErr } = await supabase.from('work_orders').insert(rows)
     if (insertErr) { setError(insertErr.message); setLoading(false); return }
     await fetchAll()
+  }
+
+  // Returns required equipment names for a work order based on field mappings + estimate module data
+  function getRequiredEquip(wo) {
+    if (!wo.estimate_module_id) return []
+    const modData  = moduleDataMap[wo.estimate_module_id] || {}
+    const fieldMaps = fieldEquipMap[wo.module_type] || []
+    const results = []
+    for (const fm of fieldMaps) {
+      if (fm.equipment_type && fieldHasValue(modData[fm.field_key])) {
+        if (!results.includes(fm.equipment_type)) results.push(fm.equipment_type)
+      }
+    }
+    return results
   }
 
   function handleStatusChange(woId, newStatus) {
@@ -448,6 +509,7 @@ export default function WorkOrders({ jobs, selectedJob }) {
           color={crewType.color}
           workOrders={sectionWOs}
           equipment={equipmentMap[crewType.name] || []}
+          requiredEquipFn={getRequiredEquip}
           onStatusChange={handleStatusChange}
         />
       ))}
