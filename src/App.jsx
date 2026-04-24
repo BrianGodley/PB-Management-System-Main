@@ -28,6 +28,8 @@ import ApplyForm from './pages/ApplyForm'
 import Accounting from './pages/Accounting'
 import TimeClockPage from './pages/TimeClockPage'
 import DailyLogsPage from './pages/DailyLogsPage'
+import MasterEquipment from './pages/MasterEquipment'
+import EquipmentTracking from './pages/EquipmentTracking'
 
 function PortalPlaceholder({ label, icon }) {
   return (
@@ -91,6 +93,8 @@ function AppRoutes() {
         <Route path="accounting" element={<Accounting />} />
         <Route path="timeclock" element={<TimeClockPage />} />
         <Route path="daily-logs" element={<DailyLogsPage />} />
+        <Route path="master-equipment" element={<MasterEquipment />} />
+        <Route path="equipment-tracking" element={<EquipmentTracking />} />
       </Route>
     </Routes>
   )

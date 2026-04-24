@@ -5,15 +5,16 @@ import { useLang } from '../contexts/LanguageContext'
 import { supabase } from '../lib/supabase'
 
 const navItems = [
-  { path: '/clients',      label: 'Clients',        icon: '👥' },
-  { path: '/bids',         label: 'Bids',           icon: '📋' },
-  { path: '/jobs',         label: 'Jobs',           icon: '🔨' },
-  { path: '/collections',  label: 'Finance',        icon: '🏦' },
-  { path: '/statistics',   label: 'Statistics',     icon: '📈' },
-  { path: '/portal/subs',  label: 'Subs & Vendors', icon: '🔧' },
-  { path: '/training',     label: 'Training',       icon: '🎓' },
-  { path: '/hr',           label: 'HR',             icon: '🏢' },
-  { path: '/accounting',   label: 'Accounting',     icon: '💼' },
+  { path: '/clients',             label: 'Clients',           icon: '👥' },
+  { path: '/bids',                label: 'Bids',              icon: '📋' },
+  { path: '/jobs',                label: 'Jobs',              icon: '🔨' },
+  { path: '/equipment-tracking',  label: 'Equipment',         icon: '🚜' },
+  { path: '/collections',         label: 'Finance',           icon: '🏦' },
+  { path: '/statistics',          label: 'Statistics',        icon: '📈' },
+  { path: '/portal/subs',         label: 'Subs & Vendors',    icon: '🔧' },
+  { path: '/training',            label: 'Training',          icon: '🎓' },
+  { path: '/hr',                  label: 'HR',                icon: '🏢' },
+  { path: '/accounting',          label: 'Accounting',        icon: '💼' },
 ]
 
 // Dock and main menu labels are computed inside the component via t()
@@ -204,6 +205,10 @@ export default function Layout() {
                   <Link to="/master-crews" onClick={() => setShowUserMenu(false)}
                     className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
                     👷 Master Crews
+                  </Link>
+                  <Link to="/master-equipment" onClick={() => setShowUserMenu(false)}
+                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
+                    🚜 Master Equipment
                   </Link>
                   <div className="border-t border-gray-100 my-1" />
                   <button
