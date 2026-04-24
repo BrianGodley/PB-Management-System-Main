@@ -47,9 +47,121 @@ function fmtDays(n) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Work Order Card
+// Module Row — one line inside a combined work order card
 // ─────────────────────────────────────────────────────────────────────────────
-function WorkOrderCard({ wo, equipment, requiredEquip, jobName, onStatusChange }) {
+function ModuleRow({ wo, jobsMap, onStatusChange }) {
+  const [updating, setUpdating] = useState(false)
+
+  async function cycleStatus() {
+    const next = { pending: 'in_progress', in_progress: 'complete', complete: 'pending' }
+    const newStatus = next[wo.status] || 'pending'
+    setUpdating(true)
+    await supabase.from('work_orders').update({ status: newStatus }).eq('id', wo.id)
+    onStatusChange(wo.id, newStatus)
+    setUpdating(false)
+  }
+
+  const jobName = jobsMap?.[wo.job_id]
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 border-b border-gray-100 last:border-0">
+      {/* Left: identifiers */}
+      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+        {jobName && (
+          <span className="flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-100 text-green-800 max-w-[100px] truncate">
+            {jobName}
+          </span>
+        )}
+        <span className="text-xs font-semibold text-gray-800 truncate">{wo.module_type}</span>
+        {wo.project_name && (
+          <>
+            <span className="text-gray-300 flex-shrink-0 text-[10px]">·</span>
+            <span className="text-xs text-gray-500 truncate">{wo.project_name}</span>
+          </>
+        )}
+      </div>
+
+      {/* Right: metrics + status */}
+      <div className="flex items-center gap-3 flex-shrink-0">
+        {parseFloat(wo.man_days)     > 0 && <span className="text-[11px] text-gray-500">{fmtDays(wo.man_days)}</span>}
+        {parseFloat(wo.labor_hours)  > 0 && <span className="text-[11px] text-gray-500">{fmtHrs(wo.labor_hours)}</span>}
+        {parseFloat(wo.labor_cost)   > 0 && <span className="text-[11px] text-gray-500">Labor {fmt(wo.labor_cost)}</span>}
+        {parseFloat(wo.material_cost)> 0 && <span className="text-[11px] text-gray-500">Mat {fmt(wo.material_cost)}</span>}
+        {parseFloat(wo.total_price)  > 0 && <span className="text-[11px] font-semibold text-green-700">{fmt(wo.total_price)}</span>}
+        <button
+          onClick={cycleStatus}
+          disabled={updating}
+          className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-colors flex-shrink-0 ${STATUS_STYLES[wo.status]}`}
+          title="Click to advance status"
+        >
+          <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATUS_DOT[wo.status]}`} />
+          {STATUS_LABELS[wo.status]}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Combined Work Order Card — all crew modules for a crew type in one card
+// ─────────────────────────────────────────────────────────────────────────────
+function CombinedWorkOrderCard({ workOrders, requiredEquipFn, jobsMap, onStatusChange }) {
+  const totalMD    = workOrders.reduce((s, w) => s + parseFloat(w.man_days     || 0), 0)
+  const totalHrs   = workOrders.reduce((s, w) => s + parseFloat(w.labor_hours  || 0), 0)
+  const totalLabor = workOrders.reduce((s, w) => s + parseFloat(w.labor_cost   || 0), 0)
+  const totalMat   = workOrders.reduce((s, w) => s + parseFloat(w.material_cost|| 0), 0)
+  const totalValue = workOrders.reduce((s, w) => s + parseFloat(w.total_price  || 0), 0)
+  const doneCount  = workOrders.filter(w => w.status === 'complete').length
+
+  // Aggregate required equipment across all modules (deduplicated)
+  const allReqEquip = [...new Set(workOrders.flatMap(wo => requiredEquipFn(wo)))]
+
+  return (
+    <div className="bg-white border-2 border-gray-200 rounded-lg overflow-hidden">
+
+      {/* Aggregate header */}
+      <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-200">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5">
+          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">
+            {workOrders.length} module{workOrders.length !== 1 ? 's' : ''}
+          </span>
+          {totalMD    > 0 && <span className="text-xs text-gray-700"><span className="text-gray-400">MD </span>{fmtDays(totalMD)}</span>}
+          {totalHrs   > 0 && <span className="text-xs text-gray-700"><span className="text-gray-400">Hrs </span>{fmtHrs(totalHrs)}</span>}
+          {totalLabor > 0 && <span className="text-xs text-gray-700"><span className="text-gray-400">Labor </span>{fmt(totalLabor)}</span>}
+          {totalMat   > 0 && <span className="text-xs text-gray-700"><span className="text-gray-400">Mat </span>{fmt(totalMat)}</span>}
+          {totalValue > 0 && <span className="text-xs font-bold text-green-700">{fmt(totalValue)}</span>}
+        </div>
+        <span className="flex-shrink-0 text-[10px] font-semibold text-gray-400 ml-4">
+          {doneCount}/{workOrders.length} complete
+        </span>
+      </div>
+
+      {/* Individual module rows */}
+      <div>
+        {workOrders.map(wo => (
+          <ModuleRow key={wo.id} wo={wo} jobsMap={jobsMap} onStatusChange={onStatusChange} />
+        ))}
+      </div>
+
+      {/* Required equipment (aggregated) */}
+      {allReqEquip.length > 0 && (
+        <div className="px-3 py-1.5 border-t border-blue-50 bg-blue-50/40 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wide flex-shrink-0">Req. Equip:</span>
+          {allReqEquip.map((eq, i) => (
+            <span key={i} className="text-[10px] font-semibold bg-white text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full">
+              {eq}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sub Work Order Card — individual card for subcontractor work orders
+// ─────────────────────────────────────────────────────────────────────────────
+function SubWorkOrderCard({ wo, requiredEquip, jobName, onStatusChange }) {
   const [updating, setUpdating] = useState(false)
 
   async function cycleStatus() {
@@ -63,19 +175,11 @@ function WorkOrderCard({ wo, equipment, requiredEquip, jobName, onStatusChange }
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-      {/* Card header — compact, uniform */}
       <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50 border-b border-gray-100">
         <div className="flex items-center gap-2 min-w-0">
-          {wo.is_subcontractor && (
-            <span className="flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">
-              SUB
-            </span>
-          )}
+          <span className="flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">SUB</span>
           {jobName && (
-            <>
-              <span className="flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-100 text-green-800 truncate max-w-[120px]">{jobName}</span>
-              <span className="text-gray-300 flex-shrink-0">·</span>
-            </>
+            <span className="flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-green-100 text-green-800 max-w-[100px] truncate">{jobName}</span>
           )}
           <span className="text-xs font-bold text-gray-900 truncate">{wo.module_type}</span>
           {wo.project_name && (
@@ -89,54 +193,20 @@ function WorkOrderCard({ wo, equipment, requiredEquip, jobName, onStatusChange }
           onClick={cycleStatus}
           disabled={updating}
           className={`flex-shrink-0 flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-colors ${STATUS_STYLES[wo.status]}`}
-          title="Click to advance status"
         >
           <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATUS_DOT[wo.status]}`} />
           {STATUS_LABELS[wo.status]}
         </button>
       </div>
-
-      {/* Card body — single compact row */}
       <div className="px-3 py-1.5 flex flex-wrap items-center gap-x-4 gap-y-0.5">
-        {parseFloat(wo.labor_hours) > 0 && (
-          <span className="text-xs text-gray-600"><span className="text-gray-400">Hrs </span>{fmtHrs(wo.labor_hours)}</span>
-        )}
-        {parseFloat(wo.man_days) > 0 && (
-          <span className="text-xs text-gray-600"><span className="text-gray-400">MD </span>{fmtDays(wo.man_days)}</span>
-        )}
-        {parseFloat(wo.labor_cost) > 0 && (
-          <span className="text-xs text-gray-600"><span className="text-gray-400">Labor </span>{fmt(wo.labor_cost)}</span>
-        )}
-        {parseFloat(wo.material_cost) > 0 && (
-          <span className="text-xs text-gray-600"><span className="text-gray-400">Mat </span>{fmt(wo.material_cost)}</span>
-        )}
-        {parseFloat(wo.sub_cost) > 0 && (
-          <span className="text-xs text-gray-600"><span className="text-gray-400">Sub </span>{fmt(wo.sub_cost)}</span>
-        )}
-        {parseFloat(wo.total_price) > 0 && (
-          <span className="text-xs font-semibold text-green-700"><span className="font-normal text-gray-400">Total </span>{fmt(wo.total_price)}</span>
-        )}
-        {equipment.length > 0 && (
-          <span className="text-xs text-gray-400">
-            {equipment.map(e => e.equipment_id).join(', ')}
-          </span>
-        )}
-        {wo.notes && (
-          <span className="text-xs text-gray-400 italic truncate max-w-xs">{wo.notes}</span>
-        )}
+        {parseFloat(wo.sub_cost)   > 0 && <span className="text-xs text-gray-600"><span className="text-gray-400">Sub </span>{fmt(wo.sub_cost)}</span>}
+        {parseFloat(wo.total_price)> 0 && <span className="text-xs font-semibold text-green-700"><span className="font-normal text-gray-400">Total </span>{fmt(wo.total_price)}</span>}
       </div>
-
-      {/* Required equipment from field mappings */}
-      {requiredEquip && requiredEquip.length > 0 && (
+      {requiredEquip?.length > 0 && (
         <div className="px-3 py-1.5 border-t border-blue-50 bg-blue-50/40 flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wide flex-shrink-0">Req. Equip:</span>
           {requiredEquip.map((eq, i) => (
-            <span
-              key={i}
-              className="text-[10px] font-semibold bg-white text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full"
-            >
-              {eq}
-            </span>
+            <span key={i} className="text-[10px] font-semibold bg-white text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full">{eq}</span>
           ))}
         </div>
       )}
@@ -145,9 +215,9 @@ function WorkOrderCard({ wo, equipment, requiredEquip, jobName, onStatusChange }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Crew Group (all work orders of the same module_type)
+// Crew Group
 // ─────────────────────────────────────────────────────────────────────────────
-function CrewGroup({ moduleType, color, workOrders, equipment, requiredEquipFn, jobsMap, onStatusChange }) {
+function CrewGroup({ moduleType, color, workOrders, requiredEquipFn, jobsMap, onStatusChange }) {
   const crewWOs = workOrders.filter(wo => !wo.is_subcontractor)
   const subWOs  = workOrders.filter(wo =>  wo.is_subcontractor)
   const total   = crewWOs.length + subWOs.length
@@ -159,14 +229,14 @@ function CrewGroup({ moduleType, color, workOrders, equipment, requiredEquipFn, 
 
   return (
     <div className="mb-4">
-      {/* Section header bar — uniform light green, compact */}
+      {/* Section header bar */}
       <div className="flex items-center gap-3 flex-wrap px-3 py-1.5 rounded-lg mb-2 bg-green-50 border-2 border-green-700">
-        <h3 className="text-sm font-bold uppercase tracking-widest text-green-900">
-          {moduleType}
-        </h3>
-        <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-green-100 text-green-800">
-          {total} work order{total !== 1 ? 's' : ''}
-        </span>
+        <h3 className="text-sm font-bold uppercase tracking-widest text-green-900">{moduleType}</h3>
+        {crewWOs.length > 0 && (
+          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-green-100 text-green-800">
+            {crewWOs.length} module{crewWOs.length !== 1 ? 's' : ''}
+          </span>
+        )}
         <div className="flex gap-3">
           {totalMD  > 0 && <span className="text-xs text-green-700">{fmtDays(totalMD)}</span>}
           {totalHrs > 0 && <span className="text-xs text-green-700">{fmtHrs(totalHrs)}</span>}
@@ -176,17 +246,28 @@ function CrewGroup({ moduleType, color, workOrders, equipment, requiredEquipFn, 
         </div>
       </div>
 
-      {/* Cards */}
-      {total > 0 && (
-        <div className="space-y-1.5 pl-2 mb-2">
-          {crewWOs.map(wo => (
-            <WorkOrderCard key={wo.id} wo={wo} equipment={equipment} requiredEquip={requiredEquipFn(wo)} jobName={jobsMap[wo.job_id]} onStatusChange={onStatusChange} />
-          ))}
-          {subWOs.map(wo => (
-            <WorkOrderCard key={wo.id} wo={wo} equipment={[]} requiredEquip={requiredEquipFn(wo)} jobName={jobsMap[wo.job_id]} onStatusChange={onStatusChange} />
-          ))}
-        </div>
-      )}
+      <div className="pl-2 space-y-1.5">
+        {/* ONE combined card for all crew modules */}
+        {crewWOs.length > 0 && (
+          <CombinedWorkOrderCard
+            workOrders={crewWOs}
+            requiredEquipFn={requiredEquipFn}
+            jobsMap={jobsMap}
+            onStatusChange={onStatusChange}
+          />
+        )}
+
+        {/* Individual card per sub work order */}
+        {subWOs.map(wo => (
+          <SubWorkOrderCard
+            key={wo.id}
+            wo={wo}
+            requiredEquip={requiredEquipFn(wo)}
+            jobName={jobsMap?.[wo.job_id]}
+            onStatusChange={onStatusChange}
+          />
+        ))}
+      </div>
     </div>
   )
 }
@@ -510,7 +591,6 @@ export default function WorkOrders({ jobs, selectedJob }) {
           moduleType={crewType.name}
           color={crewType.color}
           workOrders={sectionWOs}
-          equipment={equipmentMap[crewType.name] || []}
           requiredEquipFn={getRequiredEquip}
           jobsMap={jobsMap}
           onStatusChange={handleStatusChange}
