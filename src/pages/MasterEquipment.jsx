@@ -48,15 +48,16 @@ function generateEquipmentId(type, existingItems) {
 // ─────────────────────────────────────────────────────────────────────────────
 function EquipmentModal({ item, allEquipment, onClose, onSave }) {
   const isNew = !item?.id
-  const [name,       setName]       = useState(item?.name || '')
-  const [type,       setType]       = useState(item?.type || 'Vehicle')
-  const [year,       setYear]       = useState(item?.year || '')
-  const [condition,  setCondition]  = useState(item?.condition || 4)
-  const [saving,     setSaving]     = useState(false)
-  const [error,      setError]      = useState('')
+  const [manufacturer, setManufacturer] = useState(item?.manufacturer || '')
+  const [model,        setModel]        = useState(item?.model        || '')
+  const [type,         setType]         = useState(item?.type         || 'Vehicle')
+  const [year,         setYear]         = useState(item?.year         || '')
+  const [condition,    setCondition]    = useState(item?.condition    || 4)
+  const [saving,       setSaving]       = useState(false)
+  const [error,        setError]        = useState('')
 
   async function handleSave() {
-    if (!name.trim()) { setError('Equipment name is required.'); return }
+    if (!model.trim()) { setError('Model is required.'); return }
     setSaving(true)
     setError('')
     try {
@@ -64,14 +65,14 @@ function EquipmentModal({ item, allEquipment, onClose, onSave }) {
         const newId = generateEquipmentId(type, allEquipment)
         const { data, error: err } = await supabase
           .from('master_equipment')
-          .insert({ name: name.trim(), type, equipment_id: newId, year: year || null, condition })
+          .insert({ manufacturer: manufacturer.trim(), model: model.trim(), type, equipment_id: newId, year: year || null, condition })
           .select().single()
         if (err) throw err
         onSave(data)
       } else {
         const { data, error: err } = await supabase
           .from('master_equipment')
-          .update({ name: name.trim(), type, year: year || null, condition })
+          .update({ manufacturer: manufacturer.trim(), model: model.trim(), type, year: year || null, condition })
           .eq('id', item.id)
           .select().single()
         if (err) throw err
@@ -93,14 +94,25 @@ function EquipmentModal({ item, allEquipment, onClose, onSave }) {
         <div className="px-6 py-5 space-y-4">
           {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
 
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Equipment Name *</label>
-            <input
-              value={name}
-              onChange={e => setName(e.target.value)}
-              className="input w-full"
-              placeholder="e.g. Skid Steer, Dump Truck, Plate Compactor"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Manufacturer</label>
+              <input
+                value={manufacturer}
+                onChange={e => setManufacturer(e.target.value)}
+                className="input w-full"
+                placeholder="e.g. Caterpillar, John Deere"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Model *</label>
+              <input
+                value={model}
+                onChange={e => setModel(e.target.value)}
+                className="input w-full"
+                placeholder="e.g. 299D3, 310L"
+              />
+            </div>
           </div>
 
           <div>
@@ -543,12 +555,17 @@ export default function MasterEquipment() {
     setDeleteId(null)
   }
 
-  const filtered = equipment.filter(e =>
-    !search ||
-    e.name?.toLowerCase().includes(search.toLowerCase()) ||
-    e.equipment_id?.toLowerCase().includes(search.toLowerCase()) ||
-    e.type?.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = equipment.filter(e => {
+    if (!search) return true
+    const q = search.toLowerCase()
+    return (
+      e.manufacturer?.toLowerCase().includes(q) ||
+      e.model?.toLowerCase().includes(q) ||
+      e.name?.toLowerCase().includes(q) ||
+      e.equipment_id?.toLowerCase().includes(q) ||
+      e.type?.toLowerCase().includes(q)
+    )
+  })
 
   return (
     <div className="flex flex-col h-full">
@@ -612,7 +629,8 @@ export default function MasterEquipment() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">Equipment Name</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">Manufacturer</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">Model</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">Type</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">Equipment ID</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">Year</th>
@@ -625,8 +643,11 @@ export default function MasterEquipment() {
                 <tbody className="divide-y divide-gray-100">
                   {filtered.map(item => (
                     <tr key={item.id} className="hover:bg-gray-50 group">
-                      {/* Name */}
-                      <td className="px-4 py-3 font-medium text-gray-900">{item.name}</td>
+                      {/* Manufacturer */}
+                      <td className="px-4 py-3 text-gray-600">{item.manufacturer || <span className="text-gray-300 italic text-xs">—</span>}</td>
+
+                      {/* Model */}
+                      <td className="px-4 py-3 font-medium text-gray-900">{item.model || item.name}</td>
 
                       {/* Type */}
                       <td className="px-4 py-3">
