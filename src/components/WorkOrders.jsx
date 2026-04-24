@@ -438,36 +438,45 @@ export default function WorkOrders({ jobs, selectedJob }) {
   }
 
   // Summary totals
-  const totalMD  = workOrders.filter(w => !w.is_subcontractor).reduce((s, w) => s + parseFloat(w.man_days || 0), 0)
-  const totalMat = workOrders.filter(w => !w.is_subcontractor).reduce((s, w) => s + parseFloat(w.material_cost || 0), 0)
-  const totalSub = workOrders.filter(w =>  w.is_subcontractor).reduce((s, w) => s + parseFloat(w.sub_cost || 0), 0)
-  const complete = workOrders.filter(w => w.status === 'complete').length
+  const totalMD    = workOrders.filter(w => !w.is_subcontractor).reduce((s, w) => s + parseFloat(w.man_days || 0), 0)
+  const totalMat   = workOrders.filter(w => !w.is_subcontractor).reduce((s, w) => s + parseFloat(w.material_cost || 0), 0)
+  const totalSub   = workOrders.filter(w =>  w.is_subcontractor).reduce((s, w) => s + parseFloat(w.sub_cost || 0), 0)
+  const totalValue = workOrders.reduce((s, w) => s + parseFloat(w.total_price || 0), 0)
+  const complete   = workOrders.filter(w => w.status === 'complete').length
 
   return (
     <div>
       {/* Summary bar */}
-      <div className="flex flex-wrap items-center gap-4 mb-4 p-3 bg-gray-50 rounded-xl border border-gray-200 text-sm">
-        <div>
-          <span className="text-xs text-gray-400 block">Total Man Days</span>
-          <span className="font-bold text-gray-800">{fmtDays(totalMD)}</span>
-        </div>
-        <div>
-          <span className="text-xs text-gray-400 block">Materials</span>
-          <span className="font-bold text-gray-800">{fmt(totalMat)}</span>
-        </div>
-        {totalSub > 0 && (
-          <div>
-            <span className="text-xs text-gray-400 block">Sub Costs</span>
-            <span className="font-bold text-orange-700">{fmt(totalSub)}</span>
+      <div className="mb-5 rounded-xl border-2 border-green-700 bg-white overflow-hidden shadow-sm">
+        {/* Top accent strip */}
+        <div className="h-1 bg-green-700 w-full" />
+        <div className="flex flex-wrap items-center gap-0 divide-x divide-gray-200">
+          <div className="px-5 py-3 flex-1 min-w-[120px]">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide block mb-0.5">Total Man Days</span>
+            <span className="text-lg font-bold text-gray-900">{fmtDays(totalMD)}</span>
           </div>
-        )}
-        <div>
-          <span className="text-xs text-gray-400 block">Completion</span>
-          <span className="font-bold text-gray-800">{complete} / {workOrders.length} complete</span>
+          <div className="px-5 py-3 flex-1 min-w-[120px]">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide block mb-0.5">Materials</span>
+            <span className="text-lg font-bold text-gray-900">{fmt(totalMat)}</span>
+          </div>
+          {totalSub > 0 && (
+            <div className="px-5 py-3 flex-1 min-w-[120px]">
+              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide block mb-0.5">Sub Costs</span>
+              <span className="text-lg font-bold text-orange-600">{fmt(totalSub)}</span>
+            </div>
+          )}
+          <div className="px-5 py-3 flex-1 min-w-[140px] bg-green-50">
+            <span className="text-xs font-semibold text-green-700 uppercase tracking-wide block mb-0.5">Total Value</span>
+            <span className="text-lg font-bold text-green-800">{fmt(totalValue)}</span>
+          </div>
+          <div className="px-5 py-3 flex-1 min-w-[140px]">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide block mb-0.5">Completion</span>
+            <span className="text-lg font-bold text-gray-900">{complete} <span className="text-sm font-normal text-gray-400">/ {workOrders.length}</span></span>
+          </div>
         </div>
 
-        {/* Status filter */}
-        <div className="ml-auto flex gap-1.5">
+        {/* Status filter row */}
+        <div className="flex gap-1.5 px-5 py-2.5 border-t border-gray-100 bg-gray-50">
           {['all', 'pending', 'in_progress', 'complete'].map(s => (
             <button
               key={s}
