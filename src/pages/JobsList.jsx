@@ -126,16 +126,17 @@ export default function JobsList() {
   const selectedJobObj = selectedJob === ALL_JOBS ? null : jobs.find(j => j.id === selectedJob) || null
 
   const TABS = [
-    { key: 'schedule',   label: 'Schedule'  },
-    { key: 'daily-logs', label: 'Daily Logs'},
-    { key: 'tasks',          label: 'Tasks'          },
-    { key: 'change-orders',  label: 'Change Orders'  },
-    { key: 'finance',        label: 'Finance'        },
-    { key: 'files',          label: 'Files'          },
-    { key: 'tracking',   label: 'Tracking'   },
-    { key: 'timeclock',  label: 'Time Clock' },
-    { key: 'templates',  label: 'Templates'  },
-    { key: 'settings',   label: '⚙️ Settings' },
+    { key: 'schedule',      label: 'Schedule'      },
+    { key: 'work-orders',   label: 'Work Orders'   },
+    { key: 'tracking',      label: 'Tracking'      },
+    { key: 'timeclock',     label: 'Time Clock'    },
+    { key: 'daily-logs',    label: 'Daily Logs'    },
+    { key: 'tasks',         label: 'Tasks'         },
+    { key: 'change-orders', label: 'Change Orders' },
+    { key: 'finance',       label: 'Finance'       },
+    { key: 'files',         label: 'Files'         },
+    { key: 'templates',     label: 'Templates'     },
+    { key: 'settings',      label: '⚙️ Settings'   },
   ]
 
   return (
@@ -334,32 +335,8 @@ export default function JobsList() {
             />
           )}
 
-          {tab === 'daily-logs' && (
-            <DailyLogs
-              jobs={jobs}
-              selectedJob={selectedJob === ALL_JOBS ? 'all' : selectedJob}
-            />
-          )}
-          {tab === 'tasks'          && <ComingSoon label="Tasks" />}
-          {tab === 'change-orders'  && <ComingSoon label="Change Orders" />}
-          {tab === 'finance'        && <ComingSoon label="Finance" />}
-          {tab === 'files'          && <ComingSoon label="Files" />}
-          {tab === 'timeclock'  && (
-            <TimeClock
-              jobs={jobs}
-              selectedJob={selectedJob === ALL_JOBS ? 'all' : selectedJob}
-            />
-          )}
-          {tab === 'templates'  && <ComingSoon label="Templates" />}
-          {tab === 'settings'   && (
-            <JobScheduleSettings
-              stages={stages}
-              onAddStage={addStage}
-              onUpdateStage={updateStage}
-              onDeleteStage={deleteStage}
-              onReorderStages={reorderStages}
-            />
-          )}
+          {tab === 'work-orders' && <ComingSoon label="Work Orders" />}
+
           {tab === 'tracking'   && (
             selectedJobObj ? (
               <div className="flex flex-col items-center justify-center h-full gap-4">
@@ -379,6 +356,34 @@ export default function JobsList() {
                 <p className="text-sm">Select a job from the list to open tracking</p>
               </div>
             )
+          )}
+
+          {tab === 'timeclock'  && (
+            <TimeClock
+              jobs={jobs}
+              selectedJob={selectedJob === ALL_JOBS ? 'all' : selectedJob}
+            />
+          )}
+
+          {tab === 'daily-logs' && (
+            <DailyLogs
+              jobs={jobs}
+              selectedJob={selectedJob === ALL_JOBS ? 'all' : selectedJob}
+            />
+          )}
+          {tab === 'tasks'          && <ComingSoon label="Tasks" />}
+          {tab === 'change-orders'  && <ComingSoon label="Change Orders" />}
+          {tab === 'finance'        && <ComingSoon label="Finance" />}
+          {tab === 'files'          && <ComingSoon label="Files" />}
+          {tab === 'templates'      && <ComingSoon label="Templates" />}
+          {tab === 'settings'       && (
+            <JobScheduleSettings
+              stages={stages}
+              onAddStage={addStage}
+              onUpdateStage={updateStage}
+              onDeleteStage={deleteStage}
+              onReorderStages={reorderStages}
+            />
           )}
         </div>
       </div>
