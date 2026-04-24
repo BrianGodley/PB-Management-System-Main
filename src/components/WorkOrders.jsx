@@ -763,11 +763,11 @@ function CombinedWorkOrderCard({ workOrders, requiredEquipFn, jobsMap, onStatusC
           <span className="text-[10px] font-semibold text-gray-400">
             {doneCount}/{workOrders.length} complete
           </span>
-          {crewType && jobName && (
+          {crewType && (
             <WOActionButtons
               workOrders={workOrders}
               crewType={crewType}
-              jobName={jobName}
+              jobName={jobName || 'Job'}
               requiredEquipFn={requiredEquipFn}
               isSub={false}
             />
@@ -846,11 +846,11 @@ function SubWorkOrderCard({ wo, requiredEquip, jobName, onStatusChange, onRowCli
           )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          {crewType && jobName && (
+          {crewType && (
             <WOActionButtons
               workOrders={[wo]}
               crewType={crewType}
-              jobName={jobName}
+              jobName={jobName || 'Job'}
               requiredEquipFn={() => requiredEquip || []}
               isSub={true}
             />
@@ -948,7 +948,7 @@ function CrewGroup({ moduleType, workOrders, requiredEquipFn, jobsMap, onStatusC
                     key={wo.id}
                     wo={wo}
                     requiredEquip={requiredEquipFn(wo)}
-                    jobName={null}
+                    jobName={jobName}
                     onStatusChange={onStatusChange}
                     onRowClick={onRowClick}
                     crewType={moduleType}
@@ -976,7 +976,7 @@ function CrewGroup({ moduleType, workOrders, requiredEquipFn, jobsMap, onStatusC
                 key={wo.id}
                 wo={wo}
                 requiredEquip={requiredEquipFn(wo)}
-                jobName={jobsMap?.[wo.job_id]}
+                jobName={singleJobName}
                 onStatusChange={onStatusChange}
                 onRowClick={onRowClick}
                 crewType={moduleType}
