@@ -995,7 +995,11 @@ function ModuleRow({ wo, jobsMap, onStatusChange, onRowClick }) {
   const jobName = jobsMap?.[wo.job_id]
 
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 border-b border-gray-100 last:border-0">
+    <div
+      className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 border-b border-gray-100 last:border-0 cursor-pointer"
+      onClick={onRowClick}
+      title="Click to view / edit"
+    >
       {/* Left: identifiers */}
       <div className="flex items-center gap-1.5 min-w-0 flex-1">
         {jobName && (
@@ -1037,15 +1041,6 @@ function ModuleRow({ wo, jobsMap, onStatusChange, onRowClick }) {
         >
           <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATUS_DOT[wo.status]}`} />
           {STATUS_LABELS[wo.status]}
-        </button>
-        <button
-          onClick={onRowClick}
-          title="View / edit"
-          className="flex items-center justify-center w-6 h-6 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
-        >
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M11.5 1.5a1.414 1.414 0 0 1 2 2L5 12l-3 1 1-3 8.5-8.5z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
         </button>
       </div>
     </div>
