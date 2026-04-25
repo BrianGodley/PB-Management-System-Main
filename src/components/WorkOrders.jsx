@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -421,133 +423,174 @@ function WorkOrderDetailModal({ wo, crewTypes, onClose, onSaved, onDeleted }) {
 // Work Order Output Helpers — print / email / text
 // ─────────────────────────────────────────────────────────────────────────────
 
-function openPrintWindow(htmlBody, title) {
-  const w = window.open('', '_blank')
-  if (!w) return
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${title}</title>
-<style>
-  body { margin:0; font-family:Arial,sans-serif; }
-  @media print { @page { margin:0.75in; } }
-</style></head><body>${htmlBody}
-<script>window.addEventListener('load',function(){ setTimeout(function(){ window.print(); },300); });<\/script>
-</body></html>`)
-  w.document.close()
-}
+async function generateWorkOrderPDF({ workOrders, crewType, jobName, requiredEquipFn, isSub }) {
+  const $ = n => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(parseFloat(n) || 0)
+  const nv = v => parseFloat(v || 0)
+  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 
-function buildPrintHTML({ workOrders, crewType, jobName, requiredEquipFn, isSub }) {
-  const today = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' })
-  const $  = n => new Intl.NumberFormat('en-US', { style:'currency', currency:'USD', maximumFractionDigits:0 }).format(parseFloat(n)||0)
-  const nv = v => parseFloat(v||0)
-  const B  = 'border:1px solid #d1d5db'
-  const BH = 'border:1px solid #9ca3af'
-  const td = (t, s='') => `<td style="padding:5px 8px;${B};font-size:10.5px;vertical-align:top;${s}">${t??'—'}</td>`
-  const th = (t, s='') => `<td style="padding:5px 8px;${BH};font-size:10.5px;font-weight:600;background:#f3f4f6;${s}">${t}</td>`
-  const sectionHdr = (label, cols) =>
-    `<tr><td colspan="${cols}" style="padding:6px 8px;${BH};font-size:11px;font-weight:700;background:#e5e7eb;">${label}</td></tr>`
-
-  const totalMD    = workOrders.reduce((s,w) => s+nv(w.man_days),0)
-  const totalHrs   = workOrders.reduce((s,w) => s+nv(w.labor_hours),0)
-  const totalLabor = workOrders.reduce((s,w) => s+nv(w.labor_cost),0)
-  const totalMat   = workOrders.reduce((s,w) => s+nv(w.material_cost),0)
-  const totalSub   = workOrders.reduce((s,w) => s+nv(w.sub_cost),0)
-  const totalVal   = workOrders.reduce((s,w) => s+nv(w.total_price),0)
+  const totalMD    = workOrders.reduce((s, w) => s + nv(w.man_days), 0)
+  const totalHrs   = workOrders.reduce((s, w) => s + nv(w.labor_hours), 0)
+  const totalLabor = workOrders.reduce((s, w) => s + nv(w.labor_cost), 0)
+  const totalMat   = workOrders.reduce((s, w) => s + nv(w.material_cost), 0)
+  const totalSub   = workOrders.reduce((s, w) => s + nv(w.sub_cost), 0)
+  const totalVal   = workOrders.reduce((s, w) => s + nv(w.total_price), 0)
   const allEquip   = [...new Set(workOrders.flatMap(wo => requiredEquipFn(wo)))]
 
-  const logoUrl = window.location.origin + '/logo.png'
-  const hdr = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:12px;border-bottom:2px solid #4E7B4C;">
-      <img src="${logoUrl}" alt="Picture Build" style="height:52px;object-fit:contain;" />
-      <div style="text-align:right;">
-        <div style="font-size:18px;font-weight:700;color:#1f2937;letter-spacing:-0.5px;margin-bottom:4px;">WORK ORDER</div>
-        <div style="font-size:11px;margin-bottom:2px;"><span style="color:#6b7280;">Job:</span> <strong>${jobName}</strong></div>
-        <div style="font-size:11px;margin-bottom:2px;"><span style="color:#6b7280;">Crew Type:</span> <strong>${crewType}</strong></div>
-        <div style="font-size:10px;color:#9ca3af;">Date: ${today}</div>
-      </div>
-    </div>`
+  const doc    = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' })
+  const PW     = doc.internal.pageSize.getWidth()   // 612 pt
+  const margin = 40
 
-  if (isSub) {
-    const rows = workOrders.map(wo => `<tr>
-      ${td(wo.module_type+(wo.project_name?` — ${wo.project_name}`:'' ))}
-      ${td('—')}
-      ${td(nv(wo.sub_cost)>0?$(wo.sub_cost):'—','text-align:right')}
-    </tr>`).join('')
-    return `<div style="font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:32px;">
-      ${hdr}
-      <table style="width:100%;border-collapse:collapse;">
-        <thead>
-          ${sectionHdr('Subcontractor Module:   '+crewType, 3)}
-          <tr>${th('Module Item','width:45%')}${th('Subcontractor')}${th('Subcontractor Cost','text-align:right;width:22%')}</tr>
-        </thead>
-        <tbody>
-          ${rows}
-          <tr style="background:#f9fafb;">
-            ${td('<strong>TOTALS</strong>')}${td('')}
-            ${td('<strong>'+$(totalSub)+'</strong>','text-align:right;font-weight:700')}
-          </tr>
-        </tbody>
-      </table>
-      <div style="margin-top:12px;padding-top:10px;border-top:1px solid #e5e7eb;font-size:10.5px;">
-        <strong>Total Value:</strong> ${$(totalVal)}
-      </div>
-    </div>`
+  const GREEN = [78, 123, 76]
+  const DARK  = [31, 41, 55]
+  const MID   = [107, 114, 128]
+  const LITE  = [229, 231, 235]
+  const ZEBRA = [249, 250, 251]
+  const THEAD = [243, 244, 246]
+
+  // ── Logo
+  let logoDataUrl = null
+  try {
+    const res  = await fetch(window.location.origin + '/logo.png')
+    const blob = await res.blob()
+    logoDataUrl = await new Promise(resolve => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result)
+      reader.readAsDataURL(blob)
+    })
+  } catch (_) { /* logo optional */ }
+
+  const hdrTop = margin
+  if (logoDataUrl) {
+    doc.addImage(logoDataUrl, 'PNG', margin, hdrTop, 90, 36, undefined, 'FAST')
+  } else {
+    doc.setFontSize(13).setFont('helvetica', 'bold').setTextColor(...GREEN)
+    doc.text('PICTURE BUILD', margin, hdrTop + 24)
   }
 
-  const moduleRows = workOrders.map(wo => `<tr>
-    ${td(wo.module_type+(wo.project_name?` — ${wo.project_name}`:'' ))}
-    ${td(nv(wo.man_days)>0?nv(wo.man_days).toFixed(2):'—','text-align:center')}
-    ${td('—')}
-    ${td(nv(wo.material_cost)>0?$(wo.material_cost):'—','text-align:right')}
-  </tr>`).join('')
+  // Right: WORK ORDER + job info
+  doc.setFontSize(20).setFont('helvetica', 'bold').setTextColor(...DARK)
+  doc.text('WORK ORDER', PW - margin, hdrTop + 16, { align: 'right' })
+  doc.setFontSize(9).setFont('helvetica', 'normal').setTextColor(...MID)
+  doc.text('Job:', PW - margin - 150, hdrTop + 29)
+  doc.setFont('helvetica', 'bold').setTextColor(...DARK)
+  doc.text(jobName, PW - margin - 126, hdrTop + 29)
+  doc.setFont('helvetica', 'normal').setTextColor(...MID)
+  doc.text('Crew Type:', PW - margin - 150, hdrTop + 41)
+  doc.setFont('helvetica', 'bold').setTextColor(...DARK)
+  doc.text(crewType, PW - margin - 108, hdrTop + 41)
+  doc.setFont('helvetica', 'normal').setFontSize(8).setTextColor(...MID)
+  doc.text(`Date: ${today}`, PW - margin, hdrTop + 52, { align: 'right' })
 
-  const equipRows = workOrders.map(wo => {
-    const eq = requiredEquipFn(wo)
-    return `<tr>
-      ${td(wo.module_type+(wo.project_name?` — ${wo.project_name}`:'' ))}
-      ${td(eq.length>0?eq.join(', '):'—')}
-      ${td('—')}
-    </tr>`
-  }).join('')
+  // Green divider
+  const divY = hdrTop + 60
+  doc.setDrawColor(...GREEN).setLineWidth(1.5)
+  doc.line(margin, divY, PW - margin, divY)
 
-  return `<div style="font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:32px;">
-    ${hdr}
-    <table style="width:100%;border-collapse:collapse;margin-bottom:12px;">
-      <thead>
-        ${sectionHdr('In House Module:   '+crewType, 4)}
-        <tr>
-          ${th('Module Item','width:38%')}
-          ${th('Man Days','text-align:center;width:14%')}
-          ${th('Material Type','width:25%')}
-          ${th('Materials Cost','text-align:right;width:23%')}
-        </tr>
-      </thead>
-      <tbody>
-        ${moduleRows}
-        <tr style="background:#f9fafb;">
-          ${td('<strong>TOTALS</strong>')}
-          ${td('<strong>'+(totalMD>0?totalMD.toFixed(2):'—')+'</strong>','text-align:center;font-weight:700')}
-          ${td('<strong>'+(totalLabor>0?$(totalLabor):'—')+'</strong>','font-weight:700')}
-          ${td('<strong>'+(totalMat>0?$(totalMat):'—')+'</strong>','text-align:right;font-weight:700')}
-        </tr>
-      </tbody>
-    </table>
-    <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
-      <thead>
-        <tr>
-          ${th('Module Item','width:30%')}
-          ${th('Equipment Needed','width:45%')}
-          ${th('Inspections Needed','width:25%')}
-        </tr>
-      </thead>
-      <tbody>${equipRows}</tbody>
-    </table>
-    <div style="display:flex;flex-wrap:wrap;gap:20px;padding-top:10px;border-top:1px solid #e5e7eb;font-size:10.5px;">
-      ${totalMD>0?`<span><strong>Man Days:</strong> ${totalMD.toFixed(2)}</span>`:''}
-      ${totalHrs>0?`<span><strong>Labor Hours:</strong> ${totalHrs.toFixed(1)}</span>`:''}
-      ${totalLabor>0?`<span><strong>Labor Cost:</strong> ${$(totalLabor)}</span>`:''}
-      <span><strong>Total Value:</strong> ${$(totalVal)}</span>
-      ${allEquip.length>0?`<span><strong>Equipment:</strong> ${allEquip.join(', ')}</span>`:''}
-    </div>
-  </div>`
+  let curY = divY + 16
+
+  // Helper: gray section banner
+  function sectionBanner(label, y) {
+    doc.setFillColor(...LITE)
+    doc.rect(margin, y, PW - margin * 2, 16, 'F')
+    doc.setFontSize(9).setFont('helvetica', 'bold').setTextColor(...DARK)
+    doc.text(label, margin + 6, y + 11)
+    return y + 16
+  }
+
+  const tableStyles = {
+    styles:            { fontSize: 9, cellPadding: 5, lineColor: [209, 213, 219], lineWidth: 0.5 },
+    headStyles:        { fillColor: THEAD, textColor: DARK, fontStyle: 'bold', fontSize: 9 },
+    alternateRowStyles:{ fillColor: ZEBRA },
+    margin:            { left: margin, right: margin },
+  }
+
+  if (isSub) {
+    curY = sectionBanner(`Subcontractor Module:   ${crewType}`, curY)
+    const subRows = workOrders.map(wo => [
+      wo.module_type + (wo.project_name ? ` — ${wo.project_name}` : ''),
+      '—',
+      nv(wo.sub_cost) > 0 ? $(wo.sub_cost) : '—',
+    ])
+    subRows.push([
+      { content: 'TOTALS', styles: { fontStyle: 'bold' } },
+      '',
+      { content: $(totalSub), styles: { fontStyle: 'bold', halign: 'right' } },
+    ])
+    autoTable(doc, {
+      ...tableStyles,
+      startY: curY,
+      head: [['Module Item', 'Subcontractor', 'Sub Cost']],
+      body: subRows,
+      columnStyles: { 0: { cellWidth: 'auto' }, 1: { cellWidth: 120 }, 2: { cellWidth: 90, halign: 'right' } },
+    })
+    curY = doc.lastAutoTable.finalY + 14
+
+  } else {
+    // Modules table
+    curY = sectionBanner(`In House Module:   ${crewType}`, curY)
+    const modRows = workOrders.map(wo => [
+      wo.module_type + (wo.project_name ? ` — ${wo.project_name}` : ''),
+      nv(wo.man_days) > 0 ? nv(wo.man_days).toFixed(2) : '—',
+      '—',
+      nv(wo.material_cost) > 0 ? $(wo.material_cost) : '—',
+    ])
+    modRows.push([
+      { content: 'TOTALS', styles: { fontStyle: 'bold' } },
+      { content: totalMD > 0 ? totalMD.toFixed(2) : '—', styles: { fontStyle: 'bold', halign: 'center' } },
+      { content: totalLabor > 0 ? $(totalLabor) : '—', styles: { fontStyle: 'bold' } },
+      { content: totalMat > 0 ? $(totalMat) : '—', styles: { fontStyle: 'bold', halign: 'right' } },
+    ])
+    autoTable(doc, {
+      ...tableStyles,
+      startY: curY,
+      head: [['Module Item', 'Man Days', 'Material Type', 'Materials Cost']],
+      body: modRows,
+      columnStyles: {
+        0: { cellWidth: 'auto' },
+        1: { cellWidth: 65,  halign: 'center' },
+        2: { cellWidth: 110 },
+        3: { cellWidth: 90,  halign: 'right' },
+      },
+    })
+    curY = doc.lastAutoTable.finalY + 10
+
+    // Equipment table
+    const equipRows = workOrders.map(wo => {
+      const eq = requiredEquipFn(wo)
+      return [
+        wo.module_type + (wo.project_name ? ` — ${wo.project_name}` : ''),
+        eq.length > 0 ? eq.join(', ') : '—',
+        '—',
+      ]
+    })
+    autoTable(doc, {
+      ...tableStyles,
+      startY: curY,
+      head: [['Module Item', 'Equipment Needed', 'Inspections Needed']],
+      body: equipRows,
+      columnStyles: { 0: { cellWidth: 160 }, 1: { cellWidth: 'auto' }, 2: { cellWidth: 110 } },
+    })
+    curY = doc.lastAutoTable.finalY + 14
+  }
+
+  // Summary footer
+  doc.setDrawColor(...LITE).setLineWidth(1)
+  doc.line(margin, curY, PW - margin, curY)
+  curY += 10
+
+  const parts = []
+  if (totalMD > 0)    parts.push(`Man Days: ${totalMD.toFixed(2)}`)
+  if (totalHrs > 0)   parts.push(`Labor Hours: ${totalHrs.toFixed(1)}`)
+  if (totalLabor > 0) parts.push(`Labor Cost: ${$(totalLabor)}`)
+  parts.push(`Total Value: ${$(totalVal)}`)
+  if (allEquip.length > 0) parts.push(`Equipment: ${allEquip.join(', ')}`)
+
+  doc.setFontSize(8.5).setFont('helvetica', 'normal').setTextColor(...MID)
+  doc.text(parts.join('     '), margin, curY, { maxWidth: PW - margin * 2 })
+
+  // Open PDF in new browser tab
+  const blob = doc.output('blob')
+  window.open(URL.createObjectURL(blob), '_blank')
 }
 
 function buildEmailText({ workOrders, crewType, jobName, requiredEquipFn, isSub }) {
@@ -872,7 +915,7 @@ function WOActionButtons({ workOrders, crewType, jobName, requiredEquipFn, isSub
 
   function handlePrint(e) {
     e.stopPropagation()
-    openPrintWindow(buildPrintHTML(args), `Work Order — ${crewType} — ${jobName}`)
+    generateWorkOrderPDF(args)
   }
   function handleEmail(e) {
     e.stopPropagation()
