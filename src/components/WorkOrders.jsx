@@ -453,15 +453,15 @@ function buildPrintHTML({ workOrders, crewType, jobName, requiredEquipFn, isSub 
   const totalVal   = workOrders.reduce((s,w) => s+nv(w.total_price),0)
   const allEquip   = [...new Set(workOrders.flatMap(wo => requiredEquipFn(wo)))]
 
+  const logoUrl = window.location.origin + '/logo.png'
   const hdr = `
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid #1f2937;">
-      <div>
-        <div style="font-size:22px;font-weight:700;color:#1f2937;letter-spacing:-0.5px;">WORK ORDER</div>
-        <div style="font-size:10px;color:#9ca3af;margin-top:3px;">Date: ${today}</div>
-      </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:12px;border-bottom:2px solid #4E7B4C;">
+      <img src="${logoUrl}" alt="Picture Build" style="height:52px;object-fit:contain;" />
       <div style="text-align:right;">
-        <div style="font-size:11px;margin-bottom:3px;"><span style="color:#6b7280;">Job:</span> <strong>${jobName}</strong></div>
-        <div style="font-size:11px;"><span style="color:#6b7280;">Crew Type:</span> <strong>${crewType}</strong></div>
+        <div style="font-size:18px;font-weight:700;color:#1f2937;letter-spacing:-0.5px;margin-bottom:4px;">WORK ORDER</div>
+        <div style="font-size:11px;margin-bottom:2px;"><span style="color:#6b7280;">Job:</span> <strong>${jobName}</strong></div>
+        <div style="font-size:11px;margin-bottom:2px;"><span style="color:#6b7280;">Crew Type:</span> <strong>${crewType}</strong></div>
+        <div style="font-size:10px;color:#9ca3af;">Date: ${today}</div>
       </div>
     </div>`
 
@@ -556,6 +556,9 @@ function buildEmailText({ workOrders, crewType, jobName, requiredEquipFn, isSub 
   const nv = v => parseFloat(v||0)
   const sep = '—'.repeat(38)
   const lines = [
+    `PICTURE BUILD`,
+    `Design | Pools | Hardscape | Landscape`,
+    sep,
     `WORK ORDER — ${crewType.toUpperCase()}`,
     `Job: ${jobName}   Date: ${today}`,
     sep,
