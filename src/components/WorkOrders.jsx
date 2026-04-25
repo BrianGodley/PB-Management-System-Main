@@ -616,9 +616,203 @@ function buildSMSText({ workOrders, crewType, jobName, requiredEquipFn, isSub })
   return lines.join('\n')
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// SMS Recipients Modal
+// ─────────────────────────────────────────────────────────────────────────────
+function SMSRecipientsModal({ smsText, onClose }) {
+  const [employees, setEmployees] = useState([])
+  const [crews, setCrews]         = useState([])
+  const [selEmps, setSelEmps]     = useState(new Set())
+  const [selCrews, setSelCrews]   = useState(new Set())
+  const [loading, setLoading]     = useState(true)
+  const [sent, setSent]           = useState(false)
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from('employees').select('id, first_name, last_name, phone').eq('status', 'active').order('first_name'),
+      supabase.from('crews').select('*').order('label'),
+    ]).then(([{ data: emps }, { data: crs }]) => {
+      setEmployees(emps || [])
+      setCrews(crs || [])
+      setLoading(false)
+    })
+  }, [])
+
+  // Collect all employee IDs belonging to a crew
+  function crewMemberIds(crew) {
+    return ['crew_chief_id', 'journeyman_id', 'laborer_1_id', 'laborer_2_id', 'laborer_3_id']
+      .map(k => crew[k]).filter(Boolean)
+  }
+
+  function toggleEmp(id) {
+    setSelEmps(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function toggleCrew(crew) {
+    setSelCrews(prev => {
+      const next = new Set(prev)
+      if (next.has(crew.id)) {
+        next.delete(crew.id)
+        // de-select those members (only if not individually selected elsewhere)
+        setSelEmps(ep => {
+          const ne = new Set(ep)
+          crewMemberIds(crew).forEach(eid => ne.delete(eid))
+          return ne
+        })
+      } else {
+        next.add(crew.id)
+        setSelEmps(ep => {
+          const ne = new Set(ep)
+          crewMemberIds(crew).forEach(eid => ne.add(eid))
+          return ne
+        })
+      }
+      return next
+    })
+  }
+
+  // Build final phone list from selected employees
+  const empMap   = Object.fromEntries(employees.map(e => [e.id, e]))
+  const phones   = [...selEmps].map(id => empMap[id]?.phone).filter(Boolean)
+  const canSend  = phones.length > 0
+
+  function handleSend() {
+    if (!canSend) return
+    // Open native SMS app with all numbers (comma-separated) and body pre-filled
+    // Most mobile platforms support: sms:number1,number2?body=...
+    const nums = phones.join(',')
+    const body = encodeURIComponent(smsText)
+    window.open(`sms:${nums}?body=${body}`, '_self')
+    setSent(true)
+    setTimeout(onClose, 1200)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col" style={{ maxHeight: '85vh' }}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
+          <div>
+            <h2 className="text-base font-bold text-gray-900">Send Work Order via Text</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Select employees or crews to text this work order to</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+        </div>
+
+        {loading ? (
+          <div className="flex-1 flex items-center justify-center py-16 text-gray-400 text-sm">Loading…</div>
+        ) : (
+          <div className="flex flex-1 min-h-0 divide-x divide-gray-200">
+
+            {/* Left — individual employees */}
+            <div className="flex-1 flex flex-col min-w-0">
+              <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex-shrink-0">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Employees</span>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-1">
+                {employees.length === 0 && <p className="text-xs text-gray-400 px-1 py-2">No active employees found.</p>}
+                {employees.map(emp => {
+                  const checked = selEmps.has(emp.id)
+                  const hasPhone = !!emp.phone
+                  return (
+                    <label
+                      key={emp.id}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${checked ? 'bg-blue-50' : 'hover:bg-gray-50'} ${!hasPhone ? 'opacity-50' : ''}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={!hasPhone}
+                        onChange={() => hasPhone && toggleEmp(emp.id)}
+                        className="w-4 h-4 accent-blue-600 flex-shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-gray-800 truncate">
+                          {emp.first_name} {emp.last_name}
+                        </div>
+                        <div className="text-xs text-gray-400 truncate">
+                          {emp.phone || 'No phone on file'}
+                        </div>
+                      </div>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Right — crews */}
+            <div className="flex-1 flex flex-col min-w-0">
+              <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex-shrink-0">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Crews</span>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-1">
+                {crews.length === 0 && <p className="text-xs text-gray-400 px-1 py-2">No crews found.</p>}
+                {crews.map(crew => {
+                  const memberIds = crewMemberIds(crew)
+                  const checked   = selCrews.has(crew.id)
+                  const members   = memberIds.map(id => empMap[id]).filter(Boolean)
+                  const hasAny    = members.some(m => m.phone)
+                  return (
+                    <label
+                      key={crew.id}
+                      className={`flex items-start gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${checked ? 'bg-blue-50' : 'hover:bg-gray-50'} ${!hasAny ? 'opacity-50' : ''}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={!hasAny}
+                        onChange={() => hasAny && toggleCrew(crew)}
+                        className="w-4 h-4 accent-blue-600 flex-shrink-0 mt-0.5"
+                      />
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-gray-800">Crew {crew.label}</div>
+                        <div className="text-xs text-gray-400 leading-relaxed">
+                          {members.length === 0
+                            ? 'No members assigned'
+                            : members.map(m => `${m.first_name} ${m.last_name}`).join(', ')}
+                        </div>
+                      </div>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 flex-shrink-0 bg-gray-50 rounded-b-2xl">
+          <div className="text-xs text-gray-500">
+            {canSend
+              ? `${phones.length} recipient${phones.length === 1 ? '' : 's'} selected`
+              : 'Select at least one recipient'}
+          </div>
+          <div className="flex gap-3">
+            <button onClick={onClose} className="px-4 py-1.5 rounded-lg text-sm font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 transition-colors">
+              Cancel
+            </button>
+            <button
+              onClick={handleSend}
+              disabled={!canSend || sent}
+              className={`px-5 py-1.5 rounded-lg text-sm font-semibold transition-colors ${canSend && !sent ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+            >
+              {sent ? 'Opening SMS…' : 'Send Text'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // Three small icon buttons — print / email / text
 function WOActionButtons({ workOrders, crewType, jobName, requiredEquipFn, isSub }) {
-  const [copied, setCopied] = useState(false)
+  const [showSMSModal, setShowSMSModal] = useState(false)
   const args = { workOrders, crewType, jobName, requiredEquipFn, isSub }
 
   function handlePrint(e) {
@@ -633,45 +827,49 @@ function WOActionButtons({ workOrders, crewType, jobName, requiredEquipFn, isSub
   }
   function handleText(e) {
     e.stopPropagation()
-    const text = buildSMSText(args)
-    navigator.clipboard.writeText(text)
-      .then(() => { setCopied(true); setTimeout(()=>setCopied(false), 2000) })
-      .catch(() => window.prompt('Copy this text:', text))
+    setShowSMSModal(true)
   }
 
   const btn = 'flex items-center justify-center w-7 h-7 rounded hover:opacity-80 transition-opacity flex-shrink-0'
 
   return (
-    <div className="flex items-center gap-1 flex-shrink-0">
-      {copied && <span className="text-[9px] text-green-600 font-bold mr-1">Copied!</span>}
+    <>
+      {showSMSModal && (
+        <SMSRecipientsModal
+          smsText={buildSMSText(args)}
+          onClose={() => setShowSMSModal(false)}
+        />
+      )}
 
-      {/* Print — two-tone blue tint */}
-      <button onClick={handlePrint} title="Print work order" className={btn}>
-        <svg width="24" height="24" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
-          <rect x="4" y="10" width="20" height="13" rx="2" fill="#B5D4F4" stroke="#185FA5" strokeWidth="1.5"/>
-          <rect x="8" y="18" width="12" height="7" rx="1" fill="white" stroke="#185FA5" strokeWidth="1.2"/>
-          <rect x="8" y="4" width="12" height="8" rx="1" fill="white" stroke="#185FA5" strokeWidth="1.2"/>
-          <circle cx="21" cy="14" r="1.2" fill="#185FA5"/>
-        </svg>
-      </button>
+      <div className="flex items-center gap-1 flex-shrink-0">
+        {/* Print — two-tone blue tint */}
+        <button onClick={handlePrint} title="Print work order" className={btn}>
+          <svg width="24" height="24" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+            <rect x="4" y="10" width="20" height="13" rx="2" fill="#B5D4F4" stroke="#185FA5" strokeWidth="1.5"/>
+            <rect x="8" y="18" width="12" height="7" rx="1" fill="white" stroke="#185FA5" strokeWidth="1.2"/>
+            <rect x="8" y="4" width="12" height="8" rx="1" fill="white" stroke="#185FA5" strokeWidth="1.2"/>
+            <circle cx="21" cy="14" r="1.2" fill="#185FA5"/>
+          </svg>
+        </button>
 
-      {/* Email — two-tone blue tint */}
-      <button onClick={handleEmail} title="Email work order" className={btn}>
-        <svg width="24" height="24" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
-          <rect x="2" y="5" width="24" height="18" rx="3" fill="#B5D4F4" stroke="#185FA5" strokeWidth="1.5"/>
-          <polyline points="2,8 14,17 26,8" fill="none" stroke="#185FA5" strokeWidth="1.8" strokeLinejoin="round"/>
-        </svg>
-      </button>
+        {/* Email — two-tone blue tint */}
+        <button onClick={handleEmail} title="Email work order" className={btn}>
+          <svg width="24" height="24" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="5" width="24" height="18" rx="3" fill="#B5D4F4" stroke="#185FA5" strokeWidth="1.5"/>
+            <polyline points="2,8 14,17 26,8" fill="none" stroke="#185FA5" strokeWidth="1.8" strokeLinejoin="round"/>
+          </svg>
+        </button>
 
-      {/* Text/SMS — two-tone blue tint */}
-      <button onClick={handleText} title="Copy text for SMS" className={btn}>
-        <svg width="24" height="24" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
-          <path d="M4 5 h20 a2 2 0 0 1 2 2 v12 a2 2 0 0 1 -2 2 h-12 l-6 4 v-4 h-2 a2 2 0 0 1 -2 -2 v-12 a2 2 0 0 1 2 -2 z" fill="#B5D4F4" stroke="#185FA5" strokeWidth="1.5" strokeLinejoin="round"/>
-          <line x1="8" y1="11" x2="20" y2="11" stroke="#185FA5" strokeWidth="1.8" strokeLinecap="round"/>
-          <line x1="8" y1="15" x2="16" y2="15" stroke="#185FA5" strokeWidth="1.8" strokeLinecap="round"/>
-        </svg>
-      </button>
-    </div>
+        {/* Text/SMS — two-tone blue tint */}
+        <button onClick={handleText} title="Text work order" className={btn}>
+          <svg width="24" height="24" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 5 h20 a2 2 0 0 1 2 2 v12 a2 2 0 0 1 -2 2 h-12 l-6 4 v-4 h-2 a2 2 0 0 1 -2 -2 v-12 a2 2 0 0 1 2 -2 z" fill="#B5D4F4" stroke="#185FA5" strokeWidth="1.5" strokeLinejoin="round"/>
+            <line x1="8" y1="11" x2="20" y2="11" stroke="#185FA5" strokeWidth="1.8" strokeLinecap="round"/>
+            <line x1="8" y1="15" x2="16" y2="15" stroke="#185FA5" strokeWidth="1.8" strokeLinecap="round"/>
+          </svg>
+        </button>
+      </div>
+    </>
   )
 }
 
