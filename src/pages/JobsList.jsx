@@ -75,7 +75,7 @@ function JobItem({ job, stages, selectedJob, setSelectedJob, setJobModal, onMove
         }`}
       >
         <button className="flex-1 text-left px-2 py-1.5 text-xs min-w-0">
-          <p className={`font-medium truncate ${selectedJob === job.id ? 'text-green-800' : 'text-gray-700'}`}>
+          <p className={`font-bold truncate ${selectedJob === job.id ? 'text-green-800' : 'text-gray-800'}`}>
             {job.name || job.client_name}
           </p>
         </button>
@@ -359,10 +359,7 @@ export default function JobsList() {
                       className={`mb-1 rounded-lg transition-colors ${isOver ? 'bg-green-50 ring-1 ring-green-300' : ''}`}
                     >
                       <div className="flex items-center gap-1.5 px-2 pt-2 pb-1">
-                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide truncate flex-1">{label}</span>
-                        {stageJobs.length > 0 && (
-                          <span className="text-[10px] font-semibold text-gray-400 bg-gray-100 rounded-full px-1.5 py-0.5 leading-none">{stageJobs.length}</span>
-                        )}
+                        <span className="text-[11px] font-bold text-gray-700 uppercase tracking-wide truncate flex-1">{label}</span>
                       </div>
                       <div className="space-y-0.5 px-0.5 min-h-[4px]">
                         {stageJobs.map(job => (
