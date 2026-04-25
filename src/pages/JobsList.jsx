@@ -6,36 +6,103 @@ import DailyLogs from '../components/DailyLogs'
 import TimeClock from '../components/TimeClock'
 import WorkOrders from '../components/WorkOrders'
 
-function JobItem({ job, selectedJob, setSelectedJob, setJobModal, dragJobId, onDragStart, onDragEnd }) {
+function MoveJobModal({ job, stages, onMove, onClose }) {
+  const [selected, setSelected] = useState(job.stage_id || '__none__')
+  const [saving, setSaving] = useState(false)
+
+  async function handleMove() {
+    setSaving(true)
+    await onMove(job.id, selected === '__none__' ? null : selected)
+    onClose()
+  }
+
   return (
-    <div
-      draggable={true}
-      onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; onDragStart(job.id) }}
-      onDragEnd={onDragEnd}
-      className={`flex items-center gap-0.5 rounded-lg cursor-grab active:cursor-grabbing transition-colors ${
-        selectedJob === job.id ? 'bg-green-50 border border-green-200' : 'hover:bg-gray-100 border border-transparent'
-      } ${dragJobId === job.id ? 'opacity-40' : ''}`}
-    >
-      <button
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-xs p-5" onClick={e => e.stopPropagation()}>
+        <h3 className="text-sm font-bold text-gray-900 mb-1">Move Job</h3>
+        <p className="text-xs text-gray-500 mb-4 truncate">{job.name || job.client_name}</p>
+
+        <div className="space-y-1 mb-5">
+          <label className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${selected === '__none__' ? 'bg-green-50' : 'hover:bg-gray-50'}`}>
+            <input type="radio" name="stage" value="__none__" checked={selected === '__none__'} onChange={() => setSelected('__none__')} className="accent-green-700" />
+            <span className="text-xs font-medium text-gray-600">Unassigned</span>
+          </label>
+          {stages.map(s => (
+            <label key={s.id} className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${selected === s.id ? 'bg-green-50' : 'hover:bg-gray-50'}`}>
+              <input type="radio" name="stage" value={s.id} checked={selected === s.id} onChange={() => setSelected(s.id)} className="accent-green-700" />
+              <span className="text-xs font-medium text-gray-700">{s.name}</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="flex gap-2">
+          <button onClick={onClose} className="flex-1 text-xs px-3 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+          <button
+            onClick={handleMove}
+            disabled={saving}
+            className="flex-1 text-xs px-3 py-2 rounded-lg bg-green-700 text-white font-semibold hover:bg-green-800 transition-colors disabled:opacity-50"
+          >
+            {saving ? 'Moving…' : 'Move'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function JobItem({ job, stages, selectedJob, setSelectedJob, setJobModal, onMove }) {
+  const [showMoveModal, setShowMoveModal] = useState(false)
+  const btnCls = `flex-shrink-0 p-1 rounded transition-colors ${
+    selectedJob === job.id ? 'text-green-500 hover:text-green-800 hover:bg-green-100' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-200'
+  }`
+
+  return (
+    <>
+      {showMoveModal && (
+        <MoveJobModal
+          job={job}
+          stages={stages}
+          onMove={onMove}
+          onClose={() => setShowMoveModal(false)}
+        />
+      )}
+      <div
         onClick={() => setSelectedJob(job.id)}
-        className="flex-1 text-left px-2 py-1.5 text-xs min-w-0"
-      >
-        <p className={`font-medium truncate ${selectedJob === job.id ? 'text-green-800' : 'text-gray-700'}`}>
-          {job.name || job.client_name}
-        </p>
-      </button>
-      <button
-        onClick={e => { e.stopPropagation(); setJobModal(job) }}
-        className={`flex-shrink-0 p-1 mr-1 rounded transition-colors ${
-          selectedJob === job.id ? 'text-green-500 hover:text-green-800 hover:bg-green-100' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-200'
+        className={`flex items-center gap-0.5 rounded-lg cursor-pointer transition-colors ${
+          selectedJob === job.id ? 'bg-green-50 border border-green-200' : 'hover:bg-gray-100 border border-transparent'
         }`}
       >
-        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-            d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 0l.172.172a2 2 0 010 2.828L12 16H9v-3z" />
-        </svg>
-      </button>
-    </div>
+        <button className="flex-1 text-left px-2 py-1.5 text-xs min-w-0">
+          <p className={`font-medium truncate ${selectedJob === job.id ? 'text-green-800' : 'text-gray-700'}`}>
+            {job.name || job.client_name}
+          </p>
+        </button>
+        {/* Move stage button */}
+        <button
+          onClick={e => { e.stopPropagation(); setShowMoveModal(true) }}
+          className={btnCls}
+          title="Move to stage"
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+          </svg>
+        </button>
+        {/* Edit button */}
+        <button
+          onClick={e => { e.stopPropagation(); setJobModal(job) }}
+          className={`${btnCls} mr-1`}
+          title="Edit job"
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 0l.172.172a2 2 0 010 2.828L12 16H9v-3z" />
+          </svg>
+        </button>
+      </div>
+    </>
   )
 }
 
@@ -57,7 +124,6 @@ export default function JobsList() {
   const [jobModal,   setJobModal]   = useState(null)
   const [search,     setSearch]     = useState('')
   const [stages,          setStages]          = useState([])
-  const [dragJobId,       setDragJobId]       = useState(null)
   const [dragOverStage,   setDragOverStage]   = useState(null)
   const [showExceptions,  setShowExceptions]  = useState(false)
   const [exceptionsCount, setExceptionsCount] = useState(0)
@@ -277,8 +343,6 @@ export default function JobsList() {
                   )
                 })
 
-                const jobDragStart = (id) => { setDragJobId(id) }
-                const jobDragEnd   = ()  => { setDragJobId(null); setDragOverStage(null) }
 
                 const StageSection = ({ stageId, label }) => {
                   const stageJobs = byStage[stageId] || []
@@ -305,12 +369,11 @@ export default function JobsList() {
                           <JobItem
                             key={job.id}
                             job={job}
+                            stages={stages}
                             selectedJob={selectedJob}
                             setSelectedJob={setSelectedJob}
                             setJobModal={setJobModal}
-                            dragJobId={dragJobId}
-                            onDragStart={jobDragStart}
-                            onDragEnd={jobDragEnd}
+                            onMove={moveJobToStage}
                           />
                         ))}
                         {stageJobs.length === 0 && isOver && (
