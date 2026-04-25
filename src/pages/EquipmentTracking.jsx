@@ -65,7 +65,7 @@ function EquipmentModal({ item, allEquipment, onClose, onSave }) {
         const newId = generateEquipmentId(type, allEquipment)
         const { data, error: err } = await supabase
           .from('master_equipment')
-          .insert({ name: `${manufacturer.trim()} ${model.trim()}`.trim(), manufacturer: manufacturer.trim(), model: model.trim(), type, equipment_id: newId, year: year || null, condition })
+          .insert({ manufacturer: manufacturer.trim(), model: model.trim(), type, equipment_id: newId, year: year || null, condition })
           .select().single()
         if (err) throw err
         onSave(data)
@@ -183,7 +183,7 @@ function MaintenanceModal({ item, onClose, onSave }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-base font-bold text-gray-900">Maintenance — {item.model || item.name}</h2>
+          <h2 className="text-base font-bold text-gray-900">Maintenance — {item.manufacturer} {item.model}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
         <div className="px-6 py-5 space-y-4">
@@ -263,7 +263,6 @@ export default function EquipmentTracking() {
     return (
       e.manufacturer?.toLowerCase().includes(q) ||
       e.model?.toLowerCase().includes(q) ||
-      e.name?.toLowerCase().includes(q) ||
       e.equipment_id?.toLowerCase().includes(q) ||
       e.type?.toLowerCase().includes(q)
     )
@@ -332,7 +331,7 @@ export default function EquipmentTracking() {
                     </td>
 
                     {/* Model */}
-                    <td className="px-4 py-3 font-medium text-gray-900">{item.model || item.name}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900">{item.model}</td>
 
                     {/* Type */}
                     <td className="px-4 py-3">
