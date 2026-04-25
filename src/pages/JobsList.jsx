@@ -9,7 +9,7 @@ import WorkOrders from '../components/WorkOrders'
 function JobItem({ job, selectedJob, setSelectedJob, setJobModal, dragJobId, onDragStart, onDragEnd }) {
   return (
     <div
-      draggable
+      draggable={true}
       onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; onDragStart(job.id) }}
       onDragEnd={onDragEnd}
       className={`flex items-center gap-0.5 rounded-lg cursor-grab active:cursor-grabbing transition-colors ${
