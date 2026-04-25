@@ -642,7 +642,7 @@ function WOActionButtons({ workOrders, crewType, jobName, requiredEquipFn, isSub
     <div className="flex items-center gap-0.5 flex-shrink-0">
       {copied && <span className="text-[9px] text-green-600 font-bold mr-1">Copied!</span>}
       <button onClick={handlePrint} title="Print work order" className={btn}>🖨️</button>
-      <button onClick={handleEmail} title="Email work order" className={btn}>✉️</button>
+      <button onClick={handleEmail} title="Email work order" className={btn}>📧</button>
       <button onClick={handleText}  title="Copy text for SMS" className={btn}>💬</button>
     </div>
   )
