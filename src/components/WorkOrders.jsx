@@ -636,14 +636,38 @@ function WOActionButtons({ workOrders, crewType, jobName, requiredEquipFn, isSub
       .catch(() => window.prompt('Copy this text:', text))
   }
 
-  const btn = 'flex items-center justify-center w-6 h-6 rounded hover:bg-gray-100 transition-colors flex-shrink-0 text-base leading-none'
+  const btn = 'flex items-center justify-center w-7 h-7 rounded hover:opacity-80 transition-opacity flex-shrink-0'
 
   return (
-    <div className="flex items-center gap-0.5 flex-shrink-0">
+    <div className="flex items-center gap-1 flex-shrink-0">
       {copied && <span className="text-[9px] text-green-600 font-bold mr-1">Copied!</span>}
-      <button onClick={handlePrint} title="Print work order" className={btn}>🖨️</button>
-      <button onClick={handleEmail} title="Email work order" className={btn}>📧</button>
-      <button onClick={handleText}  title="Copy text for SMS" className={btn}>💬</button>
+
+      {/* Print — two-tone blue tint */}
+      <button onClick={handlePrint} title="Print work order" className={btn}>
+        <svg width="24" height="24" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+          <rect x="4" y="10" width="20" height="13" rx="2" fill="#B5D4F4" stroke="#185FA5" strokeWidth="1.5"/>
+          <rect x="8" y="18" width="12" height="7" rx="1" fill="white" stroke="#185FA5" strokeWidth="1.2"/>
+          <rect x="8" y="4" width="12" height="8" rx="1" fill="white" stroke="#185FA5" strokeWidth="1.2"/>
+          <circle cx="21" cy="14" r="1.2" fill="#185FA5"/>
+        </svg>
+      </button>
+
+      {/* Email — two-tone blue tint */}
+      <button onClick={handleEmail} title="Email work order" className={btn}>
+        <svg width="24" height="24" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="5" width="24" height="18" rx="3" fill="#B5D4F4" stroke="#185FA5" strokeWidth="1.5"/>
+          <polyline points="2,8 14,17 26,8" fill="none" stroke="#185FA5" strokeWidth="1.8" strokeLinejoin="round"/>
+        </svg>
+      </button>
+
+      {/* Text/SMS — two-tone blue tint */}
+      <button onClick={handleText} title="Copy text for SMS" className={btn}>
+        <svg width="24" height="24" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4 5 h20 a2 2 0 0 1 2 2 v12 a2 2 0 0 1 -2 2 h-12 l-6 4 v-4 h-2 a2 2 0 0 1 -2 -2 v-12 a2 2 0 0 1 2 -2 z" fill="#B5D4F4" stroke="#185FA5" strokeWidth="1.5" strokeLinejoin="round"/>
+          <line x1="8" y1="11" x2="20" y2="11" stroke="#185FA5" strokeWidth="1.8" strokeLinecap="round"/>
+          <line x1="8" y1="15" x2="16" y2="15" stroke="#185FA5" strokeWidth="1.8" strokeLinecap="round"/>
+        </svg>
+      </button>
     </div>
   )
 }
