@@ -907,8 +907,8 @@ function SMSRecipientsModal({ smsText, onClose }) {
   )
 }
 
-// Three small icon buttons — print / email / text
-function WOActionButtons({ workOrders, crewType, jobName, requiredEquipFn, isSub }) {
+// Four small icon buttons — print / email / text / edit
+function WOActionButtons({ workOrders, crewType, jobName, requiredEquipFn, isSub, onEdit }) {
   const [showEmailModal, setShowEmailModal] = useState(false)
   const [showSMSModal,   setShowSMSModal]   = useState(false)
   const args = { workOrders, crewType, jobName, requiredEquipFn, isSub }
@@ -971,6 +971,16 @@ function WOActionButtons({ workOrders, crewType, jobName, requiredEquipFn, isSub
             <line x1="8" y1="15" x2="16" y2="15" stroke="#185FA5" strokeWidth="1.8" strokeLinecap="round"/>
           </svg>
         </button>
+
+        {/* Edit/pencil */}
+        {onEdit && (
+          <button onClick={e => { e.stopPropagation(); onEdit() }} title="View / edit" className={btn}>
+            <svg width="24" height="24" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="2" y="2" width="24" height="24" rx="5" fill="#B5D4F4"/>
+              <path d="M18 7.5a1.768 1.768 0 0 1 2.5 2.5L9.5 21 6 22l1-3.5L18 7.5z" stroke="#185FA5" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        )}
       </div>
     </>
   )
@@ -1086,6 +1096,7 @@ function CombinedWorkOrderCard({ workOrders, requiredEquipFn, jobsMap, onStatusC
               jobName={jobName || 'Job'}
               requiredEquipFn={requiredEquipFn}
               isSub={false}
+              onEdit={workOrders.length === 1 ? () => onRowClick(workOrders[0]) : undefined}
             />
           )}
         </div>
@@ -1165,6 +1176,7 @@ function SubWorkOrderCard({ wo, requiredEquip, jobName, onStatusChange, onRowCli
               jobName={jobName || 'Job'}
               requiredEquipFn={() => requiredEquip || []}
               isSub={true}
+              onEdit={() => onRowClick(wo)}
             />
           )}
           <button
@@ -1174,15 +1186,6 @@ function SubWorkOrderCard({ wo, requiredEquip, jobName, onStatusChange, onRowCli
           >
             <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATUS_DOT[wo.status]}`} />
             {STATUS_LABELS[wo.status]}
-          </button>
-          <button
-            onClick={() => onRowClick(wo)}
-            title="View / edit"
-            className="flex items-center justify-center w-6 h-6 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
-          >
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M11.5 1.5a1.414 1.414 0 0 1 2 2L5 12l-3 1 1-3 8.5-8.5z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
           </button>
         </div>
       </div>
