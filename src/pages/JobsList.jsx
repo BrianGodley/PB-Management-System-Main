@@ -6,6 +6,52 @@ import DailyLogs from '../components/DailyLogs'
 import TimeClock from '../components/TimeClock'
 import WorkOrders from '../components/WorkOrders'
 
+function JobItem({ job, selectedJob, setSelectedJob, setJobModal, dragJobId, onDragStart, onDragEnd }) {
+  const [draggable, setDraggable] = useState(false)
+
+  return (
+    <div
+      draggable={draggable}
+      onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; onDragStart(job.id) }}
+      onDragEnd={() => { setDraggable(false); onDragEnd() }}
+      className={`flex items-center gap-0.5 rounded-lg transition-colors ${
+        selectedJob === job.id ? 'bg-green-50 border border-green-200' : 'hover:bg-gray-100 border border-transparent'
+      } ${dragJobId === job.id ? 'opacity-40' : ''}`}
+    >
+      {/* Drag handle — hold to drag */}
+      <span
+        className="flex-shrink-0 px-1.5 py-3 text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing select-none"
+        title="Hold and drag to move"
+        onMouseDown={() => setDraggable(true)}
+        onMouseUp={() => setDraggable(false)}
+        onMouseLeave={() => setDraggable(false)}
+      >
+        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 16 16">
+          <circle cx="5" cy="3" r="1.4"/><circle cx="11" cy="3" r="1.4"/>
+          <circle cx="5" cy="8" r="1.4"/><circle cx="11" cy="8" r="1.4"/>
+          <circle cx="5" cy="13" r="1.4"/><circle cx="11" cy="13" r="1.4"/>
+        </svg>
+      </span>
+      <button onClick={() => setSelectedJob(job.id)} className="flex-1 text-left pr-1 py-1.5 text-xs min-w-0">
+        <p className={`font-medium truncate ${selectedJob === job.id ? 'text-green-800' : 'text-gray-700'}`}>
+          {job.name || job.client_name}
+        </p>
+      </button>
+      <button
+        onClick={e => { e.stopPropagation(); setJobModal(job) }}
+        className={`flex-shrink-0 p-1 mr-1 rounded transition-colors ${
+          selectedJob === job.id ? 'text-green-500 hover:text-green-800 hover:bg-green-100' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-200'
+        }`}
+      >
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+            d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 0l.172.172a2 2 0 010 2.828L12 16H9v-3z" />
+        </svg>
+      </button>
+    </div>
+  )
+}
+
 function lastName(name = '') {
   const t = name.trim()
   if (t.includes(',')) return t.split(',')[0].trim().toLowerCase()
@@ -26,7 +72,6 @@ export default function JobsList() {
   const [stages,          setStages]          = useState([])
   const [dragJobId,       setDragJobId]       = useState(null)
   const [dragOverStage,   setDragOverStage]   = useState(null)
-  const dragFromHandle = useRef(false)
   const [showExceptions,  setShowExceptions]  = useState(false)
   const [exceptionsCount, setExceptionsCount] = useState(0)
 
@@ -245,50 +290,8 @@ export default function JobsList() {
                   )
                 })
 
-                const JobItem = ({ job }) => (
-                  <div
-                    key={job.id}
-                    draggable
-                    onDragStart={e => {
-                      if (!dragFromHandle.current) { e.preventDefault(); return }
-                      e.dataTransfer.effectAllowed = 'move'
-                      setDragJobId(job.id)
-                    }}
-                    onDragEnd={() => { dragFromHandle.current = false; setDragJobId(null); setDragOverStage(null) }}
-                    className={`flex items-center gap-0.5 rounded-lg transition-colors ${
-                      selectedJob === job.id ? 'bg-green-50 border border-green-200' : 'hover:bg-gray-100 border border-transparent'
-                    } ${dragJobId === job.id ? 'opacity-40' : ''}`}
-                  >
-                    {/* Drag handle — only this triggers drag */}
-                    <span
-                      className="flex-shrink-0 pl-1 pr-1 py-2.5 text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing select-none"
-                      title="Drag to move"
-                      onMouseDown={() => { dragFromHandle.current = true }}
-                      onMouseUp={() => { dragFromHandle.current = false }}
-                    >
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 16 16">
-                        <circle cx="5" cy="3" r="1.4"/><circle cx="11" cy="3" r="1.4"/>
-                        <circle cx="5" cy="8" r="1.4"/><circle cx="11" cy="8" r="1.4"/>
-                        <circle cx="5" cy="13" r="1.4"/><circle cx="11" cy="13" r="1.4"/>
-                      </svg>
-                    </span>
-                    <button onClick={() => setSelectedJob(job.id)} className="flex-1 text-left pr-1 py-1.5 text-xs min-w-0">
-                      <p className={`font-medium truncate ${selectedJob === job.id ? 'text-green-800' : 'text-gray-700'}`}>
-                        {job.name || job.client_name}
-                      </p>
-                    </button>
-                    <button
-                      onClick={e => { e.stopPropagation(); setJobModal(job) }}
-                      className={`flex-shrink-0 p-1 mr-1 rounded transition-colors ${
-                        selectedJob === job.id ? 'text-green-500 hover:text-green-800 hover:bg-green-100' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                          d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 0l.172.172a2 2 0 010 2.828L12 16H9v-3z" />
-                      </svg>
-                    </button>
-                  </div>
+                const jobDragStart = (id) => { setDragJobId(id) }
+                const jobDragEnd   = ()  => { setDragJobId(null); setDragOverStage(null) }
                 )
 
                 const StageSection = ({ stageId, label }) => {
@@ -312,7 +315,18 @@ export default function JobsList() {
                         )}
                       </div>
                       <div className="space-y-0.5 px-0.5 min-h-[4px]">
-                        {stageJobs.map(job => <JobItem key={job.id} job={job} />)}
+                        {stageJobs.map(job => (
+                          <JobItem
+                            key={job.id}
+                            job={job}
+                            selectedJob={selectedJob}
+                            setSelectedJob={setSelectedJob}
+                            setJobModal={setJobModal}
+                            dragJobId={dragJobId}
+                            onDragStart={jobDragStart}
+                            onDragEnd={jobDragEnd}
+                          />
+                        ))}
                         {stageJobs.length === 0 && isOver && (
                           <div className="h-6 rounded border-2 border-dashed border-green-300 mx-1" />
                         )}
