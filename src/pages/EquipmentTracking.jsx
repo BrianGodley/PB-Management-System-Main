@@ -65,7 +65,7 @@ function EquipmentModal({ item, allEquipment, onClose, onSave }) {
         const newId = generateEquipmentId(type, allEquipment)
         const { data, error: err } = await supabase
           .from('master_equipment')
-          .insert({ manufacturer: manufacturer.trim(), model: model.trim(), type, equipment_id: newId, year: year || null, condition })
+          .insert({ name: `${manufacturer.trim()} ${model.trim()}`.trim(), manufacturer: manufacturer.trim(), model: model.trim(), type, equipment_id: newId, year: year || null, condition })
           .select().single()
         if (err) throw err
         onSave(data)
