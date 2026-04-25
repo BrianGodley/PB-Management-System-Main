@@ -292,7 +292,6 @@ export default function JobsList() {
 
                 const jobDragStart = (id) => { setDragJobId(id) }
                 const jobDragEnd   = ()  => { setDragJobId(null); setDragOverStage(null) }
-                )
 
                 const StageSection = ({ stageId, label }) => {
                   const stageJobs = byStage[stageId] || []
