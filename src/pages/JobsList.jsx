@@ -26,6 +26,7 @@ export default function JobsList() {
   const [stages,          setStages]          = useState([])
   const [dragJobId,       setDragJobId]       = useState(null)
   const [dragOverStage,   setDragOverStage]   = useState(null)
+  const dragFromHandle = useRef(false)
   const [showExceptions,  setShowExceptions]  = useState(false)
   const [exceptionsCount, setExceptionsCount] = useState(0)
 
@@ -248,18 +249,27 @@ export default function JobsList() {
                   <div
                     key={job.id}
                     draggable
-                    onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; setDragJobId(job.id) }}
-                    onDragEnd={() => { setDragJobId(null); setDragOverStage(null) }}
+                    onDragStart={e => {
+                      if (!dragFromHandle.current) { e.preventDefault(); return }
+                      e.dataTransfer.effectAllowed = 'move'
+                      setDragJobId(job.id)
+                    }}
+                    onDragEnd={() => { dragFromHandle.current = false; setDragJobId(null); setDragOverStage(null) }}
                     className={`flex items-center gap-0.5 rounded-lg transition-colors ${
                       selectedJob === job.id ? 'bg-green-50 border border-green-200' : 'hover:bg-gray-100 border border-transparent'
                     } ${dragJobId === job.id ? 'opacity-40' : ''}`}
                   >
-                    {/* Drag handle */}
-                    <span className="flex-shrink-0 pl-1.5 pr-0.5 py-2 text-gray-300 hover:text-gray-400 cursor-grab active:cursor-grabbing" title="Drag to move">
-                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 16 16">
-                        <circle cx="5" cy="3" r="1.2"/><circle cx="11" cy="3" r="1.2"/>
-                        <circle cx="5" cy="8" r="1.2"/><circle cx="11" cy="8" r="1.2"/>
-                        <circle cx="5" cy="13" r="1.2"/><circle cx="11" cy="13" r="1.2"/>
+                    {/* Drag handle — only this triggers drag */}
+                    <span
+                      className="flex-shrink-0 pl-1 pr-1 py-2.5 text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing select-none"
+                      title="Drag to move"
+                      onMouseDown={() => { dragFromHandle.current = true }}
+                      onMouseUp={() => { dragFromHandle.current = false }}
+                    >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 16 16">
+                        <circle cx="5" cy="3" r="1.4"/><circle cx="11" cy="3" r="1.4"/>
+                        <circle cx="5" cy="8" r="1.4"/><circle cx="11" cy="8" r="1.4"/>
+                        <circle cx="5" cy="13" r="1.4"/><circle cx="11" cy="13" r="1.4"/>
                       </svg>
                     </span>
                     <button onClick={() => setSelectedJob(job.id)} className="flex-1 text-left pr-1 py-1.5 text-xs min-w-0">
