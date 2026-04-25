@@ -636,22 +636,20 @@ function WOActionButtons({ workOrders, crewType, jobName, requiredEquipFn, isSub
       .catch(() => window.prompt('Copy this text:', text))
   }
 
-  const btn = 'flex items-center justify-center w-6 h-6 rounded bg-white border border-gray-300 text-gray-500 hover:text-green-700 hover:border-green-500 hover:bg-green-50 transition-colors flex-shrink-0 shadow-sm'
-
   return (
     <div className="flex items-center gap-1 flex-shrink-0">
       {copied && <span className="text-[9px] text-green-600 font-bold mr-1">Copied!</span>}
-      <button onClick={handlePrint} title="Print work order" className={btn}>
+      <button onClick={handlePrint} title="Print work order" className="flex items-center justify-center w-6 h-6 rounded bg-blue-50 border border-blue-200 text-blue-500 hover:bg-blue-100 hover:border-blue-400 transition-colors flex-shrink-0 shadow-sm">
         <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
         </svg>
       </button>
-      <button onClick={handleEmail} title="Email work order" className={btn}>
+      <button onClick={handleEmail} title="Email work order" className="flex items-center justify-center w-6 h-6 rounded bg-purple-50 border border-purple-200 text-purple-500 hover:bg-purple-100 hover:border-purple-400 transition-colors flex-shrink-0 shadow-sm">
         <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
         </svg>
       </button>
-      <button onClick={handleText} title="Copy text for SMS" className={btn}>
+      <button onClick={handleText} title="Copy text for SMS" className="flex items-center justify-center w-6 h-6 rounded bg-green-50 border border-green-200 text-green-600 hover:bg-green-100 hover:border-green-400 transition-colors flex-shrink-0 shadow-sm">
         <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
         </svg>
