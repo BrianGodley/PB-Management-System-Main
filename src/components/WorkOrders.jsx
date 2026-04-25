@@ -995,11 +995,7 @@ function ModuleRow({ wo, jobsMap, onStatusChange, onRowClick }) {
   const jobName = jobsMap?.[wo.job_id]
 
   return (
-    <div
-      className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 border-b border-gray-100 last:border-0 cursor-pointer"
-      onClick={onRowClick}
-      title="Click to view / edit"
-    >
+    <div className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 border-b border-gray-100 last:border-0">
       {/* Left: identifiers */}
       <div className="flex items-center gap-1.5 min-w-0 flex-1">
         {jobName && (
@@ -1026,7 +1022,7 @@ function ModuleRow({ wo, jobsMap, onStatusChange, onRowClick }) {
         )}
       </div>
 
-      {/* Right: metrics + status */}
+      {/* Right: metrics + status + edit */}
       <div className="flex items-center gap-3 flex-shrink-0">
         {parseFloat(wo.man_days)     > 0 && <span className="text-[11px] text-gray-500">{fmtDays(wo.man_days)}</span>}
         {parseFloat(wo.labor_hours)  > 0 && <span className="text-[11px] text-gray-500">{fmtHrs(wo.labor_hours)}</span>}
@@ -1041,6 +1037,15 @@ function ModuleRow({ wo, jobsMap, onStatusChange, onRowClick }) {
         >
           <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATUS_DOT[wo.status]}`} />
           {STATUS_LABELS[wo.status]}
+        </button>
+        <button
+          onClick={onRowClick}
+          title="View / edit"
+          className="flex items-center justify-center w-6 h-6 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+        >
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M11.5 1.5a1.414 1.414 0 0 1 2 2L5 12l-3 1 1-3 8.5-8.5z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
         </button>
       </div>
     </div>
@@ -1136,11 +1141,7 @@ function SubWorkOrderCard({ wo, requiredEquip, jobName, onStatusChange, onRowCli
   }
 
   return (
-    <div
-      className="bg-white border-2 border-gray-400 rounded-lg overflow-hidden cursor-pointer hover:border-gray-500 transition-colors"
-      onClick={() => onRowClick(wo)}
-      title="Click to view / edit"
-    >
+    <div className="bg-white border-2 border-gray-400 rounded-lg overflow-hidden transition-colors">
       <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50 border-b border-gray-100">
         <div className="flex items-center gap-2 min-w-0">
           <span className="flex-shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">SUB</span>
@@ -1178,6 +1179,15 @@ function SubWorkOrderCard({ wo, requiredEquip, jobName, onStatusChange, onRowCli
           >
             <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATUS_DOT[wo.status]}`} />
             {STATUS_LABELS[wo.status]}
+          </button>
+          <button
+            onClick={() => onRowClick(wo)}
+            title="View / edit"
+            className="flex items-center justify-center w-6 h-6 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+          >
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M11.5 1.5a1.414 1.414 0 0 1 2 2L5 12l-3 1 1-3 8.5-8.5z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </button>
         </div>
       </div>
