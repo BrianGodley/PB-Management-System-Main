@@ -757,7 +757,7 @@ function CombinedWorkOrderCard({ workOrders, requiredEquipFn, jobsMap, onStatusC
   const allReqEquip = [...new Set(workOrders.flatMap(wo => requiredEquipFn(wo)))]
 
   return (
-    <div className="bg-white border-2 border-gray-200 rounded-lg overflow-hidden">
+    <div className="bg-white border-2 border-gray-300 rounded-lg overflow-hidden">
 
       {/* Aggregate header */}
       <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-200">
@@ -833,7 +833,7 @@ function SubWorkOrderCard({ wo, requiredEquip, jobName, onStatusChange, onRowCli
 
   return (
     <div
-      className="bg-white border border-gray-200 rounded-lg overflow-hidden cursor-pointer hover:border-gray-300 transition-colors"
+      className="bg-white border border-gray-300 rounded-lg overflow-hidden cursor-pointer hover:border-gray-400 transition-colors"
       onClick={() => onRowClick(wo)}
       title="Click to view / edit"
     >
