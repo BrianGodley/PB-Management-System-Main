@@ -359,7 +359,7 @@ export default function JobsList() {
                       className={`mb-1 rounded-lg transition-colors ${isOver ? 'bg-green-50 ring-1 ring-green-300' : ''}`}
                     >
                       <div className="flex items-center gap-1.5 px-2 pt-1.5 pb-1">
-                        <span className="text-[11px] font-bold text-gray-700 uppercase tracking-wide truncate flex-1 bg-gray-100 rounded px-2 py-0.5">{label}</span>
+                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide truncate flex-1 bg-gray-100 rounded px-2 py-0.5">{label}</span>
                       </div>
                       <div className="space-y-0.5 px-0.5 min-h-[4px]">
                         {stageJobs.map(job => (
