@@ -617,19 +617,18 @@ function buildSMSText({ workOrders, crewType, jobName, requiredEquipFn, isSub })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SMS Recipients Modal
+// Shared helpers for recipient modals
 // ─────────────────────────────────────────────────────────────────────────────
-function SMSRecipientsModal({ smsText, onClose }) {
+function useRecipientData() {
   const [employees, setEmployees] = useState([])
   const [crews, setCrews]         = useState([])
   const [selEmps, setSelEmps]     = useState(new Set())
   const [selCrews, setSelCrews]   = useState(new Set())
   const [loading, setLoading]     = useState(true)
-  const [sent, setSent]           = useState(false)
 
   useEffect(() => {
     Promise.all([
-      supabase.from('employees').select('id, first_name, last_name, phone').eq('status', 'active').order('first_name'),
+      supabase.from('employees').select('id, first_name, last_name, phone, email').eq('status', 'active').order('first_name'),
       supabase.from('crews').select('*').order('label'),
     ]).then(([{ data: emps }, { data: crs }]) => {
       setEmployees(emps || [])
@@ -638,52 +637,183 @@ function SMSRecipientsModal({ smsText, onClose }) {
     })
   }, [])
 
-  // Collect all employee IDs belonging to a crew
   function crewMemberIds(crew) {
     return ['crew_chief_id', 'journeyman_id', 'laborer_1_id', 'laborer_2_id', 'laborer_3_id']
       .map(k => crew[k]).filter(Boolean)
   }
 
-  function toggleEmp(id) {
-    setSelEmps(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }
+  const empMap = Object.fromEntries(employees.map(e => [e.id, e]))
 
-  function toggleCrew(crew) {
+  function toggleEmp(id) {
+    setSelEmps(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+  function toggleCrew(crew, contactField) {
     setSelCrews(prev => {
       const next = new Set(prev)
+      const ids  = crewMemberIds(crew).filter(id => empMap[id]?.[contactField])
       if (next.has(crew.id)) {
         next.delete(crew.id)
-        // de-select those members (only if not individually selected elsewhere)
-        setSelEmps(ep => {
-          const ne = new Set(ep)
-          crewMemberIds(crew).forEach(eid => ne.delete(eid))
-          return ne
-        })
+        setSelEmps(ep => { const ne = new Set(ep); ids.forEach(id => ne.delete(id)); return ne })
       } else {
         next.add(crew.id)
-        setSelEmps(ep => {
-          const ne = new Set(ep)
-          crewMemberIds(crew).forEach(eid => ne.add(eid))
-          return ne
-        })
+        setSelEmps(ep => { const ne = new Set(ep); ids.forEach(id => ne.add(id));    return ne })
       }
       return next
     })
   }
 
-  // Build final phone list from selected employees
-  const empMap   = Object.fromEntries(employees.map(e => [e.id, e]))
-  const phones   = [...selEmps].map(id => empMap[id]?.phone).filter(Boolean)
-  const canSend  = phones.length > 0
+  return { employees, crews, selEmps, selCrews, loading, empMap, crewMemberIds, toggleEmp, toggleCrew }
+}
+
+function RecipientPanels({ employees, crews, selEmps, selCrews, empMap, crewMemberIds, toggleEmp, toggleCrew, contactField, noContactLabel }) {
+  return (
+    <div className="flex flex-1 min-h-0 divide-x divide-gray-200">
+      {/* Left — individual employees */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex-shrink-0">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Employees</span>
+        </div>
+        <div className="flex-1 overflow-y-auto p-3 space-y-1">
+          {employees.length === 0 && <p className="text-xs text-gray-400 px-1 py-2">No active employees found.</p>}
+          {employees.map(emp => {
+            const checked  = selEmps.has(emp.id)
+            const hasContact = !!emp[contactField]
+            return (
+              <label
+                key={emp.id}
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${checked ? 'bg-blue-50' : 'hover:bg-gray-50'} ${!hasContact ? 'opacity-50' : ''}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  disabled={!hasContact}
+                  onChange={() => hasContact && toggleEmp(emp.id)}
+                  className="w-4 h-4 accent-blue-600 flex-shrink-0"
+                />
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-gray-800 truncate">{emp.first_name} {emp.last_name}</div>
+                  <div className="text-xs text-gray-400 truncate">{emp[contactField] || noContactLabel}</div>
+                </div>
+              </label>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Right — crews */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex-shrink-0">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Crews</span>
+        </div>
+        <div className="flex-1 overflow-y-auto p-3 space-y-1">
+          {crews.length === 0 && <p className="text-xs text-gray-400 px-1 py-2">No crews found.</p>}
+          {crews.map(crew => {
+            const memberIds = crewMemberIds(crew)
+            const checked   = selCrews.has(crew.id)
+            const members   = memberIds.map(id => empMap[id]).filter(Boolean)
+            const hasAny    = members.some(m => m[contactField])
+            return (
+              <label
+                key={crew.id}
+                className={`flex items-start gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${checked ? 'bg-blue-50' : 'hover:bg-gray-50'} ${!hasAny ? 'opacity-50' : ''}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  disabled={!hasAny}
+                  onChange={() => hasAny && toggleCrew(crew, contactField)}
+                  className="w-4 h-4 accent-blue-600 flex-shrink-0 mt-0.5"
+                />
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-gray-800">Crew {crew.label}</div>
+                  <div className="text-xs text-gray-400 leading-relaxed">
+                    {members.length === 0
+                      ? 'No members assigned'
+                      : members.map(m => `${m.first_name} ${m.last_name}`).join(', ')}
+                  </div>
+                </div>
+              </label>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Email Recipients Modal
+// ─────────────────────────────────────────────────────────────────────────────
+function EmailRecipientsModal({ subject, body, onClose }) {
+  const { employees, crews, selEmps, selCrews, loading, empMap, crewMemberIds, toggleEmp, toggleCrew } = useRecipientData()
+  const [sent, setSent] = useState(false)
+
+  const emails  = [...selEmps].map(id => empMap[id]?.email).filter(Boolean)
+  const canSend = emails.length > 0
 
   function handleSend() {
     if (!canSend) return
-    // Open native SMS app with all numbers (comma-separated) and body pre-filled
-    // Most mobile platforms support: sms:number1,number2?body=...
+    const to  = emails.join(',')
+    window.open(`mailto:${to}?subject=${subject}&body=${body}`, '_self')
+    setSent(true)
+    setTimeout(onClose, 1200)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col" style={{ maxHeight: '85vh' }}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
+          <div>
+            <h2 className="text-base font-bold text-gray-900">Email Work Order</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Select employees or crews to email this work order to</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+        </div>
+
+        {loading ? (
+          <div className="flex-1 flex items-center justify-center py-16 text-gray-400 text-sm">Loading…</div>
+        ) : (
+          <RecipientPanels
+            employees={employees} crews={crews}
+            selEmps={selEmps} selCrews={selCrews}
+            empMap={empMap} crewMemberIds={crewMemberIds}
+            toggleEmp={toggleEmp} toggleCrew={toggleCrew}
+            contactField="email" noContactLabel="No email on file"
+          />
+        )}
+
+        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 flex-shrink-0 bg-gray-50 rounded-b-2xl">
+          <div className="text-xs text-gray-500">
+            {canSend ? `${emails.length} recipient${emails.length === 1 ? '' : 's'} selected` : 'Select at least one recipient'}
+          </div>
+          <div className="flex gap-3">
+            <button onClick={onClose} className="px-4 py-1.5 rounded-lg text-sm font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 transition-colors">Cancel</button>
+            <button
+              onClick={handleSend}
+              disabled={!canSend || sent}
+              className={`px-5 py-1.5 rounded-lg text-sm font-semibold transition-colors ${canSend && !sent ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+            >
+              {sent ? 'Opening email…' : 'Send Email'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SMS Recipients Modal
+// ─────────────────────────────────────────────────────────────────────────────
+function SMSRecipientsModal({ smsText, onClose }) {
+  const { employees, crews, selEmps, selCrews, loading, empMap, crewMemberIds, toggleEmp, toggleCrew } = useRecipientData()
+  const [sent, setSent] = useState(false)
+
+  const phones  = [...selEmps].map(id => empMap[id]?.phone).filter(Boolean)
+  const canSend = phones.length > 0
+
+  function handleSend() {
+    if (!canSend) return
     const nums = phones.join(',')
     const body = encodeURIComponent(smsText)
     window.open(`sms:${nums}?body=${body}`, '_self')
@@ -694,8 +824,6 @@ function SMSRecipientsModal({ smsText, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col" style={{ maxHeight: '85vh' }}>
-
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
           <div>
             <h2 className="text-base font-bold text-gray-900">Send Work Order via Text</h2>
@@ -707,95 +835,21 @@ function SMSRecipientsModal({ smsText, onClose }) {
         {loading ? (
           <div className="flex-1 flex items-center justify-center py-16 text-gray-400 text-sm">Loading…</div>
         ) : (
-          <div className="flex flex-1 min-h-0 divide-x divide-gray-200">
-
-            {/* Left — individual employees */}
-            <div className="flex-1 flex flex-col min-w-0">
-              <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex-shrink-0">
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Employees</span>
-              </div>
-              <div className="flex-1 overflow-y-auto p-3 space-y-1">
-                {employees.length === 0 && <p className="text-xs text-gray-400 px-1 py-2">No active employees found.</p>}
-                {employees.map(emp => {
-                  const checked = selEmps.has(emp.id)
-                  const hasPhone = !!emp.phone
-                  return (
-                    <label
-                      key={emp.id}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${checked ? 'bg-blue-50' : 'hover:bg-gray-50'} ${!hasPhone ? 'opacity-50' : ''}`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        disabled={!hasPhone}
-                        onChange={() => hasPhone && toggleEmp(emp.id)}
-                        className="w-4 h-4 accent-blue-600 flex-shrink-0"
-                      />
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium text-gray-800 truncate">
-                          {emp.first_name} {emp.last_name}
-                        </div>
-                        <div className="text-xs text-gray-400 truncate">
-                          {emp.phone || 'No phone on file'}
-                        </div>
-                      </div>
-                    </label>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Right — crews */}
-            <div className="flex-1 flex flex-col min-w-0">
-              <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex-shrink-0">
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Crews</span>
-              </div>
-              <div className="flex-1 overflow-y-auto p-3 space-y-1">
-                {crews.length === 0 && <p className="text-xs text-gray-400 px-1 py-2">No crews found.</p>}
-                {crews.map(crew => {
-                  const memberIds = crewMemberIds(crew)
-                  const checked   = selCrews.has(crew.id)
-                  const members   = memberIds.map(id => empMap[id]).filter(Boolean)
-                  const hasAny    = members.some(m => m.phone)
-                  return (
-                    <label
-                      key={crew.id}
-                      className={`flex items-start gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${checked ? 'bg-blue-50' : 'hover:bg-gray-50'} ${!hasAny ? 'opacity-50' : ''}`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        disabled={!hasAny}
-                        onChange={() => hasAny && toggleCrew(crew)}
-                        className="w-4 h-4 accent-blue-600 flex-shrink-0 mt-0.5"
-                      />
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium text-gray-800">Crew {crew.label}</div>
-                        <div className="text-xs text-gray-400 leading-relaxed">
-                          {members.length === 0
-                            ? 'No members assigned'
-                            : members.map(m => `${m.first_name} ${m.last_name}`).join(', ')}
-                        </div>
-                      </div>
-                    </label>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
+          <RecipientPanels
+            employees={employees} crews={crews}
+            selEmps={selEmps} selCrews={selCrews}
+            empMap={empMap} crewMemberIds={crewMemberIds}
+            toggleEmp={toggleEmp} toggleCrew={toggleCrew}
+            contactField="phone" noContactLabel="No phone on file"
+          />
         )}
 
-        {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 flex-shrink-0 bg-gray-50 rounded-b-2xl">
           <div className="text-xs text-gray-500">
-            {canSend
-              ? `${phones.length} recipient${phones.length === 1 ? '' : 's'} selected`
-              : 'Select at least one recipient'}
+            {canSend ? `${phones.length} recipient${phones.length === 1 ? '' : 's'} selected` : 'Select at least one recipient'}
           </div>
           <div className="flex gap-3">
-            <button onClick={onClose} className="px-4 py-1.5 rounded-lg text-sm font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 transition-colors">
-              Cancel
-            </button>
+            <button onClick={onClose} className="px-4 py-1.5 rounded-lg text-sm font-medium text-gray-600 bg-white border border-gray-300 hover:bg-gray-50 transition-colors">Cancel</button>
             <button
               onClick={handleSend}
               disabled={!canSend || sent}
@@ -812,7 +866,8 @@ function SMSRecipientsModal({ smsText, onClose }) {
 
 // Three small icon buttons — print / email / text
 function WOActionButtons({ workOrders, crewType, jobName, requiredEquipFn, isSub }) {
-  const [showSMSModal, setShowSMSModal] = useState(false)
+  const [showEmailModal, setShowEmailModal] = useState(false)
+  const [showSMSModal,   setShowSMSModal]   = useState(false)
   const args = { workOrders, crewType, jobName, requiredEquipFn, isSub }
 
   function handlePrint(e) {
@@ -821,9 +876,7 @@ function WOActionButtons({ workOrders, crewType, jobName, requiredEquipFn, isSub
   }
   function handleEmail(e) {
     e.stopPropagation()
-    const subject = encodeURIComponent(`Work Order — ${crewType} — ${jobName}`)
-    const body    = encodeURIComponent(buildEmailText(args))
-    window.open(`mailto:?subject=${subject}&body=${body}`, '_self')
+    setShowEmailModal(true)
   }
   function handleText(e) {
     e.stopPropagation()
@@ -834,6 +887,13 @@ function WOActionButtons({ workOrders, crewType, jobName, requiredEquipFn, isSub
 
   return (
     <>
+      {showEmailModal && (
+        <EmailRecipientsModal
+          subject={encodeURIComponent(`Work Order — ${crewType} — ${jobName}`)}
+          body={encodeURIComponent(buildEmailText(args))}
+          onClose={() => setShowEmailModal(false)}
+        />
+      )}
       {showSMSModal && (
         <SMSRecipientsModal
           smsText={buildSMSText(args)}
