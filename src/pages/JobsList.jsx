@@ -7,24 +7,25 @@ import TimeClock from '../components/TimeClock'
 import WorkOrders from '../components/WorkOrders'
 
 function JobItem({ job, selectedJob, setSelectedJob, setJobModal, dragJobId, onDragStart, onDragEnd }) {
-  const [draggable, setDraggable] = useState(false)
+  const cardRef = useRef(null)
 
   return (
     <div
-      draggable={draggable}
+      ref={cardRef}
+      draggable={false}
       onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; onDragStart(job.id) }}
-      onDragEnd={() => { setDraggable(false); onDragEnd() }}
+      onDragEnd={() => { if (cardRef.current) cardRef.current.draggable = false; onDragEnd() }}
       className={`flex items-center gap-0.5 rounded-lg transition-colors ${
         selectedJob === job.id ? 'bg-green-50 border border-green-200' : 'hover:bg-gray-100 border border-transparent'
       } ${dragJobId === job.id ? 'opacity-40' : ''}`}
     >
-      {/* Drag handle — hold to drag */}
+      {/* Drag handle — mousedown sets draggable directly on DOM (synchronous) */}
       <span
         className="flex-shrink-0 px-1.5 py-3 text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing select-none"
         title="Hold and drag to move"
-        onMouseDown={() => setDraggable(true)}
-        onMouseUp={() => setDraggable(false)}
-        onMouseLeave={() => setDraggable(false)}
+        onMouseDown={() => { if (cardRef.current) cardRef.current.draggable = true }}
+        onMouseUp={() => { if (cardRef.current) cardRef.current.draggable = false }}
+        onMouseLeave={() => { if (cardRef.current) cardRef.current.draggable = false }}
       >
         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 16 16">
           <circle cx="5" cy="3" r="1.4"/><circle cx="11" cy="3" r="1.4"/>
