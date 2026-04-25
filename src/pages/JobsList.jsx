@@ -7,33 +7,19 @@ import TimeClock from '../components/TimeClock'
 import WorkOrders from '../components/WorkOrders'
 
 function JobItem({ job, selectedJob, setSelectedJob, setJobModal, dragJobId, onDragStart, onDragEnd }) {
-  const cardRef = useRef(null)
-
   return (
     <div
-      ref={cardRef}
-      draggable={false}
+      draggable
       onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; onDragStart(job.id) }}
-      onDragEnd={() => { if (cardRef.current) cardRef.current.draggable = false; onDragEnd() }}
-      className={`flex items-center gap-0.5 rounded-lg transition-colors ${
+      onDragEnd={onDragEnd}
+      className={`flex items-center gap-0.5 rounded-lg cursor-grab active:cursor-grabbing transition-colors ${
         selectedJob === job.id ? 'bg-green-50 border border-green-200' : 'hover:bg-gray-100 border border-transparent'
       } ${dragJobId === job.id ? 'opacity-40' : ''}`}
     >
-      {/* Drag handle — mousedown sets draggable directly on DOM (synchronous) */}
-      <span
-        className="flex-shrink-0 px-1.5 py-3 text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing select-none"
-        title="Hold and drag to move"
-        onMouseDown={() => { if (cardRef.current) cardRef.current.draggable = true }}
-        onMouseUp={() => { if (cardRef.current) cardRef.current.draggable = false }}
-        onMouseLeave={() => { if (cardRef.current) cardRef.current.draggable = false }}
+      <button
+        onClick={() => setSelectedJob(job.id)}
+        className="flex-1 text-left px-2 py-1.5 text-xs min-w-0"
       >
-        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 16 16">
-          <circle cx="5" cy="3" r="1.4"/><circle cx="11" cy="3" r="1.4"/>
-          <circle cx="5" cy="8" r="1.4"/><circle cx="11" cy="8" r="1.4"/>
-          <circle cx="5" cy="13" r="1.4"/><circle cx="11" cy="13" r="1.4"/>
-        </svg>
-      </span>
-      <button onClick={() => setSelectedJob(job.id)} className="flex-1 text-left pr-1 py-1.5 text-xs min-w-0">
         <p className={`font-medium truncate ${selectedJob === job.id ? 'text-green-800' : 'text-gray-700'}`}>
           {job.name || job.client_name}
         </p>
