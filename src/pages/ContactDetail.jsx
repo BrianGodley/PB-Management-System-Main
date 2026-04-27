@@ -64,7 +64,9 @@ function EditContactModal({ contact, onSave, onClose }) {
         city:           form.city?.trim() || null,
         state:          form.state?.trim() || null,
         zip:            form.zip?.trim() || null,
+        contact_type:   form.contact_type || null,
         source:         form.source?.trim() || null,
+        date_of_birth:  form.date_of_birth || null,
         notes:          form.notes?.trim() || null,
       })
       .eq('id', contact.id)
@@ -101,7 +103,22 @@ function EditContactModal({ contact, onSave, onClose }) {
             <div><label className={lbl}>State</label><input className={inp} value={form.state || ''} onChange={e => set('state', e.target.value)} maxLength={2} /></div>
             <div><label className={lbl}>Zip</label><input className={inp} value={form.zip || ''} onChange={e => set('zip', e.target.value)} /></div>
           </div>
-          <div><label className={lbl}>Lead Source</label><input className={inp} value={form.source || ''} onChange={e => set('source', e.target.value)} /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={lbl}>Contact Type</label>
+              <select className={inp} value={form.contact_type || ''} onChange={e => set('contact_type', e.target.value)}>
+                <option value="">— None —</option>
+                <option value="Residential">Residential</option>
+                <option value="Commercial">Commercial</option>
+                <option value="Public Works">Public Works</option>
+              </select>
+            </div>
+            <div>
+              <label className={lbl}>Date of Birth</label>
+              <input className={inp} type="date" value={form.date_of_birth || ''} onChange={e => set('date_of_birth', e.target.value)} />
+            </div>
+          </div>
+          <div><label className={lbl}>Contact Source</label><input className={inp} value={form.source || ''} onChange={e => set('source', e.target.value)} /></div>
           <div>
             <label className={lbl}>Notes</label>
             <textarea className={inp + ' resize-none'} rows={3} value={form.notes || ''} onChange={e => set('notes', e.target.value)} placeholder="Internal notes…" />
@@ -124,11 +141,13 @@ export default function ContactDetail() {
   const navigate = useNavigate()
   const { user } = useAuth()
 
-  const [contact, setContact]   = useState(null)
-  const [comms,   setComms]     = useState([])
-  const [client,  setClient]    = useState(null)
-  const [loading, setLoading]   = useState(true)
+  const [contact,  setContact]  = useState(null)
+  const [comms,    setComms]    = useState([])
+  const [client,   setClient]   = useState(null)
+  const [loading,  setLoading]  = useState(true)
   const [showEdit, setShowEdit] = useState(false)
+  const [leftTab,  setLeftTab]  = useState('main')   // 'main' | 'dnd' | 'tags'
+  const [tagInput, setTagInput] = useState('')
 
   // New communication entry
   const [commType,    setCommType]    = useState('note')
@@ -167,6 +186,30 @@ export default function ContactDetail() {
     }
     const { data: newComm } = await supabase.from('contact_communications').insert(entry).select().single()
     if (newComm) setComms(p => [...p, newComm])
+  }
+
+  async function handleDndToggle(field) {
+    const newVal = !contact[field]
+    setContact(p => ({ ...p, [field]: newVal }))
+    await supabase.from('contacts').update({ [field]: newVal }).eq('id', id)
+  }
+
+  async function handleTagAdd(e) {
+    if (e.key !== 'Enter') return
+    const tag = tagInput.trim()
+    if (!tag) return
+    const existing = contact.tags || []
+    if (existing.includes(tag)) { setTagInput(''); return }
+    const newTags = [...existing, tag]
+    setContact(p => ({ ...p, tags: newTags }))
+    setTagInput('')
+    await supabase.from('contacts').update({ tags: newTags }).eq('id', id)
+  }
+
+  async function handleTagRemove(tag) {
+    const newTags = (contact.tags || []).filter(t => t !== tag)
+    setContact(p => ({ ...p, tags: newTags }))
+    await supabase.from('contacts').update({ tags: newTags }).eq('id', id)
   }
 
   async function handleAddComm() {
@@ -256,46 +299,164 @@ export default function ContactDetail() {
               </select>
             </div>
 
-            {/* Contact fields */}
-            <div className="space-y-3 text-sm">
-              {contact.phone && (
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Phone</p>
-                  <a href={`tel:${contact.phone}`} className="text-gray-700 hover:text-green-700">{contact.phone}</a>
-                </div>
-              )}
-              {contact.cell && (
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Cell</p>
-                  <a href={`tel:${contact.cell}`} className="text-gray-700 hover:text-green-700">{contact.cell}</a>
-                </div>
-              )}
-              {contact.email && (
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Email</p>
-                  <a href={`mailto:${contact.email}`} className="text-gray-700 hover:text-green-700 break-all">{contact.email}</a>
-                </div>
-              )}
-              {(contact.street_address || contact.city) && (
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Address</p>
-                  <p className="text-gray-700">{contact.street_address}</p>
-                  <p className="text-gray-700">{[contact.city, contact.state, contact.zip].filter(Boolean).join(', ')}</p>
-                </div>
-              )}
-              {contact.source && (
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Lead Source</p>
-                  <p className="text-gray-700">{contact.source}</p>
-                </div>
-              )}
-              {contact.notes && (
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Notes</p>
-                  <p className="text-gray-600 text-xs leading-relaxed whitespace-pre-wrap">{contact.notes}</p>
-                </div>
-              )}
+            {/* ── Tab bar ── */}
+            <div className="flex border-b border-gray-200 mb-4 -mx-5 px-5">
+              {[
+                { key: 'main', label: 'Main' },
+                { key: 'dnd',  label: 'DND'  },
+                { key: 'tags', label: 'Tags' },
+              ].map(t => (
+                <button
+                  key={t.key}
+                  onClick={() => setLeftTab(t.key)}
+                  className={`px-3 py-2 text-xs font-semibold border-b-2 transition-colors ${
+                    leftTab === t.key
+                      ? 'border-green-600 text-green-700'
+                      : 'border-transparent text-gray-400 hover:text-gray-600'
+                  }`}
+                >
+                  {t.label}
+                  {t.key === 'dnd' && (contact.dnd_phone || contact.dnd_email || contact.dnd_sms) && (
+                    <span className="ml-1 w-1.5 h-1.5 rounded-full bg-red-500 inline-block align-middle" />
+                  )}
+                  {t.key === 'tags' && (contact.tags?.length > 0) && (
+                    <span className="ml-1 text-[10px] bg-gray-100 text-gray-500 rounded-full px-1">{contact.tags.length}</span>
+                  )}
+                </button>
+              ))}
             </div>
+
+            {/* ── MAIN TAB ── */}
+            {leftTab === 'main' && (
+              <div className="space-y-3 text-sm">
+                {contact.contact_type && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Contact Type</p>
+                    <p className="text-gray-700">{contact.contact_type}</p>
+                  </div>
+                )}
+                {contact.phone && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Phone</p>
+                    <a href={`tel:${contact.phone}`} className="text-gray-700 hover:text-green-700">{contact.phone}</a>
+                  </div>
+                )}
+                {contact.cell && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Cell</p>
+                    <a href={`tel:${contact.cell}`} className="text-gray-700 hover:text-green-700">{contact.cell}</a>
+                  </div>
+                )}
+                {contact.email && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Email</p>
+                    <a href={`mailto:${contact.email}`} className="text-gray-700 hover:text-green-700 break-all">{contact.email}</a>
+                  </div>
+                )}
+                {(contact.street_address || contact.city) && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Address</p>
+                    {contact.street_address && <p className="text-gray-700">{contact.street_address}</p>}
+                    <p className="text-gray-700">{[contact.city, contact.state, contact.zip].filter(Boolean).join(', ')}</p>
+                  </div>
+                )}
+                {contact.date_of_birth && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Date of Birth</p>
+                    <p className="text-gray-700">{new Date(contact.date_of_birth + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                  </div>
+                )}
+                {contact.source && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Contact Source</p>
+                    <p className="text-gray-700">{contact.source}</p>
+                  </div>
+                )}
+                {contact.notes && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Notes</p>
+                    <p className="text-gray-600 text-xs leading-relaxed whitespace-pre-wrap">{contact.notes}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── DND TAB ── */}
+            {leftTab === 'dnd' && (
+              <div className="space-y-1">
+                <p className="text-xs text-gray-400 mb-3">Toggle channels to stop all outreach on that medium. Changes save instantly.</p>
+                {[
+                  { field: 'dnd_phone', label: 'Phone Calls',  icon: '📞', desc: 'No outbound calls' },
+                  { field: 'dnd_email', label: 'Email',        icon: '✉️', desc: 'No marketing emails' },
+                  { field: 'dnd_sms',   label: 'SMS / Text',   icon: '💬', desc: 'No text messages' },
+                ].map(({ field, label, icon, desc }) => (
+                  <div
+                    key={field}
+                    onClick={() => handleDndToggle(field)}
+                    className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-colors ${
+                      contact[field]
+                        ? 'bg-red-50 border-red-200'
+                        : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-base">{icon}</span>
+                      <div>
+                        <p className={`text-xs font-semibold ${contact[field] ? 'text-red-700' : 'text-gray-700'}`}>{label}</p>
+                        <p className="text-[10px] text-gray-400">{contact[field] ? 'DND active' : desc}</p>
+                      </div>
+                    </div>
+                    {/* Toggle switch */}
+                    <div className={`w-9 h-5 rounded-full transition-colors relative flex-shrink-0 ${contact[field] ? 'bg-red-500' : 'bg-gray-300'}`}>
+                      <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${contact[field] ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                    </div>
+                  </div>
+                ))}
+                {(contact.dnd_phone || contact.dnd_email || contact.dnd_sms) && (
+                  <div className="mt-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-xs font-semibold text-red-700">⚠ DND Active</p>
+                    <p className="text-[10px] text-red-500 mt-0.5">
+                      {[contact.dnd_phone && 'Phone', contact.dnd_email && 'Email', contact.dnd_sms && 'SMS'].filter(Boolean).join(', ')} restricted
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── TAGS TAB ── */}
+            {leftTab === 'tags' && (
+              <div>
+                <p className="text-xs text-gray-400 mb-3">Type a tag and press Enter to add it.</p>
+                <input
+                  type="text"
+                  value={tagInput}
+                  onChange={e => setTagInput(e.target.value)}
+                  onKeyDown={handleTagAdd}
+                  placeholder="Add tag…"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600"
+                />
+                {contact.tags?.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {contact.tags.map(tag => (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-green-50 border border-green-200 text-green-800 text-xs font-medium rounded-full"
+                      >
+                        {tag}
+                        <button
+                          onClick={() => handleTagRemove(tag)}
+                          className="text-green-500 hover:text-red-500 transition-colors leading-none"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400 italic text-center py-4">No tags yet</p>
+                )}
+              </div>
+            )}
 
             {/* Linked client */}
             <div className="mt-5 pt-4 border-t border-gray-100">

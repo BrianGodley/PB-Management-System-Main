@@ -16,9 +16,12 @@ const CONTACT_FIELDS = [
   { value: 'city',           label: 'City' },
   { value: 'state',          label: 'State' },
   { value: 'zip',            label: 'Zip' },
+  { value: 'contact_type',   label: 'Contact Type' },
   { value: 'stage',          label: 'Stage' },
-  { value: 'source',         label: 'Lead Source' },
+  { value: 'source',         label: 'Contact Source' },
+  { value: 'date_of_birth',  label: 'Date of Birth' },
   { value: 'notes',          label: 'Notes' },
+  { value: 'tags',           label: 'Tags (comma-separated)' },
 ]
 
 const EXPORT_FIELDS = [
@@ -32,9 +35,12 @@ const EXPORT_FIELDS = [
   { value: 'city',           label: 'City',           on: true  },
   { value: 'state',          label: 'State',          on: true  },
   { value: 'zip',            label: 'Zip',            on: false },
+  { value: 'contact_type',   label: 'Contact Type',   on: true  },
   { value: 'stage',          label: 'Stage',          on: true  },
-  { value: 'source',         label: 'Lead Source',    on: false },
+  { value: 'source',         label: 'Contact Source', on: false },
+  { value: 'date_of_birth',  label: 'Date of Birth',  on: false },
   { value: 'notes',          label: 'Notes',          on: false },
+  { value: 'tags',           label: 'Tags',           on: false },
   { value: 'created_at',     label: 'Date Added',     on: true  },
 ]
 
@@ -73,9 +79,12 @@ function autoDetect(header) {
   if (['city','town'].includes(h))                                                  return 'city'
   if (['state','province','region','st'].includes(h))                               return 'state'
   if (['zip','zipcode','postalcode','postal','postcode'].includes(h))               return 'zip'
+  if (['contacttype','type','clienttype','customertype'].includes(h))               return 'contact_type'
   if (['stage','status','leadstage','pipelinestage'].includes(h))                   return 'stage'
-  if (['source','leadsource','referral','origin','howfound'].includes(h))           return 'source'
+  if (['source','leadsource','contactsource','referral','origin','howfound'].includes(h)) return 'source'
+  if (['dob','dateofbirth','birthdate','birthday'].includes(h))                     return 'date_of_birth'
   if (['notes','note','comments','comment','memo','description'].includes(h))       return 'notes'
+  if (['tags','tag','labels','label','categories'].includes(h))                     return 'tags'
   return ''
 }
 
@@ -109,6 +118,8 @@ export function ExportModal({ contacts, onClose }) {
         cols.map(col => {
           if (col.value === 'created_at' && c[col.value])
             return new Date(c[col.value]).toLocaleDateString()
+          if (col.value === 'tags')
+            return (c.tags || []).join(', ')
           return c[col.value] ?? ''
         })
       )
@@ -332,9 +343,12 @@ export function ImportModal({ onDone, onClose }) {
         city:           r.city           || null,
         state:          r.state          || null,
         zip:            r.zip            || null,
+        contact_type:   r.contact_type   || null,
         stage:          VALID_STAGES.includes(r.stage) ? r.stage : 'new_lead',
         source:         r.source         || null,
+        date_of_birth:  r.date_of_birth  || null,
         notes:          r.notes          || null,
+        tags:           r.tags ? r.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
       }))
 
       let inserted = 0

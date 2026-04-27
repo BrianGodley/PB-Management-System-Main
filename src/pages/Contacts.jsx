@@ -21,7 +21,7 @@ const EMPTY_FORM = {
   first_name: '', last_name: '', company_name: '',
   phone: '', cell: '', email: '',
   street_address: '', city: '', state: '', zip: '',
-  stage: 'new_lead', source: '',
+  stage: 'new_lead', contact_type: '', source: '',
 }
 
 // ── Add Contact Modal ─────────────────────────────────────────────────────────
@@ -49,6 +49,7 @@ function AddContactModal({ onSave, onClose }) {
         state:          form.state.trim() || null,
         zip:            form.zip.trim() || null,
         stage:          form.stage,
+        contact_type:   form.contact_type || null,
         source:         form.source.trim() || null,
       })
       .select()
@@ -121,7 +122,7 @@ function AddContactModal({ onSave, onClose }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className={label}>Stage</label>
               <select className={input} value={form.stage} onChange={e => set('stage', e.target.value)}>
@@ -129,7 +130,16 @@ function AddContactModal({ onSave, onClose }) {
               </select>
             </div>
             <div>
-              <label className={label}>Lead Source</label>
+              <label className={label}>Contact Type</label>
+              <select className={input} value={form.contact_type} onChange={e => set('contact_type', e.target.value)}>
+                <option value="">— None —</option>
+                <option value="Residential">Residential</option>
+                <option value="Commercial">Commercial</option>
+                <option value="Public Works">Public Works</option>
+              </select>
+            </div>
+            <div>
+              <label className={label}>Contact Source</label>
               <input className={input} value={form.source} onChange={e => set('source', e.target.value)} placeholder="Referral, Google…" />
             </div>
           </div>
