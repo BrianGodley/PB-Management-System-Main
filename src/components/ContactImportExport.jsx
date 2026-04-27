@@ -8,6 +8,8 @@ const CONTACT_FIELDS = [
   { value: 'full_name',      label: 'Full Name (auto-split → First + Last)' },
   { value: 'first_name',     label: 'First Name' },
   { value: 'last_name',      label: 'Last Name' },
+  { value: 'secondary_first_name', label: 'Spouse/Partner First Name' },
+  { value: 'secondary_last_name',  label: 'Spouse/Partner Last Name' },
   { value: 'company_name',   label: 'Company' },
   { value: 'phone',          label: 'Phone' },
   { value: 'cell',           label: 'Cell' },
@@ -16,6 +18,10 @@ const CONTACT_FIELDS = [
   { value: 'city',           label: 'City' },
   { value: 'state',          label: 'State' },
   { value: 'zip',            label: 'Zip' },
+  { value: 'company_street', label: 'Company Street Address' },
+  { value: 'company_city',   label: 'Company City' },
+  { value: 'company_state',  label: 'Company State' },
+  { value: 'company_zip',    label: 'Company Zip' },
   { value: 'contact_type',   label: 'Contact Type' },
   { value: 'stage',          label: 'Stage' },
   { value: 'source',         label: 'Contact Source' },
@@ -31,6 +37,8 @@ const CONTACT_FIELDS = [
 const EXPORT_FIELDS = [
   { value: 'first_name',     label: 'First Name',     on: true  },
   { value: 'last_name',      label: 'Last Name',      on: true  },
+  { value: 'secondary_first_name', label: 'Spouse/Partner First', on: false },
+  { value: 'secondary_last_name',  label: 'Spouse/Partner Last',  on: false },
   { value: 'company_name',   label: 'Company',        on: true  },
   { value: 'phone',          label: 'Phone',          on: true  },
   { value: 'cell',           label: 'Cell',           on: true  },
@@ -39,6 +47,10 @@ const EXPORT_FIELDS = [
   { value: 'city',           label: 'City',           on: true  },
   { value: 'state',          label: 'State',          on: true  },
   { value: 'zip',            label: 'Zip',            on: false },
+  { value: 'company_street', label: 'Company Street', on: false },
+  { value: 'company_city',   label: 'Company City',   on: false },
+  { value: 'company_state',  label: 'Company State',  on: false },
+  { value: 'company_zip',    label: 'Company Zip',    on: false },
   { value: 'contact_type',   label: 'Contact Type',   on: true  },
   { value: 'stage',          label: 'Stage',          on: true  },
   { value: 'source',         label: 'Contact Source', on: false },
@@ -79,6 +91,8 @@ function autoDetect(header) {
   if (['name','fullname','contactname','clientname','customername'].includes(h))    return 'full_name'
   if (['firstname','fname','first'].includes(h))                                    return 'first_name'
   if (['lastname','lname','last','surname','familyname'].includes(h))               return 'last_name'
+  if (['spousefirst','partnerfirst','secondaryfirst','spousepartnerfirst'].includes(h))   return 'secondary_first_name'
+  if (['spouselast','partnerlast','secondarylast','spousepartnerlast'].includes(h))       return 'secondary_last_name'
   if (['company','companyname','organization','org','business','businessname'].includes(h)) return 'company_name'
   if (['phone','phonenumber','homephone','telephone','tel','ph','workphone'].includes(h))     return 'phone'
   if (['cell','cellphone','mobile','mobilephone','cellular','cellnumber'].includes(h))       return 'cell'
@@ -87,6 +101,10 @@ function autoDetect(header) {
   if (['city','town'].includes(h))                                                  return 'city'
   if (['state','province','region','st'].includes(h))                               return 'state'
   if (['zip','zipcode','postalcode','postal','postcode'].includes(h))               return 'zip'
+  if (['companystreet','companyaddress','bizstreet','bizaddress'].includes(h))      return 'company_street'
+  if (['companycity','bizcity'].includes(h))                                        return 'company_city'
+  if (['companystate','bizstate'].includes(h))                                      return 'company_state'
+  if (['companyzip','bizzip','companyzipcode'].includes(h))                         return 'company_zip'
   if (['contacttype','type','clienttype','customertype'].includes(h))               return 'contact_type'
   if (['stage','status','leadstage','pipelinestage'].includes(h))                   return 'stage'
   if (['source','leadsource','contactsource','referral','origin','howfound'].includes(h)) return 'source'
@@ -353,26 +371,32 @@ export function ImportModal({ onDone, onClose }) {
     setLoading(true)
     try {
       const records = preview.toImport.map(r => ({
-        first_name:     r.first_name     || '',
-        last_name:      r.last_name      || '',
-        company_name:   r.company_name   || null,
-        phone:          r.phone          || null,
-        cell:           r.cell           || null,
-        email:          r.email          || null,
-        street_address: r.street_address || null,
-        city:           r.city           || null,
-        state:          r.state          || null,
-        zip:            r.zip            || null,
-        contact_type:   r.contact_type   || null,
-        stage:          VALID_STAGES.includes(r.stage) ? r.stage : 'new_lead',
-        source:         r.source         || null,
-        date_of_birth:  r.date_of_birth  || null,
-        notes:               r.notes               || null,
-        project_description: r.project_description || null,
-        tags:                r.tags ? r.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
-        dnd_phone:           r.dnd_phone ? parseBool(r.dnd_phone) : false,
-        dnd_email:           r.dnd_email ? parseBool(r.dnd_email) : false,
-        dnd_sms:             r.dnd_sms   ? parseBool(r.dnd_sms)   : false,
+        first_name:           r.first_name           || '',
+        last_name:            r.last_name            || '',
+        secondary_first_name: r.secondary_first_name || null,
+        secondary_last_name:  r.secondary_last_name  || null,
+        company_name:         r.company_name         || null,
+        phone:                r.phone                || null,
+        cell:                 r.cell                 || null,
+        email:                r.email                || null,
+        street_address:       r.street_address       || null,
+        city:                 r.city                 || null,
+        state:                r.state                || null,
+        zip:                  r.zip                  || null,
+        company_street:       r.company_street       || null,
+        company_city:         r.company_city         || null,
+        company_state:        r.company_state        || null,
+        company_zip:          r.company_zip          || null,
+        contact_type:         r.contact_type         || null,
+        stage:                VALID_STAGES.includes(r.stage) ? r.stage : 'new_lead',
+        source:               r.source               || null,
+        date_of_birth:        r.date_of_birth        || null,
+        notes:                r.notes                || null,
+        project_description:  r.project_description  || null,
+        tags:                 r.tags ? r.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+        dnd_phone:            r.dnd_phone ? parseBool(r.dnd_phone) : false,
+        dnd_email:            r.dnd_email ? parseBool(r.dnd_email) : false,
+        dnd_sms:              r.dnd_sms   ? parseBool(r.dnd_sms)   : false,
       }))
 
       let inserted = 0

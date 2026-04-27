@@ -19,8 +19,10 @@ const stageMap = Object.fromEntries(STAGES.map(s => [s.value, s]))
 
 const EMPTY_FORM = {
   first_name: '', last_name: '', company_name: '',
+  secondary_first_name: '', secondary_last_name: '',
   phone: '', cell: '', email: '',
   street_address: '', city: '', state: '', zip: '',
+  company_street: '', company_city: '', company_state: '', company_zip: '',
   stage: 'new_lead', contact_type: '', source: '', project_description: '',
 }
 
@@ -38,20 +40,26 @@ function AddContactModal({ onSave, onClose }) {
     const { data, error } = await supabase
       .from('contacts')
       .insert({
-        first_name:     form.first_name.trim(),
-        last_name:      form.last_name.trim(),
-        company_name:   form.company_name.trim() || null,
-        phone:          form.phone.trim() || null,
-        cell:           form.cell.trim() || null,
-        email:          form.email.trim() || null,
-        street_address: form.street_address.trim() || null,
-        city:           form.city.trim() || null,
-        state:          form.state.trim() || null,
-        zip:            form.zip.trim() || null,
-        stage:          form.stage,
-        contact_type:   form.contact_type || null,
-        source:              form.source.trim() || null,
-        project_description: form.project_description.trim() || null,
+        first_name:           form.first_name.trim(),
+        last_name:            form.last_name.trim(),
+        company_name:         form.company_name.trim() || null,
+        secondary_first_name: form.secondary_first_name.trim() || null,
+        secondary_last_name:  form.secondary_last_name.trim() || null,
+        phone:                form.phone.trim() || null,
+        cell:                 form.cell.trim() || null,
+        email:                form.email.trim() || null,
+        street_address:       form.street_address.trim() || null,
+        city:                 form.city.trim() || null,
+        state:                form.state.trim() || null,
+        zip:                  form.zip.trim() || null,
+        company_street:       form.company_street.trim() || null,
+        company_city:         form.company_city.trim() || null,
+        company_state:        form.company_state.trim() || null,
+        company_zip:          form.company_zip.trim() || null,
+        stage:                form.stage,
+        contact_type:         form.contact_type || null,
+        source:               form.source.trim() || null,
+        project_description:  form.project_description.trim() || null,
       })
       .select()
       .single()
@@ -88,6 +96,17 @@ function AddContactModal({ onSave, onClose }) {
             <input className={input} value={form.company_name} onChange={e => set('company_name', e.target.value)} placeholder="Optional" />
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={label}>Spouse / Partner First</label>
+              <input className={input} value={form.secondary_first_name} onChange={e => set('secondary_first_name', e.target.value)} placeholder="First" />
+            </div>
+            <div>
+              <label className={label}>Spouse / Partner Last</label>
+              <input className={input} value={form.secondary_last_name} onChange={e => set('secondary_last_name', e.target.value)} placeholder="Last" />
+            </div>
+          </div>
+
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className={label}>Phone</label>
@@ -122,6 +141,20 @@ function AddContactModal({ onSave, onClose }) {
               <input className={input} value={form.zip} onChange={e => set('zip', e.target.value)} placeholder="90210" />
             </div>
           </div>
+
+          {form.company_name.trim() && (
+            <div className="border border-gray-200 rounded-xl p-3 bg-gray-50">
+              <p className="text-xs font-semibold text-gray-500 mb-2">Company Address</p>
+              <div className="space-y-2">
+                <input className={input} value={form.company_street} onChange={e => set('company_street', e.target.value)} placeholder="Company Street Address" />
+                <div className="grid grid-cols-3 gap-2">
+                  <input className={input + ' col-span-1'} value={form.company_city} onChange={e => set('company_city', e.target.value)} placeholder="City" />
+                  <input className={input} value={form.company_state} onChange={e => set('company_state', e.target.value)} placeholder="ST" maxLength={2} />
+                  <input className={input} value={form.company_zip} onChange={e => set('company_zip', e.target.value)} placeholder="Zip" />
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-3 gap-3">
             <div>

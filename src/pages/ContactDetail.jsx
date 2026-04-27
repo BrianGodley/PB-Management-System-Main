@@ -54,21 +54,27 @@ function EditContactModal({ contact, onSave, onClose }) {
     const { data, error } = await supabase
       .from('contacts')
       .update({
-        first_name:     form.first_name?.trim() || '',
-        last_name:      form.last_name?.trim()  || '',
-        company_name:   form.company_name?.trim() || null,
-        phone:          form.phone?.trim() || null,
-        cell:           form.cell?.trim() || null,
-        email:          form.email?.trim() || null,
-        street_address: form.street_address?.trim() || null,
-        city:           form.city?.trim() || null,
-        state:          form.state?.trim() || null,
-        zip:            form.zip?.trim() || null,
-        contact_type:   form.contact_type || null,
-        source:              form.source?.trim() || null,
-        date_of_birth:       form.date_of_birth || null,
-        notes:               form.notes?.trim() || null,
-        project_description: form.project_description?.trim() || null,
+        first_name:           form.first_name?.trim() || '',
+        last_name:            form.last_name?.trim()  || '',
+        company_name:         form.company_name?.trim() || null,
+        secondary_first_name: form.secondary_first_name?.trim() || null,
+        secondary_last_name:  form.secondary_last_name?.trim() || null,
+        phone:                form.phone?.trim() || null,
+        cell:                 form.cell?.trim() || null,
+        email:                form.email?.trim() || null,
+        street_address:       form.street_address?.trim() || null,
+        city:                 form.city?.trim() || null,
+        state:                form.state?.trim() || null,
+        zip:                  form.zip?.trim() || null,
+        company_street:       form.company_street?.trim() || null,
+        company_city:         form.company_city?.trim() || null,
+        company_state:        form.company_state?.trim() || null,
+        company_zip:          form.company_zip?.trim() || null,
+        contact_type:         form.contact_type || null,
+        source:               form.source?.trim() || null,
+        date_of_birth:        form.date_of_birth || null,
+        notes:                form.notes?.trim() || null,
+        project_description:  form.project_description?.trim() || null,
       })
       .eq('id', contact.id)
       .select()
@@ -93,6 +99,10 @@ function EditContactModal({ contact, onSave, onClose }) {
             <div><label className={lbl}>Last Name</label><input className={inp} value={form.last_name || ''} onChange={e => set('last_name', e.target.value)} /></div>
           </div>
           <div><label className={lbl}>Company</label><input className={inp} value={form.company_name || ''} onChange={e => set('company_name', e.target.value)} /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className={lbl}>Spouse / Partner First</label><input className={inp} value={form.secondary_first_name || ''} onChange={e => set('secondary_first_name', e.target.value)} placeholder="First" /></div>
+            <div><label className={lbl}>Spouse / Partner Last</label><input className={inp} value={form.secondary_last_name || ''} onChange={e => set('secondary_last_name', e.target.value)} placeholder="Last" /></div>
+          </div>
           <div className="grid grid-cols-3 gap-3">
             <div><label className={lbl}>Phone</label><input className={inp} value={form.phone || ''} onChange={e => set('phone', e.target.value)} /></div>
             <div><label className={lbl}>Cell</label><input className={inp} value={form.cell || ''} onChange={e => set('cell', e.target.value)} /></div>
@@ -104,6 +114,19 @@ function EditContactModal({ contact, onSave, onClose }) {
             <div><label className={lbl}>State</label><input className={inp} value={form.state || ''} onChange={e => set('state', e.target.value)} maxLength={2} /></div>
             <div><label className={lbl}>Zip</label><input className={inp} value={form.zip || ''} onChange={e => set('zip', e.target.value)} /></div>
           </div>
+          {form.company_name?.trim() && (
+            <div className="border border-gray-200 rounded-xl p-3 bg-gray-50">
+              <p className="text-xs font-semibold text-gray-500 mb-2">Company Address</p>
+              <div className="space-y-2">
+                <input className={inp} value={form.company_street || ''} onChange={e => set('company_street', e.target.value)} placeholder="Company Street Address" />
+                <div className="grid grid-cols-3 gap-2">
+                  <input className={inp + ' col-span-1'} value={form.company_city || ''} onChange={e => set('company_city', e.target.value)} placeholder="City" />
+                  <input className={inp} value={form.company_state || ''} onChange={e => set('company_state', e.target.value)} placeholder="ST" maxLength={2} />
+                  <input className={inp} value={form.company_zip || ''} onChange={e => set('company_zip', e.target.value)} placeholder="Zip" />
+                </div>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={lbl}>Contact Type</label>
@@ -334,6 +357,14 @@ export default function ContactDetail() {
             {/* ── MAIN TAB ── */}
             {leftTab === 'main' && (
               <div className="space-y-3 text-sm">
+                {(contact.secondary_first_name || contact.secondary_last_name) && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Spouse / Partner</p>
+                    <p className="text-gray-700">
+                      {[contact.secondary_first_name, contact.secondary_last_name].filter(Boolean).join(' ')}
+                    </p>
+                  </div>
+                )}
                 {contact.contact_type && (
                   <div>
                     <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Contact Type</p>
@@ -363,6 +394,13 @@ export default function ContactDetail() {
                     <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Address</p>
                     {contact.street_address && <p className="text-gray-700">{contact.street_address}</p>}
                     <p className="text-gray-700">{[contact.city, contact.state, contact.zip].filter(Boolean).join(', ')}</p>
+                  </div>
+                )}
+                {contact.company_name && (contact.company_street || contact.company_city) && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Company Address</p>
+                    {contact.company_street && <p className="text-gray-700">{contact.company_street}</p>}
+                    <p className="text-gray-700">{[contact.company_city, contact.company_state, contact.company_zip].filter(Boolean).join(', ')}</p>
                   </div>
                 )}
                 {contact.date_of_birth && (
