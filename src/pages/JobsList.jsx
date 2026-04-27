@@ -125,8 +125,9 @@ export default function JobsList() {
   const [search,     setSearch]     = useState('')
   const [stages,          setStages]          = useState([])
   const [dragOverStage,   setDragOverStage]   = useState(null)
-  const [showExceptions,  setShowExceptions]  = useState(false)
-  const [exceptionsCount, setExceptionsCount] = useState(0)
+  const [showExceptions,    setShowExceptions]    = useState(false)
+  const [exceptionsCount,   setExceptionsCount]   = useState(0)
+  const [addScheduleTrigger, setAddScheduleTrigger] = useState(0)
 
   useEffect(() => { fetchJobs(); fetchStages() }, [])
 
@@ -285,6 +286,19 @@ export default function JobsList() {
 
         {/* Jobs sidebar — desktop only */}
         <div className="hidden lg:flex w-56 flex-shrink-0 flex-col min-h-0 -ml-6 pl-3">
+          {/* Add Schedule button — only visible on Schedule tab */}
+          {tab === 'schedule' && (
+            <button
+              onClick={() => setAddScheduleTrigger(v => v + 1)}
+              className="w-full flex items-center gap-1.5 px-2.5 py-1.5 mb-2 rounded-lg bg-green-700 text-white text-xs font-semibold hover:bg-green-800 transition-colors flex-shrink-0"
+            >
+              <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              <span className="flex-1 text-left">Add Schedule</span>
+            </button>
+          )}
+
           {/* Workday Exceptions button */}
           <button
             onClick={() => setShowExceptions(true)}
@@ -403,6 +417,7 @@ export default function JobsList() {
               showExceptionsExternal={showExceptions}
               onSetShowExceptions={setShowExceptions}
               onExceptionsLoaded={setExceptionsCount}
+              addScheduleTrigger={addScheduleTrigger}
             />
           )}
 
