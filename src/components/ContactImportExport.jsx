@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 // ── Field definitions ─────────────────────────────────────────────────────────
 const CONTACT_FIELDS = [
   { value: '',               label: '— Skip column —' },
+  { value: 'full_name',      label: 'Full Name (auto-split → First + Last)' },
   { value: 'first_name',     label: 'First Name' },
   { value: 'last_name',      label: 'Last Name' },
   { value: 'company_name',   label: 'Company' },
@@ -37,9 +38,29 @@ const EXPORT_FIELDS = [
 
 const VALID_STAGES = ['new_lead','warm_lead','consultation','quoted','won','lost','nurture']
 
+// Split "First Last" or "Last, First" into { first_name, last_name }
+function splitFullName(raw) {
+  const name = (raw || '').trim()
+  if (!name) return { first_name: '', last_name: '' }
+
+  // "Last, First Middle" format
+  if (name.includes(',')) {
+    const [last, ...rest] = name.split(',').map(s => s.trim())
+    return { first_name: rest.join(' ').trim(), last_name: last }
+  }
+
+  // "First Last" or "First Middle Last"
+  const parts = name.split(/\s+/)
+  if (parts.length === 1) return { first_name: '', last_name: parts[0] }
+  const last  = parts[parts.length - 1]
+  const first = parts.slice(0, parts.length - 1).join(' ')
+  return { first_name: first, last_name: last }
+}
+
 // Auto-detect file column → contact field
 function autoDetect(header) {
   const h = header.toLowerCase().replace(/[\s_\-().]/g, '')
+  if (['name','fullname','contactname','clientname','customername'].includes(h))    return 'full_name'
   if (['firstname','fname','first'].includes(h))                                    return 'first_name'
   if (['lastname','lname','last','surname','familyname'].includes(h))               return 'last_name'
   if (['company','companyname','organization','org','business','businessname'].includes(h)) return 'company_name'
@@ -260,7 +281,15 @@ export function ImportModal({ onDone, onClose }) {
         const mapped = {}
         headers.forEach((h, idx) => {
           const field = mapping[h]
-          if (field) mapped[field] = String(row[idx] ?? '').trim()
+          if (!field) return
+          if (field === 'full_name') {
+            // Expand full_name into first_name + last_name
+            const { first_name, last_name } = splitFullName(String(row[idx] ?? ''))
+            if (!mapped.first_name) mapped.first_name = first_name
+            if (!mapped.last_name)  mapped.last_name  = last_name
+          } else {
+            mapped[field] = String(row[idx] ?? '').trim()
+          }
         })
 
         if (!mapped.first_name && !mapped.last_name && !mapped.email && !mapped.phone) return
@@ -439,6 +468,11 @@ export function ImportModal({ onDone, onClose }) {
                                 <option key={f.value} value={f.value}>{f.label}</option>
                               ))}
                             </select>
+                            {mapping[h] === 'full_name' && (
+                              <p className="text-xs text-green-600 mt-1">
+                                ✓ Will split into First + Last. Handles "Smith, John" or "John Smith"
+                              </p>
+                            )}
                           </td>
                         </tr>
                       )
