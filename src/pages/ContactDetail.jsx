@@ -169,13 +169,15 @@ export default function ContactDetail() {
   const navigate = useNavigate()
   const { user } = useAuth()
 
-  const [contact,  setContact]  = useState(null)
-  const [comms,    setComms]    = useState([])
-  const [client,   setClient]   = useState(null)
-  const [loading,  setLoading]  = useState(true)
-  const [showEdit, setShowEdit] = useState(false)
-  const [leftTab,  setLeftTab]  = useState('main')   // 'main' | 'dnd' | 'tags'
-  const [tagInput, setTagInput] = useState('')
+  const [contact,    setContact]    = useState(null)
+  const [comms,      setComms]      = useState([])
+  const [client,     setClient]     = useState(null)
+  const [loading,    setLoading]    = useState(true)
+  const [showEdit,   setShowEdit]   = useState(false)
+  const [showDelete, setShowDelete] = useState(false)
+  const [deleting,   setDeleting]   = useState(false)
+  const [leftTab,    setLeftTab]    = useState('main')   // 'main' | 'dnd' | 'tags'
+  const [tagInput,   setTagInput]   = useState('')
 
   // New communication entry
   const [commType,    setCommType]    = useState('note')
@@ -214,6 +216,13 @@ export default function ContactDetail() {
     }
     const { data: newComm } = await supabase.from('contact_communications').insert(entry).select().single()
     if (newComm) setComms(p => [...p, newComm])
+  }
+
+  async function handleDelete() {
+    setDeleting(true)
+    await supabase.from('contact_communications').delete().eq('contact_id', id)
+    await supabase.from('contacts').delete().eq('id', id)
+    navigate('/contacts')
   }
 
   async function handleDndToggle(field) {
@@ -304,15 +313,26 @@ export default function ContactDetail() {
                   {contact.company_name && <p className="text-xs text-gray-500 mt-0.5">{contact.company_name}</p>}
                 </div>
               </div>
-              <button
-                onClick={() => setShowEdit(true)}
-                className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100 transition-colors"
-                title="Edit contact"
-              >
-                <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-                  <path d="M11.5 1.5a1.414 1.414 0 0 1 2 2L5 12l-3 1 1-3 8.5-8.5z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setShowEdit(true)}
+                  className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100 transition-colors"
+                  title="Edit contact"
+                >
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                    <path d="M11.5 1.5a1.414 1.414 0 0 1 2 2L5 12l-3 1 1-3 8.5-8.5z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setShowDelete(true)}
+                  className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors"
+                  title="Delete contact"
+                >
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                    <path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 9a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              </div>
             </div>
 
             {/* Stage selector */}
@@ -726,6 +746,43 @@ export default function ContactDetail() {
           onSave={updated => { setContact(updated); setShowEdit(false) }}
           onClose={() => setShowEdit(false)}
         />
+      )}
+
+      {showDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
+                  <path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 9a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-9" stroke="#ef4444" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-900">Delete Contact</h3>
+                <p className="text-xs text-gray-400 mt-0.5">This cannot be undone</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 mb-5">
+              Are you sure you want to delete <span className="font-semibold text-gray-800">{displayName}</span>? All communication history for this contact will also be permanently removed.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDelete(false)}
+                disabled={deleting}
+                className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex-1 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 disabled:opacity-50 transition-colors"
+              >
+                {deleting ? 'Deleting…' : 'Delete Contact'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
