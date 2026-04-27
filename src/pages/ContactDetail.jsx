@@ -12,6 +12,8 @@ const STAGES = [
   { value: 'won',          label: 'Won',           cls: 'bg-green-50 text-green-700 border-green-200',   dot: 'bg-green-500' },
   { value: 'lost',         label: 'Lost',          cls: 'bg-red-50 text-red-600 border-red-200',         dot: 'bg-red-500' },
   { value: 'nurture',      label: 'Nurture',       cls: 'bg-teal-50 text-teal-700 border-teal-200',      dot: 'bg-teal-500' },
+  { value: 'bt_import',    label: 'BT Import',     cls: 'bg-amber-50 text-amber-700 border-amber-200',   dot: 'bg-amber-500' },
+  { value: 'ghl_import',   label: 'GHL Import',    cls: 'bg-sky-50 text-sky-700 border-sky-200',         dot: 'bg-sky-500' },
 ]
 const stageMap = Object.fromEntries(STAGES.map(s => [s.value, s]))
 

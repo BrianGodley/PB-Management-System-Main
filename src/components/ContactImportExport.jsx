@@ -38,7 +38,7 @@ const EXPORT_FIELDS = [
   { value: 'created_at',     label: 'Date Added',     on: false },
 ]
 
-const VALID_STAGES = ['new_lead','warm_lead','consultation','quoted','won','lost','nurture']
+const VALID_STAGES = ['new_lead','warm_lead','consultation','quoted','won','lost','nurture','bt_import','ghl_import']
 
 // Split "First Last" or "Last, First" into { first_name, last_name }
 function splitFullName(raw) {
