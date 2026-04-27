@@ -5,6 +5,7 @@ import ScheduleCalendar from '../components/ScheduleCalendar'
 import DailyLogs from '../components/DailyLogs'
 import TimeClock from '../components/TimeClock'
 import WorkOrders from '../components/WorkOrders'
+import JobComparison from '../components/JobComparison'
 
 function MoveJobModal({ job, stages, onMove, onClose }) {
   const [selected, setSelected] = useState(job.stage_id || '__none__')
@@ -430,21 +431,11 @@ export default function JobsList() {
 
           {tab === 'tracking'   && (
             selectedJobObj ? (
-              <div className="flex flex-col items-center justify-center h-full gap-4">
-                <p className="text-5xl">📊</p>
-                <h2 className="text-lg font-bold text-gray-800">{selectedJobObj.name || selectedJobObj.client_name}</h2>
-                <p className="text-sm text-gray-400">Open the full tracker for this job</p>
-                <Link
-                  to={`/jobs/${selectedJobObj.id}/tracker`}
-                  className="btn-primary px-6 py-2.5 text-sm rounded-lg"
-                >
-                  Open Tracker
-                </Link>
-              </div>
+              <JobComparison job={selectedJobObj} />
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-gray-400 py-20">
-                <p className="text-4xl mb-3">👆</p>
-                <p className="text-sm">Select a job from the list to open tracking</p>
+                <p className="text-4xl mb-3">📊</p>
+                <p className="text-sm">Select a job to view the comparison</p>
               </div>
             )
           )}

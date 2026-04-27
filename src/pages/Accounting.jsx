@@ -515,7 +515,7 @@ function PaymentModal({ title, maxAmount, onSave, onClose }) {
 // ═════════════════════════════════════════════════════════════════════════════
 // BILLS TAB
 // ═════════════════════════════════════════════════════════════════════════════
-function BillsTab({ bills, vendors, accounts, onRefresh }) {
+function BillsTab({ bills, vendors, accounts, jobs, onRefresh }) {
   const { confirm, dialog } = useConfirm()
   const [filter, setFilter] = useState('all')
   const [modal,  setModal]  = useState(null)
@@ -529,7 +529,7 @@ function BillsTab({ bills, vendors, accounts, onRefresh }) {
   async function saveBill(data, lines) {
     const subtotal = lines.reduce((s, l) => s + Number(l.amount||0), 0)
     const total = subtotal + Number(data.tax_amount||0)
-    const payload = { ...data, subtotal, total, balance_due: total - Number(data.amount_paid||0) }
+    const payload = { ...data, subtotal, total, balance_due: total - Number(data.amount_paid||0), job_id: data.job_id || null }
     if (modal?.id) {
       await supabase.from('acct_bills').update(payload).eq('id', modal.id)
       await supabase.from('acct_bill_lines').delete().eq('bill_id', modal.id)
@@ -616,7 +616,7 @@ function BillsTab({ bills, vendors, accounts, onRefresh }) {
       </div>
 
       {modal && (
-        <BillModal bill={modal === 'new' ? null : modal} vendors={vendors} accounts={accounts}
+        <BillModal bill={modal === 'new' ? null : modal} vendors={vendors} accounts={accounts} jobs={jobs}
           onSave={saveBill} onClose={() => setModal(null)} />
       )}
       {payModal && (
@@ -627,10 +627,11 @@ function BillsTab({ bills, vendors, accounts, onRefresh }) {
   )
 }
 
-function BillModal({ bill, vendors, accounts, onSave, onClose }) {
+function BillModal({ bill, vendors, accounts, jobs, onSave, onClose }) {
   const [form, setForm] = useState({
     vendor_name: bill?.vendor_name || '',
     vendor_id:   bill?.vendor_id   || '',
+    job_id:      bill?.job_id      || '',
     number:      bill?.number      || '',
     date:        bill?.date        || today(),
     due_date:    bill?.due_date    || addDays(today(), 30),
@@ -679,6 +680,15 @@ function BillModal({ bill, vendors, accounts, onSave, onClose }) {
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Due Date</label>
             <input type="date" className="input text-sm w-full" value={form.due_date} onChange={e => setForm(p=>({...p,due_date:e.target.value}))} />
+          </div>
+          <div className="col-span-2">
+            <label className="block text-xs font-medium text-gray-600 mb-1">Job (optional)</label>
+            <select className="input text-sm w-full" value={form.job_id} onChange={e => setForm(p=>({...p,job_id:e.target.value}))}>
+              <option value="">— No job assigned —</option>
+              {(jobs || []).map(j => (
+                <option key={j.id} value={j.id}>{j.name || j.client_name}</option>
+              ))}
+            </select>
           </div>
         </div>
         <div className="border-t border-gray-100 pt-4">
@@ -1362,7 +1372,7 @@ export default function Accounting() {
           <InvoicesTab invoices={invoices} clients={clients} jobs={jobs} accounts={accounts} onRefresh={fetchAll} />
         )}
         {tab === 'bills' && (
-          <BillsTab bills={bills} vendors={vendors} accounts={accounts} onRefresh={fetchAll} />
+          <BillsTab bills={bills} vendors={vendors} accounts={accounts} jobs={jobs} onRefresh={fetchAll} />
         )}
         {tab === 'banking' && (
           <BankingTab bankAccounts={bankAccounts} accounts={accounts} onRefresh={fetchAll} />
