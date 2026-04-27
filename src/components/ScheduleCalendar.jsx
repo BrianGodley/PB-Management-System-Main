@@ -799,10 +799,9 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
   const [schedType,    setSchedType]    = useState(null)    // 'crew_type' | 'work_order'
   const [workOrders,   setWorkOrders]   = useState([])
   const [selectedWOs,  setSelectedWOs]  = useState(new Set())
-  const [woCrewId,     setWoCrewId]     = useState('')
-  const [woSubId,      setWoSubId]      = useState('')
+  // Per-WO crew assignment: { [woId]: { mode: 'crew'|'sub'|'none', crewId: string, subId: string } }
+  const [woAssignments, setWoAssignments] = useState({})
   const [woStartDate,  setWoStartDate]  = useState('')
-  const [woEntryMode,  setWoEntryMode]  = useState('none')  // 'crew' | 'sub' | 'none'
   const [woLoading,    setWoLoading]    = useState(false)
   const [woSaving,     setWoSaving]     = useState(false)
 
@@ -996,7 +995,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
   function closeModal() {
     setPhase(null); setEditItem(null); setForm(EMPTY_FORM); setModalJobId(null); setEntryMode('crew')
     setSchedType(null); setWorkOrders([]); setSelectedWOs(new Set())
-    setWoCrewId(''); setWoSubId(''); setWoStartDate(''); setWoEntryMode('none')
+    setWoAssignments({}); setWoStartDate('')
   }
 
   function updateField(key, val) {
@@ -1059,55 +1058,63 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
     const selWOs = workOrders.filter(w => selectedWOs.has(w.id))
     if (selWOs.length === 0 || !woStartDate || !modalJobId) return
 
-    const totalManDays = selWOs.reduce((s, w) => s + parseFloat(w.man_days || 0), 0)
-    const crewId   = woEntryMode === 'crew' ? woCrewId : null
-    const workDays = calcScheduleDays(totalManDays || 1, crewId)
-    const needsCrew = woEntryMode === 'none'
-
-    const endDate  = dateStr(addWorkDays(toLocalDate(woStartDate), workDays, exceptions, false, false))
-    const crew     = crews.find(c => c.id === woCrewId)
-    const sub      = subs.find(s  => s.id === woSubId)
-
-    let title = ''
-    if (woEntryMode === 'crew' && crew) {
-      title = selWOs.length === 1
-        ? `Crew ${crew.label} — ${selWOs[0].module_type}`
-        : `Crew ${crew.label} — ${selWOs.length} Work Orders`
-    } else if (woEntryMode === 'sub' && sub) {
-      title = selWOs.length === 1
-        ? `${sub.company_name} — ${selWOs[0].module_type}`
-        : `${sub.company_name} — ${selWOs.length} Work Orders`
-    } else {
-      title = selWOs.length === 1 ? selWOs[0].module_type : `${selWOs.length} Work Orders`
-    }
-
-    const payload = {
-      job_id:           modalJobId,
-      title,
-      display_color:    defaultSchedColor,
-      assignee_color:   woEntryMode === 'crew' ? (crewColorMap[woCrewId] || null)
-                      : woEntryMode === 'sub'  ? '#000000'
-                      : null,
-      assignees:        '',
-      start_date:       woStartDate,
-      end_date:         endDate,
-      work_days:        workDays,
-      progress:         0,
-      reminder:         'None',
-      notes:            `WOs: ${selWOs.map(w => w.module_type).join(', ')} · ${totalManDays.toFixed(1)} man-days`,
-      crew_id:          woEntryMode === 'crew' ? (woCrewId || null) : null,
-      sub_id:           woEntryMode === 'sub'  ? (woSubId  || null) : null,
-      include_saturday: false,
-      include_sunday:   false,
-      scheduling_type:  'work_order',
-      work_order_ids:   selWOs.map(w => w.id),
-      needs_crew:       needsCrew,
-    }
-
     setWoSaving(true)
-    const { error } = await supabase.from('schedule_items').insert(payload)
+
+    // Build one schedule_item per selected WO, each with its own crew
+    const schedulePayloads = selWOs.map(wo => {
+      const asgn     = woAssignments[wo.id] || { mode: 'none', crewId: '', subId: '' }
+      const manDays  = parseFloat(wo.man_days || 0) || 1
+      const crewId   = asgn.mode === 'crew' ? asgn.crewId : null
+      const subId    = asgn.mode === 'sub'  ? asgn.subId  : null
+      const needsCrew = asgn.mode === 'none'
+      const workDays = calcScheduleDays(manDays, crewId)
+      const endDate  = dateStr(addWorkDays(toLocalDate(woStartDate), workDays, exceptions, false, false))
+
+      const crew = crews.find(c => c.id === crewId)
+      const sub  = subs.find(s => s.id === subId)
+
+      let title = wo.module_type
+      if (asgn.mode === 'crew' && crew) title = `Crew ${crew.label} — ${wo.module_type}`
+      else if (asgn.mode === 'sub' && sub) title = `${sub.company_name} — ${wo.module_type}`
+
+      return {
+        job_id:           modalJobId,
+        title,
+        display_color:    defaultSchedColor,
+        assignee_color:   asgn.mode === 'crew' ? (crewColorMap[crewId] || null)
+                        : asgn.mode === 'sub'  ? '#000000'
+                        : null,
+        assignees:        '',
+        start_date:       woStartDate,
+        end_date:         endDate,
+        work_days:        workDays,
+        progress:         0,
+        reminder:         'None',
+        notes:            `${manDays.toFixed(1)} man-days`,
+        crew_id:          crewId || null,
+        sub_id:           subId  || null,
+        include_saturday: false,
+        include_sunday:   false,
+        scheduling_type:  'work_order',
+        work_order_ids:   [wo.id],
+        needs_crew:       needsCrew,
+      }
+    })
+
+    // Insert all schedule items
+    const { error: schedErr } = await supabase.from('schedule_items').insert(schedulePayloads)
+    if (schedErr) { console.error('WO schedule save:', schedErr); setWoSaving(false); return }
+
+    // Stamp each work_order with its scheduled crew/sub
+    await Promise.all(selWOs.map(wo => {
+      const asgn = woAssignments[wo.id] || { mode: 'none', crewId: '', subId: '' }
+      return supabase.from('work_orders').update({
+        scheduled_crew_id: asgn.mode === 'crew' ? (asgn.crewId || null) : null,
+        scheduled_sub_id:  asgn.mode === 'sub'  ? (asgn.subId  || null) : null,
+      }).eq('id', wo.id)
+    }))
+
     setWoSaving(false)
-    if (error) { console.error('WO schedule save:', error); return }
     closeModal()
     fetchItems()
   }
@@ -1310,34 +1317,45 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
         </ModalOverlay>
       )}
 
-      {/* ── Work Order Selection + Crew Assignment ────────────── */}
+      {/* ── Work Order Selection + Per-WO Crew Assignment ───────── */}
       {phase === 'wo-select' && (() => {
-        const selWOList   = workOrders.filter(w => selectedWOs.has(w.id))
-        const totalMD     = selWOList.reduce((s, w) => s + parseFloat(w.man_days || 0), 0)
-        const crewId      = woEntryMode === 'crew' ? woCrewId : null
-        const calcDays    = selWOList.length > 0 ? calcScheduleDays(totalMD || 1, crewId) : 0
-        const crewSize    = crewId ? getCrewSize(crewId) : 3
-        const endPreview  = calcDays > 0 && woStartDate
-          ? dateStr(addWorkDays(toLocalDate(woStartDate), calcDays, exceptions, false, false))
-          : null
+        const selWOList = workOrders.filter(w => selectedWOs.has(w.id))
+        const totalMD   = selWOList.reduce((s, w) => s + parseFloat(w.man_days || 0), 0)
 
-        const empDisplay = id => {
+        // Helper: label for a crew option
+        const empName = id => {
           const e = employees.find(em => em.id === id)
           return e ? (e.nickname?.trim() || e.first_name) : null
         }
-        const empFull = id => {
-          const e = employees.find(em => em.id === id)
-          return e ? `${e.first_name} ${e.last_name}` : null
+        const crewOptionLabel = c => {
+          const names = [c.crew_chief_id, c.journeyman_id, c.laborer_1_id, c.laborer_2_id, c.laborer_3_id]
+            .filter(Boolean).map(empName).filter(Boolean)
+          return `Crew ${c.label} — ${names.join(', ')} (${names.length})`
         }
-        const crewLabel = crew => {
-          const names = [crew.crew_chief_id, crew.journeyman_id, crew.laborer_1_id, crew.laborer_2_id, crew.laborer_3_id]
-            .filter(Boolean).map(empDisplay).filter(Boolean)
-          return `Crew ${crew.label} — ${names.join(', ')} (${names.length} men)`
-        }
+
+        // Helper: get or default assignment for a WO
+        const getAsgn = woId => woAssignments[woId] || { mode: 'none', crewId: '', subId: '' }
+        const setAsgn = (woId, patch) => setWoAssignments(prev => ({
+          ...prev, [woId]: { ...getAsgn(woId), ...patch }
+        }))
+
+        // Per-WO day preview
+        const woPreview = selWOList.map(wo => {
+          const asgn    = getAsgn(wo.id)
+          const md      = parseFloat(wo.man_days || 0) || 1
+          const crewId  = asgn.mode === 'crew' ? asgn.crewId : null
+          const days    = calcScheduleDays(md, crewId)
+          const crewSz  = crewId ? getCrewSize(crewId) : 3
+          return { wo, asgn, md, days, crewSz }
+        })
+
+        // Summary counts
+        const totalDays   = woPreview.reduce((s, p) => s + p.days, 0)
+        const needsCrewCt = woPreview.filter(p => p.asgn.mode === 'none').length
 
         return (
           <ModalOverlay onClose={closeModal}>
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col" style={{ maxHeight: '92vh' }}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 flex flex-col" style={{ maxHeight: '94vh' }}>
 
               {/* Header */}
               <div className="px-6 pt-5 pb-4 border-b border-gray-100 flex-shrink-0">
@@ -1346,20 +1364,26 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
                     <h3 className="text-base font-bold text-gray-800">Schedule by Work Order</h3>
                     {modalJobId && <p className="text-xs text-green-700 font-medium mt-0.5">{jobMap[modalJobId]}</p>}
                   </div>
-                  <button onClick={() => setPhase('type-select')} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">← Back</button>
+                  <button onClick={() => setPhase('type-select')} className="text-xs text-gray-400 hover:text-gray-600">← Back</button>
                 </div>
               </div>
 
               <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
 
-                {/* Work Order list */}
+                {/* ── Step 1: Select WOs ── */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Select Work Orders</p>
-                    <button
-                      onClick={() => setSelectedWOs(new Set(workOrders.map(w => w.id)))}
-                      className="text-xs text-green-700 hover:underline"
-                    >Select All</button>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">1 · Select Work Orders</p>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setSelectedWOs(new Set(workOrders.map(w => w.id)))}
+                        className="text-xs text-green-700 hover:underline"
+                      >Select All</button>
+                      {selectedWOs.size > 0 && (
+                        <button onClick={() => { setSelectedWOs(new Set()); setWoAssignments({}) }}
+                          className="text-xs text-gray-400 hover:underline">Clear</button>
+                      )}
+                    </div>
                   </div>
 
                   {woLoading ? (
@@ -1373,150 +1397,193 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
                       <p className="text-xs mt-1">Add work orders in the Work Orders tab first.</p>
                     </div>
                   ) : (
-                    <div className="space-y-1.5 max-h-52 overflow-y-auto border border-gray-200 rounded-xl p-2">
-                      {workOrders.map(wo => {
+                    <div className="border border-gray-200 rounded-xl overflow-hidden">
+                      {workOrders.map((wo, idx) => {
                         const checked = selectedWOs.has(wo.id)
                         return (
-                          <label
+                          <div
                             key={wo.id}
-                            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
-                              checked ? 'bg-green-50 border border-green-200' : 'hover:bg-gray-50 border border-transparent'
-                            }`}
+                            className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors ${idx > 0 ? 'border-t border-gray-100' : ''} ${checked ? 'bg-green-50' : 'hover:bg-gray-50'}`}
+                            onClick={() => setSelectedWOs(prev => {
+                              const next = new Set(prev)
+                              if (next.has(wo.id)) { next.delete(wo.id); setAsgn(wo.id, { mode: 'none', crewId: '', subId: '' }) }
+                              else next.add(wo.id)
+                              return next
+                            })}
                           >
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() => {
-                                setSelectedWOs(prev => {
-                                  const next = new Set(prev)
-                                  next.has(wo.id) ? next.delete(wo.id) : next.add(wo.id)
-                                  return next
-                                })
-                              }}
-                              className="w-4 h-4 rounded accent-green-600"
-                            />
+                            <input type="checkbox" readOnly checked={checked} className="w-4 h-4 rounded accent-green-600 flex-shrink-0" />
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-semibold text-gray-800 truncate">{wo.module_type}</p>
-                              {wo.project_name && <p className="text-xs text-gray-500 truncate">{wo.project_name}</p>}
-                            </div>
-                            <div className="flex-shrink-0 text-right">
-                              {parseFloat(wo.man_days) > 0 && (
-                                <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
-                                  {parseFloat(wo.man_days).toFixed(1)} MD
-                                </span>
+                              {wo.project_name && <p className="text-xs text-gray-400 truncate">{wo.project_name}</p>}
+                              {wo.crew_type && (
+                                <p className="text-[10px] text-purple-600 font-medium mt-0.5">Crew type: {wo.crew_type}</p>
                               )}
                             </div>
-                          </label>
+                            {parseFloat(wo.man_days) > 0 && (
+                              <span className="flex-shrink-0 text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
+                                {parseFloat(wo.man_days).toFixed(1)} MD
+                              </span>
+                            )}
+                          </div>
                         )
                       })}
                     </div>
                   )}
-
                   {selWOList.length > 0 && (
-                    <div className="mt-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
-                      <span className="text-xs text-blue-700 font-medium">
-                        {selWOList.length} WO{selWOList.length !== 1 ? 's' : ''} selected
-                      </span>
-                      <span className="text-xs font-bold text-blue-800">{totalMD.toFixed(1)} total man-days</span>
-                    </div>
+                    <p className="text-xs text-gray-400 mt-1.5 text-right">
+                      {selWOList.length} selected · {totalMD.toFixed(1)} total man-days
+                    </p>
                   )}
                 </div>
 
-                {/* Crew / Sub assignment */}
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Assign Crew or Subcontractor</p>
-                  <div className="flex gap-2 mb-3">
-                    {[
-                      { key: 'crew', label: '👷 Crew' },
-                      { key: 'sub',  label: '🏢 Subcontractor' },
-                      { key: 'none', label: '⏭ Skip for now' },
-                    ].map(opt => (
-                      <button
-                        key={opt.key}
-                        onClick={() => { setWoEntryMode(opt.key); setWoCrewId(''); setWoSubId('') }}
-                        className={`flex-1 py-2 rounded-lg text-xs font-semibold border-2 transition-colors ${
-                          woEntryMode === opt.key
-                            ? 'bg-green-700 text-white border-green-700'
-                            : 'border-gray-200 text-gray-500 hover:border-green-400 hover:text-green-700'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {woEntryMode === 'crew' && (
-                    <div className="space-y-2">
-                      <select
-                        value={woCrewId}
-                        onChange={e => setWoCrewId(e.target.value)}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600"
-                      >
-                        <option value="">— Select a crew —</option>
-                        {crews.map(c => (
-                          <option key={c.id} value={c.id}>{crewLabel(c)}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  {woEntryMode === 'sub' && (
-                    <select
-                      value={woSubId}
-                      onChange={e => setWoSubId(e.target.value)}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600"
-                    >
-                      <option value="">— Select a subcontractor —</option>
-                      {subs.map(s => <option key={s.id} value={s.id}>{s.company_name}</option>)}
-                    </select>
-                  )}
-
-                  {woEntryMode === 'none' && (
-                    <div className="px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-lg">
-                      <p className="text-xs text-amber-700 font-semibold">⚠ No crew assigned</p>
-                      <p className="text-xs text-amber-600 mt-0.5">The calendar item will display with a "Assign Crew" warning. You can assign a crew later by clicking the item.</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Start date + auto-calc preview */}
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Start Date</p>
-                  <input
-                    type="date"
-                    value={woStartDate}
-                    onChange={e => setWoStartDate(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600"
-                  />
-
-                  {selWOList.length > 0 && woStartDate && (
-                    <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-1">
-                      <p className="text-xs font-semibold text-gray-600">Schedule Preview</p>
-                      <div className="grid grid-cols-3 gap-2 text-center">
-                        <div className="bg-white rounded-lg p-2 border border-gray-200">
-                          <p className="text-lg font-bold text-gray-800">{totalMD.toFixed(1)}</p>
-                          <p className="text-[10px] text-gray-400">Man-Days</p>
-                        </div>
-                        <div className="bg-white rounded-lg p-2 border border-gray-200">
-                          <p className="text-lg font-bold text-blue-700">{crewSize}</p>
-                          <p className="text-[10px] text-gray-400">{woEntryMode === 'none' ? 'Default (3)' : 'Crew Size'}</p>
-                        </div>
-                        <div className="bg-green-50 rounded-lg p-2 border border-green-200">
-                          <p className="text-lg font-bold text-green-700">{calcDays}</p>
-                          <p className="text-[10px] text-gray-400">Work Days</p>
-                        </div>
+                {/* ── Step 2: Per-WO crew assignment ── */}
+                {selWOList.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">2 · Assign Crew per Module</p>
+                      {/* Quick-apply: apply one crew to all */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-gray-400">Apply to all:</span>
+                        <select
+                          className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-green-500"
+                          defaultValue=""
+                          onChange={e => {
+                            const val = e.target.value
+                            if (!val) return
+                            const [mode, id] = val.split(':')
+                            selWOList.forEach(wo => setAsgn(wo.id, {
+                              mode,
+                              crewId: mode === 'crew' ? id : '',
+                              subId:  mode === 'sub'  ? id : '',
+                            }))
+                            e.target.value = ''
+                          }}
+                        >
+                          <option value="">— pick —</option>
+                          <optgroup label="Crews">
+                            {crews.map(c => <option key={c.id} value={`crew:${c.id}`}>{`Crew ${c.label}`}</option>)}
+                          </optgroup>
+                          <optgroup label="Subcontractors">
+                            {subs.map(s => <option key={s.id} value={`sub:${s.id}`}>{s.company_name}</option>)}
+                          </optgroup>
+                          <option value="none:">Skip all</option>
+                        </select>
                       </div>
-                      {endPreview && (
-                        <p className="text-xs text-center text-gray-500 pt-1">
-                          {fmtDate(woStartDate)} → <span className="font-semibold text-gray-700">{fmtDate(endPreview)}</span>
-                        </p>
-                      )}
-                      {woEntryMode === 'none' && (
-                        <p className="text-[10px] text-amber-600 text-center">Duration estimated with default 3-man crew</p>
-                      )}
                     </div>
-                  )}
-                </div>
+
+                    <div className="border border-gray-200 rounded-xl overflow-hidden">
+                      {woPreview.map(({ wo, asgn, md, days, crewSz }, idx) => (
+                        <div key={wo.id} className={`px-3 py-3 space-y-2 ${idx > 0 ? 'border-t border-gray-100' : ''}`}>
+                          {/* WO header row */}
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 min-w-0">
+                              <span className="text-sm font-semibold text-gray-800">{wo.module_type}</span>
+                              {wo.crew_type && (
+                                <span className="ml-2 text-[10px] font-medium text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded">
+                                  {wo.crew_type}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-gray-400 flex-shrink-0">{md.toFixed(1)} MD</span>
+                            {woStartDate && (
+                              <span className="text-[10px] font-semibold text-green-700 bg-green-50 px-2 py-0.5 rounded-full flex-shrink-0">
+                                {days} day{days !== 1 ? 's' : ''} ({crewSz} men)
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Crew / Sub / None selector row */}
+                          <div className="flex gap-1.5 items-center">
+                            <div className="flex rounded-lg border border-gray-200 overflow-hidden text-[11px] font-semibold flex-shrink-0">
+                              {[
+                                { key: 'crew', label: '👷' },
+                                { key: 'sub',  label: '🏢' },
+                                { key: 'none', label: '—' },
+                              ].map(opt => (
+                                <button
+                                  key={opt.key}
+                                  onClick={() => setAsgn(wo.id, { mode: opt.key, crewId: '', subId: '' })}
+                                  className={`px-2.5 py-1.5 transition-colors ${asgn.mode === opt.key ? 'bg-green-700 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+                                  title={{ crew: 'Assign Crew', sub: 'Assign Sub', none: 'Skip' }[opt.key]}
+                                >{opt.label}</button>
+                              ))}
+                            </div>
+
+                            {asgn.mode === 'crew' && (
+                              <select
+                                value={asgn.crewId}
+                                onChange={e => setAsgn(wo.id, { crewId: e.target.value })}
+                                className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-green-500"
+                              >
+                                <option value="">— Select crew —</option>
+                                {crews.map(c => <option key={c.id} value={c.id}>{crewOptionLabel(c)}</option>)}
+                              </select>
+                            )}
+                            {asgn.mode === 'sub' && (
+                              <select
+                                value={asgn.subId}
+                                onChange={e => setAsgn(wo.id, { subId: e.target.value })}
+                                className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-green-500"
+                              >
+                                <option value="">— Select sub —</option>
+                                {subs.map(s => <option key={s.id} value={s.id}>{s.company_name}</option>)}
+                              </select>
+                            )}
+                            {asgn.mode === 'none' && (
+                              <span className="text-xs text-amber-600 ml-1">⚠ Will show "Assign Crew" on calendar</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Step 3: Start date + summary ── */}
+                {selWOList.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">3 · Start Date</p>
+                    <input
+                      type="date"
+                      value={woStartDate}
+                      onChange={e => setWoStartDate(e.target.value)}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600"
+                    />
+
+                    {woStartDate && (
+                      <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-xl">
+                        <p className="text-xs font-semibold text-gray-600 mb-2">Summary — {selWOList.length} calendar item{selWOList.length !== 1 ? 's' : ''} will be created</p>
+                        <div className="space-y-1">
+                          {woPreview.map(({ wo, asgn, days }) => {
+                            const crew = crews.find(c => c.id === asgn.crewId)
+                            const sub  = subs.find(s => s.id === asgn.subId)
+                            const end  = dateStr(addWorkDays(toLocalDate(woStartDate), days, exceptions, false, false))
+                            return (
+                              <div key={wo.id} className="flex items-center gap-2 text-xs">
+                                <span className="truncate font-medium text-gray-700 flex-1">{wo.module_type}</span>
+                                <span className="text-gray-400 flex-shrink-0">{fmtDate(woStartDate)}→{fmtDate(end)}</span>
+                                {asgn.mode === 'crew' && crew && (
+                                  <span className="text-[10px] bg-green-100 text-green-800 px-1.5 py-0.5 rounded font-semibold flex-shrink-0">Crew {crew.label}</span>
+                                )}
+                                {asgn.mode === 'sub' && sub && (
+                                  <span className="text-[10px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded font-semibold flex-shrink-0">{sub.company_name}</span>
+                                )}
+                                {asgn.mode === 'none' && (
+                                  <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold flex-shrink-0">⚠ No Crew</span>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                        {needsCrewCt > 0 && (
+                          <p className="text-[10px] text-amber-600 mt-2">
+                            {needsCrewCt} item{needsCrewCt !== 1 ? 's' : ''} will show "Assign Crew" on the calendar.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Footer */}
@@ -1526,7 +1593,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
                   disabled={woSaving || selWOList.length === 0 || !woStartDate}
                   className="flex-1 py-2.5 bg-green-700 text-white rounded-xl text-sm font-semibold hover:bg-green-800 disabled:opacity-50 transition-colors"
                 >
-                  {woSaving ? 'Scheduling…' : `Schedule ${selWOList.length > 0 ? calcDays + ' Day' + (calcDays !== 1 ? 's' : '') : ''}`}
+                  {woSaving ? 'Scheduling…' : `Create ${selWOList.length} Schedule Item${selWOList.length !== 1 ? 's' : ''}`}
                 </button>
                 <button onClick={closeModal} className="px-4 py-2.5 text-sm rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50">
                   Cancel

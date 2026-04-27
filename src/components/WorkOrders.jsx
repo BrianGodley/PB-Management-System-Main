@@ -989,7 +989,7 @@ function WOActionButtons({ workOrders, crewType, jobName, requiredEquipFn, isSub
 // ─────────────────────────────────────────────────────────────────────────────
 // Module Row — one line inside a combined work order card
 // ─────────────────────────────────────────────────────────────────────────────
-function ModuleRow({ wo, jobsMap, onStatusChange, onRowClick }) {
+function ModuleRow({ wo, jobsMap, crewMap, subMap, onStatusChange, onRowClick }) {
   const [updating, setUpdating] = useState(false)
 
   async function cycleStatus(e) {
@@ -1034,6 +1034,16 @@ function ModuleRow({ wo, jobsMap, onStatusChange, onRowClick }) {
             Edited
           </span>
         )}
+        {wo.scheduled_crew_id && crewMap?.[wo.scheduled_crew_id] && (
+          <span className="flex-shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded bg-green-100 text-green-800">
+            👷 Crew {crewMap[wo.scheduled_crew_id].label}
+          </span>
+        )}
+        {wo.scheduled_sub_id && subMap?.[wo.scheduled_sub_id] && (
+          <span className="flex-shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-700">
+            🏢 {subMap[wo.scheduled_sub_id].company_name}
+          </span>
+        )}
       </div>
 
       {/* Right: metrics + status + edit */}
@@ -1060,7 +1070,7 @@ function ModuleRow({ wo, jobsMap, onStatusChange, onRowClick }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Combined Work Order Card
 // ─────────────────────────────────────────────────────────────────────────────
-function CombinedWorkOrderCard({ workOrders, requiredEquipFn, jobsMap, onStatusChange, onRowClick, crewType, jobName }) {
+function CombinedWorkOrderCard({ workOrders, requiredEquipFn, jobsMap, crewMap, subMap, onStatusChange, onRowClick, crewType, jobName }) {
   const totalMD    = workOrders.reduce((s, w) => s + parseFloat(w.man_days     || 0), 0)
   const totalHrs   = workOrders.reduce((s, w) => s + parseFloat(w.labor_hours  || 0), 0)
   const totalLabor = workOrders.reduce((s, w) => s + parseFloat(w.labor_cost   || 0), 0)
@@ -1109,6 +1119,8 @@ function CombinedWorkOrderCard({ workOrders, requiredEquipFn, jobsMap, onStatusC
             key={wo.id}
             wo={wo}
             jobsMap={jobsMap}
+            crewMap={crewMap}
+            subMap={subMap}
             onStatusChange={onStatusChange}
             onRowClick={() => onRowClick(wo)}
           />
@@ -1133,7 +1145,7 @@ function CombinedWorkOrderCard({ workOrders, requiredEquipFn, jobsMap, onStatusC
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub Work Order Card
 // ─────────────────────────────────────────────────────────────────────────────
-function SubWorkOrderCard({ wo, requiredEquip, jobName, onStatusChange, onRowClick, crewType }) {
+function SubWorkOrderCard({ wo, requiredEquip, jobName, crewMap, subMap, onStatusChange, onRowClick, crewType }) {
   const [updating, setUpdating] = useState(false)
 
   async function cycleStatus(e) {
@@ -1166,6 +1178,16 @@ function SubWorkOrderCard({ wo, requiredEquip, jobName, onStatusChange, onRowCli
           )}
           {wo.edited_from_estimate && (
             <span className="flex-shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 uppercase tracking-wide">Edited</span>
+          )}
+          {wo.scheduled_crew_id && crewMap?.[wo.scheduled_crew_id] && (
+            <span className="flex-shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded bg-green-100 text-green-800">
+              👷 Crew {crewMap[wo.scheduled_crew_id].label}
+            </span>
+          )}
+          {wo.scheduled_sub_id && subMap?.[wo.scheduled_sub_id] && (
+            <span className="flex-shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-700">
+              🏢 {subMap[wo.scheduled_sub_id].company_name}
+            </span>
           )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -1208,7 +1230,7 @@ function SubWorkOrderCard({ wo, requiredEquip, jobName, onStatusChange, onRowCli
 // ─────────────────────────────────────────────────────────────────────────────
 // Crew Group
 // ─────────────────────────────────────────────────────────────────────────────
-function CrewGroup({ moduleType, workOrders, requiredEquipFn, jobsMap, onStatusChange, onRowClick, isAllJobs, singleJobName }) {
+function CrewGroup({ moduleType, workOrders, requiredEquipFn, jobsMap, crewMap, subMap, onStatusChange, onRowClick, isAllJobs, singleJobName }) {
   const crewWOs = workOrders.filter(wo => !wo.is_subcontractor)
   const subWOs  = workOrders.filter(wo =>  wo.is_subcontractor)
   const total   = crewWOs.length + subWOs.length
@@ -1261,6 +1283,8 @@ function CrewGroup({ moduleType, workOrders, requiredEquipFn, jobsMap, onStatusC
                     workOrders={crew}
                     requiredEquipFn={requiredEquipFn}
                     jobsMap={{}}
+                    crewMap={crewMap}
+                    subMap={subMap}
                     onStatusChange={onStatusChange}
                     onRowClick={onRowClick}
                     crewType={moduleType}
@@ -1273,6 +1297,8 @@ function CrewGroup({ moduleType, workOrders, requiredEquipFn, jobsMap, onStatusC
                     wo={wo}
                     requiredEquip={requiredEquipFn(wo)}
                     jobName={jobName}
+                    crewMap={crewMap}
+                    subMap={subMap}
                     onStatusChange={onStatusChange}
                     onRowClick={onRowClick}
                     crewType={moduleType}
@@ -1289,6 +1315,8 @@ function CrewGroup({ moduleType, workOrders, requiredEquipFn, jobsMap, onStatusC
                 workOrders={crewWOs}
                 requiredEquipFn={requiredEquipFn}
                 jobsMap={jobsMap}
+                crewMap={crewMap}
+                subMap={subMap}
                 onStatusChange={onStatusChange}
                 onRowClick={onRowClick}
                 crewType={moduleType}
@@ -1301,6 +1329,8 @@ function CrewGroup({ moduleType, workOrders, requiredEquipFn, jobsMap, onStatusC
                 wo={wo}
                 requiredEquip={requiredEquipFn(wo)}
                 jobName={singleJobName}
+                crewMap={crewMap}
+                subMap={subMap}
                 onStatusChange={onStatusChange}
                 onRowClick={onRowClick}
                 crewType={moduleType}
@@ -1322,6 +1352,8 @@ export default function WorkOrders({ jobs, selectedJob }) {
   const [equipmentMap,  setEquipmentMap]  = useState({})
   const [fieldEquipMap, setFieldEquipMap] = useState({})
   const [moduleDataMap, setModuleDataMap] = useState({})
+  const [crewMap,       setCrewMap]       = useState({})
+  const [subMap,        setSubMap]        = useState({})
   const [loading,       setLoading]       = useState(true)
   const [error,         setError]         = useState(null)
   const [statusFilter,  setStatusFilter]  = useState('all')
@@ -1339,12 +1371,14 @@ export default function WorkOrders({ jobs, selectedJob }) {
     setError(null)
 
     const woBase = supabase.from('work_orders').select('*').order('module_type').order('is_subcontractor')
-    const [woRes, ctRes, mapRes, equipRes, fieldMapRes] = await Promise.all([
+    const [woRes, ctRes, mapRes, equipRes, fieldMapRes, crewsRes, subsRes] = await Promise.all([
       jobId ? woBase.eq('job_id', jobId) : woBase,
       supabase.from('crew_types').select('*').order('sort_order').order('name'),
       supabase.from('module_equipment_map').select('module_type, equipment_id'),
       supabase.from('master_equipment').select('*'),
       supabase.from('module_field_equipment_map').select('*'),
+      supabase.from('crews').select('id, label, color').order('label'),
+      supabase.from('subs_vendors').select('id, company_name').order('company_name'),
     ])
 
     if (woRes.error) {
@@ -1369,6 +1403,10 @@ export default function WorkOrders({ jobs, selectedJob }) {
       }
       setEquipmentMap(lookup)
     }
+
+    // Build crew and sub lookup maps
+    setCrewMap(Object.fromEntries((crewsRes.data || []).map(c => [c.id, c])))
+    setSubMap(Object.fromEntries((subsRes.data  || []).map(s => [s.id, s])))
 
     const fMap = {}
     for (const m of fieldMapRes.data || []) {
@@ -1684,6 +1722,8 @@ export default function WorkOrders({ jobs, selectedJob }) {
           workOrders={sectionWOs}
           requiredEquipFn={getRequiredEquip}
           jobsMap={jobsMap}
+          crewMap={crewMap}
+          subMap={subMap}
           onStatusChange={handleStatusChange}
           onRowClick={setDetailWO}
           isAllJobs={!jobId}
