@@ -18,10 +18,10 @@ const PAY_CATS = [
 ]
 
 const FIN_SECTIONS = [
-  { key:'cash_on_hand',   label:'1 — Cash On Hand',         allowAdd: true  },
-  { key:'auto_alloc',     label:'2 — Auto Allocations',     allowAdd: true  },
-  { key:'payroll',        label:'3 — Payroll Allocations',  allowAdd: false },
-  { key:'payables_alloc', label:'4 — Payables Allocations', allowAdd: true  },
+  { key:'cash_on_hand',   label:'1 — Cash On Hand',         allowAdd: true },
+  { key:'auto_alloc',     label:'2 — Auto Allocations',     allowAdd: true },
+  { key:'payroll',        label:'3 — Payroll Allocations',  allowAdd: true },
+  { key:'payables_alloc', label:'4 — Payables Allocations', allowAdd: true },
 ]
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -239,7 +239,9 @@ export default function Collections() {
           const newFinancial = sourceFinancial.map(({ id, week_id, created_at, updated_at, ...rest }) => ({
             ...rest,
             week_id: targetWeek.id,
-            amount: rest.is_formula ? 0 : rest.amount, // formula rows are always computed dynamically
+            // Payroll rows always carry their amount (Payroll + Payroll Taxes persist week to week)
+            // Formula rows for other sections are computed dynamically and reset to 0
+            amount: (rest.is_formula && rest.section !== 'payroll') ? 0 : rest.amount,
           }))
           await supabase.from('collection_financial').insert(newFinancial)
         }
@@ -440,6 +442,7 @@ export default function Collections() {
                   <p>✅ Previously Delivered carries over unchanged</p>
                   <p>✅ All Payables rows copied over as-is</p>
                   <p>✅ All Financial Planning rows copied over as-is</p>
+                  <p>✅ Payroll Allocation amounts (Payroll, Payroll Taxes) carry over</p>
                   <p>🔄 Invoice &amp; Deposit columns will start blank</p>
                 </div>
               )}
