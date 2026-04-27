@@ -10,6 +10,7 @@ const CONTACT_FIELDS = [
   { value: 'last_name',      label: 'Last Name' },
   { value: 'company_name',   label: 'Company' },
   { value: 'phone',          label: 'Phone' },
+  { value: 'cell',           label: 'Cell' },
   { value: 'email',          label: 'Email' },
   { value: 'street_address', label: 'Street Address' },
   { value: 'city',           label: 'City' },
@@ -25,6 +26,7 @@ const EXPORT_FIELDS = [
   { value: 'last_name',      label: 'Last Name',      on: true  },
   { value: 'company_name',   label: 'Company',        on: true  },
   { value: 'phone',          label: 'Phone',          on: true  },
+  { value: 'cell',           label: 'Cell',           on: true  },
   { value: 'email',          label: 'Email',          on: true  },
   { value: 'street_address', label: 'Street Address', on: true  },
   { value: 'city',           label: 'City',           on: true  },
@@ -64,7 +66,8 @@ function autoDetect(header) {
   if (['firstname','fname','first'].includes(h))                                    return 'first_name'
   if (['lastname','lname','last','surname','familyname'].includes(h))               return 'last_name'
   if (['company','companyname','organization','org','business','businessname'].includes(h)) return 'company_name'
-  if (['phone','phonenumber','mobile','cell','cellphone','telephone','tel','ph'].includes(h)) return 'phone'
+  if (['phone','phonenumber','homephone','telephone','tel','ph','workphone'].includes(h))     return 'phone'
+  if (['cell','cellphone','mobile','mobilephone','cellular','cellnumber'].includes(h))       return 'cell'
   if (['email','emailaddress','mail','emailaddr'].includes(h))                      return 'email'
   if (['address','streetaddress','street','addr','streetaddr'].includes(h))         return 'street_address'
   if (['city','town'].includes(h))                                                  return 'city'
@@ -323,6 +326,7 @@ export function ImportModal({ onDone, onClose }) {
         last_name:      r.last_name      || '',
         company_name:   r.company_name   || null,
         phone:          r.phone          || null,
+        cell:           r.cell           || null,
         email:          r.email          || null,
         street_address: r.street_address || null,
         city:           r.city           || null,

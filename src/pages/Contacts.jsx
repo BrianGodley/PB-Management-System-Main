@@ -17,7 +17,7 @@ const stageMap = Object.fromEntries(STAGES.map(s => [s.value, s]))
 
 const EMPTY_FORM = {
   first_name: '', last_name: '', company_name: '',
-  phone: '', email: '',
+  phone: '', cell: '', email: '',
   street_address: '', city: '', state: '', zip: '',
   stage: 'new_lead', source: '',
 }
@@ -40,6 +40,7 @@ function AddContactModal({ onSave, onClose }) {
         last_name:      form.last_name.trim(),
         company_name:   form.company_name.trim() || null,
         phone:          form.phone.trim() || null,
+        cell:           form.cell.trim() || null,
         email:          form.email.trim() || null,
         street_address: form.street_address.trim() || null,
         city:           form.city.trim() || null,
@@ -83,10 +84,14 @@ function AddContactModal({ onSave, onClose }) {
             <input className={input} value={form.company_name} onChange={e => set('company_name', e.target.value)} placeholder="Optional" />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className={label}>Phone</label>
               <input className={input} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(555) 000-0000" />
+            </div>
+            <div>
+              <label className={label}>Cell</label>
+              <input className={input} value={form.cell} onChange={e => set('cell', e.target.value)} placeholder="(555) 000-0000" />
             </div>
             <div>
               <label className={label}>Email</label>
@@ -188,6 +193,7 @@ export default function Contacts() {
         (c.company_name || '').toLowerCase().includes(q) ||
         (c.email || '').toLowerCase().includes(q) ||
         (c.phone || '').toLowerCase().includes(q) ||
+        (c.cell || '').toLowerCase().includes(q) ||
         (c.city || '').toLowerCase().includes(q)
       )
     })
@@ -275,6 +281,7 @@ export default function Contacts() {
                 <th className={thCls} onClick={() => toggleSort('last_name')}>Name{arrow('last_name')}</th>
                 <th className={thCls} onClick={() => toggleSort('company_name')}>Company{arrow('company_name')}</th>
                 <th className={thCls}>Phone</th>
+                <th className={thCls}>Cell</th>
                 <th className={thCls}>Email</th>
                 <th className={thCls} onClick={() => toggleSort('street_address')}>Address{arrow('street_address')}</th>
                 <th className={thCls} onClick={() => toggleSort('city')}>City / State{arrow('city')}</th>
@@ -284,7 +291,7 @@ export default function Contacts() {
             <tbody className="divide-y divide-gray-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-gray-400">
+                  <td colSpan={8} className="px-4 py-10 text-center text-gray-400">
                     {search || stageFilter !== 'all' ? 'No contacts match your filters.' : 'No contacts yet — add your first one.'}
                   </td>
                 </tr>
@@ -302,6 +309,11 @@ export default function Contacts() {
                   <td className="px-4 py-2 text-gray-600">
                     {c.phone
                       ? <a href={`tel:${c.phone}`} className="hover:text-green-700">{c.phone}</a>
+                      : <span className="text-gray-300">—</span>}
+                  </td>
+                  <td className="px-4 py-2 text-gray-600">
+                    {c.cell
+                      ? <a href={`tel:${c.cell}`} className="hover:text-green-700">{c.cell}</a>
                       : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-4 py-2 text-gray-600">

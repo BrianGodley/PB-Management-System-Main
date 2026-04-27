@@ -56,6 +56,7 @@ function EditContactModal({ contact, onSave, onClose }) {
         last_name:      form.last_name?.trim()  || '',
         company_name:   form.company_name?.trim() || null,
         phone:          form.phone?.trim() || null,
+        cell:           form.cell?.trim() || null,
         email:          form.email?.trim() || null,
         street_address: form.street_address?.trim() || null,
         city:           form.city?.trim() || null,
@@ -87,8 +88,9 @@ function EditContactModal({ contact, onSave, onClose }) {
             <div><label className={lbl}>Last Name</label><input className={inp} value={form.last_name || ''} onChange={e => set('last_name', e.target.value)} /></div>
           </div>
           <div><label className={lbl}>Company</label><input className={inp} value={form.company_name || ''} onChange={e => set('company_name', e.target.value)} /></div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div><label className={lbl}>Phone</label><input className={inp} value={form.phone || ''} onChange={e => set('phone', e.target.value)} /></div>
+            <div><label className={lbl}>Cell</label><input className={inp} value={form.cell || ''} onChange={e => set('cell', e.target.value)} /></div>
             <div><label className={lbl}>Email</label><input className={inp} value={form.email || ''} onChange={e => set('email', e.target.value)} /></div>
           </div>
           <div><label className={lbl}>Street Address</label><input className={inp} value={form.street_address || ''} onChange={e => set('street_address', e.target.value)} /></div>
@@ -258,6 +260,12 @@ export default function ContactDetail() {
                 <div>
                   <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Phone</p>
                   <a href={`tel:${contact.phone}`} className="text-gray-700 hover:text-green-700">{contact.phone}</a>
+                </div>
+              )}
+              {contact.cell && (
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Cell</p>
+                  <a href={`tel:${contact.cell}`} className="text-gray-700 hover:text-green-700">{contact.cell}</a>
                 </div>
               )}
               {contact.email && (
