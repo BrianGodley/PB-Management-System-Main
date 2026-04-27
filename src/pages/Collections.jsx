@@ -929,7 +929,6 @@ function PayableTable({ cat, rows, subtotal, onUpdate, onDelete, onAdd }) {
             {cat.cols.map(c => (
               <th key={c} className={`px-3 py-2 font-semibold text-gray-500 ${AMOUNT_COLS.has(c) ? 'text-right' : 'text-left'}`}>
                 {getLabel(c)}
-                {readOnly.has(c) && <span className="text-gray-300 font-normal ml-1 text-[9px]">auto</span>}
               </th>
             ))}
             <th className="w-8" />
