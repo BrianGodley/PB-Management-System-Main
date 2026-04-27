@@ -288,12 +288,13 @@ export default function Contacts() {
                 <th className={thCls} onClick={() => toggleSort('street_address')}>Address{arrow('street_address')}</th>
                 <th className={thCls} onClick={() => toggleSort('city')}>City / State{arrow('city')}</th>
                 <th className={thCls} onClick={() => toggleSort('stage')}>Stage{arrow('stage')}</th>
+                <th className={thCls} onClick={() => toggleSort('created_at')}>Created{arrow('created_at')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-gray-400">
+                  <td colSpan={9} className="px-4 py-10 text-center text-gray-400">
                     {search || stageFilter !== 'all' ? 'No contacts match your filters.' : 'No contacts yet — add your first one.'}
                   </td>
                 </tr>
@@ -333,6 +334,9 @@ export default function Contacts() {
                         {stageMap[c.stage].label}
                       </span>
                     ) : '—'}
+                  </td>
+                  <td className="px-4 py-2 text-gray-400 whitespace-nowrap">
+                    {c.created_at ? new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
                   </td>
                 </tr>
               ))}

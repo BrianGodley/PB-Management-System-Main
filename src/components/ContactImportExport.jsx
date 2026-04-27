@@ -35,7 +35,7 @@ const EXPORT_FIELDS = [
   { value: 'stage',          label: 'Stage',          on: true  },
   { value: 'source',         label: 'Lead Source',    on: false },
   { value: 'notes',          label: 'Notes',          on: false },
-  { value: 'created_at',     label: 'Date Added',     on: false },
+  { value: 'created_at',     label: 'Date Added',     on: true  },
 ]
 
 const VALID_STAGES = ['new_lead','warm_lead','consultation','quoted','won','lost','nurture','bt_import','ghl_import']
