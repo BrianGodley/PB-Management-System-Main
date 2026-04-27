@@ -6,6 +6,8 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Clients from './pages/Clients'
 import ClientDetail from './pages/ClientDetail'
+import Contacts from './pages/Contacts'
+import ContactDetail from './pages/ContactDetail'
 import NewJob from './pages/NewJob'
 import JobDetail from './pages/JobDetail'
 import JobsList from './pages/JobsList'
@@ -67,7 +69,9 @@ function AppRoutes() {
           <Layout />
         </ProtectedRoute>
       }>
-        <Route index element={<Clients />} />
+        <Route index element={<Contacts />} />
+        <Route path="contacts" element={<Contacts />} />
+        <Route path="contacts/:id" element={<ContactDetail />} />
         <Route path="clients" element={<Clients />} />
         <Route path="clients/:id" element={<ClientDetail />} />
         <Route path="jobs" element={<JobsList />} />
