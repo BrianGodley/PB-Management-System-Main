@@ -198,23 +198,20 @@ export default function Contacts() {
     else { setSortField(field); setSortAsc(true) }
   }
 
-  const thCls = 'px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none hover:text-gray-800 transition-colors'
+  const thCls = 'text-left px-4 py-2 font-semibold text-gray-600 uppercase cursor-pointer select-none hover:text-gray-800 transition-colors'
   const arrow = field => sortField === field ? (sortAsc ? ' ↑' : ' ↓') : ''
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div>
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Contacts</h1>
-          <p className="text-sm text-gray-400 mt-0.5">{contacts.length.toLocaleString()} total</p>
-        </div>
+      <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
+        <h1 className="text-xl font-bold text-gray-900">Contacts</h1>
         <button
           onClick={() => setShowAdd(true)}
           className="flex items-center gap-2 px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 transition-colors"
         >
-          <span className="text-lg leading-none">+</span> Add Contact
+          + Add Contact
         </button>
       </div>
 
@@ -254,10 +251,10 @@ export default function Contacts() {
       ) : error ? (
         <div className="text-red-500 text-sm py-8 text-center">{error}</div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <table className="table-fixed w-full text-xs">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
                 <th className={thCls} onClick={() => toggleSort('last_name')}>Name{arrow('last_name')}</th>
                 <th className={thCls} onClick={() => toggleSort('company_name')}>Company{arrow('company_name')}</th>
                 <th className={thCls}>Phone</th>
@@ -270,36 +267,36 @@ export default function Contacts() {
             <tbody className="divide-y divide-gray-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-gray-400 text-sm">
+                  <td colSpan={7} className="px-4 py-10 text-center text-gray-400">
                     {search || stageFilter !== 'all' ? 'No contacts match your filters.' : 'No contacts yet — add your first one.'}
                   </td>
                 </tr>
               ) : filtered.map(c => (
                 <tr key={c.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-2">
                     <button
                       onClick={() => navigate(`/contacts/${c.id}`)}
-                      className="text-sm font-semibold text-green-700 hover:text-green-900 hover:underline text-left"
+                      className="font-semibold text-green-700 hover:text-green-900 hover:underline text-left"
                     >
                       {c.last_name}{c.first_name ? `, ${c.first_name}` : ''}
                     </button>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{c.company_name || <span className="text-gray-300">—</span>}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
+                  <td className="px-4 py-2 text-gray-600">{c.company_name || <span className="text-gray-300">—</span>}</td>
+                  <td className="px-4 py-2 text-gray-600">
                     {c.phone
                       ? <a href={`tel:${c.phone}`} className="hover:text-green-700">{c.phone}</a>
                       : <span className="text-gray-300">—</span>}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
+                  <td className="px-4 py-2 text-gray-600">
                     {c.email
                       ? <a href={`mailto:${c.email}`} className="hover:text-green-700 truncate max-w-[180px] block">{c.email}</a>
                       : <span className="text-gray-300">—</span>}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{c.street_address || <span className="text-gray-300">—</span>}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
+                  <td className="px-4 py-2 text-gray-600">{c.street_address || <span className="text-gray-300">—</span>}</td>
+                  <td className="px-4 py-2 text-gray-600">
                     {[c.city, c.state].filter(Boolean).join(', ') || <span className="text-gray-300">—</span>}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-2">
                     {stageMap[c.stage] ? (
                       <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold border ${stageMap[c.stage].cls}`}>
                         {stageMap[c.stage].label}
@@ -314,7 +311,7 @@ export default function Contacts() {
       )}
 
       {filtered.length > 0 && (
-        <p className="text-xs text-gray-400 mt-3">{filtered.length} of {contacts.length} contacts</p>
+        <p className="text-xs text-gray-400 mt-2">{filtered.length} of {contacts.length} contacts</p>
       )}
 
       {showAdd && (
