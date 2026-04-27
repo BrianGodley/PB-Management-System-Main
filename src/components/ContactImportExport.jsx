@@ -23,6 +23,9 @@ const CONTACT_FIELDS = [
   { value: 'notes',                label: 'Notes' },
   { value: 'project_description', label: 'Project Description' },
   { value: 'tags',                label: 'Tags (comma-separated)' },
+  { value: 'dnd_phone',           label: 'DND Phone (true/false)' },
+  { value: 'dnd_email',           label: 'DND Email (true/false)' },
+  { value: 'dnd_sms',             label: 'DND SMS (true/false)' },
 ]
 
 const EXPORT_FIELDS = [
@@ -43,7 +46,10 @@ const EXPORT_FIELDS = [
   { value: 'notes',                label: 'Notes',               on: false },
   { value: 'project_description', label: 'Project Description', on: false },
   { value: 'tags',                label: 'Tags',                on: false },
-  { value: 'created_at',     label: 'Date Added',     on: true  },
+  { value: 'dnd_phone',           label: 'DND Phone',           on: false },
+  { value: 'dnd_email',           label: 'DND Email',           on: false },
+  { value: 'dnd_sms',             label: 'DND SMS',             on: false },
+  { value: 'created_at',          label: 'Date Added',          on: true  },
 ]
 
 const VALID_STAGES = ['new_lead','warm_lead','consultation','quoted','won','lost','nurture','bt_import','ghl_import']
@@ -86,8 +92,18 @@ function autoDetect(header) {
   if (['source','leadsource','contactsource','referral','origin','howfound'].includes(h)) return 'source'
   if (['dob','dateofbirth','birthdate','birthday'].includes(h))                     return 'date_of_birth'
   if (['notes','note','comments','comment','memo','description'].includes(h))       return 'notes'
+  if (['projectdescription','projectdesc','project','projectdetails'].includes(h))  return 'project_description'
   if (['tags','tag','labels','label','categories'].includes(h))                     return 'tags'
+  if (['dndphone','donotcallphone','nophone','phonednd'].includes(h))               return 'dnd_phone'
+  if (['dndemail','donotcallemail','noemail','emaildnd'].includes(h))               return 'dnd_email'
+  if (['dndsms','donotcallsms','nosms','smsdnd','dndtext'].includes(h))             return 'dnd_sms'
   return ''
+}
+
+// Parse boolean-like values from imported files
+function parseBool(val) {
+  const v = String(val || '').trim().toLowerCase()
+  return ['true','yes','1','y','on'].includes(v)
 }
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
@@ -122,6 +138,8 @@ export function ExportModal({ contacts, onClose }) {
             return new Date(c[col.value]).toLocaleDateString()
           if (col.value === 'tags')
             return (c.tags || []).join(', ')
+          if (['dnd_phone','dnd_email','dnd_sms'].includes(col.value))
+            return c[col.value] ? 'true' : 'false'
           return c[col.value] ?? ''
         })
       )
@@ -352,6 +370,9 @@ export function ImportModal({ onDone, onClose }) {
         notes:               r.notes               || null,
         project_description: r.project_description || null,
         tags:                r.tags ? r.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+        dnd_phone:           r.dnd_phone ? parseBool(r.dnd_phone) : false,
+        dnd_email:           r.dnd_email ? parseBool(r.dnd_email) : false,
+        dnd_sms:             r.dnd_sms   ? parseBool(r.dnd_sms)   : false,
       }))
 
       let inserted = 0
