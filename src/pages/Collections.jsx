@@ -242,6 +242,7 @@ export default function Collections() {
             // Payroll rows always carry their amount (Payroll + Payroll Taxes persist week to week)
             // Formula rows for other sections are computed dynamically and reset to 0
             amount: (rest.is_formula && rest.section !== 'payroll') ? 0 : rest.amount,
+            is_paid: false, // paid status resets each week
           }))
           await supabase.from('collection_financial').insert(newFinancial)
         }
@@ -326,7 +327,7 @@ export default function Collections() {
   async function updateFinancial(id, field, value) {
     const parsed = field === 'amount' ? (parseFloat(value) || 0) : value
     setFinancial(prev => prev.map(f => f.id === id ? { ...f, [field]: parsed } : f))
-    await supabase.from('collection_financial').update({ [field]: parsed }).eq('id', id)
+    await supabase.from('collection_financial').update({ [field]: parsed, updated_at: new Date().toISOString() }).eq('id', id)
   }
 
   async function deleteFinancial(id) {
@@ -911,6 +912,7 @@ const PAY_ALLOC_SUBS = [
 
 function PayablesAllocSection({ rows, onUpdate, onDelete, onAddFromPayable, paySubtotalFn, payablesByCategory }) {
   const [openDropdown, setOpenDropdown] = useState(null)
+  const [confirmPay,   setConfirmPay]   = useState(null) // row to confirm paying
   const sectionTotal = rows.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0)
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col">
@@ -967,13 +969,37 @@ function PayablesAllocSection({ rows, onUpdate, onDelete, onAddFromPayable, payS
               <table className="w-full text-xs">
                 <tbody className="divide-y divide-gray-100">
                   {subRows.map(row => (
-                    <tr key={row.id} className="hover:bg-gray-50 group">
-                      <td className="px-3 py-1.5 text-gray-700">{row.label}</td>
-                      <td className="px-2 py-1 w-28">
+                    <tr
+                      key={row.id}
+                      className={`group transition-colors ${row.is_paid ? 'bg-green-50' : 'hover:bg-gray-50'}`}
+                    >
+                      <td className="px-3 py-1.5">
+                        <button
+                          onClick={() => !row.is_paid && setConfirmPay(row)}
+                          className={`text-left w-full transition-colors ${
+                            row.is_paid
+                              ? 'text-green-700 line-through decoration-green-400 cursor-default'
+                              : 'text-gray-700 hover:text-blue-700 cursor-pointer'
+                          }`}
+                          title={row.is_paid ? 'Paid' : 'Click to mark as paid'}
+                        >
+                          {row.is_paid && <span className="mr-1">✓</span>}
+                          {row.label}
+                        </button>
+                      </td>
+                      <td className={`px-2 py-1 w-28 ${row.is_paid ? 'opacity-50' : ''}`}>
                         <CellInput value={row.amount||''} onSave={v => onUpdate(row.id,'amount',v)} />
                       </td>
                       <td className="px-1 text-center w-8">
-                        <button onClick={() => onDelete(row.id)} className="text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+                        {row.is_paid ? (
+                          <button
+                            onClick={() => onUpdate(row.id, 'is_paid', false)}
+                            className="text-green-400 hover:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity text-[10px]"
+                            title="Undo paid"
+                          >↩</button>
+                        ) : (
+                          <button onClick={() => onDelete(row.id)} className="text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -983,6 +1009,34 @@ function PayablesAllocSection({ rows, onUpdate, onDelete, onAddFromPayable, payS
           </div>
         )
       })}
+
+      {/* Mark as Paid confirmation modal */}
+      {confirmPay && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setConfirmPay(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-green-700 px-5 py-3.5">
+              <h3 className="text-white font-bold text-sm">Mark as Paid?</h3>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-sm text-gray-700">
+                Mark <strong className="text-gray-900">{confirmPay.label}</strong> as paid
+                {confirmPay.amount ? ` (${fmtC(parseFloat(confirmPay.amount))})` : ''}?
+              </p>
+              <p className="text-xs text-gray-400 mt-1">The row will be highlighted to show it has been paid.</p>
+            </div>
+            <div className="px-5 pb-5 flex gap-3">
+              <button
+                onClick={() => setConfirmPay(null)}
+                className="flex-1 py-2 rounded-xl text-sm font-semibold border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+              >No</button>
+              <button
+                onClick={() => { onUpdate(confirmPay.id, 'is_paid', true); setConfirmPay(null) }}
+                className="flex-1 py-2 rounded-xl text-sm font-bold text-white bg-green-700 hover:bg-green-800 transition-colors"
+              >Yes, Mark Paid</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
