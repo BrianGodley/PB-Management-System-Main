@@ -25,11 +25,13 @@ const EMPTY_FORM = {
 function AddContactModal({ onSave, onClose }) {
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState(null)
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
 
   async function handleSave() {
     if (!form.last_name.trim() && !form.first_name.trim()) return
     setSaving(true)
+    setSaveError(null)
     const { data, error } = await supabase
       .from('contacts')
       .insert({
@@ -48,7 +50,8 @@ function AddContactModal({ onSave, onClose }) {
       .select()
       .single()
     setSaving(false)
-    if (!error && data) onSave(data)
+    if (error) { setSaveError(error.message); return }
+    if (data) onSave(data)
   }
 
   const input = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600'
@@ -124,7 +127,13 @@ function AddContactModal({ onSave, onClose }) {
           </div>
         </div>
 
-        <div className="flex gap-3 mt-6">
+        {saveError && (
+          <div className="mt-4 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600">
+            {saveError}
+          </div>
+        )}
+
+        <div className="flex gap-3 mt-4">
           <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">Cancel</button>
           <button
             onClick={handleSave}

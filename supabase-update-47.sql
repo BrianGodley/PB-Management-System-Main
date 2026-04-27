@@ -46,6 +46,18 @@ CREATE TRIGGER contacts_updated_at
   FOR EACH ROW EXECUTE FUNCTION update_contacts_updated_at();
 
 -- Indexes
-CREATE INDEX IF NOT EXISTS contacts_stage_idx       ON contacts(stage);
-CREATE INDEX IF NOT EXISTS contacts_last_name_idx   ON contacts(last_name);
+CREATE INDEX IF NOT EXISTS contacts_stage_idx        ON contacts(stage);
+CREATE INDEX IF NOT EXISTS contacts_last_name_idx    ON contacts(last_name);
 CREATE INDEX IF NOT EXISTS contact_comms_contact_idx ON contact_communications(contact_id);
+
+-- RLS Policies (authenticated users can read/write all contacts)
+ALTER TABLE contacts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE contact_communications ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "contacts_all" ON contacts;
+CREATE POLICY "contacts_all" ON contacts
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "contact_comms_all" ON contact_communications;
+CREATE POLICY "contact_comms_all" ON contact_communications
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
