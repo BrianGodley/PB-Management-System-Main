@@ -21,7 +21,7 @@ const EMPTY_FORM = {
   first_name: '', last_name: '', company_name: '',
   phone: '', cell: '', email: '',
   street_address: '', city: '', state: '', zip: '',
-  stage: 'new_lead', contact_type: '', source: '',
+  stage: 'new_lead', contact_type: '', source: '', project_description: '',
 }
 
 // ── Add Contact Modal ─────────────────────────────────────────────────────────
@@ -50,7 +50,8 @@ function AddContactModal({ onSave, onClose }) {
         zip:            form.zip.trim() || null,
         stage:          form.stage,
         contact_type:   form.contact_type || null,
-        source:         form.source.trim() || null,
+        source:              form.source.trim() || null,
+        project_description: form.project_description.trim() || null,
       })
       .select()
       .single()
@@ -142,6 +143,11 @@ function AddContactModal({ onSave, onClose }) {
               <label className={label}>Contact Source</label>
               <input className={input} value={form.source} onChange={e => set('source', e.target.value)} placeholder="Referral, Google…" />
             </div>
+          </div>
+
+          <div>
+            <label className={label}>Project Description</label>
+            <textarea className={input + ' resize-none'} rows={3} value={form.project_description} onChange={e => set('project_description', e.target.value)} placeholder="Describe the project or work needed…" />
           </div>
         </div>
 

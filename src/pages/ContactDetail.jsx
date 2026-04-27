@@ -65,9 +65,10 @@ function EditContactModal({ contact, onSave, onClose }) {
         state:          form.state?.trim() || null,
         zip:            form.zip?.trim() || null,
         contact_type:   form.contact_type || null,
-        source:         form.source?.trim() || null,
-        date_of_birth:  form.date_of_birth || null,
-        notes:          form.notes?.trim() || null,
+        source:              form.source?.trim() || null,
+        date_of_birth:       form.date_of_birth || null,
+        notes:               form.notes?.trim() || null,
+        project_description: form.project_description?.trim() || null,
       })
       .eq('id', contact.id)
       .select()
@@ -122,6 +123,10 @@ function EditContactModal({ contact, onSave, onClose }) {
           <div>
             <label className={lbl}>Notes</label>
             <textarea className={inp + ' resize-none'} rows={3} value={form.notes || ''} onChange={e => set('notes', e.target.value)} placeholder="Internal notes…" />
+          </div>
+          <div>
+            <label className={lbl}>Project Description</label>
+            <textarea className={inp + ' resize-none'} rows={3} value={form.project_description || ''} onChange={e => set('project_description', e.target.value)} placeholder="Describe the project or work needed…" />
           </div>
         </div>
         <div className="flex gap-3 mt-6">
@@ -376,6 +381,12 @@ export default function ContactDetail() {
                   <div>
                     <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Notes</p>
                     <p className="text-gray-600 text-xs leading-relaxed whitespace-pre-wrap">{contact.notes}</p>
+                  </div>
+                )}
+                {contact.project_description && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Project Description</p>
+                    <p className="text-gray-600 text-xs leading-relaxed whitespace-pre-wrap">{contact.project_description}</p>
                   </div>
                 )}
               </div>

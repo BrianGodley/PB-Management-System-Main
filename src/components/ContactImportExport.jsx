@@ -20,8 +20,9 @@ const CONTACT_FIELDS = [
   { value: 'stage',          label: 'Stage' },
   { value: 'source',         label: 'Contact Source' },
   { value: 'date_of_birth',  label: 'Date of Birth' },
-  { value: 'notes',          label: 'Notes' },
-  { value: 'tags',           label: 'Tags (comma-separated)' },
+  { value: 'notes',                label: 'Notes' },
+  { value: 'project_description', label: 'Project Description' },
+  { value: 'tags',                label: 'Tags (comma-separated)' },
 ]
 
 const EXPORT_FIELDS = [
@@ -39,8 +40,9 @@ const EXPORT_FIELDS = [
   { value: 'stage',          label: 'Stage',          on: true  },
   { value: 'source',         label: 'Contact Source', on: false },
   { value: 'date_of_birth',  label: 'Date of Birth',  on: false },
-  { value: 'notes',          label: 'Notes',          on: false },
-  { value: 'tags',           label: 'Tags',           on: false },
+  { value: 'notes',                label: 'Notes',               on: false },
+  { value: 'project_description', label: 'Project Description', on: false },
+  { value: 'tags',                label: 'Tags',                on: false },
   { value: 'created_at',     label: 'Date Added',     on: true  },
 ]
 
@@ -347,8 +349,9 @@ export function ImportModal({ onDone, onClose }) {
         stage:          VALID_STAGES.includes(r.stage) ? r.stage : 'new_lead',
         source:         r.source         || null,
         date_of_birth:  r.date_of_birth  || null,
-        notes:          r.notes          || null,
-        tags:           r.tags ? r.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+        notes:               r.notes               || null,
+        project_description: r.project_description || null,
+        tags:                r.tags ? r.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
       }))
 
       let inserted = 0
