@@ -208,6 +208,8 @@ function AddContactModal({ onSave, onClose }) {
 // ── Main Contacts List ────────────────────────────────────────────────────────
 export default function Contacts() {
   const navigate = useNavigate()
+  const PAGE_SIZE = 50
+
   const [contacts,    setContacts]    = useState([])
   const [loading,     setLoading]     = useState(true)
   const [error,       setError]       = useState(null)
@@ -218,20 +220,34 @@ export default function Contacts() {
   const [showExport,  setShowExport]  = useState(false)
   const [sortField,   setSortField]   = useState('last_name')
   const [sortAsc,     setSortAsc]     = useState(true)
+  const [page,        setPage]        = useState(0)
 
   async function fetchContacts() {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('contacts')
-      .select('*')
-      .order('last_name', { ascending: true })
-      .order('first_name', { ascending: true })
-    if (error) setError(error.message)
-    else setContacts(data || [])
+    // Fetch in pages of 1000 to bypass Supabase's default row cap
+    let all = []
+    let from = 0
+    const BATCH = 1000
+    while (true) {
+      const { data, error } = await supabase
+        .from('contacts')
+        .select('*')
+        .order('last_name', { ascending: true })
+        .order('first_name', { ascending: true })
+        .range(from, from + BATCH - 1)
+      if (error) { setError(error.message); break }
+      all = [...all, ...(data || [])]
+      if (!data || data.length < BATCH) break
+      from += BATCH
+    }
+    setContacts(all)
     setLoading(false)
   }
 
   useEffect(() => { fetchContacts() }, [])
+
+  // Reset to first page when filters change
+  useEffect(() => { setPage(0) }, [search, stageFilter])
 
   // Filter + sort
   const q = search.toLowerCase()
@@ -257,6 +273,11 @@ export default function Contacts() {
     if (sortField === field) setSortAsc(v => !v)
     else { setSortField(field); setSortAsc(true) }
   }
+
+  const totalPages  = Math.ceil(filtered.length / PAGE_SIZE)
+  const paginated   = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  const rangeStart  = filtered.length === 0 ? 0 : page * PAGE_SIZE + 1
+  const rangeEnd    = Math.min((page + 1) * PAGE_SIZE, filtered.length)
 
   const thCls = 'text-left px-4 py-2 font-semibold text-gray-600 uppercase cursor-pointer select-none hover:text-gray-800 transition-colors'
   const arrow = field => sortField === field ? (sortAsc ? ' ↑' : ' ↓') : ''
@@ -347,7 +368,7 @@ export default function Contacts() {
                     {search || stageFilter !== 'all' ? 'No contacts match your filters.' : 'No contacts yet — add your first one.'}
                   </td>
                 </tr>
-              ) : filtered.map(c => (
+              ) : paginated.map(c => (
                 <tr key={c.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-2">
                     <button
@@ -394,8 +415,72 @@ export default function Contacts() {
         </div>
       )}
 
+      {/* Pagination */}
       {filtered.length > 0 && (
-        <p className="text-xs text-gray-400 mt-2">{filtered.length} of {contacts.length} contacts</p>
+        <div className="flex items-center justify-between mt-3">
+          <p className="text-xs text-gray-400">
+            {rangeStart}–{rangeEnd} of {filtered.length.toLocaleString()} contact{filtered.length !== 1 ? 's' : ''}
+            {contacts.length !== filtered.length && ` (${contacts.length.toLocaleString()} total)`}
+          </p>
+
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1">
+              {/* First */}
+              <button
+                onClick={() => setPage(0)}
+                disabled={page === 0}
+                className="px-2 py-1 rounded text-xs text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-default"
+                title="First page"
+              >«</button>
+
+              {/* Prev */}
+              <button
+                onClick={() => setPage(p => Math.max(0, p - 1))}
+                disabled={page === 0}
+                className="px-2 py-1 rounded text-xs text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-default"
+              >‹ Prev</button>
+
+              {/* Page number pills */}
+              {(() => {
+                const pages = []
+                const delta = 2
+                const left  = Math.max(0, page - delta)
+                const right = Math.min(totalPages - 1, page + delta)
+                if (left > 0)  pages.push(0, left > 1 ? '…' : null)
+                for (let i = left; i <= right; i++) pages.push(i)
+                if (right < totalPages - 1) pages.push(right < totalPages - 2 ? '…' : null, totalPages - 1)
+                return pages.filter((v, i, a) => v !== null && a.indexOf(v) === i).map((p, i) =>
+                  p === '…'
+                    ? <span key={`ellipsis-${i}`} className="px-1 text-xs text-gray-300">…</span>
+                    : <button
+                        key={p}
+                        onClick={() => setPage(p)}
+                        className={`w-7 h-7 rounded text-xs font-medium transition-colors ${
+                          page === p
+                            ? 'bg-green-700 text-white'
+                            : 'text-gray-500 hover:bg-gray-100'
+                        }`}
+                      >{p + 1}</button>
+                )
+              })()}
+
+              {/* Next */}
+              <button
+                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                disabled={page >= totalPages - 1}
+                className="px-2 py-1 rounded text-xs text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-default"
+              >Next ›</button>
+
+              {/* Last */}
+              <button
+                onClick={() => setPage(totalPages - 1)}
+                disabled={page >= totalPages - 1}
+                className="px-2 py-1 rounded text-xs text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-default"
+                title="Last page"
+              >»</button>
+            </div>
+          )}
+        </div>
       )}
 
       {showAdd && (
