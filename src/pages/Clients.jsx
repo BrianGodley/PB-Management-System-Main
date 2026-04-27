@@ -193,30 +193,34 @@ export default function Clients() {
     switch (col.key) {
       case 'name':
         return (
-          <Link to={`/clients/${client.id}`} className="text-sm font-medium text-green-700 hover:underline truncate block">
+          <Link to={`/clients/${client.id}`} className="font-semibold text-green-700 hover:text-green-900 hover:underline truncate block">
             {displayName(client)}
           </Link>
         )
       case 'company_name':
         return client.company_name
-          ? <span className="text-xs font-medium text-gray-700 truncate block">{client.company_name}</span>
-          : <span className="text-xs text-gray-300">—</span>
+          ? <span className="text-gray-600 truncate block">{client.company_name}</span>
+          : <span className="text-gray-300">—</span>
       case 'company_position':
         return client.company_position
-          ? <span className="text-xs text-gray-600 truncate block">{client.company_position}</span>
-          : <span className="text-xs text-gray-300">—</span>
+          ? <span className="text-gray-600 truncate block">{client.company_position}</span>
+          : <span className="text-gray-300">—</span>
       case 'phone':
-        return <span className="text-xs text-gray-600">{client.phone || '—'}</span>
+        return client.phone
+          ? <a href={`tel:${client.phone}`} className="text-gray-600 hover:text-green-700">{client.phone}</a>
+          : <span className="text-gray-300">—</span>
       case 'email':
-        return <span className="text-xs text-gray-600 truncate block">{client.email || '—'}</span>
+        return client.email
+          ? <a href={`mailto:${client.email}`} className="text-gray-600 hover:text-green-700 truncate block">{client.email}</a>
+          : <span className="text-gray-300">—</span>
       case 'street':
-        return <span className="text-xs text-gray-500 truncate block">{client.street || '—'}</span>
+        return <span className="text-gray-600 truncate block">{client.street || <span className="text-gray-300">—</span>}</span>
       case 'city_state':
-        return <span className="text-xs text-gray-500 truncate block">
+        return <span className="text-gray-600 truncate block">
           {client.city ? `${client.city}${client.state ? ', ' + client.state : ''}` : '—'}
         </span>
       case 'notes':
-        return <span className="text-xs text-gray-400 italic truncate block">{client.notes || '—'}</span>
+        return <span className="text-gray-400 italic truncate block">{client.notes || '—'}</span>
       default:
         return null
     }
