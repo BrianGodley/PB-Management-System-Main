@@ -11,10 +11,10 @@ const DAYS = ['mon','tue','wed','thu','fri']
 const DAY_LABELS = { mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday', fri:'Friday' }
 
 const PAY_CATS = [
-  { key:'prelim',         label:'Prelims',         cols:['payee','amount_current'],                            subtotalCol:'amount_current' },
-  { key:'credit_card',    label:'Credit Cards/Lines', cols:['payee','amount_current','due_date','rate'],        subtotalCol:'amount_current' },
-  { key:'credit_account', label:'Credit Vendors',  cols:['payee','amount_current','amount_future','due_date'], subtotalCol:['amount_current','amount_future'], colLabels:{ amount_current:'Current', amount_future:'Future' } },
-  { key:'non_credit',     label:'Standard Vendors',cols:['payee','amount_current','amount_future','due_date'], subtotalCol:['amount_current','amount_future'], colLabels:{ amount_current:'Current', amount_future:'Future' } },
+  { key:'prelim',         label:'Prelims',            cols:['payee','amount_current'],                                                              subtotalCol:'amount_current' },
+  { key:'credit_card',    label:'Credit Cards/Lines', cols:['payee','starting_balance','new_charges','amount_current','due_date','rate'],           subtotalCol:'amount_current', colLabels:{ amount_current:'New Balance', starting_balance:'Starting Balance', new_charges:'New Charges' }, readOnlyCols:['starting_balance','amount_current'] },
+  { key:'credit_account', label:'Credit Vendors',     cols:['payee','amount_current','amount_future','due_date'],                                   subtotalCol:['amount_current','amount_future'], colLabels:{ amount_current:'Current', amount_future:'Future' } },
+  { key:'non_credit',     label:'Standard Vendors',   cols:['payee','amount_current','amount_future','due_date'],                                   subtotalCol:['amount_current','amount_future'], colLabels:{ amount_current:'Current', amount_future:'Future' } },
 ]
 
 const FIN_SECTIONS = [
@@ -221,15 +221,54 @@ export default function Collections() {
           await supabase.from('collection_rows').insert(newRows)
         }
 
-        // ── Copy payables ─────────────────────────────────────────────────
+        // ── Fetch prev-week payable allocations for starting-balance calc ─
+        const { data: prevAllocations } = await supabase
+          .from('collection_financial')
+          .select('source_payable_id, amount')
+          .eq('week_id', lastDataWeek.id)
+          .eq('section', 'payables_alloc')
+          .not('source_payable_id', 'is', null)
+
+        // Build map: old payable id → total allocated last week
+        const allocMap = {}
+        for (const alloc of (prevAllocations || [])) {
+          if (alloc.source_payable_id) {
+            allocMap[alloc.source_payable_id] =
+              (allocMap[alloc.source_payable_id] || 0) + (parseFloat(alloc.amount) || 0)
+          }
+        }
+
+        // ── Copy payables (one by one to track old → new ID mapping) ─────
+        // The ID map lets us fix source_payable_id refs in the financial rows
         const { data: sourcePayables } = await supabase
           .from('collection_payables').select('*').eq('week_id', lastDataWeek.id).order('sort_order')
+        const oldToNewIdMap = {}
         if (sourcePayables?.length) {
-          const newPayables = sourcePayables.map(({ id, week_id, created_at, updated_at, ...rest }) => ({
-            ...rest,
-            week_id: targetWeek.id,
-          }))
-          await supabase.from('collection_payables').insert(newPayables)
+          for (const { id: oldId, week_id, created_at, updated_at, ...rest } of sourcePayables) {
+            const allocated = allocMap[oldId] || 0
+            let startingBalance = parseFloat(rest.starting_balance) || 0
+            let amountCurrent   = parseFloat(rest.amount_current)   || 0
+
+            if (rest.category === 'credit_card') {
+              // Starting Balance = prev New Balance − what was allocated last week
+              startingBalance = Math.max(0, amountCurrent - allocated)
+              amountCurrent   = startingBalance // New Balance = Starting Balance + 0 new charges
+            }
+
+            const { data: newRow } = await supabase
+              .from('collection_payables')
+              .insert({
+                ...rest,
+                week_id: targetWeek.id,
+                starting_balance: startingBalance,
+                new_charges:      0,
+                amount_current:   amountCurrent,
+              })
+              .select('id')
+              .single()
+
+            if (newRow) oldToNewIdMap[oldId] = newRow.id
+          }
         }
 
         // ── Copy financial planning ───────────────────────────────────────
@@ -239,10 +278,15 @@ export default function Collections() {
           const newFinancial = sourceFinancial.map(({ id, week_id, created_at, updated_at, ...rest }) => ({
             ...rest,
             week_id: targetWeek.id,
-            // Payroll rows always carry their amount (Payroll + Payroll Taxes persist week to week)
-            // Formula rows for other sections are computed dynamically and reset to 0
-            amount: (rest.is_formula && rest.section !== 'payroll') ? 0 : rest.amount,
+            // Payroll amounts carry over; formula rows and payable allocations reset to 0
+            amount: (rest.is_formula && rest.section !== 'payroll') || rest.section === 'payables_alloc'
+              ? 0
+              : rest.amount,
             is_paid: false, // paid status resets each week
+            // Remap source_payable_id to the new week's payable row
+            source_payable_id: rest.source_payable_id
+              ? (oldToNewIdMap[rest.source_payable_id] ?? null)
+              : null,
           }))
           await supabase.from('collection_financial').insert(newFinancial)
         }
@@ -294,9 +338,20 @@ export default function Collections() {
   }
 
   async function updatePayable(id, field, value) {
-    const parsed = ['amount_current','amount_future'].includes(field) ? (parseFloat(value) || 0) : value
-    setPayables(prev => prev.map(p => p.id === id ? { ...p, [field]: parsed } : p))
-    await supabase.from('collection_payables').update({ [field]: parsed }).eq('id', id)
+    const numericFields = ['amount_current','amount_future','starting_balance','new_charges']
+    const parsed = numericFields.includes(field) ? (parseFloat(value) || 0) : value
+
+    // For credit_card rows: when new_charges changes, auto-compute New Balance into amount_current
+    const updatePayload = { [field]: parsed }
+    if (field === 'new_charges') {
+      const row = payables.find(p => p.id === id)
+      if (row?.category === 'credit_card') {
+        updatePayload.amount_current = (parseFloat(row.starting_balance) || 0) + parsed
+      }
+    }
+
+    setPayables(prev => prev.map(p => p.id === id ? { ...p, ...updatePayload } : p))
+    await supabase.from('collection_payables').update(updatePayload).eq('id', id)
   }
 
   async function deletePayable(id) {
@@ -441,9 +496,10 @@ export default function Collections() {
                   <p>✅ All client rows, manager groups, and sections</p>
                   <p>✅ Each row's <strong>New Balance → Starting Balance</strong> for the new week</p>
                   <p>✅ Previously Delivered carries over unchanged</p>
-                  <p>✅ All Payables rows copied over as-is</p>
-                  <p>✅ All Financial Planning rows copied over as-is</p>
+                  <p>✅ All Payables rows copied over</p>
+                  <p>✅ Credit Cards: Starting Balance = prev New Balance − allocated amount</p>
                   <p>✅ Payroll Allocation amounts (Payroll, Payroll Taxes) carry over</p>
+                  <p>🔄 Payable Allocation amounts reset to $0 for the new week</p>
                   <p>🔄 Invoice &amp; Deposit columns will start blank</p>
                 </div>
               )}
@@ -854,11 +910,12 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
 }
 
 // ── Payable Table ─────────────────────────────────────────────────────────────
-const COL_LABELS = { payee:'Payee', amount_current:'Amount', amount_future:'Future', due_date:'Due Date', rate:'Rate' }
-const AMOUNT_COLS = new Set(['amount_current','amount_future'])
+const COL_LABELS = { payee:'Payee', amount_current:'Amount', amount_future:'Future', due_date:'Due Date', rate:'Rate', starting_balance:'Starting Balance', new_charges:'New Charges' }
+const AMOUNT_COLS = new Set(['amount_current','amount_future','starting_balance','new_charges'])
 
 function PayableTable({ cat, rows, subtotal, onUpdate, onDelete, onAdd }) {
   const getLabel = c => (cat.colLabels && cat.colLabels[c]) || COL_LABELS[c]
+  const readOnly = new Set(cat.readOnlyCols || [])
   const visibleRows = rows
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
@@ -870,8 +927,9 @@ function PayableTable({ cat, rows, subtotal, onUpdate, onDelete, onAdd }) {
         <thead className="bg-gray-50 border-b border-gray-200">
           <tr>
             {cat.cols.map(c => (
-              <th key={c} className={`px-3 py-2 font-semibold text-gray-500 ${AMOUNT_COLS.has(c) ? 'text-center' : 'text-left'}`}>
+              <th key={c} className={`px-3 py-2 font-semibold text-gray-500 ${AMOUNT_COLS.has(c) ? 'text-right' : 'text-left'}`}>
                 {getLabel(c)}
+                {readOnly.has(c) && <span className="text-gray-300 font-normal ml-1 text-[9px]">auto</span>}
               </th>
             ))}
             <th className="w-8" />
@@ -881,10 +939,12 @@ function PayableTable({ cat, rows, subtotal, onUpdate, onDelete, onAdd }) {
           {visibleRows.map(row => (
             <tr key={row.id} className="hover:bg-gray-50 group">
               {cat.cols.map(c => (
-                <td key={c} className={`px-2 py-1 ${AMOUNT_COLS.has(c) ? 'text-center' : ''}`}>
+                <td key={c} className={`px-2 py-1 ${AMOUNT_COLS.has(c) ? 'text-right' : ''}`}>
                   {AMOUNT_COLS.has(c)
-                    ? <CellInput value={row[c]||''} onSave={v => onUpdate(row.id, c, v)} align="center" />
-                    : <TextCell  value={row[c]||''} onSave={v => onUpdate(row.id, c, v)} placeholder={getLabel(c)} />}
+                    ? readOnly.has(c)
+                      ? <span className="block text-right text-xs text-gray-500 px-1 py-0.5">{fmtC(parseFloat(row[c]) || 0)}</span>
+                      : <CellInput value={row[c]||''} onSave={v => onUpdate(row.id, c, v)} align="right" />
+                    : <TextCell value={row[c]||''} onSave={v => onUpdate(row.id, c, v)} placeholder={getLabel(c)} />}
                 </td>
               ))}
               <td className="px-1 text-center">
