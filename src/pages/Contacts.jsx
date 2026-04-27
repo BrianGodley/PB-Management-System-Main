@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { ExportModal, ImportModal } from '../components/ContactImportExport'
 
 // ── Stage config ──────────────────────────────────────────────────────────────
 const STAGES = [
@@ -157,6 +158,8 @@ export default function Contacts() {
   const [search,      setSearch]      = useState('')
   const [stageFilter, setStageFilter] = useState('all')
   const [showAdd,     setShowAdd]     = useState(false)
+  const [showImport,  setShowImport]  = useState(false)
+  const [showExport,  setShowExport]  = useState(false)
   const [sortField,   setSortField]   = useState('last_name')
   const [sortAsc,     setSortAsc]     = useState(true)
 
@@ -207,12 +210,26 @@ export default function Contacts() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
         <h1 className="text-xl font-bold text-gray-900">Contacts</h1>
-        <button
-          onClick={() => setShowAdd(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 transition-colors"
-        >
-          + Add Contact
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowImport(true)}
+            className="px-3 py-2 border border-gray-200 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+          >
+            ⬆ Import
+          </button>
+          <button
+            onClick={() => setShowExport(true)}
+            className="px-3 py-2 border border-gray-200 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+          >
+            ⬇ Export
+          </button>
+          <button
+            onClick={() => setShowAdd(true)}
+            className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 transition-colors"
+          >
+            + Add Contact
+          </button>
+        </div>
       </div>
 
       {/* Stage filter pills */}
@@ -318,6 +335,20 @@ export default function Contacts() {
         <AddContactModal
           onSave={c => { setContacts(p => [c, ...p]); setShowAdd(false) }}
           onClose={() => setShowAdd(false)}
+        />
+      )}
+
+      {showImport && (
+        <ImportModal
+          onDone={() => fetchContacts()}
+          onClose={() => setShowImport(false)}
+        />
+      )}
+
+      {showExport && (
+        <ExportModal
+          contacts={filtered}
+          onClose={() => setShowExport(false)}
         />
       )}
     </div>
