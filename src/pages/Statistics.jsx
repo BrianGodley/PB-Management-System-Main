@@ -3423,15 +3423,6 @@ export default function Statistics() {
 
     setOverlayValues(grouped)
     setValuesStatId(stat.id)
-
-    // Auto-adjust date range to cover all component stats' actual data
-    if (rawVals?.length) {
-      const dates = rawVals.map(v => v.period_date)
-      const oldest = dates.reduce((a, b) => a < b ? a : b)
-      const newest = dates.reduce((a, b) => a > b ? a : b)
-      setFromDate(oldest)
-      setToDate(newest)
-    }
   }
 
   async function refreshValues() {
@@ -3679,11 +3670,10 @@ export default function Statistics() {
     if (!selectedStat || selectedStat.stat_category !== 'overlay') return null
     if (!overlayValues.length) return []
 
+    // Overlay shows ALL available data — no fromDate/toDate filter
     const allDates = new Set()
     overlayValues.forEach(({ values }) =>
-      values
-        .filter(v => v.period_date >= fromDate && v.period_date <= toDate)
-        .forEach(v => allDates.add(v.period_date))
+      values.forEach(v => allDates.add(v.period_date))
     )
 
     return [...allDates].sort().map(date => {
@@ -3694,7 +3684,7 @@ export default function Statistics() {
       })
       return point
     })
-  }, [overlayValues, fromDate, toDate, selectedStat])
+  }, [overlayValues, selectedStat])
 
   // Y domain that combines all overlay parts' configured (or auto) ranges
   const overlayYDomain = useMemo(() => {
