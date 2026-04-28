@@ -8,6 +8,7 @@ import {
 } from 'recharts'
 
 const FG = '#3A5038'
+const OVERLAY_COLORS = ['#3A5038', '#2563EB', '#DC2626'] // green, blue, red — one per stat slot
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 function fmt(value, statType) {
@@ -49,7 +50,7 @@ function TypeSelectorModal({ onSelect, onClose }) {
   const types = [
     { key: 'basic',      label: 'Basic Statistic',    desc: 'Track a single numeric value over time.',   available: true  },
     { key: 'equation',   label: 'Equation Statistic',  desc: 'Combine multiple stats with a formula.',    available: true  },
-    { key: 'overlay',    label: 'Overlay Statistic',   desc: 'Overlay two or more stats on one chart.',  available: false },
+    { key: 'overlay',    label: 'Overlay Statistic',   desc: 'Overlay two or more stats on one chart.',  available: true  },
     { key: 'secondary',  label: 'Secondary Statistic', desc: 'Derived view from an existing statistic.', available: false },
   ]
   return (
@@ -1644,6 +1645,436 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
   )
 }
 
+// ── OverlayStatForm ───────────────────────────────────────────────────────────
+function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, allStats }) {
+  const { user } = useAuth()
+  const MAX_PARTS = 3
+
+  const [form, setForm] = useState({
+    name:                  initialData?.name                  || '',
+    stat_type:             initialData?.stat_type             || 'currency',
+    tracking:              initialData?.tracking              || 'monthly',
+    beginning_date:        initialData?.beginning_date        || daysAgo(90),
+    upside_down:           initialData?.upside_down           || false,
+    show_values:           initialData?.show_values           ?? false,
+    owner_type:            initialData?.owner_type            || 'user',
+    owner_user_id:         initialData?.owner_user_id         || user?.id || '',
+    owner_position_id:     initialData?.owner_position_id     || '',
+    default_periods:       initialData?.default_periods       ?? '',
+    missing_value_display: initialData?.missing_value_display || 'skip',
+  })
+
+  const [parts, setParts] = useState(() => {
+    const existing = initialData?.overlay_parts
+    if (existing && Array.isArray(existing) && existing.length > 0) return existing
+    return [{ stat_id: '', y_min: '', y_max: '' }]
+  })
+
+  // statRanges: { [stat_id]: { min, max } } — actual data range fetched on stat select
+  const [statRanges, setStatRanges] = useState({})
+
+  const [saving,        setSaving]        = useState(false)
+  const [archiving,     setArchiving]     = useState(false)
+  const [deleting,      setDeleting]      = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [err,           setErr]           = useState('')
+
+  const isEdit     = !!initialData?.id
+  const isArchived = !!initialData?.archived
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  // When tracking changes, clear parts (must re-select matching stats)
+  function setTracking(val) {
+    setForm(f => ({ ...f, tracking: val }))
+    setParts([{ stat_id: '', y_min: '', y_max: '' }])
+  }
+
+  // Stats available for selection (match tracking, not overlay type, not self)
+  const availableStats = (allStats || []).filter(
+    s => !s.archived && s.stat_category !== 'overlay' &&
+         s.tracking === form.tracking &&
+         (!isEdit || s.id !== initialData?.id)
+  )
+
+  // On mount, fetch ranges for any pre-filled parts (edit mode)
+  useEffect(() => {
+    parts.forEach(p => {
+      if (p.stat_id) loadRange(p.stat_id)
+    })
+  }, [])
+
+  async function loadRange(statId) {
+    if (!statId || statRanges[statId]) return
+    const { data } = await supabase.from('statistic_values').select('value').eq('statistic_id', statId)
+    const vals = (data || []).map(v => Number(v.value)).filter(v => isFinite(v))
+    if (!vals.length) return
+    setStatRanges(prev => ({
+      ...prev,
+      [statId]: { min: Math.min(...vals), max: Math.max(...vals) },
+    }))
+  }
+
+  // When a stat is chosen in a slot: reset range fields and pre-fill from actual data
+  async function handlePartStatChange(idx, statId) {
+    setParts(prev => prev.map((p, i) => i === idx
+      ? { ...p, stat_id: statId, y_min: '', y_max: '' }
+      : p
+    ))
+    if (!statId) return
+
+    const { data } = await supabase.from('statistic_values').select('value').eq('statistic_id', statId)
+    const vals = (data || []).map(v => Number(v.value)).filter(v => isFinite(v))
+    if (!vals.length) return
+
+    const rangeMin = Math.min(...vals)
+    const rangeMax = Math.max(...vals)
+    setStatRanges(prev => ({ ...prev, [statId]: { min: rangeMin, max: rangeMax } }))
+
+    // Pre-fill y_min / y_max (only if still blank — user might have typed something)
+    setParts(prev => prev.map((p, i) => {
+      if (i !== idx || p.stat_id !== statId) return p
+      return {
+        ...p,
+        y_min: p.y_min === '' ? String(rangeMin) : p.y_min,
+        y_max: p.y_max === '' ? String(rangeMax) : p.y_max,
+      }
+    }))
+  }
+
+  function updatePart(idx, key, val) {
+    setParts(prev => prev.map((p, i) => i === idx ? { ...p, [key]: val } : p))
+  }
+
+  function addPart() {
+    if (parts.length >= MAX_PARTS) return
+    setParts(prev => [...prev, { stat_id: '', y_min: '', y_max: '' }])
+  }
+
+  function removePart(idx) {
+    setParts(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  const handleSave = async () => {
+    if (!form.name.trim())    { setErr('Statistic Name is required.'); return }
+    if (!form.beginning_date) { setErr('Beginning Date is required.');  return }
+    if (!parts[0]?.stat_id)   { setErr('At least one statistic is required.'); return }
+    if (parts.some(p => !p.stat_id)) { setErr('All slots must have a statistic selected.'); return }
+
+    setSaving(true); setErr('')
+
+    const payload = {
+      name:                  form.name.trim(),
+      stat_type:             form.stat_type,
+      tracking:              form.tracking,
+      beginning_date:        form.beginning_date,
+      upside_down:           form.upside_down,
+      show_values:           form.show_values,
+      owner_type:            form.owner_type,
+      owner_user_id:         form.owner_type === 'user'     ? (form.owner_user_id || user?.id) : null,
+      owner_position_id:     form.owner_type === 'position' ? form.owner_position_id : null,
+      default_periods:       form.default_periods ? parseInt(form.default_periods) : null,
+      missing_value_display: form.missing_value_display,
+      stat_category:         'overlay',
+      overlay_parts:         parts.map(p => ({
+        stat_id: p.stat_id,
+        y_min:   p.y_min !== '' && p.y_min != null ? Number(p.y_min) : null,
+        y_max:   p.y_max !== '' && p.y_max != null ? Number(p.y_max) : null,
+      })),
+    }
+
+    let savedId, savedName
+    if (isEdit) {
+      const { error } = await supabase.from('statistics').update(payload).eq('id', initialData.id)
+      if (error) { setErr(error.message); setSaving(false); return }
+      savedId = initialData.id; savedName = payload.name
+    } else {
+      const { data, error } = await supabase.from('statistics')
+        .insert({ ...payload, created_by: user?.id, sort_order: 0 })
+        .select().single()
+      if (error) { setErr(error.message); setSaving(false); return }
+      savedId = data.id; savedName = data.name
+    }
+    setSaving(false)
+    onSave(isEdit ? savedId : null, savedName)
+  }
+
+  const handleArchive = async () => {
+    setArchiving(true)
+    await supabase.from('statistics').update({ archived: !isArchived }).eq('id', initialData.id)
+    setArchiving(false)
+    onSave(initialData.id, initialData.name)
+  }
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    await supabase.from('statistics').delete().eq('id', initialData.id)
+    setDeleting(false)
+    onDelete?.()
+  }
+
+  const COLOR_NAMES = ['Green', 'Blue', 'Red']
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+          <h2 className="text-lg font-semibold text-gray-900">
+            {isEdit ? 'Edit Overlay Statistic' : 'New Overlay Statistic'}
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+
+          {/* Name */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Statistic Name <span className="text-red-500">*</span>
+            </label>
+            <input type="text" value={form.name} onChange={e => set('name', e.target.value)}
+              placeholder="e.g., Revenue vs. Costs"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" />
+          </div>
+
+          {/* Tracking period — first, so stat list is filtered */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Tracking Period <span className="text-red-500">*</span>
+            </label>
+            <div className="flex gap-2">
+              {['daily','weekly','monthly','quarterly','yearly'].map(t => (
+                <button key={t} type="button" onClick={() => setTracking(t)}
+                  className={`flex-1 py-2 rounded-lg text-xs font-semibold border-2 capitalize transition-colors ${
+                    form.tracking === t
+                      ? 'text-white border-transparent'
+                      : 'border-gray-200 text-gray-600 hover:border-green-500 hover:text-green-700'
+                  }`}
+                  style={form.tracking === t ? { backgroundColor: FG, borderColor: FG } : {}}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-1.5">
+              Only <span className="font-semibold capitalize">{form.tracking}</span> statistics are shown below
+              {availableStats.length > 0 ? ` — ${availableStats.length} available.` : ' — none found yet.'}
+            </p>
+          </div>
+
+          {/* Stat slots */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Statistics to Overlay <span className="text-red-500">*</span>
+              <span className="ml-2 text-xs font-normal text-gray-400">({parts.length} of {MAX_PARTS} slots used)</span>
+            </label>
+
+            <div className="space-y-3">
+              {parts.map((part, idx) => {
+                const range   = statRanges[part.stat_id]
+                const color   = OVERLAY_COLORS[idx]
+                const colName = COLOR_NAMES[idx]
+                return (
+                  <div key={idx} className="rounded-xl border border-gray-200 p-4 space-y-3 bg-gray-50">
+                    {/* Slot header with color swatch */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                        <span className="text-xs font-semibold text-gray-600">Stat {idx + 1} — {colName} line</span>
+                      </div>
+                      {parts.length > 1 && (
+                        <button onClick={() => removePart(idx)}
+                          className="text-red-400 hover:text-red-600 text-xs font-bold">
+                          Remove
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Stat selector */}
+                    <select
+                      value={part.stat_id}
+                      onChange={e => handlePartStatChange(idx, e.target.value)}
+                      disabled={availableStats.length === 0}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-600"
+                    >
+                      <option value="">
+                        {availableStats.length === 0
+                          ? `— no ${form.tracking} stats available —`
+                          : '— select statistic —'}
+                      </option>
+                      {availableStats.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+
+                    {/* Y Range */}
+                    {part.stat_id && (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1">
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Y Min</label>
+                            <input
+                              type="number"
+                              value={part.y_min}
+                              onChange={e => updatePart(idx, 'y_min', e.target.value)}
+                              placeholder={range?.min != null ? String(range.min) : 'Auto'}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Y Max</label>
+                            <input
+                              type="number"
+                              value={part.y_max}
+                              onChange={e => updatePart(idx, 'y_max', e.target.value)}
+                              placeholder={range?.max != null ? String(range.max) : 'Auto'}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                            />
+                          </div>
+                        </div>
+                        {range && (
+                          <p className="text-xs text-gray-400">
+                            Actual data range: <span className="font-medium">{range.min?.toLocaleString()}</span>
+                            {' '}–{' '}
+                            <span className="font-medium">{range.max?.toLocaleString()}</span>
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {parts.length < MAX_PARTS && (
+              <button onClick={addPart} disabled={availableStats.length === 0}
+                className="mt-2 text-sm font-semibold text-green-700 hover:text-green-900 flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed">
+                + Add Another Stat
+              </button>
+            )}
+          </div>
+
+          {/* Output Format */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Y Axis Format</label>
+            <select value={form.stat_type} onChange={e => set('stat_type', e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
+              <option value="currency">Currency ($)</option>
+              <option value="numeric">Numeric (#)</option>
+              <option value="percentage">Percentage (%)</option>
+            </select>
+          </div>
+
+          {/* Beginning Date + Default Periods */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Beginning Date <span className="text-red-500">*</span>
+              </label>
+              <input type="date" value={form.beginning_date} onChange={e => set('beginning_date', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Default Periods</label>
+              <input type="number" value={form.default_periods} onChange={e => set('default_periods', e.target.value)}
+                placeholder="e.g. 12" min="1"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" />
+            </div>
+          </div>
+
+          {/* Toggles */}
+          <div className="flex items-center gap-6">
+            {[
+              { key: 'upside_down', label: 'Inverted (lower is better)' },
+              { key: 'show_values', label: 'Show Values on Chart'       },
+            ].map(({ key, label }) => (
+              <label key={key} className="flex items-center gap-2 cursor-pointer select-none">
+                <button type="button" onClick={() => set(key, !form[key])}
+                  className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${form[key] ? 'bg-green-600' : 'bg-gray-300'}`}>
+                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form[key] ? 'translate-x-4' : ''}`} />
+                </button>
+                <span className="text-sm text-gray-700">{label}</span>
+              </label>
+            ))}
+          </div>
+
+          {/* Owner */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Owner</label>
+            <div className="flex gap-2 mb-2">
+              {['user', 'position'].map(t => (
+                <button key={t} type="button" onClick={() => set('owner_type', t)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-colors ${
+                    form.owner_type === t ? 'text-white border-transparent' : 'border-gray-200 text-gray-600 hover:border-green-500'
+                  }`}
+                  style={form.owner_type === t ? { backgroundColor: FG, borderColor: FG } : {}}>
+                  {t === 'user' ? 'Person' : 'Position'}
+                </button>
+              ))}
+            </div>
+            {form.owner_type === 'user' && (
+              <select value={form.owner_user_id} onChange={e => set('owner_user_id', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
+                <option value="">— select person —</option>
+                {(profiles || []).map(p => (
+                  <option key={p.id} value={p.id}>{p.full_name || p.email}</option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {err && <p className="text-sm text-red-600 font-medium">{err}</p>}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
+          <div className="flex gap-2">
+            {isEdit && (
+              <>
+                <button onClick={handleArchive} disabled={archiving}
+                  className="px-3 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 disabled:opacity-50 font-medium">
+                  {archiving ? '…' : isArchived ? 'Unarchive' : 'Archive'}
+                </button>
+                {!confirmDelete ? (
+                  <button onClick={() => setConfirmDelete(true)}
+                    className="px-3 py-2 text-sm rounded-lg border border-red-200 text-red-600 hover:bg-red-50 font-medium">
+                    Delete
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-red-600 font-medium">Delete permanently?</span>
+                    <button onClick={handleDelete} disabled={deleting}
+                      className="px-2 py-1.5 text-xs rounded-lg bg-red-600 text-white font-bold disabled:opacity-50">
+                      {deleting ? '…' : 'Yes, delete'}
+                    </button>
+                    <button onClick={() => setConfirmDelete(false)}
+                      className="px-2 py-1.5 text-xs rounded-lg bg-gray-200 text-gray-700 font-bold">
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={onClose}
+              className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 font-medium">
+              Cancel
+            </button>
+            <button onClick={handleSave} disabled={saving}
+              className="px-5 py-2 text-sm rounded-xl font-bold text-white disabled:opacity-50"
+              style={{ backgroundColor: FG }}>
+              {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Overlay Stat'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── SheetJS loader (CDN, loaded once on first use) ───────────────────────────
 let xlsxPromise = null
 function loadXLSX() {
@@ -2846,7 +3277,11 @@ export default function Statistics() {
   const [showTypeSelector,    setShowTypeSelector]    = useState(false)
   const [showBasicForm,       setShowBasicForm]       = useState(false)
   const [showEquationForm,    setShowEquationForm]    = useState(false)
+  const [showOverlayForm,     setShowOverlayForm]     = useState(false)
   const [editingData,         setEditingData]         = useState(null)   // null = new, obj = edit
+
+  // Overlay chart data: array of { stat, part, values } for the selected overlay stat
+  const [overlayValues,       setOverlayValues]       = useState([])
   const [showDateRangeSelector, setShowDateRangeSelector] = useState(false)
   const [showEditHistory,     setShowEditHistory]     = useState(false)
   const [editHistoryFromDate, setEditHistoryFromDate] = useState(null)
@@ -2894,11 +3329,16 @@ export default function Statistics() {
 
   // ── Fetch values when selected stat changes ────────────────────────────────
   useEffect(() => {
-    if (!selectedId) { setValues([]); return }
+    if (!selectedId) { setValues([]); setOverlayValues([]); return }
     const stat = stats.find(s => s.id === selectedId)
     if (stat?.stat_category === 'equation') {
+      setOverlayValues([])
       fetchEquationValues(stat)
+    } else if (stat?.stat_category === 'overlay') {
+      setValues([])
+      fetchOverlayValues(stat)
     } else {
+      setOverlayValues([])
       fetchValues(selectedId)
     }
   }, [selectedId, stats])
@@ -2959,6 +3399,29 @@ export default function Statistics() {
     }
 
     setValues(computed)
+    setValuesStatId(stat.id)
+  }
+
+  async function fetchOverlayValues(stat) {
+    const parts  = stat.overlay_parts || []
+    const statIds = parts.map(p => p.stat_id).filter(Boolean)
+    if (!statIds.length) { setOverlayValues([]); setValuesStatId(stat.id); return }
+
+    const { data: rawVals } = await supabase
+      .from('statistic_values')
+      .select('statistic_id, period_date, value')
+      .in('statistic_id', statIds)
+      .order('period_date')
+
+    const grouped = parts
+      .filter(p => p.stat_id)
+      .map(p => ({
+        stat:   stats.find(s => s.id === p.stat_id) || null,
+        part:   p,
+        values: (rawVals || []).filter(v => v.statistic_id === p.stat_id),
+      }))
+
+    setOverlayValues(grouped)
     setValuesStatId(stat.id)
   }
 
@@ -3202,6 +3665,48 @@ export default function Statistics() {
     return result
   }, [chartData, viewPeriod, selectedStat, weekEndingDay, valuesStatId, selectedId])
 
+  // ── Overlay chart data ─────────────────────────────────────────────────────
+  const overlayChartData = useMemo(() => {
+    if (!selectedStat || selectedStat.stat_category !== 'overlay') return null
+    if (!overlayValues.length) return []
+
+    const allDates = new Set()
+    overlayValues.forEach(({ values }) =>
+      values
+        .filter(v => v.period_date >= fromDate && v.period_date <= toDate)
+        .forEach(v => allDates.add(v.period_date))
+    )
+
+    return [...allDates].sort().map(date => {
+      const point = { date, label: periodLabel(date, selectedStat.tracking) }
+      overlayValues.forEach(({ values }, i) => {
+        const v = values.find(v => v.period_date === date)
+        point[`v${i}`] = v != null ? Number(v.value) : null
+      })
+      return point
+    })
+  }, [overlayValues, fromDate, toDate, selectedStat])
+
+  // Y domain that combines all overlay parts' configured (or auto) ranges
+  const overlayYDomain = useMemo(() => {
+    if (!overlayChartData || !overlayChartData.length) return ['auto', 'auto']
+    let globalMin = Infinity, globalMax = -Infinity
+    overlayValues.forEach(({ part }, i) => {
+      const vals = overlayChartData.map(d => d[`v${i}`]).filter(v => v != null)
+      if (!vals.length) return
+      const dataMin = Math.min(...vals)
+      const dataMax = Math.max(...vals)
+      const lo = (part?.y_min != null) ? Number(part.y_min) : dataMin
+      const hi = (part?.y_max != null) ? Number(part.y_max) : dataMax
+      if (isFinite(lo)) globalMin = Math.min(globalMin, lo)
+      if (isFinite(hi)) globalMax = Math.max(globalMax, hi)
+    })
+    if (!isFinite(globalMin) || !isFinite(globalMax)) return ['auto', 'auto']
+    const range = globalMax - globalMin || Math.abs(globalMax) || 1
+    const pad   = range * 0.08
+    return [globalMin - pad, globalMax + pad]
+  }, [overlayChartData, overlayValues])
+
   // Navigation through stats
   const allStatsList = folderStats
   const currentIdx   = allStatsList.findIndex(s => s.id === selectedId)
@@ -3254,11 +3759,13 @@ export default function Statistics() {
     setShowTypeSelector(false)
     if (type === 'basic')    { setEditingData(null); setShowBasicForm(true)    }
     if (type === 'equation') { setEditingData(null); setShowEquationForm(true) }
+    if (type === 'overlay')  { setEditingData(null); setShowOverlayForm(true)  }
   }
 
   const handleSaveForm = async (editedId, savedName) => {
     setShowBasicForm(false)
     setShowEquationForm(false)
+    setShowOverlayForm(false)
     setEditingData(null)
     console.log('[Statistics] handleSaveForm — editedId:', editedId, 'savedName:', savedName)
 
@@ -3282,6 +3789,8 @@ export default function Statistics() {
     setEditingData(selectedStat)
     if (selectedStat.stat_category === 'equation') {
       setShowEquationForm(true)
+    } else if (selectedStat.stat_category === 'overlay') {
+      setShowOverlayForm(true)
     } else {
       setShowBasicForm(true)
     }
@@ -3405,7 +3914,7 @@ export default function Statistics() {
           <>
             {/* Spacer sized to push edit links flush with the left-panel / right-panel divider */}
             <div className="w-32 xl:w-40 flex-shrink-0" />
-            {selectedStat?.stat_category !== 'equation' && (
+            {!['equation','overlay'].includes(selectedStat?.stat_category) && (
               <button
                 onClick={() => {
                   if (selectedStat?.tracking === 'weekly' && weekEndingDay === null) {
@@ -3524,6 +4033,9 @@ export default function Statistics() {
                     {s.stat_category === 'equation' && (
                       <span className="text-xs bg-purple-100 text-purple-700 px-1 py-0.5 rounded font-semibold flex-shrink-0">∑</span>
                     )}
+                    {s.stat_category === 'overlay' && (
+                      <span className="text-xs bg-indigo-100 text-indigo-700 px-1 py-0.5 rounded font-semibold flex-shrink-0">⊕</span>
+                    )}
                   </div>
                   <div className="text-xs text-gray-400 mt-0.5 capitalize">{s.tracking} · {s.stat_type}</div>
                 </div>
@@ -3581,7 +4093,7 @@ export default function Statistics() {
 
                 {/* Right — quick entry (hidden for equation stats) + arrows flush right */}
                 <div className="flex-1 flex items-center justify-end pr-2 gap-2">
-                  {selectedStat?.stat_category !== 'equation' && (
+                  {!['equation','overlay'].includes(selectedStat?.stat_category) && (
                   <div className="flex items-center gap-1.5">
                     <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white">
                       <span className="w-36 flex-shrink-0 text-center px-2 text-xs text-gray-400 whitespace-nowrap border-r border-gray-200 bg-gray-50 py-1.5 select-none">
@@ -3680,67 +4192,157 @@ export default function Statistics() {
               {/* Chart */}
               <div className="flex-1 px-4 py-4 overflow-hidden relative bg-white">
 
-                {valuesStatId !== selectedId && prevDisplayRef.current.length === 0 ? (
-                  // First-ever load for this stat — no previous frame to hold
-                  <div className="h-full flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700"></div>
-                  </div>
-                ) : displayChartData.length === 0 ? (
-                  // Fully loaded, genuinely empty
-                  <div className="h-full flex items-center justify-center text-gray-400">
-                    <div className="text-center">
-                      <div className="text-3xl mb-2">📊</div>
-                      <p className="text-sm">No data in this date range.</p>
-                      <p className="text-xs mt-1">Use <strong>Edit Value History</strong> to add entries.</p>
+                {selectedStat.stat_category === 'overlay' ? (
+                  /* ── Overlay chart ─────────────────────────────────────── */
+                  valuesStatId !== selectedId ? (
+                    <div className="h-full flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700" />
                     </div>
-                  </div>
+                  ) : !overlayChartData || overlayChartData.length === 0 ? (
+                    <div className="h-full flex items-center justify-center text-gray-400">
+                      <div className="text-center">
+                        <div className="text-3xl mb-2">📊</div>
+                        <p className="text-sm">No data in this date range.</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col h-full">
+                      {/* Legend */}
+                      <div className="flex items-center gap-5 mb-2 px-1 flex-shrink-0">
+                        {overlayValues.map(({ stat }, i) => (
+                          <div key={i} className="flex items-center gap-1.5">
+                            <div className="w-8 h-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: OVERLAY_COLORS[i] }} />
+                            <span className="text-xs font-semibold text-gray-700">{stat?.name || '—'}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex-1 min-h-0">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={overlayChartData} margin={{ top: 10, right: 24, left: 16, bottom: 20 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                            <XAxis
+                              dataKey="label"
+                              tick={{ fontSize: 11, fill: '#111827', fontWeight: 600, angle: -45, textAnchor: 'end', dx: -4, dy: 4 }}
+                              tickLine={false}
+                              axisLine={{ stroke: '#d1d5db' }}
+                              height={70}
+                              interval="preserveStartEnd"
+                            />
+                            <YAxis
+                              domain={overlayYDomain}
+                              tick={{ fontSize: 11, fill: '#111827', fontWeight: 600 }}
+                              tickLine={false}
+                              axisLine={false}
+                              tickFormatter={v => {
+                                if (selectedStat.stat_type === 'currency')   return '$' + Number(v).toLocaleString()
+                                if (selectedStat.stat_type === 'percentage') return v + '%'
+                                return Number(v).toLocaleString()
+                              }}
+                              width={80}
+                            />
+                            <Tooltip
+                              content={({ active, payload, label }) => {
+                                if (!active || !payload?.length) return null
+                                return (
+                                  <div className="bg-white border border-gray-200 rounded-xl shadow-lg px-3 py-2.5 text-xs">
+                                    <p className="font-bold text-gray-500 mb-1.5">{label}</p>
+                                    {overlayValues.map(({ stat }, i) => {
+                                      const entry = payload.find(p => p.dataKey === `v${i}`)
+                                      if (!entry || entry.value == null) return null
+                                      return (
+                                        <div key={i} className="flex items-center gap-2 mb-0.5">
+                                          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: OVERLAY_COLORS[i] }} />
+                                          <span className="text-gray-600">{stat?.name}:</span>
+                                          <span className="font-bold text-gray-900">{fmt(entry.value, selectedStat.stat_type)}</span>
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                )
+                              }}
+                            />
+                            {overlayValues.map((_, i) => (
+                              <Line
+                                key={i}
+                                type="linear"
+                                dataKey={`v${i}`}
+                                stroke={OVERLAY_COLORS[i]}
+                                strokeWidth={2}
+                                dot={false}
+                                activeDot={{ r: 5, fill: OVERLAY_COLORS[i] }}
+                                connectNulls={false}
+                                isAnimationActive={false}
+                              />
+                            ))}
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  )
                 ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={displayChartData} margin={{ top: 28, right: 24, left: 16, bottom: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                      <XAxis
-                        dataKey="label"
-                        tick={{ fontSize: 11, fill: '#111827', fontWeight: 600, angle: -45, textAnchor: 'end', dx: -4, dy: 4 }}
-                        tickLine={false}
-                        axisLine={{ stroke: '#d1d5db' }}
-                        height={70}
-                        interval="preserveStartEnd"
-                      />
-                      <YAxis
-                        domain={yDomain}
-                        ticks={yTicks}
-                        tick={{ fontSize: 11, fill: '#111827', fontWeight: 600 }}
-                        tickLine={false}
-                        axisLine={false}
-                        tickFormatter={v => {
-                          if (selectedStat.stat_type === 'currency')    return '$' + Number(v).toLocaleString()
-                          if (selectedStat.stat_type === 'percentage')  return v + '%'
-                          return Number(v).toLocaleString()
-                        }}
-                        width={80}
-                      />
-                      <Tooltip
-                        cursor={<GraphCursor stat={selectedStat} chartData={displayChartData} />}
-                        content={() => null}
-                      />
-                      {/* Invisible line — registers data with axes & tooltip */}
-                      <Line
-                        type="linear"
-                        dataKey="value"
-                        stroke="transparent"
-                        dot={false}
-                        activeDot={{ r: 6, fill: FG }}
-                        isAnimationActive={false}
-                        label={false}
-                      />
-                      {/* Colored segments: black = up, red = down */}
-                      <Customized
-                        component={(props) => (
-                          <ColoredLineSegments {...props} stat={selectedStat} />
-                        )}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  /* ── Normal single-stat chart ───────────────────────────── */
+                  valuesStatId !== selectedId && prevDisplayRef.current.length === 0 ? (
+                    // First-ever load for this stat — no previous frame to hold
+                    <div className="h-full flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700"></div>
+                    </div>
+                  ) : displayChartData.length === 0 ? (
+                    // Fully loaded, genuinely empty
+                    <div className="h-full flex items-center justify-center text-gray-400">
+                      <div className="text-center">
+                        <div className="text-3xl mb-2">📊</div>
+                        <p className="text-sm">No data in this date range.</p>
+                        <p className="text-xs mt-1">Use <strong>Edit Value History</strong> to add entries.</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={displayChartData} margin={{ top: 28, right: 24, left: 16, bottom: 20 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                        <XAxis
+                          dataKey="label"
+                          tick={{ fontSize: 11, fill: '#111827', fontWeight: 600, angle: -45, textAnchor: 'end', dx: -4, dy: 4 }}
+                          tickLine={false}
+                          axisLine={{ stroke: '#d1d5db' }}
+                          height={70}
+                          interval="preserveStartEnd"
+                        />
+                        <YAxis
+                          domain={yDomain}
+                          ticks={yTicks}
+                          tick={{ fontSize: 11, fill: '#111827', fontWeight: 600 }}
+                          tickLine={false}
+                          axisLine={false}
+                          tickFormatter={v => {
+                            if (selectedStat.stat_type === 'currency')    return '$' + Number(v).toLocaleString()
+                            if (selectedStat.stat_type === 'percentage')  return v + '%'
+                            return Number(v).toLocaleString()
+                          }}
+                          width={80}
+                        />
+                        <Tooltip
+                          cursor={<GraphCursor stat={selectedStat} chartData={displayChartData} />}
+                          content={() => null}
+                        />
+                        {/* Invisible line — registers data with axes & tooltip */}
+                        <Line
+                          type="linear"
+                          dataKey="value"
+                          stroke="transparent"
+                          dot={false}
+                          activeDot={{ r: 6, fill: FG }}
+                          isAnimationActive={false}
+                          label={false}
+                        />
+                        {/* Colored segments: black = up, red = down */}
+                        <Customized
+                          component={(props) => (
+                            <ColoredLineSegments {...props} stat={selectedStat} />
+                          )}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )
                 )}
               </div>
 
@@ -3793,6 +4395,17 @@ export default function Statistics() {
           onSave={handleSaveForm}
           onDelete={handleDeleteStat}
           onClose={() => { setShowEquationForm(false); setEditingData(null) }}
+        />
+      )}
+
+      {showOverlayForm && (
+        <OverlayStatForm
+          initialData={editingData}
+          profiles={profiles}
+          allStats={stats}
+          onSave={handleSaveForm}
+          onDelete={handleDeleteStat}
+          onClose={() => { setShowOverlayForm(false); setEditingData(null) }}
         />
       )}
 
