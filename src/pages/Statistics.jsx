@@ -536,10 +536,12 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete, targe
 
           {err && <p className="text-red-600 text-sm font-medium">{err}</p>}
 
-          {/* Target Lines Section */}
-          <div className="border-t border-gray-100 pt-3">
-            <TargetLinesSection targetLines={targetLines} setTargetLines={setTargetLines} tracking={form.tracking} />
-          </div>
+          {/* Target Lines Section — only for target stats */}
+          {isTargetStat && (
+            <div className="border-t border-gray-100 pt-3">
+              <TargetLinesSection targetLines={targetLines} setTargetLines={setTargetLines} tracking={form.tracking} />
+            </div>
+          )}
 
           {/* Row 5: Archive | Delete (edit only, side by side) */}
           {isEdit && (
@@ -1519,12 +1521,6 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
     return [{ stat_id: '', operator: null }]
   })
 
-  const [targetLines, setTargetLines] = useState(() => {
-    const existing = initialData?.target_lines
-    if (existing && Array.isArray(existing)) return existing
-    return []
-  })
-
   const [saving,        setSaving]        = useState(false)
   const [archiving,     setArchiving]     = useState(false)
   const [deleting,      setDeleting]      = useState(false)
@@ -1590,7 +1586,6 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
       missing_value_display: form.missing_value_display,
       stat_category:         'equation',
       equation_parts:        parts,
-      target_lines:          targetLines.length > 0 ? targetLines : null,
     }
 
     let savedId, savedName
@@ -1832,11 +1827,6 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
             )}
           </div>
 
-          {/* Target Lines Section */}
-          <div className="border-t border-gray-100 pt-5">
-            <TargetLinesSection targetLines={targetLines} setTargetLines={setTargetLines} tracking={form.tracking} />
-          </div>
-
           {err && <p className="text-sm text-red-600 font-medium">{err}</p>}
         </div>
 
@@ -1910,12 +1900,6 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
     const existing = initialData?.overlay_parts
     if (existing && Array.isArray(existing) && existing.length > 0) return existing
     return [{ stat_id: '', y_min: '', y_max: '' }]
-  })
-
-  const [targetLines, setTargetLines] = useState(() => {
-    const existing = initialData?.target_lines
-    if (existing && Array.isArray(existing)) return existing
-    return []
   })
 
   // statRanges: { [stat_id]: { min, max } } — actual data range fetched on stat select
@@ -2032,7 +2016,6 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
         y_min:   p.y_min !== '' && p.y_min != null ? Number(p.y_min) : null,
         y_max:   p.y_max !== '' && p.y_max != null ? Number(p.y_max) : null,
       })),
-      target_lines:          targetLines.length > 0 ? targetLines : null,
     }
 
     let savedId, savedName
@@ -2276,11 +2259,6 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
                 ))}
               </select>
             )}
-          </div>
-
-          {/* Target Lines Section */}
-          <div className="border-t border-gray-100 pt-5">
-            <TargetLinesSection targetLines={targetLines} setTargetLines={setTargetLines} tracking={form.tracking} />
           </div>
 
           {err && <p className="text-sm text-red-600 font-medium">{err}</p>}
