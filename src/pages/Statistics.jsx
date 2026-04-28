@@ -4212,6 +4212,13 @@ export default function Statistics() {
                       <div className="text-center">
                         <div className="text-3xl mb-2">📊</div>
                         <p className="text-sm">No data in this date range.</p>
+                        <div className="mt-3 text-left text-xs bg-gray-100 text-gray-700 rounded p-2 max-w-xs">
+                          <p><b>overlay_parts:</b> {JSON.stringify(selectedStat.overlay_parts)}</p>
+                          <p><b>overlayValues.length:</b> {overlayValues.length}</p>
+                          {overlayValues.map((ov, i) => (
+                            <p key={i}><b>slot {i}:</b> stat={ov.stat?.name || 'NOT FOUND'}, values={ov.values.length}</p>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   ) : (
