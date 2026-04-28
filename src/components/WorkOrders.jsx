@@ -1269,7 +1269,7 @@ function CrewGroup({ moduleType, workOrders, requiredEquipFn, jobsMap, crewMap, 
         </div>
       </div>
 
-      <div className="pl-2 space-y-2">
+      <div className="space-y-2">
         {isAllJobs && jobBuckets ? (
           // ── All Jobs: one combined card per job, stacked ──────────────────
           Object.entries(jobBuckets).map(([jobId, { crew, sub }]) => {

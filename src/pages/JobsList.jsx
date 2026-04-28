@@ -286,7 +286,7 @@ export default function JobsList() {
       <div className="flex gap-2 flex-1 min-h-0">
 
         {/* Jobs sidebar — desktop only */}
-        <div className="hidden lg:flex w-56 flex-shrink-0 flex-col min-h-0 -ml-6 pl-3">
+        <div className="hidden lg:flex w-56 flex-shrink-0 flex-col min-h-0 -ml-6 pl-3 bg-white border-r border-gray-200">
           {/* Add Schedule button — only visible on Schedule tab */}
           {tab === 'schedule' && (
             <button
