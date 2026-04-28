@@ -243,26 +243,31 @@ export default function Collections() {
             (allocMap[alloc.source_payable_id] || 0) + (parseFloat(alloc.amount) || 0)
         }
       }
-      console.log('[NewWeek] prevAllocations:', prevAllocations)
-      console.log('[NewWeek] allocMap:', allocMap)
-
       // ── Copy payables (skip if already present) ───────────────────────
       const { data: existingPayables } = await supabase
         .from('collection_payables').select('id').eq('week_id', targetWeek.id).limit(1)
       if (!existingPayables?.length) {
         const { data: sourcePayables } = await supabase
           .from('collection_payables').select('*').eq('week_id', lastDataWeek.id).order('sort_order')
-        console.log('[NewWeek] sourcePayables:', sourcePayables?.map(p => ({ id: p.id, category: p.category, payee: p.payee, amount_current: p.amount_current })))
         if (sourcePayables?.length) {
           const newPayables = sourcePayables.map(p => {
             const allocated     = allocMap[p.id] || 0
             let amountCurrent   = parseFloat(p.amount_current)   || 0
+            let amountFuture    = parseFloat(p.amount_future)    || 0
             let startingBalance = parseFloat(p.starting_balance) || 0
 
             if (p.category === 'credit_card') {
+              // Starting Balance = prev New Balance − allocated; carries forward as new starting point
               startingBalance = Math.max(0, amountCurrent - allocated)
               amountCurrent   = startingBalance
-              console.log(`[NewWeek] credit_card "${p.payee}": prev balance=${p.amount_current}, allocated=${allocated}, new startingBalance=${startingBalance}`)
+            } else if (p.category === 'non_credit' && allocated > 0) {
+              // Subtract allocated payment from current balance first, then future
+              const newCurrent = Math.max(0, amountCurrent - allocated)
+              const leftover   = Math.max(0, allocated - amountCurrent)
+              amountFuture     = Math.max(0, amountFuture - leftover)
+              amountCurrent    = newCurrent
+              // Drop the row entirely if fully paid off
+              if (amountCurrent === 0 && amountFuture === 0) return null
             }
 
             return {
@@ -270,16 +275,18 @@ export default function Collections() {
               category:         p.category,
               payee:            p.payee            || '',
               amount_current:   amountCurrent,
-              amount_future:    parseFloat(p.amount_future) || 0,
+              amount_future:    amountFuture,
               due_date:         p.due_date         || null,
               rate:             p.rate             || null,
               sort_order:       p.sort_order       ?? 0,
               starting_balance: startingBalance,
               new_charges:      0,
             }
-          })
-          const { error: payErr } = await supabase.from('collection_payables').insert(newPayables)
-          if (payErr) console.error('collection_payables insert error:', payErr)
+          }).filter(Boolean) // remove nulls (fully-paid standard vendors)
+          if (newPayables.length) {
+            const { error: payErr } = await supabase.from('collection_payables').insert(newPayables)
+            if (payErr) console.error('collection_payables insert error:', payErr)
+          }
         }
       }
 
