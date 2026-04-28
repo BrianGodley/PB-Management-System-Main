@@ -238,27 +238,31 @@ export default function Collections() {
           }
         }
 
-        // ── Copy payables (batch) ─────────────────────────────────────────
+        // ── Copy payables (batch, explicit columns only) ──────────────────
         const { data: sourcePayables } = await supabase
           .from('collection_payables').select('*').eq('week_id', lastDataWeek.id).order('sort_order')
         if (sourcePayables?.length) {
-          const newPayables = sourcePayables.map(({ id: oldId, week_id, created_at, updated_at, ...rest }) => {
-            const allocated     = allocMap[oldId] || 0
-            let startingBalance = parseFloat(rest.starting_balance) || 0
-            let amountCurrent   = parseFloat(rest.amount_current)   || 0
+          const newPayables = sourcePayables.map(p => {
+            const allocated     = allocMap[p.id] || 0
+            let amountCurrent   = parseFloat(p.amount_current)   || 0
+            let startingBalance = parseFloat(p.starting_balance) || 0
 
-            if (rest.category === 'credit_card') {
-              // Starting Balance = prev New Balance − what was allocated last week
+            if (p.category === 'credit_card') {
               startingBalance = Math.max(0, amountCurrent - allocated)
-              amountCurrent   = startingBalance // New Balance = Starting + 0 new charges
+              amountCurrent   = startingBalance
             }
 
             return {
-              ...rest,
               week_id:          targetWeek.id,
+              category:         p.category,
+              payee:            p.payee            || '',
+              amount_current:   amountCurrent,
+              amount_future:    parseFloat(p.amount_future) || 0,
+              due_date:         p.due_date          || null,
+              rate:             p.rate              || null,
+              sort_order:       p.sort_order        ?? 0,
               starting_balance: startingBalance,
               new_charges:      0,
-              amount_current:   amountCurrent,
             }
           })
           await supabase.from('collection_payables').insert(newPayables)
@@ -270,13 +274,18 @@ export default function Collections() {
         if (sourceFinancial?.length) {
           const newFinancial = sourceFinancial
             .filter(f => f.section !== 'payables_alloc') // section 4 starts fresh each week
-            .map(({ id, week_id, created_at, updated_at, ...rest }) => ({
-              ...rest,
-              week_id:  targetWeek.id,
-              // Payroll rows carry their amount; formula rows for other sections reset to 0
-              amount:   (rest.is_formula && rest.section !== 'payroll') ? 0 : rest.amount,
-              is_paid:  false,
+            .map(f => ({
+              week_id:           targetWeek.id,
+              section:           f.section,
+              subsection:        f.subsection        || null,
+              label:             f.label             || null,
+              amount:            (f.is_formula && f.section !== 'payroll') ? 0 : (parseFloat(f.amount) || 0),
+              is_formula:        f.is_formula        ?? false,
+              formula_type:      f.formula_type      || null,
+              formula_pct:       f.formula_pct       ?? null,
+              sort_order:        f.sort_order         ?? 0,
               source_payable_id: null,
+              is_paid:           false,
             }))
           if (newFinancial.length) await supabase.from('collection_financial').insert(newFinancial)
         }
