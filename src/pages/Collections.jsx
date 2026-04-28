@@ -195,11 +195,10 @@ export default function Collections() {
     }
 
     if (lastDataWeek) {
-      // Check if target week already has rows (avoid duplicating)
+      // ── Copy collection rows (skip if already present) ────────────────
       const { data: existingRows } = await supabase
         .from('collection_rows').select('id').eq('week_id', targetWeek.id).limit(1)
       if (!existingRows?.length) {
-        // ── Copy collection rows ──────────────────────────────────────────
         const { data: sourceRows } = await supabase
           .from('collection_rows').select('*').eq('week_id', lastDataWeek.id).order('sort_order')
         if (sourceRows?.length) {
@@ -211,7 +210,7 @@ export default function Collections() {
             sort_order:       row.sort_order,
             notes:            '',
             prev_delivered:   row.prev_delivered ?? 0,
-            starting_balance: calcEnd(row), // carry New Balance → Starting Balance
+            starting_balance: calcEnd(row),
             mon_inv: 0, mon_dep: 0,
             tue_inv: 0, tue_dep: 0,
             wed_inv: 0, wed_dep: 0,
@@ -220,25 +219,29 @@ export default function Collections() {
           }))
           await supabase.from('collection_rows').insert(newRows)
         }
+      }
 
-        // ── Fetch prev-week payable allocations for credit-card starting-balance calc ─
-        const { data: prevAllocations } = await supabase
-          .from('collection_financial')
-          .select('source_payable_id, amount')
-          .eq('week_id', lastDataWeek.id)
-          .eq('section', 'payables_alloc')
-          .not('source_payable_id', 'is', null)
+      // ── Build allocation map for credit-card starting-balance calc ────
+      // (always fetch regardless, needed for payables copy below)
+      const { data: prevAllocations } = await supabase
+        .from('collection_financial')
+        .select('source_payable_id, amount')
+        .eq('week_id', lastDataWeek.id)
+        .eq('section', 'payables_alloc')
+        .not('source_payable_id', 'is', null)
 
-        // Build map: old payable id → total allocated last week
-        const allocMap = {}
-        for (const alloc of (prevAllocations || [])) {
-          if (alloc.source_payable_id) {
-            allocMap[alloc.source_payable_id] =
-              (allocMap[alloc.source_payable_id] || 0) + (parseFloat(alloc.amount) || 0)
-          }
+      const allocMap = {}
+      for (const alloc of (prevAllocations || [])) {
+        if (alloc.source_payable_id) {
+          allocMap[alloc.source_payable_id] =
+            (allocMap[alloc.source_payable_id] || 0) + (parseFloat(alloc.amount) || 0)
         }
+      }
 
-        // ── Copy payables (batch, explicit columns only) ──────────────────
+      // ── Copy payables (skip if already present) ───────────────────────
+      const { data: existingPayables } = await supabase
+        .from('collection_payables').select('id').eq('week_id', targetWeek.id).limit(1)
+      if (!existingPayables?.length) {
         const { data: sourcePayables } = await supabase
           .from('collection_payables').select('*').eq('week_id', lastDataWeek.id).order('sort_order')
         if (sourcePayables?.length) {
@@ -258,36 +261,44 @@ export default function Collections() {
               payee:            p.payee            || '',
               amount_current:   amountCurrent,
               amount_future:    parseFloat(p.amount_future) || 0,
-              due_date:         p.due_date          || null,
-              rate:             p.rate              || null,
-              sort_order:       p.sort_order        ?? 0,
+              due_date:         p.due_date         || null,
+              rate:             p.rate             || null,
+              sort_order:       p.sort_order       ?? 0,
               starting_balance: startingBalance,
               new_charges:      0,
             }
           })
-          await supabase.from('collection_payables').insert(newPayables)
+          const { error: payErr } = await supabase.from('collection_payables').insert(newPayables)
+          if (payErr) console.error('collection_payables insert error:', payErr)
         }
+      }
 
-        // ── Copy financial planning (skip section 4 entirely — user re-adds each week) ─
+      // ── Copy financial planning (skip if already present; section 4 always starts blank) ─
+      const { data: existingFin } = await supabase
+        .from('collection_financial').select('id').eq('week_id', targetWeek.id).limit(1)
+      if (!existingFin?.length) {
         const { data: sourceFinancial } = await supabase
           .from('collection_financial').select('*').eq('week_id', lastDataWeek.id).order('sort_order')
         if (sourceFinancial?.length) {
           const newFinancial = sourceFinancial
-            .filter(f => f.section !== 'payables_alloc') // section 4 starts fresh each week
+            .filter(f => f.section !== 'payables_alloc')
             .map(f => ({
               week_id:           targetWeek.id,
               section:           f.section,
-              subsection:        f.subsection        || null,
-              label:             f.label             || null,
+              subsection:        f.subsection   || null,
+              label:             f.label        || null,
               amount:            (f.is_formula && f.section !== 'payroll') ? 0 : (parseFloat(f.amount) || 0),
-              is_formula:        f.is_formula        ?? false,
-              formula_type:      f.formula_type      || null,
-              formula_pct:       f.formula_pct       ?? null,
-              sort_order:        f.sort_order         ?? 0,
+              is_formula:        f.is_formula   ?? false,
+              formula_type:      f.formula_type || null,
+              formula_pct:       f.formula_pct  ?? null,
+              sort_order:        f.sort_order   ?? 0,
               source_payable_id: null,
               is_paid:           false,
             }))
-          if (newFinancial.length) await supabase.from('collection_financial').insert(newFinancial)
+          if (newFinancial.length) {
+            const { error: finErr } = await supabase.from('collection_financial').insert(newFinancial)
+            if (finErr) console.error('collection_financial insert error:', finErr)
+          }
         }
       }
     }
