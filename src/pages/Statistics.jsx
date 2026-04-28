@@ -4124,7 +4124,7 @@ export default function Statistics() {
           ) : (
             <>
               {/* Chart header: print/share + auto min/max + nav */}
-              <div className="relative flex items-center px-6 py-1.5 bg-white border-b border-gray-200 flex-shrink-0">
+              <div className="relative flex items-center px-6 py-1.5 bg-gray-100 border-b border-gray-200 flex-shrink-0">
                 {/* Left — print, share, auto min/max */}
                 <div className="flex-1 flex items-center gap-2">
                   <button title="Print" onClick={handlePrint} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-xl">🖨️</button>
