@@ -1297,6 +1297,316 @@ function CompanySettings({ currentUserIsAdmin }) {
   )
 }
 
+// ── SmsSettings ───────────────────────────────────────────────────────────────
+const SMS_PROVIDERS = [
+  {
+    key: 'twilio',
+    label: 'Twilio',
+    logo: '🟥',
+    url: 'https://console.twilio.com',
+    fields: [
+      { key: 'account_sid',  label: 'Account SID',  type: 'text',     placeholder: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' },
+      { key: 'auth_token',   label: 'Auth Token',   type: 'password', placeholder: '••••••••••••••••••••••••••••••••' },
+      { key: 'from_number',  label: 'From Number',  type: 'text',     placeholder: '+15551234567' },
+    ],
+  },
+  {
+    key: 'telnyx',
+    label: 'Telnyx',
+    logo: '🟦',
+    url: 'https://portal.telnyx.com',
+    fields: [
+      { key: 'api_key',      label: 'API Key',      type: 'password', placeholder: 'KEY••••••••••••••••••' },
+      { key: 'from_number',  label: 'From Number',  type: 'text',     placeholder: '+15551234567' },
+    ],
+  },
+  {
+    key: 'vonage',
+    label: 'Vonage (Nexmo)',
+    logo: '🟪',
+    url: 'https://dashboard.nexmo.com',
+    fields: [
+      { key: 'api_key',      label: 'API Key',      type: 'text',     placeholder: 'a1b2c3d4' },
+      { key: 'api_secret',   label: 'API Secret',   type: 'password', placeholder: '••••••••••••••••' },
+      { key: 'from_number',  label: 'From / Sender', type: 'text',    placeholder: '+15551234567 or MyBrand' },
+    ],
+  },
+  {
+    key: 'sinch',
+    label: 'Sinch',
+    logo: '🟧',
+    url: 'https://dashboard.sinch.com',
+    fields: [
+      { key: 'service_plan_id', label: 'Service Plan ID', type: 'text',     placeholder: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' },
+      { key: 'api_token',       label: 'API Token',       type: 'password', placeholder: '••••••••••••••••••••••••••••••••' },
+      { key: 'from_number',     label: 'From Number',     type: 'text',     placeholder: '+15551234567' },
+    ],
+  },
+  {
+    key: 'messagebird',
+    label: 'MessageBird',
+    logo: '🐦',
+    url: 'https://dashboard.messagebird.com',
+    fields: [
+      { key: 'api_key',      label: 'API Key',            type: 'password', placeholder: 'live_••••••••••••••••••••' },
+      { key: 'from_number',  label: 'Originator (From)',  type: 'text',     placeholder: '+15551234567 or MyBrand' },
+    ],
+  },
+]
+
+function SmsSettings() {
+  const [config,        setConfig]        = useState(null)   // loaded from DB
+  const [activeKey,     setActiveKey]     = useState('twilio')
+  const [credentials,   setCredentials]   = useState({})     // { [providerKey]: { [field]: value } }
+  const [testNumber,    setTestNumber]    = useState('')
+  const [testMsg,       setTestMsg]       = useState('This is a test SMS from Picture Build System.')
+  const [loading,       setLoading]       = useState(true)
+  const [saving,        setSaving]        = useState(false)
+  const [testing,       setTesting]       = useState(false)
+  const [saveMsg,       setSaveMsg]       = useState('')
+  const [testResult,    setTestResult]    = useState('')
+  const [showSecrets,   setShowSecrets]   = useState({})     // { [providerKey+field]: bool }
+
+  useEffect(() => { loadConfig() }, [])
+
+  async function loadConfig() {
+    setLoading(true)
+    const { data } = await supabase.from('company_settings').select('sms_config').maybeSingle()
+    if (data?.sms_config) {
+      const cfg = data.sms_config
+      setActiveKey(cfg.active_provider || 'twilio')
+      setCredentials(cfg.providers || {})
+    }
+    setLoading(false)
+  }
+
+  async function handleSave() {
+    setSaving(true); setSaveMsg('')
+    const cfg = { active_provider: activeKey, providers: credentials }
+    const { data: existing } = await supabase.from('company_settings').select('id').maybeSingle()
+    let error
+    if (existing?.id) {
+      ({ error } = await supabase.from('company_settings').update({ sms_config: cfg }).eq('id', existing.id))
+    } else {
+      ({ error } = await supabase.from('company_settings').insert({ sms_config: cfg }))
+    }
+    setSaving(false)
+    setSaveMsg(error ? '⚠️ ' + error.message : '✓ SMS settings saved')
+    setTimeout(() => setSaveMsg(''), 4000)
+  }
+
+  async function handleTest() {
+    if (!testNumber.trim()) { setTestResult('⚠️ Enter a phone number first.'); return }
+    setTesting(true); setTestResult('')
+    try {
+      const { sendSMS } = await import('../lib/notify')
+      const { error } = await sendSMS({ to: testNumber.trim(), message: testMsg })
+      setTestResult(error ? '⚠️ ' + error.message : '✓ Test SMS sent! Check your phone.')
+    } catch (e) {
+      setTestResult('⚠️ ' + e.message)
+    }
+    setTesting(false)
+    setTimeout(() => setTestResult(''), 8000)
+  }
+
+  function setCred(providerKey, field, value) {
+    setCredentials(prev => ({
+      ...prev,
+      [providerKey]: { ...(prev[providerKey] || {}), [field]: value },
+    }))
+  }
+
+  function toggleShow(providerKey, field) {
+    const k = providerKey + '_' + field
+    setShowSecrets(prev => ({ ...prev, [k]: !prev[k] }))
+  }
+
+  const activeProvider = SMS_PROVIDERS.find(p => p.key === activeKey)
+  const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white font-mono'
+
+  if (loading) return <div className="flex justify-center py-16"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700" /></div>
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+
+      {/* Current provider banner */}
+      <div className="bg-green-50 border border-green-200 rounded-xl px-5 py-3 flex items-center gap-3">
+        <span className="text-xl">{activeProvider?.logo}</span>
+        <div>
+          <p className="text-sm font-bold text-green-800">Active SMS Provider: {activeProvider?.label}</p>
+          <p className="text-xs text-green-700">Messages are sent through this service. Save credentials below, then update your Edge Function to use them.</p>
+        </div>
+      </div>
+
+      {/* Provider selector */}
+      <div>
+        <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-3">Select Provider</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {SMS_PROVIDERS.map(p => (
+            <button
+              key={p.key}
+              onClick={() => setActiveKey(p.key)}
+              className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border-2 text-left transition-all ${
+                activeKey === p.key
+                  ? 'border-green-600 bg-green-50 shadow-sm'
+                  : 'border-gray-200 hover:border-gray-300 bg-white'
+              }`}
+            >
+              <span className="text-lg leading-none">{p.logo}</span>
+              <span className={`text-sm font-semibold ${activeKey === p.key ? 'text-green-800' : 'text-gray-700'}`}>
+                {p.label}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Credential fields for active provider */}
+      {activeProvider && (
+        <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">
+              {activeProvider.logo} {activeProvider.label} Credentials
+            </h3>
+            <a href={activeProvider.url} target="_blank" rel="noopener noreferrer"
+              className="text-xs text-blue-600 hover:text-blue-800 underline">
+              Open Dashboard ↗
+            </a>
+          </div>
+          {activeProvider.fields.map(f => {
+            const showKey = activeProvider.key + '_' + f.key
+            const isSecret = f.type === 'password'
+            const val = credentials[activeProvider.key]?.[f.key] || ''
+            return (
+              <div key={f.key}>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                  {f.label}
+                </label>
+                <div className="relative">
+                  <input
+                    type={isSecret && !showSecrets[showKey] ? 'password' : 'text'}
+                    value={val}
+                    onChange={e => setCred(activeProvider.key, f.key, e.target.value)}
+                    placeholder={f.placeholder}
+                    className={inp}
+                  />
+                  {isSecret && (
+                    <button
+                      type="button"
+                      onClick={() => toggleShow(activeProvider.key, f.key)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600"
+                    >
+                      {showSecrets[showKey] ? 'Hide' : 'Show'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Credentials for other providers (collapsed) */}
+      <details className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <summary className="px-5 py-3 text-sm font-semibold text-gray-600 cursor-pointer hover:bg-gray-50 select-none">
+          Configure other providers (stored, not active)
+        </summary>
+        <div className="px-5 pb-5 space-y-5 border-t border-gray-100 pt-4">
+          {SMS_PROVIDERS.filter(p => p.key !== activeKey).map(p => (
+            <div key={p.key}>
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">{p.logo} {p.label}</p>
+              {p.fields.map(f => {
+                const showKey = p.key + '_' + f.key
+                const isSecret = f.type === 'password'
+                const val = credentials[p.key]?.[f.key] || ''
+                return (
+                  <div key={f.key} className="mb-2">
+                    <label className="block text-xs text-gray-400 mb-0.5">{f.label}</label>
+                    <div className="relative">
+                      <input
+                        type={isSecret && !showSecrets[showKey] ? 'password' : 'text'}
+                        value={val}
+                        onChange={e => setCred(p.key, f.key, e.target.value)}
+                        placeholder={f.placeholder}
+                        className={inp + ' text-xs'}
+                      />
+                      {isSecret && (
+                        <button type="button" onClick={() => toggleShow(p.key, f.key)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600">
+                          {showSecrets[showKey] ? 'Hide' : 'Show'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      </details>
+
+      {/* Save */}
+      <div className="flex items-center gap-4">
+        <button onClick={handleSave} disabled={saving}
+          className="px-6 py-2 rounded-lg text-sm font-bold text-white disabled:opacity-50"
+          style={{ backgroundColor: FG }}>
+          {saving ? 'Saving…' : 'Save SMS Settings'}
+        </button>
+        {saveMsg && (
+          <span className={`text-sm font-medium ${saveMsg.startsWith('⚠️') ? 'text-red-600' : 'text-green-700'}`}>
+            {saveMsg}
+          </span>
+        )}
+      </div>
+
+      {/* Test SMS */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
+        <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Test SMS</h3>
+        <p className="text-xs text-gray-400">
+          Sends a real SMS via the <strong>send-sms</strong> Edge Function (currently wired to Twilio).
+          To activate a different provider, update the Edge Function to read <code className="bg-gray-100 px-1 rounded">sms_config</code> from company settings.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">To Phone Number</label>
+            <input type="tel" value={testNumber} onChange={e => setTestNumber(e.target.value)}
+              placeholder="+15551234567"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 font-mono" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Message</label>
+            <input type="text" value={testMsg} onChange={e => setTestMsg(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" />
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          <button onClick={handleTest} disabled={testing}
+            className="px-5 py-2 rounded-lg text-sm font-bold border border-green-700 text-green-800 hover:bg-green-50 disabled:opacity-50">
+            {testing ? 'Sending…' : '📱 Send Test SMS'}
+          </button>
+          {testResult && (
+            <span className={`text-sm font-medium ${testResult.startsWith('⚠️') ? 'text-red-600' : 'text-green-700'}`}>
+              {testResult}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Edge Function note */}
+      <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 text-sm text-amber-800 space-y-1.5">
+        <p className="font-bold">📋 To activate a new provider in production:</p>
+        <ol className="list-decimal list-inside space-y-1 text-xs text-amber-700">
+          <li>Save credentials above</li>
+          <li>Open your Supabase project → Edge Functions → <code className="bg-amber-100 px-1 rounded">send-sms</code></li>
+          <li>Update the function to read <code className="bg-amber-100 px-1 rounded">sms_config</code> from <code className="bg-amber-100 px-1 rounded">company_settings</code> and route to the active provider's API</li>
+          <li>Redeploy the function</li>
+        </ol>
+      </div>
+
+    </div>
+  )
+}
+
 export default function Admin() {
   const { user } = useAuth()
   const [tab, setTab] = useState('overview')
@@ -1445,6 +1755,7 @@ export default function Admin() {
     { key: 'overview',  label: 'Overview' },
     { key: 'users',     label: 'Users & Roles' },
     { key: 'settings',  label: 'Company Settings' },
+    { key: 'sms',       label: '📱 SMS Settings' },
   ]
 
   const statCards = [
@@ -1676,6 +1987,10 @@ export default function Admin() {
       {/* ── SETTINGS TAB ──────────────────────────────────────────────────── */}
       {tab === 'settings' && (
         <CompanySettings currentUserIsAdmin={currentUserIsAdmin} />
+      )}
+
+      {tab === 'sms' && (
+        <SmsSettings />
       )}
 
     </div>
