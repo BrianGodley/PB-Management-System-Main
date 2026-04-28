@@ -221,7 +221,7 @@ export default function Collections() {
           await supabase.from('collection_rows').insert(newRows)
         }
 
-        // ── Fetch prev-week payable allocations for starting-balance calc ─
+        // ── Fetch prev-week payable allocations for credit-card starting-balance calc ─
         const { data: prevAllocations } = await supabase
           .from('collection_financial')
           .select('source_payable_id, amount')
@@ -238,57 +238,47 @@ export default function Collections() {
           }
         }
 
-        // ── Copy payables (one by one to track old → new ID mapping) ─────
-        // The ID map lets us fix source_payable_id refs in the financial rows
+        // ── Copy payables (batch) ─────────────────────────────────────────
         const { data: sourcePayables } = await supabase
           .from('collection_payables').select('*').eq('week_id', lastDataWeek.id).order('sort_order')
-        const oldToNewIdMap = {}
         if (sourcePayables?.length) {
-          for (const { id: oldId, week_id, created_at, updated_at, ...rest } of sourcePayables) {
-            const allocated = allocMap[oldId] || 0
+          const newPayables = sourcePayables.map(({ id: oldId, week_id, created_at, updated_at, ...rest }) => {
+            const allocated     = allocMap[oldId] || 0
             let startingBalance = parseFloat(rest.starting_balance) || 0
             let amountCurrent   = parseFloat(rest.amount_current)   || 0
 
             if (rest.category === 'credit_card') {
               // Starting Balance = prev New Balance − what was allocated last week
               startingBalance = Math.max(0, amountCurrent - allocated)
-              amountCurrent   = startingBalance // New Balance = Starting Balance + 0 new charges
+              amountCurrent   = startingBalance // New Balance = Starting + 0 new charges
             }
 
-            const { data: newRow } = await supabase
-              .from('collection_payables')
-              .insert({
-                ...rest,
-                week_id: targetWeek.id,
-                starting_balance: startingBalance,
-                new_charges:      0,
-                amount_current:   amountCurrent,
-              })
-              .select('id')
-              .single()
-
-            if (newRow) oldToNewIdMap[oldId] = newRow.id
-          }
+            return {
+              ...rest,
+              week_id:          targetWeek.id,
+              starting_balance: startingBalance,
+              new_charges:      0,
+              amount_current:   amountCurrent,
+            }
+          })
+          await supabase.from('collection_payables').insert(newPayables)
         }
 
-        // ── Copy financial planning ───────────────────────────────────────
+        // ── Copy financial planning (skip section 4 entirely — user re-adds each week) ─
         const { data: sourceFinancial } = await supabase
           .from('collection_financial').select('*').eq('week_id', lastDataWeek.id).order('sort_order')
         if (sourceFinancial?.length) {
-          const newFinancial = sourceFinancial.map(({ id, week_id, created_at, updated_at, ...rest }) => ({
-            ...rest,
-            week_id: targetWeek.id,
-            // Payroll amounts carry over; formula rows and payable allocations reset to 0
-            amount: (rest.is_formula && rest.section !== 'payroll') || rest.section === 'payables_alloc'
-              ? 0
-              : rest.amount,
-            is_paid: false, // paid status resets each week
-            // Remap source_payable_id to the new week's payable row
-            source_payable_id: rest.source_payable_id
-              ? (oldToNewIdMap[rest.source_payable_id] ?? null)
-              : null,
-          }))
-          await supabase.from('collection_financial').insert(newFinancial)
+          const newFinancial = sourceFinancial
+            .filter(f => f.section !== 'payables_alloc') // section 4 starts fresh each week
+            .map(({ id, week_id, created_at, updated_at, ...rest }) => ({
+              ...rest,
+              week_id:  targetWeek.id,
+              // Payroll rows carry their amount; formula rows for other sections reset to 0
+              amount:   (rest.is_formula && rest.section !== 'payroll') ? 0 : rest.amount,
+              is_paid:  false,
+              source_payable_id: null,
+            }))
+          if (newFinancial.length) await supabase.from('collection_financial').insert(newFinancial)
         }
       }
     }
@@ -499,7 +489,7 @@ export default function Collections() {
                   <p>✅ All Payables rows copied over</p>
                   <p>✅ Credit Cards: Starting Balance = prev New Balance − allocated amount</p>
                   <p>✅ Payroll Allocation amounts (Payroll, Payroll Taxes) carry over</p>
-                  <p>🔄 Payable Allocation amounts reset to $0 for the new week</p>
+                  <p>🔄 Payable Allocations (section 4) start blank — re-add each week</p>
                   <p>🔄 Invoice &amp; Deposit columns will start blank</p>
                 </div>
               )}
