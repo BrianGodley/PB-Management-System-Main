@@ -12,6 +12,7 @@ const navItems = [
   { path: '/equipment-tracking',  label: 'Equipment',         icon: '🚜' },
   { path: '/collections',         label: 'Finance',           icon: '🏦' },
   { path: '/statistics',          label: 'Statistics',        icon: '📈' },
+  { path: '/org-chart',           label: 'Org Chart',         icon: '🏗️' },
   { path: '/portal/subs',         label: 'Subs & Vendors',    icon: '🔧' },
   { path: '/training',            label: 'Training',          icon: '🎓' },
   { path: '/hr',                  label: 'HR',                icon: '🏢' },
