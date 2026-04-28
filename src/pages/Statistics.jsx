@@ -3789,8 +3789,8 @@ export default function Statistics() {
     const dataMax = Math.max(...vals)
     const range   = dataMax - dataMin || Math.abs(dataMax) || 1
 
-    // Pick a "nice" interval that gives roughly 6–8 grid lines
-    const rawStep = range / 7
+    // Pick a "nice" interval that gives roughly 15 grid lines
+    const rawStep = range / 14
     const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)))
     const candidates = [1, 2, 2.5, 5, 10].map(f => f * magnitude)
     const step = candidates.find(c => c >= rawStep) ?? candidates[candidates.length - 1]
@@ -4294,6 +4294,7 @@ export default function Statistics() {
                                 yAxisId={`y${i}`}
                                 orientation={i === 0 ? 'left' : 'right'}
                                 domain={overlayYDomains[i] ?? ['auto', 'auto']}
+                                tickCount={15}
                                 tick={{ fontSize: 10, fill: OVERLAY_COLORS[i], fontWeight: 700 }}
                                 tickLine={false}
                                 axisLine={false}
