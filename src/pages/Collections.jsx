@@ -243,6 +243,8 @@ export default function Collections() {
             (allocMap[alloc.source_payable_id] || 0) + (parseFloat(alloc.amount) || 0)
         }
       }
+      console.log('[NewWeek] prevAllocations:', prevAllocations)
+      console.log('[NewWeek] allocMap:', allocMap)
 
       // ── Copy payables (skip if already present) ───────────────────────
       const { data: existingPayables } = await supabase
@@ -250,6 +252,7 @@ export default function Collections() {
       if (!existingPayables?.length) {
         const { data: sourcePayables } = await supabase
           .from('collection_payables').select('*').eq('week_id', lastDataWeek.id).order('sort_order')
+        console.log('[NewWeek] sourcePayables:', sourcePayables?.map(p => ({ id: p.id, category: p.category, payee: p.payee, amount_current: p.amount_current })))
         if (sourcePayables?.length) {
           const newPayables = sourcePayables.map(p => {
             const allocated     = allocMap[p.id] || 0
@@ -259,6 +262,7 @@ export default function Collections() {
             if (p.category === 'credit_card') {
               startingBalance = Math.max(0, amountCurrent - allocated)
               amountCurrent   = startingBalance
+              console.log(`[NewWeek] credit_card "${p.payee}": prev balance=${p.amount_current}, allocated=${allocated}, new startingBalance=${startingBalance}`)
             }
 
             return {
