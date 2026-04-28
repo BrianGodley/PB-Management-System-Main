@@ -311,17 +311,25 @@ export default function Collections() {
           amount:0, source_payable_id:null, is_paid:false, ...r,
         }))
 
-        // Sections 2 & 3 — copy from previous week:
-        //   auto_alloc: non-formula rows keep their amount (e.g. fixed allocations)
-        //   payroll:    carry label/row but reset amount to $0 each week
+        // Section 3 — Payroll Allocations: always seed with standard names at $0
+        const payrollRows = [
+          { label:'Payroll',       sort_order:0 },
+          { label:'Payroll Taxes', sort_order:1 },
+        ].map(r => ({
+          week_id: targetWeek.id, section:'payroll', subsection:null,
+          amount:0, is_formula:false, formula_type:null, formula_pct:null,
+          source_payable_id:null, is_paid:false, ...r,
+        }))
+
+        // Section 2 — Auto Allocations: copy from previous week, non-formula amounts preserved
         const copiedRows = (sourceFinancial || [])
-          .filter(f => f.section === 'auto_alloc' || f.section === 'payroll')
+          .filter(f => f.section === 'auto_alloc')
           .map(f => ({
             week_id:           targetWeek.id,
             section:           f.section,
             subsection:        f.subsection   || null,
             label:             f.label        || null,
-            amount:            (f.is_formula || f.section === 'payroll') ? 0 : (parseFloat(f.amount) || 0),
+            amount:            f.is_formula ? 0 : (parseFloat(f.amount) || 0),
             is_formula:        f.is_formula   ?? false,
             formula_type:      f.formula_type || null,
             formula_pct:       f.formula_pct  ?? null,
@@ -331,7 +339,7 @@ export default function Collections() {
           }))
 
         // Section 4 — Payable Allocations: always starts blank (user re-adds each week)
-        const allNewFinancial = [...cashRows, ...copiedRows]
+        const allNewFinancial = [...cashRows, ...copiedRows, ...payrollRows]
         if (allNewFinancial.length) {
           const { error: finErr } = await supabase.from('collection_financial').insert(allNewFinancial)
           if (finErr) console.error('collection_financial insert error:', finErr)
