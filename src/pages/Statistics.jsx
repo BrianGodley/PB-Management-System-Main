@@ -48,7 +48,7 @@ function getWeekEndingDate(dateStr, weekEndingDay) {
 function TypeSelectorModal({ onSelect, onClose }) {
   const types = [
     { key: 'basic',      label: 'Basic Statistic',    desc: 'Track a single numeric value over time.',   available: true  },
-    { key: 'equation',   label: 'Equation Statistic',  desc: 'Combine multiple stats with a formula.',    available: false },
+    { key: 'equation',   label: 'Equation Statistic',  desc: 'Combine multiple stats with a formula.',    available: true  },
     { key: 'overlay',    label: 'Overlay Statistic',   desc: 'Overlay two or more stats on one chart.',  available: false },
     { key: 'secondary',  label: 'Secondary Statistic', desc: 'Derived view from an existing statistic.', available: false },
   ]
@@ -1268,6 +1268,353 @@ function MultipleEntryView({ stats, weekEndingDay }) {
   )
 }
 
+// ── EquationStatForm ──────────────────────────────────────────────────────────
+function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, allStats }) {
+  const { user } = useAuth()
+
+  const [form, setForm] = useState({
+    name:                  initialData?.name                  || '',
+    stat_type:             initialData?.stat_type             || 'currency',
+    tracking:              initialData?.tracking              || 'monthly',
+    beginning_date:        initialData?.beginning_date        || daysAgo(90),
+    upside_down:           initialData?.upside_down           || false,
+    show_values:           initialData?.show_values           ?? false,
+    owner_type:            initialData?.owner_type            || 'user',
+    owner_user_id:         initialData?.owner_user_id         || user?.id || '',
+    owner_position_id:     initialData?.owner_position_id     || '',
+    default_periods:       initialData?.default_periods       ?? '',
+    missing_value_display: initialData?.missing_value_display || 'skip',
+  })
+
+  const [parts, setParts] = useState(() => {
+    const existing = initialData?.equation_parts
+    if (existing && Array.isArray(existing) && existing.length > 0) return existing
+    return [{ stat_id: '', operator: null }]
+  })
+
+  const [saving,        setSaving]        = useState(false)
+  const [archiving,     setArchiving]     = useState(false)
+  const [deleting,      setDeleting]      = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [err,           setErr]           = useState('')
+
+  const isEdit     = !!initialData?.id
+  const isArchived = !!initialData?.archived
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  // Only non-equation stats can be used as parts
+  const availableStats = (allStats || []).filter(
+    s => !s.archived && s.stat_category !== 'equation' && (!isEdit || s.id !== initialData?.id)
+  )
+
+  function addPart() {
+    setParts(prev => [...prev, { stat_id: '', operator: '+' }])
+  }
+
+  function removePart(idx) {
+    setParts(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  function updatePart(idx, key, val) {
+    setParts(prev => prev.map((p, i) => i === idx ? { ...p, [key]: val } : p))
+  }
+
+  const handleSave = async () => {
+    if (!form.name.trim())    { setErr('Statistic Name is required.'); return }
+    if (!form.beginning_date) { setErr('Beginning Date is required.');  return }
+    if (parts.length === 0 || !parts[0].stat_id) {
+      setErr('At least one statistic is required in the equation.'); return
+    }
+    if (parts.some(p => !p.stat_id)) {
+      setErr('All equation parts must have a statistic selected.'); return
+    }
+
+    setSaving(true); setErr('')
+
+    const payload = {
+      name:                  form.name.trim(),
+      stat_type:             form.stat_type,
+      tracking:              form.tracking,
+      beginning_date:        form.beginning_date,
+      upside_down:           form.upside_down,
+      show_values:           form.show_values,
+      owner_type:            form.owner_type,
+      owner_user_id:         form.owner_type === 'user'     ? (form.owner_user_id || user?.id) : null,
+      owner_position_id:     form.owner_type === 'position' ? form.owner_position_id : null,
+      default_periods:       form.default_periods ? parseInt(form.default_periods) : null,
+      missing_value_display: form.missing_value_display,
+      stat_category:         'equation',
+      equation_parts:        parts,
+    }
+
+    let savedId, savedName
+    if (isEdit) {
+      const { error } = await supabase.from('statistics').update(payload).eq('id', initialData.id)
+      if (error) { setErr(error.message); setSaving(false); return }
+      savedId = initialData.id
+      savedName = payload.name
+    } else {
+      const { data, error } = await supabase.from('statistics')
+        .insert({ ...payload, created_by: user?.id, sort_order: 0 })
+        .select().single()
+      if (error) { setErr(error.message); setSaving(false); return }
+      savedId = data.id
+      savedName = data.name
+    }
+    setSaving(false)
+    onSave(isEdit ? savedId : null, savedName)
+  }
+
+  const handleArchive = async () => {
+    setArchiving(true)
+    await supabase.from('statistics').update({ archived: !isArchived }).eq('id', initialData.id)
+    setArchiving(false)
+    onSave(initialData.id, initialData.name)
+  }
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    await supabase.from('statistics').delete().eq('id', initialData.id)
+    setDeleting(false)
+    onDelete?.()
+  }
+
+  const OPERATORS = [
+    { value: '+', label: 'Add (+)'       },
+    { value: '-', label: 'Subtract (-)' },
+    { value: '*', label: 'Multiply (×)' },
+    { value: '/', label: 'Divide (÷)'   },
+  ]
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+          <h2 className="text-lg font-semibold text-gray-900">
+            {isEdit ? 'Edit Equation Statistic' : 'New Equation Statistic'}
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+
+          {/* Name */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Statistic Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={e => set('name', e.target.value)}
+              placeholder="e.g., Total Revenue"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+            />
+          </div>
+
+          {/* Equation Builder */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Equation <span className="text-red-500">*</span>
+            </label>
+            <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 space-y-2">
+              {parts.map((part, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  {idx === 0 ? (
+                    <div className="w-36 flex-shrink-0 text-xs font-semibold text-gray-400 text-center uppercase tracking-wide">
+                      Value
+                    </div>
+                  ) : (
+                    <select
+                      value={part.operator || '+'}
+                      onChange={e => updatePart(idx, 'operator', e.target.value)}
+                      className="w-36 border border-gray-300 rounded-lg px-2 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-600 flex-shrink-0"
+                    >
+                      {OPERATORS.map(op => (
+                        <option key={op.value} value={op.value}>{op.label}</option>
+                      ))}
+                    </select>
+                  )}
+                  <select
+                    value={part.stat_id}
+                    onChange={e => updatePart(idx, 'stat_id', e.target.value)}
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-600"
+                  >
+                    <option value="">— select statistic —</option>
+                    {availableStats.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                  {parts.length > 1 && (
+                    <button
+                      onClick={() => removePart(idx)}
+                      className="text-red-400 hover:text-red-600 text-lg leading-none flex-shrink-0 px-1 font-bold"
+                      title="Remove"
+                    >✕</button>
+                  )}
+                </div>
+              ))}
+              <button
+                onClick={addPart}
+                className="mt-1 text-sm font-semibold text-green-700 hover:text-green-900 flex items-center gap-1"
+              >
+                + Add Statistic
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 mt-1.5">
+              The result is computed each period by applying operators in order. Periods where any component has no value are skipped.
+            </p>
+          </div>
+
+          {/* Output Format + Tracking */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Output Format</label>
+              <select value={form.stat_type} onChange={e => set('stat_type', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
+                <option value="currency">Currency ($)</option>
+                <option value="numeric">Numeric (#)</option>
+                <option value="percentage">Percentage (%)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Tracking</label>
+              <select value={form.tracking} onChange={e => set('tracking', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="yearly">Yearly</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Beginning Date + Default Periods */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Beginning Date <span className="text-red-500">*</span>
+              </label>
+              <input type="date" value={form.beginning_date} onChange={e => set('beginning_date', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Default Periods</label>
+              <input type="number" value={form.default_periods} onChange={e => set('default_periods', e.target.value)}
+                placeholder="e.g. 12" min="1"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" />
+            </div>
+          </div>
+
+          {/* Missing Value Display */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Missing Period Display</label>
+            <select value={form.missing_value_display} onChange={e => set('missing_value_display', e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
+              <option value="skip">Skip (gap in chart)</option>
+              <option value="zero">Show as Zero</option>
+            </select>
+          </div>
+
+          {/* Toggles */}
+          <div className="flex items-center gap-6">
+            {[
+              { key: 'upside_down', label: 'Inverted (lower is better)' },
+              { key: 'show_values', label: 'Show Values on Chart'       },
+            ].map(({ key, label }) => (
+              <label key={key} className="flex items-center gap-2 cursor-pointer select-none">
+                <button
+                  type="button"
+                  onClick={() => set(key, !form[key])}
+                  className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${form[key] ? 'bg-green-600' : 'bg-gray-300'}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form[key] ? 'translate-x-4' : ''}`} />
+                </button>
+                <span className="text-sm text-gray-700">{label}</span>
+              </label>
+            ))}
+          </div>
+
+          {/* Owner */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Owner</label>
+            <div className="flex gap-2 mb-2">
+              {['user', 'position'].map(t => (
+                <button key={t} type="button" onClick={() => set('owner_type', t)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-colors ${
+                    form.owner_type === t ? 'text-white border-transparent' : 'border-gray-200 text-gray-600 hover:border-green-500'
+                  }`}
+                  style={form.owner_type === t ? { backgroundColor: FG, borderColor: FG } : {}}
+                >
+                  {t === 'user' ? 'Person' : 'Position'}
+                </button>
+              ))}
+            </div>
+            {form.owner_type === 'user' && (
+              <select value={form.owner_user_id} onChange={e => set('owner_user_id', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
+                <option value="">— select person —</option>
+                {(profiles || []).map(p => (
+                  <option key={p.id} value={p.id}>{p.full_name || p.email}</option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {err && <p className="text-sm text-red-600 font-medium">{err}</p>}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
+          <div className="flex gap-2">
+            {isEdit && (
+              <>
+                <button onClick={handleArchive} disabled={archiving}
+                  className="px-3 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 disabled:opacity-50 font-medium">
+                  {archiving ? '…' : isArchived ? 'Unarchive' : 'Archive'}
+                </button>
+                {!confirmDelete ? (
+                  <button onClick={() => setConfirmDelete(true)}
+                    className="px-3 py-2 text-sm rounded-lg border border-red-200 text-red-600 hover:bg-red-50 font-medium">
+                    Delete
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-red-600 font-medium">Delete permanently?</span>
+                    <button onClick={handleDelete} disabled={deleting}
+                      className="px-2 py-1.5 text-xs rounded-lg bg-red-600 text-white font-bold disabled:opacity-50">
+                      {deleting ? '…' : 'Yes, delete'}
+                    </button>
+                    <button onClick={() => setConfirmDelete(false)}
+                      className="px-2 py-1.5 text-xs rounded-lg bg-gray-200 text-gray-700 font-bold">
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={onClose}
+              className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 font-medium">
+              Cancel
+            </button>
+            <button onClick={handleSave} disabled={saving}
+              className="px-5 py-2 text-sm rounded-xl font-bold text-white disabled:opacity-50"
+              style={{ backgroundColor: FG }}>
+              {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Equation Stat'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── SheetJS loader (CDN, loaded once on first use) ───────────────────────────
 let xlsxPromise = null
 function loadXLSX() {
@@ -2469,6 +2816,7 @@ export default function Statistics() {
   // Modal state
   const [showTypeSelector,    setShowTypeSelector]    = useState(false)
   const [showBasicForm,       setShowBasicForm]       = useState(false)
+  const [showEquationForm,    setShowEquationForm]    = useState(false)
   const [editingData,         setEditingData]         = useState(null)   // null = new, obj = edit
   const [showDateRangeSelector, setShowDateRangeSelector] = useState(false)
   const [showEditHistory,     setShowEditHistory]     = useState(false)
@@ -2518,8 +2866,13 @@ export default function Statistics() {
   // ── Fetch values when selected stat changes ────────────────────────────────
   useEffect(() => {
     if (!selectedId) { setValues([]); return }
-    fetchValues(selectedId)
-  }, [selectedId])
+    const stat = stats.find(s => s.id === selectedId)
+    if (stat?.stat_category === 'equation') {
+      fetchEquationValues(stat)
+    } else {
+      fetchValues(selectedId)
+    }
+  }, [selectedId, stats])
 
   async function fetchValues(statId) {
     const { data } = await supabase
@@ -2530,6 +2883,54 @@ export default function Statistics() {
     // Atomically update values AND record which stat they belong to
     setValues(data || [])
     setValuesStatId(statId)
+  }
+
+  async function fetchEquationValues(stat) {
+    const parts = stat.equation_parts || []
+    const statIds = [...new Set(parts.map(p => p.stat_id).filter(Boolean))]
+    if (statIds.length === 0) { setValues([]); setValuesStatId(stat.id); return }
+
+    const { data: rawVals } = await supabase
+      .from('statistic_values')
+      .select('statistic_id, period_date, value')
+      .in('statistic_id', statIds)
+      .order('period_date')
+
+    // Build map: statId → Map<period_date, value>
+    const valMap = {}
+    for (const id of statIds) valMap[id] = new Map()
+    for (const v of (rawVals || [])) {
+      if (valMap[v.statistic_id]) valMap[v.statistic_id].set(v.period_date, Number(v.value))
+    }
+
+    // Only compute periods where ALL component stats have a value
+    const firstId = parts[0]?.stat_id
+    if (!firstId) { setValues([]); setValuesStatId(stat.id); return }
+
+    const computed = []
+    for (const [period] of valMap[firstId] || []) {
+      const allPresent = statIds.every(id => valMap[id].has(period))
+      if (!allPresent) continue
+
+      let result = null
+      for (const part of parts) {
+        if (!part.stat_id) continue
+        const val = valMap[part.stat_id]?.get(period) ?? 0
+        if (result === null) {
+          result = val
+        } else {
+          const op = part.operator
+          if      (op === '+') result += val
+          else if (op === '-') result -= val
+          else if (op === '*') result *= val
+          else if (op === '/') result = val !== 0 ? result / val : result
+        }
+      }
+      if (result !== null) computed.push({ statistic_id: stat.id, period_date: period, value: result })
+    }
+
+    setValues(computed)
+    setValuesStatId(stat.id)
   }
 
   async function refreshValues() {
@@ -2822,11 +3223,13 @@ export default function Statistics() {
   // ── Handlers ───────────────────────────────────────────────────────────────
   const handleTypeSelect = (type) => {
     setShowTypeSelector(false)
-    if (type === 'basic') { setEditingData(null); setShowBasicForm(true) }
+    if (type === 'basic')    { setEditingData(null); setShowBasicForm(true)    }
+    if (type === 'equation') { setEditingData(null); setShowEquationForm(true) }
   }
 
   const handleSaveForm = async (editedId, savedName) => {
     setShowBasicForm(false)
+    setShowEquationForm(false)
     setEditingData(null)
     console.log('[Statistics] handleSaveForm — editedId:', editedId, 'savedName:', savedName)
 
@@ -2848,7 +3251,11 @@ export default function Statistics() {
   const handleEditStat = () => {
     if (!selectedStat) return
     setEditingData(selectedStat)
-    setShowBasicForm(true)
+    if (selectedStat.stat_category === 'equation') {
+      setShowEquationForm(true)
+    } else {
+      setShowBasicForm(true)
+    }
   }
 
   const handleDeleteStat = async () => {
@@ -2969,18 +3376,20 @@ export default function Statistics() {
           <>
             {/* Spacer sized to push edit links flush with the left-panel / right-panel divider */}
             <div className="w-32 xl:w-40 flex-shrink-0" />
-            <button
-              onClick={() => {
-                if (selectedStat?.tracking === 'weekly' && weekEndingDay === null) {
-                  setWeekEndingError(true); return
-                }
-                setWeekEndingError(false)
-                setShowDateRangeSelector(true)
-              }}
-              className="text-sm font-medium text-blue-600 hover:text-blue-800 underline underline-offset-2 transition-colors flex-shrink-0"
-            >
-              Edit Value History
-            </button>
+            {selectedStat?.stat_category !== 'equation' && (
+              <button
+                onClick={() => {
+                  if (selectedStat?.tracking === 'weekly' && weekEndingDay === null) {
+                    setWeekEndingError(true); return
+                  }
+                  setWeekEndingError(false)
+                  setShowDateRangeSelector(true)
+                }}
+                className="text-sm font-medium text-blue-600 hover:text-blue-800 underline underline-offset-2 transition-colors flex-shrink-0"
+              >
+                Edit Value History
+              </button>
+            )}
             <button
               onClick={handleEditStat}
               className="text-sm font-medium text-blue-600 hover:text-blue-800 underline underline-offset-2 transition-colors flex-shrink-0"
@@ -3081,7 +3490,12 @@ export default function Statistics() {
                   title="Drag to reorder"
                 >⠿</span>
                 <div className="flex-1 min-w-0">
-                  <div className="truncate">{s.name}</div>
+                  <div className="truncate flex items-center gap-1">
+                    {s.name}
+                    {s.stat_category === 'equation' && (
+                      <span className="text-xs bg-purple-100 text-purple-700 px-1 py-0.5 rounded font-semibold flex-shrink-0">∑</span>
+                    )}
+                  </div>
                   <div className="text-xs text-gray-400 mt-0.5 capitalize">{s.tracking} · {s.stat_type}</div>
                 </div>
               </div>
@@ -3136,8 +3550,9 @@ export default function Statistics() {
                   {selectedStat.name}
                 </span>
 
-                {/* Right — quick entry + arrows flush right */}
+                {/* Right — quick entry (hidden for equation stats) + arrows flush right */}
                 <div className="flex-1 flex items-center justify-end pr-2 gap-2">
+                  {selectedStat?.stat_category !== 'equation' && (
                   <div className="flex items-center gap-1.5">
                     <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white">
                       <span className="w-36 flex-shrink-0 text-center px-2 text-xs text-gray-400 whitespace-nowrap border-r border-gray-200 bg-gray-50 py-1.5 select-none">
@@ -3167,6 +3582,7 @@ export default function Statistics() {
                     )}
                     <div className="w-px h-5 bg-gray-200 mx-0.5 flex-shrink-0" />
                   </div>
+                  )}
                   <div className="flex items-center gap-0">
                     <button
                       onClick={() => goTo(-1)}
@@ -3337,6 +3753,17 @@ export default function Statistics() {
           onSave={handleSaveForm}
           onDelete={handleDeleteStat}
           onClose={() => { setShowBasicForm(false); setEditingData(null) }}
+        />
+      )}
+
+      {showEquationForm && (
+        <EquationStatForm
+          initialData={editingData}
+          profiles={profiles}
+          allStats={stats}
+          onSave={handleSaveForm}
+          onDelete={handleDeleteStat}
+          onClose={() => { setShowEquationForm(false); setEditingData(null) }}
         />
       )}
 
