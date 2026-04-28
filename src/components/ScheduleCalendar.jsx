@@ -321,12 +321,12 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
                   border:          item.needs_crew ? '2px dashed rgba(255,200,0,0.6)' : 'none',
                 }}
                 className="flex items-start gap-1.5 px-2 pt-1.5 pb-1.5 text-white text-sm font-semibold cursor-pointer hover:opacity-80 leading-snug"
-                title={item.needs_crew ? `${displayText} — ⚠ Crew not assigned` : displayText}
+                title={item.needs_crew ? `${displayText} — Crew not assigned` : displayText}
               >
                 {isFirst && (
                   <>
                     {item.needs_crew
-                      ? <span className="flex-shrink-0 text-yellow-300 mt-0.5 text-xs leading-none">⚠</span>
+                      ? null
                       : item.assignee_color
                         ? <span className="flex-shrink-0 w-4 h-4 rounded-full border border-white/50 mt-0.5"
                                 style={{ backgroundColor: item.assignee_color }} />
@@ -364,7 +364,7 @@ function MobileScheduleCard({ item, jobName, onClick }) {
         />
         <div className="flex-1 min-w-0">
           {item.needs_crew && (
-            <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wide mb-0.5">⚠ Crew Not Assigned</p>
+            <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wide mb-0.5">Crew Not Assigned</p>
           )}
           <p className="font-semibold text-gray-900 text-sm leading-tight">{item.title}</p>
           {jobName && (
@@ -1530,7 +1530,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
                               </select>
                             )}
                             {asgn.mode === 'none' && (
-                              <span className="text-xs text-amber-600 ml-1">⚠ Will show "Assign Crew" on calendar</span>
+                              <span className="text-xs text-amber-600 ml-1">Will show "Assign Crew" on calendar</span>
                             )}
                           </div>
                         </div>
@@ -1569,7 +1569,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
                                   <span className="text-[10px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded font-semibold flex-shrink-0">{sub.company_name}</span>
                                 )}
                                 {asgn.mode === 'none' && (
-                                  <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold flex-shrink-0">⚠ No Crew</span>
+                                  <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold flex-shrink-0">No Crew</span>
                                 )}
                               </div>
                             )
