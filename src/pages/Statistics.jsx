@@ -3403,33 +3403,27 @@ export default function Statistics() {
   }
 
   async function fetchOverlayValues(stat) {
-    const parts  = stat.overlay_parts || []
-    const statIds = parts.map(p => p.stat_id).filter(Boolean)
-    console.log('[Overlay] stat.overlay_parts:', stat.overlay_parts)
-    console.log('[Overlay] statIds:', statIds)
-    if (!statIds.length) {
-      console.log('[Overlay] no statIds — returning empty')
-      setOverlayValues([]); setValuesStatId(stat.id); return
-    }
+    const parts   = stat.overlay_parts || []
+    // stat_id may be stored as a string in JSONB — normalise to number
+    const statIds = parts.map(p => Number(p.stat_id)).filter(Boolean)
+    if (!statIds.length) { setOverlayValues([]); setValuesStatId(stat.id); return }
 
-    const { data: rawVals, error: rawErr } = await supabase
+    const { data: rawVals } = await supabase
       .from('statistic_values')
       .select('statistic_id, period_date, value')
       .in('statistic_id', statIds)
       .order('period_date')
 
-    console.log('[Overlay] rawVals count:', rawVals?.length, 'error:', rawErr)
-    console.log('[Overlay] rawVals sample:', rawVals?.slice(0, 3))
-
     const grouped = parts
       .filter(p => p.stat_id)
-      .map(p => ({
-        stat:   stats.find(s => s.id === p.stat_id) || null,
-        part:   p,
-        values: (rawVals || []).filter(v => v.statistic_id === p.stat_id),
-      }))
-
-    console.log('[Overlay] grouped:', grouped.map(g => ({ statName: g.stat?.name, valCount: g.values.length })))
+      .map(p => {
+        const numId = Number(p.stat_id)
+        return {
+          stat:   stats.find(s => s.id === numId) || null,
+          part:   p,
+          values: (rawVals || []).filter(v => v.statistic_id === numId),
+        }
+      })
 
     setOverlayValues(grouped)
     setValuesStatId(stat.id)
@@ -4211,14 +4205,7 @@ export default function Statistics() {
                     <div className="h-full flex items-center justify-center text-gray-400">
                       <div className="text-center">
                         <div className="text-3xl mb-2">📊</div>
-                        <p className="text-sm">No data in this date range.</p>
-                        <div className="mt-3 text-left text-xs bg-gray-100 text-gray-700 rounded p-2 max-w-xs">
-                          <p><b>overlay_parts:</b> {JSON.stringify(selectedStat.overlay_parts)}</p>
-                          <p><b>overlayValues.length:</b> {overlayValues.length}</p>
-                          {overlayValues.map((ov, i) => (
-                            <p key={i}><b>slot {i}:</b> stat={ov.stat?.name || 'NOT FOUND'}, values={ov.values.length}</p>
-                          ))}
-                        </div>
+                        <p className="text-sm">No data available for this overlay.</p>
                       </div>
                     </div>
                   ) : (
