@@ -45,17 +45,18 @@ function getWeekEndingDate(dateStr, weekEndingDay) {
   return isoDate(d)
 }
 
-// Compute end date for target line: either a calendar date or n periods after start date
-function computeTargetEndDate(startDate, endMode, endDate, endPeriods, tracking) {
+// Compute end date for target line: either a calendar date or n units after start date.
+// `unit` is one of daily/weekly/monthly/quarterly/yearly and may differ from the stat's tracking.
+function computeTargetEndDate(startDate, endMode, endDate, endPeriods, unit) {
   if (endMode === 'date') return endDate || startDate
   const n = parseInt(endPeriods) || 0
   if (n === 0) return startDate
   const d = new Date(startDate + 'T00:00:00')
-  if      (tracking === 'daily')     d.setDate(d.getDate() + n)
-  else if (tracking === 'weekly')    d.setDate(d.getDate() + n * 7)
-  else if (tracking === 'monthly')   d.setMonth(d.getMonth() + n)
-  else if (tracking === 'quarterly') d.setMonth(d.getMonth() + n * 3)
-  else if (tracking === 'yearly')    d.setFullYear(d.getFullYear() + n)
+  if      (unit === 'daily')     d.setDate(d.getDate() + n)
+  else if (unit === 'weekly')    d.setDate(d.getDate() + n * 7)
+  else if (unit === 'monthly')   d.setMonth(d.getMonth() + n)
+  else if (unit === 'quarterly') d.setMonth(d.getMonth() + n * 3)
+  else if (unit === 'yearly')    d.setFullYear(d.getFullYear() + n)
   return d.toISOString().slice(0, 10)
 }
 
@@ -102,9 +103,21 @@ function TypeSelectorModal({ onSelect, onClose }) {
 }
 
 // ── TargetLinesSection ───────────────────────────────────────────────────────
+const PERIOD_UNITS = [
+  { value: 'daily',     label: 'Days' },
+  { value: 'weekly',    label: 'Weeks' },
+  { value: 'monthly',   label: 'Months' },
+  { value: 'quarterly', label: 'Quarters' },
+  { value: 'yearly',    label: 'Years' },
+]
+
 function TargetLinesSection({ targetLines, setTargetLines, tracking }) {
   function addLine() {
-    setTargetLines(prev => [...prev, { start_date: '', end_mode: 'date', end_date: '', end_periods: '', start_value: '', end_value: '' }])
+    setTargetLines(prev => [...prev, {
+      start_date: '', end_mode: 'date', end_date: '',
+      end_periods: '', end_unit: tracking || 'monthly',
+      start_value: '', end_value: '',
+    }])
   }
   function removeLine(i) {
     setTargetLines(prev => prev.filter((_, idx) => idx !== i))
@@ -112,8 +125,6 @@ function TargetLinesSection({ targetLines, setTargetLines, tracking }) {
   function updateLine(i, key, val) {
     setTargetLines(prev => prev.map((tl, idx) => idx === i ? { ...tl, [key]: val } : tl))
   }
-
-  const periodLabel = tracking === 'daily' ? 'days' : tracking === 'weekly' ? 'weeks' : tracking === 'monthly' ? 'months' : tracking === 'quarterly' ? 'quarters' : 'years'
 
   return (
     <div>
@@ -152,7 +163,7 @@ function TargetLinesSection({ targetLines, setTargetLines, tracking }) {
             </div>
             {/* End mode toggle */}
             <div className="flex gap-1">
-              {['date', 'periods'].map(mode => (
+              {[['date', 'End Date'], ['periods', '# of Periods']].map(([mode, label]) => (
                 <button key={mode} type="button"
                   onClick={() => updateLine(i, 'end_mode', mode)}
                   className={`text-xs px-2.5 py-1 rounded-lg font-semibold border transition-colors ${
@@ -160,7 +171,7 @@ function TargetLinesSection({ targetLines, setTargetLines, tracking }) {
                       ? 'bg-green-700 text-white border-green-700'
                       : 'bg-white text-gray-600 border-gray-300 hover:border-green-600'
                   }`}>
-                  {mode === 'date' ? 'End Date' : `# of ${periodLabel}`}
+                  {label}
                 </button>
               ))}
             </div>
@@ -176,10 +187,20 @@ function TargetLinesSection({ targetLines, setTargetLines, tracking }) {
                   </>
                 ) : (
                   <>
-                    <label className="block text-[11px] font-semibold text-gray-500 mb-0.5">Number of {periodLabel}</label>
-                    <input type="number" min="1" value={tl.end_periods} placeholder="e.g. 4"
-                      onChange={e => updateLine(i, 'end_periods', e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-green-600" />
+                    <label className="block text-[11px] font-semibold text-gray-500 mb-0.5">Number &amp; Unit</label>
+                    <div className="flex gap-1">
+                      <input type="number" min="1" value={tl.end_periods} placeholder="e.g. 4"
+                        onChange={e => updateLine(i, 'end_periods', e.target.value)}
+                        className="w-20 border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-green-600" />
+                      <select
+                        value={tl.end_unit || tracking || 'monthly'}
+                        onChange={e => updateLine(i, 'end_unit', e.target.value)}
+                        className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-green-600 bg-white">
+                        {PERIOD_UNITS.map(u => (
+                          <option key={u.value} value={u.value}>{u.label}</option>
+                        ))}
+                      </select>
+                    </div>
                   </>
                 )}
               </div>
@@ -306,15 +327,29 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete }) {
     onDelete()
   }
 
-  const lbl = 'block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5'
-  const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white'
+  const lbl = 'block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1'
+  const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white'
+
+  // Compact pill toggle for Yes/No fields
+  const PillToggle = ({ name, value, onChange, options }) => (
+    <div className="flex gap-1 mt-1">
+      {options.map(([val, lab]) => (
+        <button key={val} type="button" onClick={() => onChange(val)}
+          className={`px-3 py-1 text-xs rounded-lg border font-semibold transition-colors ${
+            value === val ? 'bg-green-700 text-white border-green-700' : 'bg-white text-gray-600 border-gray-300 hover:border-green-500'
+          }`}>
+          {lab}
+        </button>
+      ))}
+    </div>
+  )
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh] overflow-hidden">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-7 py-4 border-b border-gray-100"
+        <div className="flex items-center justify-between px-6 py-3.5 border-b border-gray-100 flex-shrink-0"
              style={{ backgroundColor: FG }}>
           <h2 className="text-base font-bold text-white">
             {isEdit ? 'Edit Statistic' : 'New Basic Statistic'}
@@ -322,10 +357,10 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete }) {
           <button onClick={onClose} className="text-white/70 hover:text-white text-xl leading-none">✕</button>
         </div>
 
-        {/* Body — two-column grid, no scroll */}
-        <div className="px-7 py-5 space-y-4">
+        {/* Body — scrollable */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
 
-          {/* Row 1: Name (full width) */}
+          {/* Name */}
           <div>
             <label className={lbl}>Statistic Name</label>
             <input
@@ -337,8 +372,8 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete }) {
             />
           </div>
 
-          {/* Row 2: Type | Tracking */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Type | Tracking | Beginning Date — 3 col */}
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className={lbl}>Statistic Type</label>
               <select className={inp} value={form.stat_type} onChange={e => set('stat_type', e.target.value)}>
@@ -357,124 +392,81 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete }) {
                 <option value="yearly">Yearly</option>
               </select>
             </div>
-          </div>
-
-          {/* Row 3: Beginning Date | Upside Down */}
-          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={lbl}>Beginning Date</label>
-              <input
-                type="date"
-                className={inp}
-                value={form.beginning_date}
-                onChange={e => set('beginning_date', e.target.value)}
-              />
+              <input type="date" className={inp} value={form.beginning_date}
+                onChange={e => set('beginning_date', e.target.value)} />
             </div>
+          </div>
+
+          {/* Upside Down | Show Values | Default Periods — 3 col */}
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className={lbl}>Upside Down Graph</label>
-              <div className="flex gap-5 pt-1">
-                {['No', 'Yes'].map(opt => (
-                  <label key={opt} className="flex items-center gap-2 text-sm cursor-pointer select-none">
-                    <input
-                      type="radio"
-                      name="upside_down"
-                      checked={form.upside_down === (opt === 'Yes')}
-                      onChange={() => set('upside_down', opt === 'Yes')}
-                      className="accent-green-700 w-4 h-4"
-                    />
-                    <span className="text-gray-700">{opt}</span>
-                  </label>
-                ))}
-              </div>
+              <PillToggle
+                value={form.upside_down ? 'yes' : 'no'}
+                onChange={v => set('upside_down', v === 'yes')}
+                options={[['no', 'No'], ['yes', 'Yes']]}
+              />
             </div>
             <div>
               <label className={lbl}>Show Values on Graph</label>
-              <div className="flex gap-5 pt-1">
-                {['No', 'Yes'].map(opt => (
-                  <label key={opt} className="flex items-center gap-2 text-sm cursor-pointer select-none">
-                    <input
-                      type="radio"
-                      name="show_values"
-                      checked={form.show_values === (opt === 'Yes')}
-                      onChange={() => set('show_values', opt === 'Yes')}
-                      className="accent-green-700 w-4 h-4"
-                    />
-                    <span className="text-gray-700">{opt}</span>
-                  </label>
-                ))}
-              </div>
-              <p className="text-xs text-gray-400 mt-1">Display the data value at each point on the chart.</p>
+              <PillToggle
+                value={form.show_values ? 'yes' : 'no'}
+                onChange={v => set('show_values', v === 'yes')}
+                options={[['no', 'No'], ['yes', 'Yes']]}
+              />
             </div>
-          </div>
-
-          {/* Row 4: Default Display Count | Missing Value Behaviour */}
-          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={lbl}>Default # of Periods to Show</label>
-              <input
-                type="number"
-                min="1"
-                className={inp}
+              <label className={lbl}>Default # of Periods</label>
+              <input type="number" min="1" className={inp}
                 value={form.default_periods}
                 onChange={e => set('default_periods', e.target.value)}
-                placeholder={`e.g. 12 ${form.tracking}s`}
-              />
-              <p className="text-xs text-gray-400 mt-1">Leave blank to use the date range controls.</p>
-            </div>
-            <div>
-              <label className={lbl}>Missing / Not-Entered Values</label>
-              <div className="flex flex-col gap-2 pt-1">
-                {[['skip', 'Skip — gap in the line'], ['zero', 'Show as Zero']].map(([val, lab]) => (
-                  <label key={val} className="flex items-center gap-2 text-sm cursor-pointer select-none">
-                    <input
-                      type="radio"
-                      name="missing_value_display"
-                      checked={form.missing_value_display === val}
-                      onChange={() => set('missing_value_display', val)}
-                      className="accent-green-700 w-4 h-4"
-                    />
-                    <span className="text-gray-700">{lab}</span>
-                  </label>
-                ))}
-              </div>
+                placeholder="e.g. 12" />
             </div>
           </div>
 
-          {/* Row 5: Assignment (full width) */}
-          <div>
-            <label className={lbl}>Assigned To</label>
-            <div className="flex gap-5 mb-2.5">
-              {[['user', 'User'], ['position', 'Position']].map(([val, lab]) => (
-                <label key={val} className="flex items-center gap-2 text-sm cursor-pointer select-none">
-                  <input
-                    type="radio"
-                    name="owner_type"
-                    checked={form.owner_type === val}
-                    onChange={() => set('owner_type', val)}
-                    className="accent-green-700 w-4 h-4"
-                  />
-                  <span className="text-gray-700">{lab} Assigned</span>
-                </label>
-              ))}
+          {/* Missing Values | Assignment — 2 col */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={lbl}>Missing / Not-Entered Values</label>
+              <PillToggle
+                value={form.missing_value_display}
+                onChange={v => set('missing_value_display', v)}
+                options={[['skip', 'Skip (gap)'], ['zero', 'Show as Zero']]}
+              />
             </div>
-            {form.owner_type === 'user' ? (
-              <select className={inp} value={form.owner_user_id} onChange={e => set('owner_user_id', e.target.value)}>
-                <option value="">— Select User —</option>
-                {profiles.map(p => (
-                  <option key={p.id} value={p.id}>{p.full_name || p.email}</option>
+            <div>
+              <label className={lbl}>Assigned To</label>
+              <div className="flex gap-1 mt-1 mb-2">
+                {[['user', 'User'], ['position', 'Position']].map(([val, lab]) => (
+                  <button key={val} type="button" onClick={() => set('owner_type', val)}
+                    className={`px-3 py-1 text-xs rounded-lg border font-semibold transition-colors ${
+                      form.owner_type === val ? 'bg-green-700 text-white border-green-700' : 'bg-white text-gray-600 border-gray-300 hover:border-green-500'
+                    }`}>
+                    {lab}
+                  </button>
                 ))}
-              </select>
-            ) : (
-              <div className="text-sm text-gray-400 italic px-3 py-2.5 border border-dashed border-gray-300 rounded-lg">
-                Position assignment coming soon
               </div>
-            )}
+              {form.owner_type === 'user' ? (
+                <select className={inp} value={form.owner_user_id} onChange={e => set('owner_user_id', e.target.value)}>
+                  <option value="">— Select User —</option>
+                  {profiles.map(p => (
+                    <option key={p.id} value={p.id}>{p.full_name || p.email}</option>
+                  ))}
+                </select>
+              ) : (
+                <div className="text-xs text-gray-400 italic px-3 py-2 border border-dashed border-gray-300 rounded-lg">
+                  Position assignment coming soon
+                </div>
+              )}
+            </div>
           </div>
 
           {err && <p className="text-red-600 text-sm font-medium">{err}</p>}
 
           {/* Target Lines Section */}
-          <div className="border-t border-gray-100 pt-4">
+          <div className="border-t border-gray-100 pt-3">
             <TargetLinesSection targetLines={targetLines} setTargetLines={setTargetLines} tracking={form.tracking} />
           </div>
 
@@ -543,7 +535,7 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete }) {
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-3 px-7 py-4 border-t border-gray-100 bg-gray-50">
+        <div className="flex justify-end gap-3 px-6 py-3 border-t border-gray-100 bg-gray-50 flex-shrink-0">
           <button onClick={onClose} className="px-5 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 font-medium">
             Cancel
           </button>
@@ -1078,7 +1070,7 @@ function TargetLineSegments({ formattedGraphicalItems, yAxisMap, targetLines, di
     <g>
       {targetLines.map((tl, i) => {
         if (!tl.start_date) return null
-        const endDate = computeTargetEndDate(tl.start_date, tl.end_mode, tl.end_date, tl.end_periods, tracking)
+        const endDate = computeTargetEndDate(tl.start_date, tl.end_mode, tl.end_date, tl.end_periods, tl.end_unit || tracking)
         const sLabel = periodLabel(tl.start_date, tracking)
         const eLabel = periodLabel(endDate, tracking)
         const x1 = labelToX[sLabel]
@@ -1567,7 +1559,7 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh]">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
@@ -1998,7 +1990,7 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh]">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
@@ -3924,7 +3916,7 @@ export default function Statistics() {
     const extraLabels = new Set()
     tls.forEach(tl => {
       if (!tl.start_date) return
-      const endDate = computeTargetEndDate(tl.start_date, tl.end_mode, tl.end_date, tl.end_periods, tracking)
+      const endDate = computeTargetEndDate(tl.start_date, tl.end_mode, tl.end_date, tl.end_periods, tl.end_unit || tracking)
       extraLabels.add(periodLabel(tl.start_date, tracking))
       extraLabels.add(periodLabel(endDate, tracking))
     })
