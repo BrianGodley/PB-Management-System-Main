@@ -4,8 +4,8 @@ import { supabase } from '../lib/supabase'
 // ── Constants ─────────────────────────────────────────────────────────────────
 const COLL_SECTIONS = [
   { key:'current',   label:'Current Collections',   balLabel:'Starting Balance', endLabel:'New Balance' },
-  { key:'punchlist', label:'Punchlist Collections', balLabel:'Open Balance',     endLabel:'New Balance' },
-  { key:'long_term', label:'Long-Term Collections', balLabel:'Open Balance',     endLabel:'New Balance' },
+  { key:'punchlist', label:'Punchlist Collections', balLabel:'Starting Balance', endLabel:'New Balance' },
+  { key:'long_term', label:'Long-Term Collections', balLabel:'Starting Balance', endLabel:'New Balance' },
 ]
 const DAYS = ['mon','tue','wed','thu','fri']
 const DAY_LABELS = { mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday', fri:'Friday' }
