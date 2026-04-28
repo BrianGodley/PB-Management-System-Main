@@ -902,7 +902,7 @@ function ColoredLineSegments({ formattedGraphicalItems, stat }) {
             x1={prev.x} y1={prev.y}
             x2={pt.x}   y2={pt.y}
             stroke={color}
-            strokeWidth={2.5}
+            strokeWidth={3.1}
             strokeLinecap="round"
           />
         )
@@ -3691,24 +3691,20 @@ export default function Statistics() {
     })
   }, [overlayValues, fromDate, toDate, selectedStat])
 
-  // Y domain that combines all overlay parts' configured (or auto) ranges
-  const overlayYDomain = useMemo(() => {
-    if (!overlayChartData || !overlayChartData.length) return ['auto', 'auto']
-    let globalMin = Infinity, globalMax = -Infinity
-    overlayValues.forEach(({ part }, i) => {
+  // Per-stat Y domains so each overlay line gets its own independent axis
+  const overlayYDomains = useMemo(() => {
+    return overlayValues.map(({ part }, i) => {
+      if (!overlayChartData?.length) return ['auto', 'auto']
       const vals = overlayChartData.map(d => d[`v${i}`]).filter(v => v != null)
-      if (!vals.length) return
+      if (!vals.length) return ['auto', 'auto']
       const dataMin = Math.min(...vals)
       const dataMax = Math.max(...vals)
       const lo = (part?.y_min != null) ? Number(part.y_min) : dataMin
       const hi = (part?.y_max != null) ? Number(part.y_max) : dataMax
-      if (isFinite(lo)) globalMin = Math.min(globalMin, lo)
-      if (isFinite(hi)) globalMax = Math.max(globalMax, hi)
+      const range = hi - lo || Math.abs(hi) || 1
+      const pad = range * 0.08
+      return [lo - pad, hi + pad]
     })
-    if (!isFinite(globalMin) || !isFinite(globalMax)) return ['auto', 'auto']
-    const range = globalMax - globalMin || Math.abs(globalMax) || 1
-    const pad   = range * 0.08
-    return [globalMin - pad, globalMax + pad]
   }, [overlayChartData, overlayValues])
 
   // Navigation through stats
@@ -4232,18 +4228,23 @@ export default function Statistics() {
                               height={70}
                               interval="preserveStartEnd"
                             />
-                            <YAxis
-                              domain={overlayYDomain}
-                              tick={{ fontSize: 11, fill: '#111827', fontWeight: 600 }}
-                              tickLine={false}
-                              axisLine={false}
-                              tickFormatter={v => {
-                                if (selectedStat.stat_type === 'currency')   return '$' + Number(v).toLocaleString()
-                                if (selectedStat.stat_type === 'percentage') return v + '%'
-                                return Number(v).toLocaleString()
-                              }}
-                              width={80}
-                            />
+                            {overlayValues.map(({ stat }, i) => (
+                              <YAxis
+                                key={i}
+                                yAxisId={`y${i}`}
+                                orientation={i === 0 ? 'left' : 'right'}
+                                domain={overlayYDomains[i] ?? ['auto', 'auto']}
+                                tick={{ fontSize: 10, fill: OVERLAY_COLORS[i], fontWeight: 700 }}
+                                tickLine={false}
+                                axisLine={false}
+                                tickFormatter={v => {
+                                  if (selectedStat.stat_type === 'currency')   return '$' + Number(v).toLocaleString()
+                                  if (selectedStat.stat_type === 'percentage') return v + '%'
+                                  return Number(v).toLocaleString()
+                                }}
+                                width={72}
+                              />
+                            ))}
                             <Tooltip
                               content={({ active, payload, label }) => {
                                 if (!active || !payload?.length) return null
@@ -4268,10 +4269,11 @@ export default function Statistics() {
                             {overlayValues.map((_, i) => (
                               <Line
                                 key={i}
+                                yAxisId={`y${i}`}
                                 type="linear"
                                 dataKey={`v${i}`}
                                 stroke={OVERLAY_COLORS[i]}
-                                strokeWidth={2}
+                                strokeWidth={2.5}
                                 dot={false}
                                 activeDot={{ r: 5, fill: OVERLAY_COLORS[i] }}
                                 connectNulls={false}
