@@ -3247,7 +3247,8 @@ export default function Statistics() {
   const [valuesStatId, setValuesStatId] = useState(null) // which stat id the values belong to
   const [profiles,     setProfiles]     = useState([])
   const [loading,      setLoading]      = useState(true)
-  const prevDisplayRef = useRef([])   // frozen frame — last rendered displayChartData
+  const prevDisplayRef  = useRef([])   // frozen frame — last rendered displayChartData
+  const chartPrintRef   = useRef(null) // ref to chart area for printing
 
   // UI state
   const [viewMode,       setViewMode]       = useState('graphs')  // 'graphs'|'multiple-entry'|'print-multiple'|'comparison'|'import-export'|'archive'
@@ -3436,6 +3437,40 @@ export default function Statistics() {
 
   // ── Derived data ───────────────────────────────────────────────────────────
   const selectedStat = useMemo(() => stats.find(s => s.id === selectedId) || null, [stats, selectedId])
+
+  // ── Print current chart ───────────────────────────────────────────────────
+  function handlePrint() {
+    const el = chartPrintRef.current
+    if (!el || !selectedStat) return
+
+    const title    = selectedStat.name
+    const dateRange = `${fromDate} → ${toDate}`
+    const svgEls   = el.querySelectorAll('svg')
+    const svgHTML  = [...svgEls].map(s => s.outerHTML).join('')
+
+    const win = window.open('', '_blank', 'width=1000,height=700')
+    win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <title>${title}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: ui-sans-serif, system-ui, sans-serif; background: #fff; padding: 32px; }
+    h1 { font-size: 22px; font-weight: 700; color: #111827; margin-bottom: 4px; }
+    p  { font-size: 13px; color: #6b7280; margin-bottom: 24px; }
+    svg { width: 100% !important; height: auto !important; display: block; }
+    @media print { body { padding: 16px; } }
+  </style>
+</head>
+<body>
+  <h1>${title}</h1>
+  <p>${dateRange}</p>
+  ${svgHTML}
+  <script>window.onload = () => { window.print(); window.close(); }<\/script>
+</body>
+</html>`)
+    win.document.close()
+  }
 
   // ── Quick entry: compute the most-recent canonical period for the selected stat ──
   const quickPeriod = useMemo(() => {
@@ -4067,7 +4102,7 @@ export default function Statistics() {
               <div className="relative flex items-center px-6 py-1.5 bg-white border-b border-gray-200 flex-shrink-0">
                 {/* Left — print, share, auto min/max */}
                 <div className="flex-1 flex items-center gap-2">
-                  <button title="Print" className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-xl">🖨️</button>
+                  <button title="Print" onClick={handlePrint} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-xl">🖨️</button>
                   <button title="Share" className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-xl">🔗</button>
                   <div className="flex gap-1 ml-1">
                     {[['autoMin', autoMin, setAutoMin, 'Auto Min'], ['autoMax', autoMax, setAutoMax, 'Auto Max']].map(([k, val, setter, lbl]) => (
@@ -4190,7 +4225,7 @@ export default function Statistics() {
               </div>
 
               {/* Chart */}
-              <div className="flex-1 px-4 py-4 overflow-hidden relative bg-white">
+              <div ref={chartPrintRef} className="flex-1 px-4 py-4 overflow-hidden relative bg-white">
 
                 {selectedStat.stat_category === 'overlay' ? (
                   /* ── Overlay chart ─────────────────────────────────────── */
