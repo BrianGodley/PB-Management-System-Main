@@ -45,6 +45,20 @@ function getWeekEndingDate(dateStr, weekEndingDay) {
   return isoDate(d)
 }
 
+// Compute end date for target line: either a calendar date or n periods after start date
+function computeTargetEndDate(startDate, endMode, endDate, endPeriods, tracking) {
+  if (endMode === 'date') return endDate || startDate
+  const n = parseInt(endPeriods) || 0
+  if (n === 0) return startDate
+  const d = new Date(startDate + 'T00:00:00')
+  if      (tracking === 'daily')     d.setDate(d.getDate() + n)
+  else if (tracking === 'weekly')    d.setDate(d.getDate() + n * 7)
+  else if (tracking === 'monthly')   d.setMonth(d.getMonth() + n)
+  else if (tracking === 'quarterly') d.setMonth(d.getMonth() + n * 3)
+  else if (tracking === 'yearly')    d.setFullYear(d.getFullYear() + n)
+  return d.toISOString().slice(0, 10)
+}
+
 // ── TypeSelectorModal ─────────────────────────────────────────────────────────
 function TypeSelectorModal({ onSelect, onClose }) {
   const types = [
@@ -87,6 +101,102 @@ function TypeSelectorModal({ onSelect, onClose }) {
   )
 }
 
+// ── TargetLinesSection ───────────────────────────────────────────────────────
+function TargetLinesSection({ targetLines, setTargetLines, tracking }) {
+  function addLine() {
+    setTargetLines(prev => [...prev, { start_date: '', end_mode: 'date', end_date: '', end_periods: '', start_value: '', end_value: '' }])
+  }
+  function removeLine(i) {
+    setTargetLines(prev => prev.filter((_, idx) => idx !== i))
+  }
+  function updateLine(i, key, val) {
+    setTargetLines(prev => prev.map((tl, idx) => idx === i ? { ...tl, [key]: val } : tl))
+  }
+
+  const periodLabel = tracking === 'daily' ? 'days' : tracking === 'weekly' ? 'weeks' : tracking === 'monthly' ? 'months' : tracking === 'quarterly' ? 'quarters' : 'years'
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm font-semibold text-gray-700">Target Lines</span>
+        <button type="button" onClick={addLine}
+          className="text-xs px-2.5 py-1 rounded-lg bg-green-700 text-white font-semibold hover:bg-green-800 transition-colors">
+          + Add Target Line
+        </button>
+      </div>
+      {targetLines.length === 0 && (
+        <p className="text-xs text-gray-400 italic">No target lines. Add one to draw a goal line on the chart.</p>
+      )}
+      <div className="space-y-3">
+        {targetLines.map((tl, i) => (
+          <div key={i} className="border border-gray-200 rounded-xl p-3 bg-gray-50 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-green-700">Target Line {i + 1}</span>
+              <button type="button" onClick={() => removeLine(i)}
+                className="text-xs text-red-400 hover:text-red-600 font-semibold">Remove</button>
+            </div>
+            {/* Start date + start value */}
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="block text-[11px] font-semibold text-gray-500 mb-0.5">Start Date</label>
+                <input type="date" value={tl.start_date}
+                  onChange={e => updateLine(i, 'start_date', e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-green-600" />
+              </div>
+              <div className="flex-1">
+                <label className="block text-[11px] font-semibold text-gray-500 mb-0.5">Start Value</label>
+                <input type="number" value={tl.start_value} placeholder="0"
+                  onChange={e => updateLine(i, 'start_value', e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-green-600" />
+              </div>
+            </div>
+            {/* End mode toggle */}
+            <div className="flex gap-1">
+              {['date', 'periods'].map(mode => (
+                <button key={mode} type="button"
+                  onClick={() => updateLine(i, 'end_mode', mode)}
+                  className={`text-xs px-2.5 py-1 rounded-lg font-semibold border transition-colors ${
+                    tl.end_mode === mode
+                      ? 'bg-green-700 text-white border-green-700'
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-green-600'
+                  }`}>
+                  {mode === 'date' ? 'End Date' : `# of ${periodLabel}`}
+                </button>
+              ))}
+            </div>
+            {/* End date or periods + end value */}
+            <div className="flex gap-2">
+              <div className="flex-1">
+                {tl.end_mode === 'date' ? (
+                  <>
+                    <label className="block text-[11px] font-semibold text-gray-500 mb-0.5">End Date</label>
+                    <input type="date" value={tl.end_date}
+                      onChange={e => updateLine(i, 'end_date', e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-green-600" />
+                  </>
+                ) : (
+                  <>
+                    <label className="block text-[11px] font-semibold text-gray-500 mb-0.5">Number of {periodLabel}</label>
+                    <input type="number" min="1" value={tl.end_periods} placeholder="e.g. 4"
+                      onChange={e => updateLine(i, 'end_periods', e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-green-600" />
+                  </>
+                )}
+              </div>
+              <div className="flex-1">
+                <label className="block text-[11px] font-semibold text-gray-500 mb-0.5">End Value</label>
+                <input type="number" value={tl.end_value} placeholder="0"
+                  onChange={e => updateLine(i, 'end_value', e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-green-600" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── BasicStatForm ─────────────────────────────────────────────────────────────
 function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete }) {
   const { user } = useAuth()
@@ -103,6 +213,11 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete }) {
     owner_position_id:     initialData?.owner_position_id     || '',
     default_periods:       initialData?.default_periods       ?? '',
     missing_value_display: initialData?.missing_value_display || 'skip',
+  })
+  const [targetLines, setTargetLines] = useState(() => {
+    const existing = initialData?.target_lines
+    if (existing && Array.isArray(existing)) return existing
+    return []
   })
   const [saving,        setSaving]        = useState(false)
   const [archiving,     setArchiving]     = useState(false)
@@ -141,6 +256,7 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete }) {
         created_by:            user?.id || null,
         default_periods:       form.default_periods !== '' ? parseInt(form.default_periods) : null,
         missing_value_display: form.missing_value_display,
+        target_lines:          targetLines.length > 0 ? targetLines : null,
       }
 
       console.log('[Statistics] saving payload:', payload)
@@ -356,6 +472,11 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete }) {
           </div>
 
           {err && <p className="text-red-600 text-sm font-medium">{err}</p>}
+
+          {/* Target Lines Section */}
+          <div className="border-t border-gray-100 pt-4">
+            <TargetLinesSection targetLines={targetLines} setTargetLines={setTargetLines} tracking={form.tracking} />
+          </div>
 
           {/* Row 5: Archive | Delete (edit only, side by side) */}
           {isEdit && (
@@ -938,6 +1059,48 @@ function ColoredLineSegments({ formattedGraphicalItems, stat }) {
   )
 }
 
+// ── Target Line Segments ─────────────────────────────────────────────────────
+function TargetLineSegments({ formattedGraphicalItems, yAxisMap, targetLines, displayChartData, tracking }) {
+  if (!targetLines?.length || !displayChartData?.length) return null
+
+  const yAxis = yAxisMap && Object.values(yAxisMap)[0]
+  if (!yAxis?.scale) return null
+  const yScale = yAxis.scale
+
+  // Build label → x pixel position from the invisible line's rendered points
+  const points = formattedGraphicalItems?.[0]?.props?.points ?? []
+  const labelToX = {}
+  displayChartData.forEach((d, i) => {
+    if (points[i] && isFinite(points[i].x)) labelToX[d.label] = points[i].x
+  })
+
+  return (
+    <g>
+      {targetLines.map((tl, i) => {
+        if (!tl.start_date) return null
+        const endDate = computeTargetEndDate(tl.start_date, tl.end_mode, tl.end_date, tl.end_periods, tracking)
+        const sLabel = periodLabel(tl.start_date, tracking)
+        const eLabel = periodLabel(endDate, tracking)
+        const x1 = labelToX[sLabel]
+        const x2 = labelToX[eLabel]
+        if (x1 === undefined || x2 === undefined) return null
+        const y1 = yScale(Number(tl.start_value) || 0)
+        const y2 = yScale(Number(tl.end_value) || 0)
+        if (!isFinite(y1) || !isFinite(y2)) return null
+        return (
+          <g key={i}>
+            <line x1={x1} y1={y1} x2={x2} y2={y2}
+              stroke="#16a34a" strokeWidth={1.5}
+              strokeDasharray="6 3" strokeLinecap="round" opacity={0.85} />
+            <circle cx={x1} cy={y1} r={3} fill="#16a34a" />
+            <circle cx={x2} cy={y2} r={3} fill="#16a34a" />
+          </g>
+        )
+      })}
+    </g>
+  )
+}
+
 // ── Dual-handle Date Range Scrubber ──────────────────────────────────────────
 function DateRangeScrubber({ minDate, maxDate, fromDate, toDate, onFromChange, onToChange }) {
   const trackRef    = useRef(null)
@@ -1293,6 +1456,12 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
     return [{ stat_id: '', operator: null }]
   })
 
+  const [targetLines, setTargetLines] = useState(() => {
+    const existing = initialData?.target_lines
+    if (existing && Array.isArray(existing)) return existing
+    return []
+  })
+
   const [saving,        setSaving]        = useState(false)
   const [archiving,     setArchiving]     = useState(false)
   const [deleting,      setDeleting]      = useState(false)
@@ -1354,6 +1523,7 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
       missing_value_display: form.missing_value_display,
       stat_category:         'equation',
       equation_parts:        parts,
+      target_lines:          targetLines.length > 0 ? targetLines : null,
     }
 
     let savedId, savedName
@@ -1595,6 +1765,11 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
             )}
           </div>
 
+          {/* Target Lines Section */}
+          <div className="border-t border-gray-100 pt-5">
+            <TargetLinesSection targetLines={targetLines} setTargetLines={setTargetLines} tracking={form.tracking} />
+          </div>
+
           {err && <p className="text-sm text-red-600 font-medium">{err}</p>}
         </div>
 
@@ -1668,6 +1843,12 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
     const existing = initialData?.overlay_parts
     if (existing && Array.isArray(existing) && existing.length > 0) return existing
     return [{ stat_id: '', y_min: '', y_max: '' }]
+  })
+
+  const [targetLines, setTargetLines] = useState(() => {
+    const existing = initialData?.target_lines
+    if (existing && Array.isArray(existing)) return existing
+    return []
   })
 
   // statRanges: { [stat_id]: { min, max } } — actual data range fetched on stat select
@@ -1780,6 +1961,7 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
         y_min:   p.y_min !== '' && p.y_min != null ? Number(p.y_min) : null,
         y_max:   p.y_max !== '' && p.y_max != null ? Number(p.y_max) : null,
       })),
+      target_lines:          targetLines.length > 0 ? targetLines : null,
     }
 
     let savedId, savedName
@@ -2023,6 +2205,11 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
                 ))}
               </select>
             )}
+          </div>
+
+          {/* Target Lines Section */}
+          <div className="border-t border-gray-100 pt-5">
+            <TargetLinesSection targetLines={targetLines} setTargetLines={setTargetLines} tracking={form.tracking} />
           </div>
 
           {err && <p className="text-sm text-red-600 font-medium">{err}</p>}
@@ -3729,6 +3916,27 @@ export default function Statistics() {
     return result
   }, [chartData, viewPeriod, selectedStat, weekEndingDay, valuesStatId, selectedId])
 
+  // ── Chart data with target line dates included ────────────────────────────
+  const chartDataWithTargets = useMemo(() => {
+    const tls = selectedStat?.target_lines
+    if (!tls?.length || !displayChartData.length) return displayChartData
+    const tracking = selectedStat.tracking
+    const extraLabels = new Set()
+    tls.forEach(tl => {
+      if (!tl.start_date) return
+      const endDate = computeTargetEndDate(tl.start_date, tl.end_mode, tl.end_date, tl.end_periods, tracking)
+      extraLabels.add(periodLabel(tl.start_date, tracking))
+      extraLabels.add(periodLabel(endDate, tracking))
+    })
+    const existingLabels = new Set(displayChartData.map(d => d.label))
+    const extras = []
+    extraLabels.forEach(lbl => {
+      if (!existingLabels.has(lbl)) extras.push({ label: lbl, value: null, date: lbl })
+    })
+    if (!extras.length) return displayChartData
+    return [...displayChartData, ...extras].sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+  }, [displayChartData, selectedStat])
+
   // ── Overlay chart data ─────────────────────────────────────────────────────
   const overlayChartData = useMemo(() => {
     if (!selectedStat || selectedStat.stat_category !== 'overlay') return null
@@ -4364,7 +4572,7 @@ export default function Statistics() {
                     </div>
                   ) : (
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={displayChartData} margin={{ top: 28, right: 24, left: 16, bottom: 20 }}>
+                      <LineChart data={chartDataWithTargets} margin={{ top: 28, right: 24, left: 16, bottom: 20 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                         <XAxis
                           dataKey="label"
@@ -4407,6 +4615,19 @@ export default function Statistics() {
                             <ColoredLineSegments {...props} stat={selectedStat} />
                           )}
                         />
+                        {/* Target line segments — thin dashed green lines */}
+                        {selectedStat?.target_lines?.length > 0 && (
+                          <Customized
+                            component={(props) => (
+                              <TargetLineSegments
+                                {...props}
+                                targetLines={selectedStat.target_lines}
+                                displayChartData={chartDataWithTargets}
+                                tracking={selectedStat.tracking}
+                              />
+                            )}
+                          />
+                        )}
                       </LineChart>
                     </ResponsiveContainer>
                   )
