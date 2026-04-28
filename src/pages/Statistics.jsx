@@ -3936,7 +3936,7 @@ export default function Statistics() {
   )
 
   return (
-    <div className="h-[calc(100vh-2.75rem)] -m-4 lg:-m-6 flex flex-col overflow-hidden bg-gray-50">
+    <div className="h-[calc(100vh-2.75rem)] -m-4 lg:-m-6 flex flex-col overflow-hidden bg-gray-100">
 
       {/* ── MODE TABS — portalled into the green app header bar ─── */}
       {createPortal(
@@ -4038,7 +4038,7 @@ export default function Statistics() {
         }
         const v = views[viewMode]
         return (
-          <div className="flex-1 flex items-center justify-center bg-gray-50">
+          <div className="flex-1 flex items-center justify-center bg-gray-100">
             <div className="text-center">
               <div className="text-6xl mb-5">{v.icon}</div>
               <p className="text-xl font-bold text-gray-700 mb-2">{v.title}</p>
