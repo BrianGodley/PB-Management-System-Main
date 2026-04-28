@@ -11,7 +11,7 @@ const DAYS = ['mon','tue','wed','thu','fri']
 const DAY_LABELS = { mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday', fri:'Friday' }
 
 const PAY_CATS = [
-  { key:'prelim',         label:'Prelims',            cols:['payee','amount_current'],                                                              subtotalCol:'amount_current' },
+  { key:'prelim',         label:'Prelims',            cols:['payee','starting_balance','new_charges','amount_current'],                           subtotalCol:'amount_current', colLabels:{ amount_current:'New Balance', starting_balance:'Starting Balance', new_charges:'New Charges' }, readOnlyCols:['starting_balance','amount_current'] },
   { key:'credit_card',    label:'Credit Cards/Lines', cols:['payee','starting_balance','new_charges','amount_current','due_date','rate'],           subtotalCol:'amount_current', colLabels:{ amount_current:'New Balance', starting_balance:'Starting Balance', new_charges:'New Charges' }, readOnlyCols:['starting_balance','amount_current'] },
   { key:'credit_account', label:'Credit Vendors',     cols:['payee','amount_current','amount_future','due_date'],                                   subtotalCol:['amount_current','amount_future'], colLabels:{ amount_current:'Current', amount_future:'Future' } },
   { key:'non_credit',     label:'Standard Vendors',   cols:['payee','amount_current','amount_future','due_date'],                                   subtotalCol:['amount_current','amount_future'], colLabels:{ amount_current:'Current', amount_future:'Future' } },
@@ -260,6 +260,11 @@ export default function Collections() {
               // Starting Balance = prev New Balance − allocated; carries forward as new starting point
               startingBalance = Math.max(0, amountCurrent - allocated)
               amountCurrent   = startingBalance
+            } else if (p.category === 'prelim') {
+              // Same reduction logic as credit_card; drop row if fully paid off
+              startingBalance = Math.max(0, amountCurrent - allocated)
+              amountCurrent   = startingBalance
+              if (amountCurrent === 0) return null
             } else if (p.category === 'non_credit' && allocated > 0) {
               // Subtract allocated payment from current balance first, then future
               const newCurrent = Math.max(0, amountCurrent - allocated)
@@ -368,11 +373,11 @@ export default function Collections() {
     const numericFields = ['amount_current','amount_future','starting_balance','new_charges']
     const parsed = numericFields.includes(field) ? (parseFloat(value) || 0) : value
 
-    // For credit_card rows: when new_charges changes, auto-compute New Balance into amount_current
+    // For credit_card and prelim rows: when new_charges changes, auto-compute New Balance
     const updatePayload = { [field]: parsed }
     if (field === 'new_charges') {
       const row = payables.find(p => p.id === id)
-      if (row?.category === 'credit_card') {
+      if (row?.category === 'credit_card' || row?.category === 'prelim') {
         updatePayload.amount_current = (parseFloat(row.starting_balance) || 0) + parsed
       }
     }
@@ -524,7 +529,8 @@ export default function Collections() {
                   <p>✅ Each row's <strong>New Balance → Starting Balance</strong> for the new week</p>
                   <p>✅ Previously Delivered carries over unchanged</p>
                   <p>✅ All Payables rows copied over</p>
-                  <p>✅ Credit Cards: Starting Balance = prev New Balance − allocated amount</p>
+                  <p>✅ Credit Cards &amp; Prelims: Starting Balance = prev New Balance − allocated amount</p>
+                  <p>✅ Prelims &amp; Standard Vendors paid to $0 are removed automatically</p>
                   <p>✅ Payroll Allocation amounts (Payroll, Payroll Taxes) carry over</p>
                   <p>🔄 Payable Allocations (section 4) start blank — re-add each week</p>
                   <p>🔄 Invoice &amp; Deposit columns will start blank</p>
