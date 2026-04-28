@@ -3,9 +3,9 @@ import { supabase } from '../lib/supabase'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const COLL_SECTIONS = [
-  { key:'current',   label:'Current Collections',   prevLabel:'Prev Delivered', balLabel:'Starting Balance', endLabel:'New Balance' },
-  { key:'punchlist', label:'Punchlist Collections', prevLabel:'$ Delivered',    balLabel:'Open Balance',     endLabel:'New Balance' },
-  { key:'long_term', label:'Long-Term Collections', prevLabel:'$ Delivered',    balLabel:'Open Balance',     endLabel:'New Balance' },
+  { key:'current',   label:'Current Collections',   balLabel:'Starting Balance', endLabel:'New Balance' },
+  { key:'punchlist', label:'Punchlist Collections', balLabel:'Open Balance',     endLabel:'New Balance' },
+  { key:'long_term', label:'Long-Term Collections', balLabel:'Open Balance',     endLabel:'New Balance' },
 ]
 const DAYS = ['mon','tue','wed','thu','fri']
 const DAY_LABELS = { mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday', fri:'Friday' }
@@ -215,7 +215,6 @@ export default function Collections() {
             client_name:      row.client_name,
             sort_order:       row.sort_order,
             notes:            '',
-            prev_delivered:   row.prev_delivered ?? 0,
             starting_balance: calcEnd(row),
             mon_inv: 0, mon_dep: 0,
             tue_inv: 0, tue_dep: 0,
@@ -337,7 +336,7 @@ export default function Collections() {
   }
 
   // ── Row CRUD ────────────────────────────────────────────────────────────────
-  const NUM_FIELDS = ['prev_delivered','starting_balance',
+  const NUM_FIELDS = ['starting_balance',
     'mon_inv','mon_dep','tue_inv','tue_dep','wed_inv','wed_dep','thu_inv','thu_dep','fri_inv','fri_dep']
 
   async function addRow(section, manager) {
@@ -527,7 +526,6 @@ export default function Collections() {
                   </p>
                   <p>✅ All client rows, manager groups, and sections</p>
                   <p>✅ Each row's <strong>New Balance → Starting Balance</strong> for the new week</p>
-                  <p>✅ Previously Delivered carries over unchanged</p>
                   <p>✅ All Payables rows copied over</p>
                   <p>✅ Credit Cards &amp; Prelims: Starting Balance = prev New Balance − allocated amount</p>
                   <p>✅ Prelims &amp; Standard Vendors paid to $0 are removed automatically</p>
@@ -772,7 +770,6 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
         <colgroup>
           <col style={{ width:'115px' }} />
           <col style={{ width:'88px'  }} />
-          <col style={{ width:'88px'  }} />
           {DAYS.flatMap(() => [<col style={{ width:'78px' }} />, <col style={{ width:'78px' }} />])}
           <col style={{ width:'90px'  }} />
           <col style={{ width:'180px' }} />
@@ -782,7 +779,6 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
           {/* Day header row */}
           <tr className="bg-gray-50 border-b border-gray-200">
             <th rowSpan={2} className="px-3 py-2 text-center font-semibold text-gray-700 border-r border-gray-300">Client</th>
-            <th rowSpan={2} className="px-2 py-2 text-center font-semibold text-gray-600 text-[11px]">Previously<br/>Delivered</th>
             <th rowSpan={2} className="px-2 py-2 text-center font-semibold text-gray-600 text-[11px] border-r border-gray-300">{section.balLabel}</th>
             {DAYS.map(d => (
               <th key={d} colSpan={2} className="px-2 py-1.5 text-center font-extrabold text-gray-700 border-l border-r border-gray-400 text-[11px] bg-gray-200">
@@ -867,9 +863,6 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
                     <td className="px-2 py-1 border-r border-gray-300 bg-gray-100">
                       <TextCell value={row.client_name} onSave={v => onUpdate(row.id,'client_name',v)} placeholder="Client" bold onDelete={() => onDelete(row.id)} />
                     </td>
-                    <td className="px-1 py-1">
-                      <CellInput value={row.prev_delivered||''} onSave={v => onUpdate(row.id,'prev_delivered',v)} />
-                    </td>
                     <td className="px-1 py-1 border-r border-gray-300">
                       <CellInput value={row.starting_balance||''} onSave={v => onUpdate(row.id,'starting_balance',v)} />
                     </td>
@@ -901,7 +894,6 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
           {/* Subtotals */}
           <tr className="bg-amber-50 font-semibold border-t-2 border-amber-200">
             <td className="px-3 py-2 text-gray-700 text-[11px] font-bold">Subtotals</td>
-            <td className="px-2 py-2 text-right text-gray-600 text-[11px]">{fmtC(rows.reduce((s,r) => s + (parseFloat(r.prev_delivered)||0), 0))}</td>
             <td className="px-2 py-2 text-right text-gray-600 border-r border-amber-200 text-[11px]">{fmtC(rows.reduce((s,r) => s + (parseFloat(r.starting_balance)||0), 0))}</td>
             {DAYS.map(d => {
               const invS = rows.reduce((s,r) => s + (parseFloat(r[`${d}_inv`])||0), 0)
