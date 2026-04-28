@@ -294,32 +294,48 @@ export default function Collections() {
         }
       }
 
-      // ── Copy financial planning (skip if already present; section 4 always starts blank) ─
+      // ── Copy financial planning (skip if already present; sections 1 & 4 handled specially) ─
       const { data: existingFin } = await supabase
         .from('collection_financial').select('id').eq('week_id', targetWeek.id).limit(1)
       if (!existingFin?.length) {
         const { data: sourceFinancial } = await supabase
           .from('collection_financial').select('*').eq('week_id', lastDataWeek.id).order('sort_order')
-        if (sourceFinancial?.length) {
-          const newFinancial = sourceFinancial
-            .filter(f => f.section !== 'payables_alloc')
-            .map(f => ({
-              week_id:           targetWeek.id,
-              section:           f.section,
-              subsection:        f.subsection   || null,
-              label:             f.label        || null,
-              amount:            (f.is_formula && f.section !== 'payroll') ? 0 : (parseFloat(f.amount) || 0),
-              is_formula:        f.is_formula   ?? false,
-              formula_type:      f.formula_type || null,
-              formula_pct:       f.formula_pct  ?? null,
-              sort_order:        f.sort_order   ?? 0,
-              source_payable_id: null,
-              is_paid:           false,
-            }))
-          if (newFinancial.length) {
-            const { error: finErr } = await supabase.from('collection_financial').insert(newFinancial)
-            if (finErr) console.error('collection_financial insert error:', finErr)
-          }
+
+        // Section 1 — Cash On Hand: always seed with standard rows at $0
+        const cashRows = [
+          { label:'Operating Expense', sort_order:0, is_formula:false, formula_type:null, formula_pct:null },
+          { label:'Income',            sort_order:1, is_formula:false, formula_type:null, formula_pct:null },
+          { label:'Payroll',           sort_order:2, is_formula:false, formula_type:null, formula_pct:null },
+          { label:'Reserves',          sort_order:3, is_formula:true,  formula_type:'pct_cash_on_hand', formula_pct:0.01 },
+        ].map(r => ({
+          week_id: targetWeek.id, section:'cash_on_hand', subsection:null,
+          amount:0, source_payable_id:null, is_paid:false, ...r,
+        }))
+
+        // Sections 2 & 3 — copy from previous week:
+        //   auto_alloc: non-formula rows keep their amount (e.g. fixed allocations)
+        //   payroll:    carry label/row but reset amount to $0 each week
+        const copiedRows = (sourceFinancial || [])
+          .filter(f => f.section === 'auto_alloc' || f.section === 'payroll')
+          .map(f => ({
+            week_id:           targetWeek.id,
+            section:           f.section,
+            subsection:        f.subsection   || null,
+            label:             f.label        || null,
+            amount:            (f.is_formula || f.section === 'payroll') ? 0 : (parseFloat(f.amount) || 0),
+            is_formula:        f.is_formula   ?? false,
+            formula_type:      f.formula_type || null,
+            formula_pct:       f.formula_pct  ?? null,
+            sort_order:        f.sort_order   ?? 0,
+            source_payable_id: null,
+            is_paid:           false,
+          }))
+
+        // Section 4 — Payable Allocations: always starts blank (user re-adds each week)
+        const allNewFinancial = [...cashRows, ...copiedRows]
+        if (allNewFinancial.length) {
+          const { error: finErr } = await supabase.from('collection_financial').insert(allNewFinancial)
+          if (finErr) console.error('collection_financial insert error:', finErr)
         }
       }
     }
@@ -529,7 +545,9 @@ export default function Collections() {
                   <p>✅ All Payables rows copied over</p>
                   <p>✅ Credit Cards &amp; Prelims: Starting Balance = prev New Balance − allocated amount</p>
                   <p>✅ Prelims &amp; Standard Vendors paid to $0 are removed automatically</p>
-                  <p>✅ Payroll Allocation amounts (Payroll, Payroll Taxes) carry over</p>
+                  <p>✅ Cash On Hand seeded: Operating Expense, Income, Payroll ($0) + Reserves 1%</p>
+                  <p>✅ Auto Allocations carry over (fixed amounts preserved)</p>
+                  <p>✅ Payroll Allocations (Payroll, Payroll Taxes) carry labels at $0</p>
                   <p>🔄 Payable Allocations (section 4) start blank — re-add each week</p>
                   <p>🔄 Invoice &amp; Deposit columns will start blank</p>
                 </div>
