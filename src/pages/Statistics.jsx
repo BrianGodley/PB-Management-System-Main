@@ -1302,9 +1302,17 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
   const isArchived = !!initialData?.archived
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  // Only non-equation stats can be used as parts
+  // When tracking changes, clear all parts so the user re-selects matching stats
+  function setTracking(val) {
+    setForm(f => ({ ...f, tracking: val }))
+    setParts([{ stat_id: '', operator: null }])
+  }
+
+  // Only non-equation stats matching the selected tracking period
   const availableStats = (allStats || []).filter(
-    s => !s.archived && s.stat_category !== 'equation' && (!isEdit || s.id !== initialData?.id)
+    s => !s.archived && s.stat_category !== 'equation' &&
+         s.tracking === form.tracking &&
+         (!isEdit || s.id !== initialData?.id)
   )
 
   function addPart() {
@@ -1415,6 +1423,36 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
             />
           </div>
 
+          {/* Tracking — must be chosen FIRST so stat list is filtered correctly */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Tracking Period <span className="text-red-500">*</span>
+            </label>
+            <div className="flex gap-2">
+              {['daily','weekly','monthly','quarterly','yearly'].map(t => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTracking(t)}
+                  className={`flex-1 py-2 rounded-lg text-xs font-semibold border-2 capitalize transition-colors ${
+                    form.tracking === t
+                      ? 'text-white border-transparent'
+                      : 'border-gray-200 text-gray-600 hover:border-green-500 hover:text-green-700'
+                  }`}
+                  style={form.tracking === t ? { backgroundColor: FG, borderColor: FG } : {}}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-1.5">
+              Only <span className="font-semibold capitalize">{form.tracking}</span> statistics will be available to use in the equation
+              {availableStats.length > 0
+                ? ` — ${availableStats.length} available.`
+                : ' — none found for this period yet.'}
+            </p>
+          </div>
+
           {/* Equation Builder */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -1442,8 +1480,11 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
                     value={part.stat_id}
                     onChange={e => updatePart(idx, 'stat_id', e.target.value)}
                     className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-600"
+                    disabled={availableStats.length === 0}
                   >
-                    <option value="">— select statistic —</option>
+                    <option value="">
+                      {availableStats.length === 0 ? `— no ${form.tracking} stats available —` : '— select statistic —'}
+                    </option>
                     {availableStats.map(s => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
@@ -1459,38 +1500,26 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
               ))}
               <button
                 onClick={addPart}
-                className="mt-1 text-sm font-semibold text-green-700 hover:text-green-900 flex items-center gap-1"
+                disabled={availableStats.length === 0}
+                className="mt-1 text-sm font-semibold text-green-700 hover:text-green-900 flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 + Add Statistic
               </button>
             </div>
             <p className="text-xs text-gray-400 mt-1.5">
-              The result is computed each period by applying operators in order. Periods where any component has no value are skipped.
+              Operators are applied in order, top to bottom. Periods where any component has no value are skipped.
             </p>
           </div>
 
-          {/* Output Format + Tracking */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Output Format</label>
-              <select value={form.stat_type} onChange={e => set('stat_type', e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
-                <option value="currency">Currency ($)</option>
-                <option value="numeric">Numeric (#)</option>
-                <option value="percentage">Percentage (%)</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Tracking</label>
-              <select value={form.tracking} onChange={e => set('tracking', e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-                <option value="quarterly">Quarterly</option>
-                <option value="yearly">Yearly</option>
-              </select>
-            </div>
+          {/* Output Format */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Output Format</label>
+            <select value={form.stat_type} onChange={e => set('stat_type', e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
+              <option value="currency">Currency ($)</option>
+              <option value="numeric">Numeric (#)</option>
+              <option value="percentage">Percentage (%)</option>
+            </select>
           </div>
 
           {/* Beginning Date + Default Periods */}
