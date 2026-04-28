@@ -3405,13 +3405,21 @@ export default function Statistics() {
   async function fetchOverlayValues(stat) {
     const parts  = stat.overlay_parts || []
     const statIds = parts.map(p => p.stat_id).filter(Boolean)
-    if (!statIds.length) { setOverlayValues([]); setValuesStatId(stat.id); return }
+    console.log('[Overlay] stat.overlay_parts:', stat.overlay_parts)
+    console.log('[Overlay] statIds:', statIds)
+    if (!statIds.length) {
+      console.log('[Overlay] no statIds — returning empty')
+      setOverlayValues([]); setValuesStatId(stat.id); return
+    }
 
-    const { data: rawVals } = await supabase
+    const { data: rawVals, error: rawErr } = await supabase
       .from('statistic_values')
       .select('statistic_id, period_date, value')
       .in('statistic_id', statIds)
       .order('period_date')
+
+    console.log('[Overlay] rawVals count:', rawVals?.length, 'error:', rawErr)
+    console.log('[Overlay] rawVals sample:', rawVals?.slice(0, 3))
 
     const grouped = parts
       .filter(p => p.stat_id)
@@ -3420,6 +3428,8 @@ export default function Statistics() {
         part:   p,
         values: (rawVals || []).filter(v => v.statistic_id === p.stat_id),
       }))
+
+    console.log('[Overlay] grouped:', grouped.map(g => ({ statName: g.stat?.name, valCount: g.values.length })))
 
     setOverlayValues(grouped)
     setValuesStatId(stat.id)
