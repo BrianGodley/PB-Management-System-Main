@@ -1263,9 +1263,11 @@ function MultipleEntryView({ stats, weekEndingDay }) {
   const [saving,        setSaving]        = useState(false)
   const [saveMsg,       setSaveMsg]       = useState('')
 
-  // Stats matching the selected tracking type (non-archived)
+  // Stats matching the selected tracking type (non-archived, direct-entry only), sorted A→Z
   const filteredStats = useMemo(
-    () => stats.filter(s => !s.archived && s.tracking === entryTracking),
+    () => stats
+      .filter(s => !s.archived && s.tracking === entryTracking && !['equation','overlay','target'].includes(s.stat_category))
+      .sort((a, b) => a.name.localeCompare(b.name)),
     [stats, entryTracking]
   )
 
@@ -1434,7 +1436,7 @@ function MultipleEntryView({ stats, weekEndingDay }) {
         </div>
       </div>
 
-      {/* ── Entry grid ────────────────────────────────────────────────────── */}
+      {/* ── Entry grid — 3 columns, alphabetical ─────────────────────────── */}
       <div className="flex-1 overflow-y-auto p-6">
         {loading ? (
           <div className="flex justify-center pt-16">
@@ -1446,37 +1448,51 @@ function MultipleEntryView({ stats, weekEndingDay }) {
             <p className="text-sm font-medium">No {entryTracking} statistics found.</p>
             <p className="text-xs mt-1 text-gray-300">Create a {entryTracking} statistic first using the Graphs view.</p>
           </div>
-        ) : (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden max-w-2xl shadow-sm">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Statistic</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-52">Value</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filteredStats.map(s => (
-                  <tr key={s.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-5 py-3">
-                      <div className="font-medium text-gray-900">{s.name}</div>
-                      <div className="text-xs text-gray-400 capitalize mt-0.5">{s.stat_type}</div>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <input
-                        type="number"
-                        value={drafts[s.id] ?? ''}
-                        onChange={e => setDrafts(d => ({ ...d, [s.id]: e.target.value }))}
-                        placeholder="Not Entered"
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white placeholder-gray-300"
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        ) : (() => {
+          // Distribute stats evenly across 3 columns, maintaining A→Z order
+          const colSize = Math.ceil(filteredStats.length / 3)
+          const columns = [
+            filteredStats.slice(0, colSize),
+            filteredStats.slice(colSize, colSize * 2),
+            filteredStats.slice(colSize * 2),
+          ].filter(col => col.length > 0)
+
+          return (
+            <div className="flex gap-4 items-start">
+              {columns.map((colStats, ci) => (
+                <div key={ci} className="flex-1 min-w-0 bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200 bg-gray-50">
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Statistic</th>
+                        <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide w-36">Value</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {colStats.map(s => (
+                        <tr key={s.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-2.5">
+                            <div className="font-medium text-gray-900 text-sm leading-tight">{s.name}</div>
+                            <div className="text-xs text-gray-400 capitalize mt-0.5">{s.stat_type}</div>
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              value={drafts[s.id] ?? ''}
+                              onChange={e => setDrafts(d => ({ ...d, [s.id]: e.target.value }))}
+                              placeholder="—"
+                              className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white placeholder-gray-300"
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+          )
+        })()}
       </div>
 
       {/* ── Save bar ──────────────────────────────────────────────────────── */}
