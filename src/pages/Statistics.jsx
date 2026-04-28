@@ -60,6 +60,39 @@ function computeTargetEndDate(startDate, endMode, endDate, endPeriods, unit) {
   return d.toISOString().slice(0, 10)
 }
 
+// ── PickSourceStatModal ───────────────────────────────────────────────────────
+function PickSourceStatModal({ stats, onPick, onClose }) {
+  const eligible = (stats || []).filter(s =>
+    !s.archived && !['equation', 'overlay', 'target'].includes(s.stat_category)
+  )
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[80vh] overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-3.5 border-b border-gray-100 flex-shrink-0"
+             style={{ backgroundColor: '#3A5038' }}>
+          <h2 className="text-base font-bold text-white">🎯 Target Statistic — Pick Source</h2>
+          <button onClick={onClose} className="text-white/70 hover:text-white text-xl leading-none">✕</button>
+        </div>
+        <p className="px-6 pt-4 pb-2 text-sm text-gray-500">
+          Pick the statistic you want to create a target for:
+        </p>
+        <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-1.5">
+          {eligible.length === 0 && (
+            <p className="text-sm text-gray-400 italic py-4 text-center">No eligible statistics found.</p>
+          )}
+          {eligible.map(s => (
+            <button key={s.id} onClick={() => onPick(s)}
+              className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 hover:border-green-600 hover:bg-green-50 transition-colors">
+              <div className="text-sm font-semibold text-gray-800">{s.name}</div>
+              <div className="text-xs text-gray-500 mt-0.5 capitalize">{s.tracking} · {s.stat_type}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── TypeSelectorModal ─────────────────────────────────────────────────────────
 function TypeSelectorModal({ onSelect, onClose }) {
   const types = [
@@ -96,6 +129,19 @@ function TypeSelectorModal({ onSelect, onClose }) {
               <div className="text-xs text-gray-500 leading-snug">{t.desc}</div>
             </button>
           ))}
+        </div>
+
+        {/* Target Statistic — full-width button below the grid */}
+        <div className="px-6 pb-6">
+          <button
+            onClick={() => onSelect('target')}
+            className="w-full rounded-xl border-2 border-green-600 p-4 text-left hover:shadow-md hover:bg-green-50 transition-all"
+          >
+            <div className="font-semibold text-green-800 mb-1">🎯 Target Statistic</div>
+            <div className="text-xs text-gray-500 leading-snug">
+              Mirror an existing stat and overlay a custom target line showing your goal over time.
+            </div>
+          </button>
         </div>
       </div>
     </div>
@@ -219,25 +265,27 @@ function TargetLinesSection({ targetLines, setTargetLines, tracking }) {
 }
 
 // ── BasicStatForm ─────────────────────────────────────────────────────────────
-function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete }) {
+function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete, targetSource }) {
   const { user } = useAuth()
 
   const [form, setForm] = useState({
-    name:                  initialData?.name                  || '',
-    stat_type:             initialData?.stat_type             || 'currency',
-    tracking:              initialData?.tracking              || 'monthly',
-    beginning_date:        initialData?.beginning_date        || daysAgo(90),
-    upside_down:           initialData?.upside_down           || false,
-    show_values:           initialData?.show_values           ?? false,
-    owner_type:            initialData?.owner_type            || 'user',
-    owner_user_id:         initialData?.owner_user_id         || user?.id || '',
-    owner_position_id:     initialData?.owner_position_id     || '',
-    default_periods:       initialData?.default_periods       ?? '',
+    name:                  initialData?.name || (targetSource ? `${targetSource.name} Target` : ''),
+    stat_type:             initialData?.stat_type  || targetSource?.stat_type  || 'currency',
+    tracking:              initialData?.tracking   || targetSource?.tracking   || 'monthly',
+    beginning_date:        initialData?.beginning_date || daysAgo(90),
+    upside_down:           initialData?.upside_down  || false,
+    show_values:           initialData?.show_values  ?? false,
+    owner_type:            initialData?.owner_type   || 'user',
+    owner_user_id:         initialData?.owner_user_id || user?.id || '',
+    owner_position_id:     initialData?.owner_position_id || '',
+    default_periods:       initialData?.default_periods ?? '',
     missing_value_display: initialData?.missing_value_display || 'skip',
   })
   const [targetLines, setTargetLines] = useState(() => {
     const existing = initialData?.target_lines
     if (existing && Array.isArray(existing)) return existing
+    // Pre-add one empty target line when creating a target stat
+    if (targetSource) return [{ start_date: '', end_mode: 'date', end_date: '', end_periods: '', end_unit: targetSource.tracking || 'monthly', start_value: '', end_value: '' }]
     return []
   })
   const [saving,        setSaving]        = useState(false)
@@ -253,7 +301,20 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete }) {
 
   const handleSave = async () => {
     if (!form.name.trim())    { setErr('Statistic Name is required.'); return }
-    if (!form.beginning_date) { setErr('Beginning Date is required.');  return }
+    if (!form.default_periods || parseInt(form.default_periods) < 1) {
+      setErr('Default # of Periods to Show is required.')
+      return
+    }
+    const isTargetStat = !!(targetSource || initialData?.stat_category === 'target')
+    // For target stats, derive beginning_date from the first target line start date
+    let effectiveBeginningDate = form.beginning_date
+    if (isTargetStat) {
+      const firstLine = targetLines.find(tl => tl.start_date)
+      effectiveBeginningDate = firstLine?.start_date || today()
+    } else if (!form.beginning_date) {
+      setErr('Beginning Date is required.')
+      return
+    }
     setSaving(true); setErr('')
     try {
       // Always ensure owner_user_id falls back to the current user when type = 'user'
@@ -266,14 +327,14 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete }) {
         name:                  form.name.trim(),
         stat_type:             form.stat_type,
         tracking:              form.tracking,
-        beginning_date:        form.beginning_date,
+        beginning_date:        effectiveBeginningDate,
         upside_down:           form.upside_down,
         show_values:           form.show_values,
         owner_type:            form.owner_type,
         owner_user_id:         resolvedOwnerUserId,
         owner_position_id:     form.owner_type === 'position' ? (form.owner_position_id || null) : null,
         is_public:             initialData?.is_public || false,
-        stat_category:         'General',
+        stat_category:         isTargetStat ? 'target' : 'General',
         created_by:            user?.id || null,
         default_periods:       form.default_periods !== '' ? parseInt(form.default_periods) : null,
         missing_value_display: form.missing_value_display,
@@ -344,6 +405,8 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete }) {
     </div>
   )
 
+  const isTargetStat = !!(targetSource || initialData?.stat_category === 'target')
+
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh] overflow-hidden">
@@ -352,13 +415,19 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete }) {
         <div className="flex items-center justify-between px-6 py-3.5 border-b border-gray-100 flex-shrink-0"
              style={{ backgroundColor: FG }}>
           <h2 className="text-base font-bold text-white">
-            {isEdit ? 'Edit Statistic' : 'New Basic Statistic'}
+            {isEdit ? 'Edit Statistic' : isTargetStat ? 'New Target Statistic' : 'New Basic Statistic'}
           </h2>
           <button onClick={onClose} className="text-white/70 hover:text-white text-xl leading-none">✕</button>
         </div>
 
         {/* Body — scrollable */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+
+          {isTargetStat && (
+            <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 text-sm text-green-800 font-medium">
+              🎯 Target Statistic — based on <strong>{targetSource?.name || initialData?.name}</strong>
+            </div>
+          )}
 
           {/* Name */}
           <div>
@@ -392,11 +461,13 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete }) {
                 <option value="yearly">Yearly</option>
               </select>
             </div>
-            <div>
-              <label className={lbl}>Beginning Date</label>
-              <input type="date" className={inp} value={form.beginning_date}
-                onChange={e => set('beginning_date', e.target.value)} />
-            </div>
+            {!isTargetStat && (
+              <div>
+                <label className={lbl}>Beginning Date</label>
+                <input type="date" className={inp} value={form.beginning_date}
+                  onChange={e => set('beginning_date', e.target.value)} />
+              </div>
+            )}
           </div>
 
           {/* Upside Down | Show Values | Default Periods — 3 col */}
@@ -1491,6 +1562,10 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
 
   const handleSave = async () => {
     if (!form.name.trim())    { setErr('Statistic Name is required.'); return }
+    if (!form.default_periods || parseInt(form.default_periods) < 1) {
+      setErr('Default # of Periods to Show is required.')
+      return
+    }
     if (!form.beginning_date) { setErr('Beginning Date is required.');  return }
     if (parts.length === 0 || !parts[0].stat_id) {
       setErr('At least one statistic is required in the equation.'); return
@@ -1929,6 +2004,10 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
 
   const handleSave = async () => {
     if (!form.name.trim())    { setErr('Statistic Name is required.'); return }
+    if (!form.default_periods || parseInt(form.default_periods) < 1) {
+      setErr('Default # of Periods to Show is required.')
+      return
+    }
     if (!form.beginning_date) { setErr('Beginning Date is required.');  return }
     if (!parts[0]?.stat_id)   { setErr('At least one statistic is required.'); return }
     if (parts.some(p => !p.stat_id)) { setErr('All slots must have a statistic selected.'); return }
@@ -3460,6 +3539,8 @@ export default function Statistics() {
   const [showOverlayForm,     setShowOverlayForm]     = useState(false)
   const [editingData,         setEditingData]         = useState(null)   // null = new, obj = edit
   const [showPrintModal,      setShowPrintModal]      = useState(false)
+  const [showTargetPicker,    setShowTargetPicker]    = useState(false)
+  const [targetSourceStat,    setTargetSourceStat]    = useState(null)
 
   // Overlay chart data: array of { stat, part, values } for the selected overlay stat
   const [overlayValues,       setOverlayValues]       = useState([])
@@ -3813,6 +3894,33 @@ export default function Statistics() {
     setViewPeriod(selectedStat.tracking)
   }, [selectedId])
 
+  // Apply default_periods date range whenever the selected stat or its settings change
+  useEffect(() => {
+    if (!selectedStat) return
+    if (selectedStat.stat_category === 'target') return // target stats handled separately
+    const range = defaultRangeFor(selectedStat, weekEndingDay)
+    if (range) {
+      setFromDate(range.from)
+      setToDate(range.to)
+    }
+  }, [selectedStat?.id, selectedStat?.default_periods, weekEndingDay])
+
+  // For target stats, lock the date range to the target line extent
+  useEffect(() => {
+    if (!selectedStat || selectedStat.stat_category !== 'target') return
+    const tls = selectedStat.target_lines || []
+    if (!tls.length) return
+    const startDates = tls.map(tl => tl.start_date).filter(Boolean)
+    const endDates = tls.map(tl =>
+      computeTargetEndDate(tl.start_date, tl.end_mode, tl.end_date, tl.end_periods, tl.end_unit || selectedStat.tracking)
+    ).filter(Boolean)
+    if (!startDates.length) return
+    const from = startDates.reduce((a, b) => a < b ? a : b)
+    const to   = endDates.reduce((a, b) => a > b ? a : b, from)
+    setFromDate(from)
+    setToDate(to)
+  }, [selectedStat?.id, selectedStat?.stat_category, selectedStat?.target_lines])
+
   // Raw chart data — native values in date range, with optional zero-fill for missing periods
   const chartData = useMemo(() => {
     if (!selectedStat) return []
@@ -4020,6 +4128,7 @@ export default function Statistics() {
     if (type === 'basic')    { setEditingData(null); setShowBasicForm(true)    }
     if (type === 'equation') { setEditingData(null); setShowEquationForm(true) }
     if (type === 'overlay')  { setEditingData(null); setShowOverlayForm(true)  }
+    if (type === 'target')   { setShowTargetPicker(true) }
   }
 
   const handleSaveForm = async (editedId, savedName) => {
@@ -4403,51 +4512,53 @@ export default function Statistics() {
                 </div>
               </div>
 
-              {/* Period tabs + FROM/TO — centered over chart */}
-              <div className="flex items-center justify-center gap-2 py-2 bg-white border-b border-gray-100 flex-shrink-0 flex-wrap">
-                <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
-                  {['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Yearly'].map(p => {
-                    const pid        = p.toLowerCase()
-                    const nativeIdx  = PERIOD_ORDER.indexOf(selectedStat?.tracking ?? 'daily')
-                    const pidIdx     = PERIOD_ORDER.indexOf(pid)
-                    const isDisabled = selectedStat && pidIdx < nativeIdx
-                    const isActive   = viewPeriod === pid
-                    return (
-                      <button
-                        key={p}
-                        onClick={() => !isDisabled && setViewPeriod(pid)}
-                        disabled={isDisabled}
-                        title={isDisabled ? `Stat tracks ${selectedStat.tracking} — can't roll up to ${p}` : p}
-                        className={`px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
-                          isActive ? 'text-white' : 'text-gray-600 hover:bg-gray-50'
-                        }`}
-                        style={isActive ? { backgroundColor: FG } : {}}
-                      >
-                        {p}
-                      </button>
-                    )
-                  })}
+              {selectedStat?.stat_category !== 'target' && (
+                /* Period tabs + FROM/TO — centered over chart */
+                <div className="flex items-center justify-center gap-2 py-2 bg-white border-b border-gray-100 flex-shrink-0 flex-wrap">
+                  <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+                    {['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Yearly'].map(p => {
+                      const pid        = p.toLowerCase()
+                      const nativeIdx  = PERIOD_ORDER.indexOf(selectedStat?.tracking ?? 'daily')
+                      const pidIdx     = PERIOD_ORDER.indexOf(pid)
+                      const isDisabled = selectedStat && pidIdx < nativeIdx
+                      const isActive   = viewPeriod === pid
+                      return (
+                        <button
+                          key={p}
+                          onClick={() => !isDisabled && setViewPeriod(pid)}
+                          disabled={isDisabled}
+                          title={isDisabled ? `Stat tracks ${selectedStat.tracking} — can't roll up to ${p}` : p}
+                          className={`px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+                            isActive ? 'text-white' : 'text-gray-600 hover:bg-gray-50'
+                          }`}
+                          style={isActive ? { backgroundColor: FG } : {}}
+                        >
+                          {p}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div className="w-24 flex-shrink-0" />
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-gray-500 font-medium">FROM</span>
+                    <input
+                      type="date"
+                      value={fromDate}
+                      onChange={e => setFromDate(e.target.value)}
+                      className="border border-gray-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-green-600"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-gray-500 font-medium">TO</span>
+                    <input
+                      type="date"
+                      value={toDate}
+                      onChange={e => setToDate(e.target.value)}
+                      className="border border-gray-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-green-600"
+                    />
+                  </div>
                 </div>
-                <div className="w-24 flex-shrink-0" />
-                <div className="flex items-center gap-1">
-                  <span className="text-xs text-gray-500 font-medium">FROM</span>
-                  <input
-                    type="date"
-                    value={fromDate}
-                    onChange={e => setFromDate(e.target.value)}
-                    className="border border-gray-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-green-600"
-                  />
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-xs text-gray-500 font-medium">TO</span>
-                  <input
-                    type="date"
-                    value={toDate}
-                    onChange={e => setToDate(e.target.value)}
-                    className="border border-gray-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-green-600"
-                  />
-                </div>
-              </div>
+              )}
 
               {/* Chart */}
               <div ref={chartPrintRef} className="flex-1 px-4 py-4 overflow-hidden relative bg-white">
@@ -4627,14 +4738,16 @@ export default function Statistics() {
               </div>
 
               {/* Date range scrubber */}
-              <DateRangeScrubber
-                minDate={selectedStat.beginning_date}
-                maxDate={today()}
-                fromDate={fromDate}
-                toDate={toDate}
-                onFromChange={setFromDate}
-                onToChange={setToDate}
-              />
+              {selectedStat?.stat_category !== 'target' && (
+                <DateRangeScrubber
+                  minDate={selectedStat.beginning_date}
+                  maxDate={today()}
+                  fromDate={fromDate}
+                  toDate={toDate}
+                  onFromChange={setFromDate}
+                  onToChange={setToDate}
+                />
+              )}
 
               {/* Week ending not configured warning */}
               {weekEndingError && selectedStat?.tracking === 'weekly' && (
@@ -4657,13 +4770,27 @@ export default function Statistics() {
         />
       )}
 
+      {showTargetPicker && (
+        <PickSourceStatModal
+          stats={stats}
+          onClose={() => setShowTargetPicker(false)}
+          onPick={(sourceStat) => {
+            setShowTargetPicker(false)
+            setTargetSourceStat(sourceStat)
+            setEditingData(null)
+            setShowBasicForm(true)
+          }}
+        />
+      )}
+
       {showBasicForm && (
         <BasicStatForm
           initialData={editingData}
           profiles={profiles}
           onSave={handleSaveForm}
           onDelete={handleDeleteStat}
-          onClose={() => { setShowBasicForm(false); setEditingData(null) }}
+          onClose={() => { setShowBasicForm(false); setEditingData(null); setTargetSourceStat(null) }}
+          targetSource={targetSourceStat}
         />
       )}
 
