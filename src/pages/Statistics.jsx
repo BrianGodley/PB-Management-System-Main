@@ -3674,10 +3674,11 @@ export default function Statistics() {
     if (!selectedStat || selectedStat.stat_category !== 'overlay') return null
     if (!overlayValues.length) return []
 
-    // Overlay shows ALL available data — no fromDate/toDate filter
     const allDates = new Set()
     overlayValues.forEach(({ values }) =>
-      values.forEach(v => allDates.add(v.period_date))
+      values
+        .filter(v => v.period_date >= fromDate && v.period_date <= toDate)
+        .forEach(v => allDates.add(v.period_date))
     )
 
     return [...allDates].sort().map(date => {
@@ -3688,7 +3689,7 @@ export default function Statistics() {
       })
       return point
     })
-  }, [overlayValues, selectedStat])
+  }, [overlayValues, fromDate, toDate, selectedStat])
 
   // Y domain that combines all overlay parts' configured (or auto) ranges
   const overlayYDomain = useMemo(() => {
