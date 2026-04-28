@@ -3280,6 +3280,7 @@ export default function Statistics() {
   const [showEquationForm,    setShowEquationForm]    = useState(false)
   const [showOverlayForm,     setShowOverlayForm]     = useState(false)
   const [editingData,         setEditingData]         = useState(null)   // null = new, obj = edit
+  const [showPrintModal,      setShowPrintModal]      = useState(false)
 
   // Overlay chart data: array of { stat, part, values } for the selected overlay stat
   const [overlayValues,       setOverlayValues]       = useState([])
@@ -3440,26 +3441,50 @@ export default function Statistics() {
 
   // ── Print current chart ───────────────────────────────────────────────────
   function handlePrint() {
+    if (!selectedStat) return
+    setShowPrintModal(true)
+  }
+
+  function executePrint(orientation) {
+    setShowPrintModal(false)
     const el = chartPrintRef.current
     if (!el || !selectedStat) return
 
-    const title    = selectedStat.name
+    const title     = selectedStat.name
     const dateRange = `${fromDate} → ${toDate}`
-    const svgEls   = el.querySelectorAll('svg')
-    const svgHTML  = [...svgEls].map(s => s.outerHTML).join('')
 
-    const win = window.open('', '_blank', 'width=1000,height=700')
+    // Clone each SVG, preserve its content via viewBox, and make it 20% taller
+    const svgEls = el.querySelectorAll('svg')
+    let svgHTML = ''
+    svgEls.forEach(svg => {
+      const clone = svg.cloneNode(true)
+      const rect  = svg.getBoundingClientRect()
+      const w     = rect.width  || parseFloat(svg.getAttribute('width'))  || 800
+      const h     = rect.height || parseFloat(svg.getAttribute('height')) || 400
+      clone.setAttribute('viewBox', `0 0 ${w} ${h}`)
+      clone.setAttribute('width',  '100%')
+      clone.setAttribute('height', Math.round(h * 1.2))
+      clone.style.display = 'block'
+      svgHTML += clone.outerHTML
+    })
+
+    const winW = orientation === 'landscape' ? 1100 : 850
+    const winH = orientation === 'landscape' ? 700  : 950
+    const win  = window.open('', '_blank', `width=${winW},height=${winH}`)
     win.document.write(`<!DOCTYPE html>
 <html>
 <head>
   <title>${title}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: ui-sans-serif, system-ui, sans-serif; background: #fff; padding: 32px; }
-    h1 { font-size: 22px; font-weight: 700; color: #111827; margin-bottom: 4px; }
-    p  { font-size: 13px; color: #6b7280; margin-bottom: 24px; }
-    svg { width: 100% !important; height: auto !important; display: block; }
-    @media print { body { padding: 16px; } }
+    body { font-family: ui-sans-serif, system-ui, sans-serif; background: #fff; padding: 28px 32px; }
+    h1 { font-size: 20px; font-weight: 700; color: #111827; margin-bottom: 4px; }
+    p  { font-size: 12px; color: #6b7280; margin-bottom: 20px; }
+    svg { display: block; width: 100% !important; }
+    @media print {
+      @page { size: ${orientation}; margin: 1.2cm; }
+      body  { padding: 0; }
+    }
   </style>
 </head>
 <body>
@@ -4471,6 +4496,52 @@ export default function Statistics() {
           onRefresh={refreshValues}
           weekEndingDay={weekEndingDay}
         />
+      )}
+
+      {/* Print orientation picker */}
+      {showPrintModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 w-80 flex flex-col items-center gap-6">
+            <h2 className="text-lg font-bold text-gray-900">Print Orientation</h2>
+            <div className="flex gap-5">
+              {/* Portrait */}
+              <button
+                onClick={() => executePrint('portrait')}
+                className="flex flex-col items-center gap-2 px-6 py-4 rounded-xl border-2 border-gray-200 hover:border-green-600 hover:bg-green-50 transition-colors group"
+              >
+                <svg width="40" height="54" viewBox="0 0 40 54" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="1" y="1" width="38" height="52" rx="3" stroke="currentColor" strokeWidth="2" className="text-gray-400 group-hover:text-green-600" fill="#f9fafb"/>
+                  <line x1="7" y1="14" x2="33" y2="14" stroke="currentColor" strokeWidth="2" className="text-gray-300 group-hover:text-green-400"/>
+                  <line x1="7" y1="21" x2="33" y2="21" stroke="currentColor" strokeWidth="1.5" className="text-gray-300 group-hover:text-green-400"/>
+                  <line x1="7" y1="28" x2="33" y2="28" stroke="currentColor" strokeWidth="1.5" className="text-gray-300 group-hover:text-green-400"/>
+                  <line x1="7" y1="35" x2="22" y2="35" stroke="currentColor" strokeWidth="1.5" className="text-gray-300 group-hover:text-green-400"/>
+                </svg>
+                <span className="text-sm font-semibold text-gray-700 group-hover:text-green-700">Portrait</span>
+              </button>
+
+              {/* Landscape */}
+              <button
+                onClick={() => executePrint('landscape')}
+                className="flex flex-col items-center gap-2 px-6 py-4 rounded-xl border-2 border-gray-200 hover:border-green-600 hover:bg-green-50 transition-colors group"
+              >
+                <svg width="54" height="40" viewBox="0 0 54 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="1" y="1" width="52" height="38" rx="3" stroke="currentColor" strokeWidth="2" className="text-gray-400 group-hover:text-green-600" fill="#f9fafb"/>
+                  <line x1="9" y1="10" x2="45" y2="10" stroke="currentColor" strokeWidth="2" className="text-gray-300 group-hover:text-green-400"/>
+                  <line x1="9" y1="17" x2="45" y2="17" stroke="currentColor" strokeWidth="1.5" className="text-gray-300 group-hover:text-green-400"/>
+                  <line x1="9" y1="24" x2="45" y2="24" stroke="currentColor" strokeWidth="1.5" className="text-gray-300 group-hover:text-green-400"/>
+                  <line x1="9" y1="31" x2="30" y2="31" stroke="currentColor" strokeWidth="1.5" className="text-gray-300 group-hover:text-green-400"/>
+                </svg>
+                <span className="text-sm font-semibold text-gray-700 group-hover:text-green-700">Landscape</span>
+              </button>
+            </div>
+            <button
+              onClick={() => setShowPrintModal(false)}
+              className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
     </div>
   )
