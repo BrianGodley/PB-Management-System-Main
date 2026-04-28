@@ -4077,7 +4077,7 @@ export default function Statistics() {
                 className={`w-full text-left px-3 py-2.5 text-sm border-b border-gray-50 transition-colors cursor-pointer flex items-center gap-2 ${
                   s.id === selectedId
                     ? 'bg-green-50 text-green-800 font-medium'
-                    : 'text-gray-700 hover:bg-gray-50'
+                    : 'text-gray-900 hover:bg-gray-50'
                 } ${s.id === dragId ? 'opacity-30' : ''} ${
                   s.id === dragOverId ? 'border-t-2 border-t-green-500' : ''
                 }`}
