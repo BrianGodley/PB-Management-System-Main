@@ -162,12 +162,18 @@ export default function Collections() {
   // Step 1: figure out last week with data + proposed next date, then open confirmation modal
   async function handleNewWeekClick() {
     setCreatingWeek(true)
-    const { data: rowData } = await supabase
-      .from('collection_rows')
-      .select('week_id')
-      .in('week_id', weeks.map(w => w.id))
-    const weeksWithData = new Set((rowData || []).map(r => r.week_id))
-    // weeks is sorted descending — first match = most recent week with any rows
+    const weekIds = weeks.map(w => w.id)
+    const [{ data: rowData }, { data: payData }, { data: finData }] = await Promise.all([
+      supabase.from('collection_rows').select('week_id').in('week_id', weekIds),
+      supabase.from('collection_payables').select('week_id').in('week_id', weekIds),
+      supabase.from('collection_financial').select('week_id').in('week_id', weekIds),
+    ])
+    const weeksWithData = new Set([
+      ...(rowData || []).map(r => r.week_id),
+      ...(payData || []).map(r => r.week_id),
+      ...(finData || []).map(r => r.week_id),
+    ])
+    // weeks is sorted descending — first match = most recent week with any data
     const lastDataWeek = weeks.find(w => weeksWithData.has(w.id)) || null
     // Next date = last week WITH DATA + 7 days (not just the most recent week in DB)
     const nextDate = lastDataWeek
