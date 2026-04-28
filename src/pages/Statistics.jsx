@@ -3423,6 +3423,15 @@ export default function Statistics() {
 
     setOverlayValues(grouped)
     setValuesStatId(stat.id)
+
+    // Auto-adjust date range to cover all component stats' actual data
+    if (rawVals?.length) {
+      const dates = rawVals.map(v => v.period_date)
+      const oldest = dates.reduce((a, b) => a < b ? a : b)
+      const newest = dates.reduce((a, b) => a > b ? a : b)
+      setFromDate(oldest)
+      setToDate(newest)
+    }
   }
 
   async function refreshValues() {
