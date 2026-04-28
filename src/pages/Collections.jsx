@@ -306,7 +306,6 @@ export default function Collections() {
           { label:'Operating Expense', sort_order:0, is_formula:false, formula_type:null, formula_pct:null },
           { label:'Income',            sort_order:1, is_formula:false, formula_type:null, formula_pct:null },
           { label:'Payroll',           sort_order:2, is_formula:false, formula_type:null, formula_pct:null },
-          { label:'Reserves',          sort_order:3, is_formula:true,  formula_type:'pct_cash_on_hand', formula_pct:0.01 },
         ].map(r => ({
           week_id: targetWeek.id, section:'cash_on_hand', subsection:null,
           amount:0, source_payable_id:null, is_paid:false, ...r,
@@ -545,7 +544,7 @@ export default function Collections() {
                   <p>✅ All Payables rows copied over</p>
                   <p>✅ Credit Cards &amp; Prelims: Starting Balance = prev New Balance − allocated amount</p>
                   <p>✅ Prelims &amp; Standard Vendors paid to $0 are removed automatically</p>
-                  <p>✅ Cash On Hand seeded: Operating Expense, Income, Payroll ($0) + Reserves 1%</p>
+                  <p>✅ Cash On Hand seeded: Operating Expense, Income, Payroll (all $0)</p>
                   <p>✅ Auto Allocations carry over (fixed amounts preserved)</p>
                   <p>✅ Payroll Allocations (Payroll, Payroll Taxes) carry labels at $0</p>
                   <p>🔄 Payable Allocations (section 4) start blank — re-add each week</p>
