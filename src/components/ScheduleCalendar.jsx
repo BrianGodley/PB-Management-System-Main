@@ -797,8 +797,9 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
 
   // ── Work Order scheduling state ───────────────────────────────
   const [schedType,    setSchedType]    = useState(null)    // 'crew_type' | 'work_order'
-  const [workOrders,   setWorkOrders]   = useState([])
-  const [selectedWOs,  setSelectedWOs]  = useState(new Set())
+  const [workOrders,     setWorkOrders]     = useState([])
+  const [scheduledWOIds, setScheduledWOIds] = useState(new Set()) // WO IDs already on the calendar
+  const [selectedWOs,    setSelectedWOs]    = useState(new Set())
   // Per-WO crew assignment: { [woId]: { mode: 'crew'|'sub'|'none', crewId: string, subId: string } }
   const [woAssignments, setWoAssignments] = useState({})
   const [woStartDate,  setWoStartDate]  = useState('')
@@ -828,13 +829,19 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
 
   async function fetchPendingWOs(jobId) {
     setWoLoading(true)
-    const { data } = await supabase
-      .from('work_orders')
-      .select('*')
-      .eq('job_id', jobId)
-      .in('status', ['pending', 'in_progress'])
-      .order('module_type')
-    setWorkOrders(data || [])
+
+    // Fetch work orders and existing schedule items in parallel
+    const [woRes, schedRes] = await Promise.all([
+      supabase.from('work_orders').select('*').eq('job_id', jobId).in('status', ['pending', 'in_progress']).order('module_type'),
+      supabase.from('schedule_items').select('work_order_ids').eq('job_id', jobId).eq('scheduling_type', 'work_order'),
+    ])
+
+    // Build the set of already-scheduled WO IDs from all schedule items for this job
+    const alreadyScheduled = new Set(
+      (schedRes.data || []).flatMap(item => item.work_order_ids || [])
+    )
+    setScheduledWOIds(alreadyScheduled)
+    setWorkOrders(woRes.data || [])
     setWoLoading(false)
   }
 
@@ -1376,7 +1383,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">1 · Select Work Orders</p>
                     <div className="flex gap-3">
                       <button
-                        onClick={() => setSelectedWOs(new Set(workOrders.map(w => w.id)))}
+                        onClick={() => setSelectedWOs(new Set(workOrders.filter(w => !scheduledWOIds.has(w.id)).map(w => w.id)))}
                         className="text-xs text-green-700 hover:underline"
                       >Select All</button>
                       {selectedWOs.size > 0 && (
@@ -1399,31 +1406,46 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
                   ) : (
                     <div className="border border-gray-200 rounded-xl overflow-hidden">
                       {workOrders.map((wo, idx) => {
-                        const checked = selectedWOs.has(wo.id)
+                        const checked    = selectedWOs.has(wo.id)
+                        const isScheduled = scheduledWOIds.has(wo.id)
                         return (
                           <div
                             key={wo.id}
-                            className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors ${idx > 0 ? 'border-t border-gray-100' : ''} ${checked ? 'bg-green-50' : 'hover:bg-gray-50'}`}
-                            onClick={() => setSelectedWOs(prev => {
-                              const next = new Set(prev)
-                              if (next.has(wo.id)) { next.delete(wo.id); setAsgn(wo.id, { mode: 'none', crewId: '', subId: '' }) }
-                              else next.add(wo.id)
-                              return next
-                            })}
+                            className={`flex items-center gap-3 px-3 py-2.5 transition-colors ${idx > 0 ? 'border-t border-gray-100' : ''} ${
+                              isScheduled
+                                ? 'bg-gray-50 opacity-60 cursor-not-allowed'
+                                : checked
+                                  ? 'bg-green-50 cursor-pointer'
+                                  : 'hover:bg-gray-50 cursor-pointer'
+                            }`}
+                            onClick={() => {
+                              if (isScheduled) return
+                              setSelectedWOs(prev => {
+                                const next = new Set(prev)
+                                if (next.has(wo.id)) { next.delete(wo.id); setAsgn(wo.id, { mode: 'none', crewId: '', subId: '' }) }
+                                else next.add(wo.id)
+                                return next
+                              })
+                            }}
                           >
-                            <input type="checkbox" readOnly checked={checked} className="w-4 h-4 rounded accent-green-600 flex-shrink-0" />
+                            {isScheduled
+                              ? <span className="w-4 h-4 flex-shrink-0 text-gray-400 text-[10px]">✓</span>
+                              : <input type="checkbox" readOnly checked={checked} className="w-4 h-4 rounded accent-green-600 flex-shrink-0" />
+                            }
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold text-gray-800 truncate">{wo.module_type}</p>
+                              <p className={`text-sm font-semibold truncate ${isScheduled ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{wo.module_type}</p>
                               {wo.project_name && <p className="text-xs text-gray-400 truncate">{wo.project_name}</p>}
-                              {wo.crew_type && (
+                              {wo.crew_type && !isScheduled && (
                                 <p className="text-[10px] text-purple-600 font-medium mt-0.5">Crew type: {wo.crew_type}</p>
                               )}
                             </div>
-                            {parseFloat(wo.man_days) > 0 && (
+                            {isScheduled ? (
+                              <span className="flex-shrink-0 text-[10px] font-semibold text-gray-400 bg-gray-200 px-2 py-0.5 rounded-full">Scheduled</span>
+                            ) : parseFloat(wo.man_days) > 0 ? (
                               <span className="flex-shrink-0 text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
                                 {parseFloat(wo.man_days).toFixed(1)} MD
                               </span>
-                            )}
+                            ) : null}
                           </div>
                         )
                       })}
