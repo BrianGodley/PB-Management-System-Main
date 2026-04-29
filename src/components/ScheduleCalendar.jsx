@@ -866,25 +866,27 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
     setYcWeeks(4)
     setYcOptimize(false)
 
-    // Query job_stages and embed related jobs via the FK relationship
+    // Step 1: find all stage IDs with "yard" in the name
     const { data: stageData, error: stageErr } = await supabase
       .from('job_stages')
-      .select('id, name, jobs(id, client_name, job_address)')
+      .select('id, name')
       .ilike('name', '%yard%')
-    if (stageErr) console.error('[YC] stage+jobs fetch error:', stageErr)
-    console.log('[YC] stageData:', stageData)
+    if (stageErr) console.error('[YC] stage fetch error:', stageErr)
 
-    if (stageData && stageData.length > 0) {
-      const jobs = (stageData[0].jobs || []).sort((a, b) =>
-        (a.client_name || '').localeCompare(b.client_name || '')
-      )
-      console.log('[YC] jobs found:', jobs)
-      setYcJobs(jobs)
-    } else {
-      // Fallback: log all stage names to help diagnose
+    if (!stageData || stageData.length === 0) {
       const { data: allStages } = await supabase.from('job_stages').select('name')
       console.warn('[YC] No Yard Check stage matched. All stage names:', (allStages || []).map(s => s.name))
       setYcJobs([])
+    } else {
+      const stageIds = stageData.map(s => s.id)
+      // Step 2: fetch jobs whose stage_id is in those stage IDs
+      const { data: jobData, error: jobErr } = await supabase
+        .from('jobs')
+        .select('id, client_name, job_address')
+        .in('stage_id', stageIds)
+        .order('client_name')
+      if (jobErr) console.error('[YC] jobs fetch error:', jobErr)
+      setYcJobs(jobData || [])
     }
     setYcLoading(false)
   }
@@ -986,8 +988,6 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
     supabase.from('subs_vendors').select('id, company_name, divisions, status')
       .eq('type', 'sub').order('company_name')
       .then(({ data }) => { if (data) setSubs(data) })
-    supabase.from('company_settings').select('value').eq('key', 'default_schedule_color').single()
-      .then(({ data }) => { if (data?.value) setDefaultSchedColor(data.value) })
     fetchExceptions()
   }, [])
 
