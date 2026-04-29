@@ -1352,6 +1352,16 @@ const SMS_PROVIDERS = [
       { key: 'from_number',  label: 'Originator (From)',  type: 'text',     placeholder: '+15551234567 or MyBrand' },
     ],
   },
+  {
+    key: 'simpletexting',
+    label: 'SimpleTexting',
+    logo: '💬',
+    url: 'https://app.simpletexting.com',
+    fields: [
+      { key: 'api_key',      label: 'API Key',      type: 'password', placeholder: '••••••••••••••••••••••••••••••••' },
+      { key: 'from_number',  label: 'From Number',  type: 'text',     placeholder: '+15551234567' },
+    ],
+  },
 ]
 
 function SmsSettings() {
