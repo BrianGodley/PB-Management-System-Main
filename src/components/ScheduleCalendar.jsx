@@ -309,16 +309,18 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
                 style={{
                   gridRow:         lane + 1,
                   gridColumn:      `${seg.startCol + 1} / ${seg.endCol + 2}`,
-                  backgroundColor: item.needs_crew ? '#b45309' : item.display_color,
+                  backgroundColor: item.needs_crew ? '#b45309' : item.scheduling_type === 'yard_check' ? '#3b82f6' : item.display_color,
                   backgroundImage: item.needs_crew
                     ? 'repeating-linear-gradient(45deg,rgba(0,0,0,0.12),rgba(0,0,0,0.12) 3px,transparent 3px,transparent 10px)'
-                    : 'none',
+                    : item.scheduling_type === 'yard_check'
+                      ? 'repeating-linear-gradient(45deg,rgba(255,255,255,0.15),rgba(255,255,255,0.15) 3px,transparent 3px,transparent 10px)'
+                      : 'none',
                   borderRadius:    radius,
                   margin:          '0 3px',
                   minHeight:       24,
                   pointerEvents:   'auto',
                   alignSelf:       'stretch',
-                  border:          item.needs_crew ? '2px dashed rgba(255,200,0,0.6)' : 'none',
+                  border:          item.needs_crew ? '2px dashed rgba(255,200,0,0.6)' : item.scheduling_type === 'yard_check' ? '2px dashed rgba(147,197,253,0.8)' : 'none',
                 }}
                 className="flex items-start gap-1.5 px-2 pt-1.5 pb-1.5 text-white text-sm font-semibold cursor-pointer hover:opacity-80 leading-snug"
                 title={item.needs_crew ? `${displayText} — Crew not assigned` : displayText}
@@ -360,7 +362,7 @@ function MobileScheduleCard({ item, jobName, onClick }) {
       <div className="flex items-start gap-3">
         <div
           className="w-1.5 self-stretch rounded-full flex-shrink-0"
-          style={{ backgroundColor: item.needs_crew ? '#b45309' : (item.display_color || '#15803d'), minHeight: 40 }}
+          style={{ backgroundColor: item.needs_crew ? '#b45309' : item.scheduling_type === 'yard_check' ? '#3b82f6' : (item.display_color || '#15803d'), minHeight: 40 }}
         />
         <div className="flex-1 min-w-0">
           {item.needs_crew && (
@@ -960,7 +962,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
           notes:            `Week ${week + 1} of ${ycWeeks}${ycOptimize ? ` · Stop ${stopIdx + 1} of ${orderedJobs.length}` : ''}`,
           progress:         0,
           reminder:         'None',
-          display_color:    '#db2777',
+          display_color:    '#3b82f6',
           assignee_color:   null,
           assignees:        ycEmployee || '',
           crew_id:          null,
