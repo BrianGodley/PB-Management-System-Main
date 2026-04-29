@@ -800,6 +800,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
   const [workOrders,     setWorkOrders]     = useState([])
   const [scheduledWOIds, setScheduledWOIds] = useState(new Set()) // WO IDs already on the calendar
   const [selectedWOs,    setSelectedWOs]    = useState(new Set())
+  const [woSequence,     setWoSequence]     = useState([])     // Ordered array of selected WO IDs
   // Per-WO crew assignment: { [woId]: { mode: 'crew'|'sub'|'none', crewId: string, subId: string } }
   const [woAssignments, setWoAssignments] = useState({})
   const [woStartDate,  setWoStartDate]  = useState('')
@@ -829,6 +830,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
 
   async function fetchPendingWOs(jobId) {
     setWoLoading(true)
+    setWoSequence([])
 
     // Fetch work orders and existing schedule items in parallel
     const [woRes, schedRes] = await Promise.all([
@@ -1001,7 +1003,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
 
   function closeModal() {
     setPhase(null); setEditItem(null); setForm(EMPTY_FORM); setModalJobId(null); setEntryMode('crew')
-    setSchedType(null); setWorkOrders([]); setSelectedWOs(new Set())
+    setSchedType(null); setWorkOrders([]); setSelectedWOs(new Set()); setWoSequence([])
     setWoAssignments({}); setWoStartDate('')
   }
 
@@ -1062,12 +1064,21 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
   }
 
   async function saveWorkOrderSchedule() {
-    const selWOs = workOrders.filter(w => selectedWOs.has(w.id))
+    const selWOs = woSequence.map(id => workOrders.find(w => w.id === id)).filter(Boolean)
     if (selWOs.length === 0 || !woStartDate || !modalJobId) return
 
     setWoSaving(true)
 
-    // Build one schedule_item per selected WO, each with its own crew
+    // Helper for next working day after within saveWorkOrderSchedule scope
+    function nextWorkDayAfterLocal(date, excs) {
+      const d = new Date(date)
+      d.setDate(d.getDate() + 1)
+      while (!isWorkingDay(d, excs, false, false)) d.setDate(d.getDate() + 1)
+      return d
+    }
+
+    // Build one schedule_item per selected WO, each with its own crew, cascading dates
+    let runningStart = toLocalDate(woStartDate)
     const schedulePayloads = selWOs.map(wo => {
       const asgn     = woAssignments[wo.id] || { mode: 'none', crewId: '', subId: '' }
       const manDays  = parseFloat(wo.man_days || 0) || 1
@@ -1075,7 +1086,10 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
       const subId    = asgn.mode === 'sub'  ? asgn.subId  : null
       const needsCrew = asgn.mode === 'none'
       const workDays = calcScheduleDays(manDays, crewId)
-      const endDate  = dateStr(addWorkDays(toLocalDate(woStartDate), workDays, exceptions, false, false))
+      const startDateStr = dateStr(runningStart)
+      const endDateObj   = addWorkDays(runningStart, workDays, exceptions, false, false)
+      const endDate      = dateStr(endDateObj)
+      runningStart = nextWorkDayAfterLocal(endDateObj, exceptions)
 
       const crew = crews.find(c => c.id === crewId)
       const sub  = subs.find(s => s.id === subId)
@@ -1092,7 +1106,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
                         : asgn.mode === 'sub'  ? '#000000'
                         : null,
         assignees:        '',
-        start_date:       woStartDate,
+        start_date:       startDateStr,
         end_date:         endDate,
         work_days:        workDays,
         progress:         0,
@@ -1326,7 +1340,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
 
       {/* ── Work Order Selection + Per-WO Crew Assignment ───────── */}
       {phase === 'wo-select' && (() => {
-        const selWOList = workOrders.filter(w => selectedWOs.has(w.id))
+        const selWOList = woSequence.map(id => workOrders.find(w => w.id === id)).filter(Boolean)
         const totalMD   = selWOList.reduce((s, w) => s + parseFloat(w.man_days || 0), 0)
 
         // Helper: label for a crew option
@@ -1346,14 +1360,26 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
           ...prev, [woId]: { ...getAsgn(woId), ...patch }
         }))
 
-        // Per-WO day preview
+        // Helper: advance date to next working day after
+        function nextWorkDayAfter(date, excs) {
+          const d = new Date(date)
+          d.setDate(d.getDate() + 1)
+          while (!isWorkingDay(d, excs, false, false)) d.setDate(d.getDate() + 1)
+          return d
+        }
+
+        // Per-WO day preview with cascading dates
+        let runningStart = woStartDate ? toLocalDate(woStartDate) : null
         const woPreview = selWOList.map(wo => {
-          const asgn    = getAsgn(wo.id)
-          const md      = parseFloat(wo.man_days || 0) || 1
-          const crewId  = asgn.mode === 'crew' ? asgn.crewId : null
-          const days    = calcScheduleDays(md, crewId)
-          const crewSz  = crewId ? getCrewSize(crewId) : 3
-          return { wo, asgn, md, days, crewSz }
+          const asgn      = getAsgn(wo.id)
+          const md        = parseFloat(wo.man_days || 0) || 1
+          const crewId    = asgn.mode === 'crew' ? asgn.crewId : null
+          const days      = calcScheduleDays(md, crewId)
+          const crewSz    = crewId ? getCrewSize(crewId) : 3
+          const startDate = runningStart ? dateStr(runningStart) : null
+          const endDate   = runningStart ? dateStr(addWorkDays(runningStart, days, exceptions, false, false)) : null
+          if (runningStart) runningStart = nextWorkDayAfter(addWorkDays(runningStart, days, exceptions, false, false), exceptions)
+          return { wo, asgn, md, days, crewSz, startDate, endDate }
         })
 
         // Summary counts
@@ -1383,11 +1409,15 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">1 · Select Work Orders</p>
                     <div className="flex gap-3">
                       <button
-                        onClick={() => setSelectedWOs(new Set(workOrders.filter(w => !scheduledWOIds.has(w.id)).map(w => w.id)))}
+                        onClick={() => {
+                          const unscheduled = workOrders.filter(w => !scheduledWOIds.has(w.id))
+                          setSelectedWOs(new Set(unscheduled.map(w => w.id)))
+                          setWoSequence(unscheduled.map(w => w.id))
+                        }}
                         className="text-xs text-green-700 hover:underline"
                       >Select All</button>
                       {selectedWOs.size > 0 && (
-                        <button onClick={() => { setSelectedWOs(new Set()); setWoAssignments({}) }}
+                        <button onClick={() => { setSelectedWOs(new Set()); setWoAssignments({}); setWoSequence([]) }}
                           className="text-xs text-gray-400 hover:underline">Clear</button>
                       )}
                     </div>
@@ -1422,8 +1452,14 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
                               if (isScheduled) return
                               setSelectedWOs(prev => {
                                 const next = new Set(prev)
-                                if (next.has(wo.id)) { next.delete(wo.id); setAsgn(wo.id, { mode: 'none', crewId: '', subId: '' }) }
-                                else next.add(wo.id)
+                                if (next.has(wo.id)) {
+                                  next.delete(wo.id)
+                                  setAsgn(wo.id, { mode: 'none', crewId: '', subId: '' })
+                                  setWoSequence(s => s.filter(id => id !== wo.id))
+                                } else {
+                                  next.add(wo.id)
+                                  setWoSequence(s => [...s, wo.id])
+                                }
                                 return next
                               })
                             }}
@@ -1458,11 +1494,57 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
                   )}
                 </div>
 
-                {/* ── Step 2: Per-WO crew assignment ── */}
+                {/* ── Step 2: Module Sequence ── */}
+                {selWOList.length > 1 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">2 · Set Module Sequence</p>
+                      <p className="text-[10px] text-gray-400">Modules schedule one after another</p>
+                    </div>
+                    <div className="border border-gray-200 rounded-xl overflow-hidden">
+                      {selWOList.map((wo, idx) => (
+                        <div key={wo.id} className={`flex items-center gap-2 px-3 py-2 bg-white ${idx > 0 ? 'border-t border-gray-100' : ''}`}>
+                          <span className="text-xs font-bold text-gray-300 w-5 text-center flex-shrink-0">{idx + 1}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gray-800 truncate">{wo.module_type}</p>
+                            {wo.project_name && <p className="text-[10px] text-gray-400 truncate">{wo.project_name}</p>}
+                          </div>
+                          {woStartDate && woPreview[idx]?.startDate && (
+                            <span className="text-[10px] text-green-700 font-medium flex-shrink-0">
+                              {fmtDate(woPreview[idx].startDate)} → {fmtDate(woPreview[idx].endDate)}
+                            </span>
+                          )}
+                          <div className="flex flex-col gap-0.5 flex-shrink-0">
+                            <button
+                              disabled={idx === 0}
+                              onClick={() => setWoSequence(prev => {
+                                const next = [...prev]
+                                ;[next[idx - 1], next[idx]] = [next[idx], next[idx - 1]]
+                                return next
+                              })}
+                              className="w-5 h-5 flex items-center justify-center border border-gray-200 rounded text-gray-400 hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed text-[10px] leading-none"
+                            >▲</button>
+                            <button
+                              disabled={idx === selWOList.length - 1}
+                              onClick={() => setWoSequence(prev => {
+                                const next = [...prev]
+                                ;[next[idx], next[idx + 1]] = [next[idx + 1], next[idx]]
+                                return next
+                              })}
+                              className="w-5 h-5 flex items-center justify-center border border-gray-200 rounded text-gray-400 hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed text-[10px] leading-none"
+                            >▼</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Step 3: Per-WO crew assignment ── */}
                 {selWOList.length > 0 && (
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">2 · Assign Crew per Module</p>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">3 · Assign Crew per Module</p>
                       {/* Quick-apply: apply one crew to all */}
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] text-gray-400">Apply to all:</span>
@@ -1561,10 +1643,10 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
                   </div>
                 )}
 
-                {/* ── Step 3: Start date + summary ── */}
+                {/* ── Step 4: Start date + summary ── */}
                 {selWOList.length > 0 && (
                   <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">3 · Start Date</p>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">4 · Start Date</p>
                     <input
                       type="date"
                       value={woStartDate}
@@ -1576,14 +1658,13 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
                       <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-xl">
                         <p className="text-xs font-semibold text-gray-600 mb-2">Summary — {selWOList.length} calendar item{selWOList.length !== 1 ? 's' : ''} will be created</p>
                         <div className="space-y-1">
-                          {woPreview.map(({ wo, asgn, days }) => {
+                          {woPreview.map(({ wo, asgn, startDate, endDate }) => {
                             const crew = crews.find(c => c.id === asgn.crewId)
                             const sub  = subs.find(s => s.id === asgn.subId)
-                            const end  = dateStr(addWorkDays(toLocalDate(woStartDate), days, exceptions, false, false))
                             return (
                               <div key={wo.id} className="flex items-center gap-2 text-xs">
                                 <span className="truncate font-medium text-gray-700 flex-1">{wo.module_type}</span>
-                                <span className="text-gray-400 flex-shrink-0">{fmtDate(woStartDate)}→{fmtDate(end)}</span>
+                                <span className="text-gray-400 flex-shrink-0">{fmtDate(startDate)}→{fmtDate(endDate)}</span>
                                 {asgn.mode === 'crew' && crew && (
                                   <span className="text-[10px] bg-green-100 text-green-800 px-1.5 py-0.5 rounded font-semibold flex-shrink-0">Crew {crew.label}</span>
                                 )}
