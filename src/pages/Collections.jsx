@@ -436,7 +436,8 @@ export default function Collections() {
   async function updateFinancial(id, field, value) {
     const parsed = field === 'amount' ? (parseFloat(value) || 0) : value
     setFinancial(prev => prev.map(f => f.id === id ? { ...f, [field]: parsed } : f))
-    await supabase.from('collection_financial').update({ [field]: parsed }).eq('id', id)
+    const { error } = await supabase.from('collection_financial').update({ [field]: parsed }).eq('id', id)
+    if (error) console.error('[updateFinancial] field:', field, 'value:', parsed, 'error:', error)
   }
 
   async function deleteFinancial(id) {
