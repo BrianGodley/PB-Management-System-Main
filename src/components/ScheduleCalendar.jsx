@@ -817,6 +817,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
   const [ycLoading,      setYcLoading]      = useState(false)
   const [ycOptimizing,   setYcOptimizing]   = useState(false)
   const [ycSaving,       setYcSaving]       = useState(false)
+  const [ycEmployee,     setYcEmployee]     = useState('')       // assigned employee name
 
   // Support controlled (from parent sidebar button) or uncontrolled mode
   const showExceptions    = showExceptionsExternal !== undefined ? showExceptionsExternal : localShowExceptions
@@ -951,7 +952,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
       orderedJobs.forEach((job, stopIdx) => {
         items.push({
           job_id:           job.id,
-          title:            ycOptimize ? `Yard Check — Stop ${stopIdx + 1}` : 'Yard Check',
+          title:            `Yard Check ${stopIdx + 1}`,
           start_date:       ds,
           end_date:         ds,
           work_days:        1,
@@ -959,9 +960,9 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
           notes:            `Week ${week + 1} of ${ycWeeks}${ycOptimize ? ` · Stop ${stopIdx + 1} of ${orderedJobs.length}` : ''}`,
           progress:         0,
           reminder:         'None',
-          display_color:    defaultSchedColor || '#15803d',
+          display_color:    '#db2777',
           assignee_color:   null,
-          assignees:        '',
+          assignees:        ycEmployee || '',
           crew_id:          null,
           sub_id:           null,
           include_saturday: false,
@@ -985,7 +986,13 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
       .then(({ data }) => { if (data) setCrews(data) })
     supabase.from('employees').select('id, first_name, last_name, nickname')
       .eq('status', 'active').order('last_name')
-      .then(({ data }) => { if (data) setEmployees(data) })
+      .then(({ data }) => {
+        if (data) {
+          setEmployees(data)
+          const bryan = data.find(e => `${e.first_name} ${e.last_name}`.toLowerCase().includes('bryan vielman') || `${e.first_name} ${e.last_name}`.toLowerCase().includes('vielman'))
+          if (bryan) setYcEmployee(`${bryan.first_name} ${bryan.last_name}`.trim())
+        }
+      })
     supabase.from('subs_vendors').select('id, company_name, divisions, status')
       .eq('type', 'sub').order('company_name')
       .then(({ data }) => { if (data) setSubs(data) })
@@ -1982,6 +1989,22 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
                     onChange={e => setYcStartDate(e.target.value)}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/30 focus:border-teal-600"
                   />
+                </div>
+
+                {/* Assigned Employee */}
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Assigned Employee</p>
+                  <select
+                    value={ycEmployee}
+                    onChange={e => setYcEmployee(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/30 focus:border-teal-600"
+                  >
+                    <option value="">— Unassigned —</option>
+                    {employees.map(e => {
+                      const name = `${e.first_name} ${e.last_name}`.trim()
+                      return <option key={e.id} value={name}>{name}</option>
+                    })}
+                  </select>
                 </div>
 
                 {/* Number of weeks */}
