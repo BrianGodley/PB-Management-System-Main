@@ -879,9 +879,9 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
     if (ycStage) {
       const { data: jobs, error: jobErr } = await supabase
         .from('jobs')
-        .select('id, job_name, job_address')
+        .select('id, client_name, job_address')
         .eq('stage_id', ycStage.id)
-        .order('job_name')
+        .order('client_name')
       if (jobErr) console.error('[YC] jobs fetch error:', jobErr)
       console.log('[YC] jobs found:', jobs)
       setYcJobs(jobs || [])
@@ -1911,7 +1911,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
                         >
                           <input type="checkbox" readOnly checked={checked} className="w-4 h-4 rounded accent-teal-600 flex-shrink-0" />
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-gray-800 truncate">{job.job_name}</p>
+                            <p className="text-sm font-semibold text-gray-800 truncate">{job.client_name}</p>
                             {job.job_address && <p className="text-xs text-gray-400 truncate">{job.job_address}</p>}
                           </div>
                         </div>
@@ -2027,7 +2027,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
                           <div key={job.id} className={`flex items-center gap-3 px-3 py-2 ${idx > 0 ? 'border-t border-teal-100' : ''}`}>
                             <span className="w-6 h-6 rounded-full bg-teal-700 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">{idx + 1}</span>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold text-gray-800 truncate">{job.job_name}</p>
+                              <p className="text-sm font-semibold text-gray-800 truncate">{job.client_name}</p>
                               {job.job_address && <p className="text-[10px] text-gray-500 truncate">{job.job_address}</p>}
                             </div>
                           </div>
@@ -2039,7 +2039,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
                           <div key={job.id} className={`flex items-center gap-3 px-3 py-2 ${idx > 0 ? 'border-t border-gray-100' : ''}`}>
                             <span className="w-5 h-5 rounded-full bg-gray-200 text-gray-500 text-[10px] font-bold flex items-center justify-center flex-shrink-0">{idx + 1}</span>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-600 truncate">{job.job_name}</p>
+                              <p className="text-sm font-medium text-gray-600 truncate">{job.client_name}</p>
                               {job.job_address && <p className="text-[10px] text-gray-400 truncate">{job.job_address}</p>}
                             </div>
                           </div>
