@@ -865,14 +865,29 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
     setYcStartDate('')
     setYcWeeks(4)
     setYcOptimize(false)
-    const { data: stages } = await supabase.from('job_stages').select('id, name')
-    const ycStage = (stages || []).find(s => s.name === 'Yard Check')
+
+    // Load all stages and find Yard Check case-insensitively
+    const { data: stages, error: stageErr } = await supabase.from('job_stages').select('id, name')
+    if (stageErr) console.error('[YC] stage fetch error:', stageErr)
+    console.log('[YC] all stages:', stages)
+
+    const ycStage = (stages || []).find(s =>
+      s.name?.toLowerCase().includes('yard')
+    )
+    console.log('[YC] matched stage:', ycStage)
+
     if (ycStage) {
-      const { data: jobs } = await supabase
-        .from('jobs').select('id, job_name, job_address')
-        .eq('stage_id', ycStage.id).order('job_name')
+      const { data: jobs, error: jobErr } = await supabase
+        .from('jobs')
+        .select('id, job_name, job_address')
+        .eq('stage_id', ycStage.id)
+        .order('job_name')
+      if (jobErr) console.error('[YC] jobs fetch error:', jobErr)
+      console.log('[YC] jobs found:', jobs)
       setYcJobs(jobs || [])
     } else {
+      // Fallback: if no stage found, log all stage names so user can see what's in DB
+      console.warn('[YC] No Yard Check stage found. Stage names in DB:', (stages || []).map(s => s.name))
       setYcJobs([])
     }
     setYcLoading(false)
