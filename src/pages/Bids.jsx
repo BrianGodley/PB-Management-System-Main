@@ -136,6 +136,7 @@ export default function Bids() {
         p_client_id:    null,
         p_client_name:  bid.client_name || '',
         p_name:         jobName.trim(),
+        p_job_address:  bid.job_address || '',
         p_sold_date:    new Date().toISOString(),
         p_total_price:  parseFloat(bid.bid_amount) || 0,
         p_gross_profit: parseFloat(bid.gross_profit) || 0,

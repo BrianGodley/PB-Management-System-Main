@@ -826,6 +826,9 @@ function JobInfoModal({ job, onClose, onSave, onDelete }) {
   const [status,         setStatus]         = useState(job.status || 'active')
   const [jobTitle,       setJobTitle]        = useState(job.name || job.client_name || '')
   const [address,        setAddress]         = useState(job.job_address || '')
+  const [city,           setCity]            = useState(job.job_city || '')
+  const [state,          setState]           = useState(job.job_state || '')
+  const [zip,            setZip]             = useState(job.job_zip || '')
   const [consultant,     setConsultant]      = useState(job.consultant || '')
   const [projectManager, setProjectManager]  = useState(job.project_manager || '')
 
@@ -850,6 +853,9 @@ function JobInfoModal({ job, onClose, onSave, onDelete }) {
       name:            jobTitle.trim(),
       status,
       job_address:     address.trim(),
+      job_city:        city.trim(),
+      job_state:       state.trim(),
+      job_zip:         zip.trim(),
       consultant:      consultant || null,
       project_manager: projectManager || null,
     })
@@ -936,14 +942,49 @@ function JobInfoModal({ job, onClose, onSave, onDelete }) {
                   </div>
 
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Address</label>
+                    <label className="block text-xs text-gray-500 mb-1">Street Address</label>
                     <input
                       type="text"
                       value={address}
                       onChange={e => setAddress(e.target.value)}
                       className="input text-sm w-full"
-                      placeholder="Job address"
+                      placeholder="123 Main St"
                     />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="col-span-1">
+                      <label className="block text-xs text-gray-500 mb-1">City</label>
+                      <input
+                        type="text"
+                        value={city}
+                        onChange={e => setCity(e.target.value)}
+                        className="input text-sm w-full"
+                        placeholder="City"
+                      />
+                    </div>
+                    <div className="col-span-1">
+                      <label className="block text-xs text-gray-500 mb-1">State</label>
+                      <input
+                        type="text"
+                        value={state}
+                        onChange={e => setState(e.target.value)}
+                        className="input text-sm w-full"
+                        placeholder="CA"
+                        maxLength={2}
+                      />
+                    </div>
+                    <div className="col-span-1">
+                      <label className="block text-xs text-gray-500 mb-1">Zip</label>
+                      <input
+                        type="text"
+                        value={zip}
+                        onChange={e => setZip(e.target.value)}
+                        className="input text-sm w-full"
+                        placeholder="90210"
+                        maxLength={10}
+                      />
+                    </div>
                   </div>
 
                 </div>

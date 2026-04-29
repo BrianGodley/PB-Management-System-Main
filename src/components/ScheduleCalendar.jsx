@@ -882,7 +882,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
       // Step 2: fetch jobs whose stage_id is in those stage IDs
       const { data: jobData, error: jobErr } = await supabase
         .from('jobs')
-        .select('id, client_name, job_address')
+        .select('id, client_name, job_address, job_city, job_state, job_zip')
         .in('stage_id', stageIds)
         .order('client_name')
       if (jobErr) console.error('[YC] jobs fetch error:', jobErr)
@@ -898,8 +898,9 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
     // Geocode each address using Nominatim
     const geocoded = await Promise.all(selected.map(async job => {
       try {
+        const fullAddr = [job.job_address, job.job_city, job.job_state, job.job_zip].filter(Boolean).join(', ')
         const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(job.job_address || '')}&format=json&limit=1`,
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(fullAddr)}&format=json&limit=1`,
           { headers: { 'Accept-Language': 'en' } }
         )
         const data = await res.json()
@@ -1908,7 +1909,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
                           <input type="checkbox" readOnly checked={checked} className="w-4 h-4 rounded accent-teal-600 flex-shrink-0" />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold text-gray-800 truncate">{job.client_name}</p>
-                            {job.job_address && <p className="text-xs text-gray-400 truncate">{job.job_address}</p>}
+                            {job.job_address && <p className="text-xs text-gray-400 truncate">{[job.job_address, job.job_city, job.job_state].filter(Boolean).join(', ')}</p>}
                           </div>
                         </div>
                       )
@@ -2024,7 +2025,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
                             <span className="w-6 h-6 rounded-full bg-teal-700 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">{idx + 1}</span>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-semibold text-gray-800 truncate">{job.client_name}</p>
-                              {job.job_address && <p className="text-[10px] text-gray-500 truncate">{job.job_address}</p>}
+                              {job.job_address && <p className="text-[10px] text-gray-500 truncate">{[job.job_address, job.job_city, job.job_state].filter(Boolean).join(', ')}</p>}
                             </div>
                           </div>
                         ))}
@@ -2036,7 +2037,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
                             <span className="w-5 h-5 rounded-full bg-gray-200 text-gray-500 text-[10px] font-bold flex items-center justify-center flex-shrink-0">{idx + 1}</span>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-gray-600 truncate">{job.client_name}</p>
-                              {job.job_address && <p className="text-[10px] text-gray-400 truncate">{job.job_address}</p>}
+                              {job.job_address && <p className="text-[10px] text-gray-400 truncate">{[job.job_address, job.job_city, job.job_state].filter(Boolean).join(', ')}</p>}
                             </div>
                           </div>
                         ))}
