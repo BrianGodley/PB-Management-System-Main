@@ -866,28 +866,24 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
     setYcWeeks(4)
     setYcOptimize(false)
 
-    // Load all stages and find Yard Check case-insensitively
-    const { data: stages, error: stageErr } = await supabase.from('job_stages').select('id, name')
-    if (stageErr) console.error('[YC] stage fetch error:', stageErr)
-    console.log('[YC] all stages:', stages)
+    // Query job_stages and embed related jobs via the FK relationship
+    const { data: stageData, error: stageErr } = await supabase
+      .from('job_stages')
+      .select('id, name, jobs(id, client_name, job_address)')
+      .ilike('name', '%yard%')
+    if (stageErr) console.error('[YC] stage+jobs fetch error:', stageErr)
+    console.log('[YC] stageData:', stageData)
 
-    const ycStage = (stages || []).find(s =>
-      s.name?.toLowerCase().includes('yard')
-    )
-    console.log('[YC] matched stage:', ycStage)
-
-    if (ycStage) {
-      const { data: jobs, error: jobErr } = await supabase
-        .from('jobs')
-        .select('id, client_name, job_address')
-        .eq('stage_id', ycStage.id)
-        .order('client_name')
-      if (jobErr) console.error('[YC] jobs fetch error:', jobErr)
+    if (stageData && stageData.length > 0) {
+      const jobs = (stageData[0].jobs || []).sort((a, b) =>
+        (a.client_name || '').localeCompare(b.client_name || '')
+      )
       console.log('[YC] jobs found:', jobs)
-      setYcJobs(jobs || [])
+      setYcJobs(jobs)
     } else {
-      // Fallback: if no stage found, log all stage names so user can see what's in DB
-      console.warn('[YC] No Yard Check stage found. Stage names in DB:', (stages || []).map(s => s.name))
+      // Fallback: log all stage names to help diagnose
+      const { data: allStages } = await supabase.from('job_stages').select('name')
+      console.warn('[YC] No Yard Check stage matched. All stage names:', (allStages || []).map(s => s.name))
       setYcJobs([])
     }
     setYcLoading(false)
