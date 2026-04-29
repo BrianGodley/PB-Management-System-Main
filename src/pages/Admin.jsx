@@ -1297,6 +1297,232 @@ function CompanySettings({ currentUserIsAdmin }) {
   )
 }
 
+// ── EmailSettings ─────────────────────────────────────────────────────────────
+const EMAIL_PROVIDERS = [
+  {
+    key: 'resend',
+    label: 'Resend',
+    logo: '📨',
+    url: 'https://resend.com',
+    fields: [
+      { key: 'api_key',    label: 'API Key',    type: 'password', placeholder: 're_••••••••••••••••••••••••' },
+      { key: 'from_email', label: 'From Email', type: 'text',     placeholder: 'noreply@yourdomain.com' },
+    ],
+  },
+  {
+    key: 'sendgrid',
+    label: 'SendGrid',
+    logo: '📧',
+    url: 'https://app.sendgrid.com',
+    fields: [
+      { key: 'api_key',    label: 'API Key',    type: 'password', placeholder: 'SG.••••••••••••••••••••••••' },
+      { key: 'from_email', label: 'From Email', type: 'text',     placeholder: 'noreply@yourdomain.com' },
+    ],
+  },
+  {
+    key: 'mailgun',
+    label: 'Mailgun',
+    logo: '🔫',
+    url: 'https://app.mailgun.com',
+    fields: [
+      { key: 'api_key',    label: 'API Key',    type: 'password', placeholder: '••••••••••••••••••••••••••••••••' },
+      { key: 'domain',     label: 'Domain',     type: 'text',     placeholder: 'mg.yourdomain.com' },
+      { key: 'from_email', label: 'From Email', type: 'text',     placeholder: 'noreply@mg.yourdomain.com' },
+    ],
+  },
+  {
+    key: 'postmark',
+    label: 'Postmark',
+    logo: '📮',
+    url: 'https://account.postmarkapp.com',
+    fields: [
+      { key: 'server_token', label: 'Server Token', type: 'password', placeholder: '••••••••-••••-••••-••••-••••••••••••' },
+      { key: 'from_email',   label: 'From Email',   type: 'text',     placeholder: 'noreply@yourdomain.com' },
+    ],
+  },
+  {
+    key: 'smtp',
+    label: 'SMTP (Generic)',
+    logo: '🌐',
+    url: '',
+    fields: [
+      { key: 'host',       label: 'SMTP Host',  type: 'text',     placeholder: 'smtp.yourdomain.com' },
+      { key: 'port',       label: 'Port',       type: 'text',     placeholder: '587' },
+      { key: 'username',   label: 'Username',   type: 'text',     placeholder: 'user@yourdomain.com' },
+      { key: 'password',   label: 'Password',   type: 'password', placeholder: '••••••••••••••••' },
+      { key: 'from_email', label: 'From Email', type: 'text',     placeholder: 'noreply@yourdomain.com' },
+    ],
+  },
+]
+
+function EmailSettings() {
+  const [activeKey,   setActiveKey]   = useState('resend')
+  const [credentials, setCredentials] = useState({})
+  const [testTo,      setTestTo]      = useState('')
+  const [loading,     setLoading]     = useState(true)
+  const [saving,      setSaving]      = useState(false)
+  const [testing,     setTesting]     = useState(false)
+  const [saveMsg,     setSaveMsg]     = useState('')
+  const [testResult,  setTestResult]  = useState('')
+  const [showSecrets, setShowSecrets] = useState({})
+
+  useEffect(() => { loadConfig() }, [])
+
+  async function loadConfig() {
+    setLoading(true)
+    const { data } = await supabase.from('company_settings').select('email_config').maybeSingle()
+    if (data?.email_config) {
+      const cfg = data.email_config
+      setActiveKey(cfg.active_provider || 'resend')
+      setCredentials(cfg.providers || {})
+    }
+    setLoading(false)
+  }
+
+  async function handleSave() {
+    setSaving(true); setSaveMsg('')
+    const cfg = { active_provider: activeKey, providers: credentials }
+    const { data: existing } = await supabase.from('company_settings').select('id').maybeSingle()
+    let error
+    if (existing?.id) {
+      ({ error } = await supabase.from('company_settings').update({ email_config: cfg }).eq('id', existing.id))
+    } else {
+      ({ error } = await supabase.from('company_settings').insert({ email_config: cfg }))
+    }
+    setSaving(false)
+    setSaveMsg(error ? '⚠️ ' + error.message : '✓ Email settings saved')
+    setTimeout(() => setSaveMsg(''), 4000)
+  }
+
+  async function handleTest() {
+    if (!testTo.trim()) { setTestResult('⚠️ Enter an email address first.'); return }
+    setTesting(true); setTestResult('')
+    try {
+      const { sendEmail } = await import('../lib/notify')
+      const { error } = await sendEmail({
+        to: testTo.trim(),
+        subject: 'Test Email from Picture Build System',
+        html: '<p>This is a test email from your Picture Build System. Email is configured correctly!</p>',
+      })
+      setTestResult(error ? '⚠️ ' + error.message : '✓ Test email sent! Check your inbox.')
+    } catch (e) {
+      setTestResult('⚠️ ' + e.message)
+    }
+    setTesting(false)
+    setTimeout(() => setTestResult(''), 8000)
+  }
+
+  function setCred(providerKey, field, value) {
+    setCredentials(prev => ({
+      ...prev,
+      [providerKey]: { ...(prev[providerKey] || {}), [field]: value },
+    }))
+  }
+
+  function toggleShow(providerKey, field) {
+    const k = providerKey + '.' + field
+    setShowSecrets(prev => ({ ...prev, [k]: !prev[k] }))
+  }
+
+  const activeProvider = EMAIL_PROVIDERS.find(p => p.key === activeKey)
+
+  if (loading) return <div className="text-gray-400 text-sm py-8 text-center">Loading email settings…</div>
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-semibold text-gray-800">Email Provider</h2>
+        <p className="text-sm text-gray-500 mt-0.5">Choose your email sending service and enter credentials. Currently active: <strong>{activeProvider?.label}</strong></p>
+      </div>
+
+      {/* Active provider credentials */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-2xl">{activeProvider?.logo}</span>
+          <div>
+            <p className="font-semibold text-gray-800">{activeProvider?.label}</p>
+            {activeProvider?.url && (
+              <a href={activeProvider.url} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline">{activeProvider.url}</a>
+            )}
+          </div>
+          <span className="ml-auto text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Active</span>
+        </div>
+        <div className="space-y-3">
+          {activeProvider?.fields.map(f => {
+            const showKey = activeKey + '.' + f.key
+            const isSecret = f.type === 'password'
+            const showing = showSecrets[showKey]
+            return (
+              <div key={f.key}>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{f.label}</label>
+                <div className="flex gap-2">
+                  <input
+                    type={isSecret && !showing ? 'password' : 'text'}
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder={f.placeholder}
+                    value={credentials[activeKey]?.[f.key] || ''}
+                    onChange={e => setCred(activeKey, f.key, e.target.value)}
+                  />
+                  {isSecret && (
+                    <button onClick={() => toggleShow(activeKey, f.key)}
+                      className="px-3 py-2 text-xs border border-gray-300 rounded-lg text-gray-500 hover:bg-gray-50">
+                      {showing ? 'Hide' : 'Show'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        <div className="mt-4 flex items-center gap-3">
+          <button onClick={handleSave} disabled={saving}
+            className="px-4 py-2 bg-green-700 text-white text-sm font-medium rounded-lg hover:bg-green-800 disabled:opacity-50">
+            {saving ? 'Saving…' : 'Save Settings'}
+          </button>
+          {saveMsg && <span className={`text-sm font-medium ${saveMsg.startsWith('⚠️') ? 'text-red-600' : 'text-green-600'}`}>{saveMsg}</span>}
+        </div>
+      </div>
+
+      {/* Test email */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+        <p className="text-sm font-semibold text-gray-700 mb-3">Send Test Email</p>
+        <div className="flex gap-2">
+          <input
+            type="email"
+            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            placeholder="recipient@example.com"
+            value={testTo}
+            onChange={e => setTestTo(e.target.value)}
+          />
+          <button onClick={handleTest} disabled={testing}
+            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
+            {testing ? 'Sending…' : 'Send Test'}
+          </button>
+        </div>
+        {testResult && (
+          <p className={`text-sm mt-2 font-medium ${testResult.startsWith('⚠️') ? 'text-red-600' : 'text-green-600'}`}>{testResult}</p>
+        )}
+      </div>
+
+      {/* Switch provider */}
+      <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+        <p className="text-sm font-semibold text-gray-700 mb-3">Switch Provider</p>
+        <div className="grid grid-cols-2 gap-2">
+          {EMAIL_PROVIDERS.filter(p => p.key !== activeKey).map(p => (
+            <button key={p.key}
+              onClick={() => setActiveKey(p.key)}
+              className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 text-left">
+              <span className="text-xl">{p.logo}</span>
+              <span className="text-sm text-gray-700 font-medium">{p.label}</span>
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-gray-400 mt-3">Switching providers here changes the active sender. Save after switching to apply.</p>
+      </div>
+    </div>
+  )
+}
+
 // ── SmsSettings ───────────────────────────────────────────────────────────────
 const SMS_PROVIDERS = [
   {
@@ -1766,6 +1992,7 @@ export default function Admin() {
     { key: 'users',     label: 'Users & Roles' },
     { key: 'settings',  label: 'Company Settings' },
     { key: 'sms',       label: '📱 SMS Settings' },
+    { key: 'email',     label: '✉️ Email Settings' },
   ]
 
   const statCards = [
@@ -2001,6 +2228,10 @@ export default function Admin() {
 
       {tab === 'sms' && (
         <SmsSettings />
+      )}
+
+      {tab === 'email' && (
+        <EmailSettings />
       )}
 
     </div>
