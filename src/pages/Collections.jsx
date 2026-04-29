@@ -436,7 +436,7 @@ export default function Collections() {
   async function updateFinancial(id, field, value) {
     const parsed = field === 'amount' ? (parseFloat(value) || 0) : value
     setFinancial(prev => prev.map(f => f.id === id ? { ...f, [field]: parsed } : f))
-    await supabase.from('collection_financial').update({ [field]: parsed, updated_at: new Date().toISOString() }).eq('id', id)
+    await supabase.from('collection_financial').update({ [field]: parsed }).eq('id', id)
   }
 
   async function deleteFinancial(id) {
