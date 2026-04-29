@@ -807,6 +807,17 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
   const [woLoading,    setWoLoading]    = useState(false)
   const [woSaving,     setWoSaving]     = useState(false)
 
+  // Yard Check scheduling state
+  const [ycJobs,         setYcJobs]         = useState([])       // Yard Check stage jobs
+  const [ycSelected,     setYcSelected]     = useState(new Set()) // selected job IDs
+  const [ycStartDate,    setYcStartDate]    = useState('')
+  const [ycWeeks,        setYcWeeks]        = useState(4)
+  const [ycOptimize,     setYcOptimize]     = useState(false)
+  const [ycOptOrder,     setYcOptOrder]     = useState([])        // optimized job ID order
+  const [ycLoading,      setYcLoading]      = useState(false)
+  const [ycOptimizing,   setYcOptimizing]   = useState(false)
+  const [ycSaving,       setYcSaving]       = useState(false)
+
   // Support controlled (from parent sidebar button) or uncontrolled mode
   const showExceptions    = showExceptionsExternal !== undefined ? showExceptionsExternal : localShowExceptions
   const setShowExceptions = onSetShowExceptions    !== undefined ? onSetShowExceptions    : setLocalShowExceptions
@@ -845,6 +856,113 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
     setScheduledWOIds(alreadyScheduled)
     setWorkOrders(woRes.data || [])
     setWoLoading(false)
+  }
+
+  async function fetchYardCheckJobs() {
+    setYcLoading(true)
+    setYcSelected(new Set())
+    setYcOptOrder([])
+    setYcStartDate('')
+    setYcWeeks(4)
+    setYcOptimize(false)
+    const { data: stages } = await supabase.from('job_stages').select('id, name')
+    const ycStage = (stages || []).find(s => s.name === 'Yard Check')
+    if (ycStage) {
+      const { data: jobs } = await supabase
+        .from('jobs').select('id, job_name, job_address')
+        .eq('stage_id', ycStage.id).order('job_name')
+      setYcJobs(jobs || [])
+    } else {
+      setYcJobs([])
+    }
+    setYcLoading(false)
+  }
+
+  async function handleYcOptimize() {
+    setYcOptimizing(true)
+    const selected = ycJobs.filter(j => ycSelected.has(j.id))
+
+    // Geocode each address using Nominatim
+    const geocoded = await Promise.all(selected.map(async job => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(job.job_address || '')}&format=json&limit=1`,
+          { headers: { 'Accept-Language': 'en' } }
+        )
+        const data = await res.json()
+        return { ...job, lat: parseFloat(data[0]?.lat) || 0, lng: parseFloat(data[0]?.lon) || 0 }
+      } catch {
+        return { ...job, lat: 0, lng: 0 }
+      }
+    }))
+
+    // Nearest-neighbor route optimization
+    function haversine(lat1, lon1, lat2, lon2) {
+      const R = 3959
+      const dLat = (lat2 - lat1) * Math.PI / 180
+      const dLon = (lon2 - lon1) * Math.PI / 180
+      const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+    }
+
+    const remaining = [...geocoded]
+    const ordered = remaining.length > 0 ? [remaining.shift()] : []
+    while (remaining.length > 0) {
+      const last = ordered[ordered.length - 1]
+      let nearestIdx = 0, nearestDist = Infinity
+      remaining.forEach((j, i) => {
+        const d = haversine(last.lat, last.lng, j.lat, j.lng)
+        if (d < nearestDist) { nearestDist = d; nearestIdx = i }
+      })
+      ordered.push(remaining.splice(nearestIdx, 1)[0])
+    }
+
+    setYcOptOrder(ordered.map(j => j.id))
+    setYcOptimizing(false)
+  }
+
+  async function saveYardCheckSchedule() {
+    if (!ycStartDate || ycSelected.size === 0) return
+    setYcSaving(true)
+
+    // Use optimized order if available, else selection order
+    const orderedIds = ycOptimize && ycOptOrder.length > 0 ? ycOptOrder : [...ycSelected]
+    const orderedJobs = orderedIds.map(id => ycJobs.find(j => j.id === id)).filter(Boolean)
+
+    const items = []
+    for (let week = 0; week < ycWeeks; week++) {
+      const d = new Date(ycStartDate + 'T00:00:00')
+      d.setDate(d.getDate() + week * 7)
+      const ds = dateStr(d)
+      orderedJobs.forEach((job, stopIdx) => {
+        items.push({
+          job_id:           job.id,
+          title:            ycOptimize ? `Yard Check — Stop ${stopIdx + 1}` : 'Yard Check',
+          start_date:       ds,
+          end_date:         ds,
+          work_days:        1,
+          scheduling_type:  'yard_check',
+          notes:            `Week ${week + 1} of ${ycWeeks}${ycOptimize ? ` · Stop ${stopIdx + 1} of ${orderedJobs.length}` : ''}`,
+          progress:         0,
+          reminder:         'None',
+          display_color:    defaultSchedColor || '#15803d',
+          assignee_color:   null,
+          assignees:        '',
+          crew_id:          null,
+          sub_id:           null,
+          include_saturday: false,
+          include_sunday:   false,
+          needs_crew:       false,
+          work_order_ids:   [],
+        })
+      })
+    }
+
+    const { error } = await supabase.from('schedule_items').insert(items)
+    if (error) console.error('Yard check schedule error:', error)
+    setYcSaving(false)
+    closeModal()
+    fetchItems()
   }
 
   // Fetch crews, employees, subs, default color, and workday exceptions on mount
@@ -1311,25 +1429,45 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
             {modalJobId && (
               <p className="text-xs text-green-700 font-medium mb-4">{jobMap[modalJobId]}</p>
             )}
-            <div className="space-y-3">
+            <div className="space-y-2">
               <button
                 onClick={() => { setSchedType('work_order'); fetchPendingWOs(modalJobId); setPhase('wo-select') }}
-                className="w-full flex items-start gap-3 p-4 rounded-xl border-2 border-gray-200 hover:border-green-500 hover:bg-green-50 text-left transition-colors group"
+                className="w-full flex items-start gap-3 p-3.5 rounded-xl border-2 border-gray-200 hover:border-green-500 hover:bg-green-50 text-left transition-colors group"
               >
-                <span className="text-2xl mt-0.5">📋</span>
+                <span className="text-xl mt-0.5">🏗️</span>
                 <div>
-                  <p className="text-sm font-bold text-gray-800 group-hover:text-green-800">Work Order</p>
+                  <p className="text-sm font-bold text-gray-800 group-hover:text-green-800">Install Work Order</p>
                   <p className="text-xs text-gray-500 mt-0.5">Schedule by pending work orders. Auto-calculates work days from man-days ÷ crew size.</p>
                 </div>
               </button>
               <button
                 onClick={() => { setSchedType('crew_type'); setPhase('details') }}
-                className="w-full flex items-start gap-3 p-4 rounded-xl border-2 border-gray-200 hover:border-green-500 hover:bg-green-50 text-left transition-colors group"
+                className="w-full flex items-start gap-3 p-3.5 rounded-xl border-2 border-gray-200 hover:border-green-500 hover:bg-green-50 text-left transition-colors group"
               >
-                <span className="text-2xl mt-0.5">👷</span>
+                <span className="text-xl mt-0.5">👷</span>
                 <div>
-                  <p className="text-sm font-bold text-gray-800 group-hover:text-green-800">Crew Type Only</p>
+                  <p className="text-sm font-bold text-gray-800 group-hover:text-green-800">Install Crew Type</p>
                   <p className="text-xs text-gray-500 mt-0.5">Manually set dates, crew, and details — standard scheduling flow.</p>
+                </div>
+              </button>
+              <button
+                onClick={() => { fetchYardCheckJobs(); setPhase('yard-check-select') }}
+                className="w-full flex items-start gap-3 p-3.5 rounded-xl border-2 border-gray-200 hover:border-teal-500 hover:bg-teal-50 text-left transition-colors group"
+              >
+                <span className="text-xl mt-0.5">🌿</span>
+                <div>
+                  <p className="text-sm font-bold text-gray-800 group-hover:text-teal-800">Yard Check & Maintenance</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Schedule recurring yard checks for Yard Check stage jobs. Supports route optimization.</p>
+                </div>
+              </button>
+              <button
+                onClick={() => { setSchedType('warranty'); setPhase('details') }}
+                className="w-full flex items-start gap-3 p-3.5 rounded-xl border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 text-left transition-colors group"
+              >
+                <span className="text-xl mt-0.5">🛡️</span>
+                <div>
+                  <p className="text-sm font-bold text-gray-800 group-hover:text-blue-800">Warranty</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Schedule warranty follow-up visits. Set dates, crew, and details manually.</p>
                 </div>
               </button>
             </div>
@@ -1700,6 +1838,237 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
                 </button>
                 <button onClick={closeModal} className="px-4 py-2.5 text-sm rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50">
                   Cancel
+                </button>
+              </div>
+            </div>
+          </ModalOverlay>
+        )
+      })()}
+
+      {/* ── Yard Check: Job Selection ──────────────────────────── */}
+      {phase === 'yard-check-select' && (
+        <ModalOverlay onClose={closeModal}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 flex flex-col max-h-[90vh] overflow-hidden">
+            {/* Header */}
+            <div className="px-6 pt-5 pb-4 border-b border-gray-100 flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-bold text-gray-800">Yard Check & Maintenance</h3>
+                  <p className="text-xs text-green-700 font-medium mt-0.5">Select jobs to schedule</p>
+                </div>
+                <button onClick={() => setPhase('type-select')} className="text-xs text-gray-400 hover:text-gray-600">← Back</button>
+              </div>
+            </div>
+
+            <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
+              {/* Job list */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Yard Check Jobs</p>
+                  <div className="flex gap-3">
+                    <button onClick={() => setYcSelected(new Set(ycJobs.map(j => j.id)))} className="text-xs text-teal-700 hover:underline">Select All</button>
+                    {ycSelected.size > 0 && <button onClick={() => setYcSelected(new Set())} className="text-xs text-gray-400 hover:underline">Clear</button>}
+                  </div>
+                </div>
+
+                {ycLoading ? (
+                  <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-teal-600" /></div>
+                ) : ycJobs.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
+                    <p className="text-2xl mb-1">🌿</p>
+                    <p className="text-sm font-medium text-gray-500">No Yard Check jobs found</p>
+                    <p className="text-xs mt-1">Move jobs to the Yard Check stage first.</p>
+                  </div>
+                ) : (
+                  <div className="border border-gray-200 rounded-xl overflow-hidden">
+                    {ycJobs.map((job, idx) => {
+                      const checked = ycSelected.has(job.id)
+                      return (
+                        <div
+                          key={job.id}
+                          onClick={() => setYcSelected(prev => {
+                            const next = new Set(prev)
+                            if (next.has(job.id)) next.delete(job.id)
+                            else next.add(job.id)
+                            return next
+                          })}
+                          className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors ${idx > 0 ? 'border-t border-gray-100' : ''} ${checked ? 'bg-teal-50' : 'hover:bg-gray-50'}`}
+                        >
+                          <input type="checkbox" readOnly checked={checked} className="w-4 h-4 rounded accent-teal-600 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gray-800 truncate">{job.job_name}</p>
+                            {job.job_address && <p className="text-xs text-gray-400 truncate">{job.job_address}</p>}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Optimize toggle */}
+              {ycSelected.size > 1 && (
+                <div className="flex items-start gap-3 p-3 bg-teal-50 border border-teal-200 rounded-xl">
+                  <input
+                    type="checkbox"
+                    id="ycOptimize"
+                    checked={ycOptimize}
+                    onChange={e => { setYcOptimize(e.target.checked); setYcOptOrder([]) }}
+                    className="w-4 h-4 mt-0.5 rounded accent-teal-600 flex-shrink-0"
+                  />
+                  <label htmlFor="ycOptimize" className="cursor-pointer">
+                    <p className="text-sm font-semibold text-teal-800">Optimize Route</p>
+                    <p className="text-xs text-teal-600 mt-0.5">Automatically sort jobs in the most efficient driving order using address geocoding.</p>
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
+              <button
+                onClick={() => setPhase('yard-check-config')}
+                disabled={ycSelected.size === 0}
+                className="w-full py-2.5 bg-teal-700 text-white text-sm font-bold rounded-xl hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Next → Configure Schedule ({ycSelected.size} job{ycSelected.size !== 1 ? 's' : ''})
+              </button>
+            </div>
+          </div>
+        </ModalOverlay>
+      )}
+
+      {/* ── Yard Check: Schedule Configuration ─────────────────── */}
+      {phase === 'yard-check-config' && (() => {
+        const orderedIds  = ycOptimize && ycOptOrder.length > 0 ? ycOptOrder : [...ycSelected]
+        const orderedJobs = orderedIds.map(id => ycJobs.find(j => j.id === id)).filter(Boolean)
+        const unoptimizedJobs = ycJobs.filter(j => ycSelected.has(j.id))
+        const totalItems  = ycSelected.size * ycWeeks
+
+        return (
+          <ModalOverlay onClose={closeModal}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 flex flex-col max-h-[90vh] overflow-hidden">
+              {/* Header */}
+              <div className="px-6 pt-5 pb-4 border-b border-gray-100 flex-shrink-0">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-base font-bold text-gray-800">Configure Yard Checks</h3>
+                    <p className="text-xs text-teal-700 font-medium mt-0.5">{ycSelected.size} job{ycSelected.size !== 1 ? 's' : ''} selected</p>
+                  </div>
+                  <button onClick={() => setPhase('yard-check-select')} className="text-xs text-gray-400 hover:text-gray-600">← Back</button>
+                </div>
+              </div>
+
+              <div className="overflow-y-auto flex-1 px-6 py-4 space-y-5">
+
+                {/* Start date */}
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Start Date (First Yard Check Day)</p>
+                  <input
+                    type="date"
+                    value={ycStartDate}
+                    onChange={e => setYcStartDate(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/30 focus:border-teal-600"
+                  />
+                </div>
+
+                {/* Number of weeks */}
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Number of Yard Checks to Schedule</p>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number"
+                      min={1}
+                      max={52}
+                      value={ycWeeks}
+                      onChange={e => setYcWeeks(Math.max(1, Math.min(52, parseInt(e.target.value) || 1)))}
+                      className="w-24 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/30 focus:border-teal-600"
+                    />
+                    <p className="text-xs text-gray-500">visits · each successive week on the same day</p>
+                  </div>
+                </div>
+
+                {/* Route optimization panel */}
+                {ycOptimize && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Route Optimization</p>
+                      <button
+                        onClick={handleYcOptimize}
+                        disabled={ycOptimizing}
+                        className="text-xs px-3 py-1.5 bg-teal-700 text-white rounded-lg hover:bg-teal-800 disabled:opacity-50 font-medium"
+                      >
+                        {ycOptimizing ? 'Optimizing…' : ycOptOrder.length > 0 ? 'Re-Optimize' : '🗺 Run Optimization'}
+                      </button>
+                    </div>
+
+                    {ycOptOrder.length > 0 ? (
+                      <div className="border border-teal-200 rounded-xl overflow-hidden bg-teal-50">
+                        <div className="px-3 py-2 bg-teal-700 text-white">
+                          <p className="text-xs font-bold">Optimized Route — {orderedJobs.length} stops</p>
+                          <p className="text-[10px] text-teal-200 mt-0.5">Jobs ordered by closest driving distance</p>
+                        </div>
+                        {orderedJobs.map((job, idx) => (
+                          <div key={job.id} className={`flex items-center gap-3 px-3 py-2 ${idx > 0 ? 'border-t border-teal-100' : ''}`}>
+                            <span className="w-6 h-6 rounded-full bg-teal-700 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">{idx + 1}</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-gray-800 truncate">{job.job_name}</p>
+                              {job.job_address && <p className="text-[10px] text-gray-500 truncate">{job.job_address}</p>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="border border-gray-200 rounded-xl overflow-hidden">
+                        {unoptimizedJobs.map((job, idx) => (
+                          <div key={job.id} className={`flex items-center gap-3 px-3 py-2 ${idx > 0 ? 'border-t border-gray-100' : ''}`}>
+                            <span className="w-5 h-5 rounded-full bg-gray-200 text-gray-500 text-[10px] font-bold flex items-center justify-center flex-shrink-0">{idx + 1}</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-600 truncate">{job.job_name}</p>
+                              {job.job_address && <p className="text-[10px] text-gray-400 truncate">{job.job_address}</p>}
+                            </div>
+                          </div>
+                        ))}
+                        <div className="px-3 py-2 border-t border-gray-100 bg-gray-50">
+                          <p className="text-[10px] text-gray-400 italic">Click "Run Optimization" to sort by best driving route</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Summary */}
+                {ycStartDate && ycSelected.size > 0 && (
+                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl">
+                    <p className="text-xs font-semibold text-gray-600 mb-2">Summary — {totalItems} schedule item{totalItems !== 1 ? 's' : ''} will be created</p>
+                    <div className="space-y-1">
+                      {Array.from({ length: Math.min(ycWeeks, 6) }, (_, week) => {
+                        const d = new Date(ycStartDate + 'T00:00:00')
+                        d.setDate(d.getDate() + week * 7)
+                        return (
+                          <div key={week} className="flex items-center gap-2 text-xs">
+                            <span className="text-gray-500 font-medium w-16 flex-shrink-0">Week {week + 1}</span>
+                            <span className="text-gray-400">{d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                            <span className="text-gray-400 ml-auto">{ycSelected.size} job{ycSelected.size !== 1 ? 's' : ''}</span>
+                          </div>
+                        )
+                      })}
+                      {ycWeeks > 6 && (
+                        <p className="text-[10px] text-gray-400 italic">+ {ycWeeks - 6} more weeks…</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
+                <button
+                  onClick={saveYardCheckSchedule}
+                  disabled={ycSaving || !ycStartDate || ycSelected.size === 0}
+                  className="w-full py-2.5 bg-teal-700 text-white text-sm font-bold rounded-xl hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  {ycSaving ? 'Creating…' : `Create ${totalItems} Schedule Item${totalItems !== 1 ? 's' : ''}`}
                 </button>
               </div>
             </div>
