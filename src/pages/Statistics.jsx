@@ -1066,13 +1066,13 @@ function GraphCursor({ points, height, payload, stat, chartData }) {
 }
 
 // ── Clickable dot with note indicator ────────────────────────────────────────
-function NoteDot({ cx, cy, payload, notesByDate, onNoteClick }) {
+function NoteDot({ cx, cy, payload, notesByDate }) {
   if (!cx || !cy || payload?.value == null) return null
   const date    = payload?.date
-  const hasNote = date && notesByDate.has(date)
+  const hasNote = date && notesByDate?.has(date)
   return (
-    <g style={{ cursor: 'pointer' }} onClick={() => onNoteClick && date && onNoteClick(date, payload?.label)}>
-      <circle cx={cx} cy={cy} r={hasNote ? 6 : 5} fill={FG} stroke="white" strokeWidth={2} />
+    <g>
+      <circle cx={cx} cy={cy} r={5} fill={FG} stroke="white" strokeWidth={2} />
       {hasNote && (
         <>
           <circle cx={cx + 5} cy={cy - 5} r={5} fill="#f59e0b" stroke="white" strokeWidth={1.5} />
@@ -4743,7 +4743,15 @@ export default function Statistics() {
                     </div>
                   ) : (
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={chartDataWithTargets} margin={{ top: 28, right: 24, left: 16, bottom: 20 }}>
+                      <LineChart
+                        data={chartDataWithTargets}
+                        margin={{ top: 28, right: 24, left: 16, bottom: 20 }}
+                        onClick={(chartEvent) => {
+                          const pt = chartEvent?.activePayload?.[0]?.payload
+                          if (pt?.date) openNoteModal(pt.date, pt.label)
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      >
                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                         <XAxis
                           dataKey="label"
@@ -4780,10 +4788,9 @@ export default function Statistics() {
                               key={dotProps.index}
                               {...dotProps}
                               notesByDate={new Map(statNotes.map(n => [n.period_date, n]))}
-                              onNoteClick={openNoteModal}
                             />
                           )}
-                          activeDot={false}
+                          activeDot={{ r: 7, fill: FG, stroke: 'white', strokeWidth: 2 }}
                           isAnimationActive={false}
                           label={false}
                         />
