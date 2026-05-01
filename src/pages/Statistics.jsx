@@ -153,33 +153,33 @@ const STAT_TYPE_PREVIEWS = {
     </svg>
   ),
   secondary: (
-    // Weekly line on top, down arrow, Monthly line below — stacked vertically
-    <svg viewBox="0 0 110 90" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-      {/* "Weekly" tag */}
-      <rect x="2" y="2" width="30" height="11" rx="3" fill="#f1f5f9" stroke="#94a3b8" strokeWidth="1"/>
-      <text x="17" y="10" textAnchor="middle" fontSize="6.5" fontWeight="700" fill="#475569" fontFamily="sans-serif">Weekly</text>
+    // Weekly line on top (with breathing room), down arrow, Monthly line below
+    <svg viewBox="0 0 110 105" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+      {/* "Weekly" tag — pushed down from edge */}
+      <rect x="2" y="10" width="30" height="11" rx="3" fill="#f1f5f9" stroke="#94a3b8" strokeWidth="1"/>
+      <text x="17" y="18" textAnchor="middle" fontSize="6.5" fontWeight="700" fill="#475569" fontFamily="sans-serif">Weekly</text>
       {/* Weekly line — dense, wiggly */}
-      <path d="M2,36 C8,30 14,38 20,28 C26,20 32,34 38,24 C44,16 50,28 56,18 C62,10 68,22 74,14 C84,8 96,12 108,6"
+      <path d="M2,44 C8,38 14,46 20,36 C26,28 32,42 38,32 C44,24 50,36 56,26 C62,18 68,30 74,22 C84,16 96,20 108,14"
         stroke="#94a3b8" strokeWidth="1.8" strokeLinecap="round" fill="none"/>
-      <circle cx="2"   cy="36" r="1.5" fill="#94a3b8"/>
-      <circle cx="20"  cy="28" r="1.5" fill="#94a3b8"/>
-      <circle cx="38"  cy="24" r="1.5" fill="#94a3b8"/>
-      <circle cx="56"  cy="18" r="1.5" fill="#94a3b8"/>
-      <circle cx="74"  cy="14" r="1.5" fill="#94a3b8"/>
-      <circle cx="108" cy="6"  r="1.5" fill="#94a3b8"/>
+      <circle cx="2"   cy="44" r="1.5" fill="#94a3b8"/>
+      <circle cx="20"  cy="36" r="1.5" fill="#94a3b8"/>
+      <circle cx="38"  cy="32" r="1.5" fill="#94a3b8"/>
+      <circle cx="56"  cy="26" r="1.5" fill="#94a3b8"/>
+      <circle cx="74"  cy="22" r="1.5" fill="#94a3b8"/>
+      <circle cx="108" cy="14" r="1.5" fill="#94a3b8"/>
       {/* Down arrow */}
-      <line x1="55" y1="42" x2="55" y2="52" stroke="#6b7280" strokeWidth="1.8" strokeLinecap="round"/>
-      <path d="M50,48 L55,53 L60,48" stroke="#6b7280" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      <line x1="55" y1="50" x2="55" y2="60" stroke="#6b7280" strokeWidth="1.8" strokeLinecap="round"/>
+      <path d="M50,56 L55,62 L60,56" stroke="#6b7280" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
       {/* "Monthly" tag */}
-      <rect x="2" y="57" width="34" height="11" rx="3" fill="#dcfce7" stroke="#3A5038" strokeWidth="1"/>
-      <text x="19" y="65" textAnchor="middle" fontSize="6.5" fontWeight="700" fill="#3A5038" fontFamily="sans-serif">Monthly</text>
+      <rect x="2" y="66" width="34" height="11" rx="3" fill="#dcfce7" stroke="#3A5038" strokeWidth="1"/>
+      <text x="19" y="74" textAnchor="middle" fontSize="6.5" fontWeight="700" fill="#3A5038" fontFamily="sans-serif">Monthly</text>
       {/* Monthly line — smooth, fewer points */}
-      <path d="M2,86 C20,78 40,72 60,64 C78,58 92,56 108,52"
+      <path d="M2,98 C22,90 44,84 66,76 C84,70 96,66 108,62"
         stroke="#3A5038" strokeWidth="2.2" strokeLinecap="round" fill="none"/>
-      <circle cx="2"   cy="86" r="2" fill="#3A5038"/>
-      <circle cx="36"  cy="74" r="2" fill="#3A5038"/>
-      <circle cx="72"  cy="62" r="2" fill="#3A5038"/>
-      <circle cx="108" cy="52" r="2" fill="#3A5038"/>
+      <circle cx="2"   cy="98" r="2" fill="#3A5038"/>
+      <circle cx="40"  cy="84" r="2" fill="#3A5038"/>
+      <circle cx="76"  cy="70" r="2" fill="#3A5038"/>
+      <circle cx="108" cy="62" r="2" fill="#3A5038"/>
     </svg>
   ),
   auto_internal: (
@@ -209,47 +209,43 @@ const STAT_TYPE_PREVIEWS = {
     </svg>
   ),
   auto_external: (
-    // Three app logos (QB, Salesforce, GHL) with arrows converging to a line graph
-    <svg viewBox="0 0 120 90" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-      {/* ── QuickBooks logo (top) ── */}
-      <rect x="2" y="4" width="22" height="22" rx="5" fill="#2CA01C"/>
-      {/* QB intuit checkmark / Q shape */}
-      <text x="13" y="20" textAnchor="middle" fontSize="13" fontWeight="900" fill="white" fontFamily="serif">Q</text>
+    // Three app logos floating independently at scattered positions, each with its own arrow to the graph
+    <svg viewBox="0 0 130 90" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+      {/* ── QB — top-left, floating high ── */}
+      <rect x="2" y="6" width="20" height="20" rx="4" fill="#2CA01C"/>
+      <text x="12" y="21" textAnchor="middle" fontSize="12" fontWeight="900" fill="white" fontFamily="serif">Q</text>
+      {/* QB arrow → graph entry ~(58,72) */}
+      <path d="M22,16 C34,16 42,44 55,60" stroke="#9ca3af" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
+      <path d="M51,57 L56,62 L60,57" stroke="#9ca3af" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
 
-      {/* ── Salesforce logo (middle) ── */}
-      {/* Cloud shape approximation */}
-      <ellipse cx="13" cy="45" rx="11" ry="8" fill="#00A1E0"/>
-      <ellipse cx="7"  cy="49" rx="6"  ry="5" fill="#00A1E0"/>
-      <ellipse cx="19" cy="49" rx="6"  ry="5" fill="#00A1E0"/>
-      <rect x="4" y="46" width="18" height="8" fill="#00A1E0"/>
-      {/* SF text */}
-      <text x="13" y="51" textAnchor="middle" fontSize="7" fontWeight="800" fill="white" fontFamily="sans-serif">SF</text>
+      {/* ── Salesforce — middle-right of logos, floating mid ── */}
+      <ellipse cx="36" cy="40" rx="11" ry="8"  fill="#00A1E0"/>
+      <ellipse cx="29" cy="45" rx="7"  ry="5"  fill="#00A1E0"/>
+      <ellipse cx="43" cy="45" rx="7"  ry="5"  fill="#00A1E0"/>
+      <rect    x="27"  y="42" width="18" height="7" fill="#00A1E0"/>
+      <text x="36" y="47" textAnchor="middle" fontSize="7" fontWeight="800" fill="white" fontFamily="sans-serif">SF</text>
+      {/* SF arrow → graph */}
+      <path d="M48,44 C52,52 54,58 57,64" stroke="#9ca3af" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
+      <path d="M53,61 L57,66 L61,61" stroke="#9ca3af" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
 
-      {/* ── GoHighLevel logo (bottom) ── */}
-      <rect x="2" y="64" width="22" height="20" rx="5" fill="#1a1f36"/>
-      <text x="13" y="77" textAnchor="middle" fontSize="6.5" fontWeight="800" fill="#f97316" fontFamily="sans-serif">GHL</text>
+      {/* ── GHL — bottom-left, floating low ── */}
+      <rect x="4" y="64" width="22" height="18" rx="4" fill="#1a1f36"/>
+      <text x="15" y="75" textAnchor="middle" fontSize="6" fontWeight="800" fill="#f97316" fontFamily="sans-serif">GO</text>
+      <text x="15" y="79" textAnchor="middle" fontSize="5.5" fontWeight="700" fill="#fdba74" fontFamily="sans-serif">HIGH</text>
+      {/* GHL arrow → graph */}
+      <path d="M26,73 C36,73 44,72 56,68" stroke="#9ca3af" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
+      <path d="M52,65 L57,69 L53,73" stroke="#9ca3af" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
 
-      {/* ── Arrows from each app to graph ── */}
-      {/* QB → graph */}
-      <path d="M25,15 C34,15 40,36 48,40" stroke="#9ca3af" strokeWidth="1.4" strokeLinecap="round" fill="none"/>
-      <path d="M44,37 L48,41 L44,44" stroke="#9ca3af" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-      {/* SF → graph */}
-      <path d="M25,46 L48,44" stroke="#9ca3af" strokeWidth="1.4" strokeLinecap="round"/>
-      <path d="M44,41 L48,45 L44,48" stroke="#9ca3af" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-      {/* GHL → graph */}
-      <path d="M25,74 C34,74 40,54 48,48" stroke="#9ca3af" strokeWidth="1.4" strokeLinecap="round" fill="none"/>
-      <path d="M44,45 L48,49 L44,52" stroke="#9ca3af" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-
-      {/* ── Output line graph ── */}
-      <path d="M52,80 C62,70 72,58 84,46 C94,36 104,28 118,18"
+      {/* ── Output line graph (right half) ── */}
+      <path d="M60,76 C70,66 80,54 92,42 C102,32 114,22 128,14"
         stroke="#3A5038" strokeWidth="2.5" strokeLinecap="round"/>
-      <circle cx="52"  cy="80" r="2.5" fill="#3A5038"/>
-      <circle cx="70"  cy="62" r="2.5" fill="#3A5038"/>
-      <circle cx="88"  cy="44" r="2.5" fill="#3A5038"/>
-      <circle cx="108" cy="26" r="2.5" fill="#3A5038"/>
-      <circle cx="118" cy="18" r="2.5" fill="#3A5038"/>
-      {/* Soft fill under graph */}
-      <path d="M52,80 C62,70 72,58 84,46 C94,36 104,28 118,18 L118,90 L52,90 Z"
+      <circle cx="60"  cy="76" r="2.5" fill="#3A5038"/>
+      <circle cx="78"  cy="56" r="2.5" fill="#3A5038"/>
+      <circle cx="98"  cy="36" r="2.5" fill="#3A5038"/>
+      <circle cx="118" cy="20" r="2.5" fill="#3A5038"/>
+      <circle cx="128" cy="14" r="2.5" fill="#3A5038"/>
+      {/* Soft fill */}
+      <path d="M60,76 C70,66 80,54 92,42 C102,32 114,22 128,14 L128,90 L60,90 Z"
         fill="#3A5038" fillOpacity="0.07"/>
     </svg>
   ),
