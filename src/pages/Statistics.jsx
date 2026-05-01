@@ -4283,12 +4283,12 @@ function buildPrintChartSVG(chartData, statType) {
     pathStr += inPath ? `L${x},${y}` : `M${x},${y}`
     inPath = true
   })
-  const linePath = pathStr ? `<path d="${pathStr}" stroke="${FG}" stroke-width="2.2" fill="none" stroke-linejoin="round"/>` : ''
+  const linePath = pathStr ? `<path d="${pathStr}" stroke="${FG}" stroke-width="3.3" fill="none" stroke-linejoin="round"/>` : ''
 
   // Dots (only when sparse)
   const dots = n <= 36 ? vals.map(d => {
     const i = chartData.indexOf(d)
-    return `<circle cx="${xPos(i).toFixed(1)}" cy="${yPos(d.value).toFixed(1)}" r="3" fill="${FG}" stroke="white" stroke-width="1"/>`
+    return `<circle cx="${xPos(i).toFixed(1)}" cy="${yPos(d.value).toFixed(1)}" r="4.5" fill="${FG}" stroke="white" stroke-width="1.5"/>`
   }).join('') : ''
 
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" style="display:block">
@@ -4452,9 +4452,9 @@ function PrintMultipleView({ stats, weekEndingDay }) {
       flex: 1; height: 100% !important; min-height: 0;
     }
     @media print {
-      @page { size: ${orientation}; margin: ${isLandscape ? '0.5cm' : '0.8cm'}; }
+      @page { size: ${orientation}; margin: 1in 0.5in; }
       html, body { height: 100vh; }
-      .stat-page { height: 100vh; padding: ${isLandscape ? '8px 16px 4px' : '16px 24px 8px'}; }
+      .stat-page { height: 100vh; padding: ${isLandscape ? '6px 12px 4px' : '10px 16px 6px'}; }
     }
   </style>
 </head>
@@ -5697,6 +5697,11 @@ export default function Statistics() {
       clone.setAttribute('width',  '100%')
       clone.setAttribute('height', isLandscape ? '100%' : Math.round(h * 1.4))
       clone.style.cssText = 'display: block;'
+      // Thicken data lines by 50% (skip thin grid/axis lines ≤1px)
+      clone.querySelectorAll('[stroke-width]').forEach(el => {
+        const sw = parseFloat(el.getAttribute('stroke-width') || '0')
+        if (sw > 1) el.setAttribute('stroke-width', (sw * 1.5).toFixed(2))
+      })
       svgHTML += clone.outerHTML
     })
 
@@ -5738,9 +5743,9 @@ export default function Statistics() {
       ${isLandscape ? 'flex: 1; height: 100% !important; min-height: 0;' : ''}
     }
     @media print {
-      @page { size: ${orientation}; margin: ${isLandscape ? '0.5cm' : '1cm'}; }
+      @page { size: ${orientation}; margin: 1in 0.6in; }
       html, body { height: 100vh; }
-      body { padding: ${isLandscape ? '10px 18px 6px' : '20px 28px'}; }
+      body { padding: ${isLandscape ? '6px 14px 4px' : '12px 24px 6px'}; }
     }
   </style>
 </head>
