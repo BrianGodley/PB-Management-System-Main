@@ -4317,54 +4317,39 @@ function PrintMultipleView({ stats, weekEndingDay }) {
   const activeStats = (stats || []).filter(s => !s.archived)
 
   // ── Config state ─────────────────────────────────────────────────────────
-  const [tracking,       setTracking]       = useState('weekly')
-  const [selectionMode,  setSelectionMode]  = useState('all')   // 'all'|'group'|'custom'
-  const [selectedGroupId,setSelectedGroupId]= useState(null)
-  const [customStatIds,  setCustomStatIds]  = useState(new Set())
-  const [groups,         setGroups]         = useState([])
-  const [loadingGroups,  setLoadingGroups]  = useState(false)
+  const [tracking,     setTracking]     = useState('weekly')
+  const [selectedIds,  setSelectedIds]  = useState(new Set())
+  const [periodEndDate,setPeriodEndDate]= useState('')
+  const [numPeriods,   setNumPeriods]   = useState(12)
+  const [orientation,  setOrientation]  = useState('landscape')
+  const [printing,     setPrinting]     = useState(false)
 
-  const periodOpts  = useMemo(() => getRecentPeriodOptions(tracking, weekEndingDay), [tracking, weekEndingDay])
-  const [periodEndDate, setPeriodEndDate]   = useState(periodOpts[0]?.date ?? '')
-  const [numPeriods, setNumPeriods]         = useState(12)
-  const [orientation, setOrientation]       = useState('landscape')
-  const [printing,   setPrinting]           = useState(false)
+  const periodOpts = useMemo(() => getRecentPeriodOptions(tracking, weekEndingDay), [tracking, weekEndingDay])
 
-  // Reload period options when tracking changes
+  // Reload period options + reset selection when tracking changes
   useEffect(() => {
     const opts = getRecentPeriodOptions(tracking, weekEndingDay)
     setPeriodEndDate(opts[0]?.date ?? '')
+    setSelectedIds(new Set())
   }, [tracking, weekEndingDay])
 
-  useEffect(() => { loadGroups() }, [])
+  // Init periodEndDate on mount
+  useEffect(() => {
+    const opts = getRecentPeriodOptions('weekly', weekEndingDay)
+    setPeriodEndDate(opts[0]?.date ?? '')
+  }, [])
 
-  async function loadGroups() {
-    setLoadingGroups(true)
-    const { data } = await supabase.from('stat_groups').select('*').order('sort_order').order('name')
-    setGroups(data || [])
-    setLoadingGroups(false)
+  // ── Derived ───────────────────────────────────────────────────────────────
+  const matchingStats = activeStats.filter(s => s.tracking === tracking)
+  const statsToPrint  = matchingStats.filter(s => selectedIds.has(s.id))
+  const allSelected   = matchingStats.length > 0 && matchingStats.every(s => selectedIds.has(s.id))
+
+  function toggleStat(id) {
+    setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
 
-  // ── Derived: stats matching the selected tracking type ───────────────────
-  const matchingStats = activeStats.filter(s => s.tracking === tracking)
-
-  // ── Derived: stats to actually print ─────────────────────────────────────
-  const statsToPrint = useMemo(() => {
-    if (selectionMode === 'all') return matchingStats
-    if (selectionMode === 'group') {
-      const g = groups.find(g => g.id === selectedGroupId)
-      if (!g) return []
-      const ids = (g.stat_ids || []).map(Number)
-      return matchingStats.filter(s => ids.includes(Number(s.id)))
-    }
-    // custom
-    return matchingStats.filter(s => customStatIds.has(s.id))
-  }, [selectionMode, matchingStats, groups, selectedGroupId, customStatIds])
-
-  function toggleCustomStat(id) {
-    setCustomStatIds(prev => {
-      const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n
-    })
+  function toggleSelectAll() {
+    setSelectedIds(allSelected ? new Set() : new Set(matchingStats.map(s => s.id)))
   }
 
   // ── Period label for header ───────────────────────────────────────────────
@@ -4484,30 +4469,29 @@ function PrintMultipleView({ stats, weekEndingDay }) {
     }
   }
 
-  const inputCls  = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600'
-  const sectionCls = 'mb-6'
-  const labelCls  = 'block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2'
+  const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600'
+  const labelCls = 'block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2'
 
   return (
     <div className="flex-1 flex overflow-hidden bg-gray-50">
 
       {/* ── Left: config panel ───────────────────────────────────────────── */}
-      <div className="w-80 xl:w-96 flex-shrink-0 flex flex-col bg-white border-r border-gray-200 overflow-y-auto">
+      <div className="w-72 flex-shrink-0 flex flex-col bg-white border-r border-gray-200 overflow-y-auto">
         <div className="px-5 py-4 border-b border-gray-100 flex-shrink-0">
           <h2 className="text-base font-bold text-gray-900">🖨️ Print Multiple</h2>
           <p className="text-xs text-gray-400 mt-0.5">Configure then print a batch of charts.</p>
         </div>
 
-        <div className="px-5 py-5 flex-1 overflow-y-auto space-y-6">
+        <div className="px-5 py-5 flex-1 space-y-6">
 
-          {/* ── Step 1: Tracking type ── */}
-          <div className={sectionCls}>
-            <p className={labelCls}>1 · Tracking Type</p>
+          {/* Tracking type */}
+          <div>
+            <p className={labelCls}>Tracking Type</p>
             <div className="grid grid-cols-5 gap-1">
               {TRACKING_OPTIONS.map(t => (
                 <button
                   key={t.value}
-                  onClick={() => { setTracking(t.value); setSelectionMode('all'); setCustomStatIds(new Set()) }}
+                  onClick={() => setTracking(t.value)}
                   className={`py-2 rounded-lg text-xs font-semibold text-center transition-colors border-2 ${
                     tracking === t.value
                       ? 'text-white border-transparent'
@@ -4524,78 +4508,14 @@ function PrintMultipleView({ stats, weekEndingDay }) {
             </p>
           </div>
 
-          {/* ── Step 2: Which stats ── */}
-          <div className={sectionCls}>
-            <p className={labelCls}>2 · Stats to Print</p>
-            <div className="space-y-2">
-
-              {/* All */}
-              <label className="flex items-start gap-3 cursor-pointer p-2.5 rounded-lg border-2 transition-colors" style={selectionMode === 'all' ? { borderColor: FG, backgroundColor: '#f0f7f0' } : { borderColor: '#e5e7eb' }}>
-                <input type="radio" name="selMode" checked={selectionMode === 'all'}
-                  onChange={() => setSelectionMode('all')} className="mt-0.5 accent-green-700" />
-                <div>
-                  <div className="text-sm font-semibold text-gray-800">All {tracking} stats</div>
-                  <div className="text-xs text-gray-400">{matchingStats.length} chart{matchingStats.length !== 1 ? 's' : ''}</div>
-                </div>
-              </label>
-
-              {/* By group */}
-              <label className="flex items-start gap-3 cursor-pointer p-2.5 rounded-lg border-2 transition-colors" style={selectionMode === 'group' ? { borderColor: FG, backgroundColor: '#f0f7f0' } : { borderColor: '#e5e7eb' }}>
-                <input type="radio" name="selMode" checked={selectionMode === 'group'}
-                  onChange={() => setSelectionMode('group')} className="mt-0.5 accent-green-700" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-gray-800">By stat group</div>
-                  <div className="text-xs text-gray-400 mb-2">Choose a saved group</div>
-                  {selectionMode === 'group' && (
-                    <select
-                      value={selectedGroupId ?? ''}
-                      onChange={e => setSelectedGroupId(e.target.value ? Number(e.target.value) : null)}
-                      className={inputCls}
-                    >
-                      <option value="">— Pick a group —</option>
-                      {groups.map(g => {
-                        const cnt = (g.stat_ids || []).map(Number).filter(id => matchingStats.some(s => Number(s.id) === id)).length
-                        return <option key={g.id} value={g.id}>{g.name} ({cnt} {tracking})</option>
-                      })}
-                    </select>
-                  )}
-                </div>
-              </label>
-
-              {/* Custom */}
-              <label className="flex items-start gap-3 cursor-pointer p-2.5 rounded-lg border-2 transition-colors" style={selectionMode === 'custom' ? { borderColor: FG, backgroundColor: '#f0f7f0' } : { borderColor: '#e5e7eb' }}>
-                <input type="radio" name="selMode" checked={selectionMode === 'custom'}
-                  onChange={() => setSelectionMode('custom')} className="mt-0.5 accent-green-700" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-gray-800">Custom selection</div>
-                  <div className="text-xs text-gray-400 mb-2">Pick individual stats</div>
-                  {selectionMode === 'custom' && (
-                    <div className="border border-gray-200 rounded-lg bg-white max-h-44 overflow-y-auto divide-y divide-gray-50">
-                      {matchingStats.length === 0 ? (
-                        <p className="px-3 py-3 text-xs text-gray-400 text-center">No {tracking} stats available.</p>
-                      ) : matchingStats.map(s => (
-                        <label key={s.id} className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-gray-50">
-                          <input type="checkbox" checked={customStatIds.has(s.id)}
-                            onChange={() => toggleCustomStat(s.id)}
-                            className="w-3.5 h-3.5 rounded accent-green-700 flex-shrink-0" />
-                          <span className="text-xs font-medium text-gray-800 truncate">{s.name}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </label>
-            </div>
-          </div>
-
-          {/* ── Step 3: Period ── */}
-          <div className={sectionCls}>
-            <p className={labelCls}>3 · Period</p>
+          {/* Period */}
+          <div>
+            <p className={labelCls}>Period</p>
             <div className="space-y-3">
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Period Ending</label>
                 <select value={periodEndDate} onChange={e => setPeriodEndDate(e.target.value)} className={inputCls}>
-                  {getRecentPeriodOptions(tracking, weekEndingDay).map(o => (
+                  {periodOpts.map(o => (
                     <option key={o.date} value={o.date}>{o.label}</option>
                   ))}
                 </select>
@@ -4611,9 +4531,9 @@ function PrintMultipleView({ stats, weekEndingDay }) {
             </div>
           </div>
 
-          {/* ── Step 4: Orientation ── */}
-          <div className={sectionCls}>
-            <p className={labelCls}>4 · Orientation</p>
+          {/* Orientation */}
+          <div>
+            <p className={labelCls}>Orientation</p>
             <div className="grid grid-cols-2 gap-2">
               {[['landscape', '⬛ Landscape'], ['portrait', '⬜ Portrait']].map(([val, lbl]) => (
                 <button
@@ -4631,13 +4551,29 @@ function PrintMultipleView({ stats, weekEndingDay }) {
           </div>
 
         </div>
+      </div>
 
-        {/* ── Print button ── */}
-        <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0">
+      {/* ── Right: stat checklist ────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+
+        {/* Header bar with Select All + Print button */}
+        <div className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200 flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={toggleSelectAll}
+              className="text-sm font-semibold px-3 py-1.5 rounded-lg border-2 transition-colors hover:bg-gray-50"
+              style={{ borderColor: FG, color: FG }}
+            >
+              {allSelected ? 'Deselect All' : 'Select All'}
+            </button>
+            <span className="text-xs text-gray-400">
+              {selectedIds.size} of {matchingStats.length} selected · {numPeriods} {tracking} periods ending {periodEndLabel} · {orientation}
+            </span>
+          </div>
           <button
             onClick={doPrint}
             disabled={printing || statsToPrint.length === 0}
-            className="w-full py-3 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2"
+            className="py-2 px-5 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center gap-2 transition-opacity"
             style={{ backgroundColor: FG }}
           >
             {printing ? (
@@ -4646,54 +4582,37 @@ function PrintMultipleView({ stats, weekEndingDay }) {
               `🖨️ Print ${statsToPrint.length} Chart${statsToPrint.length !== 1 ? 's' : ''}`
             )}
           </button>
-          {statsToPrint.length === 0 && !printing && (
-            <p className="text-xs text-gray-400 text-center mt-2">
-              {matchingStats.length === 0
-                ? `No ${tracking} stats exist yet.`
-                : 'Select at least one stat above.'}
-            </p>
+        </div>
+
+        {/* Checklist */}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          {matchingStats.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-24 text-gray-300">
+              <div className="text-5xl mb-3">📊</div>
+              <p className="text-base font-medium">No {tracking} stats</p>
+              <p className="text-sm mt-1">Switch to a different tracking type.</p>
+            </div>
+          ) : (
+            <div className="space-y-1.5 max-w-2xl">
+              {matchingStats.map(s => (
+                <label
+                  key={s.id}
+                  className="flex items-center gap-3 px-4 py-3 bg-white rounded-xl border-2 cursor-pointer transition-colors"
+                  style={selectedIds.has(s.id) ? { borderColor: FG, backgroundColor: '#f0f7f0' } : { borderColor: '#e5e7eb' }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(s.id)}
+                    onChange={() => toggleStat(s.id)}
+                    className="w-4 h-4 rounded accent-green-700 flex-shrink-0"
+                  />
+                  <span className="text-sm font-semibold text-gray-800">{s.name}</span>
+                  <span className="text-xs text-gray-400 ml-auto capitalize">{s.stat_type}</span>
+                </label>
+              ))}
+            </div>
           )}
         </div>
-      </div>
-
-      {/* ── Right: preview list ──────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-6 py-5">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="font-semibold text-gray-800">Charts to Print</h3>
-            <p className="text-xs text-gray-400 mt-0.5">
-              {statsToPrint.length} chart{statsToPrint.length !== 1 ? 's' : ''} · {numPeriods} {tracking} periods ending {periodEndLabel} · {orientation}
-            </p>
-          </div>
-        </div>
-
-        {statsToPrint.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-gray-300">
-            <div className="text-5xl mb-3">🖨️</div>
-            <p className="text-base font-medium">No charts selected</p>
-            <p className="text-sm mt-1">Configure your options on the left.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {statsToPrint.map((s, i) => (
-              <div key={s.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
-                     style={{ backgroundColor: FG }}>
-                  {i + 1}
-                </div>
-                <div className="min-w-0">
-                  <div className="font-semibold text-gray-800 text-sm truncate">{s.name}</div>
-                  <div className="text-xs text-gray-400 capitalize mt-0.5">{s.stat_type}</div>
-                </div>
-                {selectionMode === 'custom' && (
-                  <button onClick={() => toggleCustomStat(s.id)}
-                    className="ml-auto text-gray-300 hover:text-red-500 transition-colors text-lg"
-                    title="Remove">×</button>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   )
@@ -6409,9 +6328,11 @@ export default function Statistics() {
           </>
         )}
         <div className="flex-1 min-w-0" />
-        <button onClick={() => setShowTypeSelector(true)} className="btn-primary text-sm px-3 py-1.5 flex-shrink-0">
-          + Add Statistic
-        </button>
+        {viewMode !== 'print-multiple' && (
+          <button onClick={() => setShowTypeSelector(true)} className="btn-primary text-sm px-3 py-1.5 flex-shrink-0">
+            + Add Statistic
+          </button>
+        )}
       </div>
 
       {/* ── NON-GRAPH VIEWS ─────────────────────────────────────────────── */}
