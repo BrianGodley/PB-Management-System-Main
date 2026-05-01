@@ -4314,7 +4314,7 @@ function PrintMultipleView({ stats, weekEndingDay }) {
   ]
   const NUM_PERIOD_OPTIONS = [6, 8, 10, 12, 16, 20, 24, 36, 52]
 
-  const activeStats = (stats || []).filter(s => !s.archived)
+  const activeStats = useMemo(() => (stats || []).filter(s => !s.archived), [stats])
 
   // ── Config state ─────────────────────────────────────────────────────────
   const [tracking,        setTracking]        = useState('weekly')
@@ -4431,19 +4431,28 @@ function PrintMultipleView({ stats, weekEndingDay }) {
 
   // ── Compute data coverage for each stat in the current period window ───────
   useEffect(() => {
+    let cancelled = false
+
     const statIds = matchingStats.map(s => s.id)
     if (!statIds.length || !periodEndDate) { setDataCoverage({}); return }
 
+    // Snapshot closure values so a stale response can never overwrite a newer one
+    const snapStats      = matchingStats
+    const snapNumPeriods = numPeriods
+    const snapTracking   = tracking
+    const snapWed        = weekEndingDay ?? 5
+    const snapEnd        = periodEndDate
+
     // Build the periods array for the current window
-    const endD = new Date(periodEndDate + 'T00:00:00')
+    const endD = new Date(snapEnd + 'T00:00:00')
     const periods = []
-    for (let i = numPeriods - 1; i >= 0; i--) {
+    for (let i = snapNumPeriods - 1; i >= 0; i--) {
       const d = new Date(endD)
-      if      (tracking === 'daily')     d.setDate(d.getDate() - i)
-      else if (tracking === 'weekly')    d.setDate(d.getDate() - i * 7)
-      else if (tracking === 'monthly')   d.setMonth(endD.getMonth() - i)
-      else if (tracking === 'quarterly') d.setMonth(endD.getMonth() - i * 3)
-      else                               d.setFullYear(endD.getFullYear() - i)
+      if      (snapTracking === 'daily')     d.setDate(d.getDate() - i)
+      else if (snapTracking === 'weekly')    d.setDate(d.getDate() - i * 7)
+      else if (snapTracking === 'monthly')   d.setMonth(endD.getMonth() - i)
+      else if (snapTracking === 'quarterly') d.setMonth(endD.getMonth() - i * 3)
+      else                                   d.setFullYear(endD.getFullYear() - i)
       periods.push(isoDate(d))
     }
     const startDate = periods[0]
@@ -4454,20 +4463,22 @@ function PrintMultipleView({ stats, weekEndingDay }) {
       .select('statistic_id, period_date')
       .in('statistic_id', statIds)
       .gte('period_date', startDate)
-      .lte('period_date', periodEndDate)
+      .lte('period_date', snapEnd)
       .then(({ data: vals }) => {
-        const wed = weekEndingDay ?? 5
+        if (cancelled) return
         const coverage = {}
-        for (const s of matchingStats) {
+        for (const s of snapStats) {
           const sv = (vals || []).filter(v => v.statistic_id === s.id)
           const found = periods.filter(p =>
-            sv.some(v => matchesPeriod(v.period_date, p, tracking, wed))
+            sv.some(v => matchesPeriod(v.period_date, p, snapTracking, snapWed))
           ).length
-          coverage[s.id] = { found, total: numPeriods }
+          coverage[s.id] = { found, total: snapNumPeriods }
         }
         setDataCoverage(coverage)
         setLoadingCoverage(false)
       })
+
+    return () => { cancelled = true }
   }, [matchingStats, periodEndDate, numPeriods, tracking, weekEndingDay])
 
   // ── Period label for header ───────────────────────────────────────────────
