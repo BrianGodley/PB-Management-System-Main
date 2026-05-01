@@ -93,6 +93,118 @@ function PickSourceStatModal({ stats, onPick, onClose }) {
   )
 }
 
+// ── Mini chart SVG previews for TypeSelectorModal ────────────────────────────
+const STAT_TYPE_PREVIEWS = {
+  basic: (
+    // Single clean upward-trending line with dots
+    <svg viewBox="0 0 110 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+      <path d="M4,52 C18,46 28,38 38,30 C50,21 60,18 76,12 C86,8 96,6 106,4"
+        stroke="#3A5038" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+      <circle cx="4"   cy="52" r="3" fill="#3A5038"/>
+      <circle cx="28"  cy="37" r="3" fill="#3A5038"/>
+      <circle cx="54"  cy="20" r="3" fill="#3A5038"/>
+      <circle cx="76"  cy="12" r="3" fill="#3A5038"/>
+      <circle cx="106" cy="4"  r="3" fill="#3A5038"/>
+      {/* Soft fill under line */}
+      <path d="M4,52 C18,46 28,38 38,30 C50,21 60,18 76,12 C86,8 96,6 106,4 L106,60 L4,60 Z"
+        fill="#3A5038" fillOpacity="0.08"/>
+    </svg>
+  ),
+  equation: (
+    // Two input lines + "=" → result line
+    <svg viewBox="0 0 110 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+      {/* Line A */}
+      <path d="M4,18 C14,16 22,14 34,10" stroke="#2563EB" strokeWidth="2" strokeLinecap="round"/>
+      <circle cx="4"  cy="18" r="2.5" fill="#2563EB"/>
+      <circle cx="34" cy="10" r="2.5" fill="#2563EB"/>
+      {/* Line B */}
+      <path d="M4,36 C14,32 22,30 34,26" stroke="#DC2626" strokeWidth="2" strokeLinecap="round"/>
+      <circle cx="4"  cy="36" r="2.5" fill="#DC2626"/>
+      <circle cx="34" cy="26" r="2.5" fill="#DC2626"/>
+      {/* "+" operator */}
+      <text x="40" y="26" fontSize="14" fontWeight="700" fill="#6b7280" fontFamily="monospace">+</text>
+      {/* Result line */}
+      <path d="M56,48 C68,38 80,22 106,6" stroke="#3A5038" strokeWidth="2.5" strokeLinecap="round"/>
+      <circle cx="56"  cy="48" r="3" fill="#3A5038"/>
+      <circle cx="106" cy="6"  r="3" fill="#3A5038"/>
+    </svg>
+  ),
+  overlay: (
+    // Two lines, different colors, on same axes
+    <svg viewBox="0 0 110 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+      {/* Line 1 — green */}
+      <path d="M4,48 C20,40 36,28 54,22 C70,16 88,18 106,8"
+        stroke="#3A5038" strokeWidth="2.5" strokeLinecap="round"/>
+      <circle cx="4"   cy="48" r="2.5" fill="#3A5038"/>
+      <circle cx="54"  cy="22" r="2.5" fill="#3A5038"/>
+      <circle cx="106" cy="8"  r="2.5" fill="#3A5038"/>
+      {/* Line 2 — blue */}
+      <path d="M4,38 C20,50 36,42 54,36 C70,30 88,46 106,28"
+        stroke="#2563EB" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="5 2"/>
+      <circle cx="4"   cy="38" r="2.5" fill="#2563EB"/>
+      <circle cx="54"  cy="36" r="2.5" fill="#2563EB"/>
+      <circle cx="106" cy="28" r="2.5" fill="#2563EB"/>
+    </svg>
+  ),
+  secondary: (
+    // Many small bars (source) → arrow → fewer tall bars (aggregated)
+    <svg viewBox="0 0 110 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+      {/* Source: 6 small weekly bars */}
+      {[
+        [4, 28], [13, 20], [22, 34], [31, 16], [40, 24], [49, 14],
+      ].map(([x, y], i) => (
+        <rect key={i} x={x} y={y} width="7" height={60 - y - 2} rx="1.5"
+          fill="#94a3b8" fillOpacity="0.7"/>
+      ))}
+      {/* Arrow */}
+      <path d="M60,30 L68,30 M64,26 L68,30 L64,34"
+        stroke="#6b7280" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+      {/* Result: 2 tall monthly bars */}
+      <rect x="72" y="12" width="14" height="46" rx="2" fill="#3A5038" fillOpacity="0.75"/>
+      <rect x="90" y="20" width="14" height="38" rx="2" fill="#3A5038" fillOpacity="0.75"/>
+    </svg>
+  ),
+  auto: (
+    // Database cylinder with data lines feeding into a rising line
+    <svg viewBox="0 0 110 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+      {/* DB cylinder */}
+      <ellipse cx="22" cy="14" rx="14" ry="5" fill="#e0f2fe" stroke="#0ea5e9" strokeWidth="1.5"/>
+      <rect x="8" y="14" width="28" height="22" fill="#e0f2fe" stroke="#0ea5e9" strokeWidth="1.5"/>
+      <ellipse cx="22" cy="36" rx="14" ry="5" fill="#bae6fd" stroke="#0ea5e9" strokeWidth="1.5"/>
+      {/* Horizontal data lines inside cylinder */}
+      <line x1="12" y1="22" x2="32" y2="22" stroke="#0ea5e9" strokeWidth="1" strokeOpacity="0.6"/>
+      <line x1="12" y1="28" x2="32" y2="28" stroke="#0ea5e9" strokeWidth="1" strokeOpacity="0.6"/>
+      {/* Arrow out */}
+      <path d="M36,26 L50,26 M46,22 L50,26 L46,30"
+        stroke="#0ea5e9" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+      {/* Auto-computed line */}
+      <path d="M54,50 C64,42 74,28 88,18 C96,13 100,10 106,7"
+        stroke="#1e40af" strokeWidth="2.5" strokeLinecap="round"/>
+      <circle cx="54"  cy="50" r="2.5" fill="#1e40af"/>
+      <circle cx="88"  cy="18" r="2.5" fill="#1e40af"/>
+      <circle cx="106" cy="7"  r="2.5" fill="#1e40af"/>
+    </svg>
+  ),
+  target: (
+    // Actual line + dashed target line above it
+    <svg viewBox="0 0 200 50" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+      {/* Dashed target line */}
+      <line x1="4" y1="12" x2="196" y2="12"
+        stroke="#DC2626" strokeWidth="1.8" strokeDasharray="6 4" strokeLinecap="round"/>
+      <text x="4" y="9" fontSize="7" fill="#DC2626" fontWeight="600">TARGET</text>
+      {/* Actual stat line — trending up but below target */}
+      <path d="M4,44 C30,40 55,36 80,30 C105,24 130,22 160,18 C175,16 185,20 196,16"
+        stroke="#3A5038" strokeWidth="2.5" strokeLinecap="round"/>
+      <circle cx="4"   cy="44" r="2.5" fill="#3A5038"/>
+      <circle cx="80"  cy="30" r="2.5" fill="#3A5038"/>
+      <circle cx="160" cy="18" r="2.5" fill="#3A5038"/>
+      <circle cx="196" cy="16" r="2.5" fill="#3A5038"/>
+      <path d="M4,44 C30,40 55,36 80,30 C105,24 130,22 160,18 C175,16 185,20 196,16 L196,50 L4,50 Z"
+        fill="#3A5038" fillOpacity="0.06"/>
+    </svg>
+  ),
+}
+
 // ── TypeSelectorModal ─────────────────────────────────────────────────────────
 function TypeSelectorModal({ onSelect, onClose }) {
   const types = [
@@ -115,7 +227,7 @@ function TypeSelectorModal({ onSelect, onClose }) {
               key={t.key}
               disabled={!t.available}
               onClick={() => t.available && onSelect(t.key)}
-              className={`relative rounded-xl border-2 p-4 text-left transition-all ${
+              className={`relative rounded-xl border-2 p-4 text-left transition-all overflow-hidden ${
                 t.available
                   ? 'border-gray-200 hover:border-green-600 hover:shadow-md cursor-pointer'
                   : 'border-gray-100 bg-gray-50 cursor-not-allowed opacity-60'
@@ -126,8 +238,14 @@ function TypeSelectorModal({ onSelect, onClose }) {
                   Coming Soon
                 </span>
               )}
-              <div className="font-semibold text-gray-800 mb-1 pr-16">{t.label}</div>
-              <div className="text-xs text-gray-500 leading-snug">{t.desc}</div>
+              {/* Mini chart preview — bottom-right background decoration */}
+              {STAT_TYPE_PREVIEWS[t.key] && (
+                <div className="absolute bottom-0 right-0 w-24 h-14 opacity-[0.18] pointer-events-none select-none">
+                  {STAT_TYPE_PREVIEWS[t.key]}
+                </div>
+              )}
+              <div className="relative font-semibold text-gray-800 mb-1">{t.label}</div>
+              <div className="relative text-xs text-gray-500 leading-snug pr-14">{t.desc}</div>
             </button>
           ))}
         </div>
@@ -136,10 +254,14 @@ function TypeSelectorModal({ onSelect, onClose }) {
         <div className="px-6 pb-6">
           <button
             onClick={() => onSelect('target')}
-            className="w-full rounded-xl border-2 border-green-600 p-4 text-left hover:shadow-md hover:bg-green-50 transition-all"
+            className="relative w-full rounded-xl border-2 border-green-600 p-4 text-left hover:shadow-md hover:bg-green-50 transition-all overflow-hidden"
           >
-            <div className="font-semibold text-green-800 mb-1">🎯 Target Statistic</div>
-            <div className="text-xs text-gray-500 leading-snug">
+            {/* Wide preview for full-width button */}
+            <div className="absolute bottom-0 right-0 w-48 h-12 opacity-[0.18] pointer-events-none select-none">
+              {STAT_TYPE_PREVIEWS.target}
+            </div>
+            <div className="relative font-semibold text-green-800 mb-1">🎯 Target Statistic</div>
+            <div className="relative text-xs text-gray-500 leading-snug pr-40">
               Mirror an existing stat and overlay a custom target line showing your goal over time.
             </div>
           </button>
