@@ -283,8 +283,8 @@ function UserEditModal({ profile, currentUserId, currentUserRole, onClose, onSav
           {[
             { key: 'profile',     label: '👤 Profile' },
             { key: 'permissions', label: '🔐 Permissions' },
-            ...(callerIsAdmin ? [{ key: 'account', label: '🔑 User Account' }] : []),
-            ...(callerIsAdmin ? [{ key: 'danger',  label: '⚠️ Danger' }] : []),
+            { key: 'account',     label: '🔑 Access and Roles' },
+            ...(callerIsAdmin ? [{ key: 'danger', label: '⚠️ Danger' }] : []),
           ].map(t => (
             <button
               key={t.key}

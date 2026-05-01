@@ -448,7 +448,7 @@ export default function EmployeeDetail() {
       <div className="bg-white border-b border-gray-200 px-6 flex gap-0 flex-shrink-0 overflow-x-auto">
         {[
           { key: 'profile',      label: 'Profile',       icon: '👤' },
-          { key: 'user',         label: 'User',          icon: '🔐' },
+          { key: 'user',         label: 'Access and Roles', icon: '🔑' },
           { key: 'permissions',  label: 'Permissions',   icon: '🔑' },
           { key: 'docs',         label: `Documents (${docs.length})`,     icon: '📁' },
           { key: 'certs',        label: `Certifications (${certs.length})`, icon: '🏅' },
