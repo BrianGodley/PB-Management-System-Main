@@ -358,6 +358,8 @@ export default function HR() {
   const [showBuilder,   setShowBuilder]   = useState(false)
   const [editForm,      setEditForm]      = useState(null)
   const [linkCopied,    setLinkCopied]    = useState(false)
+  const [sortCol,       setSortCol]       = useState('name')
+  const [sortDir,       setSortDir]       = useState('asc')
 
   useEffect(() => { fetchAll() }, [])
 
@@ -388,6 +390,74 @@ export default function HR() {
     navigator.clipboard.writeText(url)
     setLinkCopied(true)
     setTimeout(() => setLinkCopied(false), 2000)
+  }
+
+  // ── Sort helpers ────────────────────────────────────────────────────────────
+  function toggleSort(col) {
+    if (sortCol === col) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortCol(col)
+      setSortDir('asc')
+    }
+  }
+
+  function sortEmployees(list) {
+    const dir = sortDir === 'asc' ? 1 : -1
+    return [...list].sort((a, b) => {
+      let av, bv
+      switch (sortCol) {
+        case 'name':
+          av = `${a.last_name || ''} ${a.first_name || ''}`.toLowerCase()
+          bv = `${b.last_name || ''} ${b.first_name || ''}`.toLowerCase()
+          break
+        case 'address':
+          av = (a.address || a.city || '').toLowerCase()
+          bv = (b.address || b.city || '').toLowerCase()
+          break
+        case 'phone':
+          av = (a.phone || '').replace(/\D/g, '')
+          bv = (b.phone || '').replace(/\D/g, '')
+          break
+        case 'email':
+          av = (a.email || '').toLowerCase()
+          bv = (b.email || '').toLowerCase()
+          break
+        case 'position':
+          av = (a.job_title || '').toLowerCase()
+          bv = (b.job_title || '').toLowerCase()
+          break
+        case 'role':
+          av = (profileRoles[a.email?.toLowerCase()] || 'zzz').toLowerCase()
+          bv = (profileRoles[b.email?.toLowerCase()] || 'zzz').toLowerCase()
+          break
+        case 'started':
+          av = a.start_date || ''
+          bv = b.start_date || ''
+          break
+        default:
+          return 0
+      }
+      if (av < bv) return -1 * dir
+      if (av > bv) return 1 * dir
+      return 0
+    })
+  }
+
+  function SortIcon({ col }) {
+    if (sortCol !== col) return <span className="ml-1 text-gray-300">⇅</span>
+    return <span className="ml-1 text-green-700">{sortDir === 'asc' ? '▲' : '▼'}</span>
+  }
+
+  function SortTh({ col, label, className = '' }) {
+    return (
+      <th
+        className={`text-left px-4 py-2 font-semibold text-gray-600 uppercase cursor-pointer select-none hover:text-green-700 transition-colors ${className}`}
+        onClick={() => toggleSort(col)}
+      >
+        {label}<SortIcon col={col} />
+      </th>
+    )
   }
 
   // ── Filtered lists ──────────────────────────────────────────────────────────
@@ -523,23 +593,23 @@ export default function HR() {
                 <table className="table-fixed w-full text-xs">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left px-4 py-2 font-semibold text-gray-600 uppercase">Name</th>
-                      <th className="text-left px-4 py-2 font-semibold text-gray-600 uppercase">Address</th>
-                      <th className="text-left px-4 py-2 font-semibold text-gray-600 uppercase">Cell Phone</th>
-                      <th className="text-left px-4 py-2 font-semibold text-gray-600 uppercase">Email</th>
-                      <th className="text-left px-4 py-2 font-semibold text-gray-600 uppercase">Position</th>
-                      <th className="text-left px-4 py-2 font-semibold text-gray-600 uppercase">Role</th>
-                      <th className="text-left px-4 py-2 font-semibold text-gray-600 uppercase">Started</th>
+                      <SortTh col="name" label="Name" />
+                      <SortTh col="address" label="Address" />
+                      <SortTh col="phone" label="Cell Phone" />
+                      <SortTh col="email" label="Email" />
+                      <SortTh col="position" label="Position" />
+                      <SortTh col="role" label="Role" />
+                      <SortTh col="started" label="Started" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {filteredEmps.map(emp => {
+                    {sortEmployees(filteredEmps).map(emp => {
                       const role = profileRoles[emp.email?.toLowerCase()] || null
                       const location = emp.address ? emp.address : (emp.city || emp.state ? `${emp.city}, ${emp.state}`.replace(/^,\s*/, '').replace(/,\s*$/, '') : '—')
                       return (
                         <tr key={emp.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => navigate(`/hr/employee/${emp.id}`)}>
                           <td className="px-4 py-2">
-                            <button className="text-green-700 hover:underline font-medium">{emp.first_name} {emp.last_name}</button>
+                            <button className="text-green-700 hover:underline font-medium">{emp.last_name}, {emp.first_name}</button>
                           </td>
                           <td className="px-4 py-2 text-gray-600">{location}</td>
                           <td className="px-4 py-2 text-gray-600">{emp.phone || '—'}</td>
@@ -621,21 +691,21 @@ export default function HR() {
                 <table className="table-fixed w-full text-xs">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left px-4 py-2 font-semibold text-gray-600 uppercase">Name</th>
-                      <th className="text-left px-4 py-2 font-semibold text-gray-600 uppercase">Address</th>
-                      <th className="text-left px-4 py-2 font-semibold text-gray-600 uppercase">Cell Phone</th>
-                      <th className="text-left px-4 py-2 font-semibold text-gray-600 uppercase">Email</th>
-                      <th className="text-left px-4 py-2 font-semibold text-gray-600 uppercase">Position</th>
-                      <th className="text-left px-4 py-2 font-semibold text-gray-600 uppercase">Started</th>
+                      <SortTh col="name" label="Name" />
+                      <SortTh col="address" label="Address" />
+                      <SortTh col="phone" label="Cell Phone" />
+                      <SortTh col="email" label="Email" />
+                      <SortTh col="position" label="Position" />
+                      <SortTh col="started" label="Started" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {filteredArchive.map(emp => {
+                    {sortEmployees(filteredArchive).map(emp => {
                       const location = emp.address ? emp.address : (emp.city || emp.state ? `${emp.city || ''}, ${emp.state || ''}`.replace(/^,\s*/, '').replace(/,\s*$/, '') : '—')
                       return (
                         <tr key={emp.id} className="hover:bg-gray-50 transition-colors cursor-pointer opacity-70" onClick={() => navigate(`/hr/employee/${emp.id}`)}>
                           <td className="px-4 py-2">
-                            <button className="text-green-700 hover:underline font-medium">{emp.first_name} {emp.last_name}</button>
+                            <button className="text-green-700 hover:underline font-medium">{emp.last_name}, {emp.first_name}</button>
                           </td>
                           <td className="px-4 py-2 text-gray-600">{location}</td>
                           <td className="px-4 py-2 text-gray-600">{emp.phone || '—'}</td>
