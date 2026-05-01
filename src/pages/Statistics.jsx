@@ -2495,9 +2495,13 @@ function SecondaryStatForm({ initialData, profiles, allStats, onSave, onClose, o
           .select('period_date, value').eq('statistic_id', Number(form.source_stat_id)).order('period_date')
         if (srcVals?.length) {
           const computed = aggregateValues(srcVals, form.tracking, form.aggregation_method)
-          await supabase.from('statistic_values').insert(
-            computed.map(r => ({ statistic_id: savedId, period_date: r.period_date, value: r.value, entered_by: user?.id }))
-          )
+          if (computed.length) {
+            // Backdate beginning_date to the earliest computed value so the scrubber has full range
+            await supabase.from('statistics').update({ beginning_date: computed[0].period_date }).eq('id', savedId)
+            await supabase.from('statistic_values').insert(
+              computed.map(r => ({ statistic_id: savedId, period_date: r.period_date, value: r.value, entered_by: user?.id }))
+            )
+          }
         }
       }
       setSaving(false)
@@ -3965,6 +3969,11 @@ export default function Statistics() {
       computed.map(r => ({ statistic_id: stat.id, period_date: r.period_date, value: r.value })),
       { onConflict: 'statistic_id,period_date' }
     )
+    // Keep beginning_date at the earliest computed period so the scrubber works
+    const earliest = computed[0].period_date
+    if (!stat.beginning_date || stat.beginning_date > earliest) {
+      await supabase.from('statistics').update({ beginning_date: earliest }).eq('id', stat.id)
+    }
   }
 
   async function fetchValues(statId) {
