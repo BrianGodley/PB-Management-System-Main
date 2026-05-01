@@ -1592,7 +1592,7 @@ const SMS_PROVIDERS = [
 
 function SmsSettings() {
   const [config,        setConfig]        = useState(null)   // loaded from DB
-  const [activeKey,     setActiveKey]     = useState('twilio')
+  const [activeKey,     setActiveKey]     = useState('simpletexting')
   const [credentials,   setCredentials]   = useState({})     // { [providerKey]: { [field]: value } }
   const [testNumber,    setTestNumber]    = useState('')
   const [testMsg,       setTestMsg]       = useState('This is a test SMS from Picture Build System.')
@@ -1709,6 +1709,13 @@ function SmsSettings() {
               Open Dashboard ↗
             </a>
           </div>
+          {/* SimpleTexting-specific setup hint */}
+          {activeProvider.key === 'simpletexting' && (
+            <div className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 leading-relaxed">
+              Find your <strong>API Key</strong> in SimpleTexting → Settings → API (top right).
+              Your <strong>From Number</strong> is the 10-digit number on your account (e.g. <code>+15551234567</code>).
+            </div>
+          )}
           {activeProvider.fields.map(f => {
             const showKey = activeProvider.key + '_' + f.key
             const isSecret = f.type === 'password'
