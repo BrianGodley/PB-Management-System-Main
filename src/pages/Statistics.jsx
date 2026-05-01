@@ -152,53 +152,59 @@ const STAT_TYPE_PREVIEWS = {
     </svg>
   ),
   secondary: (
-    // Weekly line (many points) → arrow → Monthly line (fewer points)
-    <svg viewBox="0 0 110 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-      {/* "Weekly" label tag */}
-      <rect x="2" y="2" width="28" height="11" rx="3" fill="#f1f5f9" stroke="#94a3b8" strokeWidth="1"/>
-      <text x="16" y="10" textAnchor="middle" fontSize="6.5" fontWeight="700" fill="#475569" fontFamily="sans-serif">Weekly</text>
-      {/* Weekly line — dense, wiggly (many data points) */}
-      <path d="M2,50 C6,44 10,52 14,40 C18,32 22,48 26,36 C30,26 34,42 38,30 C40,24 42,32 44,22"
+    // Weekly line on top, down arrow, Monthly line below — stacked vertically
+    <svg viewBox="0 0 110 90" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+      {/* "Weekly" tag */}
+      <rect x="2" y="2" width="30" height="11" rx="3" fill="#f1f5f9" stroke="#94a3b8" strokeWidth="1"/>
+      <text x="17" y="10" textAnchor="middle" fontSize="6.5" fontWeight="700" fill="#475569" fontFamily="sans-serif">Weekly</text>
+      {/* Weekly line — dense, wiggly */}
+      <path d="M2,36 C8,30 14,38 20,28 C26,20 32,34 38,24 C44,16 50,28 56,18 C62,10 68,22 74,14 C84,8 96,12 108,6"
         stroke="#94a3b8" strokeWidth="1.8" strokeLinecap="round" fill="none"/>
-      <circle cx="2"  cy="50" r="1.5" fill="#94a3b8"/>
-      <circle cx="14" cy="40" r="1.5" fill="#94a3b8"/>
-      <circle cx="26" cy="36" r="1.5" fill="#94a3b8"/>
-      <circle cx="38" cy="30" r="1.5" fill="#94a3b8"/>
-      <circle cx="44" cy="22" r="1.5" fill="#94a3b8"/>
-      {/* Arrow */}
-      <path d="M48,36 L60,36" stroke="#6b7280" strokeWidth="1.8" strokeLinecap="round"/>
-      <path d="M56,31 L61,36 L56,41" stroke="#6b7280" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-      {/* "Monthly" label tag */}
-      <rect x="64" y="2" width="32" height="11" rx="3" fill="#dcfce7" stroke="#3A5038" strokeWidth="1"/>
-      <text x="80" y="10" textAnchor="middle" fontSize="6.5" fontWeight="700" fill="#3A5038" fontFamily="sans-serif">Monthly</text>
+      <circle cx="2"   cy="36" r="1.5" fill="#94a3b8"/>
+      <circle cx="20"  cy="28" r="1.5" fill="#94a3b8"/>
+      <circle cx="38"  cy="24" r="1.5" fill="#94a3b8"/>
+      <circle cx="56"  cy="18" r="1.5" fill="#94a3b8"/>
+      <circle cx="74"  cy="14" r="1.5" fill="#94a3b8"/>
+      <circle cx="108" cy="6"  r="1.5" fill="#94a3b8"/>
+      {/* Down arrow */}
+      <line x1="55" y1="42" x2="55" y2="52" stroke="#6b7280" strokeWidth="1.8" strokeLinecap="round"/>
+      <path d="M50,48 L55,53 L60,48" stroke="#6b7280" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      {/* "Monthly" tag */}
+      <rect x="2" y="57" width="34" height="11" rx="3" fill="#dcfce7" stroke="#3A5038" strokeWidth="1"/>
+      <text x="19" y="65" textAnchor="middle" fontSize="6.5" fontWeight="700" fill="#3A5038" fontFamily="sans-serif">Monthly</text>
       {/* Monthly line — smooth, fewer points */}
-      <path d="M64,54 C72,46 80,34 90,26 C98,20 104,16 108,12"
+      <path d="M2,86 C20,78 40,72 60,64 C78,58 92,56 108,52"
         stroke="#3A5038" strokeWidth="2.2" strokeLinecap="round" fill="none"/>
-      <circle cx="64"  cy="54" r="2" fill="#3A5038"/>
-      <circle cx="82"  cy="33" r="2" fill="#3A5038"/>
-      <circle cx="100" cy="20" r="2" fill="#3A5038"/>
-      <circle cx="108" cy="12" r="2" fill="#3A5038"/>
+      <circle cx="2"   cy="86" r="2" fill="#3A5038"/>
+      <circle cx="36"  cy="74" r="2" fill="#3A5038"/>
+      <circle cx="72"  cy="62" r="2" fill="#3A5038"/>
+      <circle cx="108" cy="52" r="2" fill="#3A5038"/>
     </svg>
   ),
   auto: (
-    // Database cylinder with data lines feeding into a rising line
-    <svg viewBox="0 0 110 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-      {/* DB cylinder */}
-      <ellipse cx="22" cy="14" rx="14" ry="5" fill="#e0f2fe" stroke="#0ea5e9" strokeWidth="1.5"/>
-      <rect x="8" y="14" width="28" height="22" fill="#e0f2fe" stroke="#0ea5e9" strokeWidth="1.5"/>
-      <ellipse cx="22" cy="36" rx="14" ry="5" fill="#bae6fd" stroke="#0ea5e9" strokeWidth="1.5"/>
-      {/* Horizontal data lines inside cylinder */}
-      <line x1="12" y1="22" x2="32" y2="22" stroke="#0ea5e9" strokeWidth="1" strokeOpacity="0.6"/>
-      <line x1="12" y1="28" x2="32" y2="28" stroke="#0ea5e9" strokeWidth="1" strokeOpacity="0.6"/>
-      {/* Arrow out */}
-      <path d="M36,26 L50,26 M46,22 L50,26 L46,30"
-        stroke="#0ea5e9" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-      {/* Auto-computed line */}
-      <path d="M54,50 C64,42 74,28 88,18 C96,13 100,10 106,7"
+    // Database cylinder on top, down arrow, computed line graph below
+    <svg viewBox="0 0 110 90" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+      {/* DB cylinder — centred at top */}
+      <ellipse cx="55" cy="10" rx="22" ry="7" fill="#e0f2fe" stroke="#0ea5e9" strokeWidth="1.5"/>
+      <rect x="33" y="10" width="44" height="22" fill="#e0f2fe" stroke="#0ea5e9" strokeWidth="1.5"/>
+      <ellipse cx="55" cy="32" rx="22" ry="7" fill="#bae6fd" stroke="#0ea5e9" strokeWidth="1.5"/>
+      {/* Data rows inside cylinder */}
+      <line x1="40" y1="18" x2="70" y2="18" stroke="#0ea5e9" strokeWidth="1.2" strokeOpacity="0.7"/>
+      <line x1="40" y1="24" x2="70" y2="24" stroke="#0ea5e9" strokeWidth="1.2" strokeOpacity="0.7"/>
+      {/* Down arrow */}
+      <line x1="55" y1="40" x2="55" y2="52" stroke="#0ea5e9" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M50,48 L55,54 L60,48" stroke="#0ea5e9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      {/* Computed line graph below */}
+      <path d="M4,86 C18,78 32,70 50,62 C66,55 82,54 106,46"
         stroke="#1e40af" strokeWidth="2.5" strokeLinecap="round"/>
-      <circle cx="54"  cy="50" r="2.5" fill="#1e40af"/>
-      <circle cx="88"  cy="18" r="2.5" fill="#1e40af"/>
-      <circle cx="106" cy="7"  r="2.5" fill="#1e40af"/>
+      <circle cx="4"   cy="86" r="2.5" fill="#1e40af"/>
+      <circle cx="32"  cy="70" r="2.5" fill="#1e40af"/>
+      <circle cx="60"  cy="60" r="2.5" fill="#1e40af"/>
+      <circle cx="88"  cy="52" r="2.5" fill="#1e40af"/>
+      <circle cx="106" cy="46" r="2.5" fill="#1e40af"/>
+      {/* Soft fill */}
+      <path d="M4,86 C18,78 32,70 50,62 C66,55 82,54 106,46 L106,90 L4,90 Z"
+        fill="#1e40af" fillOpacity="0.06"/>
     </svg>
   ),
   target: (
@@ -230,20 +236,29 @@ function TypeSelectorModal({ onSelect, onClose }) {
     { key: 'secondary',  label: 'Secondary Statistic', desc: 'Turn an existing stat into another permanent stat with longer periods.', available: true  },
     { key: 'auto',       label: 'Auto Statistic',      desc: 'Pull live data from jobs, bids, schedule, and more — auto-computed each period.',  available: true  },
   ]
+  // Preview container size per stat type (portrait ones need more height)
+  const previewSize = {
+    basic:     'w-32 h-20',
+    equation:  'w-32 h-20',
+    overlay:   'w-32 h-20',
+    secondary: 'w-28 h-28',
+    auto:      'w-28 h-28',
+  }
+
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden">
+        <div className="flex items-center justify-between px-7 py-4 border-b border-gray-100">
           <h2 className="text-lg font-semibold text-gray-900">New Statistic — Choose Type</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
         </div>
-        <div className="p-6 grid grid-cols-2 gap-4">
+        <div className="p-7 grid grid-cols-2 gap-5">
           {types.map(t => (
             <button
               key={t.key}
               disabled={!t.available}
               onClick={() => t.available && onSelect(t.key)}
-              className={`relative rounded-xl border-2 p-4 text-left transition-all overflow-hidden ${
+              className={`relative rounded-xl border-2 p-5 text-left transition-all overflow-hidden min-h-[100px] ${
                 t.available
                   ? 'border-gray-200 hover:border-green-600 hover:shadow-md cursor-pointer'
                   : 'border-gray-100 bg-gray-50 cursor-not-allowed opacity-60'
@@ -256,28 +271,28 @@ function TypeSelectorModal({ onSelect, onClose }) {
               )}
               {/* Mini chart preview — bottom-right background decoration */}
               {STAT_TYPE_PREVIEWS[t.key] && (
-                <div className="absolute bottom-0 right-0 w-24 h-14 opacity-[0.18] pointer-events-none select-none">
+                <div className={`absolute bottom-0 right-0 ${previewSize[t.key] || 'w-32 h-20'} opacity-[0.18] pointer-events-none select-none`}>
                   {STAT_TYPE_PREVIEWS[t.key]}
                 </div>
               )}
-              <div className="relative font-semibold text-gray-800 mb-1">{t.label}</div>
-              <div className="relative text-xs text-gray-500 leading-snug pr-14">{t.desc}</div>
+              <div className="relative font-semibold text-gray-800 mb-1.5 text-sm">{t.label}</div>
+              <div className="relative text-xs text-gray-500 leading-snug pr-16">{t.desc}</div>
             </button>
           ))}
         </div>
 
         {/* Target Statistic — full-width button below the grid */}
-        <div className="px-6 pb-6">
+        <div className="px-7 pb-7">
           <button
             onClick={() => onSelect('target')}
-            className="relative w-full rounded-xl border-2 border-green-600 p-4 text-left hover:shadow-md hover:bg-green-50 transition-all overflow-hidden"
+            className="relative w-full rounded-xl border-2 border-green-600 p-5 text-left hover:shadow-md hover:bg-green-50 transition-all overflow-hidden"
           >
             {/* Wide preview for full-width button */}
-            <div className="absolute bottom-0 right-0 w-48 h-12 opacity-[0.18] pointer-events-none select-none">
+            <div className="absolute bottom-0 right-0 w-56 h-14 opacity-[0.18] pointer-events-none select-none">
               {STAT_TYPE_PREVIEWS.target}
             </div>
-            <div className="relative font-semibold text-green-800 mb-1">🎯 Target Statistic</div>
-            <div className="relative text-xs text-gray-500 leading-snug pr-40">
+            <div className="relative font-semibold text-green-800 mb-1.5 text-sm">🎯 Target Statistic</div>
+            <div className="relative text-xs text-gray-500 leading-snug pr-48">
               Mirror an existing stat and overlay a custom target line showing your goal over time.
             </div>
           </button>
