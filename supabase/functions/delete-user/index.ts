@@ -51,6 +51,20 @@ serve(async (req) => {
     if (!userId)            return respond({ success: false, error: 'userId is required.' })
     if (userId === user.id) return respond({ success: false, error: 'You cannot delete your own account.' })
 
+    // ── Pre-delete: null out created_by on tables that reference auth.users(id)
+    // directly (without ON DELETE SET NULL). Belt-and-suspenders alongside the
+    // FK migration — handles any table we may have missed.
+    const tablesWithDirectAuthFK = [
+      'estimates',
+      'material_rates',
+      'labor_rates',
+      'subcontractor_rates',
+    ]
+    for (const table of tablesWithDirectAuthFK) {
+      await adminClient.from(table).update({ created_by: null }).eq('created_by', userId)
+    }
+
+    // ── Delete auth user (cascades to profiles → user_permissions, statistic_shares)
     const { error: deleteErr } = await adminClient.auth.admin.deleteUser(userId)
     if (deleteErr) return respond({ success: false, error: deleteErr.message })
 
