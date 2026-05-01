@@ -4,9 +4,16 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import ReviewModal from '../components/hr/ReviewModal'
 import { sendSMS } from '../lib/notify'
+
+function generatePassword(len = 12) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%'
+  return Array.from(crypto.getRandomValues(new Uint8Array(len)))
+    .map(b => chars[b % chars.length]).join('')
+}
 
 const DEPARTMENTS = ['Operations', 'Landscaping', 'Pool', 'Admin', 'Sales', 'Other']
 const LANGUAGES   = [
@@ -137,6 +144,14 @@ export default function EmployeeDetail() {
   const [resetTextSending, setResetTextSending] = useState(false)
   const [smsMsg,           setSmsMsg]           = useState('')
 
+  // Create system account state (used when no linkedProfile)
+  const [createEmail,    setCreateEmail]    = useState('')
+  const [createPassword, setCreatePassword] = useState(() => generatePassword())
+  const [createRole,     setCreateRole]     = useState('user')
+  const [showCreatePw,   setShowCreatePw]   = useState(false)
+  const [creating,       setCreating]       = useState(false)
+  const [createError,    setCreateError]    = useState('')
+
   // Permissions tab state
   const [perms,         setPerms]         = useState(DEFAULT_PERMS)
   const [loadingPerms,  setLoadingPerms]  = useState(true)
@@ -147,11 +162,6 @@ export default function EmployeeDetail() {
   const avatarInputRef = useRef()
 
   // ── Password / SMS helpers (same as Admin UserEditModal) ──────────────────
-  function generatePassword() {
-    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$'
-    return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
-  }
-
   function formatPhone(raw) {
     const digits = (raw || '').replace(/\D/g, '')
     if (digits.length === 10) return '+1' + digits
@@ -169,6 +179,65 @@ export default function EmployeeDetail() {
       `Log in at: ${window.location.origin}/login\n\n` +
       `For your security, please update your password after logging in.`
     )
+  }
+
+  // ── Create a new system account for an employee who doesn't have one ────────
+  async function createSystemAccount() {
+    const email = createEmail.trim().toLowerCase()
+    if (!email) { setCreateError('Email is required.'); return }
+    if (!createPassword) { setCreateError('Password is required.'); return }
+
+    setCreating(true)
+    setCreateError('')
+    try {
+      // Use a temp client so the current admin session is not replaced
+      const tempClient = createClient(
+        import.meta.env.VITE_SUPABASE_URL,
+        import.meta.env.VITE_SUPABASE_ANON_KEY,
+        { auth: { storageKey: 'admin-emp-create-tmp', persistSession: false } }
+      )
+
+      const { data, error: signUpErr } = await tempClient.auth.signUp({
+        email,
+        password: createPassword,
+        options:  { data: { full_name: `${employee.first_name} ${employee.last_name}` }, emailRedirectTo: null },
+      })
+
+      if (signUpErr) {
+        if (signUpErr.message?.includes('already registered') || signUpErr.message?.includes('already been registered')) {
+          setCreateError('That email address already has a system account.')
+        } else {
+          setCreateError(signUpErr.message || 'Failed to create account.')
+        }
+        setCreating(false)
+        return
+      }
+      if (!data?.user) { setCreateError('Account creation returned no data.'); setCreating(false); return }
+
+      const newUserId = data.user.id
+
+      // Wait for the DB trigger to create the profile row
+      await new Promise(r => setTimeout(r, 1200))
+
+      // Upsert profile with correct name/role and store temp password
+      await supabase.from('profiles').upsert({
+        id:            newUserId,
+        email,
+        full_name:     `${employee.first_name} ${employee.last_name}`,
+        role:          createRole,
+        temp_password: createPassword,
+      }, { onConflict: 'id' })
+
+      // Link employee row to the new auth user
+      await supabase.from('employees').update({ user_id: newUserId }).eq('id', employee.id)
+
+      // Reload the linked profile so the tab switches to the full account view
+      const { data: prof } = await supabase.from('profiles').select('*').eq('id', newUserId).single()
+      if (prof) { setLinkedProfile(prof); setUserRole(prof.role || 'user') }
+    } catch (e) {
+      setCreateError(e.message || 'Unexpected error.')
+    }
+    setCreating(false)
   }
 
   async function sendPasswordReset() {
@@ -246,6 +315,7 @@ export default function EmployeeDetail() {
     ])
     setEmployee(emp)
     setDraft(emp || {})
+    if (emp?.email) setCreateEmail(emp.email)
     setDocs(docsData || [])
     setCerts(certsData || [])
     setTraining(trainingData || [])
@@ -720,9 +790,105 @@ export default function EmployeeDetail() {
 
               </div>
             ) : (
-              <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-                <p className="text-gray-600 mb-3">No system account linked</p>
-                <p className="text-sm text-gray-500">This employee can be added to the system from the Admin panel.</p>
+              <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+                <div>
+                  <h3 className="font-semibold text-gray-800">Create System Account</h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    This employee doesn't have a login yet. Fill in the details below to create one.
+                  </p>
+                </div>
+
+                {createError && (
+                  <div className="text-sm px-3 py-2.5 rounded-lg border bg-red-50 border-red-200 text-red-700">
+                    ⚠️ {createError}
+                  </div>
+                )}
+
+                {/* Email */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 uppercase mb-1.5">Email Address</label>
+                  <input
+                    type="email"
+                    value={createEmail}
+                    onChange={e => setCreateEmail(e.target.value)}
+                    placeholder={employee?.email || 'employee@example.com'}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                  />
+                  {employee?.email && createEmail === '' && (
+                    <button
+                      onClick={() => setCreateEmail(employee.email)}
+                      className="mt-1 text-xs text-blue-600 hover:underline"
+                    >
+                      Use {employee.email}
+                    </button>
+                  )}
+                </div>
+
+                {/* Password */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 uppercase mb-1.5">Initial Password</label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        type={showCreatePw ? 'text' : 'password'}
+                        value={createPassword}
+                        onChange={e => setCreatePassword(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-600 pr-10"
+                      />
+                      <button
+                        onClick={() => setShowCreatePw(v => !v)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-xs"
+                      >
+                        {showCreatePw ? 'Hide' : 'Show'}
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => setCreatePassword(generatePassword())}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-600 hover:bg-gray-50"
+                      title="Generate new password"
+                    >
+                      🔄
+                    </button>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(createPassword)}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-xs text-gray-600 hover:bg-gray-50"
+                      title="Copy to clipboard"
+                    >
+                      📋
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    This password will be stored so you can text it to the employee later.
+                  </p>
+                </div>
+
+                {/* Role */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 uppercase mb-2">Role</label>
+                  <div className="flex gap-4">
+                    {['user', 'admin'].map(r => (
+                      <label key={r} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                          type="radio"
+                          name="create-role"
+                          checked={createRole === r}
+                          onChange={() => setCreateRole(r)}
+                          className="accent-green-700"
+                        />
+                        {r === 'admin' ? '🛡️ Admin' : '👤 User'}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  onClick={createSystemAccount}
+                  disabled={creating}
+                  className="w-full py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2"
+                  style={{ backgroundColor: '#3A5038' }}
+                >
+                  {creating ? '⏳ Creating account…' : '✅ Create System Account'}
+                </button>
               </div>
             )}
           </div>
