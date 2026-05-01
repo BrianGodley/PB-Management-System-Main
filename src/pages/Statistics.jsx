@@ -5982,7 +5982,7 @@ export default function Statistics() {
                             return (
                               <Cell
                                 key={`cell-${index}`}
-                                fill={isDown ? '#DC2626' : FG}
+                                fill={isDown ? '#DC2626' : '#111827'}
                                 fillOpacity={entry.value == null ? 0.2 : 0.85}
                               />
                             )

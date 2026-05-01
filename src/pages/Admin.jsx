@@ -65,8 +65,11 @@ const DEFAULT_PERMS = {
   access_master_rates: false, access_admin: false,
 }
 
-function UserEditModal({ profile, currentUserId, onClose, onSaved }) {
+function UserEditModal({ profile, currentUserId, currentUserRole, onClose, onSaved }) {
   const [tab, setTab] = useState('profile')
+
+  const callerIsAdmin      = currentUserRole === 'admin' || currentUserRole === 'super_admin'
+  const callerIsSuperAdmin = currentUserRole === 'super_admin'
 
   // ── Profile state ──────────────────────────────────────────────────────────
   const [form, setForm] = useState({
@@ -277,19 +280,24 @@ function UserEditModal({ profile, currentUserId, onClose, onSaved }) {
 
         {/* Tabs */}
         <div className="flex border-b border-gray-200 px-6 flex-shrink-0">
-          {['profile', 'permissions', 'danger'].map(t => (
+          {[
+            { key: 'profile',     label: '👤 Profile' },
+            { key: 'permissions', label: '🔐 Permissions' },
+            ...(callerIsAdmin ? [{ key: 'account', label: '🔑 User Account' }] : []),
+            ...(callerIsAdmin ? [{ key: 'danger',  label: '⚠️ Danger' }] : []),
+          ].map(t => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
+              key={t.key}
+              onClick={() => setTab(t.key)}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                tab === t && t !== 'danger'
+                tab === t.key && t.key !== 'danger'
                   ? 'border-green-700 text-green-800'
-                  : tab === t && t === 'danger'
+                  : tab === t.key && t.key === 'danger'
                   ? 'border-red-500 text-red-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              {t === 'profile' ? '👤 Profile' : t === 'permissions' ? '🔐 Permissions' : '⚠️ Danger'}
+              {t.label}
             </button>
           ))}
         </div>
@@ -332,18 +340,30 @@ function UserEditModal({ profile, currentUserId, onClose, onSaved }) {
               {/* Role */}
               <div>
                 <label className={labelCls}>Role</label>
-                <div className="flex gap-4">
-                  {['user', 'admin'].map(r => (
-                    <label key={r} className={`flex items-center gap-2 text-sm cursor-pointer ${isMe && r !== form.role ? 'opacity-50' : ''}`}>
-                      <input type="radio" name="edit-role" checked={form.role === r}
-                        onChange={() => !isMe && set('role', r)}
-                        disabled={isMe}
-                        className="accent-green-700" />
-                      {r === 'admin' ? '🛡️ Admin' : '👤 User'}
-                    </label>
-                  ))}
-                </div>
-                {isMe && <p className="text-xs text-gray-400 mt-1">You cannot change your own role.</p>}
+                {callerIsSuperAdmin && !isMe ? (
+                  <div className="flex gap-4 flex-wrap">
+                    {['user', 'admin', 'super_admin'].map(r => (
+                      <label key={r} className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input type="radio" name="edit-role" checked={form.role === r}
+                          onChange={() => set('role', r)}
+                          className="accent-green-700" />
+                        {r === 'super_admin' ? '👑 Super Admin' : r === 'admin' ? '🛡️ Admin' : '👤 User'}
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+                      form.role === 'super_admin' ? 'bg-purple-100 text-purple-800' :
+                      form.role === 'admin' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {form.role === 'super_admin' ? '👑 Super Admin' : form.role === 'admin' ? '🛡️ Admin' : '👤 User'}
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      {isMe ? 'You cannot change your own role.' : 'Only the super admin can change roles.'}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Phone */}
@@ -381,64 +401,15 @@ function UserEditModal({ profile, currentUserId, onClose, onSaved }) {
                 style={{ backgroundColor: FG }}>
                 {savingProfile ? 'Saving…' : 'Save Profile'}
               </button>
-
-              {/* Password Reset */}
-              <div className="border-t border-gray-100 pt-4">
-                <label className={labelCls}>Password Reset</label>
-                <p className="text-xs text-gray-500 mb-3">
-                  Send a password reset link to <strong>{form.email || profile.email}</strong>.
-                  The user clicks the link to set a new password.
-                </p>
-                {resetMsg && <div className="mb-2"><Msg msg={resetMsg} /></div>}
-                <button onClick={sendPasswordReset} disabled={resetSending}
-                  className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50">
-                  {resetSending ? 'Sending…' : '📧 Send Password Reset Email'}
-                </button>
-              </div>
-
-              {/* ── Text Password via Sam ─────────────────────────────── */}
-              <div className="border-t border-gray-100 pt-4">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <span className="text-base">🤖</span>
-                  <label className={labelCls} style={{ margin: 0 }}>Text Password via Sam</label>
-                </div>
-                <p className="text-xs text-gray-500 mb-3">
-                  Sam, the AI assistant, will text the user their credentials via SMS.
-                  {!(form.phone_cell || profile.phone_cell) && (
-                    <span className="text-amber-600 font-medium"> No cell phone number on file — add one in the profile above.</span>
-                  )}
-                </p>
-                {smsMsg && <div className="mb-3"><Msg msg={smsMsg} /></div>}
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={sendPasswordViaSMS}
-                    disabled={smsSending || !(form.phone_cell || profile.phone_cell)}
-                    className="px-4 py-2 rounded-lg border border-blue-200 text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-40"
-                  >
-                    {smsSending ? 'Sending…' : '📱 Text Current Password'}
-                  </button>
-                  <button
-                    onClick={resetAndTextPassword}
-                    disabled={resetTextSending || !(form.phone_cell || profile.phone_cell)}
-                    className="px-4 py-2 rounded-lg border border-green-200 text-sm font-medium text-green-700 hover:bg-green-50 disabled:opacity-40"
-                  >
-                    {resetTextSending ? 'Resetting…' : '🔄 Reset & Text New Password'}
-                  </button>
-                </div>
-                <p className="text-xs text-gray-400 mt-2">
-                  "Text Current Password" sends the last admin-set password.
-                  "Reset & Text" generates a new password, resets their account, and texts it.
-                </p>
-              </div>
             </div>
           )}
 
           {/* ── PERMISSIONS TAB ─────────────────────────────────────────── */}
           {tab === 'permissions' && (
             <div className="p-6 space-y-5">
-              {profile.role === 'admin' && (
-                <div className="bg-green-50 border border-green-200 text-green-800 text-sm px-4 py-3 rounded-xl">
-                  🛡️ This user is an <strong>Admin</strong> — they have full access to everything regardless of these settings.
+              {(profile.role === 'admin' || profile.role === 'super_admin') && (
+                <div className={`border text-sm px-4 py-3 rounded-xl ${profile.role === 'super_admin' ? 'bg-purple-50 border-purple-200 text-purple-800' : 'bg-green-50 border-green-200 text-green-800'}`}>
+                  {profile.role === 'super_admin' ? '👑' : '🛡️'} This user is a <strong>{profile.role === 'super_admin' ? 'Super Admin' : 'Admin'}</strong> — they have full access to everything regardless of these settings.
                 </div>
               )}
 
@@ -481,11 +452,67 @@ function UserEditModal({ profile, currentUserId, onClose, onSaved }) {
             </div>
           )}
 
+          {/* ── ACCOUNT TAB ─────────────────────────────────────────────── */}
+          {tab === 'account' && (
+            <div className="p-6 space-y-4">
+
+              {/* Password Reset */}
+              <div>
+                <label className={labelCls}>Password Reset</label>
+                <p className="text-xs text-gray-500 mb-3">
+                  Send a password reset link to <strong>{form.email || profile.email}</strong>.
+                  The user clicks the link to set a new password.
+                </p>
+                {resetMsg && <div className="mb-2"><Msg msg={resetMsg} /></div>}
+                <button onClick={sendPasswordReset} disabled={resetSending}
+                  className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                  {resetSending ? 'Sending…' : '📧 Send Password Reset Email'}
+                </button>
+              </div>
+
+              {/* Text Password via Sam */}
+              <div className="border-t border-gray-100 pt-4">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="text-base">🤖</span>
+                  <label className={labelCls} style={{ margin: 0 }}>Text Password via Sam</label>
+                </div>
+                <p className="text-xs text-gray-500 mb-3">
+                  Sam, the AI assistant, will text the user their credentials via SMS.
+                  {!(form.phone_cell || profile.phone_cell) && (
+                    <span className="text-amber-600 font-medium"> No cell phone number on file — add one in the Profile tab.</span>
+                  )}
+                </p>
+                {smsMsg && <div className="mb-3"><Msg msg={smsMsg} /></div>}
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={sendPasswordViaSMS}
+                    disabled={smsSending || !(form.phone_cell || profile.phone_cell)}
+                    className="px-4 py-2 rounded-lg border border-blue-200 text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-40"
+                  >
+                    {smsSending ? 'Sending…' : '📱 Text Current Password'}
+                  </button>
+                  <button
+                    onClick={resetAndTextPassword}
+                    disabled={resetTextSending || !(form.phone_cell || profile.phone_cell)}
+                    className="px-4 py-2 rounded-lg border border-green-200 text-sm font-medium text-green-700 hover:bg-green-50 disabled:opacity-40"
+                  >
+                    {resetTextSending ? 'Resetting…' : '🔄 Reset & Text New Password'}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mt-2">
+                  "Text Current Password" sends the last admin-set password.
+                  "Reset & Text" generates a new password, resets their account, and texts it.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* ── DANGER ZONE TAB ─────────────────────────────────────────── */}
           {tab === 'danger' && (
             <DangerZone
               profile={profile}
               currentUserId={currentUserId}
+              currentUserRole={currentUserRole}
               onClose={onClose}
               onSaved={onSaved}
             />
@@ -497,9 +524,12 @@ function UserEditModal({ profile, currentUserId, onClose, onSaved }) {
 }
 
 // ── DangerZone (used inside UserEditModal) ────────────────────────────────────
-function DangerZone({ profile, currentUserId, onClose, onSaved }) {
-  const isMe        = profile.id === currentUserId
-  const isArchived  = !!profile.archived_at
+function DangerZone({ profile, currentUserId, currentUserRole, onClose, onSaved }) {
+  const isMe             = profile.id === currentUserId
+  const isArchived       = !!profile.archived_at
+  const targetIsPriv     = profile.role === 'admin' || profile.role === 'super_admin'
+  const callerIsSuperAdmin = currentUserRole === 'super_admin'
+  const canDelete        = !isMe && (!targetIsPriv || callerIsSuperAdmin)
 
   const [archiving, setArchiving] = useState(false)
   const [deleting,  setDeleting]  = useState(false)
@@ -583,11 +613,16 @@ function DangerZone({ profile, currentUserId, onClose, onSaved }) {
           <strong> This cannot be undone.</strong>
         </p>
 
-        {!confirmDelete ? (
+        {!canDelete ? (
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm px-3 py-2.5 rounded-lg">
+            {isMe
+              ? '⚠️ You cannot delete your own account.'
+              : '🔒 Only the super admin can delete admin or super admin accounts.'}
+          </div>
+        ) : !confirmDelete ? (
           <button
             onClick={() => setConfirmDelete(true)}
-            disabled={isMe}
-            className="px-4 py-2 rounded-lg border border-red-300 text-sm font-medium text-red-700 hover:bg-red-100 disabled:opacity-40"
+            className="px-4 py-2 rounded-lg border border-red-300 text-sm font-medium text-red-700 hover:bg-red-100"
           >
             Delete User…
           </button>
@@ -2125,36 +2160,17 @@ export default function Admin() {
   const [counts,  setCounts]  = useState({ jobs: 0, clients: 0, bids: 0, collections: 0, statistics: 0 })
   const [loadingOverview, setLoadingOverview] = useState(true)
 
-  // ── Users state ────────────────────────────────────────────────────────────
-  const [profiles,     setProfiles]     = useState([])
-  const [loadingUsers, setLoadingUsers] = useState(false)
-  const [savingId,     setSavingId]     = useState(null)   // profile id being saved
-  const [editName,     setEditName]     = useState({})     // { [id]: string }
-  const [editUsername, setEditUsername] = useState({})     // { [id]: string }
-  const [msg,          setMsg]          = useState('')      // success/error flash
-
-  const [currentUserIsAdmin, setCurrentUserIsAdmin] = useState(false)
-  const [showAddUser,        setShowAddUser]        = useState(false)
-  const [editingUser,        setEditingUser]        = useState(null)  // profile object
+  const [currentUserRole, setCurrentUserRole] = useState('user')
 
   // ── Fetch on mount ─────────────────────────────────────────────────────────
   useEffect(() => { fetchOverview() }, [])
-  useEffect(() => { if (tab === 'users') fetchUsers() }, [tab])
 
-  // Check current user's admin status on mount — don't wait for the users tab to load profiles
+  // Track current user's full role
   useEffect(() => {
     if (!user?.id) return
     supabase.from('profiles').select('role').eq('id', user.id).single()
-      .then(({ data }) => { if (data) setCurrentUserIsAdmin(data.role === 'admin') })
+      .then(({ data }) => { if (data) setCurrentUserRole(data.role || 'user') })
   }, [user?.id])
-
-  // Also keep in sync if profiles list gets loaded (e.g. from Users tab)
-  useEffect(() => {
-    if (user?.id && profiles.length) {
-      const me = profiles.find(p => p.id === user.id)
-      if (me) setCurrentUserIsAdmin(me.role === 'admin')
-    }
-  }, [profiles, user])
 
   async function fetchOverview() {
     setLoadingOverview(true)
@@ -2175,99 +2191,15 @@ export default function Admin() {
     setLoadingOverview(false)
   }
 
-  async function fetchUsers() {
-    setLoadingUsers(true)
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('created_at')
-    if (!error) {
-      setProfiles(data || [])
-      const names = {}; const usernames = {}
-      data?.forEach(p => { names[p.id] = p.full_name || ''; usernames[p.id] = p.username || '' })
-      setEditName(names)
-      setEditUsername(usernames)
-    }
-    setLoadingUsers(false)
-  }
-
-  async function saveRole(profileId, newRole) {
-    setSavingId(profileId)
-    setMsg('')
-    const { error } = await supabase
-      .from('profiles')
-      .update({ role: newRole })
-      .eq('id', profileId)
-    if (error) {
-      setMsg('❌ ' + error.message)
-    } else {
-      setMsg('✅ Role updated.')
-      await fetchUsers()
-    }
-    setSavingId(null)
-    setTimeout(() => setMsg(''), 3000)
-  }
-
-  async function saveName(profileId) {
-    setSavingId(profileId)
-    setMsg('')
-    const { error } = await supabase
-      .from('profiles')
-      .update({ full_name: editName[profileId] })
-      .eq('id', profileId)
-    if (error) {
-      setMsg('❌ ' + error.message)
-    } else {
-      setMsg('✅ Name updated.')
-      await fetchUsers()
-    }
-    setSavingId(null)
-    setTimeout(() => setMsg(''), 3000)
-  }
-
-  async function saveUsername(profileId) {
-    setSavingId(profileId)
-    setMsg('')
-    const newUsername = (editUsername[profileId] || '').toLowerCase().trim().replace(/\s+/g, '.')
-    if (!newUsername) { setMsg('❌ Username cannot be empty.'); setSavingId(null); return }
-
-    // Use the set_username RPC if saving own profile, otherwise direct update for admin
-    const targetProfile = profiles.find(p => p.id === profileId)
-    const isOwn = profileId === user?.id
-
-    let error
-    if (isOwn) {
-      const { data: result, error: rpcErr } = await supabase.rpc('set_username', { p_username: newUsername })
-      error = rpcErr
-      if (!rpcErr && result === 'taken') {
-        setMsg('❌ That username is already taken.')
-        setSavingId(null)
-        setTimeout(() => setMsg(''), 3000)
-        return
-      }
-    } else {
-      // Admin updating another user's username directly
-      ;({ error } = await supabase.from('profiles').update({ username: newUsername }).eq('id', profileId))
-    }
-
-    if (error) {
-      setMsg('❌ ' + (error.message.includes('unique') ? 'That username is already taken.' : error.message))
-    } else {
-      setMsg('✅ Username updated.')
-      await fetchUsers()
-    }
-    setSavingId(null)
-    setTimeout(() => setMsg(''), 3000)
-  }
-
   // ── Tabs ───────────────────────────────────────────────────────────────────
+  const currentUserIsAdmin = currentUserRole === 'admin' || currentUserRole === 'super_admin'
+
   const tabs = [
-    { key: 'overview',  label: 'Overview' },
-    { key: 'users',     label: 'Users & Roles' },
-    { key: 'settings',  label: 'Company Settings' },
-    { key: 'sms',          label: '📱 SMS Settings' },
-    { key: 'email',        label: '✉️ Email Settings' },
-    { key: 'integrations', label: '🔗 Integrations' },
+    { key: 'overview',      label: 'Overview' },
+    { key: 'settings',      label: 'Company Settings' },
+    { key: 'sms',           label: '📱 SMS Settings' },
+    { key: 'email',         label: '✉️ Email Settings' },
+    { key: 'integrations',  label: '🔗 Integrations' },
   ]
 
   const statCards = [
@@ -2356,144 +2288,6 @@ export default function Admin() {
               </div>
             </>
           )
-      )}
-
-      {/* ── USERS TAB ─────────────────────────────────────────────────────── */}
-      {tab === 'users' && (
-        <>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-base font-semibold text-gray-900">Users & Roles</h2>
-              <p className="text-sm text-gray-500 mt-0.5">
-                {currentUserIsAdmin
-                  ? 'You have admin access — you can add users, update names and roles.'
-                  : 'Only admins can manage users. Contact your admin for access changes.'}
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-400">{profiles.length} user{profiles.length !== 1 ? 's' : ''}</span>
-              {currentUserIsAdmin && (
-                <button
-                  onClick={() => setShowAddUser(true)}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white"
-                  style={{ backgroundColor: FG }}
-                >
-                  + Add User
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Flash message */}
-          {msg && (
-            <div className={`mb-4 px-4 py-2.5 rounded-lg text-sm font-medium ${
-              msg.startsWith('✅') ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
-            }`}>
-              {msg}
-            </div>
-          )}
-
-          {loadingUsers ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700"></div>
-            </div>
-          ) : (
-            <div className="card p-0 overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="text-left px-5 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Name</th>
-                    <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Username</th>
-                    <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Email</th>
-                    <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Role</th>
-                    <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Joined</th>
-                    <th className="px-4 py-3"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {profiles.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="px-5 py-10 text-center text-gray-400">No users found</td>
-                    </tr>
-                  )}
-                  {profiles.map(p => {
-                    const isMe = p.id === user?.id
-                    return (
-                      <tr
-                        key={p.id}
-                        onClick={() => currentUserIsAdmin && setEditingUser(p)}
-                        className={`border-b border-gray-50 last:border-0 transition-colors ${
-                          currentUserIsAdmin ? 'cursor-pointer hover:bg-green-50/40' : ''
-                        } ${isMe ? 'bg-green-50/30' : ''}`}
-                      >
-                        {/* Name */}
-                        <td className="px-5 py-3">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
-                                 style={{ backgroundColor: FG }}>
-                              {(p.full_name || p.email || '?')[0].toUpperCase()}
-                            </div>
-                            <div>
-                              <div className="font-medium text-gray-900 text-sm leading-tight">
-                                {p.full_name || <span className="text-gray-400 italic">No name</span>}
-                              </div>
-                              {isMe && <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full font-medium">You</span>}
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Username */}
-                        <td className="px-4 py-3">
-                          <span className="font-mono text-sm text-gray-600">
-                            {p.username ? '@' + p.username : <span className="text-gray-400 italic text-xs">not set</span>}
-                          </span>
-                        </td>
-
-                        {/* Email */}
-                        <td className="px-4 py-3 text-gray-600 text-sm">{p.email}</td>
-
-                        {/* Role */}
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                            p.role === 'admin' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
-                          }`}>
-                            {p.role === 'admin' ? '🛡️ Admin' : '👤 User'}
-                          </span>
-                        </td>
-
-                        {/* Joined */}
-                        <td className="px-4 py-3 text-gray-400 text-xs">
-                          {p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
-                        </td>
-
-                        {/* Edit chevron */}
-                        <td className="px-4 py-3 text-right text-gray-300 text-sm">
-                          {currentUserIsAdmin ? '›' : ''}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Modals */}
-          {showAddUser && (
-            <AddUserModal
-              onClose={() => setShowAddUser(false)}
-              onCreated={() => { fetchUsers(); setShowAddUser(false) }}
-            />
-          )}
-          {editingUser && (
-            <UserEditModal
-              profile={editingUser}
-              currentUserId={user?.id}
-              onClose={() => setEditingUser(null)}
-              onSaved={() => { fetchUsers(); setEditingUser(null) }}
-            />
-          )}
-        </>
       )}
 
       {/* ── SETTINGS TAB ──────────────────────────────────────────────────── */}

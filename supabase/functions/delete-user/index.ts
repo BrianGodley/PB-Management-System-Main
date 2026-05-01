@@ -43,13 +43,31 @@ serve(async (req) => {
       .eq('id', user.id)
       .single()
 
-    if (callerProfile?.role !== 'admin') {
+    const callerRole = callerProfile?.role ?? 'user'
+    const callerIsAdmin      = callerRole === 'admin' || callerRole === 'super_admin'
+    const callerIsSuperAdmin = callerRole === 'super_admin'
+
+    if (!callerIsAdmin) {
       return respond({ success: false, error: 'Admin access required.' })
     }
 
     const { userId } = await req.json()
     if (!userId)            return respond({ success: false, error: 'userId is required.' })
     if (userId === user.id) return respond({ success: false, error: 'You cannot delete your own account.' })
+
+    // Check target user's role before allowing deletion
+    const { data: targetProfile } = await adminClient
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .single()
+
+    const targetRole   = targetProfile?.role ?? 'user'
+    const targetIsPriv = targetRole === 'admin' || targetRole === 'super_admin'
+
+    if (targetIsPriv && !callerIsSuperAdmin) {
+      return respond({ success: false, error: 'Only the super admin can delete admin accounts.' })
+    }
 
     // ── Pre-delete: null out created_by on tables that reference auth.users(id)
     // directly (without ON DELETE SET NULL). Belt-and-suspenders alongside the
