@@ -4179,6 +4179,304 @@ function ImportExportView({ stats, user, onImported }) {
   )
 }
 
+// ── StatGroups ────────────────────────────────────────────────────────────────
+function StatGroups({ stats }) {
+  const activeStats = (stats || []).filter(s => !s.archived)
+
+  const [groups,      setGroups]      = useState([])
+  const [loading,     setLoading]     = useState(true)
+  const [expandedId,  setExpandedId]  = useState(null)   // null | id | 'new'
+  const [editName,    setEditName]    = useState('')
+  const [editIds,     setEditIds]     = useState([])      // bigint ids as numbers
+  const [saving,      setSaving]      = useState(false)
+  const [deleting,    setDeleting]    = useState(null)
+  const [msg,         setMsg]         = useState(null)
+  const [search,      setSearch]      = useState('')
+
+  useEffect(() => { loadGroups() }, [])
+
+  async function loadGroups() {
+    setLoading(true)
+    const { data } = await supabase
+      .from('stat_groups')
+      .select('*')
+      .order('sort_order')
+      .order('name')
+    setGroups(data || [])
+    setLoading(false)
+  }
+
+  function openNew() {
+    setExpandedId('new')
+    setEditName('')
+    setEditIds([])
+    setMsg(null)
+  }
+
+  function openEdit(g) {
+    setExpandedId(g.id)
+    setEditName(g.name)
+    setEditIds((g.stat_ids || []).map(Number))
+    setMsg(null)
+  }
+
+  function cancelEdit() {
+    setExpandedId(null)
+    setMsg(null)
+  }
+
+  function toggleStat(id) {
+    setEditIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    )
+  }
+
+  async function save() {
+    if (!editName.trim()) { setMsg({ type: 'error', text: 'Group name is required.' }); return }
+    setSaving(true); setMsg(null)
+
+    if (expandedId === 'new') {
+      const { data: row } = await supabase.from('company_settings').select('id').single()
+      const { error } = await supabase.from('stat_groups').insert({
+        name:      editName.trim(),
+        stat_ids:  editIds,
+        sort_order: groups.length,
+      })
+      if (error) {
+        setMsg({ type: 'error', text: error.message })
+      } else {
+        setMsg({ type: 'success', text: 'Group created.' })
+        await loadGroups()
+        setExpandedId(null)
+      }
+    } else {
+      const { error } = await supabase.from('stat_groups')
+        .update({ name: editName.trim(), stat_ids: editIds })
+        .eq('id', expandedId)
+      if (error) {
+        setMsg({ type: 'error', text: error.message })
+      } else {
+        setMsg({ type: 'success', text: 'Group saved.' })
+        await loadGroups()
+        setExpandedId(null)
+      }
+    }
+    setSaving(false)
+  }
+
+  async function deleteGroup(id) {
+    if (!confirm('Delete this stat group? The statistics themselves will not be affected.')) return
+    setDeleting(id)
+    await supabase.from('stat_groups').delete().eq('id', id)
+    setDeleting(null)
+    if (expandedId === id) setExpandedId(null)
+    await loadGroups()
+  }
+
+  const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600'
+
+  const filteredStats = activeStats.filter(s =>
+    !search || s.name.toLowerCase().includes(search.toLowerCase())
+  )
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="font-semibold text-gray-800">Stat Groups</h3>
+          <p className="text-xs text-gray-400 mt-0.5">Create named groups to organize your statistics.</p>
+        </div>
+        {expandedId !== 'new' && (
+          <button
+            onClick={openNew}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold text-white"
+            style={{ backgroundColor: FG }}
+          >
+            + New Group
+          </button>
+        )}
+      </div>
+
+      {msg && (
+        <div className={`text-sm mb-4 rounded-lg px-3 py-2.5 ${
+          msg.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
+        }`}>
+          {msg.text}
+        </div>
+      )}
+
+      {/* New group form */}
+      {expandedId === 'new' && (
+        <div className="card mb-4 border-green-200 bg-green-50/30">
+          <h4 className="text-sm font-semibold text-gray-800 mb-3">New Group</h4>
+          <div className="mb-3">
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Group Name</label>
+            <input
+              className={inputCls}
+              value={editName}
+              onChange={e => setEditName(e.target.value)}
+              placeholder="e.g. Financial, Operations, Safety…"
+              autoFocus
+            />
+          </div>
+          <div className="mb-4">
+            <label className="block text-xs font-semibold text-gray-600 mb-2">
+              Statistics in this group <span className="text-gray-400 font-normal">({editIds.length} selected)</span>
+            </label>
+            <input
+              type="text"
+              placeholder="Filter stats…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 w-full mb-2"
+            />
+            <div className="border border-gray-200 rounded-lg bg-white max-h-52 overflow-y-auto divide-y divide-gray-50">
+              {filteredStats.length === 0 ? (
+                <p className="px-3 py-3 text-sm text-gray-400 text-center">No stats match.</p>
+              ) : filteredStats.map(s => (
+                <label key={s.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50">
+                  <input
+                    type="checkbox"
+                    checked={editIds.includes(Number(s.id))}
+                    onChange={() => toggleStat(Number(s.id))}
+                    className="w-4 h-4 rounded accent-green-700 flex-shrink-0"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium text-gray-800 truncate">{s.name}</div>
+                    <div className="text-xs text-gray-400 capitalize">{s.tracking} · {s.stat_type}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={save} disabled={saving}
+              className="px-4 py-2 rounded-lg text-sm font-bold text-white disabled:opacity-50"
+              style={{ backgroundColor: FG }}>
+              {saving ? 'Saving…' : 'Create Group'}
+            </button>
+            <button onClick={cancelEdit}
+              className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-600 hover:bg-gray-50">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Groups list */}
+      {loading ? (
+        <div className="flex justify-center py-10">
+          <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-green-700"></div>
+        </div>
+      ) : groups.length === 0 && expandedId !== 'new' ? (
+        <div className="card text-center py-10">
+          <div className="text-3xl mb-2">📂</div>
+          <p className="text-sm text-gray-500">No groups yet — click <strong>+ New Group</strong> to create one.</p>
+        </div>
+      ) : (
+        <div className="card p-0 overflow-hidden">
+          {groups.map((g, gi) => {
+            const memberStats = activeStats.filter(s => (g.stat_ids || []).map(Number).includes(Number(s.id)))
+            const isEditing   = expandedId === g.id
+            return (
+              <div key={g.id} className={`border-b border-gray-100 last:border-0 ${isEditing ? 'bg-green-50/20' : ''}`}>
+                {/* Row header */}
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <button
+                    onClick={() => isEditing ? cancelEdit() : openEdit(g)}
+                    className="flex-1 text-left flex items-center gap-3"
+                  >
+                    <span className="text-gray-400 text-xs w-3">{isEditing ? '▾' : '▸'}</span>
+                    <div>
+                      <div className="font-semibold text-gray-800 text-sm">{g.name}</div>
+                      <div className="text-xs text-gray-400">{memberStats.length} stat{memberStats.length !== 1 ? 's' : ''}</div>
+                    </div>
+                  </button>
+                  {!isEditing && (
+                    <button
+                      onClick={() => deleteGroup(g.id)}
+                      disabled={deleting === g.id}
+                      className="text-gray-300 hover:text-red-500 text-sm transition-colors disabled:opacity-40 px-1"
+                      title="Delete group"
+                    >
+                      {deleting === g.id ? '…' : '🗑️'}
+                    </button>
+                  )}
+                </div>
+
+                {/* Edit form */}
+                {isEditing && (
+                  <div className="px-4 pb-4 space-y-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">Group Name</label>
+                      <input
+                        className={inputCls}
+                        value={editName}
+                        onChange={e => setEditName(e.target.value)}
+                        autoFocus
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-2">
+                        Statistics <span className="text-gray-400 font-normal">({editIds.length} selected)</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Filter stats…"
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 w-full mb-2"
+                      />
+                      <div className="border border-gray-200 rounded-lg bg-white max-h-52 overflow-y-auto divide-y divide-gray-50">
+                        {filteredStats.length === 0 ? (
+                          <p className="px-3 py-3 text-sm text-gray-400 text-center">No stats match.</p>
+                        ) : filteredStats.map(s => (
+                          <label key={s.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50">
+                            <input
+                              type="checkbox"
+                              checked={editIds.includes(Number(s.id))}
+                              onChange={() => toggleStat(Number(s.id))}
+                              className="w-4 h-4 rounded accent-green-700 flex-shrink-0"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="text-sm font-medium text-gray-800 truncate">{s.name}</div>
+                              <div className="text-xs text-gray-400 capitalize">{s.tracking} · {s.stat_type}</div>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    {msg && expandedId === g.id && (
+                      <div className={`text-sm rounded-lg px-3 py-2 ${
+                        msg.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
+                      }`}>{msg.text}</div>
+                    )}
+                    <div className="flex gap-2">
+                      <button onClick={save} disabled={saving}
+                        className="px-4 py-2 rounded-lg text-sm font-bold text-white disabled:opacity-50"
+                        style={{ backgroundColor: FG }}>
+                        {saving ? 'Saving…' : 'Save'}
+                      </button>
+                      <button onClick={cancelEdit}
+                        className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-600 hover:bg-gray-50">
+                        Cancel
+                      </button>
+                      <button onClick={() => deleteGroup(g.id)} disabled={deleting === g.id}
+                        className="ml-auto px-4 py-2 rounded-lg border border-red-200 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-40">
+                        {deleting === g.id ? 'Deleting…' : 'Delete Group'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── StatisticsSettingsView ────────────────────────────────────────────────────
 const WEEK_DAYS = [
   { value: 0, label: 'Sunday'    },
@@ -4191,6 +4489,8 @@ const WEEK_DAYS = [
 ]
 
 function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats }) {
+  const [settingsSubTab, setSettingsSubTab] = useState('tracking')
+
   const [wedDay,   setWedDay]   = useState(weekEndingDay ?? 5)
   const [saving,   setSaving]   = useState(false)
   const [msg,      setMsg]      = useState(null)
@@ -4206,8 +4506,8 @@ function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats })
   // Keep local state in sync if parent changes
   useEffect(() => { if (weekEndingDay !== null) setWedDay(weekEndingDay) }, [weekEndingDay])
 
-  // Load view data on mount
-  useEffect(() => { loadViewData() }, [])
+  // Load view data when General tab is selected
+  useEffect(() => { if (settingsSubTab === 'general') loadViewData() }, [settingsSubTab])
 
   async function loadViewData() {
     setViewLoading(true)
@@ -4226,7 +4526,6 @@ function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats })
 
   async function handleSave() {
     setSaving(true); setMsg(null)
-    // Get the single company_settings row id first
     const { data: row } = await supabase.from('company_settings').select('id').single()
     if (!row?.id) { setMsg({ type: 'error', text: 'Could not find company settings record.' }); setSaving(false); return }
     const { error } = await supabase
@@ -4243,182 +4542,221 @@ function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats })
     }
   }
 
+  const SUB_TABS = [
+    { key: 'tracking', label: '📅 Tracking' },
+    { key: 'general',  label: '📖 General' },
+    { key: 'groups',   label: '📂 Stat Groups' },
+  ]
+
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50 px-6 py-6">
+    <div className="flex-1 overflow-y-auto bg-gray-50">
+
+      {/* Sub-tab bar */}
+      <div className="flex border-b border-gray-200 bg-white px-6">
+        {SUB_TABS.map(t => (
+          <button
+            key={t.key}
+            onClick={() => setSettingsSubTab(t.key)}
+            className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+              settingsSubTab === t.key
+                ? 'border-green-700 text-green-800'
+                : 'border-transparent text-gray-500 hover:text-gray-800'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="px-6 py-6">
       <div className="max-w-xl">
-        <h2 className="text-base font-bold text-gray-800 mb-1">Statistics Settings</h2>
-        <p className="text-xs text-gray-400 mb-6">Module-level configuration that applies across all statistics.</p>
 
-        {/* ── Weekly Settings ── */}
-        <div className="card mb-5">
-          <h3 className="font-semibold text-gray-800 mb-0.5">Weekly Tracking</h3>
-          <p className="text-xs text-gray-400 mb-4">Choose which day of the week your week-ending date falls on. This affects how weekly stat values are grouped and displayed on charts.</p>
+        {/* ── TRACKING SUB-TAB ── */}
+        {settingsSubTab === 'tracking' && (
+          <>
+            {/* Weekly Settings */}
+            <div className="card mb-5">
+              <h3 className="font-semibold text-gray-800 mb-0.5">Weekly Tracking</h3>
+              <p className="text-xs text-gray-400 mb-4">Choose which day of the week your week-ending date falls on. This affects how weekly stat values are grouped and displayed on charts.</p>
 
-          <label className="label">Week Ending Day</label>
-          <div className="grid grid-cols-7 gap-1 mb-4">
-            {WEEK_DAYS.map(d => (
-              <button
-                key={d.value}
-                onClick={() => setWedDay(d.value)}
-                className={`py-2 rounded-lg text-xs font-semibold text-center transition-colors border-2 ${
-                  wedDay === d.value
-                    ? 'text-white border-transparent'
-                    : 'text-gray-500 border-gray-200 hover:border-green-400 hover:text-green-700'
-                }`}
-                style={wedDay === d.value ? { backgroundColor: FG, borderColor: FG } : {}}
-              >
-                {d.label.slice(0, 3)}
-              </button>
-            ))}
-          </div>
-          <p className="text-xs text-gray-400">
-            Currently set to: <strong>{WEEK_DAYS.find(d => d.value === wedDay)?.label ?? '—'}</strong>
-            &nbsp;· Week-ending dates will be labeled "W/E {WEEK_DAYS.find(d => d.value === wedDay)?.label ?? '…'}"
-          </p>
-        </div>
-
-        {/* ── How periods work ── */}
-        <div className="card bg-green-50 border-green-200 mb-5">
-          <h3 className="font-semibold text-green-900 mb-2">How Tracking Periods Work</h3>
-          <div className="text-xs text-green-800 space-y-1.5">
-            <p><strong>Daily</strong> — one value per calendar day (YYYY-MM-DD)</p>
-            <p><strong>Weekly</strong> — one value per week, keyed to the week-ending day selected above</p>
-            <p><strong>Monthly</strong> — one value per calendar month (first day of month)</p>
-            <p><strong>Quarterly</strong> — one value per quarter (Jan 1, Apr 1, Jul 1, Oct 1)</p>
-            <p><strong>Yearly</strong> — one value per year (Jan 1)</p>
-            <hr className="border-green-200 my-2" />
-            <p><strong>Default Periods</strong> — set per stat in Edit Statistic → controls how many periods show on the chart by default when you switch to that stat.</p>
-          </div>
-        </div>
-
-        {/* ── Stat Types ── */}
-        <div className="card bg-blue-50 border-blue-200 mb-6">
-          <h3 className="font-semibold text-blue-900 mb-2">Stat Type Reference</h3>
-          <div className="text-xs text-blue-800 space-y-1.5">
-            <p><strong>Currency ($)</strong> — displayed as dollars with 2 decimal places (e.g. $48,500.00)</p>
-            <p><strong>Numeric (#)</strong> — plain number with up to 2 decimal places (e.g. 1,240.5)</p>
-            <p><strong>Percentage (%)</strong> — displayed with a % suffix (e.g. 94.30%)</p>
-            <hr className="border-blue-200 my-2" />
-            <p><strong>Inverted (↕)</strong> — reverses the good/bad color coding on the chart. Useful for stats where a lower number is better (e.g. defect rate, days overdue).</p>
-          </div>
-        </div>
-
-        {/* Save */}
-        {msg && (
-          <div className={`text-sm mb-4 rounded-lg px-3 py-2.5 ${
-            msg.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
-          }`}>
-            {msg.text}
-          </div>
-        )}
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="btn-primary px-6 disabled:opacity-50"
-        >
-          {saving ? 'Saving…' : 'Save Settings'}
-        </button>
-
-        {/* ── View All Data ── */}
-        <div className="mt-8">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h3 className="font-semibold text-gray-800">View All Stat Data</h3>
-              <p className="text-xs text-gray-400 mt-0.5">
-                {activeStats.length} stat{activeStats.length !== 1 ? 's' : ''} · click any row to expand its values
+              <label className="label">Week Ending Day</label>
+              <div className="grid grid-cols-7 gap-1 mb-4">
+                {WEEK_DAYS.map(d => (
+                  <button
+                    key={d.value}
+                    onClick={() => setWedDay(d.value)}
+                    className={`py-2 rounded-lg text-xs font-semibold text-center transition-colors border-2 ${
+                      wedDay === d.value
+                        ? 'text-white border-transparent'
+                        : 'text-gray-500 border-gray-200 hover:border-green-400 hover:text-green-700'
+                    }`}
+                    style={wedDay === d.value ? { backgroundColor: FG, borderColor: FG } : {}}
+                  >
+                    {d.label.slice(0, 3)}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400">
+                Currently set to: <strong>{WEEK_DAYS.find(d => d.value === wedDay)?.label ?? '—'}</strong>
+                &nbsp;· Week-ending dates will be labeled "W/E {WEEK_DAYS.find(d => d.value === wedDay)?.label ?? '…'}"
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                placeholder="Search…"
-                value={viewSearch}
-                onChange={e => setViewSearch(e.target.value)}
-                className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 w-40"
-              />
-              <button
-                onClick={() => { setViewData(null); setExpandedStats(new Set()); loadViewData() }}
-                className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1.5 rounded border border-gray-200 hover:border-gray-300 transition-colors"
-              >↻</button>
-            </div>
-          </div>
 
-          {viewLoading ? (
-            <div className="flex items-center justify-center py-10">
-              <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-green-700"></div>
+            {/* How periods work */}
+            <div className="card bg-green-50 border-green-200 mb-5">
+              <h3 className="font-semibold text-green-900 mb-2">How Tracking Periods Work</h3>
+              <div className="text-xs text-green-800 space-y-1.5">
+                <p><strong>Daily</strong> — one value per calendar day (YYYY-MM-DD)</p>
+                <p><strong>Weekly</strong> — one value per week, keyed to the week-ending day selected above</p>
+                <p><strong>Monthly</strong> — one value per calendar month (first day of month)</p>
+                <p><strong>Quarterly</strong> — one value per quarter (Jan 1, Apr 1, Jul 1, Oct 1)</p>
+                <p><strong>Yearly</strong> — one value per year (Jan 1)</p>
+                <hr className="border-green-200 my-2" />
+                <p><strong>Default Periods</strong> — set per stat in Edit Statistic → controls how many periods show on the chart by default when you switch to that stat.</p>
+              </div>
             </div>
-          ) : (
-            <div className="card p-0 overflow-hidden">
-              {activeStats.length === 0 ? (
-                <p className="px-5 py-8 text-center text-gray-400 text-sm">No statistics found.</p>
-              ) : (() => {
-                const filtered = activeStats.filter(s =>
-                  !viewSearch || s.name.toLowerCase().includes(viewSearch.toLowerCase())
-                )
-                if (filtered.length === 0) return (
-                  <p className="px-5 py-8 text-center text-gray-400 text-sm">No stats match "{viewSearch}".</p>
-                )
-                return (
-                  <div className="divide-y divide-gray-100">
-                    {filtered.map(s => {
-                      const entry    = viewData?.get(s.id)
-                      const vals     = entry?.values || []
-                      const expanded = expandedStats.has(s.id)
-                      const oldest   = vals.length ? vals[vals.length - 1].period_date : null
-                      const newest   = vals.length ? vals[0].period_date : null
-                      return (
-                        <div key={s.id}>
-                          <button
-                            onClick={() => setExpandedStats(prev => {
-                              const n = new Set(prev); n.has(s.id) ? n.delete(s.id) : n.add(s.id); return n
-                            })}
-                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left transition-colors"
-                          >
-                            <span className="text-gray-400 text-xs w-3 flex-shrink-0">{expanded ? '▾' : '▸'}</span>
-                            <span className="flex-1 text-sm font-semibold text-gray-800">{s.name}</span>
-                            <span className="text-xs text-gray-400 capitalize w-20 text-center">{s.tracking}</span>
-                            <span className="text-xs text-gray-400 capitalize w-20 text-center">{s.stat_type}</span>
-                            <span className="text-xs text-gray-500 font-medium w-16 text-right">
-                              {viewData ? `${vals.length} val${vals.length !== 1 ? 's' : ''}` : '…'}
-                            </span>
-                            <span className="text-xs text-gray-400 w-44 text-right">
-                              {vals.length > 0 ? (oldest === newest ? oldest : `${oldest} → ${newest}`) : '—'}
-                            </span>
-                          </button>
-                          {expanded && (
-                            <div className="border-t border-gray-100 bg-gray-50/60">
-                              {vals.length === 0 ? (
-                                <p className="px-10 py-3 text-xs text-gray-400 italic">No values recorded yet.</p>
-                              ) : (
-                                <table className="w-full text-sm">
-                                  <thead>
-                                    <tr className="border-b border-gray-200">
-                                      <th className="text-left px-10 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Date</th>
-                                      <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Value</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-gray-100">
-                                    {vals.map((v, i) => (
-                                      <tr key={i} className="hover:bg-white">
-                                        <td className="px-10 py-2 text-gray-600 font-mono text-xs">{v.period_date}</td>
-                                        <td className="px-4 py-2 text-right font-medium text-gray-800 text-xs">{fmt(v.value, s.stat_type)}</td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
+
+            {/* Save */}
+            {msg && (
+              <div className={`text-sm mb-4 rounded-lg px-3 py-2.5 ${
+                msg.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
+              }`}>
+                {msg.text}
+              </div>
+            )}
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="btn-primary px-6 disabled:opacity-50"
+            >
+              {saving ? 'Saving…' : 'Save Settings'}
+            </button>
+          </>
+        )}
+
+        {/* ── GENERAL SUB-TAB ── */}
+        {settingsSubTab === 'general' && (
+          <>
+            {/* Stat Types */}
+            <div className="card bg-blue-50 border-blue-200 mb-6">
+              <h3 className="font-semibold text-blue-900 mb-2">Stat Type Reference</h3>
+              <div className="text-xs text-blue-800 space-y-1.5">
+                <p><strong>Currency ($)</strong> — displayed as dollars with 2 decimal places (e.g. $48,500.00)</p>
+                <p><strong>Numeric (#)</strong> — plain number with up to 2 decimal places (e.g. 1,240.5)</p>
+                <p><strong>Percentage (%)</strong> — displayed with a % suffix (e.g. 94.30%)</p>
+                <hr className="border-blue-200 my-2" />
+                <p><strong>Inverted (↕)</strong> — reverses the good/bad color coding on the chart. Useful for stats where a lower number is better (e.g. defect rate, days overdue).</p>
+              </div>
+            </div>
+
+            {/* View All Stat Data */}
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="font-semibold text-gray-800">View All Stat Data</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {activeStats.length} stat{activeStats.length !== 1 ? 's' : ''} · click any row to expand its values
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="Search…"
+                    value={viewSearch}
+                    onChange={e => setViewSearch(e.target.value)}
+                    className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 w-40"
+                  />
+                  <button
+                    onClick={() => { setViewData(null); setExpandedStats(new Set()); loadViewData() }}
+                    className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1.5 rounded border border-gray-200 hover:border-gray-300 transition-colors"
+                  >↻</button>
+                </div>
+              </div>
+
+              {viewLoading ? (
+                <div className="flex items-center justify-center py-10">
+                  <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-green-700"></div>
+                </div>
+              ) : (
+                <div className="card p-0 overflow-hidden">
+                  {activeStats.length === 0 ? (
+                    <p className="px-5 py-8 text-center text-gray-400 text-sm">No statistics found.</p>
+                  ) : (() => {
+                    const filtered = activeStats.filter(s =>
+                      !viewSearch || s.name.toLowerCase().includes(viewSearch.toLowerCase())
+                    )
+                    if (filtered.length === 0) return (
+                      <p className="px-5 py-8 text-center text-gray-400 text-sm">No stats match "{viewSearch}".</p>
+                    )
+                    return (
+                      <div className="divide-y divide-gray-100">
+                        {filtered.map(s => {
+                          const entry    = viewData?.get(s.id)
+                          const vals     = entry?.values || []
+                          const expanded = expandedStats.has(s.id)
+                          const oldest   = vals.length ? vals[vals.length - 1].period_date : null
+                          const newest   = vals.length ? vals[0].period_date : null
+                          return (
+                            <div key={s.id}>
+                              <button
+                                onClick={() => setExpandedStats(prev => {
+                                  const n = new Set(prev); n.has(s.id) ? n.delete(s.id) : n.add(s.id); return n
+                                })}
+                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left transition-colors"
+                              >
+                                <span className="text-gray-400 text-xs w-3 flex-shrink-0">{expanded ? '▾' : '▸'}</span>
+                                <span className="flex-1 text-sm font-semibold text-gray-800">{s.name}</span>
+                                <span className="text-xs text-gray-400 capitalize w-20 text-center">{s.tracking}</span>
+                                <span className="text-xs text-gray-400 capitalize w-20 text-center">{s.stat_type}</span>
+                                <span className="text-xs text-gray-500 font-medium w-16 text-right">
+                                  {viewData ? `${vals.length} val${vals.length !== 1 ? 's' : ''}` : '…'}
+                                </span>
+                                <span className="text-xs text-gray-400 w-44 text-right">
+                                  {vals.length > 0 ? (oldest === newest ? oldest : `${oldest} → ${newest}`) : '—'}
+                                </span>
+                              </button>
+                              {expanded && (
+                                <div className="border-t border-gray-100 bg-gray-50/60">
+                                  {vals.length === 0 ? (
+                                    <p className="px-10 py-3 text-xs text-gray-400 italic">No values recorded yet.</p>
+                                  ) : (
+                                    <table className="w-full text-sm">
+                                      <thead>
+                                        <tr className="border-b border-gray-200">
+                                          <th className="text-left px-10 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Date</th>
+                                          <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Value</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-gray-100">
+                                        {vals.map((v, i) => (
+                                          <tr key={i} className="hover:bg-white">
+                                            <td className="px-10 py-2 text-gray-600 font-mono text-xs">{v.period_date}</td>
+                                            <td className="px-4 py-2 text-right font-medium text-gray-800 text-xs">{fmt(v.value, s.stat_type)}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  )}
+                                </div>
                               )}
                             </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )
-              })()}
+                          )
+                        })}
+                      </div>
+                    )
+                  })()}
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </>
+        )}
 
+        {/* ── STAT GROUPS SUB-TAB ── */}
+        {settingsSubTab === 'groups' && (
+          <StatGroups stats={stats} />
+        )}
+
+      </div>
       </div>
     </div>
   )
@@ -4902,10 +5240,13 @@ export default function Statistics() {
     const el = chartPrintRef.current
     if (!el || !selectedStat) return
 
-    const title     = selectedStat.name
-    const dateRange = `${fromDate} → ${toDate}`
+    const title       = selectedStat.name
+    const dateRange   = `${fromDate} → ${toDate}`
+    const isLandscape = orientation === 'landscape'
 
-    // Clone each SVG, preserve its content via viewBox, and make it 20% taller
+    // Clone each SVG and preserve its coordinate system via viewBox.
+    // Landscape: height="100%" so the flex container drives the SVG height.
+    // Portrait:  use 1.4× screen height for a tall, readable chart.
     const svgEls = el.querySelectorAll('svg')
     let svgHTML = ''
     svgEls.forEach(svg => {
@@ -4915,34 +5256,59 @@ export default function Statistics() {
       const h     = rect.height || parseFloat(svg.getAttribute('height')) || 400
       clone.setAttribute('viewBox', `0 0 ${w} ${h}`)
       clone.setAttribute('width',  '100%')
-      clone.setAttribute('height', Math.round(h * 1.2))
-      clone.style.display = 'block'
+      clone.setAttribute('height', isLandscape ? '100%' : Math.round(h * 1.4))
+      clone.style.cssText = 'display: block;'
       svgHTML += clone.outerHTML
     })
 
-    const winW = orientation === 'landscape' ? 1100 : 850
-    const winH = orientation === 'landscape' ? 700  : 950
+    const winW = isLandscape ? 1100 : 850
+    const winH = isLandscape ? 700  : 950
     const win  = window.open('', '_blank', `width=${winW},height=${winH}`)
     win.document.write(`<!DOCTYPE html>
-<html>
+<html style="height:100%">
 <head>
   <title>${title}</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: ui-sans-serif, system-ui, sans-serif; background: #fff; padding: 28px 32px; }
-    h1 { font-size: 20px; font-weight: 700; color: #111827; margin-bottom: 4px; }
-    p  { font-size: 12px; color: #6b7280; margin-bottom: 20px; }
-    svg { display: block; width: 100% !important; }
+    *, *::before, *::after {
+      box-sizing: border-box; margin: 0; padding: 0;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    html, body { height: 100%; }
+    body {
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      background: #fff;
+      padding: ${isLandscape ? '14px 22px 10px' : '28px 32px'};
+      ${isLandscape ? 'display: flex; flex-direction: column;' : ''}
+    }
+    h1 {
+      font-size: ${isLandscape ? '17px' : '20px'};
+      font-weight: 700; color: #111827;
+      margin-bottom: 3px; flex-shrink: 0;
+    }
+    .dr {
+      font-size: 11px; color: #6b7280;
+      margin-bottom: ${isLandscape ? '10px' : '20px'};
+      flex-shrink: 0;
+    }
+    .chart-wrap {
+      ${isLandscape ? 'flex: 1; min-height: 0; display: flex; flex-direction: column;' : ''}
+    }
+    svg {
+      display: block; width: 100% !important;
+      ${isLandscape ? 'flex: 1; height: 100% !important; min-height: 0;' : ''}
+    }
     @media print {
-      @page { size: ${orientation}; margin: 1.2cm; }
-      body  { padding: 0; }
+      @page { size: ${orientation}; margin: ${isLandscape ? '0.5cm' : '1cm'}; }
+      html, body { height: 100vh; }
+      body { padding: ${isLandscape ? '10px 18px 6px' : '20px 28px'}; }
     }
   </style>
 </head>
 <body>
   <h1>${title}</h1>
-  <p>${dateRange}</p>
-  ${svgHTML}
+  <p class="dr">${dateRange}</p>
+  <div class="chart-wrap">${svgHTML}</div>
   <script>window.onload = () => { window.print(); window.close(); }<\/script>
 </body>
 </html>`)
