@@ -4321,12 +4321,13 @@ function PrintMultipleView({ stats, weekEndingDay }) {
   const [groups,          setGroups]          = useState([])
   const [selectedGroupId, setSelectedGroupId] = useState(null)   // null = All
   const [selectedIds,     setSelectedIds]     = useState(new Set())
+  const [periodOpts,      setPeriodOpts]      = useState([])
   const [periodEndDate,   setPeriodEndDate]   = useState('')
   const [numPeriods,      setNumPeriods]      = useState(12)
   const [orientation,     setOrientation]     = useState('landscape')
   const [printing,        setPrinting]        = useState(false)
-
-  const periodOpts = useMemo(() => getRecentPeriodOptions(tracking, weekEndingDay), [tracking, weekEndingDay])
+  const [dataCoverage,    setDataCoverage]    = useState({})  // statId → {found,total}
+  const [loadingCoverage, setLoadingCoverage] = useState(false)
 
   useEffect(() => { loadGroups() }, [])
 
@@ -4383,6 +4384,91 @@ function PrintMultipleView({ stats, weekEndingDay }) {
   function toggleSelectAll() {
     setSelectedIds(allSelected ? new Set() : new Set(matchingStats.map(s => s.id)))
   }
+
+  // ── Fetch earliest period date → build full period options list ───────────
+  useEffect(() => {
+    const statIds = matchingStats.map(s => s.id)
+    if (!statIds.length) {
+      const opts = getRecentPeriodOptions(tracking, weekEndingDay)
+      setPeriodOpts(opts)
+      setPeriodEndDate(prev => opts.find(o => o.date === prev) ? prev : (opts[0]?.date ?? ''))
+      return
+    }
+    supabase
+      .from('statistic_values')
+      .select('period_date')
+      .in('statistic_id', statIds)
+      .order('period_date')
+      .limit(1)
+      .then(({ data }) => {
+        const earliest = data?.[0]?.period_date
+        const anchor = getRecentPeriodOptions(tracking, weekEndingDay, 1)[0]?.date
+        if (!earliest || !anchor) {
+          const opts = getRecentPeriodOptions(tracking, weekEndingDay)
+          setPeriodOpts(opts)
+          setPeriodEndDate(prev => opts.find(o => o.date === prev) ? prev : (opts[0]?.date ?? ''))
+          return
+        }
+        // Build options stepping back from anchor to earliest
+        const opts = []
+        let d = new Date(anchor + 'T00:00:00')
+        const fromD = new Date(earliest + 'T00:00:00')
+        let safety = 0
+        while (d >= fromD && safety < 600) {
+          const ds = isoDate(d)
+          opts.push({ date: ds, label: periodLabel(ds, tracking) })
+          if      (tracking === 'daily')     d.setDate(d.getDate() - 1)
+          else if (tracking === 'weekly')    d.setDate(d.getDate() - 7)
+          else if (tracking === 'monthly')   d.setMonth(d.getMonth() - 1)
+          else if (tracking === 'quarterly') d.setMonth(d.getMonth() - 3)
+          else                               d.setFullYear(d.getFullYear() - 1)
+          safety++
+        }
+        setPeriodOpts(opts)
+        setPeriodEndDate(prev => opts.find(o => o.date === prev) ? prev : (opts[0]?.date ?? ''))
+      })
+  }, [matchingStats, tracking, weekEndingDay])
+
+  // ── Compute data coverage for each stat in the current period window ───────
+  useEffect(() => {
+    const statIds = matchingStats.map(s => s.id)
+    if (!statIds.length || !periodEndDate) { setDataCoverage({}); return }
+
+    // Build the periods array for the current window
+    const endD = new Date(periodEndDate + 'T00:00:00')
+    const periods = []
+    for (let i = numPeriods - 1; i >= 0; i--) {
+      const d = new Date(endD)
+      if      (tracking === 'daily')     d.setDate(d.getDate() - i)
+      else if (tracking === 'weekly')    d.setDate(d.getDate() - i * 7)
+      else if (tracking === 'monthly')   d.setMonth(endD.getMonth() - i)
+      else if (tracking === 'quarterly') d.setMonth(endD.getMonth() - i * 3)
+      else                               d.setFullYear(endD.getFullYear() - i)
+      periods.push(isoDate(d))
+    }
+    const startDate = periods[0]
+
+    setLoadingCoverage(true)
+    supabase
+      .from('statistic_values')
+      .select('statistic_id, period_date')
+      .in('statistic_id', statIds)
+      .gte('period_date', startDate)
+      .lte('period_date', periodEndDate)
+      .then(({ data: vals }) => {
+        const wed = weekEndingDay ?? 5
+        const coverage = {}
+        for (const s of matchingStats) {
+          const sv = (vals || []).filter(v => v.statistic_id === s.id)
+          const found = periods.filter(p =>
+            sv.some(v => matchesPeriod(v.period_date, p, tracking, wed))
+          ).length
+          coverage[s.id] = { found, total: numPeriods }
+        }
+        setDataCoverage(coverage)
+        setLoadingCoverage(false)
+      })
+  }, [matchingStats, periodEndDate, numPeriods, tracking, weekEndingDay])
 
   // ── Period label for header ───────────────────────────────────────────────
   const periodEndLabel = periodOpts.find(o => o.date === periodEndDate)?.label ?? periodEndDate
@@ -4662,24 +4748,57 @@ function PrintMultipleView({ stats, weekEndingDay }) {
               <p className="text-sm mt-1">Switch to a different tracking type.</p>
             </div>
           ) : (
-            <div className="space-y-1.5 max-w-2xl">
-              {matchingStats.map(s => (
-                <label
-                  key={s.id}
-                  className="flex items-center gap-3 px-4 py-3 bg-white rounded-xl border-2 cursor-pointer transition-colors"
-                  style={selectedIds.has(s.id) ? { borderColor: FG, backgroundColor: '#f0f7f0' } : { borderColor: '#e5e7eb' }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.has(s.id)}
-                    onChange={() => toggleStat(s.id)}
-                    className="w-4 h-4 rounded accent-green-700 flex-shrink-0"
-                  />
-                  <span className="text-sm font-semibold text-gray-800">{s.name}</span>
-                  <span className="text-xs text-gray-400 ml-auto capitalize">{s.stat_type}</span>
-                </label>
-              ))}
-            </div>
+            <>
+              {/* Legend */}
+              <div className="flex items-center gap-4 mb-3 text-xs text-gray-400">
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-500"/>Complete
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-400"/>Partial data
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-400"/>No data
+                </span>
+                {loadingCoverage && <span className="text-gray-300 italic">checking…</span>}
+              </div>
+
+              <div className="space-y-1.5 max-w-2xl">
+                {matchingStats.map(s => {
+                  const cov = dataCoverage[s.id]
+                  const isComplete = cov && cov.found === cov.total
+                  const isPartial  = cov && cov.found > 0 && cov.found < cov.total
+                  const isEmpty    = cov && cov.found === 0
+                  return (
+                    <label
+                      key={s.id}
+                      className="flex items-center gap-3 px-4 py-3 bg-white rounded-xl border-2 cursor-pointer transition-colors"
+                      style={selectedIds.has(s.id) ? { borderColor: FG, backgroundColor: '#f0f7f0' } : { borderColor: '#e5e7eb' }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(s.id)}
+                        onChange={() => toggleStat(s.id)}
+                        className="w-4 h-4 rounded accent-green-700 flex-shrink-0"
+                      />
+                      <span className="text-sm font-semibold text-gray-800 flex-1 min-w-0 truncate">{s.name}</span>
+                      <span className="text-xs text-gray-400 capitalize flex-shrink-0">{s.stat_type}</span>
+                      {cov ? (
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${
+                          isComplete ? 'bg-green-100 text-green-700'
+                          : isPartial ? 'bg-amber-100 text-amber-700'
+                          : 'bg-red-100 text-red-700'
+                        }`}>
+                          {isComplete ? '✓' : `${cov.found}/${cov.total}`}
+                        </span>
+                      ) : (
+                        <span className="w-10 flex-shrink-0"/>
+                      )}
+                    </label>
+                  )
+                })}
+              </div>
+            </>
           )}
         </div>
       </div>
