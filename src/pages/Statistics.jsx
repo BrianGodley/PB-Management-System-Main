@@ -5566,8 +5566,8 @@ export default function Statistics() {
               </div>
 
               {selectedStat?.stat_category !== 'target' && (
-                /* Period tabs + FROM/TO — centered over chart */
-                <div className="flex items-center justify-center gap-2 py-2 bg-white border-b border-gray-100 flex-shrink-0 flex-wrap">
+                /* Period tabs + FROM/TO + chart style toggle */
+                <div className="flex items-center gap-2 py-2 px-3 bg-white border-b border-gray-100 flex-shrink-0 flex-wrap">
                   <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
                     {['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Yearly'].map(p => {
                       const pid        = p.toLowerCase()
@@ -5592,41 +5592,6 @@ export default function Statistics() {
                     })}
                   </div>
 
-                  {/* Bar / Line toggle */}
-                  <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden flex-shrink-0">
-                    <button
-                      title="Line chart"
-                      onClick={() => setChartStyle('line')}
-                      className={`px-2 py-1.5 transition-colors ${chartStyle === 'line' ? 'text-white' : 'text-gray-500 hover:bg-gray-50'}`}
-                      style={chartStyle === 'line' ? { backgroundColor: FG } : {}}
-                    >
-                      {/* Line chart icon */}
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <polyline points="1,13 4,8 7,10 10,4 13,6 15,2"
-                          stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                        <circle cx="1"  cy="13" r="1.2" fill="currentColor"/>
-                        <circle cx="4"  cy="8"  r="1.2" fill="currentColor"/>
-                        <circle cx="7"  cy="10" r="1.2" fill="currentColor"/>
-                        <circle cx="10" cy="4"  r="1.2" fill="currentColor"/>
-                        <circle cx="13" cy="6"  r="1.2" fill="currentColor"/>
-                        <circle cx="15" cy="2"  r="1.2" fill="currentColor"/>
-                      </svg>
-                    </button>
-                    <button
-                      title="Bar chart"
-                      onClick={() => setChartStyle('bar')}
-                      className={`px-2 py-1.5 transition-colors ${chartStyle === 'bar' ? 'text-white' : 'text-gray-500 hover:bg-gray-50'}`}
-                      style={chartStyle === 'bar' ? { backgroundColor: FG } : {}}
-                    >
-                      {/* Bar chart icon */}
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <rect x="1"  y="9"  width="3" height="6" rx="0.8" fill="currentColor"/>
-                        <rect x="6"  y="5"  width="3" height="10" rx="0.8" fill="currentColor"/>
-                        <rect x="11" y="1"  width="3" height="14" rx="0.8" fill="currentColor"/>
-                      </svg>
-                    </button>
-                  </div>
-
                   <div className="flex items-center gap-1">
                     <span className="text-xs text-gray-500 font-medium">FROM</span>
                     <input
@@ -5644,6 +5609,39 @@ export default function Statistics() {
                       onChange={e => setToDate(e.target.value)}
                       className="border border-gray-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-green-600"
                     />
+                  </div>
+
+                  {/* Bar / Line toggle — far right */}
+                  <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden flex-shrink-0 ml-auto">
+                    <button
+                      title="Line chart"
+                      onClick={() => setChartStyle('line')}
+                      className={`px-2 py-1.5 transition-colors ${chartStyle === 'line' ? 'text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+                      style={chartStyle === 'line' ? { backgroundColor: FG } : {}}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <polyline points="1,13 4,8 7,10 10,4 13,6 15,2"
+                          stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                        <circle cx="1"  cy="13" r="1.2" fill="currentColor"/>
+                        <circle cx="4"  cy="8"  r="1.2" fill="currentColor"/>
+                        <circle cx="7"  cy="10" r="1.2" fill="currentColor"/>
+                        <circle cx="10" cy="4"  r="1.2" fill="currentColor"/>
+                        <circle cx="13" cy="6"  r="1.2" fill="currentColor"/>
+                        <circle cx="15" cy="2"  r="1.2" fill="currentColor"/>
+                      </svg>
+                    </button>
+                    <button
+                      title="Bar chart"
+                      onClick={() => setChartStyle('bar')}
+                      className={`px-2 py-1.5 transition-colors ${chartStyle === 'bar' ? 'text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+                      style={chartStyle === 'bar' ? { backgroundColor: FG } : {}}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <rect x="1"  y="9"  width="3" height="6" rx="0.8" fill="currentColor"/>
+                        <rect x="6"  y="5"  width="3" height="10" rx="0.8" fill="currentColor"/>
+                        <rect x="11" y="1"  width="3" height="14" rx="0.8" fill="currentColor"/>
+                      </svg>
+                    </button>
                   </div>
                 </div>
               )}
