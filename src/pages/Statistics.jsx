@@ -272,7 +272,7 @@ function TypeSelectorModal({ onSelect, onClose }) {
               )}
               {/* Mini chart preview — bottom-right background decoration */}
               {STAT_TYPE_PREVIEWS[t.key] && (
-                <div className={`absolute bottom-0 right-0 ${previewSize[t.key] || 'w-32 h-20'} opacity-[0.18] pointer-events-none select-none`}>
+                <div className={`absolute bottom-0 right-0 ${previewSize[t.key] || 'w-32 h-20'} opacity-[0.45] pointer-events-none select-none`}>
                   {STAT_TYPE_PREVIEWS[t.key]}
                 </div>
               )}
@@ -289,7 +289,7 @@ function TypeSelectorModal({ onSelect, onClose }) {
             className="relative w-full rounded-xl border-2 border-green-600 p-5 text-left hover:shadow-md hover:bg-green-50 transition-all overflow-hidden"
           >
             {/* Wide preview for full-width button */}
-            <div className="absolute bottom-0 right-0 w-56 h-14 opacity-[0.18] pointer-events-none select-none">
+            <div className="absolute bottom-0 right-0 w-56 h-14 opacity-[0.45] pointer-events-none select-none">
               {STAT_TYPE_PREVIEWS.target}
             </div>
             <div className="relative font-semibold text-green-800 mb-1.5 text-sm">🎯 Target Statistic</div>
