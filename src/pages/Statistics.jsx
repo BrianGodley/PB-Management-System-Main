@@ -111,22 +111,27 @@ const STAT_TYPE_PREVIEWS = {
     </svg>
   ),
   equation: (
-    // Two input lines + "=" → result line
+    // Two labeled stat pills with +/- operator between them
     <svg viewBox="0 0 110 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-      {/* Line A */}
-      <path d="M4,18 C14,16 22,14 34,10" stroke="#2563EB" strokeWidth="2" strokeLinecap="round"/>
-      <circle cx="4"  cy="18" r="2.5" fill="#2563EB"/>
-      <circle cx="34" cy="10" r="2.5" fill="#2563EB"/>
-      {/* Line B */}
-      <path d="M4,36 C14,32 22,30 34,26" stroke="#DC2626" strokeWidth="2" strokeLinecap="round"/>
-      <circle cx="4"  cy="36" r="2.5" fill="#DC2626"/>
-      <circle cx="34" cy="26" r="2.5" fill="#DC2626"/>
-      {/* "+" operator */}
-      <text x="40" y="26" fontSize="14" fontWeight="700" fill="#6b7280" fontFamily="monospace">+</text>
-      {/* Result line */}
-      <path d="M56,48 C68,38 80,22 106,6" stroke="#3A5038" strokeWidth="2.5" strokeLinecap="round"/>
-      <circle cx="56"  cy="48" r="3" fill="#3A5038"/>
-      <circle cx="106" cy="6"  r="3" fill="#3A5038"/>
+      {/* Stat A pill */}
+      <rect x="2" y="10" width="38" height="18" rx="4" fill="#dbeafe" stroke="#2563EB" strokeWidth="1.5"/>
+      <text x="21" y="23" textAnchor="middle" fontSize="8" fontWeight="700" fill="#1d4ed8" fontFamily="sans-serif">Stat A</text>
+      {/* Stat A mini line */}
+      <path d="M6,35 C12,32 18,28 24,25 C30,22 36,20 42,17" stroke="#2563EB" strokeWidth="1.5" strokeLinecap="round"/>
+      <circle cx="6"  cy="35" r="1.8" fill="#2563EB"/>
+      <circle cx="42" cy="17" r="1.8" fill="#2563EB"/>
+
+      {/* +/- operator */}
+      <text x="55" y="26" textAnchor="middle" fontSize="13" fontWeight="800" fill="#6b7280" fontFamily="monospace">+</text>
+      <text x="55" y="40" textAnchor="middle" fontSize="10" fontWeight="600" fill="#9ca3af" fontFamily="monospace">−</text>
+
+      {/* Stat B pill */}
+      <rect x="68" y="10" width="38" height="18" rx="4" fill="#fce7f3" stroke="#db2777" strokeWidth="1.5"/>
+      <text x="87" y="23" textAnchor="middle" fontSize="8" fontWeight="700" fill="#be185d" fontFamily="sans-serif">Stat B</text>
+      {/* Stat B mini line */}
+      <path d="M70,50 C76,44 82,40 88,36 C94,32 100,30 106,26" stroke="#db2777" strokeWidth="1.5" strokeLinecap="round"/>
+      <circle cx="70"  cy="50" r="1.8" fill="#db2777"/>
+      <circle cx="106" cy="26" r="1.8" fill="#db2777"/>
     </svg>
   ),
   overlay: (
@@ -147,21 +152,25 @@ const STAT_TYPE_PREVIEWS = {
     </svg>
   ),
   secondary: (
-    // Many small bars (source) → arrow → fewer tall bars (aggregated)
+    // Labeled "Weekly" stat pill → arrow → "Monthly" stat pill
     <svg viewBox="0 0 110 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-      {/* Source: 6 small weekly bars */}
-      {[
-        [4, 28], [13, 20], [22, 34], [31, 16], [40, 24], [49, 14],
-      ].map(([x, y], i) => (
-        <rect key={i} x={x} y={y} width="7" height={60 - y - 2} rx="1.5"
-          fill="#94a3b8" fillOpacity="0.7"/>
+      {/* Weekly stat pill */}
+      <rect x="2" y="8" width="40" height="20" rx="4" fill="#f1f5f9" stroke="#94a3b8" strokeWidth="1.5"/>
+      <text x="22" y="22" textAnchor="middle" fontSize="8" fontWeight="700" fill="#475569" fontFamily="sans-serif">Weekly</text>
+      {/* Weekly mini bars */}
+      {[[5,44],[11,38],[17,50],[23,36],[29,42],[35,34]].map(([x,y],i) => (
+        <rect key={i} x={x} y={y} width="4" height={58-y} rx="1" fill="#94a3b8" fillOpacity="0.8"/>
       ))}
       {/* Arrow */}
-      <path d="M60,30 L68,30 M64,26 L68,30 L64,34"
-        stroke="#6b7280" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-      {/* Result: 2 tall monthly bars */}
-      <rect x="72" y="12" width="14" height="46" rx="2" fill="#3A5038" fillOpacity="0.75"/>
-      <rect x="90" y="20" width="14" height="38" rx="2" fill="#3A5038" fillOpacity="0.75"/>
+      <path d="M46,30 L60,30" stroke="#6b7280" strokeWidth="2" strokeLinecap="round"/>
+      <path d="M56,25 L61,30 L56,35" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      {/* Monthly stat pill */}
+      <rect x="64" y="8" width="44" height="20" rx="4" fill="#dcfce7" stroke="#3A5038" strokeWidth="1.5"/>
+      <text x="86" y="22" textAnchor="middle" fontSize="8" fontWeight="700" fill="#3A5038" fontFamily="sans-serif">Monthly</text>
+      {/* Monthly bars — taller, fewer */}
+      <rect x="68" y="32" width="11" height="26" rx="1.5" fill="#3A5038" fillOpacity="0.7"/>
+      <rect x="83" y="38" width="11" height="20" rx="1.5" fill="#3A5038" fillOpacity="0.7"/>
+      <rect x="98" y="28" width="8"  height="30" rx="1.5" fill="#3A5038" fillOpacity="0.7"/>
     </svg>
   ),
   auto: (
@@ -211,7 +220,7 @@ function TypeSelectorModal({ onSelect, onClose }) {
     { key: 'basic',      label: 'Basic Statistic',    desc: 'Track a single numeric value over time.',   available: true  },
     { key: 'equation',   label: 'Equation Statistic',  desc: 'Combine multiple stats with a formula.',    available: true  },
     { key: 'overlay',    label: 'Overlay Statistic',   desc: 'Overlay two or more stats on one chart.',  available: true  },
-    { key: 'secondary',  label: 'Secondary Statistic', desc: 'Aggregate an existing stat into a longer period (e.g. weekly → monthly).', available: true  },
+    { key: 'secondary',  label: 'Secondary Statistic', desc: 'Turn an existing stat into another permanent stat with longer periods.', available: true  },
     { key: 'auto',       label: 'Auto Statistic',      desc: 'Pull live data from jobs, bids, schedule, and more — auto-computed each period.',  available: true  },
   ]
   return (
