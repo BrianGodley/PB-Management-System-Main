@@ -3951,7 +3951,13 @@ export default function Statistics() {
       fetchOverlayValues(stat)
     } else if (stat?.stat_category === 'secondary') {
       setOverlayValues([])
-      syncSecondaryValues(stat).then(() => fetchValues(selectedId))
+      syncSecondaryValues(stat).then(earliest => {
+        fetchValues(selectedId)
+        if (earliest) {
+          setFromDate(earliest)
+          setToDate(today())
+        }
+      })
     } else {
       setOverlayValues([])
       fetchValues(selectedId)
@@ -3959,21 +3965,26 @@ export default function Statistics() {
   }, [selectedId, stats])
 
   async function syncSecondaryValues(stat) {
-    if (!stat?.source_stat_id) return
+    if (!stat?.source_stat_id) return null
     const { data: srcVals } = await supabase.from('statistic_values')
       .select('period_date, value').eq('statistic_id', stat.source_stat_id).order('period_date')
-    if (!srcVals?.length) return
+    if (!srcVals?.length) return null
     const computed = aggregateValues(srcVals, stat.tracking, stat.aggregation_method || 'sum')
-    if (!computed.length) return
+    if (!computed.length) return null
     await supabase.from('statistic_values').upsert(
       computed.map(r => ({ statistic_id: stat.id, period_date: r.period_date, value: r.value })),
       { onConflict: 'statistic_id,period_date' }
     )
-    // Keep beginning_date at the earliest computed period so the scrubber works
     const earliest = computed[0].period_date
+    // Update DB if needed
     if (!stat.beginning_date || stat.beginning_date > earliest) {
       await supabase.from('statistics').update({ beginning_date: earliest }).eq('id', stat.id)
     }
+    // Update local stats state so scrubber gets correct minDate immediately (no refetch needed)
+    setStats(prev => prev.map(s =>
+      s.id === stat.id ? { ...s, beginning_date: earliest } : s
+    ))
+    return earliest
   }
 
   async function fetchValues(statId) {
@@ -4268,7 +4279,8 @@ export default function Statistics() {
   // Apply default_periods date range whenever the selected stat or its settings change
   useEffect(() => {
     if (!selectedStat) return
-    if (selectedStat.stat_category === 'target') return // target stats handled separately
+    if (selectedStat.stat_category === 'target') return    // target stats: date locked to target line
+    if (selectedStat.stat_category === 'secondary') return // secondary stats: date set from sync
     const range = defaultRangeFor(selectedStat, weekEndingDay)
     if (range) {
       setFromDate(range.from)
