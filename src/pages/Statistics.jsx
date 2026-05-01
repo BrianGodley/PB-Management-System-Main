@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  LineChart, Line, BarChart, Bar, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Customized
 } from 'recharts'
 
@@ -4389,6 +4390,7 @@ export default function Statistics() {
   const [viewMode,       setViewMode]       = useState('graphs')  // 'graphs'|'multiple-entry'|'print-multiple'|'comparison'|'import-export'|'archive'
   const [selectedId,     setSelectedId]     = useState(null)
   const [viewPeriod,     setViewPeriod]     = useState('weekly')
+  const [chartStyle,     setChartStyle]     = useState('line')  // 'line' | 'bar'
   const [fromDate,       setFromDate]       = useState(daysAgo(90))
   const [toDate,         setToDate]         = useState(today())
   const [autoMin,        setAutoMin]        = useState(true)
@@ -5589,7 +5591,42 @@ export default function Statistics() {
                       )
                     })}
                   </div>
-                  <div className="w-24 flex-shrink-0" />
+
+                  {/* Bar / Line toggle */}
+                  <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden flex-shrink-0">
+                    <button
+                      title="Line chart"
+                      onClick={() => setChartStyle('line')}
+                      className={`px-2 py-1.5 transition-colors ${chartStyle === 'line' ? 'text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+                      style={chartStyle === 'line' ? { backgroundColor: FG } : {}}
+                    >
+                      {/* Line chart icon */}
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <polyline points="1,13 4,8 7,10 10,4 13,6 15,2"
+                          stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                        <circle cx="1"  cy="13" r="1.2" fill="currentColor"/>
+                        <circle cx="4"  cy="8"  r="1.2" fill="currentColor"/>
+                        <circle cx="7"  cy="10" r="1.2" fill="currentColor"/>
+                        <circle cx="10" cy="4"  r="1.2" fill="currentColor"/>
+                        <circle cx="13" cy="6"  r="1.2" fill="currentColor"/>
+                        <circle cx="15" cy="2"  r="1.2" fill="currentColor"/>
+                      </svg>
+                    </button>
+                    <button
+                      title="Bar chart"
+                      onClick={() => setChartStyle('bar')}
+                      className={`px-2 py-1.5 transition-colors ${chartStyle === 'bar' ? 'text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+                      style={chartStyle === 'bar' ? { backgroundColor: FG } : {}}
+                    >
+                      {/* Bar chart icon */}
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <rect x="1"  y="9"  width="3" height="6" rx="0.8" fill="currentColor"/>
+                        <rect x="6"  y="5"  width="3" height="10" rx="0.8" fill="currentColor"/>
+                        <rect x="11" y="1"  width="3" height="14" rx="0.8" fill="currentColor"/>
+                      </svg>
+                    </button>
+                  </div>
+
                   <div className="flex items-center gap-1">
                     <span className="text-xs text-gray-500 font-medium">FROM</span>
                     <input
@@ -5724,7 +5761,112 @@ export default function Statistics() {
                         <p className="text-xs mt-1">Use <strong>Edit Value History</strong> to add entries.</p>
                       </div>
                     </div>
+                  ) : chartStyle === 'bar' ? (
+                    /* ── Bar chart mode ──────────────────────────────────── */
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={chartDataWithTargets}
+                        margin={{ top: 28, right: 24, left: 16, bottom: 20 }}
+                        onClick={(chartEvent) => {
+                          const pt = chartEvent?.activePayload?.[0]?.payload
+                          if (pt?.date) openNoteModal(pt.date, pt.label)
+                        }}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+                        <XAxis
+                          dataKey="label"
+                          tick={{ fontSize: 11, fill: '#111827', fontWeight: 600, angle: -45, textAnchor: 'end', dx: -4, dy: 4 }}
+                          tickLine={false}
+                          axisLine={{ stroke: '#d1d5db' }}
+                          height={70}
+                          interval="preserveStartEnd"
+                        />
+                        <YAxis
+                          domain={yDomain}
+                          ticks={yTicks}
+                          tick={{ fontSize: 11, fill: '#111827', fontWeight: 600 }}
+                          tickLine={false}
+                          axisLine={false}
+                          tickFormatter={v => {
+                            if (selectedStat.stat_type === 'currency')   return '$' + Number(v).toLocaleString()
+                            if (selectedStat.stat_type === 'percentage') return v + '%'
+                            return Number(v).toLocaleString()
+                          }}
+                          width={80}
+                        />
+                        <Tooltip
+                          cursor={{ fill: 'rgba(0,0,0,0.04)' }}
+                          content={({ active, payload, label }) => {
+                            if (!active || !payload?.length) return null
+                            const pt = payload[0]?.payload
+                            const hasNote = pt?.date && statNotes.some(n => n.period_date === pt.date)
+                            return (
+                              <div className="bg-white border border-gray-200 rounded-xl shadow-lg px-3 py-2.5 text-xs">
+                                <p className="font-bold text-gray-500 mb-1">{label}</p>
+                                <p className="font-bold text-gray-900">{fmt(payload[0]?.value, selectedStat.stat_type)}</p>
+                                {hasNote && <p className="text-amber-600 mt-1 font-semibold">📝 Has note</p>}
+                              </div>
+                            )
+                          }}
+                        />
+                        <Bar dataKey="value" radius={[3, 3, 0, 0]} maxBarSize={60} isAnimationActive={false}>
+                          {chartDataWithTargets.map((entry, index) => {
+                            const prev  = chartDataWithTargets[index - 1]
+                            const isDown = prev != null && entry.value != null && prev.value != null
+                              ? (selectedStat.upside_down ? entry.value > prev.value : entry.value < prev.value)
+                              : false
+                            const hasNote = entry.date && statNotes.some(n => n.period_date === entry.date)
+                            return (
+                              <Cell
+                                key={`cell-${index}`}
+                                fill={isDown ? '#DC2626' : FG}
+                                fillOpacity={entry.value == null ? 0.2 : 0.85}
+                              />
+                            )
+                          })}
+                        </Bar>
+                        {/* Note dots above bars */}
+                        <Customized component={({ xAxisMap, yAxisMap, data }) => {
+                          const xAxis = Object.values(xAxisMap || {})[0]
+                          const yAxis = Object.values(yAxisMap || {})[0]
+                          if (!xAxis || !yAxis) return null
+                          const noteSet = new Set(statNotes.map(n => n.period_date))
+                          return (
+                            <g>
+                              {(data || []).map((pt, i) => {
+                                if (!pt.date || !noteSet.has(pt.date)) return null
+                                const x = xAxis.scale(pt.label)
+                                const y = pt.value != null ? yAxis.scale(pt.value) : null
+                                if (x == null || y == null) return null
+                                const bw = (xAxis.bandwidth ? xAxis.bandwidth() : 0) / 2
+                                return (
+                                  <g key={i}>
+                                    <circle cx={x + bw} cy={y - 10} r={5} fill="#f59e0b" stroke="white" strokeWidth={1.5}/>
+                                    <text x={x + bw} y={y - 10 + 3.5} textAnchor="middle" fontSize={7} fontWeight={700} fill="white">N</text>
+                                  </g>
+                                )
+                              })}
+                            </g>
+                          )
+                        }} />
+                        {/* Target line segments */}
+                        {selectedStat?.target_lines?.length > 0 && (
+                          <Customized
+                            component={(props) => (
+                              <TargetLineSegments
+                                {...props}
+                                targetLines={selectedStat.target_lines}
+                                displayChartData={chartDataWithTargets}
+                                tracking={selectedStat.tracking}
+                              />
+                            )}
+                          />
+                        )}
+                      </BarChart>
+                    </ResponsiveContainer>
                   ) : (
+                    /* ── Line chart mode (default) ───────────────────────── */
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart
                         data={chartDataWithTargets}
