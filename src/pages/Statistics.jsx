@@ -153,33 +153,33 @@ const STAT_TYPE_PREVIEWS = {
     </svg>
   ),
   secondary: (
-    // Weekly line on top (with breathing room), down arrow, Monthly line below
-    <svg viewBox="0 0 110 105" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-      {/* "Weekly" tag — pushed down from edge */}
-      <rect x="2" y="10" width="30" height="11" rx="3" fill="#f1f5f9" stroke="#94a3b8" strokeWidth="1"/>
-      <text x="17" y="18" textAnchor="middle" fontSize="6.5" fontWeight="700" fill="#475569" fontFamily="sans-serif">Weekly</text>
+    // Weekly line on top, down arrow, Monthly line below — content pushed down for breathing room
+    <svg viewBox="0 0 110 117" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+      {/* "Weekly" tag — well clear of top edge */}
+      <rect x="2" y="22" width="30" height="11" rx="3" fill="#f1f5f9" stroke="#94a3b8" strokeWidth="1"/>
+      <text x="17" y="30" textAnchor="middle" fontSize="6.5" fontWeight="700" fill="#475569" fontFamily="sans-serif">Weekly</text>
       {/* Weekly line — dense, wiggly */}
-      <path d="M2,44 C8,38 14,46 20,36 C26,28 32,42 38,32 C44,24 50,36 56,26 C62,18 68,30 74,22 C84,16 96,20 108,14"
+      <path d="M2,56 C8,50 14,58 20,48 C26,40 32,54 38,44 C44,36 50,48 56,38 C62,30 68,42 74,34 C84,28 96,32 108,26"
         stroke="#94a3b8" strokeWidth="1.8" strokeLinecap="round" fill="none"/>
-      <circle cx="2"   cy="44" r="1.5" fill="#94a3b8"/>
-      <circle cx="20"  cy="36" r="1.5" fill="#94a3b8"/>
-      <circle cx="38"  cy="32" r="1.5" fill="#94a3b8"/>
-      <circle cx="56"  cy="26" r="1.5" fill="#94a3b8"/>
-      <circle cx="74"  cy="22" r="1.5" fill="#94a3b8"/>
-      <circle cx="108" cy="14" r="1.5" fill="#94a3b8"/>
+      <circle cx="2"   cy="56" r="1.5" fill="#94a3b8"/>
+      <circle cx="20"  cy="48" r="1.5" fill="#94a3b8"/>
+      <circle cx="38"  cy="44" r="1.5" fill="#94a3b8"/>
+      <circle cx="56"  cy="38" r="1.5" fill="#94a3b8"/>
+      <circle cx="74"  cy="34" r="1.5" fill="#94a3b8"/>
+      <circle cx="108" cy="26" r="1.5" fill="#94a3b8"/>
       {/* Down arrow */}
-      <line x1="55" y1="50" x2="55" y2="60" stroke="#6b7280" strokeWidth="1.8" strokeLinecap="round"/>
-      <path d="M50,56 L55,62 L60,56" stroke="#6b7280" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      <line x1="55" y1="62" x2="55" y2="72" stroke="#6b7280" strokeWidth="1.8" strokeLinecap="round"/>
+      <path d="M50,68 L55,74 L60,68" stroke="#6b7280" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
       {/* "Monthly" tag */}
-      <rect x="2" y="66" width="34" height="11" rx="3" fill="#dcfce7" stroke="#3A5038" strokeWidth="1"/>
-      <text x="19" y="74" textAnchor="middle" fontSize="6.5" fontWeight="700" fill="#3A5038" fontFamily="sans-serif">Monthly</text>
+      <rect x="2" y="78" width="34" height="11" rx="3" fill="#dcfce7" stroke="#3A5038" strokeWidth="1"/>
+      <text x="19" y="86" textAnchor="middle" fontSize="6.5" fontWeight="700" fill="#3A5038" fontFamily="sans-serif">Monthly</text>
       {/* Monthly line — smooth, fewer points */}
-      <path d="M2,98 C22,90 44,84 66,76 C84,70 96,66 108,62"
+      <path d="M2,110 C22,102 44,96 66,88 C84,82 96,78 108,74"
         stroke="#3A5038" strokeWidth="2.2" strokeLinecap="round" fill="none"/>
-      <circle cx="2"   cy="98" r="2" fill="#3A5038"/>
-      <circle cx="40"  cy="84" r="2" fill="#3A5038"/>
-      <circle cx="76"  cy="70" r="2" fill="#3A5038"/>
-      <circle cx="108" cy="62" r="2" fill="#3A5038"/>
+      <circle cx="2"   cy="110" r="2" fill="#3A5038"/>
+      <circle cx="40"  cy="96"  r="2" fill="#3A5038"/>
+      <circle cx="76"  cy="82"  r="2" fill="#3A5038"/>
+      <circle cx="108" cy="74"  r="2" fill="#3A5038"/>
     </svg>
   ),
   auto_internal: (
@@ -209,43 +209,43 @@ const STAT_TYPE_PREVIEWS = {
     </svg>
   ),
   auto_external: (
-    // Logos track UP+RIGHT along the line: QB near start, SF near middle, GHL near end
+    // Logos track UP+RIGHT along the line — pushed far above, short straight thick arrows
     <svg viewBox="0 0 130 90" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-      {/* ── Line graph spanning full width ── */}
-      <path d="M5,80 C22,70 46,58 70,48 C90,40 106,34 124,28"
+      {/* ── Line graph — shifted lower to give logos room above ── */}
+      <path d="M5,84 C22,74 46,62 70,52 C90,44 106,38 124,32"
         stroke="#3A5038" strokeWidth="2.5" strokeLinecap="round"/>
-      <circle cx="5"   cy="80" r="2" fill="#3A5038"/>
-      <circle cx="40"  cy="62" r="2" fill="#3A5038"/>
-      <circle cx="70"  cy="48" r="2" fill="#3A5038"/>
-      <circle cx="100" cy="36" r="2" fill="#3A5038"/>
-      <circle cx="124" cy="28" r="2" fill="#3A5038"/>
-      <path d="M5,80 C22,70 46,58 70,48 C90,40 106,34 124,28 L124,90 L5,90 Z"
+      <circle cx="5"   cy="84" r="2" fill="#3A5038"/>
+      <circle cx="40"  cy="66" r="2" fill="#3A5038"/>
+      <circle cx="70"  cy="52" r="2" fill="#3A5038"/>
+      <circle cx="100" cy="40" r="2" fill="#3A5038"/>
+      <circle cx="124" cy="32" r="2" fill="#3A5038"/>
+      <path d="M5,84 C22,74 46,62 70,52 C90,44 106,38 124,32 L124,90 L5,90 Z"
         fill="#3A5038" fillOpacity="0.07"/>
 
-      {/* ── QB — floats above line START (bottom-left) ── */}
-      <rect x="2" y="52" width="16" height="16" rx="3" fill="#2CA01C"/>
-      <text x="10" y="63" textAnchor="middle" fontSize="10" fontWeight="900" fill="white" fontFamily="serif">Q</text>
-      {/* Arrow down to line near start */}
-      <path d="M8,68 C6,72 5,75 5,78" stroke="#9ca3af" strokeWidth="1" strokeLinecap="round" fill="none"/>
-      <path d="M3,76 L5,79 L7,76" stroke="#9ca3af" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      {/* ── QB — above line START, well separated ── */}
+      <rect x="2" y="46" width="16" height="16" rx="3" fill="#2CA01C"/>
+      <text x="10" y="57" textAnchor="middle" fontSize="10" fontWeight="900" fill="white" fontFamily="serif">Q</text>
+      {/* Short straight thick arrow pointing down toward line start */}
+      <line x1="8" y1="62" x2="7" y2="74" stroke="#6b7280" strokeWidth="2.2" strokeLinecap="round"/>
+      <path d="M4,71 L7,75 L10,71" stroke="#6b7280" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
 
-      {/* ── Salesforce — floats above line MIDDLE ── */}
-      <ellipse cx="62" cy="22" rx="10" ry="7"  fill="#00A1E0"/>
-      <ellipse cx="56" cy="27" rx="6"  ry="4"  fill="#00A1E0"/>
-      <ellipse cx="68" cy="27" rx="6"  ry="4"  fill="#00A1E0"/>
-      <rect x="54" y="22" width="16" height="7" fill="#00A1E0"/>
-      <text x="62" y="28" textAnchor="middle" fontSize="6" fontWeight="800" fill="white" fontFamily="sans-serif">SF</text>
-      {/* Arrow down to line middle */}
-      <path d="M65,31 C67,37 68,42 69,47" stroke="#9ca3af" strokeWidth="1" strokeLinecap="round" fill="none"/>
-      <path d="M66,45 L69,48 L72,45" stroke="#9ca3af" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      {/* ── Salesforce — above line MIDDLE, well separated ── */}
+      <ellipse cx="62" cy="16" rx="10" ry="7"  fill="#00A1E0"/>
+      <ellipse cx="56" cy="21" rx="6"  ry="4"  fill="#00A1E0"/>
+      <ellipse cx="68" cy="21" rx="6"  ry="4"  fill="#00A1E0"/>
+      <rect x="54" y="16" width="16" height="7" fill="#00A1E0"/>
+      <text x="62" y="22" textAnchor="middle" fontSize="6" fontWeight="800" fill="white" fontFamily="sans-serif">SF</text>
+      {/* Short straight thick arrow pointing down toward line middle */}
+      <line x1="64" y1="25" x2="67" y2="38" stroke="#6b7280" strokeWidth="2.2" strokeLinecap="round"/>
+      <path d="M63,35 L67,39 L71,35" stroke="#6b7280" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
 
-      {/* ── GHL — floats above line END (top-right) ── */}
+      {/* ── GHL — above line END, well separated ── */}
       <rect x="102" y="4" width="22" height="16" rx="3" fill="#1a1f36"/>
       <text x="113" y="12" textAnchor="middle" fontSize="6" fontWeight="800" fill="#f97316" fontFamily="sans-serif">GO</text>
       <text x="113" y="18" textAnchor="middle" fontSize="5.5" fontWeight="700" fill="#fdba74" fontFamily="sans-serif">HIGH</text>
-      {/* Arrow down to line end */}
-      <path d="M113,20 C116,22 120,24 123,27" stroke="#9ca3af" strokeWidth="1" strokeLinecap="round" fill="none"/>
-      <path d="M120,26 L123,29 L126,26" stroke="#9ca3af" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      {/* Short straight thick arrow pointing down toward line end */}
+      <line x1="118" y1="20" x2="121" y2="28" stroke="#6b7280" strokeWidth="2.2" strokeLinecap="round"/>
+      <path d="M117,25 L121,29 L125,25" stroke="#6b7280" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
     </svg>
   ),
   target: (
@@ -303,7 +303,7 @@ function TypeSelectorModal({ onSelect, onClose }) {
               onClick={() => t.available && onSelect(t.key)}
               className={`relative rounded-xl border-2 p-5 text-left transition-all overflow-hidden min-h-[100px] ${
                 t.available
-                  ? 'border-gray-200 hover:border-green-600 hover:shadow-md cursor-pointer'
+                  ? 'border-green-600 hover:bg-green-50 hover:border-green-700 hover:shadow-md cursor-pointer'
                   : 'border-gray-100 bg-gray-50 cursor-not-allowed opacity-60'
               }`}
             >
