@@ -1065,6 +1065,24 @@ function GraphCursor({ points, height, payload, stat, chartData }) {
   )
 }
 
+// ── Clickable dot with note indicator ────────────────────────────────────────
+function NoteDot({ cx, cy, payload, notesByDate, onNoteClick }) {
+  if (!cx || !cy || payload?.value == null) return null
+  const date    = payload?.date
+  const hasNote = date && notesByDate.has(date)
+  return (
+    <g style={{ cursor: 'pointer' }} onClick={() => onNoteClick && date && onNoteClick(date, payload?.label)}>
+      <circle cx={cx} cy={cy} r={hasNote ? 6 : 5} fill={FG} stroke="white" strokeWidth={2} />
+      {hasNote && (
+        <>
+          <circle cx={cx + 5} cy={cy - 5} r={5} fill="#f59e0b" stroke="white" strokeWidth={1.5} />
+          <text x={cx + 5} y={cy - 5 + 3.5} textAnchor="middle" fontSize={7} fontWeight={700} fill="white">N</text>
+        </>
+      )}
+    </g>
+  )
+}
+
 // ── Colored line segments: black = increasing, red = decreasing ───────────────
 function ColoredLineSegments({ formattedGraphicalItems, stat }) {
   const points = (formattedGraphicalItems?.[0]?.props?.points ?? [])
@@ -3543,6 +3561,13 @@ export default function Statistics() {
   const [editHistoryFromDate, setEditHistoryFromDate] = useState(null)
   const [weekEndingError,     setWeekEndingError]     = useState(false)  // show config warning
 
+  // Stat notes
+  const [statNotes,       setStatNotes]       = useState([])          // notes for selectedStat
+  const [noteModal,       setNoteModal]       = useState(null)        // { date, label } | null
+  const [noteText,        setNoteText]        = useState('')
+  const [noteSaving,      setNoteSaving]      = useState(false)
+  const [showNotesModal,  setShowNotesModal]  = useState(false)
+
   // Ref to auto-select a stat after stats list refreshes
   const pendingSelectName = useRef(null)
 
@@ -3581,6 +3606,46 @@ export default function Statistics() {
     setLoading(false)
     // Return fresh data so callers can use it immediately without waiting for state to re-render
     return { stats: freshStats, wed: freshWed }
+  }
+
+  // ── Fetch notes when selected stat changes ────────────────────────────────
+  useEffect(() => {
+    if (!selectedId) { setStatNotes([]); return }
+    supabase.from('stat_notes').select('*').eq('statistic_id', selectedId).order('period_date')
+      .then(({ data }) => setStatNotes(data || []))
+  }, [selectedId])
+
+  async function fetchNotes() {
+    if (!selectedId) return
+    const { data } = await supabase.from('stat_notes').select('*').eq('statistic_id', selectedId).order('period_date')
+    setStatNotes(data || [])
+  }
+
+  function openNoteModal(date, label) {
+    const existing = statNotes.find(n => n.period_date === date)
+    setNoteText(existing?.note || '')
+    setNoteModal({ date, label })
+  }
+
+  async function saveNote() {
+    if (!noteModal || !selectedId) return
+    setNoteSaving(true)
+    await supabase.from('stat_notes').upsert(
+      { statistic_id: selectedId, period_date: noteModal.date, note: noteText, created_by: user?.id },
+      { onConflict: 'statistic_id,period_date' }
+    )
+    await fetchNotes()
+    setNoteSaving(false)
+    setNoteModal(null)
+  }
+
+  async function deleteNote() {
+    if (!noteModal || !selectedId) return
+    setNoteSaving(true)
+    await supabase.from('stat_notes').delete().eq('statistic_id', selectedId).eq('period_date', noteModal.date)
+    await fetchNotes()
+    setNoteSaving(false)
+    setNoteModal(null)
   }
 
   // ── Fetch values when selected stat changes ────────────────────────────────
@@ -4297,6 +4362,15 @@ export default function Statistics() {
             >
               Edit Statistic
             </button>
+            <button
+              onClick={() => setShowNotesModal(true)}
+              className="text-sm font-medium text-amber-600 hover:text-amber-800 underline underline-offset-2 transition-colors flex-shrink-0 flex items-center gap-1"
+            >
+              {statNotes.length > 0 && (
+                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] font-bold">{statNotes.length}</span>
+              )}
+              Notes
+            </button>
           </>
         )}
         <div className="flex-1 min-w-0" />
@@ -4701,8 +4775,15 @@ export default function Statistics() {
                           type="linear"
                           dataKey="value"
                           stroke="transparent"
-                          dot={false}
-                          activeDot={{ r: 6, fill: FG }}
+                          dot={(dotProps) => (
+                            <NoteDot
+                              key={dotProps.index}
+                              {...dotProps}
+                              notesByDate={new Map(statNotes.map(n => [n.period_date, n]))}
+                              onNoteClick={openNoteModal}
+                            />
+                          )}
+                          activeDot={false}
                           isAnimationActive={false}
                           label={false}
                         />
@@ -4875,6 +4956,102 @@ export default function Statistics() {
             >
               Cancel
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Note entry modal ─────────────────────────────────────────────── */}
+      {noteModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100" style={{ backgroundColor: '#3A5038' }}>
+              <div>
+                <h2 className="text-sm font-bold text-white">📝 Data Point Note</h2>
+                <p className="text-xs text-green-200 mt-0.5">{noteModal.label}</p>
+              </div>
+              <button onClick={() => setNoteModal(null)} className="text-white/70 hover:text-white text-xl leading-none">✕</button>
+            </div>
+            <div className="px-5 py-4">
+              <textarea
+                value={noteText}
+                onChange={e => setNoteText(e.target.value)}
+                rows={4}
+                placeholder="Enter your note for this data point…"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600 resize-none"
+                autoFocus
+              />
+            </div>
+            <div className="px-5 pb-5 flex gap-2">
+              <button
+                onClick={saveNote}
+                disabled={noteSaving || !noteText.trim()}
+                className="flex-1 py-2.5 bg-green-700 text-white text-sm font-semibold rounded-xl hover:bg-green-800 disabled:opacity-50 transition-colors"
+              >
+                {noteSaving ? 'Saving…' : 'Save Note'}
+              </button>
+              {statNotes.find(n => n.period_date === noteModal.date) && (
+                <button
+                  onClick={deleteNote}
+                  disabled={noteSaving}
+                  className="px-4 py-2.5 border border-red-200 text-red-600 text-sm font-semibold rounded-xl hover:bg-red-50 disabled:opacity-50 transition-colors"
+                >
+                  Delete
+                </button>
+              )}
+              <button onClick={() => setNoteModal(null)} className="px-4 py-2.5 border border-gray-200 text-gray-500 text-sm rounded-xl hover:bg-gray-50 transition-colors">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Notes list modal ─────────────────────────────────────────────── */}
+      {showNotesModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[80vh] overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0" style={{ backgroundColor: '#3A5038' }}>
+              <div>
+                <h2 className="text-base font-bold text-white">📝 Notes — {selectedStat?.name}</h2>
+                <p className="text-xs text-green-200 mt-0.5">{statNotes.length} note{statNotes.length !== 1 ? 's' : ''}</p>
+              </div>
+              <button onClick={() => setShowNotesModal(false)} className="text-white/70 hover:text-white text-xl leading-none">✕</button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              {statNotes.length === 0 ? (
+                <div className="text-center py-10 text-gray-400">
+                  <p className="text-3xl mb-2">📝</p>
+                  <p className="text-sm font-medium text-gray-500">No notes yet</p>
+                  <p className="text-xs mt-1">Click any data point on the graph to add a note.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {statNotes.map(n => (
+                    <div key={n.id} className="border border-gray-200 rounded-xl p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-amber-600 uppercase tracking-wide mb-1">
+                            {periodLabel(n.period_date, selectedStat?.tracking)}
+                          </p>
+                          <p className="text-sm text-gray-800 whitespace-pre-wrap">{n.note}</p>
+                        </div>
+                        <button
+                          onClick={() => { openNoteModal(n.period_date, periodLabel(n.period_date, selectedStat?.tracking)); setShowNotesModal(false) }}
+                          className="text-xs text-blue-600 hover:text-blue-800 underline flex-shrink-0 mt-0.5"
+                        >
+                          Edit
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
+              <button onClick={() => setShowNotesModal(false)} className="w-full py-2.5 border border-gray-200 text-gray-600 text-sm font-medium rounded-xl hover:bg-gray-50 transition-colors">
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
