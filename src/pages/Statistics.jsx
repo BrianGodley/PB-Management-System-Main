@@ -4317,32 +4317,64 @@ function PrintMultipleView({ stats, weekEndingDay }) {
   const activeStats = (stats || []).filter(s => !s.archived)
 
   // ── Config state ─────────────────────────────────────────────────────────
-  const [tracking,     setTracking]     = useState('weekly')
-  const [selectedIds,  setSelectedIds]  = useState(new Set())
-  const [periodEndDate,setPeriodEndDate]= useState('')
-  const [numPeriods,   setNumPeriods]   = useState(12)
-  const [orientation,  setOrientation]  = useState('landscape')
-  const [printing,     setPrinting]     = useState(false)
+  const [tracking,        setTracking]        = useState('weekly')
+  const [groups,          setGroups]          = useState([])
+  const [selectedGroupId, setSelectedGroupId] = useState(null)   // null = All
+  const [selectedIds,     setSelectedIds]     = useState(new Set())
+  const [periodEndDate,   setPeriodEndDate]   = useState('')
+  const [numPeriods,      setNumPeriods]      = useState(12)
+  const [orientation,     setOrientation]     = useState('landscape')
+  const [printing,        setPrinting]        = useState(false)
 
   const periodOpts = useMemo(() => getRecentPeriodOptions(tracking, weekEndingDay), [tracking, weekEndingDay])
 
-  // Reload period options + reset selection when tracking changes
+  useEffect(() => { loadGroups() }, [])
+
+  async function loadGroups() {
+    const { data } = await supabase.from('stat_groups').select('*').order('sort_order').order('name')
+    setGroups(data || [])
+  }
+
+  // When tracking changes: reset period, clear group filter, select all matching stats
   useEffect(() => {
     const opts = getRecentPeriodOptions(tracking, weekEndingDay)
     setPeriodEndDate(opts[0]?.date ?? '')
-    setSelectedIds(new Set())
+    setSelectedGroupId(null)
+    setSelectedIds(new Set(activeStats.filter(s => s.tracking === tracking).map(s => s.id)))
   }, [tracking, weekEndingDay])
 
-  // Init periodEndDate on mount
+  // Init periodEndDate + selection on mount
   useEffect(() => {
     const opts = getRecentPeriodOptions('weekly', weekEndingDay)
     setPeriodEndDate(opts[0]?.date ?? '')
+    setSelectedIds(new Set(activeStats.filter(s => s.tracking === 'weekly').map(s => s.id)))
   }, [])
 
+  // ── Group selection handler ────────────────────────────────────────────────
+  function handleGroupSelect(groupId) {
+    setSelectedGroupId(groupId)
+    const byTracking = activeStats.filter(s => s.tracking === tracking)
+    if (groupId === null) {
+      setSelectedIds(new Set(byTracking.map(s => s.id)))
+    } else {
+      const g = groups.find(g => g.id === groupId)
+      const ids = g ? (g.stat_ids || []).map(Number) : []
+      setSelectedIds(new Set(byTracking.filter(s => ids.includes(Number(s.id))).map(s => s.id)))
+    }
+  }
+
   // ── Derived ───────────────────────────────────────────────────────────────
-  const matchingStats = activeStats.filter(s => s.tracking === tracking)
-  const statsToPrint  = matchingStats.filter(s => selectedIds.has(s.id))
-  const allSelected   = matchingStats.length > 0 && matchingStats.every(s => selectedIds.has(s.id))
+  const matchingStats = useMemo(() => {
+    const byTracking = activeStats.filter(s => s.tracking === tracking)
+    if (!selectedGroupId) return byTracking
+    const g = groups.find(g => g.id === selectedGroupId)
+    if (!g) return byTracking
+    const ids = (g.stat_ids || []).map(Number)
+    return byTracking.filter(s => ids.includes(Number(s.id)))
+  }, [activeStats, tracking, selectedGroupId, groups])
+
+  const statsToPrint = matchingStats.filter(s => selectedIds.has(s.id))
+  const allSelected  = matchingStats.length > 0 && matchingStats.every(s => selectedIds.has(s.id))
 
   function toggleStat(id) {
     setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -4469,30 +4501,30 @@ function PrintMultipleView({ stats, weekEndingDay }) {
     }
   }
 
-  const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600'
-  const labelCls = 'block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2'
+  const inputCls = 'w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-600'
+  const labelCls = 'block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2.5'
 
   return (
     <div className="flex-1 flex overflow-hidden bg-gray-50">
 
-      {/* ── Left: config panel ───────────────────────────────────────────── */}
-      <div className="w-72 flex-shrink-0 flex flex-col bg-white border-r border-gray-200 overflow-y-auto">
-        <div className="px-5 py-4 border-b border-gray-100 flex-shrink-0">
+      {/* ── Left: config panel (25% wider: 288px → 360px) ───────────────── */}
+      <div className="w-[22.5rem] flex-shrink-0 flex flex-col bg-white border-r border-gray-200 overflow-y-auto">
+        <div className="px-6 py-5 border-b border-gray-100 flex-shrink-0">
           <h2 className="text-base font-bold text-gray-900">🖨️ Print Multiple</h2>
           <p className="text-xs text-gray-400 mt-0.5">Configure then print a batch of charts.</p>
         </div>
 
-        <div className="px-5 py-5 flex-1 space-y-6">
+        <div className="px-6 py-6 flex-1 space-y-7">
 
           {/* Tracking type */}
           <div>
             <p className={labelCls}>Tracking Type</p>
-            <div className="grid grid-cols-5 gap-1">
+            <div className="grid grid-cols-5 gap-1.5">
               {TRACKING_OPTIONS.map(t => (
                 <button
                   key={t.value}
                   onClick={() => setTracking(t.value)}
-                  className={`py-2 rounded-lg text-xs font-semibold text-center transition-colors border-2 ${
+                  className={`py-2.5 rounded-lg text-xs font-semibold text-center transition-colors border-2 ${
                     tracking === t.value
                       ? 'text-white border-transparent'
                       : 'text-gray-500 border-gray-200 hover:border-green-400 hover:text-green-700'
@@ -4503,8 +4535,45 @@ function PrintMultipleView({ stats, weekEndingDay }) {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-gray-400 mt-1.5">
-              {matchingStats.length} {tracking} stat{matchingStats.length !== 1 ? 's' : ''} available
+          </div>
+
+          {/* Print By: All or a stat group */}
+          <div>
+            <p className={labelCls}>Print By</p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => handleGroupSelect(null)}
+                className={`px-4 py-2.5 rounded-lg text-sm font-semibold border-2 transition-colors ${
+                  selectedGroupId === null
+                    ? 'text-white border-transparent'
+                    : 'text-gray-500 border-gray-200 hover:border-green-400 hover:text-green-700'
+                }`}
+                style={selectedGroupId === null ? { backgroundColor: FG, borderColor: FG } : {}}
+              >
+                All
+              </button>
+              {groups.map(g => {
+                const cnt = (g.stat_ids || []).map(Number)
+                  .filter(id => activeStats.some(s => s.tracking === tracking && Number(s.id) === id)).length
+                return (
+                  <button
+                    key={g.id}
+                    onClick={() => handleGroupSelect(g.id)}
+                    className={`px-4 py-2.5 rounded-lg text-sm font-semibold border-2 transition-colors ${
+                      selectedGroupId === g.id
+                        ? 'text-white border-transparent'
+                        : 'text-gray-500 border-gray-200 hover:border-green-400 hover:text-green-700'
+                    }`}
+                    style={selectedGroupId === g.id ? { backgroundColor: FG, borderColor: FG } : {}}
+                  >
+                    {g.name}
+                    <span className="ml-1 font-normal opacity-70">({cnt})</span>
+                  </button>
+                )
+              })}
+            </div>
+            <p className="text-xs text-gray-400 mt-2">
+              {matchingStats.length} {tracking} stat{matchingStats.length !== 1 ? 's' : ''} shown
             </p>
           </div>
 
@@ -4513,7 +4582,7 @@ function PrintMultipleView({ stats, weekEndingDay }) {
             <p className={labelCls}>Period</p>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Period Ending</label>
+                <label className="block text-xs text-gray-500 mb-1.5">Period Ending</label>
                 <select value={periodEndDate} onChange={e => setPeriodEndDate(e.target.value)} className={inputCls}>
                   {periodOpts.map(o => (
                     <option key={o.date} value={o.date}>{o.label}</option>
@@ -4521,7 +4590,7 @@ function PrintMultipleView({ stats, weekEndingDay }) {
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Number of Periods</label>
+                <label className="block text-xs text-gray-500 mb-1.5">Number of Periods</label>
                 <select value={numPeriods} onChange={e => setNumPeriods(Number(e.target.value))} className={inputCls}>
                   {NUM_PERIOD_OPTIONS.map(n => (
                     <option key={n} value={n}>{n} periods</option>
@@ -4534,12 +4603,12 @@ function PrintMultipleView({ stats, weekEndingDay }) {
           {/* Orientation */}
           <div>
             <p className={labelCls}>Orientation</p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2.5">
               {[['landscape', '⬛ Landscape'], ['portrait', '⬜ Portrait']].map(([val, lbl]) => (
                 <button
                   key={val}
                   onClick={() => setOrientation(val)}
-                  className={`py-2.5 rounded-lg text-sm font-semibold border-2 transition-colors ${
+                  className={`py-3 rounded-lg text-sm font-semibold border-2 transition-colors ${
                     orientation === val ? 'text-white border-transparent' : 'text-gray-500 border-gray-200 hover:border-green-400'
                   }`}
                   style={orientation === val ? { backgroundColor: FG, borderColor: FG } : {}}
