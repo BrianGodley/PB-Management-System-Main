@@ -111,27 +111,27 @@ const STAT_TYPE_PREVIEWS = {
     </svg>
   ),
   equation: (
-    // Two labeled stat pills with +/- operator between them
-    <svg viewBox="0 0 110 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-      {/* Stat A pill */}
-      <rect x="2" y="10" width="38" height="18" rx="4" fill="#dbeafe" stroke="#2563EB" strokeWidth="1.5"/>
-      <text x="21" y="23" textAnchor="middle" fontSize="8" fontWeight="700" fill="#1d4ed8" fontFamily="sans-serif">Stat A</text>
-      {/* Stat A mini line */}
-      <path d="M6,35 C12,32 18,28 24,25 C30,22 36,20 42,17" stroke="#2563EB" strokeWidth="1.5" strokeLinecap="round"/>
-      <circle cx="6"  cy="35" r="1.8" fill="#2563EB"/>
-      <circle cx="42" cy="17" r="1.8" fill="#2563EB"/>
-
-      {/* +/- operator */}
-      <text x="55" y="26" textAnchor="middle" fontSize="13" fontWeight="800" fill="#6b7280" fontFamily="monospace">+</text>
-      <text x="55" y="40" textAnchor="middle" fontSize="10" fontWeight="600" fill="#9ca3af" fontFamily="monospace">−</text>
-
-      {/* Stat B pill */}
-      <rect x="68" y="10" width="38" height="18" rx="4" fill="#fce7f3" stroke="#db2777" strokeWidth="1.5"/>
-      <text x="87" y="23" textAnchor="middle" fontSize="8" fontWeight="700" fill="#be185d" fontFamily="sans-serif">Stat B</text>
-      {/* Stat B mini line */}
-      <path d="M70,50 C76,44 82,40 88,36 C94,32 100,30 106,26" stroke="#db2777" strokeWidth="1.5" strokeLinecap="round"/>
-      <circle cx="70"  cy="50" r="1.8" fill="#db2777"/>
-      <circle cx="106" cy="26" r="1.8" fill="#db2777"/>
+    // Two small line graphs stacked with +/- in the middle, no labels
+    <svg viewBox="0 0 110 64" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+      {/* Top line graph — blue */}
+      <path d="M4,18 C18,16 30,12 44,8 C58,4 74,6 106,3"
+        stroke="#2563EB" strokeWidth="2" strokeLinecap="round"/>
+      <circle cx="4"   cy="18" r="2" fill="#2563EB"/>
+      <circle cx="44"  cy="8"  r="2" fill="#2563EB"/>
+      <circle cx="76"  cy="6"  r="2" fill="#2563EB"/>
+      <circle cx="106" cy="3"  r="2" fill="#2563EB"/>
+      {/* Divider */}
+      <line x1="4" y1="28" x2="106" y2="28" stroke="#e5e7eb" strokeWidth="1"/>
+      {/* +/- stacked operator */}
+      <text x="55" y="26" textAnchor="middle" fontSize="10" fontWeight="800" fill="#9ca3af" fontFamily="monospace">+</text>
+      <text x="55" y="37" textAnchor="middle" fontSize="10" fontWeight="700" fill="#d1d5db" fontFamily="monospace">−</text>
+      {/* Bottom line graph — pink */}
+      <path d="M4,60 C20,54 36,50 54,46 C70,42 88,44 106,40"
+        stroke="#db2777" strokeWidth="2" strokeLinecap="round"/>
+      <circle cx="4"   cy="60" r="2" fill="#db2777"/>
+      <circle cx="54"  cy="46" r="2" fill="#db2777"/>
+      <circle cx="82"  cy="43" r="2" fill="#db2777"/>
+      <circle cx="106" cy="40" r="2" fill="#db2777"/>
     </svg>
   ),
   overlay: (
@@ -152,25 +152,32 @@ const STAT_TYPE_PREVIEWS = {
     </svg>
   ),
   secondary: (
-    // Labeled "Weekly" stat pill → arrow → "Monthly" stat pill
+    // Weekly line (many points) → arrow → Monthly line (fewer points)
     <svg viewBox="0 0 110 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-      {/* Weekly stat pill */}
-      <rect x="2" y="8" width="40" height="20" rx="4" fill="#f1f5f9" stroke="#94a3b8" strokeWidth="1.5"/>
-      <text x="22" y="22" textAnchor="middle" fontSize="8" fontWeight="700" fill="#475569" fontFamily="sans-serif">Weekly</text>
-      {/* Weekly mini bars */}
-      {[[5,44],[11,38],[17,50],[23,36],[29,42],[35,34]].map(([x,y],i) => (
-        <rect key={i} x={x} y={y} width="4" height={58-y} rx="1" fill="#94a3b8" fillOpacity="0.8"/>
-      ))}
+      {/* "Weekly" label tag */}
+      <rect x="2" y="2" width="28" height="11" rx="3" fill="#f1f5f9" stroke="#94a3b8" strokeWidth="1"/>
+      <text x="16" y="10" textAnchor="middle" fontSize="6.5" fontWeight="700" fill="#475569" fontFamily="sans-serif">Weekly</text>
+      {/* Weekly line — dense, wiggly (many data points) */}
+      <path d="M2,50 C6,44 10,52 14,40 C18,32 22,48 26,36 C30,26 34,42 38,30 C40,24 42,32 44,22"
+        stroke="#94a3b8" strokeWidth="1.8" strokeLinecap="round" fill="none"/>
+      <circle cx="2"  cy="50" r="1.5" fill="#94a3b8"/>
+      <circle cx="14" cy="40" r="1.5" fill="#94a3b8"/>
+      <circle cx="26" cy="36" r="1.5" fill="#94a3b8"/>
+      <circle cx="38" cy="30" r="1.5" fill="#94a3b8"/>
+      <circle cx="44" cy="22" r="1.5" fill="#94a3b8"/>
       {/* Arrow */}
-      <path d="M46,30 L60,30" stroke="#6b7280" strokeWidth="2" strokeLinecap="round"/>
-      <path d="M56,25 L61,30 L56,35" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-      {/* Monthly stat pill */}
-      <rect x="64" y="8" width="44" height="20" rx="4" fill="#dcfce7" stroke="#3A5038" strokeWidth="1.5"/>
-      <text x="86" y="22" textAnchor="middle" fontSize="8" fontWeight="700" fill="#3A5038" fontFamily="sans-serif">Monthly</text>
-      {/* Monthly bars — taller, fewer */}
-      <rect x="68" y="32" width="11" height="26" rx="1.5" fill="#3A5038" fillOpacity="0.7"/>
-      <rect x="83" y="38" width="11" height="20" rx="1.5" fill="#3A5038" fillOpacity="0.7"/>
-      <rect x="98" y="28" width="8"  height="30" rx="1.5" fill="#3A5038" fillOpacity="0.7"/>
+      <path d="M48,36 L60,36" stroke="#6b7280" strokeWidth="1.8" strokeLinecap="round"/>
+      <path d="M56,31 L61,36 L56,41" stroke="#6b7280" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      {/* "Monthly" label tag */}
+      <rect x="64" y="2" width="32" height="11" rx="3" fill="#dcfce7" stroke="#3A5038" strokeWidth="1"/>
+      <text x="80" y="10" textAnchor="middle" fontSize="6.5" fontWeight="700" fill="#3A5038" fontFamily="sans-serif">Monthly</text>
+      {/* Monthly line — smooth, fewer points */}
+      <path d="M64,54 C72,46 80,34 90,26 C98,20 104,16 108,12"
+        stroke="#3A5038" strokeWidth="2.2" strokeLinecap="round" fill="none"/>
+      <circle cx="64"  cy="54" r="2" fill="#3A5038"/>
+      <circle cx="82"  cy="33" r="2" fill="#3A5038"/>
+      <circle cx="100" cy="20" r="2" fill="#3A5038"/>
+      <circle cx="108" cy="12" r="2" fill="#3A5038"/>
     </svg>
   ),
   auto: (
