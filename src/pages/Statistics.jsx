@@ -99,7 +99,7 @@ function TypeSelectorModal({ onSelect, onClose }) {
     { key: 'basic',      label: 'Basic Statistic',    desc: 'Track a single numeric value over time.',   available: true  },
     { key: 'equation',   label: 'Equation Statistic',  desc: 'Combine multiple stats with a formula.',    available: true  },
     { key: 'overlay',    label: 'Overlay Statistic',   desc: 'Overlay two or more stats on one chart.',  available: true  },
-    { key: 'secondary',  label: 'Secondary Statistic', desc: 'Derived view from an existing statistic.', available: false },
+    { key: 'secondary',  label: 'Secondary Statistic', desc: 'Aggregate an existing stat into a longer period (e.g. weekly → monthly).', available: true  },
   ]
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
@@ -2369,6 +2369,292 @@ function downloadBlob(content, filename, mimeType) {
   URL.revokeObjectURL(url)
 }
 
+// ── SecondaryStatForm ─────────────────────────────────────────────────────────
+// Period order for aggregation validation
+const SEC_PERIOD_ORDER = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly']
+
+// Map a source period_date into its output-period bucket (returns YYYY-MM-DD string)
+function getOutputPeriodKey(dateStr, outputTracking) {
+  const d = new Date(dateStr + 'T00:00:00')
+  if (outputTracking === 'monthly')   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+  if (outputTracking === 'quarterly') {
+    const q = Math.floor(d.getMonth() / 3)
+    return `${d.getFullYear()}-${String(q * 3 + 1).padStart(2, '0')}-01`
+  }
+  if (outputTracking === 'yearly')    return `${d.getFullYear()}-01-01`
+  if (outputTracking === 'weekly') {
+    // ISO week Monday
+    const day = d.getDay() || 7
+    d.setDate(d.getDate() - day + 1)
+    return isoDate(d)
+  }
+  return dateStr // daily → daily
+}
+
+// Aggregate source values into output periods
+function aggregateValues(sourceValues, outputTracking, method) {
+  const buckets = new Map()
+  for (const v of sourceValues) {
+    const key = getOutputPeriodKey(v.period_date, outputTracking)
+    if (!buckets.has(key)) buckets.set(key, [])
+    buckets.get(key).push(Number(v.value))
+  }
+  const result = []
+  for (const [period_date, vals] of buckets) {
+    let value
+    if      (method === 'sum')     value = vals.reduce((a, b) => a + b, 0)
+    else if (method === 'average') value = vals.reduce((a, b) => a + b, 0) / vals.length
+    else if (method === 'last')    value = vals[vals.length - 1]
+    else if (method === 'first')   value = vals[0]
+    result.push({ period_date, value })
+  }
+  return result.sort((a, b) => a.period_date.localeCompare(b.period_date))
+}
+
+function SecondaryStatForm({ initialData, profiles, allStats, onSave, onClose, onDelete }) {
+  const { user } = useAuth()
+
+  // Eligible source stats: basic stats only (not secondary/equation/overlay/target)
+  const eligibleSources = (allStats || []).filter(s =>
+    !s.archived && !['equation', 'overlay', 'target', 'secondary'].includes(s.stat_category)
+  )
+
+  const isEdit = !!initialData?.id
+
+  const [form, setForm] = useState({
+    name:             initialData?.name || '',
+    source_stat_id:   initialData?.source_stat_id || '',
+    tracking:         initialData?.tracking || 'monthly',
+    aggregation_method: initialData?.aggregation_method || 'sum',
+    stat_type:        initialData?.stat_type || 'currency',
+    owner_type:       initialData?.owner_type || 'user',
+    owner_user_id:    initialData?.owner_user_id || user?.id || '',
+    default_periods:  initialData?.default_periods ?? 12,
+  })
+
+  const [saving,        setSaving]        = useState(false)
+  const [deleting,      setDeleting]      = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [err,           setErr]           = useState('')
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  // When source changes, inherit stat_type and suggest a name
+  const sourceStat = eligibleSources.find(s => s.id === Number(form.source_stat_id))
+  useEffect(() => {
+    if (sourceStat && !isEdit) {
+      set('stat_type', sourceStat.stat_type || 'currency')
+      if (!form.name) set('name', `${sourceStat.name} (${form.tracking})`)
+    }
+  }, [form.source_stat_id])
+
+  useEffect(() => {
+    if (sourceStat && !isEdit) {
+      set('name', `${sourceStat.name} (${form.tracking})`)
+    }
+  }, [form.tracking])
+
+  // Valid output periods: only periods ABOVE the source's tracking
+  const sourceIdx = SEC_PERIOD_ORDER.indexOf(sourceStat?.tracking || 'daily')
+  const validOutputPeriods = SEC_PERIOD_ORDER.filter((_, i) => i > sourceIdx)
+
+  const handleSave = async () => {
+    if (!form.name.trim())          { setErr('Name is required.'); return }
+    if (!form.source_stat_id)       { setErr('Please select a source statistic.'); return }
+    if (!validOutputPeriods.includes(form.tracking)) {
+      setErr('Output period must be a longer interval than the source statistic.'); return
+    }
+    setSaving(true); setErr('')
+    try {
+      const payload = {
+        name:               form.name.trim(),
+        stat_type:          form.stat_type,
+        tracking:           form.tracking,
+        stat_category:      'secondary',
+        source_stat_id:     Number(form.source_stat_id),
+        aggregation_method: form.aggregation_method,
+        owner_type:         form.owner_type,
+        owner_user_id:      form.owner_type === 'user' ? (form.owner_user_id || user?.id) : null,
+        default_periods:    form.default_periods ? parseInt(form.default_periods) : 12,
+        beginning_date:     today(),
+        missing_value_display: 'skip',
+        created_by:         user?.id || null,
+      }
+      let savedId, savedName
+      if (isEdit) {
+        const { error } = await supabase.from('statistics').update(payload).eq('id', initialData.id)
+        if (error) throw error
+        savedId = initialData.id; savedName = payload.name
+      } else {
+        const { data, error } = await supabase.from('statistics').insert({ ...payload, sort_order: 0 }).select().single()
+        if (error) throw error
+        savedId = data.id; savedName = data.name
+
+        // Seed values from source stat
+        const { data: srcVals } = await supabase.from('statistic_values')
+          .select('period_date, value').eq('statistic_id', Number(form.source_stat_id)).order('period_date')
+        if (srcVals?.length) {
+          const computed = aggregateValues(srcVals, form.tracking, form.aggregation_method)
+          await supabase.from('statistic_values').insert(
+            computed.map(r => ({ statistic_id: savedId, period_date: r.period_date, value: r.value, entered_by: user?.id }))
+          )
+        }
+      }
+      setSaving(false)
+      onSave(isEdit ? savedId : null, savedName)
+    } catch (e) {
+      setErr(e.message || 'Save failed.')
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    await supabase.from('statistics').delete().eq('id', initialData.id)
+    setDeleting(false)
+    onDelete?.()
+  }
+
+  const AGG_METHODS = [
+    { key: 'sum',     label: 'Sum',     desc: 'Add all values in the period (best for revenue, counts)' },
+    { key: 'average', label: 'Average', desc: 'Mean of all values (best for rates, percentages)' },
+    { key: 'last',    label: 'Last',    desc: 'Use the final value in the period' },
+    { key: 'first',   label: 'First',   desc: 'Use the first value in the period' },
+  ]
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+          <h2 className="text-lg font-semibold text-gray-900">
+            {isEdit ? 'Edit Secondary Statistic' : 'New Secondary Statistic'}
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+
+          {/* Source stat */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Source Statistic <span className="text-red-500">*</span>
+            </label>
+            <p className="text-xs text-gray-500 mb-2">Pick the existing stat whose values you want to aggregate into a longer period.</p>
+            <select
+              value={form.source_stat_id}
+              onChange={e => { set('source_stat_id', e.target.value) }}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+            >
+              <option value="">— Select a statistic —</option>
+              {eligibleSources.map(s => (
+                <option key={s.id} value={s.id}>{s.name} ({s.tracking})</option>
+              ))}
+            </select>
+            {sourceStat && (
+              <p className="text-xs text-green-700 mt-1.5 font-medium">
+                Source tracks <span className="capitalize">{sourceStat.tracking}</span> · {sourceStat.stat_type}
+              </p>
+            )}
+          </div>
+
+          {/* Output period */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Output Period <span className="text-red-500">*</span>
+            </label>
+            <p className="text-xs text-gray-500 mb-2">Must be a longer interval than the source.</p>
+            <div className="flex gap-2 flex-wrap">
+              {SEC_PERIOD_ORDER.map(t => {
+                const disabled = !validOutputPeriods.includes(t)
+                return (
+                  <button key={t} type="button"
+                    disabled={disabled}
+                    onClick={() => !disabled && set('tracking', t)}
+                    className={`flex-1 min-w-[70px] py-2 rounded-lg text-xs font-semibold border-2 capitalize transition-colors ${
+                      form.tracking === t && !disabled
+                        ? 'text-white border-transparent'
+                        : disabled
+                          ? 'border-gray-100 text-gray-300 bg-gray-50 cursor-not-allowed'
+                          : 'border-gray-200 text-gray-600 hover:border-green-500 hover:text-green-700'
+                    }`}
+                    style={form.tracking === t && !disabled ? { backgroundColor: FG, borderColor: FG } : {}}
+                  >
+                    {t}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Aggregation method */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Aggregation Method</label>
+            <div className="space-y-2">
+              {AGG_METHODS.map(m => (
+                <label key={m.key} className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-colors ${
+                  form.aggregation_method === m.key ? 'border-green-600 bg-green-50' : 'border-gray-200 hover:border-gray-300'
+                }`}>
+                  <input type="radio" name="agg" value={m.key} checked={form.aggregation_method === m.key}
+                    onChange={() => set('aggregation_method', m.key)} className="mt-0.5 accent-green-700" />
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">{m.label}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{m.desc}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Name */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Statistic Name <span className="text-red-500">*</span>
+            </label>
+            <input type="text" value={form.name} onChange={e => set('name', e.target.value)}
+              placeholder="e.g., Gross Income (Monthly)"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" />
+          </div>
+
+          {/* Default periods */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Default Periods to Show</label>
+            <input type="number" min={1} max={120} value={form.default_periods}
+              onChange={e => set('default_periods', e.target.value)}
+              className="w-32 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" />
+          </div>
+
+          {err && <p className="text-sm text-red-600 font-medium">{err}</p>}
+        </div>
+
+        <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0 flex gap-2">
+          <button onClick={handleSave} disabled={saving}
+            className="flex-1 py-2.5 text-sm font-semibold text-white rounded-xl transition-colors disabled:opacity-50"
+            style={{ backgroundColor: FG }}>
+            {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Secondary Stat'}
+          </button>
+          {isEdit && !confirmDelete && (
+            <button onClick={() => setConfirmDelete(true)}
+              className="px-4 py-2.5 border border-red-200 text-red-600 text-sm font-semibold rounded-xl hover:bg-red-50 transition-colors">
+              Delete
+            </button>
+          )}
+          {isEdit && confirmDelete && (
+            <button onClick={handleDelete} disabled={deleting}
+              className="px-4 py-2.5 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 disabled:opacity-50 transition-colors">
+              {deleting ? 'Deleting…' : 'Confirm Delete'}
+            </button>
+          )}
+          <button onClick={onClose}
+            className="px-4 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── ImportExportView ──────────────────────────────────────────────────────────
 // Required fields for import
 const IMPORT_FIELDS = [
@@ -3549,6 +3835,7 @@ export default function Statistics() {
   const [showBasicForm,       setShowBasicForm]       = useState(false)
   const [showEquationForm,    setShowEquationForm]    = useState(false)
   const [showOverlayForm,     setShowOverlayForm]     = useState(false)
+  const [showSecondaryForm,   setShowSecondaryForm]   = useState(false)
   const [editingData,         setEditingData]         = useState(null)   // null = new, obj = edit
   const [showPrintModal,      setShowPrintModal]      = useState(false)
   const [showTargetPicker,    setShowTargetPicker]    = useState(false)
@@ -3658,11 +3945,27 @@ export default function Statistics() {
     } else if (stat?.stat_category === 'overlay') {
       setValues([])
       fetchOverlayValues(stat)
+    } else if (stat?.stat_category === 'secondary') {
+      setOverlayValues([])
+      syncSecondaryValues(stat).then(() => fetchValues(selectedId))
     } else {
       setOverlayValues([])
       fetchValues(selectedId)
     }
   }, [selectedId, stats])
+
+  async function syncSecondaryValues(stat) {
+    if (!stat?.source_stat_id) return
+    const { data: srcVals } = await supabase.from('statistic_values')
+      .select('period_date, value').eq('statistic_id', stat.source_stat_id).order('period_date')
+    if (!srcVals?.length) return
+    const computed = aggregateValues(srcVals, stat.tracking, stat.aggregation_method || 'sum')
+    if (!computed.length) return
+    await supabase.from('statistic_values').upsert(
+      computed.map(r => ({ statistic_id: stat.id, period_date: r.period_date, value: r.value })),
+      { onConflict: 'statistic_id,period_date' }
+    )
+  }
 
   async function fetchValues(statId) {
     const { data } = await supabase
@@ -4184,16 +4487,18 @@ export default function Statistics() {
   // ── Handlers ───────────────────────────────────────────────────────────────
   const handleTypeSelect = (type) => {
     setShowTypeSelector(false)
-    if (type === 'basic')    { setEditingData(null); setShowBasicForm(true)    }
-    if (type === 'equation') { setEditingData(null); setShowEquationForm(true) }
-    if (type === 'overlay')  { setEditingData(null); setShowOverlayForm(true)  }
-    if (type === 'target')   { setShowTargetPicker(true) }
+    if (type === 'basic')     { setEditingData(null); setShowBasicForm(true)      }
+    if (type === 'equation')  { setEditingData(null); setShowEquationForm(true)   }
+    if (type === 'overlay')   { setEditingData(null); setShowOverlayForm(true)    }
+    if (type === 'secondary') { setEditingData(null); setShowSecondaryForm(true)  }
+    if (type === 'target')    { setShowTargetPicker(true) }
   }
 
   const handleSaveForm = async (editedId, savedName) => {
     setShowBasicForm(false)
     setShowEquationForm(false)
     setShowOverlayForm(false)
+    setShowSecondaryForm(false)
     setEditingData(null)
     console.log('[Statistics] handleSaveForm — editedId:', editedId, 'savedName:', savedName)
 
@@ -4219,6 +4524,8 @@ export default function Statistics() {
       setShowEquationForm(true)
     } else if (selectedStat.stat_category === 'overlay') {
       setShowOverlayForm(true)
+    } else if (selectedStat.stat_category === 'secondary') {
+      setShowSecondaryForm(true)
     } else {
       setShowBasicForm(true)
     }
@@ -4895,6 +5202,17 @@ export default function Statistics() {
           onSave={handleSaveForm}
           onDelete={handleDeleteStat}
           onClose={() => { setShowOverlayForm(false); setEditingData(null) }}
+        />
+      )}
+
+      {showSecondaryForm && (
+        <SecondaryStatForm
+          initialData={editingData}
+          profiles={profiles}
+          allStats={stats}
+          onSave={handleSaveForm}
+          onDelete={handleDeleteStat}
+          onClose={() => { setShowSecondaryForm(false); setEditingData(null) }}
         />
       )}
 
