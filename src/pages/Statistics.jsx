@@ -209,44 +209,43 @@ const STAT_TYPE_PREVIEWS = {
     </svg>
   ),
   auto_external: (
-    // Three app logos floating independently at scattered positions, each with its own arrow to the graph
+    // Logos track UP+RIGHT along the line: QB near start, SF near middle, GHL near end
     <svg viewBox="0 0 130 90" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-      {/* ── QB — top-left, floating high ── */}
-      <rect x="2" y="6" width="20" height="20" rx="4" fill="#2CA01C"/>
-      <text x="12" y="21" textAnchor="middle" fontSize="12" fontWeight="900" fill="white" fontFamily="serif">Q</text>
-      {/* QB arrow → graph entry ~(58,72) */}
-      <path d="M22,16 C34,16 42,44 55,60" stroke="#9ca3af" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
-      <path d="M51,57 L56,62 L60,57" stroke="#9ca3af" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-
-      {/* ── Salesforce — middle-right of logos, floating mid ── */}
-      <ellipse cx="36" cy="40" rx="11" ry="8"  fill="#00A1E0"/>
-      <ellipse cx="29" cy="45" rx="7"  ry="5"  fill="#00A1E0"/>
-      <ellipse cx="43" cy="45" rx="7"  ry="5"  fill="#00A1E0"/>
-      <rect    x="27"  y="42" width="18" height="7" fill="#00A1E0"/>
-      <text x="36" y="47" textAnchor="middle" fontSize="7" fontWeight="800" fill="white" fontFamily="sans-serif">SF</text>
-      {/* SF arrow → graph */}
-      <path d="M48,44 C52,52 54,58 57,64" stroke="#9ca3af" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
-      <path d="M53,61 L57,66 L61,61" stroke="#9ca3af" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-
-      {/* ── GHL — bottom-left, floating low ── */}
-      <rect x="4" y="64" width="22" height="18" rx="4" fill="#1a1f36"/>
-      <text x="15" y="75" textAnchor="middle" fontSize="6" fontWeight="800" fill="#f97316" fontFamily="sans-serif">GO</text>
-      <text x="15" y="79" textAnchor="middle" fontSize="5.5" fontWeight="700" fill="#fdba74" fontFamily="sans-serif">HIGH</text>
-      {/* GHL arrow → graph */}
-      <path d="M26,73 C36,73 44,72 56,68" stroke="#9ca3af" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
-      <path d="M52,65 L57,69 L53,73" stroke="#9ca3af" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-
-      {/* ── Output line graph (right half) ── */}
-      <path d="M60,76 C70,66 80,54 92,42 C102,32 114,22 128,14"
+      {/* ── Line graph spanning full width ── */}
+      <path d="M5,80 C22,70 46,58 70,48 C90,40 106,34 124,28"
         stroke="#3A5038" strokeWidth="2.5" strokeLinecap="round"/>
-      <circle cx="60"  cy="76" r="2.5" fill="#3A5038"/>
-      <circle cx="78"  cy="56" r="2.5" fill="#3A5038"/>
-      <circle cx="98"  cy="36" r="2.5" fill="#3A5038"/>
-      <circle cx="118" cy="20" r="2.5" fill="#3A5038"/>
-      <circle cx="128" cy="14" r="2.5" fill="#3A5038"/>
-      {/* Soft fill */}
-      <path d="M60,76 C70,66 80,54 92,42 C102,32 114,22 128,14 L128,90 L60,90 Z"
+      <circle cx="5"   cy="80" r="2" fill="#3A5038"/>
+      <circle cx="40"  cy="62" r="2" fill="#3A5038"/>
+      <circle cx="70"  cy="48" r="2" fill="#3A5038"/>
+      <circle cx="100" cy="36" r="2" fill="#3A5038"/>
+      <circle cx="124" cy="28" r="2" fill="#3A5038"/>
+      <path d="M5,80 C22,70 46,58 70,48 C90,40 106,34 124,28 L124,90 L5,90 Z"
         fill="#3A5038" fillOpacity="0.07"/>
+
+      {/* ── QB — floats above line START (bottom-left) ── */}
+      <rect x="2" y="52" width="16" height="16" rx="3" fill="#2CA01C"/>
+      <text x="10" y="63" textAnchor="middle" fontSize="10" fontWeight="900" fill="white" fontFamily="serif">Q</text>
+      {/* Arrow down to line near start */}
+      <path d="M8,68 C6,72 5,75 5,78" stroke="#9ca3af" strokeWidth="1" strokeLinecap="round" fill="none"/>
+      <path d="M3,76 L5,79 L7,76" stroke="#9ca3af" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+
+      {/* ── Salesforce — floats above line MIDDLE ── */}
+      <ellipse cx="62" cy="22" rx="10" ry="7"  fill="#00A1E0"/>
+      <ellipse cx="56" cy="27" rx="6"  ry="4"  fill="#00A1E0"/>
+      <ellipse cx="68" cy="27" rx="6"  ry="4"  fill="#00A1E0"/>
+      <rect x="54" y="22" width="16" height="7" fill="#00A1E0"/>
+      <text x="62" y="28" textAnchor="middle" fontSize="6" fontWeight="800" fill="white" fontFamily="sans-serif">SF</text>
+      {/* Arrow down to line middle */}
+      <path d="M65,31 C67,37 68,42 69,47" stroke="#9ca3af" strokeWidth="1" strokeLinecap="round" fill="none"/>
+      <path d="M66,45 L69,48 L72,45" stroke="#9ca3af" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+
+      {/* ── GHL — floats above line END (top-right) ── */}
+      <rect x="102" y="4" width="22" height="16" rx="3" fill="#1a1f36"/>
+      <text x="113" y="12" textAnchor="middle" fontSize="6" fontWeight="800" fill="#f97316" fontFamily="sans-serif">GO</text>
+      <text x="113" y="18" textAnchor="middle" fontSize="5.5" fontWeight="700" fill="#fdba74" fontFamily="sans-serif">HIGH</text>
+      {/* Arrow down to line end */}
+      <path d="M113,20 C116,22 120,24 123,27" stroke="#9ca3af" strokeWidth="1" strokeLinecap="round" fill="none"/>
+      <path d="M120,26 L123,29 L126,26" stroke="#9ca3af" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
     </svg>
   ),
   target: (
