@@ -1843,6 +1843,273 @@ function SmsSettings() {
   )
 }
 
+// ── IntegrationsSettings ───────────────────────────────────────────────────────
+function IntegrationsSettings() {
+  const [loading,  setLoading]  = useState(true)
+  const [saving,   setSaving]   = useState(false)
+  const [saveMsg,  setSaveMsg]  = useState('')
+  const [activeTab, setActiveTab] = useState('qbo') // 'qbo' | 'qbd'
+
+  // QuickBooks Online
+  const [qbo, setQbo] = useState({
+    enabled:       false,
+    environment:   'sandbox',
+    client_id:     '',
+    client_secret: '',
+    realm_id:      '',
+    oauth_status:  'not_connected',
+  })
+
+  // QuickBooks Desktop
+  const [qbd, setQbd] = useState({
+    enabled:         false,
+    connector_url:   '',
+    username:        '',
+    password:        '',
+    company_file:    '',
+  })
+
+  const [showSecrets, setShowSecrets] = useState({}) // { field: bool }
+
+  useEffect(() => { loadConfig() }, [])
+
+  async function loadConfig() {
+    setLoading(true)
+    const { data } = await supabase.from('company_settings').select('integrations_config').maybeSingle()
+    if (data?.integrations_config) {
+      const cfg = data.integrations_config
+      if (cfg.qbo) setQbo(q => ({ ...q, ...cfg.qbo }))
+      if (cfg.qbd) setQbd(q => ({ ...q, ...cfg.qbd }))
+    }
+    setLoading(false)
+  }
+
+  async function handleSave() {
+    setSaving(true); setSaveMsg('')
+    const cfg = { qbo, qbd }
+    const { data: existing } = await supabase.from('company_settings').select('id').maybeSingle()
+    let error
+    if (existing?.id) {
+      ;({ error } = await supabase.from('company_settings').update({ integrations_config: cfg }).eq('id', existing.id))
+    } else {
+      ;({ error } = await supabase.from('company_settings').insert({ integrations_config: cfg }))
+    }
+    setSaving(false)
+    setSaveMsg(error ? '⚠️ ' + error.message : '✓ Integration settings saved')
+    setTimeout(() => setSaveMsg(''), 4000)
+  }
+
+  const toggleSecret = (k) => setShowSecrets(s => ({ ...s, [k]: !s[k] }))
+  const secretInput = (val, onChange, field, placeholder) => (
+    <div className="relative">
+      <input
+        type={showSecrets[field] ? 'text' : 'password'}
+        value={val}
+        onChange={onChange}
+        placeholder={placeholder}
+        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm pr-16 focus:outline-none focus:ring-2 focus:ring-green-600"
+      />
+      <button type="button" onClick={() => toggleSecret(field)}
+        className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-700 font-medium">
+        {showSecrets[field] ? 'Hide' : 'Show'}
+      </button>
+    </div>
+  )
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-20">
+      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-700"></div>
+    </div>
+  )
+
+  const tabBtnCls = (k) => `px-5 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
+    activeTab === k ? 'border-green-700 text-green-800' : 'border-transparent text-gray-500 hover:text-gray-800'
+  }`
+
+  const lbl = 'block text-xs font-semibold text-gray-600 mb-1'
+  const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600'
+
+  return (
+    <div className="max-w-2xl">
+      <div className="mb-6">
+        <h2 className="text-lg font-bold text-gray-900">Integrations</h2>
+        <p className="text-sm text-gray-500 mt-0.5">Connect external apps. Configuration only — actual sync will be enabled in a future release.</p>
+      </div>
+
+      {/* Sub-tabs */}
+      <div className="flex gap-1 border-b border-gray-200 mb-6">
+        <button className={tabBtnCls('qbo')} onClick={() => setActiveTab('qbo')}>
+          QuickBooks Online
+        </button>
+        <button className={tabBtnCls('qbd')} onClick={() => setActiveTab('qbd')}>
+          QuickBooks Desktop
+        </button>
+      </div>
+
+      {/* ── QuickBooks Online ── */}
+      {activeTab === 'qbo' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <div>
+              <p className="text-sm font-semibold text-gray-800">Enable QuickBooks Online</p>
+              <p className="text-xs text-gray-500 mt-0.5">Connect via OAuth 2.0 to sync jobs, invoices, and payments.</p>
+            </div>
+            <button type="button"
+              onClick={() => setQbo(q => ({ ...q, enabled: !q.enabled }))}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                qbo.enabled ? 'bg-green-600' : 'bg-gray-300'
+              }`}>
+              <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                qbo.enabled ? 'translate-x-5' : 'translate-x-0'
+              }`} />
+            </button>
+          </div>
+
+          {/* OAuth status badge */}
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-200 bg-white">
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+              qbo.oauth_status === 'connected'
+                ? 'bg-green-100 text-green-800'
+                : 'bg-amber-100 text-amber-800'
+            }`}>
+              {qbo.oauth_status === 'connected' ? '● Connected' : '○ Not Connected'}
+            </span>
+            <span className="text-xs text-gray-500">
+              {qbo.oauth_status === 'connected'
+                ? 'OAuth token is active. Sync is authorized.'
+                : 'OAuth not yet authorized. Enter credentials below and complete OAuth flow.'}
+            </span>
+          </div>
+
+          <div>
+            <label className={lbl}>Environment</label>
+            <select value={qbo.environment} onChange={e => setQbo(q => ({ ...q, environment: e.target.value }))} className={inp}>
+              <option value="sandbox">Sandbox (Testing)</option>
+              <option value="production">Production</option>
+            </select>
+          </div>
+
+          <div>
+            <label className={lbl}>Client ID</label>
+            <input type="text" value={qbo.client_id}
+              onChange={e => setQbo(q => ({ ...q, client_id: e.target.value }))}
+              placeholder="From your Intuit Developer app"
+              className={inp} />
+          </div>
+
+          <div>
+            <label className={lbl}>Client Secret</label>
+            {secretInput(
+              qbo.client_secret,
+              e => setQbo(q => ({ ...q, client_secret: e.target.value })),
+              'qbo_secret',
+              'From your Intuit Developer app'
+            )}
+          </div>
+
+          <div>
+            <label className={lbl}>Realm ID (Company ID)</label>
+            <input type="text" value={qbo.realm_id}
+              onChange={e => setQbo(q => ({ ...q, realm_id: e.target.value }))}
+              placeholder="Found in QuickBooks Online URL after login"
+              className={inp} />
+          </div>
+
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-800 space-y-1">
+            <p className="font-semibold">How to get your credentials:</p>
+            <ol className="list-decimal list-inside space-y-0.5 text-blue-700">
+              <li>Go to <a href="https://developer.intuit.com" target="_blank" rel="noopener noreferrer" className="underline">developer.intuit.com</a> and sign in</li>
+              <li>Create an app → select "Accounting" scope</li>
+              <li>Copy the Client ID and Client Secret from "Keys & credentials"</li>
+              <li>Your Realm ID appears in your QBO URL: quickbooks.intuit.com/app/qbo?&realmid=<strong>XXXXXXXXX</strong></li>
+            </ol>
+          </div>
+        </div>
+      )}
+
+      {/* ── QuickBooks Desktop ── */}
+      {activeTab === 'qbd' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <div>
+              <p className="text-sm font-semibold text-gray-800">Enable QuickBooks Desktop</p>
+              <p className="text-xs text-gray-500 mt-0.5">Connect via QuickBooks Web Connector (QBWC) to sync with a local QB file.</p>
+            </div>
+            <button type="button"
+              onClick={() => setQbd(q => ({ ...q, enabled: !q.enabled }))}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                qbd.enabled ? 'bg-green-600' : 'bg-gray-300'
+              }`}>
+              <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                qbd.enabled ? 'translate-x-5' : 'translate-x-0'
+              }`} />
+            </button>
+          </div>
+
+          <div>
+            <label className={lbl}>Web Connector Endpoint URL</label>
+            <input type="url" value={qbd.connector_url}
+              onChange={e => setQbd(q => ({ ...q, connector_url: e.target.value }))}
+              placeholder="https://yourdomain.com/qbwc"
+              className={inp} />
+          </div>
+
+          <div>
+            <label className={lbl}>Web Connector Username</label>
+            <input type="text" value={qbd.username}
+              onChange={e => setQbd(q => ({ ...q, username: e.target.value }))}
+              placeholder="Username configured in QBWC"
+              className={inp} />
+          </div>
+
+          <div>
+            <label className={lbl}>Web Connector Password</label>
+            {secretInput(
+              qbd.password,
+              e => setQbd(q => ({ ...q, password: e.target.value })),
+              'qbd_password',
+              'Password configured in QBWC'
+            )}
+          </div>
+
+          <div>
+            <label className={lbl}>Company File Path (optional)</label>
+            <input type="text" value={qbd.company_file}
+              onChange={e => setQbd(q => ({ ...q, company_file: e.target.value }))}
+              placeholder="C:\Users\...\Company.qbw"
+              className={inp} />
+          </div>
+
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-800 space-y-1">
+            <p className="font-semibold">Setup instructions:</p>
+            <ol className="list-decimal list-inside space-y-0.5 text-blue-700">
+              <li>Download and install the QuickBooks Web Connector on the computer running QB Desktop</li>
+              <li>Enter the endpoint URL above (provided by your Picture Build server admin)</li>
+              <li>Open QBWC, add a new application, and paste this URL</li>
+              <li>Enter the username and password configured here</li>
+              <li>Open your QB Desktop company file and authorize the connection</li>
+            </ol>
+          </div>
+        </div>
+      )}
+
+      {/* Save */}
+      <div className="mt-6 flex items-center gap-4">
+        <button onClick={handleSave} disabled={saving}
+          className="px-6 py-2.5 text-sm font-bold text-white rounded-lg disabled:opacity-50 transition-colors"
+          style={{ backgroundColor: FG }}>
+          {saving ? 'Saving…' : 'Save Integration Settings'}
+        </button>
+        {saveMsg && (
+          <span className={`text-sm font-medium ${saveMsg.startsWith('⚠️') ? 'text-red-600' : 'text-green-700'}`}>
+            {saveMsg}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function Admin() {
   const { user } = useAuth()
   const [tab, setTab] = useState('overview')
@@ -1991,8 +2258,9 @@ export default function Admin() {
     { key: 'overview',  label: 'Overview' },
     { key: 'users',     label: 'Users & Roles' },
     { key: 'settings',  label: 'Company Settings' },
-    { key: 'sms',       label: '📱 SMS Settings' },
-    { key: 'email',     label: '✉️ Email Settings' },
+    { key: 'sms',          label: '📱 SMS Settings' },
+    { key: 'email',        label: '✉️ Email Settings' },
+    { key: 'integrations', label: '🔗 Integrations' },
   ]
 
   const statCards = [
@@ -2232,6 +2500,10 @@ export default function Admin() {
 
       {tab === 'email' && (
         <EmailSettings />
+      )}
+
+      {tab === 'integrations' && (
+        <IntegrationsSettings />
       )}
 
     </div>

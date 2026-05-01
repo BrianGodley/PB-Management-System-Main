@@ -100,6 +100,7 @@ function TypeSelectorModal({ onSelect, onClose }) {
     { key: 'equation',   label: 'Equation Statistic',  desc: 'Combine multiple stats with a formula.',    available: true  },
     { key: 'overlay',    label: 'Overlay Statistic',   desc: 'Overlay two or more stats on one chart.',  available: true  },
     { key: 'secondary',  label: 'Secondary Statistic', desc: 'Aggregate an existing stat into a longer period (e.g. weekly → monthly).', available: true  },
+    { key: 'auto',       label: 'Auto Statistic',      desc: 'Pull live data from jobs, bids, schedule, and more — auto-computed each period.',  available: true  },
   ]
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
@@ -2659,6 +2660,427 @@ function SecondaryStatForm({ initialData, profiles, allStats, onSave, onClose, o
   )
 }
 
+// ── AUTO_SOURCES registry ──────────────────────────────────────────────────────
+// Each source defines how to pull from a Supabase table and compute a metric.
+// `metric`: 'count' | 'sum' | 'avg'
+// `field`:  column to sum/avg (omitted for count)
+// `filter`: optional {col: val} equality filters applied to the query
+// `date_column`: which column on the table represents the period date
+const AUTO_SOURCES = [
+  {
+    category: 'Jobs',
+    icon: '🏗️',
+    sources: [
+      {
+        key: 'jobs_sold_count',
+        label: 'Jobs Sold — Count',
+        table: 'jobs', date_column: 'sold_date', metric: 'count',
+        stat_type: 'numeric',
+        desc: 'Number of jobs marked as sold/active per period.',
+      },
+      {
+        key: 'jobs_revenue',
+        label: 'Jobs Revenue (Total Price)',
+        table: 'jobs', date_column: 'sold_date', metric: 'sum', field: 'total_price',
+        stat_type: 'currency',
+        desc: 'Sum of total job price for jobs sold in the period.',
+      },
+      {
+        key: 'jobs_gross_profit',
+        label: 'Jobs Gross Profit',
+        table: 'jobs', date_column: 'sold_date', metric: 'sum', field: 'gross_profit',
+        stat_type: 'currency',
+        desc: 'Sum of gross profit for jobs sold in the period.',
+      },
+      {
+        key: 'jobs_avg_gpmd',
+        label: 'Jobs Avg GPMD %',
+        table: 'jobs', date_column: 'sold_date', metric: 'avg', field: 'gpmd',
+        stat_type: 'percentage',
+        desc: 'Average gross profit margin % across jobs sold in the period.',
+      },
+      {
+        key: 'jobs_avg_price',
+        label: 'Jobs Avg Price',
+        table: 'jobs', date_column: 'sold_date', metric: 'avg', field: 'total_price',
+        stat_type: 'currency',
+        desc: 'Average job price for jobs sold in the period.',
+      },
+      {
+        key: 'jobs_created_count',
+        label: 'Jobs Created — Count',
+        table: 'jobs', date_column: 'created_at', metric: 'count',
+        stat_type: 'numeric',
+        desc: 'Number of job records created in the period.',
+      },
+    ],
+  },
+  {
+    category: 'Bids',
+    icon: '📋',
+    sources: [
+      {
+        key: 'bids_count',
+        label: 'Bids Created — Count',
+        table: 'bids', date_column: 'created_at', metric: 'count',
+        stat_type: 'numeric',
+        desc: 'Number of bids created in the period.',
+      },
+      {
+        key: 'bids_total_value',
+        label: 'Bids Total Value',
+        table: 'bids', date_column: 'created_at', metric: 'sum', field: 'total_price',
+        stat_type: 'currency',
+        desc: 'Sum of all bid values created in the period.',
+      },
+      {
+        key: 'bids_avg_value',
+        label: 'Bids Avg Value',
+        table: 'bids', date_column: 'created_at', metric: 'avg', field: 'total_price',
+        stat_type: 'currency',
+        desc: 'Average bid value created in the period.',
+      },
+      {
+        key: 'bids_gross_profit',
+        label: 'Bids Gross Profit',
+        table: 'bids', date_column: 'created_at', metric: 'sum', field: 'gross_profit',
+        stat_type: 'currency',
+        desc: 'Sum of gross profit on bids created in the period.',
+      },
+      {
+        key: 'bids_sold_count',
+        label: 'Bids Won (Sold) — Count',
+        table: 'bids', date_column: 'sold_date', metric: 'count',
+        stat_type: 'numeric',
+        desc: 'Number of bids marked as sold in the period.',
+      },
+      {
+        key: 'bids_sold_value',
+        label: 'Bids Won — Total Value',
+        table: 'bids', date_column: 'sold_date', metric: 'sum', field: 'total_price',
+        stat_type: 'currency',
+        desc: 'Sum of total price for bids marked as sold in the period.',
+      },
+    ],
+  },
+  {
+    category: 'Schedule',
+    icon: '📅',
+    sources: [
+      {
+        key: 'schedule_items_count',
+        label: 'Schedule Items — Total',
+        table: 'schedule_items', date_column: 'work_date', metric: 'count',
+        stat_type: 'numeric',
+        desc: 'Total number of scheduled items (any type) in the period.',
+      },
+      {
+        key: 'schedule_job_count',
+        label: 'Schedule Items — Jobs Only',
+        table: 'schedule_items', date_column: 'work_date', metric: 'count',
+        filter: { scheduling_type: 'job' },
+        stat_type: 'numeric',
+        desc: 'Scheduled job appearances in the period.',
+      },
+      {
+        key: 'schedule_yard_check_count',
+        label: 'Schedule Items — Yard Checks',
+        table: 'schedule_items', date_column: 'work_date', metric: 'count',
+        filter: { scheduling_type: 'yard_check' },
+        stat_type: 'numeric',
+        desc: 'Number of yard check visits scheduled in the period.',
+      },
+    ],
+  },
+  {
+    category: 'Collections',
+    icon: '💰',
+    sources: [
+      {
+        key: 'collections_invoiced',
+        label: 'Collections — Invoiced Amount',
+        table: 'collections', date_column: 'invoice_date', metric: 'sum', field: 'amount',
+        stat_type: 'currency',
+        desc: 'Total dollar amount invoiced in the period.',
+      },
+      {
+        key: 'collections_paid',
+        label: 'Collections — Paid Amount',
+        table: 'collections', date_column: 'paid_date', metric: 'sum', field: 'amount_paid',
+        stat_type: 'currency',
+        desc: 'Total dollar amount collected (paid) in the period.',
+      },
+      {
+        key: 'collections_invoice_count',
+        label: 'Collections — Invoice Count',
+        table: 'collections', date_column: 'invoice_date', metric: 'count',
+        stat_type: 'numeric',
+        desc: 'Number of invoices created in the period.',
+      },
+    ],
+  },
+  {
+    category: 'Work Orders',
+    icon: '🛠️',
+    sources: [
+      {
+        key: 'work_orders_count',
+        label: 'Work Orders Created — Count',
+        table: 'work_orders', date_column: 'created_at', metric: 'count',
+        stat_type: 'numeric',
+        desc: 'Number of work orders created in the period.',
+      },
+    ],
+  },
+  {
+    category: 'Clients',
+    icon: '🤝',
+    sources: [
+      {
+        key: 'clients_count',
+        label: 'New Clients — Count',
+        table: 'clients', date_column: 'created_at', metric: 'count',
+        stat_type: 'numeric',
+        desc: 'Number of client records created in the period.',
+      },
+    ],
+  },
+]
+
+// Flatten for quick lookup by key
+const AUTO_SOURCE_MAP = Object.fromEntries(
+  AUTO_SOURCES.flatMap(cat => cat.sources.map(s => [s.key, s]))
+)
+
+// ── AutoStatForm ──────────────────────────────────────────────────────────────
+function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete }) {
+  const { user } = useAuth()
+  const isEdit = !!initialData?.id
+
+  // Parse existing data_source if editing
+  const existingDs = (() => {
+    try { return JSON.parse(initialData?.data_source || '{}') } catch { return {} }
+  })()
+
+  const [selectedCategory, setSelectedCategory] = useState(
+    existingDs.category || AUTO_SOURCES[0].category
+  )
+  const [selectedKey, setSelectedKey] = useState(existingDs.key || '')
+  const [form, setForm] = useState({
+    name:           initialData?.name || '',
+    tracking:       initialData?.tracking || 'monthly',
+    stat_type:      initialData?.stat_type || 'numeric',
+    owner_type:     initialData?.owner_type || 'user',
+    owner_user_id:  initialData?.owner_user_id || user?.id || '',
+    default_periods: initialData?.default_periods ?? 12,
+  })
+
+  const [saving,        setSaving]        = useState(false)
+  const [deleting,      setDeleting]      = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [err,           setErr]           = useState('')
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const categoryObj = AUTO_SOURCES.find(c => c.category === selectedCategory) || AUTO_SOURCES[0]
+  const sourceDef   = AUTO_SOURCE_MAP[selectedKey] || null
+
+  // When source changes, inherit stat_type and suggest name
+  useEffect(() => {
+    if (sourceDef && !isEdit) {
+      set('stat_type', sourceDef.stat_type)
+      if (!form.name) set('name', `${sourceDef.label} (${form.tracking})`)
+    }
+  }, [selectedKey])
+
+  async function handleSave() {
+    if (!selectedKey) { setErr('Please select a data source.'); return }
+    if (!form.name.trim()) { setErr('Please enter a name.'); return }
+    setErr(''); setSaving(true)
+
+    const ds = JSON.stringify({ key: selectedKey, category: selectedCategory, ...sourceDef })
+
+    const payload = {
+      name: form.name.trim(),
+      stat_category: 'auto',
+      tracking: form.tracking,
+      stat_type: form.stat_type,
+      owner_type: form.owner_type,
+      owner_user_id: form.owner_type === 'user' ? form.owner_user_id || null : null,
+      default_periods: Number(form.default_periods) || 12,
+      data_source: ds,
+      beginning_date: today(),
+    }
+
+    let savedId = null
+    if (isEdit) {
+      const { error } = await supabase.from('statistics').update(payload).eq('id', initialData.id)
+      if (error) { setErr(error.message); setSaving(false); return }
+      savedId = initialData.id
+    } else {
+      const { data, error } = await supabase.from('statistics').insert({ ...payload, sort_order: 9999 }).select().single()
+      if (error) { setErr(error.message); setSaving(false); return }
+      savedId = data.id
+    }
+
+    setSaving(false)
+    onSave(savedId, form.name.trim())
+  }
+
+  async function handleDelete() {
+    setDeleting(true)
+    await supabase.from('statistic_values').delete().eq('statistic_id', initialData.id)
+    await supabase.from('statistics').delete().eq('id', initialData.id)
+    setDeleting(false)
+    onDelete?.()
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl flex flex-col max-h-[90vh] overflow-hidden">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-3.5 border-b border-gray-100 flex-shrink-0"
+             style={{ backgroundColor: '#1e40af' }}>
+          <h2 className="text-base font-bold text-white">⚡ Auto Statistic</h2>
+          <button onClick={onClose} className="text-white/70 hover:text-white text-xl leading-none">✕</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+
+          {/* Category picker */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Data Category</label>
+            <div className="flex flex-wrap gap-2">
+              {AUTO_SOURCES.map(cat => (
+                <button key={cat.category} type="button"
+                  onClick={() => { setSelectedCategory(cat.category); setSelectedKey('') }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                    selectedCategory === cat.category
+                      ? 'bg-blue-700 text-white border-blue-700'
+                      : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                  }`}>
+                  {cat.icon} {cat.category}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Source picker */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Data Source</label>
+            <div className="space-y-1.5">
+              {categoryObj.sources.map(src => (
+                <button key={src.key} type="button"
+                  onClick={() => setSelectedKey(src.key)}
+                  className={`w-full text-left px-4 py-2.5 rounded-xl border-2 transition-colors ${
+                    selectedKey === src.key
+                      ? 'border-blue-600 bg-blue-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}>
+                  <div className="text-sm font-semibold text-gray-800">{src.label}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">{src.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {sourceDef && (
+            <>
+              {/* Tracking period */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Tracking Period</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {['daily','weekly','monthly','quarterly','yearly'].map(t => (
+                    <button key={t} type="button" onClick={() => set('tracking', t)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border capitalize transition-colors ${
+                        form.tracking === t ? 'text-white border-transparent' : 'border-gray-200 text-gray-600 hover:border-blue-400'
+                      }`}
+                      style={form.tracking === t ? { backgroundColor: '#1e40af', borderColor: '#1e40af' } : {}}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Stat type */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Value Format</label>
+                <div className="flex gap-2">
+                  {[['currency','($) Currency'],['numeric','(#) Numeric'],['percentage','(%) Percentage']].map(([val,lab]) => (
+                    <button key={val} type="button" onClick={() => set('stat_type', val)}
+                      className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+                        form.stat_type === val ? 'bg-blue-700 text-white border-blue-700' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                      }`}>
+                      {lab}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Name */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                  Statistic Name <span className="text-red-500">*</span>
+                </label>
+                <input type="text" value={form.name} onChange={e => set('name', e.target.value)}
+                  placeholder="e.g., Monthly Jobs Sold"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600" />
+              </div>
+
+              {/* Default periods + Owner */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Default Periods</label>
+                  <input type="number" min={1} max={120} value={form.default_periods}
+                    onChange={e => set('default_periods', e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Assigned To</label>
+                  <select value={form.owner_user_id} onChange={e => set('owner_user_id', e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
+                    <option value="">— Anyone —</option>
+                    {profiles.map(p => (
+                      <option key={p.id} value={p.id}>{p.full_name || p.email}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </>
+          )}
+
+          {err && <p className="text-sm text-red-600 font-medium">{err}</p>}
+        </div>
+
+        <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0 flex gap-2">
+          <button onClick={handleSave} disabled={saving}
+            className="flex-1 py-2.5 text-sm font-semibold text-white rounded-xl transition-colors disabled:opacity-50"
+            style={{ backgroundColor: '#1e40af' }}>
+            {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Auto Stat'}
+          </button>
+          {isEdit && !confirmDelete && (
+            <button onClick={() => setConfirmDelete(true)}
+              className="px-4 py-2.5 border border-red-200 text-red-600 text-sm font-semibold rounded-xl hover:bg-red-50 transition-colors">
+              Delete
+            </button>
+          )}
+          {isEdit && confirmDelete && (
+            <button onClick={handleDelete} disabled={deleting}
+              className="px-4 py-2.5 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 disabled:opacity-50 transition-colors">
+              {deleting ? 'Deleting…' : 'Confirm Delete'}
+            </button>
+          )}
+          <button onClick={onClose}
+            className="px-4 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── ImportExportView ──────────────────────────────────────────────────────────
 // Required fields for import
 const IMPORT_FIELDS = [
@@ -3840,6 +4262,7 @@ export default function Statistics() {
   const [showEquationForm,    setShowEquationForm]    = useState(false)
   const [showOverlayForm,     setShowOverlayForm]     = useState(false)
   const [showSecondaryForm,   setShowSecondaryForm]   = useState(false)
+  const [showAutoForm,        setShowAutoForm]        = useState(false)
   const [editingData,         setEditingData]         = useState(null)   // null = new, obj = edit
   const [showPrintModal,      setShowPrintModal]      = useState(false)
   const [showTargetPicker,    setShowTargetPicker]    = useState(false)
@@ -3958,6 +4381,15 @@ export default function Statistics() {
           setToDate(today())
         }
       })
+    } else if (stat?.stat_category === 'auto') {
+      setOverlayValues([])
+      syncAutoValues(stat).then(earliest => {
+        fetchValues(selectedId)
+        if (earliest) {
+          setFromDate(earliest)
+          setToDate(today())
+        }
+      })
     } else {
       setOverlayValues([])
       fetchValues(selectedId)
@@ -3981,6 +4413,70 @@ export default function Statistics() {
       await supabase.from('statistics').update({ beginning_date: earliest }).eq('id', stat.id)
     }
     // Update local stats state so scrubber gets correct minDate immediately (no refetch needed)
+    setStats(prev => prev.map(s =>
+      s.id === stat.id ? { ...s, beginning_date: earliest } : s
+    ))
+    return earliest
+  }
+
+  async function syncAutoValues(stat) {
+    if (!stat?.data_source) return null
+    let ds
+    try { ds = JSON.parse(stat.data_source) } catch { return null }
+    if (!ds?.table || !ds?.date_column) return null
+
+    // Fetch all rows from the source table
+    let query = supabase.from(ds.table).select(
+      ds.metric === 'count'
+        ? `${ds.date_column}`
+        : `${ds.date_column}, ${ds.field}`
+    )
+    // Apply equality filters
+    if (ds.filter) {
+      for (const [col, val] of Object.entries(ds.filter)) {
+        query = query.eq(col, val)
+      }
+    }
+    // Filter out nulls on the date column
+    query = query.not(ds.date_column, 'is', null)
+    const { data: rows, error } = await query
+    if (error || !rows?.length) return null
+
+    // Group by period
+    const buckets = new Map()
+    for (const row of rows) {
+      const rawDate = row[ds.date_column]
+      if (!rawDate) continue
+      const dateStr = rawDate.slice(0, 10)
+      const bucket  = getOutputPeriodKey(dateStr, stat.tracking)
+      if (!buckets.has(bucket)) buckets.set(bucket, [])
+      if (ds.metric !== 'count') {
+        const val = Number(row[ds.field] ?? 0)
+        buckets.get(bucket).push(val)
+      } else {
+        buckets.get(bucket).push(1)
+      }
+    }
+
+    const computed = []
+    for (const [period_date, vals] of buckets) {
+      let value
+      if      (ds.metric === 'count') value = vals.length
+      else if (ds.metric === 'sum')   value = vals.reduce((a, b) => a + b, 0)
+      else if (ds.metric === 'avg')   value = vals.reduce((a, b) => a + b, 0) / vals.length
+      computed.push({ period_date, value })
+    }
+    computed.sort((a, b) => a.period_date.localeCompare(b.period_date))
+    if (!computed.length) return null
+
+    await supabase.from('statistic_values').upsert(
+      computed.map(r => ({ statistic_id: stat.id, period_date: r.period_date, value: r.value })),
+      { onConflict: 'statistic_id,period_date' }
+    )
+    const earliest = computed[0].period_date
+    if (!stat.beginning_date || stat.beginning_date > earliest) {
+      await supabase.from('statistics').update({ beginning_date: earliest }).eq('id', stat.id)
+    }
     setStats(prev => prev.map(s =>
       s.id === stat.id ? { ...s, beginning_date: earliest } : s
     ))
@@ -4281,6 +4777,7 @@ export default function Statistics() {
     if (!selectedStat) return
     if (selectedStat.stat_category === 'target') return    // target stats: date locked to target line
     if (selectedStat.stat_category === 'secondary') return // secondary stats: date set from sync
+    if (selectedStat.stat_category === 'auto') return      // auto stats: date set from sync
     const range = defaultRangeFor(selectedStat, weekEndingDay)
     if (range) {
       setFromDate(range.from)
@@ -4512,6 +5009,7 @@ export default function Statistics() {
     if (type === 'equation')  { setEditingData(null); setShowEquationForm(true)   }
     if (type === 'overlay')   { setEditingData(null); setShowOverlayForm(true)    }
     if (type === 'secondary') { setEditingData(null); setShowSecondaryForm(true)  }
+    if (type === 'auto')      { setEditingData(null); setShowAutoForm(true)       }
     if (type === 'target')    { setShowTargetPicker(true) }
   }
 
@@ -4520,6 +5018,7 @@ export default function Statistics() {
     setShowEquationForm(false)
     setShowOverlayForm(false)
     setShowSecondaryForm(false)
+    setShowAutoForm(false)
     setEditingData(null)
     console.log('[Statistics] handleSaveForm — editedId:', editedId, 'savedName:', savedName)
 
@@ -4547,6 +5046,8 @@ export default function Statistics() {
       setShowOverlayForm(true)
     } else if (selectedStat.stat_category === 'secondary') {
       setShowSecondaryForm(true)
+    } else if (selectedStat.stat_category === 'auto') {
+      setShowAutoForm(true)
     } else {
       setShowBasicForm(true)
     }
@@ -4554,6 +5055,7 @@ export default function Statistics() {
 
   const handleDeleteStat = async () => {
     setShowBasicForm(false)
+    setShowAutoForm(false)
     setEditingData(null)
     setSelectedId(null)
     await fetchAll()
@@ -5234,6 +5736,16 @@ export default function Statistics() {
           onSave={handleSaveForm}
           onDelete={handleDeleteStat}
           onClose={() => { setShowSecondaryForm(false); setEditingData(null) }}
+        />
+      )}
+
+      {showAutoForm && (
+        <AutoStatForm
+          initialData={editingData}
+          profiles={profiles}
+          onSave={handleSaveForm}
+          onDelete={handleDeleteStat}
+          onClose={() => { setShowAutoForm(false); setEditingData(null) }}
         />
       )}
 
