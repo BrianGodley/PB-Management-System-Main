@@ -5752,9 +5752,10 @@ export default function Statistics() {
     const dateRange   = `${fromDate} → ${toDate}`
     const isLandscape = orientation === 'landscape'
 
-    // Clone each SVG and preserve its coordinate system via viewBox.
-    // Landscape: height="100%" so the flex container drives the SVG height.
-    // Portrait:  use 1.4× screen height for a tall, readable chart.
+    // Clone each SVG — preserve its viewBox, set width/height to 100%
+    // so the flex container below drives the final rendered size.
+    // preserveAspectRatio="none" lets the chart fill whatever shape the
+    // printed page gives it rather than letterboxing.
     const svgEls = el.querySelectorAll('svg')
     let svgHTML = ''
     svgEls.forEach(svg => {
@@ -5764,7 +5765,8 @@ export default function Statistics() {
       const h     = rect.height || parseFloat(svg.getAttribute('height')) || 400
       clone.setAttribute('viewBox', `0 0 ${w} ${h}`)
       clone.setAttribute('width',  '100%')
-      clone.setAttribute('height', isLandscape ? '100%' : Math.round(h * 1.4))
+      clone.setAttribute('height', '100%')
+      clone.setAttribute('preserveAspectRatio', 'none')
       clone.style.cssText = 'display: block;'
       // Thicken data lines by 50% (skip thin grid/axis lines ≤1px)
       clone.querySelectorAll('[stroke-width]').forEach(el => {
@@ -5784,15 +5786,14 @@ export default function Statistics() {
   <style>
     *, *::before, *::after {
       box-sizing: border-box; margin: 0; padding: 0;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
     }
     html, body { height: 100%; }
     body {
       font-family: ui-sans-serif, system-ui, sans-serif;
       background: #fff;
-      padding: ${isLandscape ? '14px 22px 10px' : '28px 32px'};
-      ${isLandscape ? 'display: flex; flex-direction: column;' : ''}
+      display: flex; flex-direction: column;
+      padding: ${isLandscape ? '10px 18px 8px' : '12px 20px 10px'};
     }
     h1 {
       font-size: ${isLandscape ? '17px' : '20px'};
@@ -5801,20 +5802,20 @@ export default function Statistics() {
     }
     .dr {
       font-size: 11px; color: #6b7280;
-      margin-bottom: ${isLandscape ? '10px' : '20px'};
-      flex-shrink: 0;
+      margin-bottom: 8px; flex-shrink: 0;
     }
     .chart-wrap {
-      ${isLandscape ? 'flex: 1; min-height: 0; display: flex; flex-direction: column;' : ''}
+      flex: 1; min-height: 0;
+      display: flex; flex-direction: column;
     }
-    svg {
+    .chart-wrap svg {
       display: block; width: 100% !important;
-      ${isLandscape ? 'flex: 1; height: 100% !important; min-height: 0;' : ''}
+      flex: 1; height: 100% !important; min-height: 0;
     }
     @media print {
-      @page { size: ${orientation}; margin: 1in 0.6in; }
+      @page { size: ${orientation}; margin: ${isLandscape ? '1in 0.5in' : '0.5in 1in'}; }
       html, body { height: 100vh; }
-      body { padding: ${isLandscape ? '6px 14px 4px' : '12px 24px 6px'}; }
+      body { padding: ${isLandscape ? '6px 12px 4px' : '8px 14px 6px'}; }
     }
   </style>
 </head>
