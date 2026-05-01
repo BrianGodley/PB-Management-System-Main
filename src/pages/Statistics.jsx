@@ -182,7 +182,7 @@ const STAT_TYPE_PREVIEWS = {
       <circle cx="108" cy="52" r="2" fill="#3A5038"/>
     </svg>
   ),
-  auto: (
+  auto_internal: (
     // Database cylinder on top, down arrow, computed line graph below
     <svg viewBox="0 0 110 90" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
       {/* DB cylinder — centred at top */}
@@ -206,6 +206,51 @@ const STAT_TYPE_PREVIEWS = {
       {/* Soft fill */}
       <path d="M4,86 C18,78 32,70 50,62 C66,55 82,54 106,46 L106,90 L4,90 Z"
         fill="#1e40af" fillOpacity="0.06"/>
+    </svg>
+  ),
+  auto_external: (
+    // Three app logos (QB, Salesforce, GHL) with arrows converging to a line graph
+    <svg viewBox="0 0 120 90" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+      {/* ── QuickBooks logo (top) ── */}
+      <rect x="2" y="4" width="22" height="22" rx="5" fill="#2CA01C"/>
+      {/* QB intuit checkmark / Q shape */}
+      <text x="13" y="20" textAnchor="middle" fontSize="13" fontWeight="900" fill="white" fontFamily="serif">Q</text>
+
+      {/* ── Salesforce logo (middle) ── */}
+      {/* Cloud shape approximation */}
+      <ellipse cx="13" cy="45" rx="11" ry="8" fill="#00A1E0"/>
+      <ellipse cx="7"  cy="49" rx="6"  ry="5" fill="#00A1E0"/>
+      <ellipse cx="19" cy="49" rx="6"  ry="5" fill="#00A1E0"/>
+      <rect x="4" y="46" width="18" height="8" fill="#00A1E0"/>
+      {/* SF text */}
+      <text x="13" y="51" textAnchor="middle" fontSize="7" fontWeight="800" fill="white" fontFamily="sans-serif">SF</text>
+
+      {/* ── GoHighLevel logo (bottom) ── */}
+      <rect x="2" y="64" width="22" height="20" rx="5" fill="#1a1f36"/>
+      <text x="13" y="77" textAnchor="middle" fontSize="6.5" fontWeight="800" fill="#f97316" fontFamily="sans-serif">GHL</text>
+
+      {/* ── Arrows from each app to graph ── */}
+      {/* QB → graph */}
+      <path d="M25,15 C34,15 40,36 48,40" stroke="#9ca3af" strokeWidth="1.4" strokeLinecap="round" fill="none"/>
+      <path d="M44,37 L48,41 L44,44" stroke="#9ca3af" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      {/* SF → graph */}
+      <path d="M25,46 L48,44" stroke="#9ca3af" strokeWidth="1.4" strokeLinecap="round"/>
+      <path d="M44,41 L48,45 L44,48" stroke="#9ca3af" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      {/* GHL → graph */}
+      <path d="M25,74 C34,74 40,54 48,48" stroke="#9ca3af" strokeWidth="1.4" strokeLinecap="round" fill="none"/>
+      <path d="M44,45 L48,49 L44,52" stroke="#9ca3af" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+
+      {/* ── Output line graph ── */}
+      <path d="M52,80 C62,70 72,58 84,46 C94,36 104,28 118,18"
+        stroke="#3A5038" strokeWidth="2.5" strokeLinecap="round"/>
+      <circle cx="52"  cy="80" r="2.5" fill="#3A5038"/>
+      <circle cx="70"  cy="62" r="2.5" fill="#3A5038"/>
+      <circle cx="88"  cy="44" r="2.5" fill="#3A5038"/>
+      <circle cx="108" cy="26" r="2.5" fill="#3A5038"/>
+      <circle cx="118" cy="18" r="2.5" fill="#3A5038"/>
+      {/* Soft fill under graph */}
+      <path d="M52,80 C62,70 72,58 84,46 C94,36 104,28 118,18 L118,90 L52,90 Z"
+        fill="#3A5038" fillOpacity="0.07"/>
     </svg>
   ),
   target: (
@@ -235,15 +280,17 @@ function TypeSelectorModal({ onSelect, onClose }) {
     { key: 'equation',   label: 'Equation Statistic',  desc: 'Combine multiple stats with a formula.',    available: true  },
     { key: 'overlay',    label: 'Overlay Statistic',   desc: 'Overlay two or more stats on one chart.',  available: true  },
     { key: 'secondary',  label: 'Secondary Statistic', desc: 'Make Longer Period Stats.', available: true  },
-    { key: 'auto',       label: 'Auto Statistic',      desc: 'Pull live data from jobs, bids, schedule, and more — auto-computed each period.',  available: true  },
+    { key: 'auto_internal', label: 'Auto Internal Stats', desc: 'Pull live data from jobs, bids, schedule, and more — auto-computed each period.', available: true  },
+    { key: 'auto_external', label: 'Auto External Stats', desc: 'Connect external apps via API — QuickBooks, Salesforce, GoHighLevel, and more.',   available: true  },
   ]
   // Preview container size per stat type (portrait ones need more height)
   const previewSize = {
-    basic:     'w-32 h-20',
-    equation:  'w-32 h-20',
-    overlay:   'w-32 h-20',
-    secondary: 'w-28 h-28',
-    auto:      'w-28 h-28',
+    basic:         'w-32 h-20',
+    equation:      'w-32 h-20',
+    overlay:       'w-32 h-20',
+    secondary:     'w-28 h-28',
+    auto_internal: 'w-28 h-28',
+    auto_external: 'w-32 h-28',
   }
 
   return (
@@ -3056,7 +3103,7 @@ function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete }) {
 
     const payload = {
       name: form.name.trim(),
-      stat_category: 'auto',
+      stat_category: 'auto_internal',
       tracking: form.tracking,
       stat_type: form.stat_type,
       owner_type: form.owner_type,
@@ -3228,6 +3275,122 @@ function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete }) {
           <button onClick={onClose}
             className="px-4 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50 transition-colors">
             Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── AutoExternalStatForm ──────────────────────────────────────────────────────
+const EXTERNAL_APPS = [
+  {
+    key: 'quickbooks_online',
+    label: 'QuickBooks Online',
+    color: '#2CA01C',
+    textColor: 'white',
+    icon: (
+      <svg viewBox="0 0 32 32" className="w-6 h-6">
+        <rect width="32" height="32" rx="6" fill="#2CA01C"/>
+        <text x="16" y="23" textAnchor="middle" fontSize="18" fontWeight="900" fill="white" fontFamily="serif">Q</text>
+      </svg>
+    ),
+  },
+  {
+    key: 'quickbooks_desktop',
+    label: 'QuickBooks Desktop',
+    color: '#1a6e10',
+    textColor: 'white',
+    icon: (
+      <svg viewBox="0 0 32 32" className="w-6 h-6">
+        <rect width="32" height="32" rx="6" fill="#1a6e10"/>
+        <text x="16" y="23" textAnchor="middle" fontSize="18" fontWeight="900" fill="white" fontFamily="serif">Q</text>
+        <rect x="20" y="18" width="10" height="10" rx="2" fill="#0d4a08"/>
+        <text x="25" y="26" textAnchor="middle" fontSize="8" fontWeight="700" fill="#4ade80" fontFamily="sans-serif">D</text>
+      </svg>
+    ),
+  },
+  {
+    key: 'salesforce',
+    label: 'Salesforce',
+    color: '#00A1E0',
+    textColor: 'white',
+    icon: (
+      <svg viewBox="0 0 32 32" className="w-6 h-6">
+        {/* Salesforce cloud shape */}
+        <ellipse cx="16" cy="15" rx="14" ry="10" fill="#00A1E0"/>
+        <ellipse cx="8"  cy="19" rx="7"  ry="6"  fill="#00A1E0"/>
+        <ellipse cx="24" cy="19" rx="7"  ry="6"  fill="#00A1E0"/>
+        <text x="16" y="20" textAnchor="middle" fontSize="9" fontWeight="800" fill="white" fontFamily="sans-serif">SF</text>
+      </svg>
+    ),
+  },
+  {
+    key: 'gohighlevel',
+    label: 'GoHighLevel',
+    color: '#1a1f36',
+    textColor: '#f97316',
+    icon: (
+      <svg viewBox="0 0 32 32" className="w-6 h-6">
+        <rect width="32" height="32" rx="6" fill="#1a1f36"/>
+        <text x="16" y="14" textAnchor="middle" fontSize="7" fontWeight="800" fill="#f97316" fontFamily="sans-serif">GO</text>
+        <text x="16" y="23" textAnchor="middle" fontSize="7" fontWeight="800" fill="#f97316" fontFamily="sans-serif">HIGH</text>
+      </svg>
+    ),
+  },
+]
+
+function AutoExternalStatForm({ onClose }) {
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-3.5 border-b border-gray-100 flex-shrink-0"
+             style={{ background: 'linear-gradient(135deg, #1a1f36 0%, #2CA01C 50%, #00A1E0 100%)' }}>
+          <h2 className="text-base font-bold text-white">🔗 Auto External Stats</h2>
+          <button onClick={onClose} className="text-white/70 hover:text-white text-xl leading-none">✕</button>
+        </div>
+
+        <div className="px-6 py-5 space-y-5">
+          <p className="text-sm text-gray-600 leading-relaxed">
+            Connect external apps to automatically pull metrics into your statistics dashboard.
+            Configure your integrations first, then create stats from the live data they provide.
+          </p>
+
+          {/* App grid */}
+          <div className="grid grid-cols-2 gap-3">
+            {EXTERNAL_APPS.map(app => (
+              <div key={app.key}
+                className="flex items-center gap-3 p-3 rounded-xl border-2 border-gray-100 bg-gray-50 opacity-70">
+                <div className="flex-shrink-0">{app.icon}</div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-700">{app.label}</p>
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700 mt-0.5">
+                    Coming Soon
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Setup nudge */}
+          <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+            <span className="text-xl flex-shrink-0">⚙️</span>
+            <div>
+              <p className="text-sm font-semibold text-blue-800">Set up integrations first</p>
+              <p className="text-xs text-blue-700 mt-0.5 leading-snug">
+                Go to <strong>Admin → Integrations</strong> to configure your QuickBooks, Salesforce,
+                or GoHighLevel connection. Once connected, return here to create stats from their live data.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-gray-100 flex justify-end">
+          <button onClick={onClose}
+            className="px-5 py-2 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50 transition-colors">
+            Close
           </button>
         </div>
       </div>
@@ -4418,6 +4581,7 @@ export default function Statistics() {
   const [showOverlayForm,     setShowOverlayForm]     = useState(false)
   const [showSecondaryForm,   setShowSecondaryForm]   = useState(false)
   const [showAutoForm,        setShowAutoForm]        = useState(false)
+  const [showAutoExternalForm, setShowAutoExternalForm] = useState(false)
   const [editingData,         setEditingData]         = useState(null)   // null = new, obj = edit
   const [showPrintModal,      setShowPrintModal]      = useState(false)
   const [showTargetPicker,    setShowTargetPicker]    = useState(false)
@@ -4536,7 +4700,7 @@ export default function Statistics() {
           setToDate(today())
         }
       })
-    } else if (stat?.stat_category === 'auto') {
+    } else if (stat?.stat_category === 'auto_internal') {
       setOverlayValues([])
       syncAutoValues(stat).then(earliest => {
         fetchValues(selectedId)
@@ -4932,7 +5096,7 @@ export default function Statistics() {
     if (!selectedStat) return
     if (selectedStat.stat_category === 'target') return    // target stats: date locked to target line
     if (selectedStat.stat_category === 'secondary') return // secondary stats: date set from sync
-    if (selectedStat.stat_category === 'auto') return      // auto stats: date set from sync
+    if (selectedStat.stat_category === 'auto_internal') return  // auto stats: date set from sync
     const range = defaultRangeFor(selectedStat, weekEndingDay)
     if (range) {
       setFromDate(range.from)
@@ -5164,7 +5328,8 @@ export default function Statistics() {
     if (type === 'equation')  { setEditingData(null); setShowEquationForm(true)   }
     if (type === 'overlay')   { setEditingData(null); setShowOverlayForm(true)    }
     if (type === 'secondary') { setEditingData(null); setShowSecondaryForm(true)  }
-    if (type === 'auto')      { setEditingData(null); setShowAutoForm(true)       }
+    if (type === 'auto_internal') { setEditingData(null); setShowAutoForm(true)         }
+    if (type === 'auto_external') { setEditingData(null); setShowAutoExternalForm(true) }
     if (type === 'target')    { setShowTargetPicker(true) }
   }
 
@@ -5174,6 +5339,7 @@ export default function Statistics() {
     setShowOverlayForm(false)
     setShowSecondaryForm(false)
     setShowAutoForm(false)
+    setShowAutoExternalForm(false)
     setEditingData(null)
     console.log('[Statistics] handleSaveForm — editedId:', editedId, 'savedName:', savedName)
 
@@ -5201,8 +5367,10 @@ export default function Statistics() {
       setShowOverlayForm(true)
     } else if (selectedStat.stat_category === 'secondary') {
       setShowSecondaryForm(true)
-    } else if (selectedStat.stat_category === 'auto') {
+    } else if (selectedStat.stat_category === 'auto_internal') {
       setShowAutoForm(true)
+    } else if (selectedStat.stat_category === 'auto_external') {
+      setShowAutoExternalForm(true)
     } else {
       setShowBasicForm(true)
     }
@@ -5211,6 +5379,7 @@ export default function Statistics() {
   const handleDeleteStat = async () => {
     setShowBasicForm(false)
     setShowAutoForm(false)
+    setShowAutoExternalForm(false)
     setEditingData(null)
     setSelectedId(null)
     await fetchAll()
@@ -6039,6 +6208,12 @@ export default function Statistics() {
           onSave={handleSaveForm}
           onDelete={handleDeleteStat}
           onClose={() => { setShowAutoForm(false); setEditingData(null) }}
+        />
+      )}
+
+      {showAutoExternalForm && (
+        <AutoExternalStatForm
+          onClose={() => { setShowAutoExternalForm(false); setEditingData(null) }}
         />
       )}
 
