@@ -124,8 +124,8 @@ const STAT_TYPE_PREVIEWS = {
       {/* Divider */}
       <line x1="4" y1="28" x2="106" y2="28" stroke="#e5e7eb" strokeWidth="1"/>
       {/* +/- stacked operator */}
-      <text x="55" y="26" textAnchor="middle" fontSize="10" fontWeight="800" fill="#9ca3af" fontFamily="monospace">+</text>
-      <text x="55" y="37" textAnchor="middle" fontSize="10" fontWeight="700" fill="#d1d5db" fontFamily="monospace">−</text>
+      <text x="55" y="26" textAnchor="middle" fontSize="12" fontWeight="900" fill="#374151" fontFamily="monospace">+</text>
+      <text x="55" y="39" textAnchor="middle" fontSize="12" fontWeight="900" fill="#6b7280" fontFamily="monospace">−</text>
       {/* Bottom line graph — pink */}
       <path d="M4,60 C20,54 36,50 54,46 C70,42 88,44 106,40"
         stroke="#db2777" strokeWidth="2" strokeLinecap="round"/>
@@ -234,7 +234,7 @@ function TypeSelectorModal({ onSelect, onClose }) {
     { key: 'basic',      label: 'Basic Statistic',    desc: 'Track a single numeric value over time.',   available: true  },
     { key: 'equation',   label: 'Equation Statistic',  desc: 'Combine multiple stats with a formula.',    available: true  },
     { key: 'overlay',    label: 'Overlay Statistic',   desc: 'Overlay two or more stats on one chart.',  available: true  },
-    { key: 'secondary',  label: 'Secondary Statistic', desc: 'Turn an existing stat into another permanent stat with longer periods.', available: true  },
+    { key: 'secondary',  label: 'Secondary Statistic', desc: 'Make Longer Period Stats.', available: true  },
     { key: 'auto',       label: 'Auto Statistic',      desc: 'Pull live data from jobs, bids, schedule, and more — auto-computed each period.',  available: true  },
   ]
   // Preview container size per stat type (portrait ones need more height)
