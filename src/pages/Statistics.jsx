@@ -4179,6 +4179,526 @@ function ImportExportView({ stats, user, onImported }) {
   )
 }
 
+// ── Print-Multiple helpers ────────────────────────────────────────────────────
+
+function fmtShort(v, statType) {
+  if (v == null) return ''
+  const n = Number(v)
+  const abs = Math.abs(n)
+  if (abs >= 1_000_000) return (statType === 'currency' ? '$' : '') + (n / 1_000_000).toFixed(1) + 'M'
+  if (abs >= 1_000)     return (statType === 'currency' ? '$' : '') + (n / 1_000).toFixed(0) + 'k'
+  if (statType === 'currency')   return '$' + n.toFixed(0)
+  if (statType === 'percentage') return n.toFixed(1) + '%'
+  return n.toLocaleString('en-US', { maximumFractionDigits: 1 })
+}
+
+function getRecentPeriodOptions(tracking, weekEndingDay, count = 16) {
+  const now  = new Date()
+  let anchor
+  if (tracking === 'daily') {
+    anchor = isoDate(now)
+  } else if (tracking === 'weekly') {
+    anchor = getWeekEndingDate(isoDate(now), weekEndingDay ?? 5)
+  } else if (tracking === 'monthly') {
+    const prev = new Date(now.getFullYear(), now.getMonth(), 0)
+    anchor = isoDate(prev)
+  } else if (tracking === 'quarterly') {
+    const cq = Math.floor(now.getMonth() / 3)
+    const lq = cq === 0 ? 3 : cq - 1
+    const yr = cq === 0 ? now.getFullYear() - 1 : now.getFullYear()
+    anchor = isoDate(new Date(yr, lq * 3 + 3, 0))
+  } else {
+    anchor = `${now.getFullYear() - 1}-12-31`
+  }
+  const opts = []
+  for (let i = 0; i < count; i++) {
+    const d = new Date(anchor + 'T00:00:00')
+    if      (tracking === 'daily')     d.setDate(d.getDate() - i)
+    else if (tracking === 'weekly')    d.setDate(d.getDate() - i * 7)
+    else if (tracking === 'monthly')   d.setMonth(d.getMonth() - i)
+    else if (tracking === 'quarterly') d.setMonth(d.getMonth() - i * 3)
+    else                               d.setFullYear(d.getFullYear() - i)
+    opts.push({ date: isoDate(d), label: periodLabel(isoDate(d), tracking) })
+  }
+  return opts
+}
+
+function buildPrintChartSVG(chartData, statType) {
+  const W = 760, H = 300
+  const PAD = { top: 28, right: 24, bottom: 62, left: 72 }
+  const CW  = W - PAD.left - PAD.right
+  const CH  = H - PAD.top  - PAD.bottom
+  const FG  = '#3A5038'
+
+  const vals = chartData.filter(d => d.value != null)
+  if (vals.length === 0) {
+    return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+      <rect width="${W}" height="${H}" fill="white"/>
+      <text x="${W/2}" y="${H/2}" text-anchor="middle" font-size="13" font-family="sans-serif" fill="#9ca3af">No data for this period</text>
+    </svg>`
+  }
+
+  const allVals = vals.map(d => d.value)
+  let minV = Math.min(...allVals)
+  let maxV = Math.max(...allVals)
+  if (minV === maxV) { minV = minV === 0 ? -1 : minV * 0.9; maxV = maxV === 0 ? 1 : maxV * 1.1 }
+  const span = maxV - minV
+  minV -= span * 0.05; maxV += span * 0.08
+
+  const n   = chartData.length
+  const xPos = i => PAD.left + (n > 1 ? (i / (n - 1)) * CW : CW / 2)
+  const yPos = v => PAD.top + CH - ((v - minV) / (maxV - minV)) * CH
+
+  // Y ticks (5 lines)
+  const yTicks = Array.from({ length: 5 }, (_, i) => {
+    const v = minV + (i / 4) * (maxV - minV)
+    return { y: yPos(v), label: fmtShort(v, statType) }
+  })
+
+  // X label step
+  const maxXLabels = 10
+  const step = Math.max(1, Math.ceil(n / maxXLabels))
+
+  const gridLines = yTicks.map(t =>
+    `<line x1="${PAD.left}" y1="${t.y.toFixed(1)}" x2="${W - PAD.right}" y2="${t.y.toFixed(1)}" stroke="#e5e7eb" stroke-width="1"/>`
+  ).join('')
+
+  const yLabels = yTicks.map(t =>
+    `<text x="${PAD.left - 7}" y="${(t.y + 4).toFixed(1)}" text-anchor="end" font-size="9" font-family="sans-serif" fill="#6b7280">${t.label}</text>`
+  ).join('')
+
+  const xLabels = chartData.map((d, i) => {
+    if (i % step !== 0 && i !== n - 1) return ''
+    const x = xPos(i).toFixed(1)
+    const y = (PAD.top + CH + 14).toFixed(1)
+    return `<text x="${x}" y="${y}" text-anchor="end" font-size="8" font-family="sans-serif" fill="#374151" transform="rotate(-40 ${x} ${y})">${d.label}</text>`
+  }).join('')
+
+  // Line path segments (break on null)
+  let pathStr = ''
+  let inPath  = false
+  chartData.forEach((d, i) => {
+    if (d.value == null) { inPath = false; return }
+    const x = xPos(i).toFixed(1); const y = yPos(d.value).toFixed(1)
+    pathStr += inPath ? `L${x},${y}` : `M${x},${y}`
+    inPath = true
+  })
+  const linePath = pathStr ? `<path d="${pathStr}" stroke="${FG}" stroke-width="2.2" fill="none" stroke-linejoin="round"/>` : ''
+
+  // Dots (only when sparse)
+  const dots = n <= 36 ? vals.map(d => {
+    const i = chartData.indexOf(d)
+    return `<circle cx="${xPos(i).toFixed(1)}" cy="${yPos(d.value).toFixed(1)}" r="3" fill="${FG}" stroke="white" stroke-width="1"/>`
+  }).join('') : ''
+
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" style="display:block">
+  <rect width="${W}" height="${H}" fill="white"/>
+  ${gridLines}
+  <line x1="${PAD.left}" y1="${PAD.top}" x2="${PAD.left}" y2="${(PAD.top + CH).toFixed(1)}" stroke="#d1d5db" stroke-width="1"/>
+  <line x1="${PAD.left}" y1="${(PAD.top + CH).toFixed(1)}" x2="${W - PAD.right}" y2="${(PAD.top + CH).toFixed(1)}" stroke="#d1d5db" stroke-width="1"/>
+  ${yLabels}
+  ${xLabels}
+  ${linePath}
+  ${dots}
+</svg>`
+}
+
+// ── PrintMultipleView ─────────────────────────────────────────────────────────
+function PrintMultipleView({ stats, weekEndingDay }) {
+  const TRACKING_OPTIONS = [
+    { value: 'daily',     label: 'Daily'     },
+    { value: 'weekly',    label: 'Weekly'    },
+    { value: 'monthly',   label: 'Monthly'   },
+    { value: 'quarterly', label: 'Quarterly' },
+    { value: 'yearly',    label: 'Yearly'    },
+  ]
+  const NUM_PERIOD_OPTIONS = [6, 8, 10, 12, 16, 20, 24, 36, 52]
+
+  const activeStats = (stats || []).filter(s => !s.archived)
+
+  // ── Config state ─────────────────────────────────────────────────────────
+  const [tracking,       setTracking]       = useState('weekly')
+  const [selectionMode,  setSelectionMode]  = useState('all')   // 'all'|'group'|'custom'
+  const [selectedGroupId,setSelectedGroupId]= useState(null)
+  const [customStatIds,  setCustomStatIds]  = useState(new Set())
+  const [groups,         setGroups]         = useState([])
+  const [loadingGroups,  setLoadingGroups]  = useState(false)
+
+  const periodOpts  = useMemo(() => getRecentPeriodOptions(tracking, weekEndingDay), [tracking, weekEndingDay])
+  const [periodEndDate, setPeriodEndDate]   = useState(periodOpts[0]?.date ?? '')
+  const [numPeriods, setNumPeriods]         = useState(12)
+  const [orientation, setOrientation]       = useState('landscape')
+  const [printing,   setPrinting]           = useState(false)
+
+  // Reload period options when tracking changes
+  useEffect(() => {
+    const opts = getRecentPeriodOptions(tracking, weekEndingDay)
+    setPeriodEndDate(opts[0]?.date ?? '')
+  }, [tracking, weekEndingDay])
+
+  useEffect(() => { loadGroups() }, [])
+
+  async function loadGroups() {
+    setLoadingGroups(true)
+    const { data } = await supabase.from('stat_groups').select('*').order('sort_order').order('name')
+    setGroups(data || [])
+    setLoadingGroups(false)
+  }
+
+  // ── Derived: stats matching the selected tracking type ───────────────────
+  const matchingStats = activeStats.filter(s => s.tracking === tracking)
+
+  // ── Derived: stats to actually print ─────────────────────────────────────
+  const statsToPrint = useMemo(() => {
+    if (selectionMode === 'all') return matchingStats
+    if (selectionMode === 'group') {
+      const g = groups.find(g => g.id === selectedGroupId)
+      if (!g) return []
+      const ids = (g.stat_ids || []).map(Number)
+      return matchingStats.filter(s => ids.includes(Number(s.id)))
+    }
+    // custom
+    return matchingStats.filter(s => customStatIds.has(s.id))
+  }, [selectionMode, matchingStats, groups, selectedGroupId, customStatIds])
+
+  function toggleCustomStat(id) {
+    setCustomStatIds(prev => {
+      const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n
+    })
+  }
+
+  // ── Period label for header ───────────────────────────────────────────────
+  const periodEndLabel = periodOpts.find(o => o.date === periodEndDate)?.label ?? periodEndDate
+
+  // ── Print ─────────────────────────────────────────────────────────────────
+  async function doPrint() {
+    if (!statsToPrint.length) return
+    setPrinting(true)
+    try {
+      const statIds = statsToPrint.map(s => s.id)
+
+      // Fetch all values for selected stats
+      const { data: allValues } = await supabase
+        .from('statistic_values')
+        .select('statistic_id, period_date, value')
+        .in('statistic_id', statIds)
+        .order('period_date')
+
+      const valuesByStatId = {}
+      for (const v of (allValues || [])) {
+        if (!valuesByStatId[v.statistic_id]) valuesByStatId[v.statistic_id] = []
+        valuesByStatId[v.statistic_id].push(v)
+      }
+
+      // Build period dates array (going back numPeriods from periodEndDate)
+      const endD = new Date(periodEndDate + 'T00:00:00')
+      const periods = []
+      for (let i = numPeriods - 1; i >= 0; i--) {
+        const d = new Date(endD)
+        if      (tracking === 'daily')     d.setDate(d.getDate() - i)
+        else if (tracking === 'weekly')    d.setDate(d.getDate() - i * 7)
+        else if (tracking === 'monthly')   d.setMonth(endD.getMonth() - i)
+        else if (tracking === 'quarterly') d.setMonth(endD.getMonth() - i * 3)
+        else                               d.setFullYear(endD.getFullYear() - i)
+        const ds = isoDate(d)
+        periods.push({ date: ds, label: periodLabel(ds, tracking) })
+      }
+
+      // For each stat, build chart data + SVG
+      const pages = statsToPrint.map(stat => {
+        const vals   = valuesByStatId[stat.id] || []
+        const wed    = weekEndingDay ?? 5
+        const chartData = periods.map(p => {
+          const match = vals.find(v => matchesPeriod(v.period_date, p.date, tracking, wed))
+          return { label: p.label, value: match ? Number(match.value) : null }
+        })
+        const svgHTML = buildPrintChartSVG(chartData, stat.stat_type)
+        const tracking_label = tracking.charAt(0).toUpperCase() + tracking.slice(1)
+        const dateRange = `${periods[0]?.label ?? ''} – ${periods[periods.length - 1]?.label ?? ''}`
+        return { stat, svgHTML, tracking_label, dateRange }
+      })
+
+      const isLandscape = orientation === 'landscape'
+      const winW = isLandscape ? 1120 : 860
+      const winH = isLandscape ? 720  : 980
+
+      const pagesHTML = pages.map((p, idx) => `
+        <div class="stat-page" ${idx === pages.length - 1 ? 'style="page-break-after:avoid"' : ''}>
+          <div class="stat-header">
+            <h2>${p.stat.name}</h2>
+            <p class="meta">${p.tracking_label} &nbsp;·&nbsp; ${p.dateRange} &nbsp;·&nbsp; ${numPeriods} periods</p>
+          </div>
+          <div class="chart-wrap">${p.svgHTML}</div>
+        </div>`
+      ).join('')
+
+      const win = window.open('', '_blank', `width=${winW},height=${winH}`)
+      win.document.write(`<!DOCTYPE html>
+<html style="height:100%">
+<head>
+  <title>Statistics Print</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box; margin: 0; padding: 0;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    html, body { height: 100%; }
+    body { font-family: ui-sans-serif, system-ui, sans-serif; background: #fff; }
+    .stat-page {
+      height: 100vh;
+      display: flex; flex-direction: column;
+      padding: ${isLandscape ? '14px 22px 10px' : '22px 32px 14px'};
+      page-break-after: always;
+    }
+    .stat-header { flex-shrink: 0; margin-bottom: ${isLandscape ? '10px' : '14px'}; }
+    .stat-header h2 {
+      font-size: ${isLandscape ? '17px' : '20px'};
+      font-weight: 700; color: #111827;
+    }
+    .stat-header .meta {
+      font-size: 11px; color: #6b7280; margin-top: 3px;
+    }
+    .chart-wrap {
+      flex: 1; min-height: 0;
+      display: flex; flex-direction: column;
+    }
+    .chart-wrap svg {
+      display: block; width: 100% !important;
+      flex: 1; height: 100% !important; min-height: 0;
+    }
+    @media print {
+      @page { size: ${orientation}; margin: ${isLandscape ? '0.5cm' : '0.8cm'}; }
+      html, body { height: 100vh; }
+      .stat-page { height: 100vh; padding: ${isLandscape ? '8px 16px 4px' : '16px 24px 8px'}; }
+    }
+  </style>
+</head>
+<body>
+  ${pagesHTML}
+  <script>window.onload = () => { window.print(); window.close(); }<\/script>
+</body>
+</html>`)
+      win.document.close()
+    } finally {
+      setPrinting(false)
+    }
+  }
+
+  const inputCls  = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600'
+  const sectionCls = 'mb-6'
+  const labelCls  = 'block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2'
+
+  return (
+    <div className="flex-1 flex overflow-hidden bg-gray-50">
+
+      {/* ── Left: config panel ───────────────────────────────────────────── */}
+      <div className="w-80 xl:w-96 flex-shrink-0 flex flex-col bg-white border-r border-gray-200 overflow-y-auto">
+        <div className="px-5 py-4 border-b border-gray-100 flex-shrink-0">
+          <h2 className="text-base font-bold text-gray-900">🖨️ Print Multiple</h2>
+          <p className="text-xs text-gray-400 mt-0.5">Configure then print a batch of charts.</p>
+        </div>
+
+        <div className="px-5 py-5 flex-1 overflow-y-auto space-y-6">
+
+          {/* ── Step 1: Tracking type ── */}
+          <div className={sectionCls}>
+            <p className={labelCls}>1 · Tracking Type</p>
+            <div className="grid grid-cols-5 gap-1">
+              {TRACKING_OPTIONS.map(t => (
+                <button
+                  key={t.value}
+                  onClick={() => { setTracking(t.value); setSelectionMode('all'); setCustomStatIds(new Set()) }}
+                  className={`py-2 rounded-lg text-xs font-semibold text-center transition-colors border-2 ${
+                    tracking === t.value
+                      ? 'text-white border-transparent'
+                      : 'text-gray-500 border-gray-200 hover:border-green-400 hover:text-green-700'
+                  }`}
+                  style={tracking === t.value ? { backgroundColor: FG, borderColor: FG } : {}}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-1.5">
+              {matchingStats.length} {tracking} stat{matchingStats.length !== 1 ? 's' : ''} available
+            </p>
+          </div>
+
+          {/* ── Step 2: Which stats ── */}
+          <div className={sectionCls}>
+            <p className={labelCls}>2 · Stats to Print</p>
+            <div className="space-y-2">
+
+              {/* All */}
+              <label className="flex items-start gap-3 cursor-pointer p-2.5 rounded-lg border-2 transition-colors" style={selectionMode === 'all' ? { borderColor: FG, backgroundColor: '#f0f7f0' } : { borderColor: '#e5e7eb' }}>
+                <input type="radio" name="selMode" checked={selectionMode === 'all'}
+                  onChange={() => setSelectionMode('all')} className="mt-0.5 accent-green-700" />
+                <div>
+                  <div className="text-sm font-semibold text-gray-800">All {tracking} stats</div>
+                  <div className="text-xs text-gray-400">{matchingStats.length} chart{matchingStats.length !== 1 ? 's' : ''}</div>
+                </div>
+              </label>
+
+              {/* By group */}
+              <label className="flex items-start gap-3 cursor-pointer p-2.5 rounded-lg border-2 transition-colors" style={selectionMode === 'group' ? { borderColor: FG, backgroundColor: '#f0f7f0' } : { borderColor: '#e5e7eb' }}>
+                <input type="radio" name="selMode" checked={selectionMode === 'group'}
+                  onChange={() => setSelectionMode('group')} className="mt-0.5 accent-green-700" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-gray-800">By stat group</div>
+                  <div className="text-xs text-gray-400 mb-2">Choose a saved group</div>
+                  {selectionMode === 'group' && (
+                    <select
+                      value={selectedGroupId ?? ''}
+                      onChange={e => setSelectedGroupId(e.target.value ? Number(e.target.value) : null)}
+                      className={inputCls}
+                    >
+                      <option value="">— Pick a group —</option>
+                      {groups.map(g => {
+                        const cnt = (g.stat_ids || []).map(Number).filter(id => matchingStats.some(s => Number(s.id) === id)).length
+                        return <option key={g.id} value={g.id}>{g.name} ({cnt} {tracking})</option>
+                      })}
+                    </select>
+                  )}
+                </div>
+              </label>
+
+              {/* Custom */}
+              <label className="flex items-start gap-3 cursor-pointer p-2.5 rounded-lg border-2 transition-colors" style={selectionMode === 'custom' ? { borderColor: FG, backgroundColor: '#f0f7f0' } : { borderColor: '#e5e7eb' }}>
+                <input type="radio" name="selMode" checked={selectionMode === 'custom'}
+                  onChange={() => setSelectionMode('custom')} className="mt-0.5 accent-green-700" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-gray-800">Custom selection</div>
+                  <div className="text-xs text-gray-400 mb-2">Pick individual stats</div>
+                  {selectionMode === 'custom' && (
+                    <div className="border border-gray-200 rounded-lg bg-white max-h-44 overflow-y-auto divide-y divide-gray-50">
+                      {matchingStats.length === 0 ? (
+                        <p className="px-3 py-3 text-xs text-gray-400 text-center">No {tracking} stats available.</p>
+                      ) : matchingStats.map(s => (
+                        <label key={s.id} className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-gray-50">
+                          <input type="checkbox" checked={customStatIds.has(s.id)}
+                            onChange={() => toggleCustomStat(s.id)}
+                            className="w-3.5 h-3.5 rounded accent-green-700 flex-shrink-0" />
+                          <span className="text-xs font-medium text-gray-800 truncate">{s.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {/* ── Step 3: Period ── */}
+          <div className={sectionCls}>
+            <p className={labelCls}>3 · Period</p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Period Ending</label>
+                <select value={periodEndDate} onChange={e => setPeriodEndDate(e.target.value)} className={inputCls}>
+                  {getRecentPeriodOptions(tracking, weekEndingDay).map(o => (
+                    <option key={o.date} value={o.date}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Number of Periods</label>
+                <select value={numPeriods} onChange={e => setNumPeriods(Number(e.target.value))} className={inputCls}>
+                  {NUM_PERIOD_OPTIONS.map(n => (
+                    <option key={n} value={n}>{n} periods</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Step 4: Orientation ── */}
+          <div className={sectionCls}>
+            <p className={labelCls}>4 · Orientation</p>
+            <div className="grid grid-cols-2 gap-2">
+              {[['landscape', '⬛ Landscape'], ['portrait', '⬜ Portrait']].map(([val, lbl]) => (
+                <button
+                  key={val}
+                  onClick={() => setOrientation(val)}
+                  className={`py-2.5 rounded-lg text-sm font-semibold border-2 transition-colors ${
+                    orientation === val ? 'text-white border-transparent' : 'text-gray-500 border-gray-200 hover:border-green-400'
+                  }`}
+                  style={orientation === val ? { backgroundColor: FG, borderColor: FG } : {}}
+                >
+                  {lbl}
+                </button>
+              ))}
+            </div>
+          </div>
+
+        </div>
+
+        {/* ── Print button ── */}
+        <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0">
+          <button
+            onClick={doPrint}
+            disabled={printing || statsToPrint.length === 0}
+            className="w-full py-3 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2"
+            style={{ backgroundColor: FG }}
+          >
+            {printing ? (
+              <><span className="animate-spin">⏳</span> Preparing…</>
+            ) : (
+              `🖨️ Print ${statsToPrint.length} Chart${statsToPrint.length !== 1 ? 's' : ''}`
+            )}
+          </button>
+          {statsToPrint.length === 0 && !printing && (
+            <p className="text-xs text-gray-400 text-center mt-2">
+              {matchingStats.length === 0
+                ? `No ${tracking} stats exist yet.`
+                : 'Select at least one stat above.'}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* ── Right: preview list ──────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto px-6 py-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-semibold text-gray-800">Charts to Print</h3>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {statsToPrint.length} chart{statsToPrint.length !== 1 ? 's' : ''} · {numPeriods} {tracking} periods ending {periodEndLabel} · {orientation}
+            </p>
+          </div>
+        </div>
+
+        {statsToPrint.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 text-gray-300">
+            <div className="text-5xl mb-3">🖨️</div>
+            <p className="text-base font-medium">No charts selected</p>
+            <p className="text-sm mt-1">Configure your options on the left.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {statsToPrint.map((s, i) => (
+              <div key={s.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
+                     style={{ backgroundColor: FG }}>
+                  {i + 1}
+                </div>
+                <div className="min-w-0">
+                  <div className="font-semibold text-gray-800 text-sm truncate">{s.name}</div>
+                  <div className="text-xs text-gray-400 capitalize mt-0.5">{s.stat_type}</div>
+                </div>
+                {selectionMode === 'custom' && (
+                  <button onClick={() => toggleCustomStat(s.id)}
+                    className="ml-auto text-gray-300 hover:text-red-500 transition-colors text-lg"
+                    title="Remove">×</button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── StatGroups ────────────────────────────────────────────────────────────────
 function StatGroups({ stats }) {
   const activeStats = (stats || []).filter(s => !s.archived)
@@ -5923,23 +6443,20 @@ export default function Statistics() {
         />
       )}
 
-      {['print-multiple', 'comparison'].includes(viewMode) && (() => {
-        const views = {
-          'print-multiple': { icon: '🖨️',  title: 'Print Multiple',  desc: 'Select and print multiple statistic charts in one go.'  },
-          'comparison':     { icon: '⚖️',  title: 'Comparison',      desc: 'Overlay and compare two or more statistics side by side.' },
-        }
-        const v = views[viewMode]
-        return (
-          <div className="flex-1 flex items-center justify-center bg-gray-100">
-            <div className="text-center">
-              <div className="text-6xl mb-5">{v.icon}</div>
-              <p className="text-xl font-bold text-gray-700 mb-2">{v.title}</p>
-              <p className="text-sm text-gray-400 max-w-xs">{v.desc}</p>
-              <p className="mt-4 text-xs text-gray-300 italic">Coming soon</p>
-            </div>
+      {viewMode === 'print-multiple' && (
+        <PrintMultipleView stats={stats} weekEndingDay={weekEndingDay} />
+      )}
+
+      {viewMode === 'comparison' && (
+        <div className="flex-1 flex items-center justify-center bg-gray-100">
+          <div className="text-center">
+            <div className="text-6xl mb-5">⚖️</div>
+            <p className="text-xl font-bold text-gray-700 mb-2">Comparison</p>
+            <p className="text-sm text-gray-400 max-w-xs">Overlay and compare two or more statistics side by side.</p>
+            <p className="mt-4 text-xs text-gray-300 italic">Coming soon</p>
           </div>
-        )
-      })()}
+        </div>
+      )}
 
       {/* ── BODY (Graphs mode only) ──────────────────────────────────────── */}
       {viewMode === 'graphs' && (
