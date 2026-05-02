@@ -35,7 +35,7 @@ async function sendViaSimpleTexting(creds: Record<string, string>, toNumber: str
   const body = {
     contactPhone: stPhone(toNumber),
     accountPhone: stPhone(from_number),
-    mode: 'SMS',
+    mode: 'MMS_PREFERRED',
     text: message,
   }
 
@@ -55,9 +55,8 @@ async function sendViaSimpleTexting(creds: Record<string, string>, toNumber: str
   console.log('SimpleTexting response:', JSON.stringify(data))
 
   if (!res.ok) {
-    // Return the full raw response so we can see exactly what's wrong
     const msg = data?.message || data?.error || data?.errors?.[0]?.message || `SimpleTexting error ${res.status}`
-    return { success: false, error: msg, raw: data }
+    return { success: false, error: msg, raw: data, sent: body }
   }
   return { success: true, id: data?.id || null, status: data?.status || 'sent', raw: data }
 }

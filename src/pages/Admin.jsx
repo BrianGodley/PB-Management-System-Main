@@ -1673,8 +1673,9 @@ function SmsSettings() {
       const { sendSMS } = await import('../lib/notify')
       const { data, error } = await sendSMS({ to: testNumber.trim(), message: testMsg })
       if (error) {
-        const raw = data?.raw ? ' — ' + JSON.stringify(data.raw) : ''
-        setTestResult('⚠️ ' + error.message + raw)
+        const raw  = data?.raw  ? ' raw:'  + JSON.stringify(data.raw)  : ''
+        const sent = data?.sent ? ' sent:' + JSON.stringify(data.sent) : ''
+        setTestResult('⚠️ ' + error.message + raw + sent)
       } else {
         setTestResult('✓ Test SMS sent! Check your phone.')
       }
