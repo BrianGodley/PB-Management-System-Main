@@ -294,9 +294,9 @@ export default function EmployeeDetail() {
 
   async function sendPasswordViaSMS() {
     if (!linkedProfile) return
-    const phone = formatPhone(employee?.phone || linkedProfile.phone_cell || '')
+    const phone = formatPhone(employee?.cell_phone || linkedProfile.phone_cell || '')
     if (!phone || phone === '+') { setSmsMsg('error:No cell phone number on file for this employee.'); return }
-    if (!validateSmsPhone(phone)) { setSmsMsg('error:Phone number "' + (employee?.phone || '') + '" is not a valid 10-digit US number. Please update the phone number in the Profile tab.'); return }
+    if (!validateSmsPhone(phone)) { setSmsMsg('error:Phone number "' + (employee?.cell_phone || '') + '" is not a valid 10-digit US number. Please update the phone number in the Profile tab.'); return }
     if (!linkedProfile.temp_password) { setSmsMsg('error:No stored password found. Use "Reset & Text New Password" instead.'); return }
     setSmsSending(true); setSmsMsg('')
     const firstName = employee?.first_name || (linkedProfile.full_name || '').split(' ')[0]
@@ -310,9 +310,9 @@ export default function EmployeeDetail() {
 
   async function resetAndTextPassword() {
     if (!linkedProfile) return
-    const phone = formatPhone(employee?.phone || linkedProfile.phone_cell || '')
+    const phone = formatPhone(employee?.cell_phone || linkedProfile.phone_cell || '')
     if (!phone || phone === '+') { setSmsMsg('error:No cell phone number on file for this employee.'); return }
-    if (!validateSmsPhone(phone)) { setSmsMsg('error:Phone number "' + (employee?.phone || '') + '" is not a valid 10-digit US number. Please update the phone number in the Profile tab.'); return }
+    if (!validateSmsPhone(phone)) { setSmsMsg('error:Phone number "' + (employee?.cell_phone || '') + '" is not a valid 10-digit US number. Please update the phone number in the Profile tab.'); return }
     if (!confirm(`Generate a new password for ${employee?.first_name || linkedProfile.full_name} and text it to ${phone}?`)) return
     setResetTextSending(true); setSmsMsg('')
     const newPw = generatePassword()
@@ -613,7 +613,7 @@ export default function EmployeeDetail() {
                   <div className="grid grid-cols-2 gap-3">
                     {[
                       ['first_name', 'First Name'], ['last_name', 'Last Name'],
-                      ['email', 'Email'], ['phone', 'Phone'],
+                      ['email', 'Email'], ['phone', 'Phone (Home/Work)'], ['cell_phone', 'Cell Phone'],
                     ].map(([key, label]) => (
                       <Field key={key} label={label} value={draft[key]} editing={editing} onChange={v => set(key, v)} />
                     ))}
@@ -805,7 +805,7 @@ export default function EmployeeDetail() {
                   </div>
                   <p className="text-xs text-gray-500 mb-3">
                     Sam, the AI assistant, will text the employee their credentials via SMS.
-                    {!employee?.phone && (
+                    {!employee?.cell_phone && (
                       <span className="text-amber-600 font-medium"> No cell phone on file — add one in the Profile tab.</span>
                     )}
                   </p>
@@ -816,12 +816,12 @@ export default function EmployeeDetail() {
                   )}
                   <div className="flex flex-wrap gap-2">
                     <button onClick={sendPasswordViaSMS}
-                      disabled={smsSending || !employee?.phone}
+                      disabled={smsSending || !employee?.cell_phone}
                       className="px-4 py-2 rounded-lg border border-blue-200 text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-40">
                       {smsSending ? 'Sending…' : '📱 Text Current Password'}
                     </button>
                     <button onClick={resetAndTextPassword}
-                      disabled={resetTextSending || !employee?.phone}
+                      disabled={resetTextSending || !employee?.cell_phone}
                       className="px-4 py-2 rounded-lg border border-green-200 text-sm font-medium text-green-700 hover:bg-green-50 disabled:opacity-40">
                       {resetTextSending ? 'Resetting…' : '🔄 Reset & Text New Password'}
                     </button>

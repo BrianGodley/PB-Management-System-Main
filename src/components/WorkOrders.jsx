@@ -852,7 +852,7 @@ function SMSRecipientsModal({ smsText, onClose }) {
   const { employees, crews, selEmps, selCrews, loading, empMap, crewMemberIds, toggleEmp, toggleCrew } = useRecipientData()
   const [sent, setSent] = useState(false)
 
-  const phones  = [...selEmps].map(id => empMap[id]?.phone).filter(Boolean)
+  const phones  = [...selEmps].map(id => empMap[id]?.cell_phone || empMap[id]?.phone).filter(Boolean)
   const canSend = phones.length > 0
 
   function handleSend() {

@@ -35,7 +35,7 @@ const STATUS_LABELS = {
 // ── Add Employee Modal ────────────────────────────────────────────────────────
 function AddEmployeeModal({ onSave, onClose }) {
   const [form, setForm] = useState({
-    first_name: '', last_name: '', nickname: '', email: '', phone: '',
+    first_name: '', last_name: '', nickname: '', email: '', phone: '', cell_phone: '',
     job_title: '', department: '', start_date: '', pay_rate: '', pay_type: 'hourly',
     username: '', password: generatePassword(), role: 'user', showPassword: false, user_id: null,
   })
@@ -72,6 +72,7 @@ function AddEmployeeModal({ onSave, onClose }) {
         nickname: form.nickname,
         email: form.email,
         phone: form.phone,
+        cell_phone: form.cell_phone,
         job_title: form.job_title,
         department: form.department,
         start_date: form.start_date || null,
@@ -176,8 +177,15 @@ function AddEmployeeModal({ onSave, onClose }) {
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Phone</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Cell Phone</label>
+            <input value={form.cell_phone} onChange={e => set('cell_phone', e.target.value)}
+              placeholder="(555) 123-4567"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Phone (Home/Work)</label>
             <input value={form.phone} onChange={e => set('phone', e.target.value)}
+              placeholder="(555) 123-4567"
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
           </div>
           <div>
@@ -612,7 +620,7 @@ export default function HR() {
                             <button className="text-green-700 hover:underline font-medium">{emp.last_name}, {emp.first_name}</button>
                           </td>
                           <td className="px-4 py-2 text-gray-600">{location}</td>
-                          <td className="px-4 py-2 text-gray-600">{emp.phone || '—'}</td>
+                          <td className="px-4 py-2 text-gray-600">{emp.cell_phone || '—'}</td>
                           <td className="px-4 py-2 text-gray-600">{emp.email || '—'}</td>
                           <td className="px-4 py-2 text-gray-600">{emp.job_title || '—'}</td>
                           <td className="px-4 py-2">
@@ -708,7 +716,7 @@ export default function HR() {
                             <button className="text-green-700 hover:underline font-medium">{emp.last_name}, {emp.first_name}</button>
                           </td>
                           <td className="px-4 py-2 text-gray-600">{location}</td>
-                          <td className="px-4 py-2 text-gray-600">{emp.phone || '—'}</td>
+                          <td className="px-4 py-2 text-gray-600">{emp.cell_phone || '—'}</td>
                           <td className="px-4 py-2 text-gray-600">{emp.email || '—'}</td>
                           <td className="px-4 py-2 text-gray-600">{emp.job_title || '—'}</td>
                           <td className="px-4 py-2 text-gray-600">{emp.start_date ? new Date(emp.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '—'}</td>
