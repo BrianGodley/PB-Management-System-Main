@@ -1671,13 +1671,18 @@ function SmsSettings() {
     setTesting(true); setTestResult('')
     try {
       const { sendSMS } = await import('../lib/notify')
-      const { error } = await sendSMS({ to: testNumber.trim(), message: testMsg })
-      setTestResult(error ? '⚠️ ' + error.message : '✓ Test SMS sent! Check your phone.')
+      const { data, error } = await sendSMS({ to: testNumber.trim(), message: testMsg })
+      if (error) {
+        const raw = data?.raw ? ' — ' + JSON.stringify(data.raw) : ''
+        setTestResult('⚠️ ' + error.message + raw)
+      } else {
+        setTestResult('✓ Test SMS sent! Check your phone.')
+      }
     } catch (e) {
       setTestResult('⚠️ ' + e.message)
     }
     setTesting(false)
-    setTimeout(() => setTestResult(''), 8000)
+    setTimeout(() => setTestResult(''), 15000)
   }
 
   function setCred(providerKey, field, value) {

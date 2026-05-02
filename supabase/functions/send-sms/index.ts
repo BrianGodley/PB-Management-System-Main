@@ -21,24 +21,33 @@ async function loadSmsConfig() {
 }
 
 // ── SimpleTexting ─────────────────────────────────────────────────────────────
+// Normalize to 10-digit US number (strip country code if present)
+function stPhone(num: string): string {
+  const digits = num.replace(/\D/g, '')
+  if (digits.length === 11 && digits.startsWith('1')) return digits.slice(1)
+  return digits
+}
+
 async function sendViaSimpleTexting(creds: Record<string, string>, toNumber: string, message: string) {
   const { api_key, from_number } = creds
   if (!api_key || !from_number) throw new Error('SimpleTexting requires api_key and from_number')
 
-  const contactPhone = toNumber.replace(/^\+/, '')
+  const body = {
+    contactPhone: stPhone(toNumber),
+    accountPhone: stPhone(from_number),
+    mode: 'SMS',
+    text: message,
+  }
 
-  const res = await fetch('https://api.simpletexting.com/v2/api/messages', {
+  console.log('SimpleTexting request body:', JSON.stringify(body))
+
+  const res = await fetch('https://api-app2.simpletexting.com/v2/api/messages', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${api_key}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      contactPhone,
-      accountPhone: from_number.replace(/^\+/, ''),
-      mode: 'SMS',
-      text: message,
-    }),
+    body: JSON.stringify(body),
   })
 
   const data = await res.json()
@@ -46,7 +55,8 @@ async function sendViaSimpleTexting(creds: Record<string, string>, toNumber: str
   console.log('SimpleTexting response:', JSON.stringify(data))
 
   if (!res.ok) {
-    const msg = data?.message || data?.error || `SimpleTexting error ${res.status}`
+    // Return the full raw response so we can see exactly what's wrong
+    const msg = data?.message || data?.error || data?.errors?.[0]?.message || `SimpleTexting error ${res.status}`
     return { success: false, error: msg, raw: data }
   }
   return { success: true, id: data?.id || null, status: data?.status || 'sent', raw: data }
@@ -184,4 +194,3 @@ serve(async (req) => {
 
 
 
-                                                                                            
