@@ -285,10 +285,18 @@ export default function EmployeeDetail() {
     setResetSending(false)
   }
 
+  function validateSmsPhone(phone) {
+    const digits = phone.replace(/\D/g, '')
+    if (digits.length === 10) return true
+    if (digits.length === 11 && digits.startsWith('1')) return true
+    return false
+  }
+
   async function sendPasswordViaSMS() {
     if (!linkedProfile) return
     const phone = formatPhone(employee?.phone || linkedProfile.phone_cell || '')
     if (!phone || phone === '+') { setSmsMsg('error:No cell phone number on file for this employee.'); return }
+    if (!validateSmsPhone(phone)) { setSmsMsg('error:Phone number "' + (employee?.phone || '') + '" is not a valid 10-digit US number. Please update the phone number in the Profile tab.'); return }
     if (!linkedProfile.temp_password) { setSmsMsg('error:No stored password found. Use "Reset & Text New Password" instead.'); return }
     setSmsSending(true); setSmsMsg('')
     const firstName = employee?.first_name || (linkedProfile.full_name || '').split(' ')[0]
@@ -296,7 +304,7 @@ export default function EmployeeDetail() {
       to:      phone,
       message: samMessage(firstName, linkedProfile.email, linkedProfile.temp_password),
     })
-    setSmsMsg(error ? 'error:SMS failed — ' + error.message : 'ok:Password texted to ' + phone)
+    setSmsMsg(error ? 'error:SMS failed — ' + error.message + ' (sent to ' + phone + ')' : 'ok:Password texted to ' + phone)
     setSmsSending(false)
   }
 
@@ -304,6 +312,7 @@ export default function EmployeeDetail() {
     if (!linkedProfile) return
     const phone = formatPhone(employee?.phone || linkedProfile.phone_cell || '')
     if (!phone || phone === '+') { setSmsMsg('error:No cell phone number on file for this employee.'); return }
+    if (!validateSmsPhone(phone)) { setSmsMsg('error:Phone number "' + (employee?.phone || '') + '" is not a valid 10-digit US number. Please update the phone number in the Profile tab.'); return }
     if (!confirm(`Generate a new password for ${employee?.first_name || linkedProfile.full_name} and text it to ${phone}?`)) return
     setResetTextSending(true); setSmsMsg('')
     const newPw = generatePassword()
