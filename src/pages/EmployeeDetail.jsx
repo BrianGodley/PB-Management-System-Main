@@ -365,20 +365,26 @@ export default function EmployeeDetail() {
     setReviews(reviewsData || [])
     setReviewForms(formsData || [])
 
-    // Fetch linked profile by email
-    if (emp?.email) {
-      const { data: prof } = await supabase.from('profiles').select('*').eq('email', emp.email).single()
+    // Fetch linked profile — by user_id first (definitive), then email as fallback
+    let prof = null
+    if (emp?.user_id) {
+      const { data } = await supabase.from('profiles').select('*').eq('id', emp.user_id).maybeSingle()
+      prof = data
+    }
+    if (!prof && emp?.email) {
+      const { data } = await supabase.from('profiles').select('*').eq('email', emp.email.toLowerCase()).maybeSingle()
+      prof = data
+      // If found by email, persist the user_id link so future loads use the fast path
       if (prof) {
-        setLinkedProfile(prof)
-        setUserRole(prof.role || 'user')
-        // Fetch permissions
-        const { data: permsData } = await supabase
-          .from('user_permissions')
-          .select('*')
-          .eq('user_id', prof.id)
-          .single()
-        if (permsData) setPerms(prev => ({ ...prev, ...permsData }))
+        await supabase.from('employees').update({ user_id: prof.id }).eq('id', id)
       }
+    }
+    if (prof) {
+      setLinkedProfile(prof)
+      setUserRole(prof.role || 'user')
+      const { data: permsData } = await supabase
+        .from('user_permissions').select('*').eq('user_id', prof.id).single()
+      if (permsData) setPerms(prev => ({ ...prev, ...permsData }))
     }
 
     setLoadingPerms(false)
