@@ -205,7 +205,20 @@ export default function EmployeeDetail() {
 
       if (signUpErr) {
         if (signUpErr.message?.includes('already registered') || signUpErr.message?.includes('already been registered')) {
-          setCreateError('That email address already has a system account.')
+          // Account exists — find and link the existing profile
+          const { data: existingProf } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('email', email)
+            .maybeSingle()
+          if (existingProf) {
+            await supabase.from('employees').update({ user_id: existingProf.id }).eq('id', employee.id)
+            setLinkedProfile(existingProf)
+            setUserRole(existingProf.role || 'user')
+            setCreating(false)
+            return
+          }
+          setCreateError('That email already has an account but no matching profile was found. Contact a super admin.')
         } else {
           setCreateError(signUpErr.message || 'Failed to create account.')
         }
@@ -237,6 +250,27 @@ export default function EmployeeDetail() {
     } catch (e) {
       setCreateError(e.message || 'Unexpected error.')
     }
+    setCreating(false)
+  }
+
+  // ── Link an existing system account to this employee by email ────────────────
+  async function linkExistingAccount() {
+    const email = createEmail.trim().toLowerCase()
+    if (!email) { setCreateError('Enter the email address of the existing account.'); return }
+    setCreating(true); setCreateError('')
+    const { data: existingProf } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('email', email)
+      .maybeSingle()
+    if (!existingProf) {
+      setCreateError('No system account found with that email address.')
+      setCreating(false)
+      return
+    }
+    await supabase.from('employees').update({ user_id: existingProf.id }).eq('id', employee.id)
+    setLinkedProfile(existingProf)
+    setUserRole(existingProf.role || 'user')
     setCreating(false)
   }
 
@@ -881,14 +915,26 @@ export default function EmployeeDetail() {
                   </div>
                 </div>
 
-                <button
-                  onClick={createSystemAccount}
-                  disabled={creating}
-                  className="w-full py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2"
-                  style={{ backgroundColor: '#3A5038' }}
-                >
-                  {creating ? '⏳ Creating account…' : '✅ Create System Account'}
-                </button>
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={createSystemAccount}
+                    disabled={creating}
+                    className="w-full py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2"
+                    style={{ backgroundColor: '#3A5038' }}
+                  >
+                    {creating ? '⏳ Creating account…' : '✅ Create System Account'}
+                  </button>
+                  <button
+                    onClick={linkExistingAccount}
+                    disabled={creating || !createEmail.trim()}
+                    className="w-full py-2.5 rounded-xl text-sm font-semibold border border-blue-300 text-blue-700 hover:bg-blue-50 disabled:opacity-40"
+                  >
+                    🔗 Link Existing Account by Email
+                  </button>
+                  <p className="text-xs text-gray-400 text-center">
+                    Use "Link" if this employee already has a login — it connects their existing account without creating a new one.
+                  </p>
+                </div>
               </div>
             )}
           </div>
