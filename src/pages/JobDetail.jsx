@@ -97,12 +97,12 @@ export default function JobDetail() {
       .eq('job_id', id)
       .order('uploaded_at', { ascending: false })
     if (data) {
-      const withUrls = await Promise.all(data.map(async f => {
-        const { data: urlData } = await supabase.storage
+      const withUrls = data.map(f => {
+        const { data: urlData } = supabase.storage
           .from('job-files')
-          .createSignedUrl(f.storage_path, 3600)
-        return { ...f, signedUrl: urlData?.signedUrl || null }
-      }))
+          .getPublicUrl(f.storage_path)
+        return { ...f, signedUrl: urlData?.publicUrl || null }
+      })
       setFiles(withUrls)
     }
     setFilesLoading(false)
@@ -112,7 +112,6 @@ export default function JobDetail() {
     const file = e.target.files?.[0]
     if (!file) return
     setUploading(true)
-    const ext = file.name.split('.').pop()
     const path = `jobs/${id}/${Date.now()}-${file.name}`
     const { error: storageErr } = await supabase.storage
       .from('job-files')
