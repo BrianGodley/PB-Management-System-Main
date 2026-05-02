@@ -76,8 +76,8 @@ function CellInput({ value, onSave, placeholder='', align='right' }) {
     : local
   return (
     <input
-      type={focused ? 'number' : 'text'}
-      step="0.01"
+      type="text"
+      inputMode="decimal"
       value={display}
       onChange={e => setLocal(e.target.value)}
       onFocus={() => setFocused(true)}
@@ -129,6 +129,8 @@ export default function Collections() {
   const [creatingWeek,       setCreatingWeek]       = useState(false)
   const [companyWeekEndDay,  setCompanyWeekEndDay]  = useState(6) // default Saturday
   const [newWeekModal,       setNewWeekModal]       = useState(null) // { lastDataWeek, nextDate }
+  const [deleteWeekConfirm,  setDeleteWeekConfirm]  = useState(false)
+  const [deletingWeek,       setDeletingWeek]       = useState(false)
 
   const selectedWeek = weeks[weekIdx] || null
 
@@ -358,6 +360,25 @@ export default function Collections() {
     setNewWeekModal(null)
   }
 
+  // ── Delete week ─────────────────────────────────────────────────────────────
+  async function handleDeleteWeek() {
+    if (!selectedWeek) return
+    setDeletingWeek(true)
+    const id = selectedWeek.id
+    await Promise.all([
+      supabase.from('collection_rows').delete().eq('week_id', id),
+      supabase.from('collection_payables').delete().eq('week_id', id),
+      supabase.from('collection_financial').delete().eq('week_id', id),
+    ])
+    await supabase.from('collection_weeks').delete().eq('id', id)
+    const newWeeks = weeks.filter(w => w.id !== id)
+    setWeeks(newWeeks)
+    setWeekIdx(prev => Math.min(prev, Math.max(0, newWeeks.length - 1)))
+    setRows([]); setPayables([]); setFinancial([])
+    setDeletingWeek(false)
+    setDeleteWeekConfirm(false)
+  }
+
   // ── Row CRUD ────────────────────────────────────────────────────────────────
   const NUM_FIELDS = ['starting_balance',
     'mon_inv','mon_dep','tue_inv','tue_dep','wed_inv','wed_dep','thu_inv','thu_dep','fri_inv','fri_dep']
@@ -510,6 +531,13 @@ export default function Collections() {
           >›</button>
         </div>
         <div className="flex-1" />
+        {selectedWeek && selectedWeek.week_ending >= new Date().toISOString().split('T')[0] && (
+          <button
+            onClick={() => setDeleteWeekConfirm(true)}
+            disabled={deletingWeek}
+            className="text-sm px-3 py-1.5 rounded-lg bg-red-100 text-red-700 font-medium hover:bg-red-200 disabled:opacity-50"
+          >🗑 Delete Week</button>
+        )}
         <button
           onClick={handleNewWeekClick} disabled={creatingWeek}
           className="text-sm px-3 py-1.5 rounded-lg bg-green-700 text-white font-medium hover:bg-green-800 disabled:opacity-50 mr-16"
@@ -571,6 +599,36 @@ export default function Collections() {
                 disabled={creatingWeek}
                 className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-green-700 hover:bg-green-800 disabled:opacity-50"
               >{creatingWeek ? 'Creating…' : 'Create New Week'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Week Confirmation Modal ───────────────────────────────── */}
+      {deleteWeekConfirm && selectedWeek && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+            <div className="bg-red-600 px-6 py-4">
+              <h2 className="text-white font-bold text-lg">Delete This Week?</h2>
+            </div>
+            <div className="px-6 py-5 space-y-3">
+              <p className="text-sm text-gray-700">
+                Are you sure you want to delete the week ending <strong>{fmtWeekEnd(selectedWeek.week_ending)}</strong>?
+              </p>
+              <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                ⚠️ This permanently deletes all collections, payables, and financial planning data for this week.
+              </p>
+            </div>
+            <div className="px-6 pb-5 flex gap-3">
+              <button
+                onClick={() => setDeleteWeekConfirm(false)}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold border border-gray-300 text-gray-600 hover:bg-gray-50"
+              >Cancel</button>
+              <button
+                onClick={handleDeleteWeek}
+                disabled={deletingWeek}
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+              >{deletingWeek ? 'Deleting…' : 'Yes, Delete Week'}</button>
             </div>
           </div>
         </div>
