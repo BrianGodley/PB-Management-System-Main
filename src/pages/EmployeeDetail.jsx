@@ -173,7 +173,7 @@ export default function EmployeeDetail() {
     const greeting = firstName ? `Hi ${firstName}, ` : 'Hi there, '
     const action   = isReset ? 'your password has been reset' : 'here are your login credentials'
     return (
-      `${greeting}this is Sam, the AI assistant from the Picture Build System — ${action}.\n\n` +
+      `${greeting}this is Sam, the AI assistant from the Picture Build System - ${action}.\n\n` +
       `Email: ${email}\n` +
       `Password: ${password}\n\n` +
       `Log in at: ${window.location.origin}/login\n\n` +
@@ -300,11 +300,16 @@ export default function EmployeeDetail() {
     if (!linkedProfile.temp_password) { setSmsMsg('error:No stored password found. Use "Reset & Text New Password" instead.'); return }
     setSmsSending(true); setSmsMsg('')
     const firstName = employee?.first_name || (linkedProfile.full_name || '').split(' ')[0]
-    const { error } = await sendSMS({
+    const { data: smsData, error } = await sendSMS({
       to:      phone,
       message: samMessage(firstName, linkedProfile.email, linkedProfile.temp_password),
     })
-    setSmsMsg(error ? 'error:SMS failed — ' + error.message + ' (sent to ' + phone + ')' : 'ok:Password texted to ' + phone)
+    if (error) {
+      const detail = smsData?.raw?.details ? ' — ' + smsData.raw.details : ''
+      setSmsMsg('error:SMS failed — ' + error.message + detail + ' (sent to ' + phone + ')')
+    } else {
+      setSmsMsg('ok:Password texted to ' + phone)
+    }
     setSmsSending(false)
   }
 
@@ -326,12 +331,12 @@ export default function EmployeeDetail() {
       console.warn('reset-user-password Edge Function not available:', e)
     }
     const firstName = employee?.first_name || (linkedProfile.full_name || '').split(' ')[0]
-    const { error: smsErr } = await sendSMS({
+    const { data: smsData2, error: smsErr } = await sendSMS({
       to:      phone,
       message: samMessage(firstName, linkedProfile.email, newPw, true),
     })
     setSmsMsg(smsErr
-      ? 'error:SMS failed — ' + smsErr.message
+      ? 'error:SMS failed — ' + smsErr.message + (smsData2?.raw?.details ? ' — ' + smsData2.raw.details : '') + ' (sent to ' + phone + ')'
       : 'ok:New password texted to ' + phone + '. If their login does not work, also send a password reset email.'
     )
     setResetTextSending(false)
