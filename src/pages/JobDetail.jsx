@@ -22,12 +22,17 @@ export default function JobDetail() {
   const [showCOForm, setShowCOForm] = useState(false)
   const [savingCO, setSavingCO] = useState(false)
   const [editingStatus, setEditingStatus] = useState(false)
+  const [activeTab,     setActiveTab]     = useState('projects')
+  const [files,         setFiles]         = useState([])
+  const [filesLoading,  setFilesLoading]  = useState(false)
+  const [uploading,     setUploading]     = useState(false)
 
   const [coForm, setCOForm] = useState({
     description: '', additional_contract_price: '', additional_man_days: '', additional_material_cost: '', notes: '', date_added: new Date().toISOString().split('T')[0]
   })
 
   useEffect(() => { fetchData() }, [id])
+  useEffect(() => { if (activeTab === 'documents' && id) fetchFiles() }, [activeTab, id])
 
   async function fetchData() {
     setLoading(true)
@@ -84,6 +89,65 @@ export default function JobDetail() {
     fetchData()
   }
 
+  async function fetchFiles() {
+    setFilesLoading(true)
+    const { data } = await supabase
+      .from('job_files')
+      .select('*')
+      .eq('job_id', id)
+      .order('uploaded_at', { ascending: false })
+    if (data) {
+      const withUrls = await Promise.all(data.map(async f => {
+        const { data: urlData } = await supabase.storage
+          .from('job-files')
+          .createSignedUrl(f.storage_path, 3600)
+        return { ...f, signedUrl: urlData?.signedUrl || null }
+      }))
+      setFiles(withUrls)
+    }
+    setFilesLoading(false)
+  }
+
+  async function handleUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    const ext = file.name.split('.').pop()
+    const path = `jobs/${id}/${Date.now()}-${file.name}`
+    const { error: storageErr } = await supabase.storage
+      .from('job-files')
+      .upload(path, file)
+    if (!storageErr) {
+      await supabase.from('job_files').insert({
+        job_id: id,
+        file_name: file.name,
+        file_type: file.type,
+        file_category: file.type?.startsWith('image/') ? 'photo' : 'document',
+        storage_path: path,
+        file_size: file.size,
+        source: 'manual',
+        uploaded_by: user?.id,
+      })
+      fetchFiles()
+    }
+    setUploading(false)
+    e.target.value = ''
+  }
+
+  async function handleDeleteFile(file) {
+    if (!confirm(`Delete "${file.file_name}"?`)) return
+    await supabase.storage.from('job-files').remove([file.storage_path])
+    await supabase.from('job_files').delete().eq('id', file.id)
+    setFiles(prev => prev.filter(f => f.id !== file.id))
+  }
+
+  function fmtSize(bytes) {
+    if (!bytes) return ''
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1048576) return `${(bytes/1024).toFixed(1)} KB`
+    return `${(bytes/1048576).toFixed(1)} MB`
+  }
+
   if (loading) return <div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-700"></div></div>
   if (!job) return <div className="card text-center py-12 text-gray-500">Job not found.</div>
 
@@ -121,7 +185,7 @@ export default function JobDetail() {
       </div>
 
       {/* Job header card */}
-      <div className="card mb-4">
+      <div className="card mb-4 bg-blue-50">
         <div className="flex items-start justify-between mb-3">
           <div>
             <h1 className="text-xl font-bold text-gray-900">{job.client_name}</h1>
@@ -158,15 +222,15 @@ export default function JobDetail() {
 
         {/* Financial summary */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <div className="bg-gray-50 rounded-lg p-3 text-center">
+          <div className="bg-white rounded-lg p-3 text-center">
             <p className="text-xs text-gray-500">Contract</p>
             <p className="font-bold text-gray-900">${parseFloat(job.contract_price || 0).toLocaleString()}</p>
           </div>
-          <div className="bg-blue-50 rounded-lg p-3 text-center">
+          <div className="bg-white rounded-lg p-3 text-center">
             <p className="text-xs text-gray-500">Change Orders</p>
             <p className="font-bold text-blue-700">+${changeOrderRevenue.toLocaleString()}</p>
           </div>
-          <div className="bg-gray-50 rounded-lg p-3 text-center">
+          <div className="bg-white rounded-lg p-3 text-center">
             <p className="text-xs text-gray-500">Total Revenue</p>
             <p className="font-bold text-gray-900">${totalRevenue.toLocaleString()}</p>
           </div>
@@ -187,7 +251,23 @@ export default function JobDetail() {
         </div>
       </div>
 
+      {/* Tab nav */}
+      <div className="flex gap-0 border-b border-gray-200 mb-4">
+        {[
+          { key: 'projects',      label: '🏗 Projects'      },
+          { key: 'change_orders', label: '📋 Change Orders' },
+          { key: 'documents',     label: '📁 Documents'     },
+        ].map(t => (
+          <button key={t.key} onClick={() => setActiveTab(t.key)}
+            className={`px-5 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+              activeTab === t.key ? 'border-green-700 text-green-800' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >{t.label}</button>
+        ))}
+      </div>
+
       {/* Projects */}
+      {activeTab === 'projects' && (
       <div className="mb-4">
         <h2 className="font-semibold text-gray-900 mb-3 text-lg">Projects & Modules</h2>
         {(job.projects || []).length === 0 ? (
@@ -223,8 +303,10 @@ export default function JobDetail() {
           ))
         )}
       </div>
+      )}
 
       {/* Change Orders */}
+      {activeTab === 'change_orders' && (
       <div className="mb-6">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold text-gray-900 text-lg">Change Orders</h2>
@@ -293,6 +375,65 @@ export default function JobDetail() {
           ))
         )}
       </div>
+      )}
+
+      {/* Documents */}
+      {activeTab === 'documents' && (
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-semibold text-gray-900 text-lg">Documents & Photos</h2>
+            <label className={`cursor-pointer text-sm px-3 py-1.5 rounded-lg font-medium transition-colors ${uploading ? 'bg-gray-200 text-gray-400' : 'bg-green-700 text-white hover:bg-green-800'}`}>
+              {uploading ? 'Uploading…' : '+ Upload File'}
+              <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip" />
+            </label>
+          </div>
+
+          {filesLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700" />
+            </div>
+          ) : files.length === 0 ? (
+            <div className="card text-center py-10 text-gray-400">
+              <p className="text-3xl mb-2">📁</p>
+              <p className="text-sm">No documents yet — upload a file or import from BuilderTrend</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {files.map(file => {
+                const isImage = file.file_type?.startsWith('image/')
+                return (
+                  <div key={file.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm group">
+                    {isImage && file.signedUrl ? (
+                      <a href={file.signedUrl} target="_blank" rel="noopener noreferrer">
+                        <img src={file.signedUrl} alt={file.file_name} className="w-full h-32 object-cover hover:opacity-90 transition-opacity" />
+                      </a>
+                    ) : (
+                      <div className="w-full h-32 bg-gray-50 flex items-center justify-center text-4xl">
+                        {file.file_type === 'application/pdf' ? '📄' : '📎'}
+                      </div>
+                    )}
+                    <div className="p-2.5">
+                      <p className="text-xs font-medium text-gray-800 truncate" title={file.file_name}>{file.file_name}</p>
+                      <div className="flex items-center justify-between mt-1">
+                        <span className="text-[10px] text-gray-400">{fmtSize(file.file_size)}</span>
+                        <div className="flex items-center gap-1.5">
+                          {file.signedUrl && (
+                            <a href={file.signedUrl} download={file.file_name} className="text-[10px] text-blue-600 hover:text-blue-800 font-medium">⬇ Download</a>
+                          )}
+                          <button onClick={() => handleDeleteFile(file)} className="text-[10px] text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+                        </div>
+                      </div>
+                      {file.source === 'buildertrend' && (
+                        <span className="text-[9px] text-purple-500 font-medium">BuilderTrend</span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
