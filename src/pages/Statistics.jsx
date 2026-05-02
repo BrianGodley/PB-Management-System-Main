@@ -4387,8 +4387,19 @@ function PrintMultipleView({ stats, weekEndingDay }) {
 
   // ── Fetch earliest period date → build full period options list ───────────
   useEffect(() => {
-    const statIds = matchingStats.map(s => s.id)
-    if (!statIds.length) {
+    if (!matchingStats.length) {
+      const opts = getRecentPeriodOptions(tracking, weekEndingDay)
+      setPeriodOpts(opts)
+      setPeriodEndDate(prev => opts.find(o => o.date === prev) ? prev : (opts[0]?.date ?? ''))
+      return
+    }
+    // For equation stats, look up their component stat IDs instead of the equation's own ID
+    const queryIds = [...new Set(matchingStats.flatMap(s =>
+      s.stat_category === 'equation'
+        ? (s.equation_parts || []).map(p => p.stat_id).filter(Boolean)
+        : [s.id]
+    ))]
+    if (!queryIds.length) {
       const opts = getRecentPeriodOptions(tracking, weekEndingDay)
       setPeriodOpts(opts)
       setPeriodEndDate(prev => opts.find(o => o.date === prev) ? prev : (opts[0]?.date ?? ''))
@@ -4397,7 +4408,7 @@ function PrintMultipleView({ stats, weekEndingDay }) {
     supabase
       .from('statistic_values')
       .select('period_date')
-      .in('statistic_id', statIds)
+      .in('statistic_id', queryIds)
       .order('period_date')
       .limit(1)
       .then(({ data }) => {
@@ -4433,8 +4444,7 @@ function PrintMultipleView({ stats, weekEndingDay }) {
   useEffect(() => {
     let cancelled = false
 
-    const statIds = matchingStats.map(s => s.id)
-    if (!statIds.length || !periodEndDate) { setDataCoverage({}); return }
+    if (!matchingStats.length || !periodEndDate) { setDataCoverage({}); return }
 
     // Snapshot closure values so a stale response can never overwrite a newer one
     const snapStats      = matchingStats
@@ -4457,23 +4467,50 @@ function PrintMultipleView({ stats, weekEndingDay }) {
     }
     const startDate = periods[0]
 
+    // Separate equation stats; for them, look up component stat IDs instead of their own
+    const equationStats = snapStats.filter(s => s.stat_category === 'equation')
+    const regularStats  = snapStats.filter(s => s.stat_category !== 'equation')
+    const eqComponentIds = [...new Set(
+      equationStats.flatMap(s => (s.equation_parts || []).map(p => p.stat_id).filter(Boolean))
+    )]
+    const regularIds = regularStats.map(s => s.id)
+    const allQueryIds = [...new Set([...regularIds, ...eqComponentIds])]
+
+    if (!allQueryIds.length) { setDataCoverage({}); return }
+
     setLoadingCoverage(true)
     supabase
       .from('statistic_values')
       .select('statistic_id, period_date')
-      .in('statistic_id', statIds)
+      .in('statistic_id', allQueryIds)
       .gte('period_date', startDate)
       .lte('period_date', snapEnd)
       .then(({ data: vals }) => {
         if (cancelled) return
         const coverage = {}
-        for (const s of snapStats) {
+
+        // Regular stats: count periods where that stat has a value
+        for (const s of regularStats) {
           const sv = (vals || []).filter(v => v.statistic_id === s.id)
           const found = periods.filter(p =>
             sv.some(v => matchesPeriod(v.period_date, p, snapTracking, snapWed))
           ).length
           coverage[s.id] = { found, total: snapNumPeriods }
         }
+
+        // Equation stats: a period counts if ALL component stats have a value
+        for (const s of equationStats) {
+          const compIds = (s.equation_parts || []).map(p => p.stat_id).filter(Boolean)
+          if (!compIds.length) { coverage[s.id] = { found: 0, total: snapNumPeriods }; continue }
+          const found = periods.filter(p =>
+            compIds.every(cid => {
+              const cv = (vals || []).filter(v => v.statistic_id === cid)
+              return cv.some(v => matchesPeriod(v.period_date, p, snapTracking, snapWed))
+            })
+          ).length
+          coverage[s.id] = { found, total: snapNumPeriods }
+        }
+
         setDataCoverage(coverage)
         setLoadingCoverage(false)
       })
