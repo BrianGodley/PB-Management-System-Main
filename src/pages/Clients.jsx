@@ -461,7 +461,7 @@ export default function Clients() {
           )}
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-xl border-2 border-green-700 overflow-hidden">
           <table className="table-fixed w-full text-xs">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
