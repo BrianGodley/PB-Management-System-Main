@@ -883,7 +883,7 @@ function SMSRecipientsModal({ smsText, onClose }) {
             selEmps={selEmps} selCrews={selCrews}
             empMap={empMap} crewMemberIds={crewMemberIds}
             toggleEmp={toggleEmp} toggleCrew={toggleCrew}
-            contactField="phone" noContactLabel="No phone on file"
+            contactField="cell_phone" noContactLabel="No cell phone on file"
           />
         )}
 
