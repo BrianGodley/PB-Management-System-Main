@@ -495,7 +495,7 @@ function JobDetail({ job, onDelete, price, onEdit }) {
   }[job.status] || { label: 'Active', cls: 'bg-green-100 text-green-800 border border-green-300' }
 
   return (
-    <div className="card">
+    <div className="card bg-blue-50">
       <div className="flex items-start justify-between mb-4 gap-2">
         <div className="min-w-0">
           <h2 className="text-lg sm:text-xl font-bold text-gray-900 truncate">{job.name || job.client_name}</h2>
@@ -511,30 +511,30 @@ function JobDetail({ job, onDelete, price, onEdit }) {
         </div>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <div className="bg-gray-50 rounded-lg p-3">
+        <div className="bg-white rounded-lg p-3">
           <p className="text-xs text-gray-400 mb-0.5">Job Total</p>
           <p className="font-bold text-gray-900">${price(job).toLocaleString()}</p>
         </div>
         {job.gross_profit > 0 && (
-          <div className="bg-gray-50 rounded-lg p-3">
+          <div className="bg-white rounded-lg p-3">
             <p className="text-xs text-gray-400 mb-0.5">Gross Profit</p>
             <p className="font-bold text-green-700">${Math.round(job.gross_profit).toLocaleString()}</p>
           </div>
         )}
         {job.gpmd > 0 && (
-          <div className="bg-gray-50 rounded-lg p-3">
+          <div className="bg-white rounded-lg p-3">
             <p className="text-xs text-gray-400 mb-0.5">GPMD</p>
             <p className="font-bold text-gray-700">${Math.round(job.gpmd).toLocaleString()}</p>
           </div>
         )}
         {job.sold_date && (
-          <div className="bg-gray-50 rounded-lg p-3">
+          <div className="bg-white rounded-lg p-3">
             <p className="text-xs text-gray-400 mb-0.5">Sold Date</p>
             <p className="font-medium text-gray-700">{new Date(job.sold_date).toLocaleDateString()}</p>
           </div>
         )}
         {job.total_man_days > 0 && (
-          <div className="bg-gray-50 rounded-lg p-3">
+          <div className="bg-white rounded-lg p-3">
             <p className="text-xs text-gray-400 mb-0.5">Man Days</p>
             <p className="font-medium text-gray-700">{parseFloat(job.total_man_days).toFixed(1)}</p>
           </div>
