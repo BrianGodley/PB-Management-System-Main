@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 import ScheduleCalendar from '../components/ScheduleCalendar'
 import DailyLogs from '../components/DailyLogs'
 import TimeClock from '../components/TimeClock'
@@ -456,7 +457,7 @@ export default function JobsList() {
           {tab === 'tasks'          && <ComingSoon label="Tasks" />}
           {tab === 'change-orders'  && <ComingSoon label="Change Orders" />}
           {tab === 'finance'        && <ComingSoon label="Finance" />}
-          {tab === 'files'          && <ComingSoon label="Files" />}
+          {tab === 'files'          && <JobFilesPanel job={selectedJobObj} />}
           {tab === 'templates'      && <ComingSoon label="Templates" />}
           {tab === 'settings'       && (
             <JobScheduleSettings
@@ -811,6 +812,142 @@ function ComingSoon({ label }) {
       <p className="text-4xl mb-3">🚧</p>
       <p className="text-lg font-semibold text-gray-500">{label}</p>
       <p className="text-sm mt-1">Coming soon</p>
+    </div>
+  )
+}
+
+// ── Job Files Panel ───────────────────────────────────────────────────────────
+function JobFilesPanel({ job }) {
+  const { user } = useAuth()
+  const [files,        setFiles]        = useState([])
+  const [filesLoading, setFilesLoading] = useState(false)
+  const [uploading,    setUploading]    = useState(false)
+
+  useEffect(() => {
+    if (job?.id) fetchFiles(job.id)
+    else setFiles([])
+  }, [job?.id])
+
+  async function fetchFiles(jobId) {
+    setFilesLoading(true)
+    const { data } = await supabase
+      .from('job_files')
+      .select('*')
+      .eq('job_id', jobId)
+      .order('uploaded_at', { ascending: false })
+    if (data) {
+      setFiles(data.map(f => ({
+        ...f,
+        publicUrl: supabase.storage.from('job-files').getPublicUrl(f.storage_path).data?.publicUrl || null
+      })))
+    }
+    setFilesLoading(false)
+  }
+
+  async function handleUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file || !job?.id) return
+    setUploading(true)
+    const path = `jobs/${job.id}/${Date.now()}-${file.name}`
+    const { error } = await supabase.storage.from('job-files').upload(path, file)
+    if (!error) {
+      await supabase.from('job_files').insert({
+        job_id: job.id,
+        file_name: file.name,
+        file_type: file.type,
+        file_category: file.type?.startsWith('image/') ? 'photo' : 'document',
+        storage_path: path,
+        file_size: file.size,
+        source: 'manual',
+        uploaded_by: user?.id,
+      })
+      fetchFiles(job.id)
+    }
+    setUploading(false)
+    e.target.value = ''
+  }
+
+  async function handleDelete(f) {
+    if (!confirm(`Delete "${f.file_name}"?`)) return
+    await supabase.storage.from('job-files').remove([f.storage_path])
+    await supabase.from('job_files').delete().eq('id', f.id)
+    setFiles(prev => prev.filter(x => x.id !== f.id))
+  }
+
+  function fmtSize(bytes) {
+    if (!bytes) return ''
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / 1048576).toFixed(1)} MB`
+  }
+
+  if (!job) return (
+    <div className="flex flex-col items-center justify-center h-full text-gray-400 py-20">
+      <p className="text-4xl mb-3">📁</p>
+      <p className="text-lg font-semibold text-gray-500">Select a job to view files</p>
+      <p className="text-sm mt-1">Choose a job from the sidebar</p>
+    </div>
+  )
+
+  return (
+    <div className="p-4">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">Documents & Photos</h2>
+          <p className="text-xs text-gray-400">{job.client_name || job.name}</p>
+        </div>
+        <label className={`cursor-pointer text-sm px-3 py-1.5 rounded-lg font-medium transition-colors ${uploading ? 'bg-gray-200 text-gray-400' : 'bg-green-700 text-white hover:bg-green-800'}`}>
+          {uploading ? 'Uploading…' : '+ Upload File'}
+          <input type="file" className="hidden" onChange={handleUpload} disabled={uploading}
+            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip" />
+        </label>
+      </div>
+
+      {filesLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700" />
+        </div>
+      ) : files.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+          <p className="text-4xl mb-3">📂</p>
+          <p className="text-sm font-medium text-gray-500">No files yet</p>
+          <p className="text-xs mt-1">Upload a file or import from BuilderTrend</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {files.map(f => {
+            const isImage = f.file_type?.startsWith('image/')
+            return (
+              <div key={f.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm group">
+                {isImage && f.publicUrl ? (
+                  <a href={f.publicUrl} target="_blank" rel="noopener noreferrer">
+                    <img src={f.publicUrl} alt={f.file_name} className="w-full h-28 object-cover hover:opacity-90 transition-opacity" />
+                  </a>
+                ) : (
+                  <div className="w-full h-28 bg-gray-50 flex items-center justify-center text-4xl">
+                    {f.file_type === 'application/pdf' ? '📄' : '📎'}
+                  </div>
+                )}
+                <div className="p-2.5">
+                  <p className="text-xs font-medium text-gray-800 truncate" title={f.file_name}>{f.file_name}</p>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-[10px] text-gray-400">{fmtSize(f.file_size)}</span>
+                    <div className="flex items-center gap-1.5">
+                      {f.publicUrl && (
+                        <a href={f.publicUrl} download={f.file_name} className="text-[10px] text-blue-600 hover:text-blue-800 font-medium">⬇</a>
+                      )}
+                      <button onClick={() => handleDelete(f)} className="text-[10px] text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+                    </div>
+                  </div>
+                  {f.source === 'buildertrend' && (
+                    <span className="text-[9px] text-purple-500 font-medium">BuilderTrend</span>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
