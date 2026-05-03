@@ -765,7 +765,12 @@ export default function EstimateDetail() {
         {estimate.client_name && (
           <>
             <span className="text-gray-300">/</span>
-            <span className="text-gray-400">{estimate.client_name}</span>
+            <Link
+              to={estimate.client_id ? `/clients/${estimate.client_id}` : '/clients'}
+              className="text-gray-400 hover:text-gray-600 hover:underline"
+            >
+              {estimate.client_name}
+            </Link>
           </>
         )}
         <span className="text-gray-300">/</span>
@@ -800,7 +805,9 @@ export default function EstimateDetail() {
             </div>
           ) : (
             <div className="flex items-center gap-2 group">
-              <h1 className="text-2xl font-bold text-gray-900">{estimate.estimate_name}</h1>
+              <h1 className="text-2xl font-bold text-gray-900">
+                {estimate.client_name ? `${estimate.client_name} - ${estimate.estimate_name}` : estimate.estimate_name}
+              </h1>
               <button
                 onClick={() => { setNameInput(estimate.estimate_name); setEditingName(true) }}
                 className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-gray-600"
@@ -820,9 +827,6 @@ export default function EstimateDetail() {
           <span className={`text-xs font-semibold px-3 py-1 rounded-full ${STATUS_BADGE[estimate.status] || STATUS_BADGE.pending}`}>
             {estimate.status?.charAt(0).toUpperCase() + estimate.status?.slice(1) || 'Pending'}
           </span>
-          {estimate.client_name && (
-            <span className="text-sm text-gray-400">{estimate.client_name}</span>
-          )}
         </div>
 
         {/* Status action buttons */}

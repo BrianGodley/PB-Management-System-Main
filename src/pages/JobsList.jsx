@@ -1051,17 +1051,20 @@ function JobFilesPanel({ job }) {
   const [newFolderName, setNewFolderName] = useState('')
   const [savingFolder,  setSavingFolder]  = useState(false)
   const [showModal,     setShowModal]     = useState(false)
-  // folder navigation: null = root, uuid = inside that folder
-  const [openFolderId,  setOpenFolderId]  = useState(null)
+  // folder navigation stack: [{id, name}] — empty = root
+  const [folderStack,   setFolderStack]   = useState([])
+
+  // Current folder id (null = root)
+  const currentFolderId = folderStack.length > 0 ? folderStack[folderStack.length - 1].id : null
 
   useEffect(() => {
     if (job?.id) { fetchFiles(job.id); fetchFolders(job.id) }
     else { setFiles([]); setFolders([]) }
-    setOpenFolderId(null)
+    setFolderStack([])
   }, [job?.id])
 
-  // Reset open folder when switching sub-tabs
-  useEffect(() => { setOpenFolderId(null) }, [subTab])
+  // Reset folder stack when switching sub-tabs
+  useEffect(() => { setFolderStack([]) }, [subTab])
 
   async function fetchFiles(jobId) {
     setFilesLoading(true)
@@ -1095,7 +1098,7 @@ function JobFilesPanel({ job }) {
         file_size: file.size,
         source: 'manual',
         uploaded_by: user?.id,
-        folder_id: openFolderId || null,
+        folder_id: currentFolderId || null,
       })
       fetchFiles(job.id)
     }
@@ -1114,9 +1117,13 @@ function JobFilesPanel({ job }) {
     if (!newFolderName.trim() || !job?.id) return
     setSavingFolder(true)
     const folderType = subTab === 'documents' ? 'document' : 'photo_video'
-    const existing   = folders.filter(f => f.folder_type === folderType).length
+    const existing   = folders.filter(f => f.parent_folder_id === currentFolderId && f.folder_type === folderType).length
     const { data } = await supabase.from('job_folders').insert({
-      job_id: job.id, folder_name: newFolderName.trim(), folder_type: folderType, sort_order: existing,
+      job_id: job.id,
+      folder_name: newFolderName.trim(),
+      folder_type: folderType,
+      sort_order: existing,
+      parent_folder_id: currentFolderId || null,
     }).select().single()
     if (data) setFolders(prev => [...prev, data])
     setNewFolderName(''); setAddingFolder(false); setSavingFolder(false)
@@ -1126,7 +1133,10 @@ function JobFilesPanel({ job }) {
     if (!confirm('Remove this folder? Files inside will become unorganized.')) return
     await supabase.from('job_folders').delete().eq('id', id)
     setFolders(prev => prev.filter(f => f.id !== id))
-    if (openFolderId === id) setOpenFolderId(null)
+    // If removed folder is in our stack, pop back to parent
+    if (folderStack.some(f => f.id === id)) {
+      setFolderStack(prev => prev.slice(0, prev.findIndex(f => f.id === id)))
+    }
   }
 
   function fmtSize(bytes) {
@@ -1137,20 +1147,22 @@ function JobFilesPanel({ job }) {
   }
 
   const isMedia      = f => f.file_type?.startsWith('image/') || f.file_type?.startsWith('video/')
-  const docFolders   = folders.filter(f => f.folder_type !== 'photo_video')
-  const photoFolders = folders.filter(f => f.folder_type === 'photo_video')
-  const activeFolders = subTab === 'documents' ? docFolders : photoFolders
   const uploadAccept  = subTab === 'documents' ? '.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip' : 'image/*,video/*'
   const folderIconColor = subTab === 'documents' ? '#f59e0b' : '#60a5fa'
 
+  // Folders visible at current depth
+  const activeFolders = folders.filter(f =>
+    f.folder_type !== 'photo_video' === (subTab === 'documents') &&
+    (f.parent_folder_id ?? null) === currentFolderId
+  )
+
   // Files scoped to current view
   const allTabFiles  = files.filter(f => subTab === 'documents' ? !isMedia(f) : isMedia(f))
-  const openFolder   = openFolderId ? activeFolders.find(f => f.id === openFolderId) : null
-  const visibleFiles = openFolderId
-    ? allTabFiles.filter(f => f.folder_id === openFolderId)
+  const visibleFiles = currentFolderId
+    ? allTabFiles.filter(f => f.folder_id === currentFolderId)
     : allTabFiles.filter(f => !f.folder_id)
 
-  const rootIsEmpty   = !filesLoading && activeFolders.length === 0 && allTabFiles.filter(f => !f.folder_id).length === 0
+  const rootIsEmpty   = !filesLoading && activeFolders.length === 0 && visibleFiles.length === 0
   const folderIsEmpty = !filesLoading && visibleFiles.length === 0
 
   if (!job) return (
@@ -1192,21 +1204,37 @@ function JobFilesPanel({ job }) {
       </div>
 
       {/* Breadcrumb / back nav */}
-      {openFolderId ? (
-        <div className="flex items-center gap-2 mb-4">
+      {folderStack.length > 0 ? (
+        <div className="flex items-center gap-1.5 mb-4 flex-wrap">
+          {/* Root link */}
           <button
-            onClick={() => { setOpenFolderId(null); setAddingFolder(false) }}
-            className="flex items-center gap-1.5 text-sm text-green-700 hover:text-green-900 font-medium transition-colors"
+            onClick={() => { setFolderStack([]); setAddingFolder(false) }}
+            className="text-sm text-green-700 hover:text-green-900 font-medium transition-colors"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            All Folders
+            📁 All Folders
           </button>
-          <span className="text-gray-300">/</span>
-          <span className="text-sm font-semibold text-gray-800">{openFolder?.folder_name}</span>
+          {/* Intermediate crumbs */}
+          {folderStack.map((crumb, idx) => {
+            const isLast = idx === folderStack.length - 1
+            return (
+              <span key={crumb.id} className="flex items-center gap-1.5">
+                <span className="text-gray-300">/</span>
+                {isLast ? (
+                  <span className="text-sm font-semibold text-gray-800">{crumb.name}</span>
+                ) : (
+                  <button
+                    onClick={() => { setFolderStack(prev => prev.slice(0, idx + 1)); setAddingFolder(false) }}
+                    className="text-sm text-green-700 hover:text-green-900 font-medium transition-colors"
+                  >
+                    {crumb.name}
+                  </button>
+                )}
+              </span>
+            )
+          })}
+          {/* Delete current folder */}
           <button
-            onClick={() => handleRemoveFolder(openFolderId)}
+            onClick={() => handleRemoveFolder(currentFolderId)}
             className="ml-auto text-xs text-red-400 hover:text-red-600 transition-colors"
             title="Delete folder"
           >Delete folder</button>
@@ -1226,7 +1254,7 @@ function JobFilesPanel({ job }) {
       )}
 
       {/* Inline add-folder input */}
-      {addingFolder && !openFolderId && (
+      {addingFolder && (
         <div className="flex gap-2 mb-4">
           <input autoFocus type="text" value={newFolderName}
             onChange={e => setNewFolderName(e.target.value)}
@@ -1244,24 +1272,53 @@ function JobFilesPanel({ job }) {
         <div className="flex items-center justify-center py-16">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700" />
         </div>
-      ) : openFolderId ? (
+      ) : currentFolderId ? (
         /* ── FOLDER VIEW ─────────────────────────────────────────── */
         <>
-          {/* Upload toolbar inside folder */}
-          <div className="flex items-center gap-2 mb-4">
+          {/* Upload + subfolder toolbar inside folder */}
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
+            <button
+              onClick={() => { setAddingFolder(a => !a); setNewFolderName('') }}
+              className="text-xs px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors font-medium"
+            >{addingFolder ? '✕ Cancel' : '+ Add Subfolder'}</button>
             <label className={`cursor-pointer text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${uploading ? 'bg-gray-200 text-gray-400' : 'bg-green-700 text-white hover:bg-green-800'}`}>
               {uploading ? 'Uploading…' : `+ Upload ${subTab === 'documents' ? 'Document' : 'Photo / Video'}`}
               <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} accept={uploadAccept} />
             </label>
           </div>
 
-          {folderIsEmpty ? (
+          {/* Subfolders */}
+          {activeFolders.length > 0 && (
+            <div className="mb-6">
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-3">Subfolders</p>
+              <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                {activeFolders.map(f => {
+                  const count = allTabFiles.filter(x => x.folder_id === f.id).length
+                  return (
+                    <button
+                      key={f.id}
+                      onClick={() => { setFolderStack(prev => [...prev, { id: f.id, name: f.folder_name }]); setAddingFolder(false) }}
+                      className="flex flex-col items-center gap-1.5 p-3 rounded-xl hover:bg-gray-100 transition-colors group relative text-center"
+                      title={f.folder_name}
+                    >
+                      <FolderIcon color={folderIconColor} size={52} />
+                      <span className="text-xs font-medium text-gray-700 leading-tight line-clamp-2 w-full text-center">{f.folder_name}</span>
+                      {count > 0 && <span className="text-[10px] text-gray-400">{count} file{count !== 1 ? 's' : ''}</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {folderIsEmpty && activeFolders.length === 0 && (
             <div className="flex flex-col items-center py-12 text-gray-400">
               <div className="mb-3 opacity-40"><FolderIcon color={folderIconColor} size={56} /></div>
               <p className="text-sm font-medium text-gray-500">This folder is empty</p>
-              <p className="text-xs mt-1 text-center max-w-xs">Upload a file above to add it to this folder.</p>
+              <p className="text-xs mt-1 text-center max-w-xs">Upload a file above or add a subfolder to organize content here.</p>
             </div>
-          ) : (
+          )}
+          {visibleFiles.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {visibleFiles.map(f => (
                 <FileCard key={f.id} f={f} onDelete={handleDeleteFile} fmtSize={fmtSize} />
@@ -1282,7 +1339,7 @@ function JobFilesPanel({ job }) {
                   return (
                     <button
                       key={f.id}
-                      onClick={() => { setOpenFolderId(f.id); setAddingFolder(false) }}
+                      onClick={() => { setFolderStack([{ id: f.id, name: f.folder_name }]); setAddingFolder(false) }}
                       className="flex flex-col items-center gap-1.5 p-3 rounded-xl hover:bg-gray-100 transition-colors group relative text-center"
                       title={f.folder_name}
                     >
@@ -1347,9 +1404,6 @@ const CO_STATUS_STYLE = {
 function JobChangeOrdersPanel({ job }) {
   const [cos,        setCos]        = useState([])
   const [loading,    setLoading]    = useState(false)
-  const [showModal,  setShowModal]  = useState(false)
-  const [coForm,     setCoForm]     = useState({ name: '' })
-  const [coError,    setCoError]    = useState('')
   const [creatingCO, setCreatingCO] = useState(false)
   const [updatingId, setUpdatingId] = useState(null)
 
@@ -1390,25 +1444,17 @@ function JobChangeOrdersPanel({ job }) {
     setLoading(false)
   }
 
-  async function handleCreateCO() {
-    if (!coForm.name.trim()) { setCoError('Please enter a name.'); return }
-    setCoError(''); setCreatingCO(true)
-
+  async function handleNewCO() {
+    setCreatingCO(true)
     const clientName = job.client_name || job.name || ''
     const { data: est, error } = await supabase
       .from('estimates')
-      .insert({ estimate_name: coForm.name, client_name: clientName, status: 'pending' })
+      .insert({ estimate_name: '', client_name: clientName, status: 'pending' })
       .select().single()
-
     setCreatingCO(false)
     if (error) { alert('Error creating estimate: ' + error.message); return }
-
-    setShowModal(false)
-    const { name } = coForm
-    setCoForm({ name: '' })
-
-    // Open inline estimator (no bid yet — create mode)
-    openEstimator(est.id, null, name, '')
+    // Open inline estimator with empty description — user fills it in the panel
+    openEstimator(est.id, null, '', '')
   }
 
   function handleCoSaved(bid) {
@@ -1468,41 +1514,15 @@ function JobChangeOrdersPanel({ job }) {
   // ── CO list view ─────────────────────────────────────────────────────────
   return (
     <div className="p-4">
-      {/* New CO modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6" onClick={e => e.stopPropagation()}>
-            <div className="mb-5">
-              <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-0.5">New Change Order</p>
-              <h2 className="text-lg font-bold text-gray-900">{job.name || job.client_name}</h2>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Change Order Name <span className="text-red-500">*</span></label>
-              <input autoFocus className="input" placeholder="e.g. Add Patio Extension…"
-                value={coForm.name} onChange={e => { setCoForm(p => ({ ...p, name: e.target.value })); setCoError('') }}
-                onKeyDown={e => e.key === 'Enter' && handleCreateCO()} />
-            </div>
-            {coError && <p className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{coError}</p>}
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => { setShowModal(false); setCoForm({ name: '' }); setCoError('') }}
-                className="btn-secondary flex-1">Cancel</button>
-              <button onClick={handleCreateCO} disabled={creatingCO} className="btn-primary flex-1 disabled:opacity-50">
-                {creatingCO ? 'Creating…' : 'Next →'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-lg font-bold text-gray-900">Change Orders</h2>
           <p className="text-xs text-gray-400">{job.client_name || job.name}</p>
         </div>
-        <button onClick={() => setShowModal(true)}
-          className="text-xs px-3 py-1.5 rounded-lg bg-blue-700 text-white font-semibold hover:bg-blue-800 transition-colors">
-          + New Change Order
+        <button onClick={handleNewCO} disabled={creatingCO}
+          className="text-xs px-3 py-1.5 rounded-lg bg-blue-700 text-white font-semibold hover:bg-blue-800 transition-colors disabled:opacity-50">
+          {creatingCO ? 'Creating…' : '+ New Change Order'}
         </button>
       </div>
 
@@ -1515,9 +1535,9 @@ function JobChangeOrdersPanel({ job }) {
           <p className="text-4xl mb-3">📋</p>
           <p className="text-sm font-medium text-gray-500">No change orders yet for this job</p>
           <p className="text-xs mt-1 mb-5 text-center max-w-xs">Click "+ New Change Order" to build a priced change order using the estimating interface.</p>
-          <button onClick={() => setShowModal(true)}
-            className="text-sm px-4 py-2 rounded-lg bg-blue-700 text-white font-medium hover:bg-blue-800 transition-colors">
-            + New Change Order
+          <button onClick={handleNewCO} disabled={creatingCO}
+            className="text-sm px-4 py-2 rounded-lg bg-blue-700 text-white font-medium hover:bg-blue-800 transition-colors disabled:opacity-50">
+            {creatingCO ? 'Creating…' : '+ New Change Order'}
           </button>
         </div>
       ) : (

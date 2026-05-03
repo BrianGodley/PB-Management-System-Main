@@ -304,7 +304,7 @@ export default function ClientDetail() {
       </div>
 
       {/* ── Client Info Card ── */}
-      <div className="card mb-4 border-2 border-green-700">
+      <div className="card mb-4 border-2 border-green-700 bg-blue-50">
         {editing ? (
           <form onSubmit={handleSave} className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div>

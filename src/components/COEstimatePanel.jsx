@@ -101,6 +101,7 @@ export default function COEstimatePanel({
   const [savingModule,     setSavingModule]     = useState(false)
   const [editingModule,    setEditingModule]    = useState(null)
   const [savingCO,         setSavingCO]         = useState(false)
+  const [description,      setDescription]      = useState(coName || '')
 
   useEffect(() => { fetchData() }, [estimateId])
 
@@ -293,6 +294,7 @@ export default function COEstimatePanel({
 
   // ── Save / Update CO bid ─────────────────────────────────────────────────
   async function handleSaveCO() {
+    if (!description.trim()) { alert('Please enter a Description before saving.'); return }
     if (!projects.length) { alert('Add at least one project before saving.'); return }
     setSavingCO(true)
     try {
@@ -303,14 +305,18 @@ export default function COEstimatePanel({
       const bidGpmd    = totalMD > 0 ? Math.round(totalGp / totalMD) : 0
       const projNames  = projects.map(p => p.project_name)
 
+      // Always sync the estimate name to the description
+      await supabase.from('estimates').update({ estimate_name: description.trim() }).eq('id', estimateId)
+
       let bid
       if (bidId) {
-        // Update existing bid with new totals
+        // Update existing bid with new totals + description
         const { data: updated } = await supabase.from('bids').update({
           bid_amount:   grandTotal,
           gross_profit: totalGp,
           gpmd:         bidGpmd,
           projects:     projNames,
+          co_name:      description.trim(),
         }).eq('id', bidId).select().single()
         bid = updated
       } else {
@@ -339,7 +345,7 @@ export default function COEstimatePanel({
           created_by:     user?.id || null,
           record_type:    'change_order',
           linked_job_id:  jobId,
-          co_name:        coName,
+          co_name:        description.trim(),
           co_type:        coType,
         }).select().single()
         if (bidErr) throw new Error(bidErr.message)
@@ -349,7 +355,7 @@ export default function COEstimatePanel({
         if (estimate && projects.length) {
           try {
             const blob     = await generateBidDoc(estimate, projects, clientAddress)
-            const safeName = (coName || 'ChangeOrder').replace(/[^a-z0-9]/gi, '_')
+            const safeName = (description.trim() || 'ChangeOrder').replace(/[^a-z0-9]/gi, '_')
             downloadBidDoc(blob, `${safeName}_CO_${new Date().toISOString().split('T')[0]}.docx`)
           } catch (_) { /* doc gen failure is non-fatal */ }
         }
@@ -425,20 +431,27 @@ export default function COEstimatePanel({
     <div className="flex flex-col h-full">
 
       {/* CO header bar */}
-      <div className="flex items-center justify-between gap-3 mb-3 px-1 flex-wrap">
-        <div className="flex items-center gap-3">
+      <div className="flex items-start justify-between gap-3 mb-3 px-1 flex-wrap">
+        <div className="flex items-start gap-3 flex-1 min-w-0">
           <button
             onClick={onClose}
-            className="text-sm text-gray-500 hover:text-gray-800 font-medium flex items-center gap-1"
+            className="text-sm text-gray-500 hover:text-gray-800 font-medium flex items-center gap-1 mt-1 flex-shrink-0"
           >
             ← Back
           </button>
-          <div className="h-4 w-px bg-gray-200" />
-          <div className="flex items-center gap-2">
-            <span className="text-base">📋</span>
-            <div>
-              <p className="text-sm font-bold text-gray-900 leading-tight">{coName || 'Change Order'}</p>
-              {coType && <p className="text-xs text-blue-600">{coType}</p>}
+          <div className="h-4 w-px bg-gray-200 mt-2 flex-shrink-0" />
+          <div className="flex items-start gap-2 flex-1 min-w-0">
+            <span className="text-base mt-1">📋</span>
+            <div className="flex-1 min-w-0">
+              <label className="block text-[10px] font-semibold text-blue-600 uppercase tracking-wide mb-0.5">
+                Description <span className="text-red-500">*</span>
+              </label>
+              <input
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                placeholder="e.g. Add Patio Extension…"
+                className="w-full text-sm font-semibold text-gray-900 border-b border-gray-300 focus:border-blue-500 outline-none bg-transparent pb-0.5 placeholder-gray-300"
+              />
             </div>
           </div>
         </div>
@@ -446,7 +459,7 @@ export default function COEstimatePanel({
         <button
           onClick={handleSaveCO}
           disabled={savingCO}
-          className="text-sm px-4 py-2 rounded-lg bg-blue-700 text-white font-semibold hover:bg-blue-800 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+          className="text-sm px-4 py-2 rounded-lg bg-blue-700 text-white font-semibold hover:bg-blue-800 transition-colors disabled:opacity-50 flex items-center gap-1.5 flex-shrink-0"
         >
           {savingCO ? '⏳ Saving…' : bidId ? '💾 Update Change Order' : '📋 Save Change Order'}
         </button>
