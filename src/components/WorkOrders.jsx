@@ -638,7 +638,7 @@ function buildEmailText({ workOrders, crewType, jobName, requiredEquipFn, isSub 
 function buildSMSText({ workOrders, crewType, jobName, requiredEquipFn, isSub }) {
   const $  = n => '$'+Math.round(parseFloat(n||0)).toLocaleString()
   const nv = v => parseFloat(v||0)
-  const lines = [`WO: ${crewType} – ${jobName}`]
+  const lines = [`WO: ${crewType} - ${jobName}`]
   for (const wo of workOrders) {
     const label = wo.project_name?`${wo.module_type}/${wo.project_name}`:wo.module_type
     const parts = []
