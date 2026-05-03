@@ -671,7 +671,7 @@ function useRecipientData() {
 
   useEffect(() => {
     Promise.all([
-      supabase.from('employees').select('id, first_name, last_name, phone, email').eq('status', 'active').order('first_name'),
+      supabase.from('employees').select('id, first_name, last_name, phone, cell_phone, email').eq('status', 'active').order('first_name'),
       supabase.from('crews').select('*').order('label'),
     ]).then(([{ data: emps }, { data: crs }]) => {
       setEmployees(emps || [])
