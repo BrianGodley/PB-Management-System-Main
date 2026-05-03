@@ -35,11 +35,8 @@ function formatJobName(clientName) {
 export default function Bids() {
   const { user } = useAuth()
   const [bids,          setBids]          = useState([])
-  const [changeOrders,  setChangeOrders]  = useState([])
   const [profiles,      setProfiles]      = useState({})
-  const [jobsMap,       setJobsMap]       = useState({})
   const [loading,       setLoading]       = useState(true)
-  const [pageTab,       setPageTab]       = useState('change_orders') // 'change_orders' | 'bids'
   const [filter,        setFilter]        = useState('all')
   const [search,        setSearch]        = useState('')
   const [updatingId,    setUpdatingId]    = useState(null)
@@ -58,28 +55,17 @@ export default function Bids() {
   // Cascade warning modal state
   const [cascadeModal, setCascadeModal] = useState(null) // { type, title, body, woCount, onConfirm }
 
-  useEffect(() => { fetchBids(); fetchProfiles(); fetchJobs() }, [])
+  useEffect(() => { fetchBids(); fetchProfiles() }, [])
 
   async function fetchBids() {
     setLoading(true)
     const { data } = await supabase
       .from('bids')
       .select('*')
+      .in('record_type', ['bid'])
       .order('date_submitted', { ascending: false })
-    if (data) {
-      setBids(data.filter(b => !b.record_type || b.record_type === 'bid'))
-      setChangeOrders(data.filter(b => b.record_type === 'change_order'))
-    }
+    if (data) setBids(data)
     setLoading(false)
-  }
-
-  async function fetchJobs() {
-    const { data } = await supabase.from('jobs').select('id, name, client_name')
-    if (data) {
-      const map = {}
-      data.forEach(j => { map[j.id] = j.name || j.client_name })
-      setJobsMap(map)
-    }
   }
 
   async function fetchProfiles() {
@@ -477,300 +463,132 @@ export default function Bids() {
       )}
 
       <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
-        <h1 className="text-xl font-bold text-gray-900">Bids / COs</h1>
+        <h1 className="text-xl font-bold text-gray-900">Bids</h1>
       </div>
 
-      {/* Page tabs */}
-      <div className="flex gap-1 border-b border-gray-200 mb-5">
-        {[
-          { key: 'change_orders', label: '📋 Change Orders', count: changeOrders.length },
-          { key: 'bids',          label: '📄 Bids',          count: bids.length },
-        ].map(t => (
-          <button
-            key={t.key}
-            onClick={() => { setPageTab(t.key); setFilter('all'); setSearch('') }}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-1.5 ${
-              pageTab === t.key
-                ? 'border-green-700 text-green-800 bg-green-50'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {t.label}
-            <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${pageTab === t.key ? 'bg-green-700 text-white' : 'bg-gray-100 text-gray-500'}`}>
-              {t.count}
-            </span>
-          </button>
-        ))}
+      {/* Summary */}
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="card text-center">
+          <p className="text-xs text-gray-500 mb-1">Pipeline Value</p>
+          <p className="font-bold text-gray-900">${totalBidValue.toLocaleString()}</p>
+        </div>
+        <div className="card text-center">
+          <p className="text-xs text-gray-500 mb-1">Sold Value</p>
+          <p className="font-bold text-green-700">${soldValue.toLocaleString()}</p>
+        </div>
+        <div className="card text-center">
+          <p className="text-xs text-gray-500 mb-1">Close Rate</p>
+          <p className="font-bold text-blue-700">{closeRate.toFixed(0)}%</p>
+        </div>
       </div>
 
-      {/* ── CHANGE ORDERS TAB ─────────────────────────────────────────── */}
-      {pageTab === 'change_orders' && (() => {
-        const filteredCOs = changeOrders.filter(co => {
-          const matchStatus = filter === 'all' || co.status === filter
-          const matchSearch = (co.co_name || co.client_name || '').toLowerCase().includes(search.toLowerCase())
-          return matchStatus && matchSearch
-        })
-        const coValue  = changeOrders.filter(c => c.status !== 'lost').reduce((s, c) => s + parseFloat(c.bid_amount || 0), 0)
-        const coApproved = changeOrders.filter(c => c.status === 'sold').reduce((s, c) => s + parseFloat(c.bid_amount || 0), 0)
-        return (
-          <>
-            <div className="grid grid-cols-2 gap-3 mb-5">
-              <div className="card text-center">
-                <p className="text-xs text-gray-500 mb-1">CO Pipeline</p>
-                <p className="font-bold text-gray-900">${coValue.toLocaleString()}</p>
-              </div>
-              <div className="card text-center">
-                <p className="text-xs text-gray-500 mb-1">Approved Value</p>
-                <p className="font-bold text-green-700">${coApproved.toLocaleString()}</p>
-              </div>
-            </div>
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <input type="text" placeholder="Search bids..." value={search}
+          onChange={e => setSearch(e.target.value)} className="input sm:max-w-xs" />
+        <div className="flex gap-1 flex-wrap">
+          {['all', ...BID_STATUSES].map(s => (
+            <button key={s} onClick={() => setFilter(s)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium capitalize transition-colors ${filter === s ? (STATUS_FILTER[s] || 'bg-green-700 text-white') : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'}`}>
+              {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 mb-4">
-              <input type="text" placeholder="Search change orders..." value={search}
-                onChange={e => setSearch(e.target.value)} className="input sm:max-w-xs" />
-              <div className="flex gap-1 flex-wrap">
-                {['all', ...BID_STATUSES].map(s => (
-                  <button key={s} onClick={() => setFilter(s)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium capitalize transition-colors ${filter === s ? (STATUS_FILTER[s] || 'bg-green-700 text-white') : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'}`}
-                  >
-                    {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {filteredCOs.length === 0 ? (
-              <div className="card text-center py-12">
-                <p className="text-4xl mb-3">📋</p>
-                <p className="text-gray-500">No change orders found.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm border-collapse">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left px-4 py-3 font-semibold text-gray-700">Change Order</th>
-                      <th className="text-left px-4 py-3 font-semibold text-gray-700">Client</th>
-                      <th className="text-left px-4 py-3 font-semibold text-gray-700">Job</th>
-                      <th className="text-left px-4 py-3 font-semibold text-gray-700">Type</th>
-                      <th className="text-left px-4 py-3 font-semibold text-gray-700">Created</th>
-                      <th className="text-left px-4 py-3 font-semibold text-gray-700">Created By</th>
-                      <th className="text-center px-4 py-3 font-semibold text-gray-700">Doc</th>
-                      <th className="text-right px-4 py-3 font-semibold text-gray-700">Gross Profit</th>
-                      <th className="text-right px-4 py-3 font-semibold text-gray-700">Amount</th>
-                      <th className="text-center px-4 py-3 font-semibold text-gray-700">Status</th>
-                      <th className="text-center px-4 py-3 font-semibold text-gray-700">Delete</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredCOs.map((co, i) => {
-                      const currentStatus = co.status || 'pending'
-                      const isUpdating = updatingId === co.id
-                      return (
-                        <tr key={co.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
-                          <td className="px-4 py-3">
-                            {co.estimate_id ? (
-                              <Link
-                                to={`/estimates/${co.estimate_id}?co=1&job_id=${co.linked_job_id || ''}&co_name=${encodeURIComponent(co.co_name || '')}&co_type=${encodeURIComponent(co.co_type || '')}`}
-                                className="font-semibold text-blue-700 hover:underline"
-                              >
-                                {co.co_name || '—'}
-                              </Link>
-                            ) : (
-                              <p className="font-semibold text-gray-800">{co.co_name || '—'}</p>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-gray-700">{co.client_name}</td>
-                          <td className="px-4 py-3 text-gray-600 text-xs">
-                            {co.linked_job_id ? (jobsMap[co.linked_job_id] || co.linked_job_id.slice(0, 8)) : '—'}
-                          </td>
-                          <td className="px-4 py-3 text-gray-500 text-xs">{co.co_type || '—'}</td>
-                          <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
-                            {co.date_submitted ? new Date(co.date_submitted).toLocaleDateString() : '—'}
-                          </td>
-                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap text-sm">
-                            {co.created_by ? (profiles[co.created_by] || '—') : '—'}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <button
-                              onClick={() => downloadBid(co)}
-                              disabled={downloadingId === co.id || !co.estimate_id}
-                              title={co.estimate_id ? 'Download CO doc' : 'No linked estimate'}
-                              className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-gray-200 text-gray-400 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                            >
-                              {downloadingId === co.id ? <span className="animate-spin text-xs">⟳</span> : <span className="text-base">📄</span>}
-                            </button>
-                          </td>
-                          <td className="px-4 py-3 text-right whitespace-nowrap font-semibold text-green-700">
-                            {co.gross_profit > 0 ? `$${Math.round(co.gross_profit).toLocaleString()}` : <span className="text-gray-300 font-normal">—</span>}
-                          </td>
-                          <td className="px-4 py-3 text-right font-bold text-gray-900 whitespace-nowrap">
-                            ${parseFloat(co.bid_amount || 0).toLocaleString()}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <select
-                              value={currentStatus}
-                              disabled={isUpdating}
-                              onChange={e => updateStatus(co.id, e.target.value)}
-                              className={`text-xs font-semibold rounded-full px-3 py-1 border-2 cursor-pointer appearance-none text-center transition-colors focus:outline-none disabled:opacity-40 ${STATUS_SELECT[currentStatus] || STATUS_SELECT.pending}`}
-                            >
-                              {BID_STATUSES.map(s => (
-                                <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <button
-                              onClick={() => deleteBid(co.id)}
-                              className="text-xs px-2 py-1 rounded border border-red-100 text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-                            >✕</button>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </>
-        )
-      })()}
-
-      {/* ── BIDS TAB ──────────────────────────────────────────────────── */}
-      {pageTab === 'bids' && (() => {
-        const filteredBids = bids.filter(b => {
-          const matchStatus = filter === 'all' || b.status === filter
-          const matchSearch = b.client_name.toLowerCase().includes(search.toLowerCase()) ||
-            (b.job_address || '').toLowerCase().includes(search.toLowerCase())
-          return matchStatus && matchSearch
-        })
-        return (
-          <>
-            <div className="grid grid-cols-3 gap-3 mb-5">
-              <div className="card text-center">
-                <p className="text-xs text-gray-500 mb-1">Pipeline Value</p>
-                <p className="font-bold text-gray-900">${totalBidValue.toLocaleString()}</p>
-              </div>
-              <div className="card text-center">
-                <p className="text-xs text-gray-500 mb-1">Sold Value</p>
-                <p className="font-bold text-green-700">${soldValue.toLocaleString()}</p>
-              </div>
-              <div className="card text-center">
-                <p className="text-xs text-gray-500 mb-1">Close Rate</p>
-                <p className="font-bold text-blue-700">{closeRate.toFixed(0)}%</p>
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3 mb-4">
-              <input type="text" placeholder="Search bids..." value={search}
-                onChange={e => setSearch(e.target.value)} className="input sm:max-w-xs" />
-              <div className="flex gap-1 flex-wrap">
-                {['all', ...BID_STATUSES].map(s => (
-                  <button key={s} onClick={() => setFilter(s)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium capitalize transition-colors ${filter === s ? (STATUS_FILTER[s] || 'bg-green-700 text-white') : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'}`}
-                  >
-                    {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {filteredBids.length === 0 ? (
-              <div className="card text-center py-12">
-                <p className="text-4xl mb-3">📋</p>
-                <p className="text-gray-500 mb-4">No bids found.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm border-collapse">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left px-4 py-3 font-semibold text-gray-700">Client</th>
-                      <th className="text-left px-4 py-3 font-semibold text-gray-700">Projects</th>
-                      <th className="text-left px-4 py-3 font-semibold text-gray-700">Created</th>
-                      <th className="text-left px-4 py-3 font-semibold text-gray-700">Created By</th>
-                      <th className="text-center px-4 py-3 font-semibold text-gray-700">Bid Doc</th>
-                      <th className="text-right px-4 py-3 font-semibold text-gray-700">Gross Profit</th>
-                      <th className="text-right px-4 py-3 font-semibold text-gray-700">GPMD</th>
-                      <th className="text-right px-4 py-3 font-semibold text-gray-700">Bid Amount</th>
-                      <th className="text-center px-4 py-3 font-semibold text-gray-700">Status</th>
-                      <th className="text-center px-4 py-3 font-semibold text-gray-700">Delete</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredBids.map((bid, i) => {
-                      const currentStatus = bid.status || 'pending'
-                      const isUpdating = updatingId === bid.id
-                      return (
-                        <tr key={bid.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
-                          <td className="px-4 py-3">
-                            <p className="font-semibold text-gray-900">{bid.client_name}</p>
-                            {bid.job_address && <p className="text-xs text-gray-400 truncate max-w-[180px]">{bid.job_address}</p>}
-                            {bid.salesperson && <p className="text-xs text-gray-400">👤 {bid.salesperson}</p>}
-                            {bid.estimate_id && (
-                              <Link to={`/estimates/${bid.estimate_id}`} className="text-xs text-green-700 hover:underline">📋 View Estimate</Link>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            {bid.projects && bid.projects.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {bid.projects.map((proj, j) => (
-                                  <span key={j} className="text-xs px-2 py-0.5 bg-green-50 text-green-800 border border-green-200 rounded-full">{proj}</span>
-                                ))}
-                              </div>
-                            ) : <span className="text-xs text-gray-400">—</span>}
-                          </td>
-                          <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
-                            {new Date(bid.date_submitted).toLocaleDateString()}
-                          </td>
-                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap text-sm">
-                            {bid.created_by ? (profiles[bid.created_by] || '—') : bid.salesperson || <span className="text-gray-300">—</span>}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <button
-                              onClick={() => downloadBid(bid)}
-                              disabled={downloadingId === bid.id || !bid.estimate_id}
-                              title={bid.estimate_id ? 'Download bid doc' : 'No linked estimate'}
-                              className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-gray-200 text-gray-400 hover:border-green-400 hover:text-green-600 hover:bg-green-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                            >
-                              {downloadingId === bid.id ? <span className="animate-spin text-xs">⟳</span> : <span className="text-base">📄</span>}
-                            </button>
-                          </td>
-                          <td className="px-4 py-3 text-right whitespace-nowrap font-semibold text-green-700">
-                            {bid.gross_profit > 0 ? `$${Math.round(bid.gross_profit).toLocaleString()}` : <span className="text-gray-300 font-normal">—</span>}
-                          </td>
-                          <td className="px-4 py-3 text-right whitespace-nowrap text-gray-700">
-                            {bid.gpmd > 0 ? `$${Math.round(bid.gpmd).toLocaleString()}` : <span className="text-gray-300">—</span>}
-                          </td>
-                          <td className="px-4 py-3 text-right font-bold text-gray-900 whitespace-nowrap">
-                            ${parseFloat(bid.bid_amount || 0).toLocaleString()}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <select
-                              value={currentStatus}
-                              disabled={isUpdating}
-                              onChange={e => updateStatus(bid.id, e.target.value)}
-                              className={`text-xs font-semibold rounded-full px-3 py-1 border-2 cursor-pointer appearance-none text-center transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-40 ${STATUS_SELECT[currentStatus] || STATUS_SELECT.pending}`}
-                            >
-                              {BID_STATUSES.map(s => (
-                                <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <button onClick={() => deleteBid(bid.id)}
-                              className="text-xs px-2 py-1 rounded border border-red-100 text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors">✕</button>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </>
-        )
-      })()}
+      {filtered.length === 0 ? (
+        <div className="card text-center py-12">
+          <p className="text-4xl mb-3">📋</p>
+          <p className="text-gray-500 mb-4">No bids found.</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="text-left px-4 py-3 font-semibold text-gray-700">Client</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-700">Projects</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-700">Created</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-700">Created By</th>
+                <th className="text-center px-4 py-3 font-semibold text-gray-700">Bid Doc</th>
+                <th className="text-right px-4 py-3 font-semibold text-gray-700">Gross Profit</th>
+                <th className="text-right px-4 py-3 font-semibold text-gray-700">GPMD</th>
+                <th className="text-right px-4 py-3 font-semibold text-gray-700">Bid Amount</th>
+                <th className="text-center px-4 py-3 font-semibold text-gray-700">Status</th>
+                <th className="text-center px-4 py-3 font-semibold text-gray-700">Delete</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((bid, i) => {
+                const currentStatus = bid.status || 'pending'
+                const isUpdating = updatingId === bid.id
+                return (
+                  <tr key={bid.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-gray-900">{bid.client_name}</p>
+                      {bid.job_address && <p className="text-xs text-gray-400 truncate max-w-[180px]">{bid.job_address}</p>}
+                      {bid.salesperson && <p className="text-xs text-gray-400">👤 {bid.salesperson}</p>}
+                      {bid.estimate_id && (
+                        <Link to={`/estimates/${bid.estimate_id}`} className="text-xs text-green-700 hover:underline">📋 View Estimate</Link>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {bid.projects && bid.projects.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {bid.projects.map((proj, j) => (
+                            <span key={j} className="text-xs px-2 py-0.5 bg-green-50 text-green-800 border border-green-200 rounded-full">{proj}</span>
+                          ))}
+                        </div>
+                      ) : <span className="text-xs text-gray-400">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                      {new Date(bid.date_submitted).toLocaleDateString()}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap text-sm">
+                      {bid.created_by ? (profiles[bid.created_by] || '—') : bid.salesperson || <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => downloadBid(bid)}
+                        disabled={downloadingId === bid.id || !bid.estimate_id}
+                        title={bid.estimate_id ? 'Download bid doc' : 'No linked estimate'}
+                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-gray-200 text-gray-400 hover:border-green-400 hover:text-green-600 hover:bg-green-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        {downloadingId === bid.id ? <span className="animate-spin text-xs">⟳</span> : <span className="text-base">📄</span>}
+                      </button>
+                    </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap font-semibold text-green-700">
+                      {bid.gross_profit > 0 ? `$${Math.round(bid.gross_profit).toLocaleString()}` : <span className="text-gray-300 font-normal">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap text-gray-700">
+                      {bid.gpmd > 0 ? `$${Math.round(bid.gpmd).toLocaleString()}` : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right font-bold text-gray-900 whitespace-nowrap">
+                      ${parseFloat(bid.bid_amount || 0).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <select
+                        value={currentStatus}
+                        disabled={isUpdating}
+                        onChange={e => updateStatus(bid.id, e.target.value)}
+                        className={`text-xs font-semibold rounded-full px-3 py-1 border-2 cursor-pointer appearance-none text-center transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-40 ${STATUS_SELECT[currentStatus] || STATUS_SELECT.pending}`}
+                      >
+                        {BID_STATUSES.map(s => (
+                          <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <button onClick={() => deleteBid(bid.id)}
+                        className="text-xs px-2 py-1 rounded border border-red-100 text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors">✕</button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }

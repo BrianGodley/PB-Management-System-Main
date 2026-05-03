@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import NewEstimateModal from '../components/NewEstimateModal'
-import NewChangeOrderModal from '../components/NewChangeOrderModal'
 
 // Match exactly the badge colours used in Bids.jsx
 const BID_STATUS_STYLES = {
@@ -28,10 +27,9 @@ export default function ClientDetail() {
   const [estimates, setEstimates] = useState([])
   const [bids,      setBids]      = useState([])
   const [soldJobs,  setSoldJobs]  = useState([])
+  const [jobCOs,    setJobCOs]    = useState({}) // map: job_id -> CO[]
   const [loading,   setLoading]   = useState(true)
   const [showEstimateModal, setShowEstimateModal] = useState(false)
-  const [showCOModal,       setShowCOModal]       = useState(false)
-  const [changeOrders,      setChangeOrders]      = useState([])
   const [editing,  setEditing]  = useState(false)
   const [saving,   setSaving]   = useState(false)
   const [form,     setForm]     = useState({})
@@ -76,23 +74,15 @@ export default function ClientDetail() {
 
       if (estData) setEstimates(estData)
 
-      // Fetch bids from the bids table — same source as the Bids page
+      // Fetch bids (record_type = 'bid' only)
       const { data: bidsData } = await supabase
         .from('bids')
         .select('id, client_name, status, bid_amount, estimate_id, date_submitted, projects, gross_profit, gpmd')
         .eq('client_name', clientData.name)
+        .in('record_type', ['bid'])
         .order('date_submitted', { ascending: false })
 
       if (bidsData) setBids(bidsData)
-
-      // Fetch change orders for this client
-      const { data: coData } = await supabase
-        .from('bids')
-        .select('id, co_name, co_type, client_name, status, bid_amount, gross_profit, date_submitted, linked_job_id, estimate_id')
-        .eq('client_name', clientData.name)
-        .eq('record_type', 'change_order')
-        .order('date_submitted', { ascending: false })
-      if (coData) setChangeOrders(coData)
 
       // Fetch jobs (sold/active work)
       const { data: jobsData } = await supabase
@@ -101,7 +91,29 @@ export default function ClientDetail() {
         .eq('client_name', clientData.name)
         .order('sold_date', { ascending: false })
 
-      if (jobsData) setSoldJobs(jobsData)
+      if (jobsData) {
+        setSoldJobs(jobsData)
+
+        // Fetch COs linked to these jobs
+        if (jobsData.length > 0) {
+          const jobIds = jobsData.map(j => j.id)
+          const { data: coData } = await supabase
+            .from('bids')
+            .select('id, co_name, co_type, status, bid_amount, gross_profit, date_submitted, linked_job_id, estimate_id')
+            .eq('record_type', 'change_order')
+            .in('linked_job_id', jobIds)
+            .order('date_submitted', { ascending: false })
+
+          if (coData) {
+            const coMap = {}
+            coData.forEach(co => {
+              if (!coMap[co.linked_job_id]) coMap[co.linked_job_id] = []
+              coMap[co.linked_job_id].push(co)
+            })
+            setJobCOs(coMap)
+          }
+        }
+      }
     }
 
     setLoading(false)
@@ -154,32 +166,6 @@ export default function ClientDetail() {
     if (est) {
       setShowEstimateModal(false)
       navigate(`/estimates/${est.id}`)
-    }
-  }
-
-  async function handleCONext(data) {
-    // Create an estimate for this change order, then navigate in CO mode
-    const { data: est, error } = await supabase
-      .from('estimates')
-      .insert({
-        estimate_name: data.name,
-        type:          data.type,
-        client_name:   client.name,
-        client_id:     client.id,
-        status:        'pending',
-      })
-      .select()
-      .single()
-    if (error) { alert(`Error creating change order estimate: ${error.message}`); return }
-    if (est) {
-      setShowCOModal(false)
-      const params = new URLSearchParams({
-        co: '1',
-        job_id:  data.jobId,
-        co_name: data.name,
-        co_type: data.type,
-      })
-      navigate(`/estimates/${est.id}?${params.toString()}`)
     }
   }
 
@@ -239,7 +225,6 @@ export default function ClientDetail() {
   }
 
   const fmt  = (v) => `$${Math.round(v).toLocaleString()}`
-  const fmt2 = (v) => `$${parseFloat(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   if (loading) return (
     <div className="flex items-center justify-center py-20">
@@ -250,6 +235,7 @@ export default function ClientDetail() {
 
   const totalRevenue  = soldJobs.reduce((s, j) => s + parseFloat(j.total_price   || 0), 0)
   const totalGP       = soldJobs.reduce((s, j) => s + parseFloat(j.gross_profit  || 0), 0)
+  const totalCOs      = Object.values(jobCOs).flat().length
 
   return (
     <div>
@@ -305,7 +291,7 @@ export default function ClientDetail() {
       )}
 
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 mb-5 text-sm">
+      <div className="flex items-center gap-2 mb-4 text-sm">
         <Link to="/clients" className="text-gray-400 hover:text-gray-600">← Clients</Link>
         <span className="text-gray-300">/</span>
         <span className="text-gray-700 font-medium">{displayName(client) || client.name}</span>
@@ -430,7 +416,7 @@ export default function ClientDetail() {
       </div>
 
       {/* ── Stats Bar ── */}
-      <div className="bg-white rounded-xl border border-gray-200 mb-6 overflow-hidden">
+      <div className="bg-white rounded-xl border border-gray-200 mb-4 overflow-hidden">
         <div className="grid grid-cols-3 md:grid-cols-6 divide-x divide-gray-100">
           {[
             { label: 'Estimates',         value: estimates.length,  fmt: v => v,          color: 'text-gray-900' },
@@ -448,260 +434,263 @@ export default function ClientDetail() {
         </div>
       </div>
 
-      {/* ── Tables: full width ── */}
-      <div className="space-y-6">
+      {/* ── Tables ── */}
+      <div className="space-y-4">
 
-          {/* ── Estimates ── */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="font-bold text-gray-900 text-lg">Estimates</h2>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowCOModal(true)}
-                  className="text-sm px-3 py-1.5 rounded-lg border-2 border-blue-600 text-blue-700 font-semibold hover:bg-blue-50 transition-colors"
-                >
-                  + New Change Order
-                </button>
-                <button onClick={() => setShowEstimateModal(true)} className="btn-primary text-sm">
-                  + New Estimate
-                </button>
-              </div>
+        {/* ── Estimates ── */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="font-semibold text-gray-800 text-sm flex items-center gap-2">
+              Estimates
+              <span className="text-xs px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">{estimates.length}</span>
+            </h2>
+            <button onClick={() => setShowEstimateModal(true)} className="btn-primary text-xs px-3 py-1.5">
+              + New Estimate
+            </button>
+          </div>
+
+          {estimates.length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-200 text-center py-6 text-gray-400 text-sm">
+              <p className="mb-3">No estimates yet.</p>
+              <button onClick={() => setShowEstimateModal(true)} className="btn-primary text-sm inline-block">
+                Create First Estimate
+              </button>
             </div>
-
-            {estimates.length === 0 ? (
-              <div className="card text-center py-8 text-gray-400">
-                <p className="mb-3">No estimates yet for this client.</p>
-                <button onClick={() => setShowEstimateModal(true)} className="btn-primary text-sm inline-block">
-                  Create First Estimate
-                </button>
-              </div>
-            ) : (
-              <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-                <table className="w-full text-sm min-w-[640px]">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                      <th className="px-4 py-2.5 text-left">Estimate</th>
-                      <th className="px-3 py-2.5 text-right">Man Days</th>
-                      <th className="px-3 py-2.5 text-right">Labor Burden</th>
-                      <th className="px-3 py-2.5 text-right">Materials</th>
-                      <th className="px-3 py-2.5 text-right">Sub Cost</th>
-                      <th className="px-3 py-2.5 text-right">Gross Profit</th>
-                      <th className="px-3 py-2.5 text-right">GPMD</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {estimates.map(est => {
-                      const t = estimateTotals(est)
-                      return (
-                        <tr key={est.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-3">
-                            <Link
-                              to={`/estimates/${est.id}`}
-                              className="font-semibold text-green-700 hover:underline"
-                            >
-                              {est.estimate_name}
-                            </Link>
-                            {est.type && (
-                              <p className="text-xs text-gray-400 mt-0.5">{est.type}</p>
-                            )}
-                          </td>
-                          <td className="px-3 py-3 text-right text-gray-700">{t.man_days.toFixed(1)}</td>
-                          <td className="px-3 py-3 text-right text-gray-600">{fmt(t.labor_burden)}</td>
-                          <td className="px-3 py-3 text-right text-gray-700">{fmt(t.material_cost)}</td>
-                          <td className="px-3 py-3 text-right text-gray-600">{t.sub_cost > 0 ? fmt(t.sub_cost) : '—'}</td>
-                          <td className="px-3 py-3 text-right font-medium text-green-700">{t.gross_profit > 0 ? fmt(t.gross_profit) : '—'}</td>
-                          <td className="px-3 py-3 text-right text-gray-600">
-                            {t.gpmd > 0 ? `$${Math.round(t.gpmd).toLocaleString()}` : '—'}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {/* ── Bids ── */}
-          <div>
-            <h2 className="font-bold text-gray-900 text-lg mb-3">Bids</h2>
-
-            {bids.length === 0 ? (
-              <div className="card text-center py-6 text-gray-400 text-sm">
-                No bids yet for this client.
-              </div>
-            ) : (
-              <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-                <table className="w-full text-sm min-w-[500px]">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                      <th className="px-4 py-2.5 text-left">Bid</th>
-                      <th className="px-3 py-2.5 text-right">Date</th>
-                      <th className="px-3 py-2.5 text-right">Gross Profit</th>
-                      <th className="px-3 py-2.5 text-right">Bid Amount</th>
-                      <th className="px-3 py-2.5 text-center">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {bids.map(bid => {
-                      const status = bid.status || 'pending'
-                      return (
-                        <tr key={bid.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-3">
-                            {bid.estimate_id ? (
-                              <Link to={`/estimates/${bid.estimate_id}`}
-                                className="font-semibold text-green-700 hover:underline">
-                                {bid.client_name}
-                              </Link>
-                            ) : (
-                              <p className="font-semibold text-gray-800">{bid.client_name}</p>
-                            )}
-                            {bid.projects && bid.projects.length > 0 && (
-                              <p className="text-xs text-gray-400 mt-0.5">{bid.projects.join(', ')}</p>
-                            )}
-                          </td>
-                          <td className="px-3 py-3 text-right text-gray-500 text-xs whitespace-nowrap">
-                            {bid.date_submitted ? new Date(bid.date_submitted).toLocaleDateString() : '—'}
-                          </td>
-                          <td className="px-3 py-3 text-right font-medium text-green-700">
-                            {bid.gross_profit > 0 ? `$${Math.round(bid.gross_profit).toLocaleString()}` : '—'}
-                          </td>
-                          <td className="px-3 py-3 text-right font-bold text-gray-900 whitespace-nowrap">
-                            ${parseFloat(bid.bid_amount || 0).toLocaleString()}
-                          </td>
-                          <td className="px-3 py-3 text-center">
-                            <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${BID_STATUS_STYLES[status] || BID_STATUS_STYLES.pending}`}>
-                              {status.charAt(0).toUpperCase() + status.slice(1)}
-                            </span>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {/* ── Jobs ── */}
-          <div>
-            <h2 className="font-bold text-gray-900 text-lg mb-3">Jobs</h2>
-
-            {soldJobs.length === 0 ? (
-              <div className="card text-center py-6 text-gray-400 text-sm">
-                No jobs yet for this client.
-              </div>
-            ) : (
-              <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-                <table className="w-full text-sm min-w-[560px]">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                      <th className="px-4 py-2.5 text-left">Job Name</th>
-                      <th className="px-3 py-2.5 text-right">Sold Date</th>
-                      <th className="px-3 py-2.5 text-right">Man Days</th>
-                      <th className="px-3 py-2.5 text-right">Materials</th>
-                      <th className="px-3 py-2.5 text-right">Gross Profit</th>
-                      <th className="px-3 py-2.5 text-right">Total Price</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {soldJobs.map(job => (
-                      <tr key={job.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3 font-semibold text-gray-800">{job.name}</td>
-                        <td className="px-3 py-3 text-right text-gray-500 text-xs whitespace-nowrap">
-                          {job.sold_date ? new Date(job.sold_date).toLocaleDateString() : '—'}
+          ) : (
+            <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+              <table className="w-full text-sm min-w-[640px]">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    <th className="px-4 py-2 text-left">Estimate</th>
+                    <th className="px-3 py-2 text-right">Man Days</th>
+                    <th className="px-3 py-2 text-right">Labor Burden</th>
+                    <th className="px-3 py-2 text-right">Materials</th>
+                    <th className="px-3 py-2 text-right">Sub Cost</th>
+                    <th className="px-3 py-2 text-right">Gross Profit</th>
+                    <th className="px-3 py-2 text-right">GPMD</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {estimates.map(est => {
+                    const t = estimateTotals(est)
+                    return (
+                      <tr key={est.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-1.5">
+                          <Link
+                            to={`/estimates/${est.id}`}
+                            className="font-semibold text-green-700 hover:underline"
+                          >
+                            {est.estimate_name}
+                          </Link>
+                          {est.type && (
+                            <p className="text-xs text-gray-400 mt-0.5">{est.type}</p>
+                          )}
                         </td>
-                        <td className="px-3 py-3 text-right text-gray-700">
-                          {parseFloat(job.total_man_days || 0).toFixed(1)}
+                        <td className="px-3 py-1.5 text-right text-gray-700">{t.man_days.toFixed(1)}</td>
+                        <td className="px-3 py-1.5 text-right text-gray-600">{fmt(t.labor_burden)}</td>
+                        <td className="px-3 py-1.5 text-right text-gray-700">{fmt(t.material_cost)}</td>
+                        <td className="px-3 py-1.5 text-right text-gray-600">{t.sub_cost > 0 ? fmt(t.sub_cost) : '—'}</td>
+                        <td className="px-3 py-1.5 text-right font-medium text-green-700">{t.gross_profit > 0 ? fmt(t.gross_profit) : '—'}</td>
+                        <td className="px-3 py-1.5 text-right text-gray-600">
+                          {t.gpmd > 0 ? `$${Math.round(t.gpmd).toLocaleString()}` : '—'}
                         </td>
-                        <td className="px-3 py-3 text-right text-gray-700">{fmt(job.material_cost)}</td>
-                        <td className="px-3 py-3 text-right font-medium text-green-700">{fmt(job.gross_profit)}</td>
-                        <td className="px-3 py-3 text-right font-bold text-gray-900">{fmt(job.total_price)}</td>
                       </tr>
-                    ))}
-                  </tbody>
-                  {soldJobs.length > 1 && (
-                    <tfoot className="border-t-2 border-gray-200 bg-gray-50">
-                      <tr className="text-xs font-semibold text-gray-600">
-                        <td className="px-4 py-2.5" colSpan={2}>Totals</td>
-                        <td className="px-3 py-2.5 text-right">
-                          {soldJobs.reduce((s, j) => s + parseFloat(j.total_man_days || 0), 0).toFixed(1)}
-                        </td>
-                        <td className="px-3 py-2.5 text-right">
-                          {fmt(soldJobs.reduce((s, j) => s + parseFloat(j.material_cost || 0), 0))}
-                        </td>
-                        <td className="px-3 py-2.5 text-right text-green-700">{fmt(totalGP)}</td>
-                        <td className="px-3 py-2.5 text-right font-bold text-gray-900">{fmt(totalRevenue)}</td>
-                      </tr>
-                    </tfoot>
-                  )}
-                </table>
-              </div>
-            )}
-          </div>
-
-          {/* ── Change Orders ── */}
-          <div>
-            <h2 className="font-bold text-gray-900 text-lg mb-3">Change Orders</h2>
-            {changeOrders.length === 0 ? (
-              <div className="card text-center py-6 text-gray-400 text-sm">
-                No change orders yet for this client.
-              </div>
-            ) : (
-              <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-                <table className="w-full text-sm min-w-[500px]">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                      <th className="px-4 py-2.5 text-left">Change Order</th>
-                      <th className="px-3 py-2.5 text-left">Type</th>
-                      <th className="px-3 py-2.5 text-right">Date</th>
-                      <th className="px-3 py-2.5 text-right">Gross Profit</th>
-                      <th className="px-3 py-2.5 text-right">Amount</th>
-                      <th className="px-3 py-2.5 text-center">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {changeOrders.map(co => {
-                      const status = co.status || 'pending'
-                      return (
-                        <tr key={co.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-3">
-                            {co.estimate_id ? (
-                              <Link
-                                to={`/estimates/${co.estimate_id}?co=1&job_id=${co.linked_job_id || ''}&co_name=${encodeURIComponent(co.co_name || '')}&co_type=${encodeURIComponent(co.co_type || '')}`}
-                                className="font-semibold text-blue-700 hover:underline"
-                              >
-                                {co.co_name || co.client_name}
-                              </Link>
-                            ) : (
-                              <p className="font-semibold text-gray-800">{co.co_name || co.client_name}</p>
-                            )}
-                          </td>
-                          <td className="px-3 py-3 text-gray-500 text-xs">{co.co_type || '—'}</td>
-                          <td className="px-3 py-3 text-right text-gray-500 text-xs whitespace-nowrap">
-                            {co.date_submitted ? new Date(co.date_submitted).toLocaleDateString() : '—'}
-                          </td>
-                          <td className="px-3 py-3 text-right font-medium text-green-700">
-                            {co.gross_profit > 0 ? `$${Math.round(co.gross_profit).toLocaleString()}` : '—'}
-                          </td>
-                          <td className="px-3 py-3 text-right font-bold text-gray-900 whitespace-nowrap">
-                            ${parseFloat(co.bid_amount || 0).toLocaleString()}
-                          </td>
-                          <td className="px-3 py-3 text-center">
-                            <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${BID_STATUS_STYLES[status] || BID_STATUS_STYLES.pending}`}>
-                              {status.charAt(0).toUpperCase() + status.slice(1)}
-                            </span>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
+
+        {/* ── Bids ── */}
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <h2 className="font-semibold text-gray-800 text-sm">Bids</h2>
+            <span className="text-xs px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">{bids.length}</span>
+          </div>
+
+          {bids.length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-200 text-center py-6 text-gray-400 text-sm">
+              No bids yet for this client.
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+              <table className="w-full text-sm min-w-[500px]">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    <th className="px-4 py-2 text-left">Bid</th>
+                    <th className="px-3 py-2 text-right">Date</th>
+                    <th className="px-3 py-2 text-right">Gross Profit</th>
+                    <th className="px-3 py-2 text-right">Bid Amount</th>
+                    <th className="px-3 py-2 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {bids.map(bid => {
+                    const status = bid.status || 'pending'
+                    return (
+                      <tr key={bid.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-1.5">
+                          {bid.estimate_id ? (
+                            <Link to={`/estimates/${bid.estimate_id}`}
+                              className="font-semibold text-green-700 hover:underline">
+                              {bid.client_name}
+                            </Link>
+                          ) : (
+                            <p className="font-semibold text-gray-800">{bid.client_name}</p>
+                          )}
+                          {bid.projects && bid.projects.length > 0 && (
+                            <p className="text-xs text-gray-400 mt-0.5">{bid.projects.join(', ')}</p>
+                          )}
+                        </td>
+                        <td className="px-3 py-1.5 text-right text-gray-500 text-xs whitespace-nowrap">
+                          {bid.date_submitted ? new Date(bid.date_submitted).toLocaleDateString() : '—'}
+                        </td>
+                        <td className="px-3 py-1.5 text-right font-medium text-green-700">
+                          {bid.gross_profit > 0 ? `$${Math.round(bid.gross_profit).toLocaleString()}` : '—'}
+                        </td>
+                        <td className="px-3 py-1.5 text-right font-bold text-gray-900 whitespace-nowrap">
+                          ${parseFloat(bid.bid_amount || 0).toLocaleString()}
+                        </td>
+                        <td className="px-3 py-1.5 text-center">
+                          <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${BID_STATUS_STYLES[status] || BID_STATUS_STYLES.pending}`}>
+                            {status.charAt(0).toUpperCase() + status.slice(1)}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* ── Jobs / COs ── */}
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <h2 className="font-semibold text-gray-800 text-sm">Jobs / COs</h2>
+            <span className="text-xs px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">
+              {soldJobs.length}{totalCOs > 0 ? ` · ${totalCOs} CO${totalCOs !== 1 ? 's' : ''}` : ''}
+            </span>
+          </div>
+
+          {soldJobs.length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-200 text-center py-6 text-gray-400 text-sm">
+              No jobs yet for this client.
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+              <table className="w-full text-sm min-w-[560px]">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    <th className="px-4 py-2 text-left">Job / Change Order</th>
+                    <th className="px-3 py-2 text-right">Date</th>
+                    <th className="px-3 py-2 text-right">Man Days</th>
+                    <th className="px-3 py-2 text-right">Materials</th>
+                    <th className="px-3 py-2 text-right">Gross Profit</th>
+                    <th className="px-3 py-2 text-right">Total Price</th>
+                    <th className="px-3 py-2 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {soldJobs.map(job => {
+                    const cos = jobCOs[job.id] || []
+                    return (
+                      <>
+                        {/* Job row */}
+                        <tr key={job.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-1.5 font-semibold text-gray-800">{job.name}</td>
+                          <td className="px-3 py-1.5 text-right text-gray-500 text-xs whitespace-nowrap">
+                            {job.sold_date ? new Date(job.sold_date).toLocaleDateString() : '—'}
+                          </td>
+                          <td className="px-3 py-1.5 text-right text-gray-700">
+                            {parseFloat(job.total_man_days || 0).toFixed(1)}
+                          </td>
+                          <td className="px-3 py-1.5 text-right text-gray-700">{fmt(job.material_cost)}</td>
+                          <td className="px-3 py-1.5 text-right font-medium text-green-700">{fmt(job.gross_profit)}</td>
+                          <td className="px-3 py-1.5 text-right font-bold text-gray-900">{fmt(job.total_price)}</td>
+                          <td className="px-3 py-1.5 text-center">
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                              job.status === 'active'    ? 'bg-green-50 text-green-800 border border-green-300' :
+                              job.status === 'complete'  ? 'bg-blue-50 text-blue-800 border border-blue-300' :
+                              job.status === 'on_hold'   ? 'bg-yellow-50 text-yellow-800 border border-yellow-300' :
+                              'bg-gray-100 text-gray-600'
+                            }`}>
+                              {job.status ? job.status.charAt(0).toUpperCase() + job.status.slice(1).replace('_', ' ') : '—'}
+                            </span>
+                          </td>
+                        </tr>
+
+                        {/* CO sub-rows */}
+                        {cos.map(co => {
+                          const coStatus = co.status || 'pending'
+                          return (
+                            <tr key={co.id} className="bg-blue-50/40 hover:bg-blue-50 transition-colors border-b border-blue-100/60">
+                              <td className="pl-8 pr-3 py-1.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-blue-300 text-xs">↳</span>
+                                  {co.estimate_id ? (
+                                    <Link
+                                      to={`/estimates/${co.estimate_id}?co=1&job_id=${co.linked_job_id || ''}&co_name=${encodeURIComponent(co.co_name || '')}&co_type=${encodeURIComponent(co.co_type || '')}`}
+                                      className="text-xs font-medium text-blue-700 hover:underline"
+                                    >
+                                      {co.co_name || '—'}
+                                    </Link>
+                                  ) : (
+                                    <span className="text-xs font-medium text-blue-700">{co.co_name || '—'}</span>
+                                  )}
+                                  {co.co_type && (
+                                    <span className="text-[10px] text-blue-400">{co.co_type}</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-3 py-1.5 text-right text-gray-400 text-xs whitespace-nowrap">
+                                {co.date_submitted ? new Date(co.date_submitted).toLocaleDateString() : '—'}
+                              </td>
+                              <td className="px-3 py-1.5 text-right text-gray-400 text-xs">—</td>
+                              <td className="px-3 py-1.5 text-right text-gray-400 text-xs">—</td>
+                              <td className="px-3 py-1.5 text-right text-xs font-medium text-green-600">
+                                {co.gross_profit > 0 ? `$${Math.round(co.gross_profit).toLocaleString()}` : '—'}
+                              </td>
+                              <td className="px-3 py-1.5 text-right text-xs font-semibold text-gray-700">
+                                ${parseFloat(co.bid_amount || 0).toLocaleString()}
+                              </td>
+                              <td className="px-3 py-1.5 text-center">
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${BID_STATUS_STYLES[coStatus] || BID_STATUS_STYLES.pending}`}>
+                                  {coStatus.charAt(0).toUpperCase() + coStatus.slice(1)}
+                                </span>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </>
+                    )
+                  })}
+                </tbody>
+                {soldJobs.length > 1 && (
+                  <tfoot className="border-t-2 border-gray-200 bg-gray-50">
+                    <tr className="text-xs font-semibold text-gray-600">
+                      <td className="px-4 py-2" colSpan={2}>Totals</td>
+                      <td className="px-3 py-2 text-right">
+                        {soldJobs.reduce((s, j) => s + parseFloat(j.total_man_days || 0), 0).toFixed(1)}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {fmt(soldJobs.reduce((s, j) => s + parseFloat(j.material_cost || 0), 0))}
+                      </td>
+                      <td className="px-3 py-2 text-right text-green-700">{fmt(totalGP)}</td>
+                      <td className="px-3 py-2 text-right font-bold text-gray-900">{fmt(totalRevenue)}</td>
+                      <td />
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          )}
+        </div>
+
+      </div>
 
       {/* New Estimate modal */}
       {showEstimateModal && (
@@ -709,15 +698,6 @@ export default function ClientDetail() {
           client={client}
           onClose={() => setShowEstimateModal(false)}
           onNext={handleEstimateNext}
-        />
-      )}
-
-      {/* New Change Order modal */}
-      {showCOModal && (
-        <NewChangeOrderModal
-          client={client}
-          onClose={() => setShowCOModal(false)}
-          onNext={handleCONext}
         />
       )}
     </div>

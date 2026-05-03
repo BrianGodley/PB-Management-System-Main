@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import ScheduleCalendar from '../components/ScheduleCalendar'
@@ -455,7 +455,7 @@ export default function JobsList() {
             />
           )}
           {tab === 'tasks'          && <JobTasksPanel job={selectedJobObj} />}
-          {tab === 'change-orders'  && <ComingSoon label="Change Orders" />}
+          {tab === 'change-orders'  && <JobChangeOrdersPanel job={selectedJobObj} />}
           {tab === 'finance'        && <ComingSoon label="Finance" />}
           {tab === 'files'          && <JobFilesPanel job={selectedJobObj} />}
           {tab === 'settings'       && (
@@ -1329,6 +1329,236 @@ function JobFilesPanel({ job }) {
             </div>
           )}
         </>
+      )}
+    </div>
+  )
+}
+
+// ── Job Change Orders Panel ───────────────────────────────────────────────────
+const CO_STATUSES     = ['pending', 'presented', 'sold', 'lost']
+const CO_STATUS_STYLE = {
+  pending:   'border-yellow-400 text-yellow-800 bg-yellow-50',
+  presented: 'border-blue-400   text-blue-800   bg-blue-50',
+  sold:      'border-green-500  text-green-800  bg-green-50',
+  lost:      'border-red-400    text-red-800    bg-red-50',
+}
+
+function JobChangeOrdersPanel({ job }) {
+  const navigate = useNavigate()
+  const [cos,          setCos]          = useState([])
+  const [loading,      setLoading]      = useState(false)
+  const [showModal,    setShowModal]    = useState(false)
+  const [coForm,       setCoForm]       = useState({ name: '', type: '' })
+  const [coError,      setCoError]      = useState('')
+  const [creatingCO,   setCreatingCO]   = useState(false)
+  const [updatingId,   setUpdatingId]   = useState(null)
+
+  useEffect(() => {
+    if (job?.id) fetchCOs(job.id)
+    else setCos([])
+  }, [job?.id])
+
+  async function fetchCOs(jobId) {
+    setLoading(true)
+    const { data } = await supabase
+      .from('bids')
+      .select('*')
+      .eq('record_type', 'change_order')
+      .eq('linked_job_id', jobId)
+      .order('date_submitted', { ascending: false })
+    if (data) setCos(data)
+    setLoading(false)
+  }
+
+  async function handleCreateCO() {
+    if (!coForm.name.trim()) { setCoError('Please enter a name.'); return }
+    if (!coForm.type)         { setCoError('Please select a type.'); return }
+    setCoError(''); setCreatingCO(true)
+
+    // Create the underlying estimate
+    const clientName = job.client_name || job.name || ''
+    const { data: est, error } = await supabase
+      .from('estimates')
+      .insert({ estimate_name: coForm.name, type: coForm.type, client_name: clientName, status: 'pending' })
+      .select().single()
+
+    setCreatingCO(false)
+    if (error) { alert('Error creating estimate: ' + error.message); return }
+
+    setShowModal(false)
+    setCoForm({ name: '', type: '' })
+
+    // Navigate to estimate in CO mode; return_to brings user back to jobs page
+    const params = new URLSearchParams({
+      co:        '1',
+      job_id:    job.id,
+      co_name:   coForm.name,
+      co_type:   coForm.type,
+      return_to: '/jobs',
+    })
+    navigate(`/estimates/${est.id}?${params.toString()}`)
+  }
+
+  async function handleStatusChange(id, status) {
+    setUpdatingId(id)
+    await supabase.from('bids').update({ status }).eq('id', id)
+    setCos(prev => prev.map(c => c.id === id ? { ...c, status } : c))
+    setUpdatingId(null)
+  }
+
+  async function handleDelete(co) {
+    if (!confirm(`Delete change order "${co.co_name}"?`)) return
+    await supabase.from('bids').delete().eq('id', co.id)
+    setCos(prev => prev.filter(c => c.id !== co.id))
+  }
+
+  const fmt = v => '$' + Math.round(parseFloat(v || 0)).toLocaleString()
+
+  if (!job) return (
+    <div className="flex flex-col items-center justify-center h-full text-gray-400 py-20">
+      <p className="text-4xl mb-3">📋</p>
+      <p className="text-lg font-semibold text-gray-500">Select a job to view change orders</p>
+    </div>
+  )
+
+  return (
+    <div className="p-4">
+      {/* New CO modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6" onClick={e => e.stopPropagation()}>
+            <div className="mb-5">
+              <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-0.5">New Change Order</p>
+              <h2 className="text-lg font-bold text-gray-900">{job.name || job.client_name}</h2>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Change Order Name <span className="text-red-500">*</span></label>
+                <input autoFocus className="input" placeholder="e.g. Add Patio Extension…"
+                  value={coForm.name} onChange={e => { setCoForm(p => ({ ...p, name: e.target.value })); setCoError('') }}
+                  onKeyDown={e => e.key === 'Enter' && handleCreateCO()} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Type <span className="text-red-500">*</span></label>
+                <select className="input" value={coForm.type} onChange={e => { setCoForm(p => ({ ...p, type: e.target.value })); setCoError('') }}>
+                  <option value="">-- Select Type --</option>
+                  <option>Residential</option>
+                  <option>Commercial</option>
+                  <option>Public Works</option>
+                </select>
+              </div>
+            </div>
+            {coError && <p className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{coError}</p>}
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => { setShowModal(false); setCoForm({ name: '', type: '' }); setCoError('') }}
+                className="btn-secondary flex-1">Cancel</button>
+              <button onClick={handleCreateCO} disabled={creatingCO}
+                className="btn-primary flex-1 disabled:opacity-50">
+                {creatingCO ? 'Creating…' : 'Next →'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">Change Orders</h2>
+          <p className="text-xs text-gray-400">{job.client_name || job.name}</p>
+        </div>
+        <button onClick={() => setShowModal(true)}
+          className="text-xs px-3 py-1.5 rounded-lg bg-blue-700 text-white font-semibold hover:bg-blue-800 transition-colors">
+          + New Change Order
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-700" />
+        </div>
+      ) : cos.length === 0 ? (
+        <div className="flex flex-col items-center py-14 text-gray-400">
+          <p className="text-4xl mb-3">📋</p>
+          <p className="text-sm font-medium text-gray-500">No change orders yet for this job</p>
+          <p className="text-xs mt-1 mb-5 text-center max-w-xs">Click "+ New Change Order" to build a priced change order using the estimating interface.</p>
+          <button onClick={() => setShowModal(true)}
+            className="text-sm px-4 py-2 rounded-lg bg-blue-700 text-white font-medium hover:bg-blue-800 transition-colors">
+            + New Change Order
+          </button>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="text-left px-4 py-3 font-semibold text-gray-700">Change Order</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-700">Type</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-700">Created</th>
+                <th className="text-center px-4 py-3 font-semibold text-gray-700">Doc</th>
+                <th className="text-right px-4 py-3 font-semibold text-gray-700">Gross Profit</th>
+                <th className="text-right px-4 py-3 font-semibold text-gray-700">Amount</th>
+                <th className="text-center px-4 py-3 font-semibold text-gray-700">Status</th>
+                <th className="text-center px-4 py-3 font-semibold text-gray-700">Delete</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cos.map((co, i) => {
+                const status = co.status || 'pending'
+                return (
+                  <tr key={co.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
+                    <td className="px-4 py-3">
+                      {co.estimate_id ? (
+                        <Link
+                          to={`/estimates/${co.estimate_id}?co=1&job_id=${co.linked_job_id || ''}&co_name=${encodeURIComponent(co.co_name || '')}&co_type=${encodeURIComponent(co.co_type || '')}&return_to=%2Fjobs`}
+                          className="font-semibold text-blue-700 hover:underline"
+                        >
+                          {co.co_name || '—'}
+                        </Link>
+                      ) : (
+                        <span className="font-semibold text-gray-800">{co.co_name || '—'}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500 text-xs">{co.co_type || '—'}</td>
+                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                      {co.date_submitted ? new Date(co.date_submitted).toLocaleDateString() : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {co.estimate_id ? (
+                        <Link to={`/estimates/${co.estimate_id}?co=1&job_id=${co.linked_job_id || ''}&co_name=${encodeURIComponent(co.co_name || '')}&co_type=${encodeURIComponent(co.co_type || '')}&return_to=%2Fjobs`}
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-gray-200 text-gray-400 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+                          📄
+                        </Link>
+                      ) : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap font-semibold text-green-700">
+                      {co.gross_profit > 0 ? fmt(co.gross_profit) : <span className="text-gray-300 font-normal">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right font-bold text-gray-900 whitespace-nowrap">
+                      {fmt(co.bid_amount)}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <select
+                        value={status}
+                        disabled={updatingId === co.id}
+                        onChange={e => handleStatusChange(co.id, e.target.value)}
+                        className={`text-xs font-semibold rounded-full px-3 py-1 border-2 cursor-pointer appearance-none text-center transition-colors focus:outline-none disabled:opacity-40 ${CO_STATUS_STYLE[status] || CO_STATUS_STYLE.pending}`}
+                      >
+                        {CO_STATUSES.map(s => (
+                          <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <button onClick={() => handleDelete(co)}
+                        className="text-xs px-2 py-1 rounded border border-red-100 text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors">✕</button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )

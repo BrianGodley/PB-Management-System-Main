@@ -97,6 +97,7 @@ export default function EstimateDetail() {
   const coJobId   = searchParams.get('job_id')   || null
   const coName    = searchParams.get('co_name')  || ''
   const coType    = searchParams.get('co_type')  || ''
+  const returnTo  = searchParams.get('return_to') || null
   const [estimate, setEstimate]           = useState(null)
   const [projects, setProjects]           = useState([])
   const [loading, setLoading]             = useState(true)
@@ -568,6 +569,11 @@ export default function EstimateDetail() {
       const safeName = (estimate.estimate_name || (isCOMode ? 'ChangeOrder' : 'Bid')).replace(/[^a-z0-9]/gi, '_')
       const suffix   = isCOMode ? 'CO' : 'Bid'
       downloadBidDoc(blob, `${safeName}_${suffix}_${new Date().toISOString().split('T')[0]}.docx`)
+
+      // Navigate back if a return path was provided (e.g., back to Jobs > Change Orders)
+      if (isCOMode && returnTo) {
+        navigate(returnTo)
+      }
 
     } catch (err) {
       alert('Error creating bid: ' + err.message)
