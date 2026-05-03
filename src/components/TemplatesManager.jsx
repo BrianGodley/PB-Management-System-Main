@@ -134,11 +134,22 @@ export default function TemplatesManager() {
 
   async function fetchTemplates() {
     setLoading(true)
-    const { data } = await supabase
+
+    // Try with template_tasks; fall back without it if the table doesn't exist yet
+    let { data, error } = await supabase
       .from('job_templates')
       .select('*, template_folders(*), template_tasks(*)')
       .order('name')
-    if (data) setTemplates(data.map(t => ({
+
+    if (error || !data) {
+      const res = await supabase
+        .from('job_templates')
+        .select('*, template_folders(*)')
+        .order('name')
+      data = (res.data || []).map(t => ({ ...t, template_tasks: [] }))
+    }
+
+    setTemplates((data || []).map(t => ({
       ...t,
       template_folders: (t.template_folders || []).sort((a, b) => a.sort_order - b.sort_order),
       template_tasks:   (t.template_tasks   || []).sort((a, b) => a.sort_order - b.sort_order),
@@ -285,13 +296,20 @@ function TemplateModal({ template, userId, onSave, onClose }) {
     let templateId = template?.id
 
     if (isEdit) {
-      await supabase.from('job_templates').update({ ...templateData, updated_at: new Date().toISOString() }).eq('id', templateId)
+      const { error } = await supabase
+        .from('job_templates')
+        .update({ ...templateData, updated_at: new Date().toISOString() })
+        .eq('id', templateId)
+      if (error) { alert('Error updating template: ' + error.message); setSaving(false); return }
     } else {
-      const { data } = await supabase.from('job_templates').insert({ ...templateData, created_by: userId }).select().single()
-      templateId = data?.id
+      const { data, error } = await supabase
+        .from('job_templates')
+        .insert({ ...templateData, created_by: userId })
+        .select()
+        .single()
+      if (error || !data?.id) { alert('Error creating template: ' + (error?.message || 'Unknown error')); setSaving(false); return }
+      templateId = data.id
     }
-
-    if (!templateId) { setSaving(false); return }
 
     // Sync folders (delete all, re-insert with folder_type)
     await supabase.from('template_folders').delete().eq('template_id', templateId)
@@ -299,14 +317,21 @@ function TemplateModal({ template, userId, onSave, onClose }) {
       ...docFolders.map((f, i)   => ({ template_id: templateId, folder_name: f.folder_name, folder_type: 'document',   sort_order: i })),
       ...photoFolders.map((f, i) => ({ template_id: templateId, folder_name: f.folder_name, folder_type: 'photo_video', sort_order: i })),
     ]
-    if (allFolders.length) await supabase.from('template_folders').insert(allFolders)
+    if (allFolders.length) {
+      const { error: folderErr } = await supabase.from('template_folders').insert(allFolders)
+      if (folderErr) console.warn('Folder insert error (run supabase-update-73.sql?):', folderErr.message)
+    }
 
-    // Sync tasks (delete all, re-insert)
-    await supabase.from('template_tasks').delete().eq('template_id', templateId)
-    if (tasks.length) {
-      await supabase.from('template_tasks').insert(
-        tasks.map((t, i) => ({ template_id: templateId, task_name: t.task_name, sort_order: i }))
-      )
+    // Sync tasks — requires supabase-update-73.sql; skip gracefully if table missing
+    try {
+      await supabase.from('template_tasks').delete().eq('template_id', templateId)
+      if (tasks.length) {
+        await supabase.from('template_tasks').insert(
+          tasks.map((t, i) => ({ template_id: templateId, task_name: t.task_name, sort_order: i }))
+        )
+      }
+    } catch (taskErr) {
+      console.warn('template_tasks not available (run supabase-update-73.sql?):', taskErr)
     }
 
     setSaving(false)
