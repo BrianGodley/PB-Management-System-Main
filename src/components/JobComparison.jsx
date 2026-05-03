@@ -40,7 +40,7 @@ function DeltaBadge({ est, act, currency = false, inverse = false }) {
 
 function KpiCard({ label, est, act, currency = false, inverse = false, sub }) {
   const delta = act - est
-  const over  = inverse ? delta < 0 : delta > 0
+  const over  = inverse ? delta > 0 : delta < 0
   const deltaColor = delta === 0 ? 'text-gray-400'
     : over ? 'text-red-600 bg-red-50' : 'text-green-700 bg-green-50'
   const display = v => currency ? fmt(v) : fmtD(v)
