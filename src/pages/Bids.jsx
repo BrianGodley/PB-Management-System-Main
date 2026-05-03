@@ -48,7 +48,7 @@ export default function Bids() {
   const [templates,    setTemplates]    = useState([])
 
   useEffect(() => {
-    supabase.from('job_templates').select('id, name, auto_trigger, template_folders(*)').order('name')
+    supabase.from('job_templates').select('id, name, auto_trigger, template_folders(*), template_tasks(*)').order('name')
       .then(({ data }) => { if (data) setTemplates(data) })
   }, [])
 
@@ -154,17 +154,30 @@ export default function Bids() {
       if (jobErr) throw new Error(jobErr.message)
       const job = { id: jobId }
 
-      // Apply template folders if a template was selected
+      // Apply template folders + tasks if a template was selected
       if (soldModal.templateId) {
         const tmpl = templates.find(t => t.id === soldModal.templateId)
         const folders = (tmpl?.template_folders || []).sort((a, b) => a.sort_order - b.sort_order)
+        const tasks   = (tmpl?.template_tasks   || []).sort((a, b) => a.sort_order - b.sort_order)
         if (folders.length) {
           await supabase.from('job_folders').insert(
             folders.map((f, i) => ({
               job_id:      jobId,
               folder_name: f.folder_name,
+              folder_type: f.folder_type || 'document',
               template_id: tmpl.id,
               sort_order:  i,
+            }))
+          )
+        }
+        if (tasks.length) {
+          await supabase.from('job_tasks').insert(
+            tasks.map((t, i) => ({
+              job_id:      jobId,
+              task_name:   t.task_name,
+              template_id: tmpl.id,
+              sort_order:  i,
+              status:      'pending',
             }))
           )
         }

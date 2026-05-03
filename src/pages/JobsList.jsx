@@ -454,7 +454,7 @@ export default function JobsList() {
               selectedJob={selectedJob === ALL_JOBS ? 'all' : selectedJob}
             />
           )}
-          {tab === 'tasks'          && <ComingSoon label="Tasks" />}
+          {tab === 'tasks'          && <JobTasksPanel job={selectedJobObj} />}
           {tab === 'change-orders'  && <ComingSoon label="Change Orders" />}
           {tab === 'finance'        && <ComingSoon label="Finance" />}
           {tab === 'files'          && <JobFilesPanel job={selectedJobObj} />}
@@ -834,23 +834,179 @@ function ComingSoon({ label }) {
   )
 }
 
-// ── Job Files Panel ───────────────────────────────────────────────────────────
-function JobFilesPanel({ job }) {
-  const { user } = useAuth()
-  const [files,              setFiles]              = useState([])
-  const [filesLoading,       setFilesLoading]       = useState(false)
-  const [uploading,          setUploading]          = useState(false)
-  const [folders,            setFolders]            = useState([])
-  const [templates,          setTemplates]          = useState([])
-  const [selectedTemplateId, setSelectedTemplateId] = useState('')
-  const [applyingTemplate,   setApplyingTemplate]   = useState(false)
+// ── Apply Template Modal ──────────────────────────────────────────────────────
+function ApplyTemplateModal({ job, onClose, onApplied }) {
+  const [templates,   setTemplates]   = useState([])
+  const [selectedId,  setSelectedId]  = useState('')
+  const [preview,     setPreview]     = useState(null)
+  const [checks,      setChecks]      = useState({ doc: {}, photo: {}, tasks: {} })
+  const [saving,      setSaving]      = useState(false)
 
   useEffect(() => {
     supabase.from('job_templates')
-      .select('id, name, auto_trigger, template_folders(*)')
+      .select('id, name, auto_trigger, template_folders(*), template_tasks(*)')
       .order('name')
       .then(({ data }) => { if (data) setTemplates(data) })
   }, [])
+
+  function handleSelectTemplate(id) {
+    setSelectedId(id)
+    if (!id) { setPreview(null); return }
+    const tmpl = templates.find(t => t.id === id)
+    const docFolders   = (tmpl?.template_folders || []).filter(f => f.folder_type !== 'photo_video').sort((a, b) => a.sort_order - b.sort_order)
+    const photoFolders = (tmpl?.template_folders || []).filter(f => f.folder_type === 'photo_video').sort((a, b) => a.sort_order - b.sort_order)
+    const tasks        = (tmpl?.template_tasks   || []).sort((a, b) => a.sort_order - b.sort_order)
+    setPreview({ docFolders, photoFolders, tasks, tmplId: id })
+    const cd = {}; docFolders.forEach(f => { cd[f.id] = true })
+    const cp = {}; photoFolders.forEach(f => { cp[f.id] = true })
+    const ct = {}; tasks.forEach(t => { ct[t.id] = true })
+    setChecks({ doc: cd, photo: cp, tasks: ct })
+  }
+
+  function toggle(section, id) {
+    setChecks(prev => ({ ...prev, [section]: { ...prev[section], [id]: !prev[section][id] } }))
+  }
+
+  function toggleAll(section, items, idField) {
+    const allChecked = items.every(x => checks[section][x[idField]])
+    const next = {}
+    items.forEach(x => { next[x[idField]] = !allChecked })
+    setChecks(prev => ({ ...prev, [section]: next }))
+  }
+
+  const selectedCount = preview
+    ? Object.values(checks.doc).filter(Boolean).length
+    + Object.values(checks.photo).filter(Boolean).length
+    + Object.values(checks.tasks).filter(Boolean).length
+    : 0
+
+  async function handleSave() {
+    if (!preview || !job?.id) return
+    setSaving(true)
+
+    const docToCreate   = preview.docFolders.filter(f => checks.doc[f.id])
+    const photoToCreate = preview.photoFolders.filter(f => checks.photo[f.id])
+    const tasksToCreate = preview.tasks.filter(t => checks.tasks[t.id])
+
+    const folderInserts = [
+      ...docToCreate.map((f, i)   => ({ job_id: job.id, folder_name: f.folder_name, folder_type: 'document',   template_id: preview.tmplId, sort_order: i })),
+      ...photoToCreate.map((f, i) => ({ job_id: job.id, folder_name: f.folder_name, folder_type: 'photo_video', template_id: preview.tmplId, sort_order: i })),
+    ]
+    if (folderInserts.length) await supabase.from('job_folders').insert(folderInserts)
+    if (tasksToCreate.length) {
+      await supabase.from('job_tasks').insert(
+        tasksToCreate.map((t, i) => ({ job_id: job.id, task_name: t.task_name, template_id: preview.tmplId, sort_order: i, status: 'pending' }))
+      )
+    }
+    setSaving(false)
+    onApplied()
+  }
+
+  const CheckList = ({ items, section, idField, nameField, icon }) => {
+    if (!items.length) return null
+    const allChecked = items.every(x => checks[section][x[idField]])
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <p className="text-xs font-bold text-gray-600 uppercase tracking-wide">{icon} {section === 'doc' ? 'Document Folders' : section === 'photo' ? 'Photo / Video Folders' : 'Tasks'}</p>
+          <button onClick={() => toggleAll(section, items, idField)} className="text-[11px] text-blue-500 hover:text-blue-700">
+            {allChecked ? 'Uncheck all' : 'Check all'}
+          </button>
+        </div>
+        <div className="bg-gray-50 rounded-xl overflow-hidden border border-gray-100">
+          {items.map((item, i) => (
+            <label key={item[idField]} className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-white transition-colors ${i < items.length - 1 ? 'border-b border-gray-100' : ''}`}>
+              <input
+                type="checkbox"
+                checked={!!checks[section][item[idField]]}
+                onChange={() => toggle(section, item[idField])}
+                className="accent-green-700 w-4 h-4 flex-shrink-0 rounded"
+              />
+              <span className="text-sm text-gray-700">{icon === '📁' || icon === '📸' ? '📁 ' : ''}{item[nameField]}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden" style={{ maxHeight: '88vh' }} onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="bg-green-700 px-6 py-4 flex-shrink-0">
+          <h2 className="text-white font-bold text-lg">Apply Job Template</h2>
+          <p className="text-green-200 text-xs mt-0.5">
+            Select what to create for <span className="font-semibold text-white">{job?.name || job?.client_name}</span>
+          </p>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+
+          {/* Template selector */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1.5">Template</label>
+            <select
+              value={selectedId}
+              onChange={e => handleSelectTemplate(e.target.value)}
+              className="input w-full"
+            >
+              <option value="">Choose a template…</option>
+              {templates.map(t => (
+                <option key={t.id} value={t.id}>{t.name}{t.auto_trigger === 'sold_bid' ? ' (Auto)' : ''}</option>
+              ))}
+            </select>
+            {templates.length === 0 && (
+              <p className="text-xs text-gray-400 mt-1">No templates yet — create one in Jobs → Settings → Templates.</p>
+            )}
+          </div>
+
+          {/* Preview with checkboxes */}
+          {preview && (
+            <>
+              {preview.docFolders.length === 0 && preview.photoFolders.length === 0 && preview.tasks.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-4 bg-gray-50 rounded-xl">This template has no folders or tasks defined.</p>
+              ) : (
+                <>
+                  <CheckList items={preview.docFolders}   section="doc"   idField="id" nameField="folder_name" icon="📄" />
+                  <CheckList items={preview.photoFolders} section="photo" idField="id" nameField="folder_name" icon="📸" />
+                  <CheckList items={preview.tasks}        section="tasks" idField="id" nameField="task_name"   icon="✅" />
+                </>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 pb-5 pt-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-sm font-semibold border border-gray-300 text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button
+            onClick={handleSave}
+            disabled={saving || !preview || selectedCount === 0}
+            className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-green-700 hover:bg-green-800 disabled:opacity-50"
+          >
+            {saving ? 'Creating…' : selectedCount > 0 ? `Create ${selectedCount} Item${selectedCount !== 1 ? 's' : ''}` : 'Nothing Selected'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Job Files Panel ─────────────────────────────────── Documents + Photos tabs
+function JobFilesPanel({ job }) {
+  const { user } = useAuth()
+  const [subTab,        setSubTab]        = useState('documents')
+  const [files,         setFiles]         = useState([])
+  const [filesLoading,  setFilesLoading]  = useState(false)
+  const [folders,       setFolders]       = useState([])
+  const [uploading,     setUploading]     = useState(false)
+  const [addingFolder,  setAddingFolder]  = useState(false)
+  const [newFolderName, setNewFolderName] = useState('')
+  const [savingFolder,  setSavingFolder]  = useState(false)
+  const [showModal,     setShowModal]     = useState(false)
 
   useEffect(() => {
     if (job?.id) { fetchFiles(job.id); fetchFolders(job.id) }
@@ -859,53 +1015,17 @@ function JobFilesPanel({ job }) {
 
   async function fetchFiles(jobId) {
     setFilesLoading(true)
-    const { data } = await supabase
-      .from('job_files')
-      .select('*')
-      .eq('job_id', jobId)
-      .order('uploaded_at', { ascending: false })
-    if (data) {
-      setFiles(data.map(f => ({
-        ...f,
-        publicUrl: supabase.storage.from('job-files').getPublicUrl(f.storage_path).data?.publicUrl || null
-      })))
-    }
+    const { data } = await supabase.from('job_files').select('*').eq('job_id', jobId).order('uploaded_at', { ascending: false })
+    if (data) setFiles(data.map(f => ({
+      ...f,
+      publicUrl: supabase.storage.from('job-files').getPublicUrl(f.storage_path).data?.publicUrl || null,
+    })))
     setFilesLoading(false)
   }
 
   async function fetchFolders(jobId) {
-    const { data } = await supabase
-      .from('job_folders')
-      .select('*')
-      .eq('job_id', jobId)
-      .order('sort_order')
+    const { data } = await supabase.from('job_folders').select('*').eq('job_id', jobId).order('sort_order')
     if (data) setFolders(data)
-  }
-
-  async function handleApplyTemplate() {
-    if (!selectedTemplateId || !job?.id) return
-    setApplyingTemplate(true)
-    const tmpl = templates.find(t => t.id === selectedTemplateId)
-    const tmplFolders = (tmpl?.template_folders || []).sort((a, b) => a.sort_order - b.sort_order)
-    if (tmplFolders.length) {
-      await supabase.from('job_folders').insert(
-        tmplFolders.map((f, i) => ({
-          job_id:      job.id,
-          folder_name: f.folder_name,
-          template_id: tmpl.id,
-          sort_order:  i,
-        }))
-      )
-      await fetchFolders(job.id)
-    }
-    setSelectedTemplateId('')
-    setApplyingTemplate(false)
-  }
-
-  async function handleRemoveFolder(folderId) {
-    if (!confirm('Remove this folder?')) return
-    await supabase.from('job_folders').delete().eq('id', folderId)
-    setFolders(prev => prev.filter(f => f.id !== folderId))
   }
 
   async function handleUpload(e) {
@@ -915,15 +1035,11 @@ function JobFilesPanel({ job }) {
     const path = `jobs/${job.id}/${Date.now()}-${file.name}`
     const { error } = await supabase.storage.from('job-files').upload(path, file)
     if (!error) {
+      const isMedia = file.type?.startsWith('image/') || file.type?.startsWith('video/')
       await supabase.from('job_files').insert({
-        job_id: job.id,
-        file_name: file.name,
-        file_type: file.type,
-        file_category: file.type?.startsWith('image/') ? 'photo' : 'document',
-        storage_path: path,
-        file_size: file.size,
-        source: 'manual',
-        uploaded_by: user?.id,
+        job_id: job.id, file_name: file.name, file_type: file.type,
+        file_category: isMedia ? 'photo' : 'document',
+        storage_path: path, file_size: file.size, source: 'manual', uploaded_by: user?.id,
       })
       fetchFiles(job.id)
     }
@@ -931,11 +1047,29 @@ function JobFilesPanel({ job }) {
     e.target.value = ''
   }
 
-  async function handleDelete(f) {
+  async function handleDeleteFile(f) {
     if (!confirm(`Delete "${f.file_name}"?`)) return
     await supabase.storage.from('job-files').remove([f.storage_path])
     await supabase.from('job_files').delete().eq('id', f.id)
     setFiles(prev => prev.filter(x => x.id !== f.id))
+  }
+
+  async function handleAddFolder() {
+    if (!newFolderName.trim() || !job?.id) return
+    setSavingFolder(true)
+    const folderType = subTab === 'documents' ? 'document' : 'photo_video'
+    const existing   = folders.filter(f => f.folder_type === folderType).length
+    const { data } = await supabase.from('job_folders').insert({
+      job_id: job.id, folder_name: newFolderName.trim(), folder_type: folderType, sort_order: existing,
+    }).select().single()
+    if (data) setFolders(prev => [...prev, data])
+    setNewFolderName(''); setAddingFolder(false); setSavingFolder(false)
+  }
+
+  async function handleRemoveFolder(id) {
+    if (!confirm('Remove this folder?')) return
+    await supabase.from('job_folders').delete().eq('id', id)
+    setFolders(prev => prev.filter(f => f.id !== id))
   }
 
   function fmtSize(bytes) {
@@ -944,6 +1078,16 @@ function JobFilesPanel({ job }) {
     if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`
     return `${(bytes / 1048576).toFixed(1)} MB`
   }
+
+  const isMedia = f => f.file_type?.startsWith('image/') || f.file_type?.startsWith('video/')
+  const docFolders   = folders.filter(f => f.folder_type !== 'photo_video')
+  const photoFolders = folders.filter(f => f.folder_type === 'photo_video')
+  const docFiles     = files.filter(f => !isMedia(f))
+  const mediaFiles   = files.filter(f => isMedia(f))
+  const activeFolders = subTab === 'documents' ? docFolders : photoFolders
+  const activeFiles   = subTab === 'documents' ? docFiles   : mediaFiles
+  const isEmpty       = !filesLoading && activeFolders.length === 0 && activeFiles.length === 0
+  const uploadAccept  = subTab === 'documents' ? '.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip' : 'image/*,video/*'
 
   if (!job) return (
     <div className="flex flex-col items-center justify-center h-full text-gray-400 py-20">
@@ -955,118 +1099,294 @@ function JobFilesPanel({ job }) {
 
   return (
     <div className="p-4">
-      <div className="flex items-center justify-between mb-4">
+      {showModal && (
+        <ApplyTemplateModal
+          job={job}
+          onClose={() => setShowModal(false)}
+          onApplied={() => { setShowModal(false); fetchFolders(job.id); fetchFiles(job.id) }}
+        />
+      )}
+
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
         <div>
-          <h2 className="text-lg font-bold text-gray-900">Documents & Photos</h2>
+          <h2 className="text-lg font-bold text-gray-900">Files</h2>
           <p className="text-xs text-gray-400">{job.client_name || job.name}</p>
         </div>
-        <label className={`cursor-pointer text-sm px-3 py-1.5 rounded-lg font-medium transition-colors ${uploading ? 'bg-gray-200 text-gray-400' : 'bg-green-700 text-white hover:bg-green-800'}`}>
-          {uploading ? 'Uploading…' : '+ Upload File'}
-          <input type="file" className="hidden" onChange={handleUpload} disabled={uploading}
-            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip" />
+      </div>
+
+      {/* Sub-tabs */}
+      <div className="flex gap-1 border-b border-gray-200 mb-4">
+        {[{ key: 'documents', label: '📄 Documents' }, { key: 'photos', label: '📸 Photos / Videos' }].map(t => (
+          <button key={t.key}
+            onClick={() => { setSubTab(t.key); setAddingFolder(false); setNewFolderName('') }}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              subTab === t.key ? 'border-green-700 text-green-800 bg-green-50' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >{t.label}</button>
+        ))}
+      </div>
+
+      {/* Toolbar */}
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <button
+          onClick={() => { setAddingFolder(a => !a); setNewFolderName('') }}
+          className="text-xs px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors font-medium"
+        >{addingFolder ? '✕ Cancel' : '+ Add Folder'}</button>
+        <label className={`cursor-pointer text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${uploading ? 'bg-gray-200 text-gray-400' : 'bg-green-700 text-white hover:bg-green-800'}`}>
+          {uploading ? 'Uploading…' : `+ Upload ${subTab === 'documents' ? 'Document' : 'Photo / Video'}`}
+          <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} accept={uploadAccept} />
         </label>
       </div>
+
+      {/* Inline add-folder input */}
+      {addingFolder && (
+        <div className="flex gap-2 mb-4">
+          <input autoFocus type="text" value={newFolderName}
+            onChange={e => setNewFolderName(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleAddFolder(); if (e.key === 'Escape') { setAddingFolder(false); setNewFolderName('') } }}
+            placeholder="Folder name…" className="input text-sm flex-1"
+          />
+          <button onClick={handleAddFolder} disabled={!newFolderName.trim() || savingFolder}
+            className="px-3 py-1.5 rounded-lg bg-green-700 text-white text-sm font-medium hover:bg-green-800 disabled:opacity-40 transition-colors">
+            {savingFolder ? '…' : 'Create'}
+          </button>
+        </div>
+      )}
 
       {filesLoading ? (
         <div className="flex items-center justify-center py-16">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700" />
         </div>
-      ) : files.length === 0 ? (
-        <div className="space-y-6">
-          {/* Empty files message */}
-          <div className="flex flex-col items-center justify-center py-10 text-gray-400">
-            <p className="text-4xl mb-3">📂</p>
-            <p className="text-sm font-medium text-gray-500">No files yet</p>
-            <p className="text-xs mt-1">Upload a file using the button above</p>
-          </div>
-
-          {/* Template folder setup card */}
-          {templates.length > 0 && (
-            <div className="max-w-sm mx-auto bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-lg">📋</span>
-                <p className="text-sm font-bold text-gray-800">Folder Structure</p>
-              </div>
-              <p className="text-xs text-gray-500 mb-4">Apply a template to set up folders for organizing files on this job.</p>
-
-              {folders.length > 0 ? (
-                <div>
-                  <p className="text-xs font-semibold text-green-700 mb-2">
-                    ✅ {folders.length} folder{folders.length !== 1 ? 's' : ''} set up
-                  </p>
-                  <div className="space-y-1 mb-3">
-                    {folders.map(f => (
-                      <div key={f.id} className="flex items-center justify-between text-xs text-gray-700 bg-gray-50 rounded-lg px-3 py-1.5">
-                        <span>📁 {f.folder_name}</span>
-                        <button
-                          onClick={() => handleRemoveFolder(f.id)}
-                          className="text-red-300 hover:text-red-500 ml-2 text-[10px]"
-                          title="Remove folder"
-                        >✕</button>
-                      </div>
-                    ))}
+      ) : (
+        <>
+          {/* Folder chips */}
+          {activeFolders.length > 0 && (
+            <div className="mb-5">
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Folders</p>
+              <div className="flex flex-wrap gap-2">
+                {activeFolders.map(f => (
+                  <div key={f.id} className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm group">
+                    <span className="text-sm">📁</span>
+                    <span className="text-sm text-gray-700 font-medium">{f.folder_name}</span>
+                    <button onClick={() => handleRemoveFolder(f.id)}
+                      className="text-red-300 hover:text-red-500 ml-1 opacity-0 group-hover:opacity-100 transition-opacity text-xs">✕</button>
                   </div>
-                  <p className="text-xs text-gray-400">Files you upload will be organized into these folders.</p>
-                </div>
-              ) : (
-                <div className="flex gap-2">
-                  <select
-                    value={selectedTemplateId}
-                    onChange={e => setSelectedTemplateId(e.target.value)}
-                    className="input text-sm flex-1"
-                  >
-                    <option value="">Choose a template…</option>
-                    {templates.map(t => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}{t.auto_trigger === 'sold_bid' ? ' (Auto)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={handleApplyTemplate}
-                    disabled={!selectedTemplateId || applyingTemplate}
-                    className="px-3 py-1.5 rounded-lg bg-green-700 text-white text-sm font-medium hover:bg-green-800 disabled:opacity-40 transition-colors whitespace-nowrap"
-                  >
-                    {applyingTemplate ? '…' : 'Apply'}
-                  </button>
-                </div>
-              )}
+                ))}
+              </div>
             </div>
           )}
+
+          {/* Files grid */}
+          {activeFiles.length > 0 ? (
+            <div>
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Files</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {activeFiles.map(f => {
+                  const isImg = f.file_type?.startsWith('image/')
+                  return (
+                    <div key={f.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm group">
+                      {isImg && f.publicUrl ? (
+                        <a href={f.publicUrl} target="_blank" rel="noopener noreferrer">
+                          <img src={f.publicUrl} alt={f.file_name} className="w-full h-28 object-cover hover:opacity-90 transition-opacity" />
+                        </a>
+                      ) : (
+                        <div className="w-full h-28 bg-gray-50 flex items-center justify-center text-4xl">
+                          {f.file_type?.startsWith('video/') ? '🎥' : f.file_type === 'application/pdf' ? '📄' : '📎'}
+                        </div>
+                      )}
+                      <div className="p-2.5">
+                        <p className="text-xs font-medium text-gray-800 truncate" title={f.file_name}>{f.file_name}</p>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-[10px] text-gray-400">{fmtSize(f.file_size)}</span>
+                          <div className="flex items-center gap-1.5">
+                            {f.publicUrl && <a href={f.publicUrl} download={f.file_name} className="text-[10px] text-blue-600 hover:text-blue-800 font-medium">⬇</a>}
+                            <button onClick={() => handleDeleteFile(f)} className="text-[10px] text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+                          </div>
+                        </div>
+                        {f.source === 'buildertrend' && <span className="text-[9px] text-purple-500 font-medium">BuilderTrend</span>}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ) : isEmpty ? (
+            /* Empty state */
+            <div className="flex flex-col items-center py-12 text-gray-400">
+              <p className="text-4xl mb-3">{subTab === 'documents' ? '📄' : '📸'}</p>
+              <p className="text-sm font-medium text-gray-500">
+                No {subTab === 'documents' ? 'documents' : 'photos or videos'} yet
+              </p>
+              <p className="text-xs mt-1 mb-5 text-center max-w-xs">
+                Add a folder manually above, upload a file, or apply a template to set up your folder structure automatically.
+              </p>
+              <button
+                onClick={() => setShowModal(true)}
+                className="flex items-center gap-2 text-sm px-4 py-2 rounded-lg bg-green-700 text-white font-medium hover:bg-green-800 transition-colors"
+              >
+                <span>📋</span> Apply Template
+              </button>
+            </div>
+          ) : null}
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── Job Tasks Panel ───────────────────────────────────────────────────────────
+function JobTasksPanel({ job }) {
+  const [tasks,       setTasks]       = useState([])
+  const [loading,     setLoading]     = useState(false)
+  const [addingTask,  setAddingTask]  = useState(false)
+  const [newTaskName, setNewTaskName] = useState('')
+  const [saving,      setSaving]      = useState(false)
+  const [showModal,   setShowModal]   = useState(false)
+
+  useEffect(() => {
+    if (job?.id) fetchTasks(job.id)
+    else setTasks([])
+  }, [job?.id])
+
+  async function fetchTasks(jobId) {
+    setLoading(true)
+    const { data } = await supabase.from('job_tasks').select('*').eq('job_id', jobId).order('sort_order')
+    if (data) setTasks(data)
+    setLoading(false)
+  }
+
+  async function handleAddTask() {
+    if (!newTaskName.trim() || !job?.id) return
+    setSaving(true)
+    const { data } = await supabase.from('job_tasks').insert({
+      job_id: job.id, task_name: newTaskName.trim(), status: 'pending', sort_order: tasks.length,
+    }).select().single()
+    if (data) setTasks(prev => [...prev, data])
+    setNewTaskName(''); setAddingTask(false); setSaving(false)
+  }
+
+  async function toggleTask(task) {
+    const newStatus = task.status === 'completed' ? 'pending' : 'completed'
+    await supabase.from('job_tasks').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', task.id)
+    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t))
+  }
+
+  async function deleteTask(id) {
+    if (!confirm('Remove this task?')) return
+    await supabase.from('job_tasks').delete().eq('id', id)
+    setTasks(prev => prev.filter(t => t.id !== id))
+  }
+
+  if (!job) return (
+    <div className="flex flex-col items-center justify-center h-full text-gray-400 py-20">
+      <p className="text-4xl mb-3">✅</p>
+      <p className="text-lg font-semibold text-gray-500">Select a job to view tasks</p>
+      <p className="text-sm mt-1">Choose a job from the sidebar</p>
+    </div>
+  )
+
+  const completed = tasks.filter(t => t.status === 'completed').length
+
+  return (
+    <div className="p-4 max-w-2xl">
+      {showModal && (
+        <ApplyTemplateModal
+          job={job}
+          onClose={() => setShowModal(false)}
+          onApplied={() => { setShowModal(false); fetchTasks(job.id) }}
+        />
+      )}
+
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">Tasks</h2>
+          <p className="text-xs text-gray-400">{job.client_name || job.name}</p>
+        </div>
+        <button
+          onClick={() => { setAddingTask(a => !a); setNewTaskName('') }}
+          className="text-xs px-3 py-1.5 rounded-lg bg-green-700 text-white font-medium hover:bg-green-800 transition-colors"
+        >{addingTask ? '✕ Cancel' : '+ Add Task'}</button>
+      </div>
+
+      {/* Add task input */}
+      {addingTask && (
+        <div className="flex gap-2 mb-4">
+          <input autoFocus type="text" value={newTaskName}
+            onChange={e => setNewTaskName(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleAddTask(); if (e.key === 'Escape') { setAddingTask(false); setNewTaskName('') } }}
+            placeholder="Task name…" className="input text-sm flex-1"
+          />
+          <button onClick={handleAddTask} disabled={!newTaskName.trim() || saving}
+            className="px-3 py-1.5 rounded-lg bg-green-700 text-white text-sm font-medium hover:bg-green-800 disabled:opacity-40">
+            {saving ? '…' : 'Add'}
+          </button>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700" />
+        </div>
+      ) : tasks.length === 0 ? (
+        <div className="flex flex-col items-center py-12 text-gray-400">
+          <p className="text-4xl mb-3">✅</p>
+          <p className="text-sm font-medium text-gray-500">No tasks yet</p>
+          <p className="text-xs mt-1 mb-5 text-center max-w-xs">Add tasks manually above, or apply a template to create folders and tasks all at once.</p>
+          <button
+            onClick={() => setShowModal(true)}
+            className="flex items-center gap-2 text-sm px-4 py-2 rounded-lg bg-green-700 text-white font-medium hover:bg-green-800 transition-colors"
+          >
+            <span>📋</span> Apply Template
+          </button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {files.map(f => {
-            const isImage = f.file_type?.startsWith('image/')
-            return (
-              <div key={f.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm group">
-                {isImage && f.publicUrl ? (
-                  <a href={f.publicUrl} target="_blank" rel="noopener noreferrer">
-                    <img src={f.publicUrl} alt={f.file_name} className="w-full h-28 object-cover hover:opacity-90 transition-opacity" />
-                  </a>
-                ) : (
-                  <div className="w-full h-28 bg-gray-50 flex items-center justify-center text-4xl">
-                    {f.file_type === 'application/pdf' ? '📄' : '📎'}
-                  </div>
-                )}
-                <div className="p-2.5">
-                  <p className="text-xs font-medium text-gray-800 truncate" title={f.file_name}>{f.file_name}</p>
-                  <div className="flex items-center justify-between mt-1">
-                    <span className="text-[10px] text-gray-400">{fmtSize(f.file_size)}</span>
-                    <div className="flex items-center gap-1.5">
-                      {f.publicUrl && (
-                        <a href={f.publicUrl} download={f.file_name} className="text-[10px] text-blue-600 hover:text-blue-800 font-medium">⬇</a>
-                      )}
-                      <button onClick={() => handleDelete(f)} className="text-[10px] text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
-                    </div>
-                  </div>
-                  {f.source === 'buildertrend' && (
-                    <span className="text-[9px] text-purple-500 font-medium">BuilderTrend</span>
+        <div>
+          {/* Progress bar */}
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex-1 bg-gray-100 rounded-full h-2">
+              <div
+                className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${tasks.length > 0 ? (completed / tasks.length) * 100 : 0}%` }}
+              />
+            </div>
+            <span className="text-xs font-semibold text-gray-500 flex-shrink-0">{completed}/{tasks.length} done</span>
+          </div>
+
+          {/* Task list */}
+          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            {tasks.map((task, i) => (
+              <div key={task.id}
+                className={`flex items-center gap-3 px-4 py-3 hover:bg-gray-50 group transition-colors ${i < tasks.length - 1 ? 'border-b border-gray-100' : ''}`}
+              >
+                <button
+                  onClick={() => toggleTask(task)}
+                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                    task.status === 'completed' ? 'bg-green-600 border-green-600 text-white' : 'border-gray-300 hover:border-green-500'
+                  }`}
+                >
+                  {task.status === 'completed' && (
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
                   )}
-                </div>
+                </button>
+                <span className={`flex-1 text-sm ${task.status === 'completed' ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+                  {task.task_name}
+                </span>
+                <button onClick={() => deleteTask(task.id)}
+                  className="text-red-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity text-xs p-1">✕</button>
               </div>
-            )
-          })}
+            ))}
+          </div>
+
+          {/* Apply more from template */}
+          <div className="mt-3 text-center">
+            <button onClick={() => setShowModal(true)} className="text-xs text-gray-400 hover:text-green-700 transition-colors">
+              + Apply template to add more
+            </button>
+          </div>
         </div>
       )}
     </div>
