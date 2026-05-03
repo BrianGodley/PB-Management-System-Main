@@ -47,7 +47,7 @@ function KpiCard({ label, est, act, currency = false, inverse = false, sub }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col gap-1">
       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{label}</span>
-      <div className="flex items-end justify-between gap-2 mt-1">
+      <div className="flex items-start justify-between gap-2 mt-1">
         <div>
           <p className="text-[10px] text-gray-400">Estimated</p>
           <p className="text-lg font-bold text-gray-800">{display(est)}</p>
@@ -55,13 +55,13 @@ function KpiCard({ label, est, act, currency = false, inverse = false, sub }) {
         <div className="text-right">
           <p className="text-[10px] text-gray-400">Actual</p>
           <p className="text-lg font-bold text-gray-900">{display(act)}</p>
+          {delta !== 0 && (
+            <div className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded mt-1 ${deltaColor}`}>
+              {delta > 0 ? '▲' : '▼'} {display(Math.abs(delta))} {over ? '(over)' : '(under)'}
+            </div>
+          )}
         </div>
       </div>
-      {delta !== 0 && (
-        <div className={`text-[11px] font-semibold px-2 py-0.5 rounded self-start ${deltaColor}`}>
-          {delta > 0 ? '▲' : '▼'} {display(Math.abs(delta))} {over ? '(over)' : '(under)'}
-        </div>
-      )}
       {sub && <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>}
     </div>
   )
@@ -74,7 +74,7 @@ function GpCard({ estGP, actGP, estPct, actPct }) {
   return (
     <div className="bg-white rounded-xl border-2 border-green-700 p-4 flex flex-col gap-1">
       <span className="text-[10px] font-bold text-green-700 uppercase tracking-wide">Gross Profit {trend}</span>
-      <div className="flex items-end justify-between gap-2 mt-1">
+      <div className="flex items-start justify-between gap-2 mt-1">
         <div>
           <p className="text-[10px] text-gray-400">Estimated</p>
           <p className="text-lg font-bold text-gray-800">{fmt(estGP)}</p>
@@ -84,13 +84,13 @@ function GpCard({ estGP, actGP, estPct, actPct }) {
           <p className="text-[10px] text-gray-400">Actual</p>
           <p className={`text-lg font-bold ${color}`}>{fmt(actGP)}</p>
           <p className="text-[10px] text-gray-400">{actPct.toFixed(1)}% margin</p>
+          {delta !== 0 && (
+            <div className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded mt-1 ${delta > 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+              {delta > 0 ? '▲' : '▼'} {fmt(Math.abs(delta))} {delta > 0 ? 'above' : 'below'}
+            </div>
+          )}
         </div>
       </div>
-      {delta !== 0 && (
-        <div className={`text-[11px] font-semibold px-2 py-0.5 rounded self-start mt-1 ${delta > 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
-          {delta > 0 ? '▲' : '▼'} {fmt(Math.abs(delta))} {delta > 0 ? 'above estimate' : 'below estimate'}
-        </div>
-      )}
     </div>
   )
 }
