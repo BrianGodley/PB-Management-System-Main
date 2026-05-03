@@ -7,6 +7,7 @@ import DailyLogs from '../components/DailyLogs'
 import TimeClock from '../components/TimeClock'
 import WorkOrders from '../components/WorkOrders'
 import JobComparison from '../components/JobComparison'
+import TemplatesManager from '../components/TemplatesManager'
 
 function MoveJobModal({ job, stages, onMove, onClose }) {
   const [selected, setSelected] = useState(job.stage_id || '__none__')
@@ -238,7 +239,6 @@ export default function JobsList() {
     { key: 'change-orders', label: 'Change Orders' },
     { key: 'finance',       label: 'Finance'       },
     { key: 'files',         label: 'Files'         },
-    { key: 'templates',     label: 'Templates'     },
     { key: 'settings',      label: '⚙️ Settings'   },
   ]
 
@@ -458,7 +458,6 @@ export default function JobsList() {
           {tab === 'change-orders'  && <ComingSoon label="Change Orders" />}
           {tab === 'finance'        && <ComingSoon label="Finance" />}
           {tab === 'files'          && <JobFilesPanel job={selectedJobObj} />}
-          {tab === 'templates'      && <ComingSoon label="Templates" />}
           {tab === 'settings'       && (
             <JobScheduleSettings
               stages={stages}
@@ -615,6 +614,7 @@ function getWeekRangeStr(startDay) {
 
 // ── Job Schedule Settings ─────────────────────────────────────────────────────
 function JobScheduleSettings({ stages = [], onAddStage, onUpdateStage, onDeleteStage, onReorderStages }) {
+  const [settingsTab,     setSettingsTab]     = useState('general')
   const [defaultColor,    setDefaultColor]    = useState('#15803d')
   const [saving,          setSaving]          = useState(false)
   const [saved,           setSaved]           = useState(false)
@@ -660,7 +660,24 @@ function JobScheduleSettings({ stages = [], onAddStage, onUpdateStage, onDeleteS
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="space-y-4">
+      {/* Settings sub-tabs */}
+      <div className="flex gap-1 border-b border-gray-200 mb-2">
+        {[
+          { key: 'general',   label: '⚙️ General'   },
+          { key: 'templates', label: '📋 Templates'  },
+        ].map(t => (
+          <button key={t.key} onClick={() => setSettingsTab(t.key)}
+            className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+              settingsTab === t.key ? 'border-green-700 text-green-800' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >{t.label}</button>
+        ))}
+      </div>
+
+      {settingsTab === 'templates' && <TemplatesManager />}
+
+      {settingsTab === 'general' && <div className="max-w-2xl space-y-6">
 
       {/* Default color */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -802,6 +819,7 @@ function JobScheduleSettings({ stages = [], onAddStage, onUpdateStage, onDeleteS
         </div>
       </div>
 
+      </div>}
     </div>
   )
 }

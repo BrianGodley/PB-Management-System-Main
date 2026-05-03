@@ -43,8 +43,14 @@ export default function Bids() {
   const [downloadingId, setDownloadingId] = useState(null)
 
   // Sold modal state
-  const [soldModal, setSoldModal] = useState(null) // { bidId, bid, jobName }
-  const [savingJob, setSavingJob] = useState(false)
+  const [soldModal,    setSoldModal]    = useState(null) // { bidId, bid, jobName, templateId }
+  const [savingJob,    setSavingJob]    = useState(false)
+  const [templates,    setTemplates]    = useState([])
+
+  useEffect(() => {
+    supabase.from('job_templates').select('id, name, auto_trigger, template_folders(*)').order('name')
+      .then(({ data }) => { if (data) setTemplates(data) })
+  }, [])
 
   // Cascade warning modal state
   const [cascadeModal, setCascadeModal] = useState(null) // { type, title, body, woCount, onConfirm }
@@ -94,7 +100,8 @@ export default function Bids() {
     if (status === 'sold') {
       // Intercept — show Sold modal to create job
       const bid = bids.find(b => b.id === id)
-      setSoldModal({ bidId: id, bid, jobName: formatJobName(bid?.client_name || '') })
+      const autoTemplate = templates.find(t => t.auto_trigger === 'sold_bid')
+      setSoldModal({ bidId: id, bid, jobName: formatJobName(bid?.client_name || ''), templateId: autoTemplate?.id || '' })
       return
     }
 
@@ -146,6 +153,22 @@ export default function Bids() {
 
       if (jobErr) throw new Error(jobErr.message)
       const job = { id: jobId }
+
+      // Apply template folders if a template was selected
+      if (soldModal.templateId) {
+        const tmpl = templates.find(t => t.id === soldModal.templateId)
+        const folders = (tmpl?.template_folders || []).sort((a, b) => a.sort_order - b.sort_order)
+        if (folders.length) {
+          await supabase.from('job_folders').insert(
+            folders.map((f, i) => ({
+              job_id:      jobId,
+              folder_name: f.folder_name,
+              template_id: tmpl.id,
+              sort_order:  i,
+            }))
+          )
+        }
+      }
 
       // Create projects from bid.projects array
       if (bid.projects?.length) {
@@ -328,7 +351,7 @@ export default function Bids() {
               )}
             </div>
 
-            <div className="mb-5">
+            <div className="mb-4">
               <label className="block text-sm font-semibold text-gray-700 mb-1">Job Name</label>
               <input
                 type="text"
@@ -340,6 +363,25 @@ export default function Bids() {
               />
               <p className="text-xs text-gray-400 mt-1">Auto-filled as Last, First — edit freely.</p>
             </div>
+
+            {templates.length > 0 && (
+              <div className="mb-5">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Apply Template</label>
+                <select
+                  value={soldModal.templateId}
+                  onChange={e => setSoldModal(prev => ({ ...prev, templateId: e.target.value }))}
+                  className="input w-full"
+                >
+                  <option value="">No template</option>
+                  {templates.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}{t.auto_trigger === 'sold_bid' ? ' (Auto)' : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400 mt-1">Folders from this template will be created on the new job.</p>
+              </div>
+            )}
 
             <div className="flex gap-3">
               <button
