@@ -1735,7 +1735,7 @@ export default function WorkOrders({ jobs, selectedJob }) {
         </div>
 
         {/* Filter row + add button */}
-        <div className="flex items-center justify-between gap-2 px-5 py-2.5 border-t border-gray-100 bg-gray-50">
+        <div className="flex items-center justify-between gap-2 px-5 py-2.5 border-t border-gray-100 bg-blue-50">
           <div className="flex gap-1.5 flex-wrap">
             {['all', 'pending', 'in_progress', 'complete'].map(s => (
               <button
@@ -1763,8 +1763,8 @@ export default function WorkOrders({ jobs, selectedJob }) {
         </div>
       </div>
 
-      {/* Crew type sections */}
-      {sections.map(({ crewType, workOrders: sectionWOs }) => (
+      {/* Crew type sections — only render if the section has work orders */}
+      {sections.filter(s => s.workOrders.length > 0).map(({ crewType, workOrders: sectionWOs }) => (
         <CrewGroup
           key={crewType.id}
           moduleType={crewType.name}
