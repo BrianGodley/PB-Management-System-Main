@@ -1303,7 +1303,7 @@ function CrewGroup({ moduleType, workOrders, requiredEquipFn, jobsMap, crewMap, 
   return (
     <div className="mb-4">
       {/* Section header bar */}
-      <div className="flex items-center gap-3 flex-wrap px-3 py-0.5 rounded-lg mb-2 bg-white border-2 border-green-700">
+      <div className="flex items-center gap-3 flex-wrap px-3 py-0.5 rounded-lg mb-2 bg-blue-50 border-2 border-green-700">
         <h3 className="text-sm font-bold uppercase tracking-widest text-gray-800">{moduleType}</h3>
         {crewWOs.length > 0 && (
           <span className="text-xs font-semibold px-2.5 py-0 rounded-full bg-gray-100 text-gray-600">
