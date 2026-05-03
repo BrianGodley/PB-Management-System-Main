@@ -837,13 +837,24 @@ function ComingSoon({ label }) {
 // ── Job Files Panel ───────────────────────────────────────────────────────────
 function JobFilesPanel({ job }) {
   const { user } = useAuth()
-  const [files,        setFiles]        = useState([])
-  const [filesLoading, setFilesLoading] = useState(false)
-  const [uploading,    setUploading]    = useState(false)
+  const [files,              setFiles]              = useState([])
+  const [filesLoading,       setFilesLoading]       = useState(false)
+  const [uploading,          setUploading]          = useState(false)
+  const [folders,            setFolders]            = useState([])
+  const [templates,          setTemplates]          = useState([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState('')
+  const [applyingTemplate,   setApplyingTemplate]   = useState(false)
 
   useEffect(() => {
-    if (job?.id) fetchFiles(job.id)
-    else setFiles([])
+    supabase.from('job_templates')
+      .select('id, name, auto_trigger, template_folders(*)')
+      .order('name')
+      .then(({ data }) => { if (data) setTemplates(data) })
+  }, [])
+
+  useEffect(() => {
+    if (job?.id) { fetchFiles(job.id); fetchFolders(job.id) }
+    else { setFiles([]); setFolders([]) }
   }, [job?.id])
 
   async function fetchFiles(jobId) {
@@ -860,6 +871,41 @@ function JobFilesPanel({ job }) {
       })))
     }
     setFilesLoading(false)
+  }
+
+  async function fetchFolders(jobId) {
+    const { data } = await supabase
+      .from('job_folders')
+      .select('*')
+      .eq('job_id', jobId)
+      .order('sort_order')
+    if (data) setFolders(data)
+  }
+
+  async function handleApplyTemplate() {
+    if (!selectedTemplateId || !job?.id) return
+    setApplyingTemplate(true)
+    const tmpl = templates.find(t => t.id === selectedTemplateId)
+    const tmplFolders = (tmpl?.template_folders || []).sort((a, b) => a.sort_order - b.sort_order)
+    if (tmplFolders.length) {
+      await supabase.from('job_folders').insert(
+        tmplFolders.map((f, i) => ({
+          job_id:      job.id,
+          folder_name: f.folder_name,
+          template_id: tmpl.id,
+          sort_order:  i,
+        }))
+      )
+      await fetchFolders(job.id)
+    }
+    setSelectedTemplateId('')
+    setApplyingTemplate(false)
+  }
+
+  async function handleRemoveFolder(folderId) {
+    if (!confirm('Remove this folder?')) return
+    await supabase.from('job_folders').delete().eq('id', folderId)
+    setFolders(prev => prev.filter(f => f.id !== folderId))
   }
 
   async function handleUpload(e) {
@@ -926,10 +972,67 @@ function JobFilesPanel({ job }) {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700" />
         </div>
       ) : files.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-          <p className="text-4xl mb-3">📂</p>
-          <p className="text-sm font-medium text-gray-500">No files yet</p>
-          <p className="text-xs mt-1">Upload a file or import from BuilderTrend</p>
+        <div className="space-y-6">
+          {/* Empty files message */}
+          <div className="flex flex-col items-center justify-center py-10 text-gray-400">
+            <p className="text-4xl mb-3">📂</p>
+            <p className="text-sm font-medium text-gray-500">No files yet</p>
+            <p className="text-xs mt-1">Upload a file using the button above</p>
+          </div>
+
+          {/* Template folder setup card */}
+          {templates.length > 0 && (
+            <div className="max-w-sm mx-auto bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-lg">📋</span>
+                <p className="text-sm font-bold text-gray-800">Folder Structure</p>
+              </div>
+              <p className="text-xs text-gray-500 mb-4">Apply a template to set up folders for organizing files on this job.</p>
+
+              {folders.length > 0 ? (
+                <div>
+                  <p className="text-xs font-semibold text-green-700 mb-2">
+                    ✅ {folders.length} folder{folders.length !== 1 ? 's' : ''} set up
+                  </p>
+                  <div className="space-y-1 mb-3">
+                    {folders.map(f => (
+                      <div key={f.id} className="flex items-center justify-between text-xs text-gray-700 bg-gray-50 rounded-lg px-3 py-1.5">
+                        <span>📁 {f.folder_name}</span>
+                        <button
+                          onClick={() => handleRemoveFolder(f.id)}
+                          className="text-red-300 hover:text-red-500 ml-2 text-[10px]"
+                          title="Remove folder"
+                        >✕</button>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-400">Files you upload will be organized into these folders.</p>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <select
+                    value={selectedTemplateId}
+                    onChange={e => setSelectedTemplateId(e.target.value)}
+                    className="input text-sm flex-1"
+                  >
+                    <option value="">Choose a template…</option>
+                    {templates.map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}{t.auto_trigger === 'sold_bid' ? ' (Auto)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={handleApplyTemplate}
+                    disabled={!selectedTemplateId || applyingTemplate}
+                    className="px-3 py-1.5 rounded-lg bg-green-700 text-white text-sm font-medium hover:bg-green-800 disabled:opacity-40 transition-colors whitespace-nowrap"
+                  >
+                    {applyingTemplate ? '…' : 'Apply'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
