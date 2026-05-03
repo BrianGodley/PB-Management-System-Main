@@ -1348,7 +1348,7 @@ function JobChangeOrdersPanel({ job }) {
   const [cos,        setCos]        = useState([])
   const [loading,    setLoading]    = useState(false)
   const [showModal,  setShowModal]  = useState(false)
-  const [coForm,     setCoForm]     = useState({ name: '', type: '' })
+  const [coForm,     setCoForm]     = useState({ name: '' })
   const [coError,    setCoError]    = useState('')
   const [creatingCO, setCreatingCO] = useState(false)
   const [updatingId, setUpdatingId] = useState(null)
@@ -1392,24 +1392,23 @@ function JobChangeOrdersPanel({ job }) {
 
   async function handleCreateCO() {
     if (!coForm.name.trim()) { setCoError('Please enter a name.'); return }
-    if (!coForm.type)         { setCoError('Please select a type.'); return }
     setCoError(''); setCreatingCO(true)
 
     const clientName = job.client_name || job.name || ''
     const { data: est, error } = await supabase
       .from('estimates')
-      .insert({ estimate_name: coForm.name, type: coForm.type, client_name: clientName, status: 'pending' })
+      .insert({ estimate_name: coForm.name, client_name: clientName, status: 'pending' })
       .select().single()
 
     setCreatingCO(false)
     if (error) { alert('Error creating estimate: ' + error.message); return }
 
     setShowModal(false)
-    const { name, type } = coForm
-    setCoForm({ name: '', type: '' })
+    const { name } = coForm
+    setCoForm({ name: '' })
 
     // Open inline estimator (no bid yet — create mode)
-    openEstimator(est.id, null, name, type)
+    openEstimator(est.id, null, name, '')
   }
 
   function handleCoSaved(bid) {
@@ -1477,26 +1476,15 @@ function JobChangeOrdersPanel({ job }) {
               <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-0.5">New Change Order</p>
               <h2 className="text-lg font-bold text-gray-900">{job.name || job.client_name}</h2>
             </div>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Change Order Name <span className="text-red-500">*</span></label>
-                <input autoFocus className="input" placeholder="e.g. Add Patio Extension…"
-                  value={coForm.name} onChange={e => { setCoForm(p => ({ ...p, name: e.target.value })); setCoError('') }}
-                  onKeyDown={e => e.key === 'Enter' && handleCreateCO()} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Type <span className="text-red-500">*</span></label>
-                <select className="input" value={coForm.type} onChange={e => { setCoForm(p => ({ ...p, type: e.target.value })); setCoError('') }}>
-                  <option value="">-- Select Type --</option>
-                  <option>Residential</option>
-                  <option>Commercial</option>
-                  <option>Public Works</option>
-                </select>
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Change Order Name <span className="text-red-500">*</span></label>
+              <input autoFocus className="input" placeholder="e.g. Add Patio Extension…"
+                value={coForm.name} onChange={e => { setCoForm(p => ({ ...p, name: e.target.value })); setCoError('') }}
+                onKeyDown={e => e.key === 'Enter' && handleCreateCO()} />
             </div>
             {coError && <p className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{coError}</p>}
             <div className="flex gap-3 mt-6">
-              <button onClick={() => { setShowModal(false); setCoForm({ name: '', type: '' }); setCoError('') }}
+              <button onClick={() => { setShowModal(false); setCoForm({ name: '' }); setCoError('') }}
                 className="btn-secondary flex-1">Cancel</button>
               <button onClick={handleCreateCO} disabled={creatingCO} className="btn-primary flex-1 disabled:opacity-50">
                 {creatingCO ? 'Creating…' : 'Next →'}

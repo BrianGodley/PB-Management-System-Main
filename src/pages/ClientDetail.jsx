@@ -72,8 +72,6 @@ export default function ClientDetail() {
         .eq('client_name', clientData.name)
         .order('created_at', { ascending: false })
 
-      if (estData) setEstimates(estData)
-
       // Fetch bids (record_type = 'bid' only)
       const { data: bidsData } = await supabase
         .from('bids')
@@ -94,7 +92,8 @@ export default function ClientDetail() {
       if (jobsData) {
         setSoldJobs(jobsData)
 
-        // Fetch COs linked to these jobs
+        // Fetch COs linked to these jobs, then filter CO estimates out of the estimates list
+        let coEstimateIds = new Set()
         if (jobsData.length > 0) {
           const jobIds = jobsData.map(j => j.id)
           const { data: coData } = await supabase
@@ -105,6 +104,7 @@ export default function ClientDetail() {
             .order('date_submitted', { ascending: false })
 
           if (coData) {
+            coEstimateIds = new Set(coData.map(co => co.estimate_id).filter(Boolean))
             const coMap = {}
             coData.forEach(co => {
               if (!coMap[co.linked_job_id]) coMap[co.linked_job_id] = []
@@ -113,6 +113,12 @@ export default function ClientDetail() {
             setJobCOs(coMap)
           }
         }
+
+        // Set estimates excluding any that back a change order
+        if (estData) setEstimates(estData.filter(e => !coEstimateIds.has(e.id)))
+      } else {
+        // No jobs — still set estimates (nothing to exclude)
+        if (estData) setEstimates(estData)
       }
     }
 
