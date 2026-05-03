@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link, useSearchParams, useNavigate } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import ScheduleCalendar from '../components/ScheduleCalendar'
@@ -8,6 +8,7 @@ import TimeClock from '../components/TimeClock'
 import WorkOrders from '../components/WorkOrders'
 import JobComparison from '../components/JobComparison'
 import TemplatesManager from '../components/TemplatesManager'
+import COEstimatePanel  from '../components/COEstimatePanel'
 
 function MoveJobModal({ job, stages, onMove, onClose }) {
   const [selected, setSelected] = useState(job.stage_id || '__none__')
@@ -1344,19 +1345,38 @@ const CO_STATUS_STYLE = {
 }
 
 function JobChangeOrdersPanel({ job }) {
-  const navigate = useNavigate()
-  const [cos,          setCos]          = useState([])
-  const [loading,      setLoading]      = useState(false)
-  const [showModal,    setShowModal]    = useState(false)
-  const [coForm,       setCoForm]       = useState({ name: '', type: '' })
-  const [coError,      setCoError]      = useState('')
-  const [creatingCO,   setCreatingCO]   = useState(false)
-  const [updatingId,   setUpdatingId]   = useState(null)
+  const [cos,        setCos]        = useState([])
+  const [loading,    setLoading]    = useState(false)
+  const [showModal,  setShowModal]  = useState(false)
+  const [coForm,     setCoForm]     = useState({ name: '', type: '' })
+  const [coError,    setCoError]    = useState('')
+  const [creatingCO, setCreatingCO] = useState(false)
+  const [updatingId, setUpdatingId] = useState(null)
+
+  // Inline estimator state
+  const [openEstimateId, setOpenEstimateId] = useState(null)
+  const [openBidId,      setOpenBidId]      = useState(null)
+  const [openCoName,     setOpenCoName]     = useState('')
+  const [openCoType,     setOpenCoType]     = useState('')
 
   useEffect(() => {
     if (job?.id) fetchCOs(job.id)
-    else setCos([])
+    else { setCos([]); closeEstimator() }
   }, [job?.id])
+
+  function closeEstimator() {
+    setOpenEstimateId(null)
+    setOpenBidId(null)
+    setOpenCoName('')
+    setOpenCoType('')
+  }
+
+  function openEstimator(estimateId, bidId, coName, coType) {
+    setOpenEstimateId(estimateId)
+    setOpenBidId(bidId || null)
+    setOpenCoName(coName || '')
+    setOpenCoType(coType || '')
+  }
 
   async function fetchCOs(jobId) {
     setLoading(true)
@@ -1375,7 +1395,6 @@ function JobChangeOrdersPanel({ job }) {
     if (!coForm.type)         { setCoError('Please select a type.'); return }
     setCoError(''); setCreatingCO(true)
 
-    // Create the underlying estimate
     const clientName = job.client_name || job.name || ''
     const { data: est, error } = await supabase
       .from('estimates')
@@ -1386,17 +1405,24 @@ function JobChangeOrdersPanel({ job }) {
     if (error) { alert('Error creating estimate: ' + error.message); return }
 
     setShowModal(false)
+    const { name, type } = coForm
     setCoForm({ name: '', type: '' })
 
-    // Navigate to estimate in CO mode; return_to brings user back to jobs page
-    const params = new URLSearchParams({
-      co:        '1',
-      job_id:    job.id,
-      co_name:   coForm.name,
-      co_type:   coForm.type,
-      return_to: '/jobs',
+    // Open inline estimator (no bid yet — create mode)
+    openEstimator(est.id, null, name, type)
+  }
+
+  function handleCoSaved(bid) {
+    if (!bid) return
+    setCos(prev => {
+      const idx = prev.findIndex(c => c.id === bid.id)
+      if (idx >= 0) {
+        const updated = [...prev]
+        updated[idx] = { ...prev[idx], ...bid }
+        return updated
+      }
+      return [bid, ...prev]
     })
-    navigate(`/estimates/${est.id}?${params.toString()}`)
   }
 
   async function handleStatusChange(id, status) {
@@ -1408,6 +1434,7 @@ function JobChangeOrdersPanel({ job }) {
 
   async function handleDelete(co) {
     if (!confirm(`Delete change order "${co.co_name}"?`)) return
+    if (co.estimate_id) await supabase.from('estimates').delete().eq('id', co.estimate_id)
     await supabase.from('bids').delete().eq('id', co.id)
     setCos(prev => prev.filter(c => c.id !== co.id))
   }
@@ -1421,6 +1448,25 @@ function JobChangeOrdersPanel({ job }) {
     </div>
   )
 
+  // ── Inline estimator view ────────────────────────────────────────────────
+  if (openEstimateId) {
+    return (
+      <div className="p-4 flex flex-col h-full">
+        <COEstimatePanel
+          estimateId={openEstimateId}
+          bidId={openBidId}
+          coName={openCoName}
+          coType={openCoType}
+          jobId={job.id}
+          clientName={job.client_name || job.name || ''}
+          onClose={closeEstimator}
+          onSaved={handleCoSaved}
+        />
+      </div>
+    )
+  }
+
+  // ── CO list view ─────────────────────────────────────────────────────────
   return (
     <div className="p-4">
       {/* New CO modal */}
@@ -1452,8 +1498,7 @@ function JobChangeOrdersPanel({ job }) {
             <div className="flex gap-3 mt-6">
               <button onClick={() => { setShowModal(false); setCoForm({ name: '', type: '' }); setCoError('') }}
                 className="btn-secondary flex-1">Cancel</button>
-              <button onClick={handleCreateCO} disabled={creatingCO}
-                className="btn-primary flex-1 disabled:opacity-50">
+              <button onClick={handleCreateCO} disabled={creatingCO} className="btn-primary flex-1 disabled:opacity-50">
                 {creatingCO ? 'Creating…' : 'Next →'}
               </button>
             </div>
@@ -1495,7 +1540,6 @@ function JobChangeOrdersPanel({ job }) {
                 <th className="text-left px-4 py-3 font-semibold text-gray-700">Change Order</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-700">Type</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-700">Created</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-700">Doc</th>
                 <th className="text-right px-4 py-3 font-semibold text-gray-700">Gross Profit</th>
                 <th className="text-right px-4 py-3 font-semibold text-gray-700">Amount</th>
                 <th className="text-center px-4 py-3 font-semibold text-gray-700">Status</th>
@@ -1509,12 +1553,12 @@ function JobChangeOrdersPanel({ job }) {
                   <tr key={co.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
                     <td className="px-4 py-3">
                       {co.estimate_id ? (
-                        <Link
-                          to={`/estimates/${co.estimate_id}?co=1&job_id=${co.linked_job_id || ''}&co_name=${encodeURIComponent(co.co_name || '')}&co_type=${encodeURIComponent(co.co_type || '')}&return_to=%2Fjobs`}
-                          className="font-semibold text-blue-700 hover:underline"
+                        <button
+                          onClick={() => openEstimator(co.estimate_id, co.id, co.co_name, co.co_type)}
+                          className="font-semibold text-blue-700 hover:underline text-left"
                         >
                           {co.co_name || '—'}
-                        </Link>
+                        </button>
                       ) : (
                         <span className="font-semibold text-gray-800">{co.co_name || '—'}</span>
                       )}
@@ -1522,14 +1566,6 @@ function JobChangeOrdersPanel({ job }) {
                     <td className="px-4 py-3 text-gray-500 text-xs">{co.co_type || '—'}</td>
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
                       {co.date_submitted ? new Date(co.date_submitted).toLocaleDateString() : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {co.estimate_id ? (
-                        <Link to={`/estimates/${co.estimate_id}?co=1&job_id=${co.linked_job_id || ''}&co_name=${encodeURIComponent(co.co_name || '')}&co_type=${encodeURIComponent(co.co_type || '')}&return_to=%2Fjobs`}
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-gray-200 text-gray-400 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
-                          📄
-                        </Link>
-                      ) : <span className="text-gray-300">—</span>}
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap font-semibold text-green-700">
                       {co.gross_profit > 0 ? fmt(co.gross_profit) : <span className="text-gray-300 font-normal">—</span>}
