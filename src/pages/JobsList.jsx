@@ -996,6 +996,49 @@ function ApplyTemplateModal({ job, onClose, onApplied }) {
 }
 
 // ── Job Files Panel ─────────────────────────────────── Documents + Photos tabs
+// ── Folder SVG icon ───────────────────────────────────────────────────────────
+function FolderIcon({ color = '#f59e0b', size = 48 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M4 10C4 8.343 5.343 7 7 7H18.586C19.116 7 19.625 7.211 20 7.586L23.414 11H41C42.657 11 44 12.343 44 14V38C44 39.657 42.657 41 41 41H7C5.343 41 4 39.657 4 38V10Z"
+        fill={color} />
+      <path d="M4 18C4 16.343 5.343 15 7 15H41C42.657 15 44 16.343 44 18V38C44 39.657 42.657 41 41 41H7C5.343 41 4 39.657 4 38V18Z"
+        fill={color === '#f59e0b' ? '#fbbf24' : color === '#60a5fa' ? '#93c5fd' : '#fbbf24'} />
+    </svg>
+  )
+}
+
+// ── File card ─────────────────────────────────────────────────────────────────
+function FileCard({ f, onDelete, fmtSize }) {
+  const isImg = f.file_type?.startsWith('image/')
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm group">
+      {isImg && f.publicUrl ? (
+        <a href={f.publicUrl} target="_blank" rel="noopener noreferrer">
+          <img src={f.publicUrl} alt={f.file_name} className="w-full h-28 object-cover hover:opacity-90 transition-opacity" />
+        </a>
+      ) : (
+        <div className="w-full h-28 bg-gray-50 flex items-center justify-center text-4xl">
+          {f.file_type?.startsWith('video/') ? '🎥' : f.file_type === 'application/pdf' ? '📄' : '📎'}
+        </div>
+      )}
+      <div className="p-2.5">
+        <p className="text-xs font-medium text-gray-800 truncate" title={f.file_name}>{f.file_name}</p>
+        <div className="flex items-center justify-between mt-1">
+          <span className="text-[10px] text-gray-400">{fmtSize(f.file_size)}</span>
+          <div className="flex items-center gap-1.5">
+            {f.publicUrl && (
+              <a href={f.publicUrl} download={f.file_name} className="text-[10px] text-blue-600 hover:text-blue-800 font-medium">⬇</a>
+            )}
+            <button onClick={() => onDelete(f)} className="text-[10px] text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+          </div>
+        </div>
+        {f.source === 'buildertrend' && <span className="text-[9px] text-purple-500 font-medium">BuilderTrend</span>}
+      </div>
+    </div>
+  )
+}
+
 function JobFilesPanel({ job }) {
   const { user } = useAuth()
   const [subTab,        setSubTab]        = useState('documents')
@@ -1007,11 +1050,17 @@ function JobFilesPanel({ job }) {
   const [newFolderName, setNewFolderName] = useState('')
   const [savingFolder,  setSavingFolder]  = useState(false)
   const [showModal,     setShowModal]     = useState(false)
+  // folder navigation: null = root, uuid = inside that folder
+  const [openFolderId,  setOpenFolderId]  = useState(null)
 
   useEffect(() => {
     if (job?.id) { fetchFiles(job.id); fetchFolders(job.id) }
     else { setFiles([]); setFolders([]) }
+    setOpenFolderId(null)
   }, [job?.id])
+
+  // Reset open folder when switching sub-tabs
+  useEffect(() => { setOpenFolderId(null) }, [subTab])
 
   async function fetchFiles(jobId) {
     setFilesLoading(true)
@@ -1037,9 +1086,15 @@ function JobFilesPanel({ job }) {
     if (!error) {
       const isMedia = file.type?.startsWith('image/') || file.type?.startsWith('video/')
       await supabase.from('job_files').insert({
-        job_id: job.id, file_name: file.name, file_type: file.type,
+        job_id: job.id,
+        file_name: file.name,
+        file_type: file.type,
         file_category: isMedia ? 'photo' : 'document',
-        storage_path: path, file_size: file.size, source: 'manual', uploaded_by: user?.id,
+        storage_path: path,
+        file_size: file.size,
+        source: 'manual',
+        uploaded_by: user?.id,
+        folder_id: openFolderId || null,
       })
       fetchFiles(job.id)
     }
@@ -1067,9 +1122,10 @@ function JobFilesPanel({ job }) {
   }
 
   async function handleRemoveFolder(id) {
-    if (!confirm('Remove this folder?')) return
+    if (!confirm('Remove this folder? Files inside will become unorganized.')) return
     await supabase.from('job_folders').delete().eq('id', id)
     setFolders(prev => prev.filter(f => f.id !== id))
+    if (openFolderId === id) setOpenFolderId(null)
   }
 
   function fmtSize(bytes) {
@@ -1079,15 +1135,22 @@ function JobFilesPanel({ job }) {
     return `${(bytes / 1048576).toFixed(1)} MB`
   }
 
-  const isMedia = f => f.file_type?.startsWith('image/') || f.file_type?.startsWith('video/')
+  const isMedia      = f => f.file_type?.startsWith('image/') || f.file_type?.startsWith('video/')
   const docFolders   = folders.filter(f => f.folder_type !== 'photo_video')
   const photoFolders = folders.filter(f => f.folder_type === 'photo_video')
-  const docFiles     = files.filter(f => !isMedia(f))
-  const mediaFiles   = files.filter(f => isMedia(f))
   const activeFolders = subTab === 'documents' ? docFolders : photoFolders
-  const activeFiles   = subTab === 'documents' ? docFiles   : mediaFiles
-  const isEmpty       = !filesLoading && activeFolders.length === 0 && activeFiles.length === 0
   const uploadAccept  = subTab === 'documents' ? '.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip' : 'image/*,video/*'
+  const folderIconColor = subTab === 'documents' ? '#f59e0b' : '#60a5fa'
+
+  // Files scoped to current view
+  const allTabFiles  = files.filter(f => subTab === 'documents' ? !isMedia(f) : isMedia(f))
+  const openFolder   = openFolderId ? activeFolders.find(f => f.id === openFolderId) : null
+  const visibleFiles = openFolderId
+    ? allTabFiles.filter(f => f.folder_id === openFolderId)
+    : allTabFiles.filter(f => !f.folder_id)
+
+  const rootIsEmpty   = !filesLoading && activeFolders.length === 0 && allTabFiles.filter(f => !f.folder_id).length === 0
+  const folderIsEmpty = !filesLoading && visibleFiles.length === 0
 
   if (!job) return (
     <div className="flex flex-col items-center justify-center h-full text-gray-400 py-20">
@@ -1127,20 +1190,42 @@ function JobFilesPanel({ job }) {
         ))}
       </div>
 
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <button
-          onClick={() => { setAddingFolder(a => !a); setNewFolderName('') }}
-          className="text-xs px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors font-medium"
-        >{addingFolder ? '✕ Cancel' : '+ Add Folder'}</button>
-        <label className={`cursor-pointer text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${uploading ? 'bg-gray-200 text-gray-400' : 'bg-green-700 text-white hover:bg-green-800'}`}>
-          {uploading ? 'Uploading…' : `+ Upload ${subTab === 'documents' ? 'Document' : 'Photo / Video'}`}
-          <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} accept={uploadAccept} />
-        </label>
-      </div>
+      {/* Breadcrumb / back nav */}
+      {openFolderId ? (
+        <div className="flex items-center gap-2 mb-4">
+          <button
+            onClick={() => { setOpenFolderId(null); setAddingFolder(false) }}
+            className="flex items-center gap-1.5 text-sm text-green-700 hover:text-green-900 font-medium transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            All Folders
+          </button>
+          <span className="text-gray-300">/</span>
+          <span className="text-sm font-semibold text-gray-800">{openFolder?.folder_name}</span>
+          <button
+            onClick={() => handleRemoveFolder(openFolderId)}
+            className="ml-auto text-xs text-red-400 hover:text-red-600 transition-colors"
+            title="Delete folder"
+          >Delete folder</button>
+        </div>
+      ) : (
+        /* Toolbar — root view only */
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
+          <button
+            onClick={() => { setAddingFolder(a => !a); setNewFolderName('') }}
+            className="text-xs px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors font-medium"
+          >{addingFolder ? '✕ Cancel' : '+ Add Folder'}</button>
+          <label className={`cursor-pointer text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${uploading ? 'bg-gray-200 text-gray-400' : 'bg-green-700 text-white hover:bg-green-800'}`}>
+            {uploading ? 'Uploading…' : `+ Upload ${subTab === 'documents' ? 'Document' : 'Photo / Video'}`}
+            <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} accept={uploadAccept} />
+          </label>
+        </div>
+      )}
 
       {/* Inline add-folder input */}
-      {addingFolder && (
+      {addingFolder && !openFolderId && (
         <div className="flex gap-2 mb-4">
           <input autoFocus type="text" value={newFolderName}
             onChange={e => setNewFolderName(e.target.value)}
@@ -1158,61 +1243,75 @@ function JobFilesPanel({ job }) {
         <div className="flex items-center justify-center py-16">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700" />
         </div>
-      ) : (
+      ) : openFolderId ? (
+        /* ── FOLDER VIEW ─────────────────────────────────────────── */
         <>
-          {/* Folder chips */}
+          {/* Upload toolbar inside folder */}
+          <div className="flex items-center gap-2 mb-4">
+            <label className={`cursor-pointer text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${uploading ? 'bg-gray-200 text-gray-400' : 'bg-green-700 text-white hover:bg-green-800'}`}>
+              {uploading ? 'Uploading…' : `+ Upload ${subTab === 'documents' ? 'Document' : 'Photo / Video'}`}
+              <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} accept={uploadAccept} />
+            </label>
+          </div>
+
+          {folderIsEmpty ? (
+            <div className="flex flex-col items-center py-12 text-gray-400">
+              <div className="mb-3 opacity-40"><FolderIcon color={folderIconColor} size={56} /></div>
+              <p className="text-sm font-medium text-gray-500">This folder is empty</p>
+              <p className="text-xs mt-1 text-center max-w-xs">Upload a file above to add it to this folder.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {visibleFiles.map(f => (
+                <FileCard key={f.id} f={f} onDelete={handleDeleteFile} fmtSize={fmtSize} />
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        /* ── ROOT VIEW ───────────────────────────────────────────── */
+        <>
+          {/* Folder grid */}
           {activeFolders.length > 0 && (
-            <div className="mb-5">
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Folders</p>
-              <div className="flex flex-wrap gap-2">
-                {activeFolders.map(f => (
-                  <div key={f.id} className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-3 py-2 shadow-sm group">
-                    <span className="text-sm">📁</span>
-                    <span className="text-sm text-gray-700 font-medium">{f.folder_name}</span>
-                    <button onClick={() => handleRemoveFolder(f.id)}
-                      className="text-red-300 hover:text-red-500 ml-1 opacity-0 group-hover:opacity-100 transition-opacity text-xs">✕</button>
-                  </div>
+            <div className="mb-6">
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-3">Folders</p>
+              <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                {activeFolders.map(f => {
+                  const folderFileCount = allTabFiles.filter(x => x.folder_id === f.id).length
+                  return (
+                    <button
+                      key={f.id}
+                      onClick={() => { setOpenFolderId(f.id); setAddingFolder(false) }}
+                      className="flex flex-col items-center gap-1.5 p-3 rounded-xl hover:bg-gray-100 transition-colors group relative text-center"
+                      title={f.folder_name}
+                    >
+                      <FolderIcon color={folderIconColor} size={52} />
+                      <span className="text-xs font-medium text-gray-700 leading-tight line-clamp-2 w-full text-center">{f.folder_name}</span>
+                      {folderFileCount > 0 && (
+                        <span className="text-[10px] text-gray-400">{folderFileCount} file{folderFileCount !== 1 ? 's' : ''}</span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Unorganized files at root */}
+          {visibleFiles.length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                {activeFolders.length > 0 ? 'Unorganized Files' : 'Files'}
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {visibleFiles.map(f => (
+                  <FileCard key={f.id} f={f} onDelete={handleDeleteFile} fmtSize={fmtSize} />
                 ))}
               </div>
             </div>
           )}
 
-          {/* Files grid */}
-          {activeFiles.length > 0 ? (
-            <div>
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Files</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                {activeFiles.map(f => {
-                  const isImg = f.file_type?.startsWith('image/')
-                  return (
-                    <div key={f.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm group">
-                      {isImg && f.publicUrl ? (
-                        <a href={f.publicUrl} target="_blank" rel="noopener noreferrer">
-                          <img src={f.publicUrl} alt={f.file_name} className="w-full h-28 object-cover hover:opacity-90 transition-opacity" />
-                        </a>
-                      ) : (
-                        <div className="w-full h-28 bg-gray-50 flex items-center justify-center text-4xl">
-                          {f.file_type?.startsWith('video/') ? '🎥' : f.file_type === 'application/pdf' ? '📄' : '📎'}
-                        </div>
-                      )}
-                      <div className="p-2.5">
-                        <p className="text-xs font-medium text-gray-800 truncate" title={f.file_name}>{f.file_name}</p>
-                        <div className="flex items-center justify-between mt-1">
-                          <span className="text-[10px] text-gray-400">{fmtSize(f.file_size)}</span>
-                          <div className="flex items-center gap-1.5">
-                            {f.publicUrl && <a href={f.publicUrl} download={f.file_name} className="text-[10px] text-blue-600 hover:text-blue-800 font-medium">⬇</a>}
-                            <button onClick={() => handleDeleteFile(f)} className="text-[10px] text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
-                          </div>
-                        </div>
-                        {f.source === 'buildertrend' && <span className="text-[9px] text-purple-500 font-medium">BuilderTrend</span>}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          ) : isEmpty ? (
-            /* Empty state */
+          {rootIsEmpty && (
             <div className="flex flex-col items-center py-12 text-gray-400">
               <p className="text-4xl mb-3">{subTab === 'documents' ? '📄' : '📸'}</p>
               <p className="text-sm font-medium text-gray-500">
@@ -1228,7 +1327,7 @@ function JobFilesPanel({ job }) {
                 <span>📋</span> Apply Template
               </button>
             </div>
-          ) : null}
+          )}
         </>
       )}
     </div>
