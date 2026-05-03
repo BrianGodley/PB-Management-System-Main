@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { generateBidDoc, downloadBidDoc } from '../lib/generateBidDoc'
@@ -87,9 +87,16 @@ const STATUS_BADGE = {
 }
 
 export default function EstimateDetail() {
-  const { id }   = useParams()
-  const navigate = useNavigate()
-  const { user } = useAuth()
+  const { id }         = useParams()
+  const navigate       = useNavigate()
+  const { user }       = useAuth()
+  const [searchParams] = useSearchParams()
+
+  // Change Order mode — set when navigating from NewChangeOrderModal
+  const isCOMode  = searchParams.get('co') === '1'
+  const coJobId   = searchParams.get('job_id')   || null
+  const coName    = searchParams.get('co_name')  || ''
+  const coType    = searchParams.get('co_type')  || ''
   const [estimate, setEstimate]           = useState(null)
   const [projects, setProjects]           = useState([])
   const [loading, setLoading]             = useState(true)
@@ -530,7 +537,7 @@ export default function EstimateDetail() {
       const bidGpmd    = totalMD > 0 ? Math.round(totalGp / totalMD) : 0
       const projNames  = projects.map(p => p.project_name)
 
-      // Save bid record to Supabase
+      // Save bid / change order record to Supabase
       const { data: bid, error: bidErr } = await supabase
         .from('bids')
         .insert({
@@ -545,6 +552,11 @@ export default function EstimateDetail() {
           projects:       projNames,
           notes:          '',
           created_by:     user?.id || null,
+          // Change Order fields
+          record_type:    isCOMode ? 'change_order' : 'bid',
+          linked_job_id:  isCOMode ? coJobId : null,
+          co_name:        isCOMode ? coName  : null,
+          co_type:        isCOMode ? coType  : null,
         })
         .select()
         .single()
@@ -553,8 +565,9 @@ export default function EstimateDetail() {
 
       // Generate and download the Word doc
       const blob     = await generateBidDoc(estimate, projects, clientAddress)
-      const safeName = (estimate.estimate_name || 'Bid').replace(/[^a-z0-9]/gi, '_')
-      downloadBidDoc(blob, `${safeName}_Bid_${new Date().toISOString().split('T')[0]}.docx`)
+      const safeName = (estimate.estimate_name || (isCOMode ? 'ChangeOrder' : 'Bid')).replace(/[^a-z0-9]/gi, '_')
+      const suffix   = isCOMode ? 'CO' : 'Bid'
+      downloadBidDoc(blob, `${safeName}_${suffix}_${new Date().toISOString().split('T')[0]}.docx`)
 
     } catch (err) {
       alert('Error creating bid: ' + err.message)
@@ -753,6 +766,16 @@ export default function EstimateDetail() {
         <span className="text-gray-700 font-medium">{editingName ? nameInput || estimate.estimate_name : estimate.estimate_name}</span>
       </div>
 
+      {/* Change Order mode banner */}
+      {isCOMode && (
+        <div className="flex items-center gap-2 mb-3 px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800">
+          <span className="text-base">📋</span>
+          <span><span className="font-semibold">Change Order:</span> {coName || 'Unnamed'}</span>
+          {coType && <span className="text-blue-500">· {coType}</span>}
+          <span className="ml-auto text-xs text-blue-500">Complete the estimate below, then click Create Change Order</span>
+        </div>
+      )}
+
       {/* Estimate header */}
       <div className="flex items-start justify-between gap-4 mb-5 flex-wrap">
         <div className="flex items-center gap-3 flex-wrap">
@@ -798,13 +821,19 @@ export default function EstimateDetail() {
 
         {/* Status action buttons */}
         <div className="flex gap-2 flex-shrink-0 flex-wrap">
-          {/* Create Bid */}
+          {/* Create Bid / Change Order */}
           <button
             onClick={createBid}
             disabled={creatingBid}
-            className="text-sm px-4 py-2 rounded-lg border border-green-700 text-green-700 font-semibold hover:bg-green-50 transition-colors disabled:opacity-50"
+            className={`text-sm px-4 py-2 rounded-lg font-semibold transition-colors disabled:opacity-50 ${
+              isCOMode
+                ? 'border border-blue-700 text-blue-700 hover:bg-blue-50'
+                : 'border border-green-700 text-green-700 hover:bg-green-50'
+            }`}
           >
-            {creatingBid ? '⏳ Generating...' : '📄 Create Bid'}
+            {creatingBid
+              ? '⏳ Generating...'
+              : isCOMode ? '📋 Create Change Order' : '📄 Create Bid'}
           </button>
 
           <button

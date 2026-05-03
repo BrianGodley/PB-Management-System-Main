@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import NewEstimateModal from '../components/NewEstimateModal'
+import NewChangeOrderModal from '../components/NewChangeOrderModal'
 
 // Match exactly the badge colours used in Bids.jsx
 const BID_STATUS_STYLES = {
@@ -29,6 +30,8 @@ export default function ClientDetail() {
   const [soldJobs,  setSoldJobs]  = useState([])
   const [loading,   setLoading]   = useState(true)
   const [showEstimateModal, setShowEstimateModal] = useState(false)
+  const [showCOModal,       setShowCOModal]       = useState(false)
+  const [changeOrders,      setChangeOrders]      = useState([])
   const [editing,  setEditing]  = useState(false)
   const [saving,   setSaving]   = useState(false)
   const [form,     setForm]     = useState({})
@@ -81,6 +84,15 @@ export default function ClientDetail() {
         .order('date_submitted', { ascending: false })
 
       if (bidsData) setBids(bidsData)
+
+      // Fetch change orders for this client
+      const { data: coData } = await supabase
+        .from('bids')
+        .select('id, co_name, co_type, client_name, status, bid_amount, gross_profit, date_submitted, linked_job_id, estimate_id')
+        .eq('client_name', clientData.name)
+        .eq('record_type', 'change_order')
+        .order('date_submitted', { ascending: false })
+      if (coData) setChangeOrders(coData)
 
       // Fetch jobs (sold/active work)
       const { data: jobsData } = await supabase
@@ -142,6 +154,32 @@ export default function ClientDetail() {
     if (est) {
       setShowEstimateModal(false)
       navigate(`/estimates/${est.id}`)
+    }
+  }
+
+  async function handleCONext(data) {
+    // Create an estimate for this change order, then navigate in CO mode
+    const { data: est, error } = await supabase
+      .from('estimates')
+      .insert({
+        estimate_name: data.name,
+        type:          data.type,
+        client_name:   client.name,
+        client_id:     client.id,
+        status:        'pending',
+      })
+      .select()
+      .single()
+    if (error) { alert(`Error creating change order estimate: ${error.message}`); return }
+    if (est) {
+      setShowCOModal(false)
+      const params = new URLSearchParams({
+        co: '1',
+        job_id:  data.jobId,
+        co_name: data.name,
+        co_type: data.type,
+      })
+      navigate(`/estimates/${est.id}?${params.toString()}`)
     }
   }
 
@@ -417,9 +455,17 @@ export default function ClientDetail() {
           <div>
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-bold text-gray-900 text-lg">Estimates</h2>
-              <button onClick={() => setShowEstimateModal(true)} className="btn-primary text-sm">
-                + New Estimate
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowCOModal(true)}
+                  className="text-sm px-3 py-1.5 rounded-lg border-2 border-blue-600 text-blue-700 font-semibold hover:bg-blue-50 transition-colors"
+                >
+                  + New Change Order
+                </button>
+                <button onClick={() => setShowEstimateModal(true)} className="btn-primary text-sm">
+                  + New Estimate
+                </button>
+              </div>
             </div>
 
             {estimates.length === 0 ? (
@@ -597,9 +643,62 @@ export default function ClientDetail() {
           {/* ── Change Orders ── */}
           <div>
             <h2 className="font-bold text-gray-900 text-lg mb-3">Change Orders</h2>
-            <div className="bg-white rounded-xl border border-gray-200 border-dashed text-center py-8 text-gray-400 text-sm">
-              Change Orders coming soon.
-            </div>
+            {changeOrders.length === 0 ? (
+              <div className="card text-center py-6 text-gray-400 text-sm">
+                No change orders yet for this client.
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+                <table className="w-full text-sm min-w-[500px]">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      <th className="px-4 py-2.5 text-left">Change Order</th>
+                      <th className="px-3 py-2.5 text-left">Type</th>
+                      <th className="px-3 py-2.5 text-right">Date</th>
+                      <th className="px-3 py-2.5 text-right">Gross Profit</th>
+                      <th className="px-3 py-2.5 text-right">Amount</th>
+                      <th className="px-3 py-2.5 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {changeOrders.map(co => {
+                      const status = co.status || 'pending'
+                      return (
+                        <tr key={co.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3">
+                            {co.estimate_id ? (
+                              <Link
+                                to={`/estimates/${co.estimate_id}?co=1&job_id=${co.linked_job_id || ''}&co_name=${encodeURIComponent(co.co_name || '')}&co_type=${encodeURIComponent(co.co_type || '')}`}
+                                className="font-semibold text-blue-700 hover:underline"
+                              >
+                                {co.co_name || co.client_name}
+                              </Link>
+                            ) : (
+                              <p className="font-semibold text-gray-800">{co.co_name || co.client_name}</p>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 text-gray-500 text-xs">{co.co_type || '—'}</td>
+                          <td className="px-3 py-3 text-right text-gray-500 text-xs whitespace-nowrap">
+                            {co.date_submitted ? new Date(co.date_submitted).toLocaleDateString() : '—'}
+                          </td>
+                          <td className="px-3 py-3 text-right font-medium text-green-700">
+                            {co.gross_profit > 0 ? `$${Math.round(co.gross_profit).toLocaleString()}` : '—'}
+                          </td>
+                          <td className="px-3 py-3 text-right font-bold text-gray-900 whitespace-nowrap">
+                            ${parseFloat(co.bid_amount || 0).toLocaleString()}
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${BID_STATUS_STYLES[status] || BID_STATUS_STYLES.pending}`}>
+                              {status.charAt(0).toUpperCase() + status.slice(1)}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
         </div>
@@ -610,6 +709,15 @@ export default function ClientDetail() {
           client={client}
           onClose={() => setShowEstimateModal(false)}
           onNext={handleEstimateNext}
+        />
+      )}
+
+      {/* New Change Order modal */}
+      {showCOModal && (
+        <NewChangeOrderModal
+          client={client}
+          onClose={() => setShowCOModal(false)}
+          onNext={handleCONext}
         />
       )}
     </div>
