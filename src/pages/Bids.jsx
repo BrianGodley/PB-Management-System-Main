@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { generateBidDoc, downloadBidDoc } from '../lib/generateBidDoc'
+import BidDocViewerModal from '../components/BidDocViewerModal'
 
 const BID_STATUSES = ['pending', 'presented', 'sold', 'lost']
 
@@ -40,6 +41,7 @@ export default function Bids() {
   const [filter,        setFilter]        = useState('all')
   const [search,        setSearch]        = useState('')
   const [updatingId,    setUpdatingId]    = useState(null)
+  const [viewingBid, setViewingBid]         = useState(null)
   const [downloadingId, setDownloadingId] = useState(null)
 
   // Sold modal state
@@ -549,12 +551,12 @@ export default function Bids() {
                     </td>
                     <td className="px-4 py-3 text-center">
                       <button
-                        onClick={() => downloadBid(bid)}
-                        disabled={downloadingId === bid.id || !bid.estimate_id}
-                        title={bid.estimate_id ? 'Download bid doc' : 'No linked estimate'}
+                        onClick={() => setViewingBid(bid)}
+                        disabled={!bid.estimate_id}
+                        title={bid.estimate_id ? 'View bid doc' : 'No linked estimate'}
                         className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-gray-200 text-gray-400 hover:border-green-400 hover:text-green-600 hover:bg-green-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                       >
-                        {downloadingId === bid.id ? <span className="animate-spin text-xs">⟳</span> : <span className="text-base">📄</span>}
+                        <span className="text-base">📄</span>
                       </button>
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap font-semibold text-green-700">
@@ -588,6 +590,13 @@ export default function Bids() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {viewingBid && (
+        <BidDocViewerModal
+          bid={viewingBid}
+          onClose={() => setViewingBid(null)}
+        />
       )}
     </div>
   )

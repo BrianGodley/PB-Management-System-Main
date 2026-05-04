@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import NewEstimateModal from '../components/NewEstimateModal'
+import BidDocViewerModal from '../components/BidDocViewerModal'
 
 // Match exactly the badge colours used in Bids.jsx
 const BID_STATUS_STYLES = {
@@ -30,6 +31,7 @@ export default function ClientDetail() {
   const [jobCOs,    setJobCOs]    = useState({}) // map: job_id -> CO[]
   const [loading,   setLoading]   = useState(true)
   const [showEstimateModal, setShowEstimateModal] = useState(false)
+  const [viewingBid,        setViewingBid]        = useState(null)
   const [editing,  setEditing]  = useState(false)
   const [saving,   setSaving]   = useState(false)
   const [form,     setForm]     = useState({})
@@ -538,6 +540,7 @@ export default function ClientDetail() {
                   <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
                     <th className="px-4 py-2 text-left">Bid</th>
                     <th className="px-3 py-2 text-right">Date</th>
+                    <th className="px-3 py-2 text-center">Bid Doc</th>
                     <th className="px-3 py-2 text-right">Gross Profit</th>
                     <th className="px-3 py-2 text-right">Bid Amount</th>
                     <th className="px-3 py-2 text-center">Status</th>
@@ -563,6 +566,16 @@ export default function ClientDetail() {
                         </td>
                         <td className="px-3 py-1.5 text-right text-gray-500 text-xs whitespace-nowrap">
                           {bid.date_submitted ? new Date(bid.date_submitted).toLocaleDateString() : '—'}
+                        </td>
+                        <td className="px-3 py-1.5 text-center">
+                          <button
+                            onClick={() => setViewingBid(bid)}
+                            disabled={!bid.estimate_id}
+                            title={bid.estimate_id ? 'View bid doc' : 'No linked estimate'}
+                            className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-gray-200 text-gray-400 hover:border-green-400 hover:text-green-600 hover:bg-green-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            <span className="text-sm">📄</span>
+                          </button>
                         </td>
                         <td className="px-3 py-1.5 text-right font-medium text-green-700">
                           {bid.gross_profit > 0 ? `$${Math.round(bid.gross_profit).toLocaleString()}` : '—'}
@@ -722,6 +735,14 @@ export default function ClientDetail() {
           client={client}
           onClose={() => setShowEstimateModal(false)}
           onNext={handleEstimateNext}
+        />
+      )}
+
+      {/* Bid Doc viewer modal */}
+      {viewingBid && (
+        <BidDocViewerModal
+          bid={viewingBid}
+          onClose={() => setViewingBid(null)}
         />
       )}
     </div>
