@@ -411,6 +411,14 @@ export default function EmployeeDetail() {
   // ── Profile save ──────────────────────────────────────────────────────────
   async function handleProfileSave() {
     setSaving(true)
+
+    // Detect whether the email is changing on this save — if it is and the
+    // employee has a linked auth account, we'll need to propagate the new
+    // address to auth.users + profiles so password reset uses the new email.
+    const oldEmail = (employee?.email || '').trim().toLowerCase()
+    const newEmail = (draft.email   || '').trim().toLowerCase()
+    const emailChanged = newEmail && newEmail !== oldEmail
+
     const { error: err } = await supabase.from('employees').update({
       ...draft,
       pay_rate:   draft.pay_rate   ? parseFloat(draft.pay_rate)   : null,
@@ -418,6 +426,31 @@ export default function EmployeeDetail() {
       updated_at: new Date().toISOString(),
     }).eq('id', id)
     if (err) { setSaving(false); alert(err.message); return }
+
+    // Sync the email into auth.users + profiles via the admin RPC so
+    // password reset, username login, and Supabase Auth all use the new
+    // address (employees.email alone isn't enough — Supabase Auth has its
+    // own copy of the email and that's what receives the reset link).
+    if (emailChanged && linkedProfile?.id) {
+      const { data: syncResult, error: syncErr } = await supabase.rpc(
+        'admin_sync_employee_email',
+        { p_employee_id: id, p_new_email: newEmail }
+      )
+      const status = syncErr ? syncErr.message : syncResult
+      if (status !== 'ok') {
+        const friendly = ({
+          forbidden:            'You need admin access to change another user\'s login email.',
+          invalid_email:        'The new email is empty or invalid.',
+          no_linked_account:    'No auth account is linked to this employee — login email not changed.',
+          email_already_in_use: 'That email is already used by another account.',
+        })[status] || `Login email sync failed: ${status}`
+        alert(
+          'Profile saved, but the LOGIN email could not be updated:\n\n' +
+          friendly +
+          '\n\nPassword reset will continue to use the previous address until this is resolved.'
+        )
+      }
+    }
 
     // Sync preferred_language to the linked auth profile so the UI updates
     if (linkedProfile?.id && draft.preferred_language) {
