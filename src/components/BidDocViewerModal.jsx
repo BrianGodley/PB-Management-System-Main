@@ -26,8 +26,31 @@ import { useEffect, useRef, useState } from 'react'
 import * as mammoth from 'mammoth'
 import { supabase } from '../lib/supabase'
 import { generateBidDoc } from '../lib/generateBidDoc'
+import { LOGO_B64 } from '../lib/logoBase64'
 
 const FG = '#3A5038'
+
+// HTML version of the letterhead used in the .docx (logo left, company info
+// right). The .docx puts this in a Word Header that repeats on every page;
+// mammoth strips Word headers during conversion, so for the modal/preview/
+// download we render it once at the top of the body. Inline styles + base64
+// logo so the saved HTML is self-contained and the downloaded .doc renders
+// the same way without external assets.
+const LETTERHEAD_HTML =
+  '<table style="width:100%;border-collapse:collapse;margin:0 0 12px 0;border:none;" cellpadding="0" cellspacing="0" border="0">' +
+    '<tr>' +
+      '<td style="width:30%;vertical-align:middle;border:none;padding:0;">' +
+        '<img src="data:image/png;base64,' + LOGO_B64 + '" alt="Picture Build" style="height:50px;width:auto;display:block;" />' +
+      '</td>' +
+      '<td style="width:70%;vertical-align:middle;text-align:right;border:none;padding:0;font-family:Calibri,Arial,sans-serif;font-size:9pt;color:#333;line-height:1.4;">' +
+        '12410 Foothill Blvd Unit U &nbsp; Sylmar, CA 91342<br/>' +
+        '(818) 751-2690 &nbsp;&nbsp; www.picturebuild.com<br/>' +
+        "CA Contractor's License &nbsp; B, C-27,8,53: 990772" +
+      '</td>' +
+    '</tr>' +
+  '</table>' +
+  '<hr style="border:none;border-top:1px solid #d0d0d0;margin:0 0 16px 0;" />'
+
 
 export default function BidDocViewerModal({ bid, onClose }) {
   const editorRef = useRef(null)
@@ -100,7 +123,8 @@ export default function BidDocViewerModal({ bid, onClose }) {
     const blob = await generateBidDoc(est, projs || [], bidLite.job_address || '')
     const ab   = await blob.arrayBuffer()
     const res  = await mammoth.convertToHtml({ arrayBuffer: ab })
-    return res.value || '<p class="text-gray-400">Document is empty.</p>'
+    const body = res.value || '<p class="text-gray-400">Document is empty.</p>'
+    return LETTERHEAD_HTML + body
   }
 
   // -- Editing -----------------------------------------------------------
