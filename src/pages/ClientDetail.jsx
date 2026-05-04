@@ -114,11 +114,22 @@ export default function ClientDetail() {
           }
         }
 
-        // Set estimates excluding any that back a change order
-        if (estData) setEstimates(estData.filter(e => !coEstimateIds.has(e.id)))
+        // Set estimates excluding any that back a change order, and any
+        // blank / orphaned rows (no name) that can be left behind by partial
+        // creation flows or interrupted deletes — those have no meaningful
+        // display and shouldn't show up in the count or table.
+        if (estData) setEstimates(
+          estData.filter(e =>
+            !coEstimateIds.has(e.id) &&
+            (e.estimate_name || '').trim() !== ''
+          )
+        )
       } else {
-        // No jobs — still set estimates (nothing to exclude)
-        if (estData) setEstimates(estData)
+        // No jobs — still set estimates (nothing to exclude), but still drop
+        // blank / orphaned rows for the same reason as above.
+        if (estData) setEstimates(
+          estData.filter(e => (e.estimate_name || '').trim() !== '')
+        )
       }
     }
 
