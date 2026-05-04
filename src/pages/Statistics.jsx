@@ -463,7 +463,7 @@ function TargetLinesSection({ targetLines, setTargetLines, tracking }) {
 }
 
 // ── BasicStatForm ─────────────────────────────────────────────────────────────
-function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete, targetSource }) {
+function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete, targetSource, onOpenShares }) {
   const { user } = useAuth()
 
   const [form, setForm] = useState({
@@ -807,6 +807,16 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete, targe
 
         {/* Footer */}
         <div className="flex justify-end gap-3 px-6 py-3 border-t border-gray-100 bg-gray-50 flex-shrink-0">
+          {initialData?.id && onOpenShares && (
+            <button
+              type="button"
+              onClick={() => onOpenShares(initialData.id, initialData.name)}
+              className="px-4 py-2 rounded-lg text-sm text-purple-700 hover:bg-purple-50 border border-purple-200 font-medium"
+              title="Manage who else can view or edit this statistic"
+            >
+              🔒 Shared Permissions
+            </button>
+          )}
           <button onClick={onClose} className="px-5 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 font-medium">
             Cancel
           </button>
@@ -1730,7 +1740,7 @@ function MultipleEntryView({ stats, weekEndingDay }) {
 }
 
 // ── EquationStatForm ──────────────────────────────────────────────────────────
-function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, allStats }) {
+function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, allStats, onOpenShares }) {
   const { user } = useAuth()
 
   const [form, setForm] = useState({
@@ -2188,6 +2198,13 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
             )}
           </div>
           <div className="flex gap-2">
+            {initialData?.id && onOpenShares && (
+              <button type="button" onClick={() => onOpenShares(initialData.id, initialData.name)}
+                className="px-4 py-2 text-sm rounded-lg border border-purple-200 text-purple-700 hover:bg-purple-50 font-medium"
+                title="Manage who else can view or edit this statistic">
+                🔒 Shared Permissions
+              </button>
+            )}
             <button onClick={onClose}
               className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 font-medium">
               Cancel
@@ -2205,7 +2222,7 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
 }
 
 // ── OverlayStatForm ───────────────────────────────────────────────────────────
-function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, allStats }) {
+function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, allStats, onOpenShares }) {
   const { user } = useAuth()
   const MAX_PARTS = 3
 
@@ -2622,6 +2639,13 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
             )}
           </div>
           <div className="flex gap-2">
+            {initialData?.id && onOpenShares && (
+              <button type="button" onClick={() => onOpenShares(initialData.id, initialData.name)}
+                className="px-4 py-2 text-sm rounded-lg border border-purple-200 text-purple-700 hover:bg-purple-50 font-medium"
+                title="Manage who else can view or edit this statistic">
+                🔒 Shared Permissions
+              </button>
+            )}
             <button onClick={onClose}
               className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 font-medium">
               Cancel
@@ -2704,7 +2728,7 @@ function aggregateValues(sourceValues, outputTracking, method) {
   return result.sort((a, b) => a.period_date.localeCompare(b.period_date))
 }
 
-function SecondaryStatForm({ initialData, profiles, allStats, onSave, onClose, onDelete }) {
+function SecondaryStatForm({ initialData, profiles, allStats, onSave, onClose, onDelete, onOpenShares }) {
   const { user } = useAuth()
 
   // Eligible source stats: basic stats only (not secondary/equation/overlay/target)
@@ -2942,6 +2966,13 @@ function SecondaryStatForm({ initialData, profiles, allStats, onSave, onClose, o
               {deleting ? 'Deleting…' : 'Confirm Delete'}
             </button>
           )}
+          {initialData?.id && onOpenShares && (
+            <button onClick={() => onOpenShares(initialData.id, initialData.name)}
+              className="px-4 py-2.5 border border-purple-200 text-purple-700 text-sm rounded-xl hover:bg-purple-50 transition-colors"
+              title="Manage who else can view or edit this statistic">
+              🔒 Shared Permissions
+            </button>
+          )}
           <button onClick={onClose}
             className="px-4 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50 transition-colors">
             Cancel
@@ -3145,7 +3176,7 @@ const AUTO_SOURCE_MAP = Object.fromEntries(
 )
 
 // ── AutoStatForm ──────────────────────────────────────────────────────────────
-function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete }) {
+function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete, onOpenShares }) {
   const { user } = useAuth()
   const isEdit = !!initialData?.id
 
@@ -3361,6 +3392,13 @@ function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete }) {
             <button onClick={handleDelete} disabled={deleting}
               className="px-4 py-2.5 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 disabled:opacity-50 transition-colors">
               {deleting ? 'Deleting…' : 'Confirm Delete'}
+            </button>
+          )}
+          {initialData?.id && onOpenShares && (
+            <button onClick={() => onOpenShares(initialData.id, initialData.name)}
+              className="px-4 py-2.5 border border-purple-200 text-purple-700 text-sm rounded-xl hover:bg-purple-50 transition-colors"
+              title="Manage who else can view or edit this statistic">
+              🔒 Shared Permissions
             </button>
           )}
           <button onClick={onClose}
@@ -5665,6 +5703,11 @@ export default function Statistics() {
   const [openFolder,     setOpenFolder]     = useState('all')  // 'all'|'archived'
   const [showShares,     setShowShares]     = useState(false)
   const [userShares,     setUserShares]     = useState({}) // statId -> 'view'|'edit' for the current user
+  // When the Shared Permissions button is clicked from inside a stat-edit
+  // modal, we capture which stat the modal is for so StatSharesModal
+  // doesn't have to rely on selectedStat (the user might be editing a
+  // stat they don't currently have selected on the chart).
+  const [sharesTarget,   setSharesTarget]   = useState(null) // { id, name } or null
   const [search,         setSearch]         = useState('')
   const [showN,          setShowN]          = useState(25)
 
@@ -6572,6 +6615,11 @@ export default function Statistics() {
     }
   }
 
+  const openShares = (statId, statName) => {
+    setSharesTarget({ id: statId, name: statName })
+    setShowShares(true)
+  }
+
   const handleEditStat = () => {
     if (!selectedStat) return
     setEditingData(selectedStat)
@@ -7393,6 +7441,7 @@ export default function Statistics() {
           onDelete={handleDeleteStat}
           onClose={() => { setShowBasicForm(false); setEditingData(null); setTargetSourceStat(null) }}
           targetSource={targetSourceStat}
+          onOpenShares={openShares}
         />
       )}
 
@@ -7404,6 +7453,7 @@ export default function Statistics() {
           onSave={handleSaveForm}
           onDelete={handleDeleteStat}
           onClose={() => { setShowEquationForm(false); setEditingData(null) }}
+          onOpenShares={openShares}
         />
       )}
 
@@ -7415,6 +7465,7 @@ export default function Statistics() {
           onSave={handleSaveForm}
           onDelete={handleDeleteStat}
           onClose={() => { setShowOverlayForm(false); setEditingData(null) }}
+          onOpenShares={openShares}
         />
       )}
 
@@ -7426,6 +7477,7 @@ export default function Statistics() {
           onSave={handleSaveForm}
           onDelete={handleDeleteStat}
           onClose={() => { setShowSecondaryForm(false); setEditingData(null) }}
+          onOpenShares={openShares}
         />
       )}
 
@@ -7436,6 +7488,7 @@ export default function Statistics() {
           onSave={handleSaveForm}
           onDelete={handleDeleteStat}
           onClose={() => { setShowAutoForm(false); setEditingData(null) }}
+          onOpenShares={openShares}
         />
       )}
 
@@ -7609,13 +7662,14 @@ export default function Statistics() {
           </div>
         </div>
       )}
-    {/* Shared Permissions modal */}
-    {showShares && selectedStat && (
+    {/* Shared Permissions modal — sharesTarget wins (set by stat-edit
+       modal buttons), falls back to selectedStat (page-header button). */}
+    {showShares && (sharesTarget || selectedStat) && (
       <StatSharesModal
-        statId={selectedStat.id}
-        statName={selectedStat.name}
-        ownerUserId={selectedStat.owner_user_id}
-        onClose={() => setShowShares(false)}
+        statId={(sharesTarget || selectedStat).id}
+        statName={(sharesTarget || selectedStat).name}
+        ownerUserId={(sharesTarget || selectedStat).owner_user_id || user?.id}
+        onClose={() => { setShowShares(false); setSharesTarget(null) }}
       />
     )}
     </div>
