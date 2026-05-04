@@ -7,6 +7,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Customized
 } from 'recharts'
+import StatSharesModal from '../components/StatSharesModal'
 
 const FG = '#3A5038'
 const OVERLAY_COLORS = ['#3A5038', '#2563EB', '#DC2626'] // green, blue, red — one per stat slot
@@ -5661,7 +5662,9 @@ export default function Statistics() {
   const [toDate,         setToDate]         = useState(today())
   const [autoMin,        setAutoMin]        = useState(true)
   const [autoMax,        setAutoMax]        = useState(true)
-  const [openFolder,     setOpenFolder]     = useState('my')   // 'my'|'shared'|'public'
+  const [openFolder,     setOpenFolder]     = useState('all')  // 'all'|'archived'
+  const [showShares,     setShowShares]     = useState(false)
+  const [userShares,     setUserShares]     = useState({}) // statId -> 'view'|'edit' for the current user
   const [search,         setSearch]         = useState('')
   const [showN,          setShowN]          = useState(25)
 
@@ -5713,7 +5716,7 @@ export default function Statistics() {
     const found = stats.find(s => s.name === pendingSelectName.current)
     console.log('[Statistics] pendingSelect check — looking for:', pendingSelectName.current, 'found:', found, 'in', stats.map(s=>s.name))
     if (found) {
-      setOpenFolder('my')
+      setOpenFolder('all')
       selectStat(found.id)
       pendingSelectName.current = null
     }
@@ -6220,22 +6223,41 @@ export default function Statistics() {
     setTimeout(() => setQuickSaveMsg(''), 3000)
   }
 
-  // Folder groupings — archived stats are segregated into their own folder
-  const myStats       = useMemo(() => stats.filter(s => !s.archived && s.owner_user_id === user?.id),              [stats, user])
-  const sharedStats   = useMemo(() => stats.filter(s => !s.archived && s.owner_user_id !== user?.id && !s.is_public), [stats, user])
-  const publicStats   = useMemo(() => stats.filter(s => !s.archived && s.is_public),                               [stats])
-  const archivedStats = useMemo(() => stats.filter(s => s.archived),                                               [stats])
+  // Fetch this user's statistic_shares rows so we can render the Shared/Owner
+  // badges and (in phase 5) drive accessibility once RLS is tightened.
+  useEffect(() => {
+    if (!user?.id) return
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase
+        .from('statistic_shares')
+        .select('statistic_id, permission')
+        .eq('user_id', user.id)
+      if (cancelled) return
+      const map = {}
+      for (const r of (data || [])) map[r.statistic_id] = r.permission
+      setUserShares(map)
+    })()
+    return () => { cancelled = true }
+  }, [user?.id])
 
-  // Flat searchable list based on open folder
+  // Stat groupings:
+  //   • myStats        = stats this user owns
+  //   • sharedStats    = stats explicitly shared with this user (statistic_shares)
+  //   • accessibleStats = my + shared (the single flat list shown in the sidebar)
+  //   • archivedStats  = archived stats (regardless of ownership) — own folder
+  const myStats         = useMemo(() => stats.filter(s => !s.archived && s.owner_user_id === user?.id), [stats, user])
+  const sharedStats     = useMemo(() => stats.filter(s => !s.archived && s.owner_user_id !== user?.id && userShares[s.id]), [stats, user, userShares])
+  const accessibleStats = useMemo(() => [...myStats, ...sharedStats], [myStats, sharedStats])
+  const archivedStats   = useMemo(() => stats.filter(s => s.archived), [stats])
+
+  // Flat searchable list — folders collapsed to All vs Archived
   const folderStats = useMemo(() => {
-    const base = openFolder === 'my'       ? myStats
-               : openFolder === 'shared'   ? sharedStats
-               : openFolder === 'archived' ? archivedStats
-               :                             publicStats
+    const base = openFolder === 'archived' ? archivedStats : accessibleStats
     if (!search.trim()) return base
     const q = search.toLowerCase()
     return base.filter(s => s.name.toLowerCase().includes(q))
-  }, [openFolder, myStats, sharedStats, publicStats, archivedStats, search])
+  }, [openFolder, accessibleStats, archivedStats, search])
 
   // Period hierarchy — used to determine valid aggregation options
   const PERIOD_ORDER = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly']
@@ -6708,6 +6730,15 @@ export default function Statistics() {
             >
               Edit Statistic
             </button>
+            {selectedStat?.owner_user_id === user?.id && (
+              <button
+                onClick={() => setShowShares(true)}
+                className="text-sm font-medium text-purple-600 hover:text-purple-800 underline underline-offset-2 transition-colors flex-shrink-0"
+                title="Manage who else can view or edit this statistic"
+              >
+                🔒 Shared Permissions
+              </button>
+            )}
             <button
               onClick={() => setShowNotesModal(true)}
               className="text-sm font-medium text-amber-600 hover:text-amber-800 underline underline-offset-2 transition-colors flex-shrink-0 flex items-center gap-1"
@@ -6742,7 +6773,7 @@ export default function Statistics() {
           user={user}
           onImported={async () => {
             await fetchAll()          // refresh the stats list
-            setOpenFolder('my')       // open My Stats folder
+            setOpenFolder('all')       // open My Stats folder
             setViewMode('graphs')     // switch to Graphs so stats are visible
           }}
         />
@@ -6780,9 +6811,8 @@ export default function Statistics() {
 
           {/* Folder rows */}
           <div className="px-2 py-2 border-b border-gray-100 space-y-0.5">
-            <FolderRow id="public"   label="Public Stats"   count={publicStats.length} />
-            <FolderRow id="shared"   label="Shared Stats"   count={sharedStats.length} />
-            <FolderRow id="my"       label="My Stats"       count={myStats.length} />
+            <FolderRow id="all"      label="All Stats"      count={accessibleStats.length} />
+            <FolderRow id="archived" label="Archived"       count={archivedStats.length} />
           </div>
 
           {/* Flat stat list */}
@@ -6818,6 +6848,13 @@ export default function Statistics() {
                     {s.stat_category === 'overlay' && (
                       <span className="text-xs bg-indigo-100 text-indigo-700 px-1 py-0.5 rounded font-semibold flex-shrink-0">⊕</span>
                     )}
+                    {s.owner_user_id === user?.id ? (
+                      <span className="text-[10px] bg-green-100 text-green-700 px-1 py-0.5 rounded font-semibold flex-shrink-0" title="You own this stat">Owner</span>
+                    ) : userShares[s.id] ? (
+                      <span className="text-[10px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-semibold flex-shrink-0" title={`Shared with you (${userShares[s.id]})`}>
+                        Shared{userShares[s.id] === 'edit' ? ' ✏️' : ''}
+                      </span>
+                    ) : null}
                   </div>
                   <div className="text-xs text-gray-400 mt-0.5 capitalize">{s.tracking} · {s.stat_type}</div>
                 </div>
@@ -7572,6 +7609,15 @@ export default function Statistics() {
           </div>
         </div>
       )}
+    {/* Shared Permissions modal */}
+    {showShares && selectedStat && (
+      <StatSharesModal
+        statId={selectedStat.id}
+        statName={selectedStat.name}
+        ownerUserId={selectedStat.owner_user_id}
+        onClose={() => setShowShares(false)}
+      />
+    )}
     </div>
   )
 }
