@@ -5957,12 +5957,16 @@ export default function Statistics() {
       }
     }
 
-    // Compute result: only periods where ALL components have a value
-    const firstNumId = parts[0]?.stat_id ? Number(parts[0].stat_id) : null
-    if (!firstNumId || !compMaps[firstNumId]) return new Map()
+    // Compute result: collect union of all periods from all components, then intersect
+    const allPeriods = new Set()
+    for (const id of compIds) {
+      for (const [period] of (compMaps[id] || new Map())) {
+        allPeriods.add(period)
+      }
+    }
 
     const result = new Map()
-    for (const [period] of compMaps[firstNumId]) {
+    for (const period of [...allPeriods].sort()) {
       const allPresent = compIds.every(id => compMaps[id]?.has(period))
       if (!allPresent) continue
 
