@@ -1782,18 +1782,21 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
     return visited
   }
 
-  // Stats available as equation operands — same tracking period, not self, no circular deps
-  const availableStats = (allStats || []).filter(s => {
-    if (s.archived) return false
+  // Shared eligibility check (excluding archived flag)
+  function isEligible(s) {
     if (s.tracking !== form.tracking) return false
     if (isEdit && s.id === initialData?.id) return false
-    // Prevent circular reference: skip equation stats whose dep tree includes this stat
     if (isEdit && s.stat_category === 'equation') {
       const deps = collectEquationDeps(s.id, allStats)
       if (deps.has(initialData?.id)) return false
     }
     return true
-  })
+  }
+
+  // Active stats available as equation operands
+  const availableStats = (allStats || []).filter(s => !s.archived && isEligible(s))
+  // Archived stats — still usable for historical reference in equations
+  const archivedStats  = (allStats || []).filter(s =>  s.archived && isEligible(s))
 
   function addPart() {
     setParts(prev => [...prev, { stat_id: '', operator: '+' }])
@@ -1931,8 +1934,8 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
             </div>
             <p className="text-xs text-gray-400 mt-1.5">
               Only <span className="font-semibold capitalize">{form.tracking}</span> statistics will be available to use in the equation
-              {availableStats.length > 0
-                ? ` — ${availableStats.length} available.`
+              {(availableStats.length + archivedStats.length) > 0
+                ? ` — ${availableStats.length} active${archivedStats.length > 0 ? `, ${archivedStats.length} archived` : ''}.`
                 : ' — none found for this period yet.'}
             </p>
           </div>
@@ -1964,16 +1967,31 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
                     value={part.stat_id}
                     onChange={e => updatePart(idx, 'stat_id', e.target.value)}
                     className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-600"
-                    disabled={availableStats.length === 0}
+                    disabled={availableStats.length === 0 && archivedStats.length === 0}
                   >
                     <option value="">
-                      {availableStats.length === 0 ? `— no ${form.tracking} stats available —` : '— select statistic —'}
+                      {availableStats.length === 0 && archivedStats.length === 0
+                        ? `— no ${form.tracking} stats available —`
+                        : '— select statistic —'}
                     </option>
-                    {availableStats.map(s => (
-                      <option key={s.id} value={s.id}>
-                        {s.stat_category === 'equation' ? `∑ ${s.name}` : s.name}
-                      </option>
-                    ))}
+                    {availableStats.length > 0 && (
+                      <optgroup label="Active Stats">
+                        {availableStats.map(s => (
+                          <option key={s.id} value={s.id}>
+                            {s.stat_category === 'equation' ? `∑ ${s.name}` : s.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {archivedStats.length > 0 && (
+                      <optgroup label="Archived Stats (Historical Reference)">
+                        {archivedStats.map(s => (
+                          <option key={s.id} value={s.id}>
+                            {s.stat_category === 'equation' ? `∑ ${s.name} [archived]` : `${s.name} [archived]`}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                   {parts.length > 1 && (
                     <button
