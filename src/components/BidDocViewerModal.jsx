@@ -13,8 +13,10 @@
 //      reopen jumps straight to the saved version.
 //   4. Regenerate replaces the current content with a fresh template
 //      pulled from the current estimate (after a confirm).
-//   5. Download converts the current HTML to a .docx file via
-//      html-docx-js so the downloaded file matches what the user sees.
+//   5. Print / Save PDF opens the current HTML in a new window with
+//      print-friendly CSS and triggers the browser's print dialog. The
+//      browser exposes "Save as PDF" as a destination there, so the same
+//      action covers physical printing and PDF export with no extra deps.
 //
 // Usage:
 //   <BidDocViewerModal bid={bid} onClose={() => setViewingBid(null)} />
@@ -40,7 +42,7 @@ const LETTERHEAD_HTML =
   '<table style="width:100%;border-collapse:collapse;margin:0 0 12px 0;border:none;" cellpadding="0" cellspacing="0" border="0">' +
     '<tr>' +
       '<td style="width:30%;vertical-align:middle;border:none;padding:0;">' +
-        '<img src="data:image/png;base64,' + LOGO_B64 + '" alt="Picture Build" style="height:50px;width:auto;display:block;" />' +
+        '<img src="data:image/png;base64,' + LOGO_B64 + '" alt="Picture Build" width="213" height="50" style="width:213px;height:50px;display:block;" />' +
       '</td>' +
       '<td style="width:70%;vertical-align:middle;text-align:right;border:none;padding:0;font-family:Calibri,Arial,sans-serif;font-size:9pt;color:#333;line-height:1.4;">' +
         '12410 Foothill Blvd Unit U &nbsp; Sylmar, CA 91342<br/>' +
@@ -183,44 +185,51 @@ export default function BidDocViewerModal({ bid, onClose }) {
     }
   }
 
-  // -- Download as .doc (Word HTML) ---------------------------------------
-  // We avoid the html-docx-js dependency (it ships a `with` statement that
-  // Rollup can't bundle in strict-mode ES modules). Instead we wrap the
-  // current HTML in the Microsoft Office HTML namespace and serve it with the
-  // application/msword MIME type. Word opens this like a native .doc and
-  // preserves tables, lists, basic formatting from the editor.
+  // -- Print / Save as PDF -----------------------------------------------
+  // Opens the current HTML in a new window with print-friendly CSS and
+  // triggers the browser's print dialog. Every modern browser exposes
+  // "Save as PDF" as a destination in that dialog, so the same button
+  // covers both physical printing and PDF export without pulling in a
+  // PDF-rendering dependency. Image sizing follows the inline width/height
+  // attributes we set on the letterhead logo.
   function handleDownload() {
     if (!editorRef.current) return
     const currentHtml = editorRef.current.innerHTML
+    const safeName = (bid.client_name || 'Bid').replace(/[^a-z0-9]/gi, '_')
+    const dateStr  = bid.date_submitted || new Date().toISOString().split('T')[0]
+    const title    = `${safeName}_Bid_${dateStr}`
+
     const docHtml =
-      '<!DOCTYPE html>' +
-      '<html xmlns:o="urn:schemas-microsoft-com:office:office"' +
-      '      xmlns:w="urn:schemas-microsoft-com:office:word"' +
-      '      xmlns="http://www.w3.org/TR/REC-html40">' +
-      '<head><meta charset="utf-8"><title>Bid Document</title>' +
+      '<!DOCTYPE html><html><head>' +
+      '<meta charset="utf-8">' +
+      `<title>${title}</title>` +
       '<style>' +
-      'body{font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#333;}' +
-      'table{border-collapse:collapse;width:100%;}' +
-      'th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;vertical-align:top;}' +
-      'th{background:#f2f2f2;font-weight:600;}' +
-      'h1,h2,h3{color:#1f2937;}' +
+      '@page { size: letter; margin: 0.5in; }' +
+      'body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; color: #333; margin: 0; padding: 0; }' +
+      'table { border-collapse: collapse; width: 100%; }' +
+      'th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; vertical-align: top; }' +
+      'th { background: #f2f2f2; font-weight: 600; }' +
+      'h1, h2, h3 { color: #1f2937; margin-top: 1em; margin-bottom: 0.5em; }' +
+      'h1 { font-size: 18pt; } h2 { font-size: 14pt; } h3 { font-size: 12pt; }' +
+      'p { margin: 0.5em 0; line-height: 1.4; }' +
+      'img { max-width: 100%; height: auto; }' +
+      '* { print-color-adjust: exact; -webkit-print-color-adjust: exact; }' +
       '</style></head>' +
       '<body>' + currentHtml + '</body></html>'
 
-    // BOM (\ufeff) helps Word detect the encoding
-    const blob = new Blob(['\ufeff', docHtml], { type: 'application/msword' })
-    const safeName = (bid.client_name || 'Bid').replace(/[^a-z0-9]/gi, '_')
-    const dateStr  = bid.date_submitted || new Date().toISOString().split('T')[0]
-    const filename = `${safeName}_Bid_${dateStr}.doc`
+    const win = window.open('', '_blank', 'width=900,height=1100')
+    if (!win) {
+      alert('Please allow popups for this site so the bid can be printed / saved as PDF.')
+      return
+    }
+    win.document.open()
+    win.document.write(docHtml)
+    win.document.close()
 
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    // Wait for layout + base64 image decode, then open print dialog
+    setTimeout(() => {
+      try { win.focus(); win.print() } catch (_) { /* user closed window */ }
+    }, 400)
   }
 
   // -- Render ------------------------------------------------------------
@@ -271,7 +280,7 @@ export default function BidDocViewerModal({ bid, onClose }) {
               disabled={loading}
               className="text-xs px-3 py-1.5 rounded-lg bg-white text-green-800 hover:bg-green-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold"
             >
-              ⬇ Download
+              🖨 Print / PDF
             </button>
             <button
               onClick={onClose}
