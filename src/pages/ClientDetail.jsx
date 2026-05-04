@@ -467,14 +467,14 @@ export default function ClientDetail() {
           </div>
 
           {estimates.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-200 text-center py-6 text-gray-400 text-sm">
+            <div className="bg-white rounded-xl border-2 border-green-700 text-center py-6 text-gray-400 text-sm">
               <p className="mb-3">No estimates yet.</p>
               <button onClick={() => setShowEstimateModal(true)} className="btn-primary text-sm inline-block">
                 Create First Estimate
               </button>
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+            <div className="bg-white rounded-xl border-2 border-green-700 overflow-x-auto">
               <table className="w-full text-sm min-w-[640px]">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
@@ -528,11 +528,11 @@ export default function ClientDetail() {
           </div>
 
           {bids.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-200 text-center py-6 text-gray-400 text-sm">
+            <div className="bg-white rounded-xl border-2 border-green-700 text-center py-6 text-gray-400 text-sm">
               No bids yet for this client.
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+            <div className="bg-white rounded-xl border-2 border-green-700 overflow-x-auto">
               <table className="w-full text-sm min-w-[500px]">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
@@ -594,11 +594,11 @@ export default function ClientDetail() {
           </div>
 
           {soldJobs.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-200 text-center py-6 text-gray-400 text-sm">
+            <div className="bg-white rounded-xl border-2 border-green-700 text-center py-6 text-gray-400 text-sm">
               No jobs yet for this client.
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+            <div className="bg-white rounded-xl border-2 border-green-700 overflow-x-auto">
               <table className="w-full text-sm min-w-[560px]">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
@@ -618,7 +618,14 @@ export default function ClientDetail() {
                       <>
                         {/* Job row */}
                         <tr key={job.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-1.5 font-semibold text-gray-800">{job.name}</td>
+                          <td className="px-4 py-1.5 font-semibold">
+                            <Link
+                              to={`/jobs/${job.id}`}
+                              className="text-green-700 hover:underline"
+                            >
+                              {job.name}
+                            </Link>
+                          </td>
                           <td className="px-3 py-1.5 text-right text-gray-500 text-xs whitespace-nowrap">
                             {job.sold_date ? new Date(job.sold_date).toLocaleDateString() : '—'}
                           </td>
