@@ -5405,7 +5405,7 @@ const WEEK_DAYS = [
   { value: 6, label: 'Saturday'  },
 ]
 
-function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats }) {
+function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, profiles, isAdmin, onEditStat }) {
   const [settingsSubTab, setSettingsSubTab] = useState('tracking')
 
   const [wedDay,   setWedDay]   = useState(weekEndingDay ?? 5)
@@ -5463,7 +5463,22 @@ function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats })
     { key: 'tracking', label: '📅 Tracking' },
     { key: 'general',  label: '📖 General' },
     { key: 'groups',   label: '📂 Stat Groups' },
+    ...(isAdmin ? [{ key: 'master', label: '👑 Master' }] : []),
   ]
+
+  // Helper for the Master tab: turn a stat's owner_user_id into a display name.
+  function ownerLabel(stat) {
+    if (stat?.owner_type === 'position' && stat.owner_position_id) return 'Position #' + stat.owner_position_id
+    if (!stat?.owner_user_id) return '—'
+    const p = (profiles || []).find(x => x.id === stat.owner_user_id)
+    return p?.full_name || (p?.email ? p.email.split('@')[0] : '—')
+  }
+
+  // Sorted list of every stat for the Master table — newest first by id.
+  const masterStats = useMemo(
+    () => [...(stats || [])].sort((a, b) => (b.id || 0) - (a.id || 0)),
+    [stats]
+  )
 
   return (
     <div className="flex-1 overflow-y-auto bg-gray-50">
@@ -5673,6 +5688,61 @@ function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats })
           <StatGroups stats={stats} />
         )}
 
+        {/* ── MASTER SUB-TAB — admin-only listing of every stat ── */}
+        {settingsSubTab === 'master' && isAdmin && (
+          <div className="p-6">
+            <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr className="text-xs uppercase tracking-wide text-gray-500">
+                    <th className="text-left px-4 py-2 font-semibold">Name</th>
+                    <th className="text-left px-3 py-2 font-semibold">Category</th>
+                    <th className="text-left px-3 py-2 font-semibold">Tracking</th>
+                    <th className="text-left px-3 py-2 font-semibold">Owner</th>
+                    <th className="text-center px-3 py-2 font-semibold">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {masterStats.length === 0 && (
+                    <tr><td colSpan={5} className="text-center py-12 text-gray-400">No statistics defined.</td></tr>
+                  )}
+                  {masterStats.map(s => (
+                    <tr
+                      key={s.id}
+                      onClick={() => onEditStat?.(s)}
+                      className="hover:bg-green-50/40 cursor-pointer transition-colors"
+                      title="Click to edit"
+                    >
+                      <td className="px-4 py-2 font-medium text-gray-900">
+                        {s.name}
+                        {s.stat_category === 'equation' && (
+                          <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-semibold">∑</span>
+                        )}
+                        {s.stat_category === 'overlay' && (
+                          <span className="ml-2 text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-semibold">⊕</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-gray-600 capitalize">{s.stat_category || s.stat_type || '—'}</td>
+                      <td className="px-3 py-2 text-gray-600 capitalize">{s.tracking || '—'}</td>
+                      <td className="px-3 py-2 text-gray-600">{ownerLabel(s)}</td>
+                      <td className="px-3 py-2 text-center">
+                        {s.archived ? (
+                          <span className="text-[11px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">Archived</span>
+                        ) : (
+                          <span className="text-[11px] bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-medium">Active</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-gray-400 mt-3">
+              Showing {masterStats.length} statistic{masterStats.length === 1 ? '' : 's'}. Click any row to open its edit modal.
+            </p>
+          </div>
+        )}
+
       </div>
       </div>
     </div>
@@ -5795,6 +5865,9 @@ export default function Statistics() {
   const [values,       setValues]       = useState([])   // values for selectedStat
   const [valuesStatId, setValuesStatId] = useState(null) // which stat id the values belong to
   const [profiles,     setProfiles]     = useState([])
+  // Admin flag derived from profiles.role for the current user. Used to
+  // gate admin-only UI like the Master tab in Settings.
+  const isCurrentUserAdmin = (profiles || []).some(p => p.id === user?.id && p.role === 'admin')
   const [loading,      setLoading]      = useState(true)
   const prevDisplayRef  = useRef([])   // frozen frame — last rendered displayChartData
   const chartPrintRef   = useRef(null) // ref to chart area for printing
@@ -5881,7 +5954,7 @@ export default function Statistics() {
   async function fetchAll() {
     setLoading(true)
     const [profRes, stsRes, settingsRes] = await Promise.all([
-      supabase.from('profiles').select('id, email, full_name').order('full_name'),
+      supabase.from('profiles').select('id, email, full_name, role').order('full_name'),
       supabase.from('statistics').select('*').order('sort_order', { ascending: true }).order('name'),
       supabase.from('company_settings').select('week_ending_day').maybeSingle(),
     ])
@@ -6750,6 +6823,27 @@ export default function Statistics() {
     }
   }
 
+  // Open the edit modal for any stat (used by the Master tab in Settings).
+  // Mirrors handleEditStat but takes the stat directly instead of relying
+  // on the currently-selected stat on the chart.
+  const editStatById = (stat) => {
+    if (!stat) return
+    setEditingData(stat)
+    if (stat.stat_category === 'equation') {
+      setShowEquationForm(true)
+    } else if (stat.stat_category === 'overlay') {
+      setShowOverlayForm(true)
+    } else if (stat.stat_category === 'secondary') {
+      setShowSecondaryForm(true)
+    } else if (stat.stat_category === 'auto_internal') {
+      setShowAutoForm(true)
+    } else if (stat.stat_category === 'auto_external') {
+      setShowAutoExternalForm(true)
+    } else {
+      setShowBasicForm(true)
+    }
+  }
+
   const handleDeleteStat = async () => {
     setShowBasicForm(false)
     setShowAutoForm(false)
@@ -6935,6 +7029,9 @@ export default function Statistics() {
           weekEndingDay={weekEndingDay}
           onWeekEndingDayChange={day => setWeekEndingDay(day)}
           stats={stats}
+          profiles={profiles}
+          isAdmin={isCurrentUserAdmin}
+          onEditStat={editStatById}
         />
       )}
 
