@@ -39,7 +39,7 @@ const FG = '#3A5038'
 // logo so the saved HTML is self-contained and the downloaded .doc renders
 // the same way without external assets.
 const LETTERHEAD_HTML =
-  '<table style="width:100%;border-collapse:collapse;margin:0 0 12px 0;border:none;" cellpadding="0" cellspacing="0" border="0">' +
+  '<table data-letterhead="picture-build" style="width:100%;border-collapse:collapse;margin:0 0 12px 0;border:none;" cellpadding="0" cellspacing="0" border="0">' +
     '<tr>' +
       '<td style="width:30%;vertical-align:middle;border:none;padding:0;">' +
         '<img src="data:image/png;base64,' + LOGO_B64 + '" alt="Picture Build" width="213" height="50" style="width:213px;height:50px;display:block;" />' +
@@ -53,6 +53,17 @@ const LETTERHEAD_HTML =
   '</table>' +
   '<hr style="border:none;border-top:1px solid #d0d0d0;margin:0 0 16px 0;" />'
 
+// Inject the letterhead at the top of the given HTML if it's not already
+// present. Detected via the data-letterhead marker on the outer table; this
+// keeps older saved bids (whose bid_doc_html predates the letterhead) from
+// printing/downloading without branding.
+function ensureLetterhead(html) {
+  if (typeof html === 'string' && html.indexOf('data-letterhead="picture-build"') !== -1) {
+    return html
+  }
+  return LETTERHEAD_HTML + (html || '')
+}
+
 
 export default function BidDocViewerModal({ bid, onClose }) {
   const editorRef = useRef(null)
@@ -65,6 +76,7 @@ export default function BidDocViewerModal({ bid, onClose }) {
   const [saveMsg,          setSaveMsg]          = useState('') // "ok:..." or "error:..."
   const [hasSavedVersion,  setHasSavedVersion]  = useState(false)
   const [regenerating,     setRegenerating]     = useState(false)
+  const [downloadingPdf,  setDownloadingPdf]  = useState(false)
 
   // -- Initial load -------------------------------------------------------
   useEffect(() => {
@@ -185,6 +197,77 @@ export default function BidDocViewerModal({ bid, onClose }) {
     }
   }
 
+  // -- Direct PDF download ------------------------------------------------
+  // Uses jsPDF + html2canvas to render the current HTML into a PDF blob and
+  // trigger a download without going through the browser's print dialog.
+  // Both libraries are dynamic-imported so if their bundles ever fail at
+  // runtime, the synchronous Print button still works as a fallback.
+  async function handleDownloadPdf() {
+    if (!editorRef.current) return
+    setDownloadingPdf(true)
+    setSaveMsg('')
+
+    // Off-screen container with the full document HTML (letterhead always on)
+    const container = document.createElement('div')
+    container.innerHTML = ensureLetterhead(editorRef.current.innerHTML)
+    container.style.cssText =
+      'position:fixed;left:-10000px;top:0;width:720px;' +
+      'font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#333;' +
+      'padding:0;background:#fff;'
+    document.body.appendChild(container)
+
+    try {
+      const [{ jsPDF }, h2c] = await Promise.all([
+        import('jspdf'),
+        import('html2canvas'),
+      ])
+      const html2canvas = h2c.default || h2c
+
+      // Render container to canvas, then page-slice into a letter-size PDF
+      const canvas = await html2canvas(container, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+      })
+      const pdf = new jsPDF({ unit: 'in', format: 'letter', compress: true })
+      const pageW = 8.5
+      const pageH = 11
+      const marginX = 0.5
+      const marginY = 0.5
+      const usableW = pageW - 2 * marginX
+      const imgW = usableW
+      const imgH = (canvas.height * imgW) / canvas.width
+
+      let y = 0
+      const imgData = canvas.toDataURL('image/png')
+      // If image is shorter than one page, simple add
+      if (imgH <= pageH - 2 * marginY) {
+        pdf.addImage(imgData, 'PNG', marginX, marginY, imgW, imgH)
+      } else {
+        // Slice into pages by re-using the same image and shifting Y
+        const pageImgH = pageH - 2 * marginY
+        let remaining = imgH
+        while (remaining > 0) {
+          pdf.addImage(imgData, 'PNG', marginX, marginY - y, imgW, imgH)
+          remaining -= pageImgH
+          y += pageImgH
+          if (remaining > 0) pdf.addPage()
+        }
+      }
+
+      const safeName = (bid.client_name || 'Bid').replace(/[^a-z0-9]/gi, '_')
+      const dateStr  = bid.date_submitted || new Date().toISOString().split('T')[0]
+      pdf.save(`${safeName}_Bid_${dateStr}.pdf`)
+    } catch (err) {
+      console.error('PDF download failed:', err)
+      setSaveMsg('error:PDF download failed: ' + (err?.message || err) + '. Try the Print button as a fallback.')
+    } finally {
+      try { document.body.removeChild(container) } catch (_) {}
+      setDownloadingPdf(false)
+    }
+  }
+
   // -- Print / Save as PDF -----------------------------------------------
   // Opens the current HTML in a new window with print-friendly CSS and
   // triggers the browser's print dialog. Every modern browser exposes
@@ -194,7 +277,7 @@ export default function BidDocViewerModal({ bid, onClose }) {
   // attributes we set on the letterhead logo.
   function handleDownload() {
     if (!editorRef.current) return
-    const currentHtml = editorRef.current.innerHTML
+    const currentHtml = ensureLetterhead(editorRef.current.innerHTML)
     const safeName = (bid.client_name || 'Bid').replace(/[^a-z0-9]/gi, '_')
     const dateStr  = bid.date_submitted || new Date().toISOString().split('T')[0]
     const title    = `${safeName}_Bid_${dateStr}`
@@ -276,11 +359,20 @@ export default function BidDocViewerModal({ bid, onClose }) {
               {saving ? 'Saving…' : 'Save'}
             </button>
             <button
-              onClick={handleDownload}
-              disabled={loading}
+              onClick={handleDownloadPdf}
+              disabled={loading || downloadingPdf}
+              title="Download a PDF copy with the company letterhead"
               className="text-xs px-3 py-1.5 rounded-lg bg-white text-green-800 hover:bg-green-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold"
             >
-              🖨 Print / PDF
+              {downloadingPdf ? 'Building PDF…' : '⬇ Download PDF'}
+            </button>
+            <button
+              onClick={handleDownload}
+              disabled={loading}
+              title="Open the print dialog (also offers Save as PDF)"
+              className="text-xs px-3 py-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold"
+            >
+              🖨 Print
             </button>
             <button
               onClick={onClose}
