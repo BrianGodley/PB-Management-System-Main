@@ -32,6 +32,7 @@ export default function ClientDetail() {
   const [loading,   setLoading]   = useState(true)
   const [showEstimateModal, setShowEstimateModal] = useState(false)
   const [viewingBid,        setViewingBid]        = useState(null)
+  const [profiles,          setProfiles]          = useState({}) // user_id -> full_name for 'Estimated By'
   const [editing,  setEditing]  = useState(false)
   const [saving,   setSaving]   = useState(false)
   const [form,     setForm]     = useState({})
@@ -45,6 +46,19 @@ export default function ClientDetail() {
   ]
 
   useEffect(() => { fetchData() }, [id])
+
+  // Profiles map for the "Estimated By" column on the Bids table
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from('profiles').select('id, full_name, email')
+      if (!data) return
+      const map = {}
+      for (const p of data) {
+        map[p.id] = p.full_name || (p.email ? p.email.split('@')[0] : '—')
+      }
+      setProfiles(map)
+    })()
+  }, [])
 
   async function fetchData() {
     setLoading(true)
@@ -77,7 +91,7 @@ export default function ClientDetail() {
       // Fetch bids (record_type = 'bid' only)
       const { data: bidsData } = await supabase
         .from('bids')
-        .select('id, client_name, status, bid_amount, estimate_id, date_submitted, projects, gross_profit, gpmd')
+        .select('id, client_name, status, bid_amount, estimate_id, date_submitted, projects, gross_profit, gpmd, estimates(estimate_name, created_by)')
         .eq('client_name', clientData.name)
         .in('record_type', ['bid'])
         .order('date_submitted', { ascending: false })
@@ -540,6 +554,7 @@ export default function ClientDetail() {
                   <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
                     <th className="px-4 py-2 text-left">Bid</th>
                     <th className="px-3 py-2 text-right">Date</th>
+                    <th className="px-3 py-2 text-left">Estimated By</th>
                     <th className="px-3 py-2 text-center">Bid Doc</th>
                     <th className="px-3 py-2 text-right">Gross Profit</th>
                     <th className="px-3 py-2 text-right">Bid Amount</th>
@@ -555,10 +570,10 @@ export default function ClientDetail() {
                           {bid.estimate_id ? (
                             <Link to={`/estimates/${bid.estimate_id}`}
                               className="font-semibold text-green-700 hover:underline">
-                              {bid.client_name}
+                              {bid.estimates?.estimate_name || bid.client_name}
                             </Link>
                           ) : (
-                            <p className="font-semibold text-gray-800">{bid.client_name}</p>
+                            <p className="font-semibold text-gray-800">{bid.estimates?.estimate_name || bid.client_name}</p>
                           )}
                           {bid.projects && bid.projects.length > 0 && (
                             <p className="text-xs text-gray-400 mt-0.5">{bid.projects.join(', ')}</p>
@@ -566,6 +581,11 @@ export default function ClientDetail() {
                         </td>
                         <td className="px-3 py-1.5 text-right text-gray-500 text-xs whitespace-nowrap">
                           {bid.date_submitted ? new Date(bid.date_submitted).toLocaleDateString() : '—'}
+                        </td>
+                        <td className="px-3 py-1.5 text-left text-gray-600 text-xs whitespace-nowrap">
+                          {bid.estimates?.created_by
+                            ? (profiles[bid.estimates.created_by] || '—')
+                            : '—'}
                         </td>
                         <td className="px-3 py-1.5 text-center">
                           <button

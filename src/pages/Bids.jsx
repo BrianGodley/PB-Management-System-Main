@@ -63,7 +63,7 @@ export default function Bids() {
     setLoading(true)
     const { data } = await supabase
       .from('bids')
-      .select('*')
+      .select('*, estimates(estimate_name, created_by)')
       .in('record_type', ['bid'])
       .order('date_submitted', { ascending: false })
     if (data) setBids(data)
@@ -509,10 +509,10 @@ export default function Bids() {
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="text-left px-4 py-3 font-semibold text-gray-700">Client</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-700">Projects</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-700">Created</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-700">Created By</th>
                 <th className="text-center px-4 py-3 font-semibold text-gray-700">Bid Doc</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-700 w-72" style={{ width: '288px' }}>Projects</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-700">Created</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-700">Estimated By</th>
                 <th className="text-right px-4 py-3 font-semibold text-gray-700">Gross Profit</th>
                 <th className="text-right px-4 py-3 font-semibold text-gray-700">GPMD</th>
                 <th className="text-right px-4 py-3 font-semibold text-gray-700">Bid Amount</th>
@@ -527,27 +527,13 @@ export default function Bids() {
                 return (
                   <tr key={bid.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
                     <td className="px-4 py-3">
-                      <p className="font-semibold text-gray-900">{bid.client_name}</p>
+                      <p className="font-semibold text-gray-900">{bid.estimates?.estimate_name || bid.client_name}</p>
+                      <p className="text-xs text-gray-500">{bid.client_name}</p>
                       {bid.job_address && <p className="text-xs text-gray-400 truncate max-w-[180px]">{bid.job_address}</p>}
                       {bid.salesperson && <p className="text-xs text-gray-400">👤 {bid.salesperson}</p>}
                       {bid.estimate_id && (
                         <Link to={`/estimates/${bid.estimate_id}`} className="text-xs text-green-700 hover:underline">📋 View Estimate</Link>
                       )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {bid.projects && bid.projects.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {bid.projects.map((proj, j) => (
-                            <span key={j} className="text-xs px-2 py-0.5 bg-green-50 text-green-800 border border-green-200 rounded-full">{proj}</span>
-                          ))}
-                        </div>
-                      ) : <span className="text-xs text-gray-400">—</span>}
-                    </td>
-                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
-                      {new Date(bid.date_submitted).toLocaleDateString()}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap text-sm">
-                      {bid.created_by ? (profiles[bid.created_by] || '—') : bid.salesperson || <span className="text-gray-300">—</span>}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <button
@@ -558,6 +544,25 @@ export default function Bids() {
                       >
                         <span className="text-base">📄</span>
                       </button>
+                    </td>
+                    <td className="px-4 py-3 align-top" style={{ width: '288px', maxWidth: '288px' }}>
+                      {bid.projects && bid.projects.length > 0 ? (
+                        <div className="flex flex-wrap gap-1" style={{ width: '256px' }}>
+                          {bid.projects.map((proj, j) => (
+                            <span key={j} className="text-xs px-2 py-0.5 bg-green-50 text-green-800 border border-green-200 rounded-full break-words">{proj}</span>
+                          ))}
+                        </div>
+                      ) : <span className="text-xs text-gray-400">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                      {new Date(bid.date_submitted).toLocaleDateString()}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap text-sm">
+                      {bid.estimates?.created_by
+                        ? (profiles[bid.estimates.created_by] || '—')
+                        : bid.created_by
+                          ? (profiles[bid.created_by] || '—')
+                          : bid.salesperson || <span className="text-gray-300">—</span>}
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap font-semibold text-green-700">
                       {bid.gross_profit > 0 ? `$${Math.round(bid.gross_profit).toLocaleString()}` : <span className="text-gray-300 font-normal">—</span>}
