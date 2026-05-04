@@ -24,9 +24,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import * as mammoth from 'mammoth'
-import htmlDocx from 'html-docx-js/dist/html-docx'
 import { supabase } from '../lib/supabase'
-import { generateBidDoc, downloadBidDoc } from '../lib/generateBidDoc'
+import { generateBidDoc } from '../lib/generateBidDoc'
 
 const FG = '#3A5038'
 
@@ -160,22 +159,44 @@ export default function BidDocViewerModal({ bid, onClose }) {
     }
   }
 
-  // -- Download as .docx -------------------------------------------------
+  // -- Download as .doc (Word HTML) ---------------------------------------
+  // We avoid the html-docx-js dependency (it ships a `with` statement that
+  // Rollup can't bundle in strict-mode ES modules). Instead we wrap the
+  // current HTML in the Microsoft Office HTML namespace and serve it with the
+  // application/msword MIME type. Word opens this like a native .doc and
+  // preserves tables, lists, basic formatting from the editor.
   function handleDownload() {
     if (!editorRef.current) return
     const currentHtml = editorRef.current.innerHTML
     const docHtml =
-      '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' +
+      '<!DOCTYPE html>' +
+      '<html xmlns:o="urn:schemas-microsoft-com:office:office"' +
+      '      xmlns:w="urn:schemas-microsoft-com:office:word"' +
+      '      xmlns="http://www.w3.org/TR/REC-html40">' +
+      '<head><meta charset="utf-8"><title>Bid Document</title>' +
+      '<style>' +
       'body{font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#333;}' +
       'table{border-collapse:collapse;width:100%;}' +
       'th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;vertical-align:top;}' +
       'th{background:#f2f2f2;font-weight:600;}' +
       'h1,h2,h3{color:#1f2937;}' +
-      '</style></head><body>' + currentHtml + '</body></html>'
-    const blob = htmlDocx.asBlob(docHtml)
+      '</style></head>' +
+      '<body>' + currentHtml + '</body></html>'
+
+    // BOM (\ufeff) helps Word detect the encoding
+    const blob = new Blob(['\ufeff', docHtml], { type: 'application/msword' })
     const safeName = (bid.client_name || 'Bid').replace(/[^a-z0-9]/gi, '_')
     const dateStr  = bid.date_submitted || new Date().toISOString().split('T')[0]
-    downloadBidDoc(blob, `${safeName}_Bid_${dateStr}.docx`)
+    const filename = `${safeName}_Bid_${dateStr}.doc`
+
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   }
 
   // -- Render ------------------------------------------------------------
