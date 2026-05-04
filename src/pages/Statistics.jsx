@@ -5949,16 +5949,28 @@ export default function Statistics() {
 
     // Batch-fetch DB values for regular components (send numbers, not strings).
     // Includes archived components — their historical values flow into the equation.
+    // PAGINATED: Supabase imposes a default 1000-row cap per request. With several
+    // components × weekly entries × multiple years, this silently drops the most
+    // recent rows (since order is period_date ASC), causing equation graphs to
+    // cut off mid-history. Page through .range() until exhausted.
     if (regularIds.length > 0) {
-      const { data: rawVals } = await supabase
-        .from('statistic_values')
-        .select('statistic_id, period_date, value')
-        .in('statistic_id', regularIds)
-        .order('period_date')
       for (const id of regularIds) compMaps[id] = new Map()
-      for (const v of (rawVals || [])) {
-        // v.statistic_id comes back as a number — coerces to same string key
-        compMaps[Number(v.statistic_id)]?.set(v.period_date, Number(v.value))
+      const PAGE_SIZE = 1000
+      let from = 0
+      while (true) {
+        const { data: pageRows, error: pageErr } = await supabase
+          .from('statistic_values')
+          .select('statistic_id, period_date, value')
+          .in('statistic_id', regularIds)
+          .order('period_date')
+          .range(from, from + PAGE_SIZE - 1)
+        if (pageErr || !pageRows) break
+        for (const v of pageRows) {
+          // v.statistic_id comes back as a number — coerces to same numeric key
+          compMaps[Number(v.statistic_id)]?.set(v.period_date, Number(v.value))
+        }
+        if (pageRows.length < PAGE_SIZE) break
+        from += PAGE_SIZE
       }
     }
 
