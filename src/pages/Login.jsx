@@ -61,17 +61,24 @@ export default function Login() {
   async function handleForgotPassword(e) {
     e.preventDefault()
     setResetMsg('')
-    if (!resetUsername.trim()) { setResetMsg('error:Please enter your username.'); return }
+    const entered = resetUsername.trim()
+    if (!entered) { setResetMsg('error:Please enter your username or email.'); return }
     setResetLoading(true)
 
     try {
-      // Look up email by username
-      const { data: email, error: rpcErr } = await supabase.rpc(
-        'get_email_by_username',
-        { p_username: resetUsername.trim().toLowerCase() }
-      )
-      if (rpcErr) throw new Error(rpcErr.message)
-      if (!email) throw new Error('Username not found. Contact your admin if you need help.')
+      let email = entered
+
+      // If the user typed an email address, use it directly.
+      // Otherwise treat it as a username and look up the email.
+      if (!email.includes('@')) {
+        const { data: resolvedEmail, error: rpcErr } = await supabase.rpc(
+          'get_email_by_username',
+          { p_username: email.toLowerCase() }
+        )
+        if (rpcErr) throw new Error(rpcErr.message)
+        if (!resolvedEmail) throw new Error('Username not found. Try entering your email address instead, or contact your admin.')
+        email = resolvedEmail
+      }
 
       // Send reset email
       const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email, {
@@ -231,13 +238,13 @@ export default function Login() {
                 </button>
                 <h2 className="text-lg font-bold text-gray-900">Reset your password</h2>
                 <p className="text-sm text-gray-500 mt-0.5">
-                  Enter your username and we'll send a reset link to your email address.
+                  Enter your username or email and we'll send a reset link to your email address.
                 </p>
               </div>
 
-              {/* Username */}
+              {/* Username or Email */}
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Username</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Username or Email</label>
                 <div className="relative">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm select-none">@</span>
                   <input
@@ -245,7 +252,8 @@ export default function Login() {
                     className={inputCls + ' pl-8'}
                     value={resetUsername}
                     onChange={e => setResetUsername(e.target.value)}
-                    placeholder="your.username"
+                    placeholder="username or you@company.com"
+                    autoComplete="username"
                     autoFocus
                     spellCheck={false}
                   />

@@ -7545,4 +7545,30 @@ export default function Statistics() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-bold text-amber-600 uppercase tracking-wide mb-1">
-  
+                            {periodLabel(n.period_date, selectedStat?.tracking)}
+                          </p>
+                          <p className="text-sm text-gray-800 whitespace-pre-wrap">{n.note}</p>
+                        </div>
+                        <button
+                          onClick={() => { openNoteModal(n.period_date, periodLabel(n.period_date, selectedStat?.tracking)); setShowNotesModal(false) }}
+                          className="text-xs text-blue-600 hover:text-blue-800 underline flex-shrink-0 mt-0.5"
+                        >
+                          Edit
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
+              <button onClick={() => setShowNotesModal(false)} className="w-full py-2.5 border border-gray-200 text-gray-600 text-sm font-medium rounded-xl hover:bg-gray-50 transition-colors">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
