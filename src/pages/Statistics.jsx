@@ -487,6 +487,7 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete, targe
     return []
   })
   const [saving,        setSaving]        = useState(false)
+  const [pendingShares,  setPendingShares]  = useState({}) // user_id -> 'view'|'edit', applied to DB after stat insert
   const [archiving,     setArchiving]     = useState(false)
   const [deleting,      setDeleting]      = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -542,18 +543,32 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete, targe
       console.log('[Statistics] saving payload:', payload)
 
       let error
+      let newStatId = initialData?.id || null
       if (initialData?.id) {
         ({ error } = await supabase.from('statistics').update(payload).eq('id', initialData.id))
         console.log('[Statistics] update result — error:', error)
       } else {
-        const res = await supabase.from('statistics').insert(payload)
+        const res = await supabase.from('statistics').insert(payload).select().single()
         error = res.error
-        console.log('[Statistics] insert result — error:', error, 'status:', res.status)
+        newStatId = res.data?.id || null
+        console.log('[Statistics] insert result — error:', error, 'status:', res.status, 'newId:', newStatId)
       }
 
       if (error) {
         console.error('[Statistics] save error:', error)
         throw error
+      }
+
+      // If user picked permissions before saving, write them now we have an id.
+      if (newStatId && pendingShares && Object.keys(pendingShares).length > 0) {
+        const rows = Object.entries(pendingShares).map(([uid, perm]) => ({
+          statistic_id: newStatId,
+          user_id:      uid,
+          permission:   perm,
+          created_by:   user?.id || null,
+        }))
+        const { error: shareErr } = await supabase.from('statistic_shares').insert(rows)
+        if (shareErr) console.error('[Statistics] failed to write pending shares:', shareErr)
       }
 
       console.log('[Statistics] save succeeded, calling onSave with name:', payload.name)
@@ -810,12 +825,20 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete, targe
           {onOpenShares && (
             <button
               type="button"
-              disabled={!initialData?.id}
-              onClick={() => initialData?.id && onOpenShares(initialData.id, initialData.name)}
-              className="px-4 py-2 rounded-lg text-sm text-purple-700 hover:bg-purple-50 border border-purple-200 font-medium disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-              title={initialData?.id ? 'Manage who else can view or edit this statistic' : 'Save the stat first to manage permissions'}
+              onClick={() => {
+                if (initialData?.id) {
+                  onOpenShares(initialData.id, initialData.name)
+                } else {
+                  onOpenShares(null, form.name?.trim() || 'New Stat', {
+                    initialShares: pendingShares,
+                    onLocalSave:   (m) => setPendingShares(m),
+                  })
+                }
+              }}
+              className="px-4 py-2 rounded-lg text-sm text-purple-700 hover:bg-purple-50 border border-purple-200 font-medium"
+              title="Manage who else can view or edit this statistic"
             >
-              🔒 Shared Permissions
+              🔒 Shared Permissions{!initialData?.id && Object.keys(pendingShares).length > 0 ? ` (${Object.keys(pendingShares).length})` : ''}
             </button>
           )}
           <button onClick={onClose} className="px-5 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 font-medium">
@@ -1765,6 +1788,7 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
   })
 
   const [saving,        setSaving]        = useState(false)
+  const [pendingShares,  setPendingShares]  = useState({}) // user_id -> 'view'|'edit', applied to DB after stat insert
   const [archiving,     setArchiving]     = useState(false)
   const [deleting,      setDeleting]      = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -1864,6 +1888,16 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
       if (error) { setErr(error.message); setSaving(false); return }
       savedId = data.id
       savedName = data.name
+    }
+    if (!isEdit && savedId && pendingShares && Object.keys(pendingShares).length > 0) {
+      const rows = Object.entries(pendingShares).map(([uid, perm]) => ({
+        statistic_id: savedId,
+        user_id:      uid,
+        permission:   perm,
+        created_by:   user?.id || null,
+      }))
+      const { error: shareErr } = await supabase.from('statistic_shares').insert(rows)
+      if (shareErr) console.error('[Statistics] failed to write pending shares:', shareErr)
     }
     setSaving(false)
     onSave(isEdit ? savedId : null, savedName)
@@ -2201,11 +2235,19 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
           <div className="flex gap-2">
             {onOpenShares && (
               <button type="button"
-                disabled={!initialData?.id}
-                onClick={() => initialData?.id && onOpenShares(initialData.id, initialData.name)}
-                className="px-4 py-2 text-sm rounded-lg border border-purple-200 text-purple-700 hover:bg-purple-50 font-medium disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                title={initialData?.id ? 'Manage who else can view or edit this statistic' : 'Save the stat first to manage permissions'}>
-                🔒 Shared Permissions
+                onClick={() => {
+                  if (initialData?.id) {
+                    onOpenShares(initialData.id, initialData.name)
+                  } else {
+                    onOpenShares(null, form.name?.trim() || 'New Stat', {
+                      initialShares: pendingShares,
+                      onLocalSave:   (m) => setPendingShares(m),
+                    })
+                  }
+                }}
+                className="px-4 py-2 text-sm rounded-lg border border-purple-200 text-purple-700 hover:bg-purple-50 font-medium"
+                title="Manage who else can view or edit this statistic">
+                🔒 Shared Permissions{!initialData?.id && Object.keys(pendingShares).length > 0 ? ` (${Object.keys(pendingShares).length})` : ''}
               </button>
             )}
             <button onClick={onClose}
@@ -2253,6 +2295,7 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
   const [statRanges, setStatRanges] = useState({})
 
   const [saving,        setSaving]        = useState(false)
+  const [pendingShares,  setPendingShares]  = useState({}) // user_id -> 'view'|'edit', applied to DB after stat insert
   const [archiving,     setArchiving]     = useState(false)
   const [deleting,      setDeleting]      = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -2376,6 +2419,16 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
         .select().single()
       if (error) { setErr(error.message); setSaving(false); return }
       savedId = data.id; savedName = data.name
+    }
+    if (!isEdit && savedId && pendingShares && Object.keys(pendingShares).length > 0) {
+      const rows = Object.entries(pendingShares).map(([uid, perm]) => ({
+        statistic_id: savedId,
+        user_id:      uid,
+        permission:   perm,
+        created_by:   user?.id || null,
+      }))
+      const { error: shareErr } = await supabase.from('statistic_shares').insert(rows)
+      if (shareErr) console.error('[Statistics] failed to write pending shares:', shareErr)
     }
     setSaving(false)
     onSave(isEdit ? savedId : null, savedName)
@@ -2644,11 +2697,19 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
           <div className="flex gap-2">
             {onOpenShares && (
               <button type="button"
-                disabled={!initialData?.id}
-                onClick={() => initialData?.id && onOpenShares(initialData.id, initialData.name)}
-                className="px-4 py-2 text-sm rounded-lg border border-purple-200 text-purple-700 hover:bg-purple-50 font-medium disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-                title={initialData?.id ? 'Manage who else can view or edit this statistic' : 'Save the stat first to manage permissions'}>
-                🔒 Shared Permissions
+                onClick={() => {
+                  if (initialData?.id) {
+                    onOpenShares(initialData.id, initialData.name)
+                  } else {
+                    onOpenShares(null, form.name?.trim() || 'New Stat', {
+                      initialShares: pendingShares,
+                      onLocalSave:   (m) => setPendingShares(m),
+                    })
+                  }
+                }}
+                className="px-4 py-2 text-sm rounded-lg border border-purple-200 text-purple-700 hover:bg-purple-50 font-medium"
+                title="Manage who else can view or edit this statistic">
+                🔒 Shared Permissions{!initialData?.id && Object.keys(pendingShares).length > 0 ? ` (${Object.keys(pendingShares).length})` : ''}
               </button>
             )}
             <button onClick={onClose}
@@ -2755,6 +2816,7 @@ function SecondaryStatForm({ initialData, profiles, allStats, onSave, onClose, o
   })
 
   const [saving,        setSaving]        = useState(false)
+  const [pendingShares,  setPendingShares]  = useState({}) // user_id -> 'view'|'edit', applied to DB after stat insert
   const [deleting,      setDeleting]      = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [err,           setErr]           = useState('')
@@ -2825,6 +2887,16 @@ function SecondaryStatForm({ initialData, profiles, allStats, onSave, onClose, o
             )
           }
         }
+      }
+      if (!isEdit && savedId && pendingShares && Object.keys(pendingShares).length > 0) {
+        const rows = Object.entries(pendingShares).map(([uid, perm]) => ({
+          statistic_id: savedId,
+          user_id:      uid,
+          permission:   perm,
+          created_by:   user?.id || null,
+        }))
+        const { error: shareErr } = await supabase.from('statistic_shares').insert(rows)
+        if (shareErr) console.error('[Statistics] failed to write pending shares:', shareErr)
       }
       setSaving(false)
       onSave(isEdit ? savedId : null, savedName)
@@ -2973,11 +3045,19 @@ function SecondaryStatForm({ initialData, profiles, allStats, onSave, onClose, o
           )}
           {onOpenShares && (
             <button
-              disabled={!initialData?.id}
-              onClick={() => initialData?.id && onOpenShares(initialData.id, initialData.name)}
-              className="px-4 py-2.5 border border-purple-200 text-purple-700 text-sm rounded-xl hover:bg-purple-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-              title={initialData?.id ? 'Manage who else can view or edit this statistic' : 'Save the stat first to manage permissions'}>
-              🔒 Shared Permissions
+              onClick={() => {
+                if (initialData?.id) {
+                  onOpenShares(initialData.id, initialData.name)
+                } else {
+                  onOpenShares(null, form.name?.trim() || 'New Stat', {
+                    initialShares: pendingShares,
+                    onLocalSave:   (m) => setPendingShares(m),
+                  })
+                }
+              }}
+              className="px-4 py-2.5 border border-purple-200 text-purple-700 text-sm rounded-xl hover:bg-purple-50 transition-colors"
+              title="Manage who else can view or edit this statistic">
+              🔒 Shared Permissions{!initialData?.id && Object.keys(pendingShares).length > 0 ? ` (${Object.keys(pendingShares).length})` : ''}
             </button>
           )}
           <button onClick={onClose}
@@ -3206,6 +3286,7 @@ function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete, onOpen
   })
 
   const [saving,        setSaving]        = useState(false)
+  const [pendingShares,  setPendingShares]  = useState({}) // user_id -> 'view'|'edit', applied to DB after stat insert
   const [deleting,      setDeleting]      = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [err,           setErr]           = useState('')
@@ -3253,6 +3334,16 @@ function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete, onOpen
       savedId = data.id
     }
 
+    if (!isEdit && savedId && pendingShares && Object.keys(pendingShares).length > 0) {
+      const rows = Object.entries(pendingShares).map(([uid, perm]) => ({
+        statistic_id: savedId,
+        user_id:      uid,
+        permission:   perm,
+        created_by:   user?.id || null,
+      }))
+      const { error: shareErr } = await supabase.from('statistic_shares').insert(rows)
+      if (shareErr) console.error('[Statistics] failed to write pending shares:', shareErr)
+    }
     setSaving(false)
     onSave(savedId, form.name.trim())
   }
@@ -3403,11 +3494,19 @@ function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete, onOpen
           )}
           {onOpenShares && (
             <button
-              disabled={!initialData?.id}
-              onClick={() => initialData?.id && onOpenShares(initialData.id, initialData.name)}
-              className="px-4 py-2.5 border border-purple-200 text-purple-700 text-sm rounded-xl hover:bg-purple-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-              title={initialData?.id ? 'Manage who else can view or edit this statistic' : 'Save the stat first to manage permissions'}>
-              🔒 Shared Permissions
+              onClick={() => {
+                if (initialData?.id) {
+                  onOpenShares(initialData.id, initialData.name)
+                } else {
+                  onOpenShares(null, form.name?.trim() || 'New Stat', {
+                    initialShares: pendingShares,
+                    onLocalSave:   (m) => setPendingShares(m),
+                  })
+                }
+              }}
+              className="px-4 py-2.5 border border-purple-200 text-purple-700 text-sm rounded-xl hover:bg-purple-50 transition-colors"
+              title="Manage who else can view or edit this statistic">
+              🔒 Shared Permissions{!initialData?.id && Object.keys(pendingShares).length > 0 ? ` (${Object.keys(pendingShares).length})` : ''}
             </button>
           )}
           <button onClick={onClose}
@@ -6624,8 +6723,12 @@ export default function Statistics() {
     }
   }
 
-  const openShares = (statId, statName) => {
-    setSharesTarget({ id: statId, name: statName })
+  // Opens the Shared Permissions modal. For an existing stat (DB mode) just
+  // pass id + name. For a not-yet-saved stat (local mode), pass a third
+  // options arg with { initialShares, onLocalSave } so the modal can collect
+  // permissions into local state that the form persists after the stat insert.
+  const openShares = (statId, statName, options = {}) => {
+    setSharesTarget({ id: statId || null, name: statName, ...options })
     setShowShares(true)
   }
 
@@ -7669,6 +7772,8 @@ export default function Statistics() {
         statId={(sharesTarget || selectedStat).id}
         statName={(sharesTarget || selectedStat).name}
         ownerUserId={(sharesTarget || selectedStat).owner_user_id || user?.id}
+        initialShares={sharesTarget?.initialShares}
+        onLocalSave={sharesTarget?.onLocalSave}
         onClose={() => { setShowShares(false); setSharesTarget(null) }}
       />
     )}

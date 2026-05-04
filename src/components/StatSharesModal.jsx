@@ -29,7 +29,7 @@ import { useAuth } from '../contexts/AuthContext'
 
 const FG = '#3A5038'
 
-export default function StatSharesModal({ statId, statName, ownerUserId, onClose }) {
+export default function StatSharesModal({ statId, statName, ownerUserId, onClose, initialShares, onLocalSave }) {
   const { user } = useAuth()
 
   const [employees,  setEmployees]  = useState([]) // [{id, name, email, user_id}]
@@ -45,8 +45,7 @@ export default function StatSharesModal({ statId, statName, ownerUserId, onClose
     let cancelled = false
     async function load() {
       try {
-        // Pull employees joined to their profile (auth account). Only employees
-        // with a user_id can be shared with.
+        // Always need the employee list for both modes
         const { data: empData, error: empErr } = await supabase
           .from('employees')
           .select('id, first_name, last_name, email, user_id, status')
@@ -54,11 +53,22 @@ export default function StatSharesModal({ statId, statName, ownerUserId, onClose
           .order('last_name', { ascending: true })
         if (empErr) throw empErr
 
-        const { data: shareData, error: shareErr } = await supabase
-          .from('statistic_shares')
-          .select('user_id, permission')
-          .eq('statistic_id', statId)
-        if (shareErr) throw shareErr
+        // DB mode (we have a statId) → fetch existing share rows.
+        // Local mode (no statId — new-stat creation) → seed from initialShares
+        // and skip the DB read entirely.
+        let sharesMap = {}
+        if (statId) {
+          const { data: shareData, error: shareErr } = await supabase
+            .from('statistic_shares')
+            .select('user_id, permission')
+            .eq('statistic_id', statId)
+          if (shareErr) throw shareErr
+          for (const row of (shareData || [])) {
+            sharesMap[row.user_id] = row.permission
+          }
+        } else {
+          sharesMap = { ...(initialShares || {}) }
+        }
 
         if (cancelled) return
 
@@ -70,11 +80,6 @@ export default function StatSharesModal({ statId, statName, ownerUserId, onClose
             name:    [e.first_name, e.last_name].filter(Boolean).join(' ') || e.email || '—',
             email:   e.email || '',
           }))
-
-        const sharesMap = {}
-        for (const row of (shareData || [])) {
-          sharesMap[row.user_id] = row.permission
-        }
 
         setEmployees(list)
         setShares(sharesMap)
@@ -124,6 +129,21 @@ export default function StatSharesModal({ statId, statName, ownerUserId, onClose
     setSaving(true)
     setError('')
 
+    // Local mode (no statId yet — used while creating a new stat). The form
+    // will write the shares to the DB itself after the stat is inserted.
+    if (!statId) {
+      try {
+        onLocalSave?.({ ...shares })
+        setOriginal(shares)
+        onClose?.()
+      } catch (err) {
+        setError(err?.message || 'Save failed.')
+        setSaving(false)
+      }
+      return
+    }
+
+    // DB mode — diff and persist directly.
     try {
       const toUpsert = []
       const toDelete = []
