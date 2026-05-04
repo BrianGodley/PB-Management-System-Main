@@ -207,9 +207,25 @@ export default function BidDocViewerModal({ bid, onClose }) {
     setDownloadingPdf(true)
     setSaveMsg('')
 
-    // Off-screen container with the full document HTML (letterhead always on)
+    // Off-screen container with the full document HTML (letterhead always on).
+    // We embed an inline <style> so html2canvas captures the same paragraph
+    // / table spacing the editor preview and Print path use — without these
+    // rules the PDF collapses to browser defaults and elements stack on top
+    // of each other (especially around the project subtotal boxes).
     const container = document.createElement('div')
-    container.innerHTML = ensureLetterhead(editorRef.current.innerHTML)
+    const pdfStyles =
+      '<style>' +
+      'p { margin: 0.5em 0; line-height: 1.4; }' +
+      'table { border-collapse: collapse; width: 100%; margin: 0.75em 0; }' +
+      'td { vertical-align: top; padding: 4px 6px; }' +
+      'th { background: #f2f2f2; font-weight: 600; padding: 4px 6px; }' +
+      'h1, h2, h3 { color: #1f2937; margin: 1em 0 0.5em 0; page-break-after: avoid; }' +
+      'h1 { font-size: 18pt; } h2 { font-size: 14pt; } h3 { font-size: 12pt; }' +
+      'hr { border: none; border-top: 1px solid #d0d0d0; margin: 0.75em 0; }' +
+      'img { max-width: 100%; height: auto; }' +
+      '* { print-color-adjust: exact; -webkit-print-color-adjust: exact; }' +
+      '</style>'
+    container.innerHTML = pdfStyles + ensureLetterhead(editorRef.current.innerHTML)
     container.style.cssText =
       'position:fixed;left:-10000px;top:0;width:720px;' +
       'font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#333;' +

@@ -275,21 +275,20 @@ function buildProjectSection(project) {
     paras.push(emptyLine(60))
   }
 
-  // Project total price row
+  // Project total price row — single-column, right-aligned table.
+  // (Was a two-column layout where column 1 was an empty spacer; that
+  // empty cell now disappears entirely and the same visual position is
+  // achieved via the table's `alignment: RIGHT`.)
   const projTotal = modules.reduce((s, m) => s + parseFloat(m.total_price || m.data?.calc?.price || 0), 0)
   if (projTotal > 0) {
     const totalTable = new Table({
-      width: { size: 9360, type: WidthType.DXA },
-      columnWidths: [6360, 3000],
+      alignment: AlignmentType.RIGHT,
+      width: { size: 3000, type: WidthType.DXA },
+      columnWidths: [3000],
       borders: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER, insideH: NO_BORDER, insideV: NO_BORDER },
       rows: [
         new TableRow({
           children: [
-            new TableCell({
-              borders: NO_BORDERS,
-              width: { size: 6360, type: WidthType.DXA },
-              children: [emptyLine(0)],
-            }),
             new TableCell({
               borders: {
                 top: THIN, bottom: { style: BorderStyle.DOUBLE, size: 6, color: '333333' },
@@ -316,7 +315,8 @@ function buildProjectSection(project) {
     paras.push(totalTable)
   }
 
-  paras.push(emptyLine(120))
+  // Larger gap between the subtotal box and the next project's heading
+  paras.push(emptyLine(240))
   return paras
 }
 
