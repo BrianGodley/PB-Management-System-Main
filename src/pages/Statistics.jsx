@@ -1768,14 +1768,16 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
     setParts([{ stat_id: '', operator: null }])
   }
 
-  // Collect all stat IDs transitively depended on by a given equation stat
+  // Collect all stat IDs transitively depended on by a given equation stat.
+  // Normalise all IDs to numbers — JSONB may store stat_ids as strings.
   function collectEquationDeps(statId, all, visited = new Set()) {
-    if (visited.has(statId)) return visited
-    visited.add(statId)
-    const st = (all || []).find(s => s.id === statId)
+    const numId = Number(statId)
+    if (!numId || visited.has(numId)) return visited
+    visited.add(numId)
+    const st = (all || []).find(s => Number(s.id) === numId)
     if (!st || st.stat_category !== 'equation') return visited
     for (const part of (st.equation_parts || [])) {
-      if (part.stat_id) collectEquationDeps(part.stat_id, all, visited)
+      if (part.stat_id) collectEquationDeps(Number(part.stat_id), all, visited)
     }
     return visited
   }
@@ -5843,19 +5845,24 @@ export default function Statistics() {
 
   // Recursively resolve an equation stat into a Map<period_date, number>.
   // Handles equation stats whose components are themselves equation stats.
+  // IMPORTANT: stat_ids in JSONB equation_parts are stored as strings from HTML
+  // select values — always normalise to Number() before any comparison or query.
   async function resolveEquationToMap(stat, allStatsList, depth = 0) {
     if (depth > 10) return new Map() // guard against runaway cycles
     const parts = stat.equation_parts || []
-    const compIds = [...new Set(parts.map(p => p.stat_id).filter(Boolean))]
+    // Normalise stat_ids to numbers — they may be strings in JSONB
+    const compIds = [...new Set(
+      parts.map(p => p.stat_id ? Number(p.stat_id) : null).filter(Boolean)
+    )]
     if (compIds.length === 0) return new Map()
 
     // Split components into regular (has DB rows) vs nested equation stats
     const compMaps = {}
     const regularIds = []
     for (const id of compIds) {
-      const compStat = (allStatsList || []).find(s => s.id === id)
+      const compStat = (allStatsList || []).find(s => Number(s.id) === id)
       if (compStat?.stat_category === 'equation') {
-        // Resolve recursively
+        // Resolve recursively — use numeric id as key
         compMaps[id] = await resolveEquationToMap(compStat, allStatsList, depth + 1)
       } else {
         compMaps[id] = null // fetch from DB
@@ -5863,7 +5870,7 @@ export default function Statistics() {
       }
     }
 
-    // Batch-fetch DB values for regular components
+    // Batch-fetch DB values for regular components (send numbers, not strings)
     if (regularIds.length > 0) {
       const { data: rawVals } = await supabase
         .from('statistic_values')
@@ -5872,23 +5879,25 @@ export default function Statistics() {
         .order('period_date')
       for (const id of regularIds) compMaps[id] = new Map()
       for (const v of (rawVals || [])) {
-        compMaps[v.statistic_id]?.set(v.period_date, Number(v.value))
+        // v.statistic_id comes back as a number — coerces to same string key
+        compMaps[Number(v.statistic_id)]?.set(v.period_date, Number(v.value))
       }
     }
 
     // Compute result: only periods where ALL components have a value
-    const firstId = parts[0]?.stat_id
-    if (!firstId || !compMaps[firstId]) return new Map()
+    const firstNumId = parts[0]?.stat_id ? Number(parts[0].stat_id) : null
+    if (!firstNumId || !compMaps[firstNumId]) return new Map()
 
     const result = new Map()
-    for (const [period] of compMaps[firstId]) {
+    for (const [period] of compMaps[firstNumId]) {
       const allPresent = compIds.every(id => compMaps[id]?.has(period))
       if (!allPresent) continue
 
       let val = null
       for (const part of parts) {
         if (!part.stat_id) continue
-        const pv = compMaps[part.stat_id]?.get(period) ?? 0
+        const numId = Number(part.stat_id)
+        const pv = compMaps[numId]?.get(period) ?? 0
         if (val === null) {
           val = pv
         } else {
