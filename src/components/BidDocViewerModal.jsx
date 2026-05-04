@@ -1,11 +1,20 @@
 // src/components/BidDocViewerModal.jsx
 //
-// Modal that previews a bid document inline instead of forcing a download.
-// Bid docs are generated client-side as .docx blobs (see lib/generateBidDoc.js),
-// which browsers can't render natively, so we run the blob through mammoth
-// to convert it into HTML for preview. The original .docx blob is preserved
-// and exposed via a Download button so the user can still grab the file
-// after viewing it.
+// Bid document viewer + editor.
+//
+// Behavior:
+//   1. On open: fetch the latest bids row.
+//      - If bids.bid_doc_html is set, that saved HTML is shown directly.
+//      - Otherwise we generate a fresh .docx from the linked estimate,
+//        convert it to HTML via mammoth, and show that.
+//   2. The body is a contenteditable div - light text edits work inline
+//      (typing, deleting, bolding via ctrl+B, etc.).
+//   3. Save persists the current HTML to bids.bid_doc_html so the next
+//      reopen jumps straight to the saved version.
+//   4. Regenerate replaces the current content with a fresh template
+//      pulled from the current estimate (after a confirm).
+//   5. Download converts the current HTML to a .docx file via
+//      html-docx-js so the downloaded file matches what the user sees.
 //
 // Usage:
 //   <BidDocViewerModal bid={bid} onClose={() => setViewingBid(null)} />
@@ -13,54 +22,60 @@
 // Required bid fields:
 //   id, estimate_id, client_name, date_submitted, job_address (optional)
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as mammoth from 'mammoth'
+import htmlDocx from 'html-docx-js/dist/html-docx'
 import { supabase } from '../lib/supabase'
 import { generateBidDoc, downloadBidDoc } from '../lib/generateBidDoc'
 
 const FG = '#3A5038'
 
 export default function BidDocViewerModal({ bid, onClose }) {
-  const [html, setHtml]         = useState('')
-  const [blob, setBlob]         = useState(null)
-  const [loading, setLoading]   = useState(true)
-  const [error, setError]       = useState('')
+  const editorRef = useRef(null)
 
+  const [html,             setHtml]             = useState('')
+  const [loading,          setLoading]          = useState(true)
+  const [error,            setError]            = useState('')
+  const [dirty,            setDirty]            = useState(false)
+  const [saving,           setSaving]           = useState(false)
+  const [saveMsg,          setSaveMsg]          = useState('') // "ok:..." or "error:..."
+  const [hasSavedVersion,  setHasSavedVersion]  = useState(false)
+  const [regenerating,     setRegenerating]     = useState(false)
+
+  // -- Initial load -------------------------------------------------------
   useEffect(() => {
     let cancelled = false
 
     async function load() {
       try {
-        if (!bid?.estimate_id) {
-          throw new Error('This bid has no linked estimate, so its bid document cannot be generated.')
-        }
+        if (!bid?.id) throw new Error('Missing bid id.')
 
-        // Fetch estimate + projects (same shape generateBidDoc expects)
-        const { data: est, error: estErr } = await supabase
-          .from('estimates').select('*').eq('id', bid.estimate_id).single()
-        if (estErr) throw estErr
+        const { data: latest, error: bidErr } = await supabase
+          .from('bids')
+          .select('bid_doc_html, bid_doc_updated_at, estimate_id, client_name, date_submitted, job_address')
+          .eq('id', bid.id)
+          .single()
+        if (bidErr) throw bidErr
+        if (cancelled) return
 
-        const { data: projs, error: projErr } = await supabase
-          .from('estimate_projects')
-          .select('*, estimate_modules(*)')
-          .eq('estimate_id', bid.estimate_id)
-          .order('created_at')
-        if (projErr) throw projErr
-
-        const generatedBlob = await generateBidDoc(est, projs || [], bid.job_address || '')
-
-        // Convert .docx blob → HTML for preview
-        const arrayBuffer = await generatedBlob.arrayBuffer()
-        const result      = await mammoth.convertToHtml({ arrayBuffer })
-
-        if (!cancelled) {
-          setHtml(result.value || '<p class="text-gray-400">Document is empty.</p>')
-          setBlob(generatedBlob)
+        if (latest.bid_doc_html && latest.bid_doc_html.trim() !== '') {
+          setHtml(latest.bid_doc_html)
+          setHasSavedVersion(true)
           setLoading(false)
+          return
         }
+
+        if (!latest.estimate_id) {
+          throw new Error('This bid has no linked estimate, so its bid document cannot be generated. Edit and save manually if you want a starting draft.')
+        }
+        const fresh = await generateFromEstimate(latest)
+        if (cancelled) return
+        setHtml(fresh)
+        setHasSavedVersion(false)
+        setLoading(false)
       } catch (err) {
         if (!cancelled) {
-          setError(err?.message || 'Failed to generate bid document.')
+          setError(err?.message || 'Failed to load bid document.')
           setLoading(false)
         }
       }
@@ -68,15 +83,102 @@ export default function BidDocViewerModal({ bid, onClose }) {
 
     load()
     return () => { cancelled = true }
-  }, [bid?.id, bid?.estimate_id])
+  }, [bid?.id])
 
+  // -- Generate fresh HTML from the linked estimate ----------------------
+  async function generateFromEstimate(bidLite) {
+    const { data: est, error: estErr } = await supabase
+      .from('estimates').select('*').eq('id', bidLite.estimate_id).single()
+    if (estErr) throw estErr
+
+    const { data: projs, error: projErr } = await supabase
+      .from('estimate_projects')
+      .select('*, estimate_modules(*)')
+      .eq('estimate_id', bidLite.estimate_id)
+      .order('created_at')
+    if (projErr) throw projErr
+
+    const blob = await generateBidDoc(est, projs || [], bidLite.job_address || '')
+    const ab   = await blob.arrayBuffer()
+    const res  = await mammoth.convertToHtml({ arrayBuffer: ab })
+    return res.value || '<p class="text-gray-400">Document is empty.</p>'
+  }
+
+  // -- Editing -----------------------------------------------------------
+  function handleInput() {
+    if (!dirty) setDirty(true)
+    if (saveMsg) setSaveMsg('')
+  }
+
+  // -- Save --------------------------------------------------------------
+  async function handleSave() {
+    if (!editorRef.current) return
+    setSaving(true)
+    setSaveMsg('')
+
+    const newHtml = editorRef.current.innerHTML
+    const { error: upErr } = await supabase
+      .from('bids')
+      .update({
+        bid_doc_html:       newHtml,
+        bid_doc_updated_at: new Date().toISOString(),
+      })
+      .eq('id', bid.id)
+
+    setSaving(false)
+    if (upErr) {
+      setSaveMsg('error:Save failed: ' + upErr.message)
+      return
+    }
+    setHtml(newHtml)
+    setHasSavedVersion(true)
+    setDirty(false)
+    setSaveMsg('ok:Saved')
+  }
+
+  // -- Regenerate from estimate ------------------------------------------
+  async function handleRegenerate() {
+    const ok = window.confirm(
+      'Discard your edits and regenerate this bid document from the latest estimate?\n\n' +
+      'Your saved version will be replaced when you click Save afterward.'
+    )
+    if (!ok) return
+
+    setRegenerating(true)
+    setError('')
+    setSaveMsg('')
+    try {
+      const fresh = await generateFromEstimate(bid)
+      setHtml(fresh)
+      setHasSavedVersion(false)
+      setDirty(true)
+      setSaveMsg('ok:Regenerated from estimate. Click Save to replace your saved version.')
+    } catch (err) {
+      setError(err?.message || 'Regeneration failed.')
+    } finally {
+      setRegenerating(false)
+    }
+  }
+
+  // -- Download as .docx -------------------------------------------------
   function handleDownload() {
-    if (!blob) return
+    if (!editorRef.current) return
+    const currentHtml = editorRef.current.innerHTML
+    const docHtml =
+      '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' +
+      'body{font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#333;}' +
+      'table{border-collapse:collapse;width:100%;}' +
+      'th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;vertical-align:top;}' +
+      'th{background:#f2f2f2;font-weight:600;}' +
+      'h1,h2,h3{color:#1f2937;}' +
+      '</style></head><body>' + currentHtml + '</body></html>'
+    const blob = htmlDocx.asBlob(docHtml)
     const safeName = (bid.client_name || 'Bid').replace(/[^a-z0-9]/gi, '_')
     const dateStr  = bid.date_submitted || new Date().toISOString().split('T')[0]
     downloadBidDoc(blob, `${safeName}_Bid_${dateStr}.docx`)
   }
 
+  // -- Render ------------------------------------------------------------
   return (
     <div
       className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
@@ -96,15 +198,35 @@ export default function BidDocViewerModal({ bid, onClose }) {
             <p className="text-xs text-green-200 mt-0.5 truncate">
               {bid.client_name || '—'}
               {bid.date_submitted ? ` · ${new Date(bid.date_submitted).toLocaleDateString()}` : ''}
+              {hasSavedVersion && (
+                <span className="ml-2 px-2 py-0.5 rounded-full bg-green-600/40 text-green-100 text-[10px]">
+                  Edited version
+                </span>
+              )}
             </p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0 ml-4">
             <button
-              onClick={handleDownload}
-              disabled={!blob}
+              onClick={handleRegenerate}
+              disabled={regenerating || loading}
+              title="Discard edits and regenerate from the current estimate"
+              className="text-xs px-3 py-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold"
+            >
+              {regenerating ? 'Regenerating…' : 'Regenerate'}
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={!dirty || saving || loading}
               className="text-xs px-3 py-1.5 rounded-lg bg-white text-green-800 hover:bg-green-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold"
             >
-              ⬇ Download .docx
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            <button
+              onClick={handleDownload}
+              disabled={loading}
+              className="text-xs px-3 py-1.5 rounded-lg bg-white text-green-800 hover:bg-green-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold"
+            >
+              ⬇ Download
             </button>
             <button
               onClick={onClose}
@@ -116,31 +238,62 @@ export default function BidDocViewerModal({ bid, onClose }) {
           </div>
         </div>
 
+        {/* Save status banner */}
+        {saveMsg && (
+          <div
+            className={`px-6 py-2 text-xs flex-shrink-0 ${
+              saveMsg.startsWith('ok:')
+                ? 'bg-green-50 text-green-800 border-b border-green-200'
+                : 'bg-red-50 text-red-700 border-b border-red-200'
+            }`}
+          >
+            {saveMsg.slice(saveMsg.indexOf(':') + 1)}
+          </div>
+        )}
+
         {/* Body */}
         <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
           {loading && (
             <div className="text-center py-20 text-gray-500">
               <span className="animate-spin inline-block w-8 h-8 border-2 border-green-700/30 border-t-green-700 rounded-full mb-4"></span>
-              <p className="text-sm">Generating preview…</p>
+              <p className="text-sm">Loading…</p>
             </div>
           )}
 
-          {error && (
+          {error && !loading && (
             <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
-              <span className="font-semibold">Could not preview document:</span> {error}
+              <span className="font-semibold">Could not load:</span> {error}
             </div>
           )}
 
           {!loading && !error && (
             <div
-              className="bid-doc-preview bg-white rounded-xl shadow border border-gray-200 p-10 mx-auto max-w-3xl"
+              ref={editorRef}
+              contentEditable
+              suppressContentEditableWarning
+              onInput={handleInput}
+              spellCheck
+              className="bid-doc-preview bg-white rounded-xl shadow border border-gray-200 p-10 mx-auto max-w-3xl outline-none focus:ring-2 focus:ring-green-700/20 cursor-text"
               dangerouslySetInnerHTML={{ __html: html }}
             />
           )}
         </div>
+
+        {/* Footer hint */}
+        {!loading && !error && (
+          <div className="px-6 py-2 bg-gray-50 border-t border-gray-200 text-xs text-gray-500 flex-shrink-0">
+            {dirty ? (
+              <span>Unsaved changes — click <strong className="text-green-800">Save</strong> to persist them.</span>
+            ) : hasSavedVersion ? (
+              <span>Showing the saved edited version. Click anywhere to make further edits.</span>
+            ) : (
+              <span>Showing a fresh template generated from the estimate. Edit anywhere and Save to keep your changes.</span>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Scoped styles for the converted document so it looks document-like */}
+      {/* Scoped styles for the document body */}
       <style>{`
         .bid-doc-preview h1, .bid-doc-preview h2, .bid-doc-preview h3 {
           color: #1f2937;
@@ -182,6 +335,7 @@ export default function BidDocViewerModal({ bid, onClose }) {
           height: auto;
         }
         .bid-doc-preview strong { color: #111827; }
+        .bid-doc-preview[contenteditable="true"]:focus { outline: none; }
       `}</style>
     </div>
   )
