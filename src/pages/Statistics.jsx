@@ -1749,7 +1749,7 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
   const [parts, setParts] = useState(() => {
     const existing = initialData?.equation_parts
     if (existing && Array.isArray(existing) && existing.length > 0) return existing
-    return [{ stat_id: '', operator: null }]
+    return [] // start empty — user clicks stats from the list to build the formula
   })
 
   const [saving,        setSaving]        = useState(false)
@@ -1765,7 +1765,7 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
   // When tracking changes, clear all parts so the user re-selects matching stats
   function setTracking(val) {
     setForm(f => ({ ...f, tracking: val }))
-    setParts([{ stat_id: '', operator: null }])
+    setParts([])
   }
 
   // Collect all stat IDs transitively depended on by a given equation stat.
@@ -1817,11 +1817,8 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
       return
     }
     if (!form.beginning_date) { setErr('Beginning Date is required.');  return }
-    if (parts.length === 0 || !parts[0].stat_id) {
-      setErr('At least one statistic is required in the equation.'); return
-    }
-    if (parts.some(p => !p.stat_id)) {
-      setErr('All equation parts must have a statistic selected.'); return
+    if (parts.length === 0) {
+      setErr('Add at least one statistic to the equation using the picker on the left.'); return
     }
 
     setSaving(true); setErr('')
@@ -1940,75 +1937,133 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
             </p>
           </div>
 
-          {/* Equation Builder */}
+          {/* Equation Builder — two-column: stat picker list + formula */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Equation <span className="text-red-500">*</span>
             </label>
-            <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 space-y-2">
-              {parts.map((part, idx) => (
-                <div key={idx} className="flex items-center gap-2">
-                  {idx === 0 ? (
-                    <div className="w-36 flex-shrink-0 text-xs font-semibold text-gray-400 text-center uppercase tracking-wide">
-                      Value
-                    </div>
+            <div className="flex gap-3 min-h-[220px]">
+
+              {/* ── LEFT: stat picker list ── */}
+              <div className="w-[48%] flex-shrink-0 border border-gray-200 rounded-xl overflow-hidden flex flex-col">
+                <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 flex-shrink-0">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">
+                    Click a stat to add it →
+                  </p>
+                </div>
+                <div className="overflow-y-auto flex-1">
+                  {availableStats.length === 0 && archivedStats.length === 0 ? (
+                    <p className="text-xs text-gray-400 italic px-3 py-4 text-center">
+                      No {form.tracking} stats found.
+                    </p>
                   ) : (
-                    <select
-                      value={part.operator || '+'}
-                      onChange={e => updatePart(idx, 'operator', e.target.value)}
-                      className="w-36 border border-gray-300 rounded-lg px-2 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-600 flex-shrink-0"
-                    >
-                      {OPERATORS.map(op => (
-                        <option key={op.value} value={op.value}>{op.label}</option>
-                      ))}
-                    </select>
-                  )}
-                  <select
-                    value={part.stat_id}
-                    onChange={e => updatePart(idx, 'stat_id', e.target.value)}
-                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-600"
-                    disabled={availableStats.length === 0 && archivedStats.length === 0}
-                  >
-                    <option value="">
-                      {availableStats.length === 0 && archivedStats.length === 0
-                        ? `— no ${form.tracking} stats available —`
-                        : '— select statistic —'}
-                    </option>
-                    {availableStats.length > 0 && (
-                      <optgroup label="Active Stats">
-                        {availableStats.map(s => (
-                          <option key={s.id} value={s.id}>
-                            {s.stat_category === 'equation' ? `∑ ${s.name}` : s.name}
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
-                    {archivedStats.length > 0 && (
-                      <optgroup label="Archived Stats (Historical Reference)">
-                        {archivedStats.map(s => (
-                          <option key={s.id} value={s.id}>
-                            {s.stat_category === 'equation' ? `∑ ${s.name} [archived]` : `${s.name} [archived]`}
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
-                  </select>
-                  {parts.length > 1 && (
-                    <button
-                      onClick={() => removePart(idx)}
-                      className="text-red-400 hover:text-red-600 text-lg leading-none flex-shrink-0 px-1 font-bold"
-                      title="Remove"
-                    >✕</button>
+                    <>
+                      {availableStats.length > 0 && (
+                        <>
+                          <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Active Stats</span>
+                          </div>
+                          {availableStats.map(s => {
+                            const alreadyIn = parts.some(p => String(p.stat_id) === String(s.id))
+                            return (
+                              <button
+                                key={s.id}
+                                onClick={() => setParts(prev => [
+                                  ...prev,
+                                  { stat_id: String(s.id), operator: prev.length === 0 ? null : '+' }
+                                ])}
+                                className="w-full text-left px-3 py-2 border-b border-gray-50 hover:bg-green-50 transition-colors flex items-center justify-between gap-2 group"
+                              >
+                                <div className="min-w-0">
+                                  <p className="text-xs font-semibold text-gray-800 truncate">
+                                    {s.stat_category === 'equation' && <span className="text-purple-600 mr-1">∑</span>}
+                                    {s.name}
+                                  </p>
+                                  <p className="text-[10px] text-gray-400 capitalize">{s.stat_type}</p>
+                                </div>
+                                <span className={`text-sm flex-shrink-0 font-bold transition-colors ${alreadyIn ? 'text-green-600' : 'text-gray-300 group-hover:text-green-600'}`}>+</span>
+                              </button>
+                            )
+                          })}
+                        </>
+                      )}
+                      {archivedStats.length > 0 && (
+                        <>
+                          <div className="px-3 py-1.5 bg-amber-50 border-b border-amber-100 border-t border-t-gray-100">
+                            <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wide">Archived · Historical Reference</span>
+                          </div>
+                          {archivedStats.map(s => {
+                            const alreadyIn = parts.some(p => String(p.stat_id) === String(s.id))
+                            return (
+                              <button
+                                key={s.id}
+                                onClick={() => setParts(prev => [
+                                  ...prev,
+                                  { stat_id: String(s.id), operator: prev.length === 0 ? null : '+' }
+                                ])}
+                                className="w-full text-left px-3 py-2 border-b border-gray-50 hover:bg-amber-50 transition-colors flex items-center justify-between gap-2 group"
+                              >
+                                <div className="min-w-0">
+                                  <p className="text-xs font-semibold text-gray-500 truncate">
+                                    {s.stat_category === 'equation' && <span className="text-purple-400 mr-1">∑</span>}
+                                    {s.name}
+                                  </p>
+                                  <p className="text-[10px] text-amber-500 capitalize">archived · {s.stat_type}</p>
+                                </div>
+                                <span className={`text-sm flex-shrink-0 font-bold transition-colors ${alreadyIn ? 'text-amber-500' : 'text-gray-300 group-hover:text-amber-500'}`}>+</span>
+                              </button>
+                            )
+                          })}
+                        </>
+                      )}
+                    </>
                   )}
                 </div>
-              ))}
-              <button
-                onClick={addPart}
-                disabled={availableStats.length === 0}
-                className="mt-1 text-sm font-semibold text-green-700 hover:text-green-900 flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                + Add Statistic
-              </button>
+              </div>
+
+              {/* ── RIGHT: formula builder ── */}
+              <div className="flex-1 border border-gray-200 rounded-xl overflow-hidden flex flex-col">
+                <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 flex-shrink-0">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Formula</p>
+                </div>
+                <div className="overflow-y-auto flex-1 p-2 space-y-1">
+                  {parts.length === 0 || !parts[0].stat_id ? (
+                    <p className="text-xs text-gray-400 italic text-center py-6">
+                      ← Click stats on the left to build the equation
+                    </p>
+                  ) : (
+                    parts.map((part, idx) => {
+                      const statName = [...availableStats, ...archivedStats].find(s => String(s.id) === String(part.stat_id))?.name || '—'
+                      const isArchived = archivedStats.some(s => String(s.id) === String(part.stat_id))
+                      return (
+                        <div key={idx} className="flex items-center gap-1.5">
+                          {idx === 0 ? (
+                            <span className="text-[10px] font-bold text-gray-400 uppercase w-24 flex-shrink-0 text-center">Value</span>
+                          ) : (
+                            <select
+                              value={part.operator || '+'}
+                              onChange={e => updatePart(idx, 'operator', e.target.value)}
+                              className="w-24 flex-shrink-0 border border-gray-300 rounded-lg px-1.5 py-1 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-green-600"
+                            >
+                              {OPERATORS.map(op => (
+                                <option key={op.value} value={op.value}>{op.label}</option>
+                              ))}
+                            </select>
+                          )}
+                          <div className={`flex-1 min-w-0 rounded-lg px-2 py-1.5 text-xs font-semibold truncate ${isArchived ? 'bg-amber-50 text-amber-800' : 'bg-green-50 text-green-900'}`}>
+                            {statName}{isArchived ? ' [archived]' : ''}
+                          </div>
+                          <button
+                            onClick={() => removePart(idx)}
+                            className="text-red-300 hover:text-red-600 font-bold flex-shrink-0 px-0.5 text-sm leading-none"
+                            title="Remove"
+                          >✕</button>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
             </div>
             <p className="text-xs text-gray-400 mt-1.5">
               Operators are applied in order, top to bottom. Periods where any component has no value are skipped.
