@@ -1768,12 +1768,30 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
     setParts([{ stat_id: '', operator: null }])
   }
 
-  // Only non-equation stats matching the selected tracking period
-  const availableStats = (allStats || []).filter(
-    s => !s.archived && s.stat_category !== 'equation' &&
-         s.tracking === form.tracking &&
-         (!isEdit || s.id !== initialData?.id)
-  )
+  // Collect all stat IDs transitively depended on by a given equation stat
+  function collectEquationDeps(statId, all, visited = new Set()) {
+    if (visited.has(statId)) return visited
+    visited.add(statId)
+    const st = (all || []).find(s => s.id === statId)
+    if (!st || st.stat_category !== 'equation') return visited
+    for (const part of (st.equation_parts || [])) {
+      if (part.stat_id) collectEquationDeps(part.stat_id, all, visited)
+    }
+    return visited
+  }
+
+  // Stats available as equation operands — same tracking period, not self, no circular deps
+  const availableStats = (allStats || []).filter(s => {
+    if (s.archived) return false
+    if (s.tracking !== form.tracking) return false
+    if (isEdit && s.id === initialData?.id) return false
+    // Prevent circular reference: skip equation stats whose dep tree includes this stat
+    if (isEdit && s.stat_category === 'equation') {
+      const deps = collectEquationDeps(s.id, allStats)
+      if (deps.has(initialData?.id)) return false
+    }
+    return true
+  })
 
   function addPart() {
     setParts(prev => [...prev, { stat_id: '', operator: '+' }])
@@ -1950,7 +1968,9 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
                       {availableStats.length === 0 ? `— no ${form.tracking} stats available —` : '— select statistic —'}
                     </option>
                     {availableStats.map(s => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
+                      <option key={s.id} value={s.id}>
+                        {s.stat_category === 'equation' ? `∑ ${s.name}` : s.name}
+                      </option>
                     ))}
                   </select>
                   {parts.length > 1 && (
@@ -5821,50 +5841,74 @@ export default function Statistics() {
     setValuesStatId(statId)
   }
 
-  async function fetchEquationValues(stat) {
+  // Recursively resolve an equation stat into a Map<period_date, number>.
+  // Handles equation stats whose components are themselves equation stats.
+  async function resolveEquationToMap(stat, allStatsList, depth = 0) {
+    if (depth > 10) return new Map() // guard against runaway cycles
     const parts = stat.equation_parts || []
-    const statIds = [...new Set(parts.map(p => p.stat_id).filter(Boolean))]
-    if (statIds.length === 0) { setValues([]); setValuesStatId(stat.id); return }
+    const compIds = [...new Set(parts.map(p => p.stat_id).filter(Boolean))]
+    if (compIds.length === 0) return new Map()
 
-    const { data: rawVals } = await supabase
-      .from('statistic_values')
-      .select('statistic_id, period_date, value')
-      .in('statistic_id', statIds)
-      .order('period_date')
-
-    // Build map: statId → Map<period_date, value>
-    const valMap = {}
-    for (const id of statIds) valMap[id] = new Map()
-    for (const v of (rawVals || [])) {
-      if (valMap[v.statistic_id]) valMap[v.statistic_id].set(v.period_date, Number(v.value))
+    // Split components into regular (has DB rows) vs nested equation stats
+    const compMaps = {}
+    const regularIds = []
+    for (const id of compIds) {
+      const compStat = (allStatsList || []).find(s => s.id === id)
+      if (compStat?.stat_category === 'equation') {
+        // Resolve recursively
+        compMaps[id] = await resolveEquationToMap(compStat, allStatsList, depth + 1)
+      } else {
+        compMaps[id] = null // fetch from DB
+        regularIds.push(id)
+      }
     }
 
-    // Only compute periods where ALL component stats have a value
-    const firstId = parts[0]?.stat_id
-    if (!firstId) { setValues([]); setValuesStatId(stat.id); return }
+    // Batch-fetch DB values for regular components
+    if (regularIds.length > 0) {
+      const { data: rawVals } = await supabase
+        .from('statistic_values')
+        .select('statistic_id, period_date, value')
+        .in('statistic_id', regularIds)
+        .order('period_date')
+      for (const id of regularIds) compMaps[id] = new Map()
+      for (const v of (rawVals || [])) {
+        compMaps[v.statistic_id]?.set(v.period_date, Number(v.value))
+      }
+    }
 
-    const computed = []
-    for (const [period] of valMap[firstId] || []) {
-      const allPresent = statIds.every(id => valMap[id].has(period))
+    // Compute result: only periods where ALL components have a value
+    const firstId = parts[0]?.stat_id
+    if (!firstId || !compMaps[firstId]) return new Map()
+
+    const result = new Map()
+    for (const [period] of compMaps[firstId]) {
+      const allPresent = compIds.every(id => compMaps[id]?.has(period))
       if (!allPresent) continue
 
-      let result = null
+      let val = null
       for (const part of parts) {
         if (!part.stat_id) continue
-        const val = valMap[part.stat_id]?.get(period) ?? 0
-        if (result === null) {
-          result = val
+        const pv = compMaps[part.stat_id]?.get(period) ?? 0
+        if (val === null) {
+          val = pv
         } else {
-          const op = part.operator
-          if      (op === '+') result += val
-          else if (op === '-') result -= val
-          else if (op === '*') result *= val
-          else if (op === '/') result = val !== 0 ? result / val : result
+          if      (part.operator === '+') val += pv
+          else if (part.operator === '-') val -= pv
+          else if (part.operator === '*') val *= pv
+          else if (part.operator === '/') val = pv !== 0 ? val / pv : val
         }
       }
-      if (result !== null) computed.push({ statistic_id: stat.id, period_date: period, value: result })
+      if (val !== null) result.set(period, val)
     }
+    return result
+  }
 
+  async function fetchEquationValues(stat) {
+    const resolvedMap = await resolveEquationToMap(stat, stats)
+    const computed = []
+    for (const [period, value] of resolvedMap) {
+      computed.push({ statistic_id: stat.id, period_date: period, value })
+    }
     setValues(computed)
     setValuesStatId(stat.id)
   }
