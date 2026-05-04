@@ -5930,15 +5930,14 @@ export default function Statistics() {
     if (compIds.length === 0) return new Map()
 
     // Split components into regular (has DB rows) vs nested equation stats.
-    // Track which components are archived — archived stats are treated as
-    // "historical reference": they contribute their value where present, but
-    // missing periods are filled with 0 instead of disqualifying the period.
+    // Both active and archived components contribute their values where present;
+    // missing periods are filled with 0 (see period-loop below) so that components
+    // with non-overlapping date ranges (e.g. archived historical data + current
+    // sales) combine cleanly without dropping periods.
     const compMaps = {}
-    const archivedSet = new Set()       // component IDs that are archived
     const regularIds = []
     for (const id of compIds) {
       const compStat = (allStatsList || []).find(s => Number(s.id) === id)
-      if (compStat?.archived) archivedSet.add(id)
       if (compStat?.stat_category === 'equation') {
         // Resolve recursively — use numeric id as key
         compMaps[id] = await resolveEquationToMap(compStat, allStatsList, depth + 1)
@@ -5949,8 +5948,7 @@ export default function Statistics() {
     }
 
     // Batch-fetch DB values for regular components (send numbers, not strings).
-    // Important: fetch values for archived components too — they're still in
-    // the DB and we want their historical values to flow into the equation.
+    // Includes archived components — their historical values flow into the equation.
     if (regularIds.length > 0) {
       const { data: rawVals } = await supabase
         .from('statistic_values')
@@ -5964,17 +5962,15 @@ export default function Statistics() {
       }
     }
 
-    // Active (non-archived) component IDs drive which periods are "real".
-    // If every component is archived, fall back to using all of them so a
-    // pure-archived equation (historical lookback) still computes.
-    const activeIds = compIds.filter(id => !archivedSet.has(id))
-    const drivingIds = activeIds.length > 0 ? activeIds : compIds
-
-    // Period set: union of periods across the driving (non-archived) components.
-    // Archived components don't add new periods on their own — they only
-    // contribute values to periods that an active component already covers.
+    // Period set: union of periods across ALL components (active + archived).
+    // Any period where at least one component has data is included.
+    // Components missing a value for a period contribute 0 (see ?? 0 below) —
+    // this matches the natural intent of summing rollups like Total Company Sales,
+    // and keeps results sensible when components have non-overlapping date ranges
+    // (e.g. reps that came/went, archived stats from prior years, nested
+    // equation stats whose sub-results don't perfectly align).
     const allPeriods = new Set()
-    for (const id of drivingIds) {
+    for (const id of compIds) {
       for (const [period] of (compMaps[id] || new Map())) {
         allPeriods.add(period)
       }
@@ -5982,11 +5978,6 @@ export default function Statistics() {
 
     const result = new Map()
     for (const period of [...allPeriods].sort()) {
-      // Require every DRIVING component to have a value — archived components
-      // are allowed to be missing (they'll contribute 0 below).
-      const allPresent = drivingIds.every(id => compMaps[id]?.has(period))
-      if (!allPresent) continue
-
       let val = null
       for (const part of parts) {
         if (!part.stat_id) continue
