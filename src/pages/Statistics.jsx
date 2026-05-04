@@ -807,12 +807,13 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete, targe
 
         {/* Footer */}
         <div className="flex justify-end gap-3 px-6 py-3 border-t border-gray-100 bg-gray-50 flex-shrink-0">
-          {initialData?.id && onOpenShares && (
+          {onOpenShares && (
             <button
               type="button"
-              onClick={() => onOpenShares(initialData.id, initialData.name)}
-              className="px-4 py-2 rounded-lg text-sm text-purple-700 hover:bg-purple-50 border border-purple-200 font-medium"
-              title="Manage who else can view or edit this statistic"
+              disabled={!initialData?.id}
+              onClick={() => initialData?.id && onOpenShares(initialData.id, initialData.name)}
+              className="px-4 py-2 rounded-lg text-sm text-purple-700 hover:bg-purple-50 border border-purple-200 font-medium disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+              title={initialData?.id ? 'Manage who else can view or edit this statistic' : 'Save the stat first to manage permissions'}
             >
               🔒 Shared Permissions
             </button>
@@ -2198,10 +2199,12 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
             )}
           </div>
           <div className="flex gap-2">
-            {initialData?.id && onOpenShares && (
-              <button type="button" onClick={() => onOpenShares(initialData.id, initialData.name)}
-                className="px-4 py-2 text-sm rounded-lg border border-purple-200 text-purple-700 hover:bg-purple-50 font-medium"
-                title="Manage who else can view or edit this statistic">
+            {onOpenShares && (
+              <button type="button"
+                disabled={!initialData?.id}
+                onClick={() => initialData?.id && onOpenShares(initialData.id, initialData.name)}
+                className="px-4 py-2 text-sm rounded-lg border border-purple-200 text-purple-700 hover:bg-purple-50 font-medium disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                title={initialData?.id ? 'Manage who else can view or edit this statistic' : 'Save the stat first to manage permissions'}>
                 🔒 Shared Permissions
               </button>
             )}
@@ -2639,10 +2642,12 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
             )}
           </div>
           <div className="flex gap-2">
-            {initialData?.id && onOpenShares && (
-              <button type="button" onClick={() => onOpenShares(initialData.id, initialData.name)}
-                className="px-4 py-2 text-sm rounded-lg border border-purple-200 text-purple-700 hover:bg-purple-50 font-medium"
-                title="Manage who else can view or edit this statistic">
+            {onOpenShares && (
+              <button type="button"
+                disabled={!initialData?.id}
+                onClick={() => initialData?.id && onOpenShares(initialData.id, initialData.name)}
+                className="px-4 py-2 text-sm rounded-lg border border-purple-200 text-purple-700 hover:bg-purple-50 font-medium disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                title={initialData?.id ? 'Manage who else can view or edit this statistic' : 'Save the stat first to manage permissions'}>
                 🔒 Shared Permissions
               </button>
             )}
@@ -2966,10 +2971,12 @@ function SecondaryStatForm({ initialData, profiles, allStats, onSave, onClose, o
               {deleting ? 'Deleting…' : 'Confirm Delete'}
             </button>
           )}
-          {initialData?.id && onOpenShares && (
-            <button onClick={() => onOpenShares(initialData.id, initialData.name)}
-              className="px-4 py-2.5 border border-purple-200 text-purple-700 text-sm rounded-xl hover:bg-purple-50 transition-colors"
-              title="Manage who else can view or edit this statistic">
+          {onOpenShares && (
+            <button
+              disabled={!initialData?.id}
+              onClick={() => initialData?.id && onOpenShares(initialData.id, initialData.name)}
+              className="px-4 py-2.5 border border-purple-200 text-purple-700 text-sm rounded-xl hover:bg-purple-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+              title={initialData?.id ? 'Manage who else can view or edit this statistic' : 'Save the stat first to manage permissions'}>
               🔒 Shared Permissions
             </button>
           )}
@@ -3394,10 +3401,12 @@ function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete, onOpen
               {deleting ? 'Deleting…' : 'Confirm Delete'}
             </button>
           )}
-          {initialData?.id && onOpenShares && (
-            <button onClick={() => onOpenShares(initialData.id, initialData.name)}
-              className="px-4 py-2.5 border border-purple-200 text-purple-700 text-sm rounded-xl hover:bg-purple-50 transition-colors"
-              title="Manage who else can view or edit this statistic">
+          {onOpenShares && (
+            <button
+              disabled={!initialData?.id}
+              onClick={() => initialData?.id && onOpenShares(initialData.id, initialData.name)}
+              className="px-4 py-2.5 border border-purple-200 text-purple-700 text-sm rounded-xl hover:bg-purple-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+              title={initialData?.id ? 'Manage who else can view or edit this statistic' : 'Save the stat first to manage permissions'}>
               🔒 Shared Permissions
             </button>
           )}
@@ -6778,15 +6787,6 @@ export default function Statistics() {
             >
               Edit Statistic
             </button>
-            {selectedStat?.owner_user_id === user?.id && (
-              <button
-                onClick={() => setShowShares(true)}
-                className="text-sm font-medium text-purple-600 hover:text-purple-800 underline underline-offset-2 transition-colors flex-shrink-0"
-                title="Manage who else can view or edit this statistic"
-              >
-                🔒 Shared Permissions
-              </button>
-            )}
             <button
               onClick={() => setShowNotesModal(true)}
               className="text-sm font-medium text-amber-600 hover:text-amber-800 underline underline-offset-2 transition-colors flex-shrink-0 flex items-center gap-1"
