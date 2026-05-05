@@ -958,7 +958,15 @@ export default function DesignDetail() {
                     ))}
                     {/* In-progress preview */}
                     {drawing && (
-                      <DrawingPreview drawing={drawing} hover={hoverPoint} zoom={zoom} color={drawing.type === 'scale' ? '#FF8800' : drawColor} pageScale={pageScale} />
+                      <DrawingPreview
+                        drawing={drawing}
+                        hover={hoverPoint}
+                        zoom={zoom}
+                        color={drawing.type === 'scale'
+                          ? '#FF8800'
+                          : (items.find(it => it.id === activeItemId)?.color || FG)}
+                        pageScale={pageScale}
+                      />
                     )}
                   </svg>
                 )}
