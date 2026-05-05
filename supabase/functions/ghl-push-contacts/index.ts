@@ -188,13 +188,24 @@ serve(async (req) => {
       .filter(r => r.updated_at && r.ghl_synced_at && r.updated_at > r.ghl_synced_at)
       .slice(0, limit)
 
+    // GHL's /contacts/upsert requires at least one of email or phone to
+    // dedupe against. PBS contacts that have neither (name-only rows from
+    // legacy imports) will always 422 on upsert. Filter them out so they
+    // don't burn API calls and inflate the error count. They'll need
+    // contact info added in PBS before they can sync upward.
+    const hasEmailOrPhone = (r: any) =>
+      (r.email && r.email.trim()) || (r.phone && r.phone.trim()) || (r.cell && r.cell.trim())
+
     // Combine + de-dupe by id; cap at limit. New rows first so initial
     // bulk push works through your backlog before chasing tiny edits.
+    // Also skip rows GHL would reject (no email or phone).
     const seen = new Set<string>()
     const queue: any[] = []
+    let skippedNoContactInfo = 0
     for (const r of [...(noLink || []), ...(stale || [])]) {
       if (seen.has(r.id)) continue
       seen.add(r.id)
+      if (!hasEmailOrPhone(r)) { skippedNoContactInfo += 1; continue }
       queue.push(r)
       if (queue.length >= limit) break
     }
@@ -221,12 +232,13 @@ serve(async (req) => {
         first_name: r.first_name, last_name: r.last_name, email: r.email,
       }))
       return json(200, {
-        ok:                  true,
-        dry_run:             true,
-        would_create:        (noLinkTotal || 0),
-        would_update:        (staleTotal || 0),
-        total_eligible:      totalEligible,
-        next_batch_size:     queue.length,
+        ok:                          true,
+        dry_run:                     true,
+        would_create:                (noLinkTotal || 0),
+        would_update:                (staleTotal || 0),
+        total_eligible:              totalEligible,
+        next_batch_size:             queue.length,
+        skipped_no_contact_info:     skippedNoContactInfo,
         samples,
       })
     }
