@@ -6525,7 +6525,7 @@ export default function Statistics() {
   const accessibleStats = useMemo(
     () => [...myStats, ...sharedStats].sort((a, b) =>
       (a.sort_order ?? 999) - (b.sort_order ?? 999)
-      || (a.name || ).localeCompare(b.name || , undefined, { numeric: true, sensitivity: 'base' })
+      || (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' })
     ),
     [myStats, sharedStats]
   )
