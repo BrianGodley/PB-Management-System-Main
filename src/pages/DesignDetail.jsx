@@ -1345,4 +1345,11 @@ function DrawingPreview({ drawing, hover, zoom, color, pageScale }) {
     const d = allPts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0]} ${p[1]}`).join(' ')
     return (
       <g pointerEvents="none">
-        <path d={d} fill={c
+        <path d={d} fill={color} fillOpacity={0.15} stroke={color} strokeWidth={2} strokeDasharray="6 4" />
+        {pts.map((p, i) => (<circle key={i} cx={p[0]} cy={p[1]} r={4} fill={color} stroke="#fff" strokeWidth={1.5} />))}
+      </g>
+    )
+  }
+
+  return null
+}
