@@ -3,6 +3,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LanguageContext'
 import { supabase } from '../lib/supabase'
+import SamChat from './SamChat'
 
 const navItems = [
   { path: '/contacts',            label: 'Contacts',          icon: '🗂️' },
@@ -349,6 +350,9 @@ export default function Layout() {
           </div>
         </>
       )}
+
+      {/* Sam — floating AI assistant, available on every page */}
+      <SamChat />
     </div>
   )
 }
