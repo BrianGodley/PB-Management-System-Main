@@ -215,6 +215,8 @@ export default function Contacts() {
   const [error,       setError]       = useState(null)
   const [search,      setSearch]      = useState('')
   const [stageFilter, setStageFilter] = useState('all')
+  // Mobile-only filter modal — replaces the inline pill row on phones.
+  const [showMobileFilter, setShowMobileFilter] = useState(false)
   const [showAdd,     setShowAdd]     = useState(false)
   const [showImport,  setShowImport]  = useState(false)
   const [showExport,  setShowExport]  = useState(false)
@@ -289,29 +291,47 @@ export default function Contacts() {
       <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
         <h1 className="text-xl font-bold text-gray-900">Contacts</h1>
         <div className="flex items-center gap-2">
+          {/* Filter — mobile-only entry to the new filter modal. */}
+          <button
+            onClick={() => setShowMobileFilter(true)}
+            className="sm:hidden px-3 py-2 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg flex items-center gap-1.5"
+          >
+            🔎 Filter
+            {stageFilter !== 'all' && (
+              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-green-700 text-white text-[10px] font-bold">1</span>
+            )}
+          </button>
           <button
             onClick={() => setShowImport(true)}
-            className="px-3 py-2 border border-gray-200 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+            className="hidden sm:flex px-3 py-2 border border-gray-200 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-50 transition-colors items-center gap-1.5"
           >
             ⬆ Import
           </button>
           <button
             onClick={() => setShowExport(true)}
-            className="px-3 py-2 border border-gray-200 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+            className="hidden sm:flex px-3 py-2 border border-gray-200 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-50 transition-colors items-center gap-1.5"
           >
             ⬇ Export
           </button>
           <button
             onClick={() => setShowAdd(true)}
-            className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 transition-colors"
+            className="hidden sm:flex px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 transition-colors"
           >
             + Add Contact
           </button>
         </div>
       </div>
 
-      {/* Stage filter pills */}
-      <div className="flex flex-wrap gap-2 mb-4">
+      {/* Mobile: full-width Add Contact button sits directly above the search field. */}
+      <button
+        onClick={() => setShowAdd(true)}
+        className="sm:hidden w-full mb-3 py-2.5 bg-green-700 text-white rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
+      >
+        + Add Contact
+      </button>
+
+      {/* Stage filter pills — desktop only; mobile uses the Filter modal */}
+      <div className="hidden sm:flex flex-wrap gap-2 mb-4">
         <button
           onClick={() => setStageFilter('all')}
           className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${stageFilter === 'all' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}
@@ -502,6 +522,43 @@ export default function Contacts() {
           contacts={filtered}
           onClose={() => setShowExport(false)}
         />
+      )}
+
+      {/* Mobile filter modal — picks the stage filter and closes. */}
+      {showMobileFilter && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 flex items-start sm:items-center justify-center p-4 pt-16 sm:pt-4 sm:hidden"
+          onClick={() => setShowMobileFilter(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="text-base font-bold text-gray-800">Filter contacts</h2>
+              <button onClick={() => setShowMobileFilter(false)} className="text-gray-400 text-xl leading-none px-1">✕</button>
+            </div>
+            <div className="p-3 space-y-2 max-h-[60vh] overflow-y-auto">
+              <button
+                onClick={() => { setStageFilter('all'); setShowMobileFilter(false) }}
+                className={`w-full flex items-center justify-between px-3 py-3 rounded-lg border text-sm font-semibold transition-colors ${stageFilter === 'all' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-700 border-gray-200'}`}
+              >
+                <span>All contacts</span>
+                <span className="text-xs opacity-70">{contacts.length}</span>
+              </button>
+              {STAGES.map(s => (
+                <button
+                  key={s.value}
+                  onClick={() => { setStageFilter(s.value); setShowMobileFilter(false) }}
+                  className={`w-full flex items-center justify-between px-3 py-3 rounded-lg border text-sm font-semibold transition-colors ${stageFilter === s.value ? s.cls + ' ring-2 ring-current' : 'bg-white text-gray-600 border-gray-200'}`}
+                >
+                  <span>{s.label}</span>
+                  <span className="text-xs opacity-60">{contacts.filter(c => c.stage === s.value).length}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
