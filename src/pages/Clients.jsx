@@ -56,7 +56,45 @@ export default function Clients() {
     notes: ''
   })
 
+  // ── Contact-import flow for new clients ─────────────────────────────────
+  // The "New Client" form has two source modes: "scratch" (blank form) and
+  // "contact" (prefill from an existing Contacts row). Picking a contact
+  // populates the form fields; the user can still edit before saving.
+  const [newClientMode,        setNewClientMode]        = useState('scratch') // 'scratch' | 'contact'
+  const [contactsForImport,    setContactsForImport]    = useState([])
+  const [contactImportSearch,  setContactImportSearch]  = useState('')
+  const [selectedContactId,    setSelectedContactId]    = useState(null)
+
   useEffect(() => { fetchClients() }, [])
+  useEffect(() => {
+    // Lazy-load the contacts list the first time the form is opened.
+    if (!showForm || contactsForImport.length > 0) return
+    supabase.from('contacts')
+      .select('id, first_name, last_name, company_name, company_position, email, phone, street_address, city, state, zip')
+      .order('last_name')
+      .then(({ data }) => setContactsForImport(data || []))
+  }, [showForm])
+
+  // When the user selects a contact, copy its fields into the form. They can
+  // still edit anything before saving.
+  function applyContactToForm(contactId) {
+    const c = contactsForImport.find(x => x.id === contactId)
+    if (!c) return
+    setSelectedContactId(contactId)
+    setForm({
+      first_name:       c.first_name       || '',
+      last_name:        c.last_name        || '',
+      company_name:     c.company_name     || '',
+      company_position: c.company_position || '',
+      email:            c.email            || '',
+      phone:            c.phone            || '',
+      street:           c.street_address   || '',
+      city:             c.city             || '',
+      state:            c.state            || '',
+      zip:              c.zip              || '',
+      notes:            '',
+    })
+  }
 
   // Close column picker on outside click
   useEffect(() => {
@@ -104,6 +142,7 @@ export default function Clients() {
     } else {
       setForm({ first_name:'', last_name:'', company_name:'', company_position:'', email:'', phone:'', street:'', city:'', state:'', zip:'', notes:'' })
       setShowForm(false); setSaveError(''); fetchClients()
+      setNewClientMode('scratch'); setSelectedContactId(null); setContactImportSearch('')
     }
   }
 
@@ -319,7 +358,80 @@ export default function Clients() {
       {/* ── New client form ── */}
       {showForm && (
         <form onSubmit={handleSave} className="card mb-6">
-          <h2 className="font-semibold text-gray-900 mb-4">New Client</h2>
+          <h2 className="font-semibold text-gray-900 mb-3">New Client</h2>
+
+          {/* Source toggle: blank form or import from a Contact row */}
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xs font-semibold text-gray-500 uppercase">Source:</span>
+            {[
+              { key: 'scratch', label: 'From scratch' },
+              { key: 'contact', label: 'From a contact' },
+            ].map(o => (
+              <button
+                key={o.key}
+                type="button"
+                onClick={() => setNewClientMode(o.key)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-colors ${
+                  newClientMode === o.key
+                    ? 'border-green-700 bg-green-50 text-green-800'
+                    : 'border-gray-200 text-gray-500 hover:border-green-500'
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+
+          {newClientMode === 'contact' && (
+            <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+              <label className="label">Pick a contact to import</label>
+              <input
+                type="text"
+                placeholder="Search by name, company, email…"
+                value={contactImportSearch}
+                onChange={e => setContactImportSearch(e.target.value)}
+                className="input mb-2"
+              />
+              <div className="max-h-56 overflow-y-auto border border-gray-200 rounded-md bg-white divide-y divide-gray-100">
+                {(() => {
+                  const q = contactImportSearch.trim().toLowerCase()
+                  const list = q
+                    ? contactsForImport.filter(c => {
+                        const hay = [c.first_name, c.last_name, c.company_name, c.email, c.phone].filter(Boolean).join(' ').toLowerCase()
+                        return hay.includes(q)
+                      })
+                    : contactsForImport
+                  if (list.length === 0) return (
+                    <p className="px-3 py-3 text-xs text-gray-400">{contactImportSearch ? 'No matches.' : 'No contacts yet.'}</p>
+                  )
+                  return list.slice(0, 50).map(c => {
+                    const isSelected = c.id === selectedContactId
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => applyContactToForm(c.id)}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-green-50 ${isSelected ? 'bg-green-50' : ''}`}
+                      >
+                        <p className="font-semibold text-gray-800">
+                          {c.last_name}{c.first_name ? `, ${c.first_name}` : ''}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {[c.company_name, c.email, c.phone].filter(Boolean).join(' · ') || '—'}
+                        </p>
+                      </button>
+                    )
+                  })
+                })()}
+              </div>
+              {selectedContactId && (
+                <p className="text-[11px] text-green-700 mt-2">
+                  ✓ Imported into the form below — you can still edit any field before saving.
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
             <div>
@@ -382,7 +494,16 @@ export default function Clients() {
             <div className="mt-3 bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-lg">⚠️ {saveError}</div>
           )}
           <div className="flex gap-2 mt-4">
-            <button type="button" onClick={() => setShowForm(false)} className="btn-secondary flex-1">Cancel</button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowForm(false)
+                setNewClientMode('scratch')
+                setSelectedContactId(null)
+                setContactImportSearch('')
+              }}
+              className="btn-secondary flex-1"
+            >Cancel</button>
             <button type="submit" disabled={saving} className="btn-primary flex-1">{saving ? 'Saving...' : 'Save Client'}</button>
           </div>
         </form>
