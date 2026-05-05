@@ -139,7 +139,25 @@ async function fetchContactsPage(args: {
   token:      string
   locationId: string
   page:       number
+  sinceIso?:  string | null
 }): Promise<GhlPagedResponse> {
+  const body: Record<string, unknown> = {
+    locationId: args.locationId,
+    page:       args.page,
+    pageLimit:  PAGE_LIMIT,
+    // Sort by dateUpdated ascending so we can advance a high-water-mark
+    // and resume across invocations.
+    sort: [{ field: 'dateUpdated', direction: 'asc' }],
+  }
+  // When we have a saved high-water-mark, ask GHL to only return records
+  // with a strictly later dateUpdated. Use `gte` (we'll dedupe within a
+  // run via seenGhlIds, and dedupe across runs via ghl_contact_id match).
+  if (args.sinceIso) {
+    body.filters = [
+      { field: 'dateUpdated', operator: 'gte', value: args.sinceIso },
+    ]
+  }
+
   const res = await fetch(`${GHL_BASE_URL}/contacts/search`, {
     method: 'POST',
     headers: {
@@ -148,21 +166,16 @@ async function fetchContactsPage(args: {
       Accept:         'application/json',
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      locationId: args.locationId,
-      page:       args.page,
-      pageLimit:  PAGE_LIMIT,
-      // No filters — we want every contact in the location.
-    }),
+    body: JSON.stringify(body),
   })
 
-  let body: unknown = null
-  try { body = await res.json() } catch { /* */ }
+  let resp: unknown = null
+  try { resp = await res.json() } catch { /* */ }
   if (!res.ok) {
-    const msg = (body as any)?.message || (body as any)?.error || `GHL ${res.status}`
+    const msg = (resp as any)?.message || (resp as any)?.error || `GHL ${res.status}`
     throw new Error(msg)
   }
-  return body as GhlPagedResponse
+  return resp as GhlPagedResponse
 }
 
 // Map a GHL contact onto the PBS contacts schema.
@@ -275,6 +288,14 @@ serve(async (req) => {
     // Walk pages 1..N from GHL. We rely on the response's `total` field
     // (returned by /contacts/search) to know when we're done — much more
     // reliable than guessing from page-size shrinkage.
+    //
+    // We process at most MAX_RECORDS_PER_INVOCATION records per call
+    // and bail out early when we get within MAX_WALL_BUDGET_MS of
+    // Supabase's 150s wall-time. The remaining work is signalled to
+    // the caller via the `remaining` field; the UI auto-loops.
+    const MAX_RECORDS_PER_INVOCATION = 500
+    const MAX_WALL_BUDGET_MS         = 100_000   // 100s, leaves headroom
+    const startedAt = Date.now()
     let newestSeen: string | null = null
     let pages = 0
     let reportedTotal: number | null = null
@@ -289,6 +310,7 @@ serve(async (req) => {
         token:      conn.access_token,
         locationId: conn.location_id,
         page:       pages,
+        sinceIso,
       })
       const list = page.contacts || []
       if (page.meta?.total != null) reportedTotal = page.meta.total
@@ -424,6 +446,10 @@ serve(async (req) => {
       // fewer than a full page.
       if (list.length < PAGE_LIMIT) break
       if (reportedTotal != null && processedCount >= reportedTotal) break
+      // Soft per-invocation budgets — bail early so Supabase doesn't
+      // kill us at 150s.
+      if (processedCount >= MAX_RECORDS_PER_INVOCATION) break
+      if (Date.now() - startedAt > MAX_WALL_BUDGET_MS) break
     }
 
     inboundSyncedAt = newestSeen || (state?.inbound_synced_at ?? null)
@@ -434,6 +460,9 @@ serve(async (req) => {
     )
 
     if (dryRun) {
+      const remaining = (reportedTotal != null)
+        ? Math.max(0, reportedTotal - processedCount)
+        : 0
       // Don't touch sync state on dry runs — just return the preview.
       return json(200, {
         ok:      true,
@@ -441,6 +470,8 @@ serve(async (req) => {
         ...counts,
         samples,
         pages,
+        remaining,
+        total_eligible: reportedTotal,
       })
     }
 
@@ -465,11 +496,16 @@ serve(async (req) => {
       message:        logMessage,
     })
 
+    const remaining = (reportedTotal != null)
+      ? Math.max(0, reportedTotal - processedCount)
+      : 0
     return json(200, {
       ok:               true,
       records_synced:   recordsSynced,
       inbound_synced_at: inboundSyncedAt,
       pages,
+      remaining,
+      total_eligible:   reportedTotal,
       ...counts,
     })
   } catch (e) {

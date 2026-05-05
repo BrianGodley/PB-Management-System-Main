@@ -2136,9 +2136,47 @@ function IntegrationsSettings() {
         setTimeout(() => setGhlPushProgress(p => { const n = { ...p }; delete n[objectType]; return n }), 4000)
         await loadGhl()
       } else {
+        // Auto-loop the pull just like the push: keep calling until
+        // remaining hits 0 or the user clicks Stop. The Edge Function
+        // limits each invocation to ~500 records so it doesn't trip
+        // Supabase's 150s wall time.
+        ghlPushAbortRef.current = false
+        let totalPulled = body.records_synced || 0
+        let remaining   = body.remaining || 0
+        const totalEligible = (body.total_eligible ?? totalPulled + remaining)
+        setGhlPushProgress(p => ({ ...p, [objectType]: { pushed: totalPulled, total: totalEligible, errors: 0 } }))
         setGhlMsgError(false)
-        setGhlMsg(`${objectType} pull: pulled ${body.records_synced ?? 0}.`)
+        setGhlMsg(`${objectType} pull: ${totalPulled}/${totalEligible} pulled…`)
+        let safety = 200
+        while (remaining > 0 && !ghlPushAbortRef.current && safety-- > 0) {
+          const r2 = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnSlug}`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type':  'application/json',
+                'Authorization': `Bearer ${jwt}`,
+              },
+              body: JSON.stringify({}),
+            }
+          )
+          const b2 = await r2.json().catch(() => ({}))
+          if (!r2.ok || b2.ok === false) {
+            setGhlMsgError(true)
+            setGhlMsg(`${objectType} pull: ${b2.error || b2.message || `HTTP ${r2.status}`} (after ${totalPulled} pulled)`)
+            break
+          }
+          totalPulled += b2.records_synced || 0
+          remaining    = b2.remaining || 0
+          setGhlPushProgress(p => ({ ...p, [objectType]: { pushed: totalPulled, total: totalEligible, errors: 0 } }))
+          setGhlMsg(`${objectType} pull: ${totalPulled}/${totalEligible} pulled…`)
+        }
+        const tail = ghlPushAbortRef.current
+          ? ' (stopped)'
+          : (remaining > 0 ? ` (paused — ${remaining} still remaining)` : ' (done)')
+        setGhlMsg(`${objectType} pull: ${totalPulled} pulled${tail}`)
         setGhlPreview(p => { const n = { ...p }; delete n[`${objectType}:${direction}`]; return n })
+        setTimeout(() => setGhlPushProgress(p => { const n = { ...p }; delete n[objectType]; return n }), 4000)
         await loadGhl()
       }
     } catch (e) {
