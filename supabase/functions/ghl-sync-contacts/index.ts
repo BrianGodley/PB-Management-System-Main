@@ -125,42 +125,35 @@ interface GhlPagedResponse {
   }
 }
 
-// One page from GHL.
+// One page from GHL via the v2 search endpoint.
 //
-// We support two cursor inputs:
-//   • nextPageUrl — if GHL gave us one in the previous response's meta,
-//     use it verbatim. This is the most reliable form because GHL signs
-//     it with whatever filter context it expects.
-//   • (startAfter, startAfterId) tuple — the documented v2 cursor.
-//     BOTH must be passed: startAfter is a millisecond timestamp,
-//     startAfterId is the record's id. Without startAfter the cursor
-//     can become ambiguous and the API may return the same page.
+// We use POST /contacts/search instead of GET /contacts/ because the GET
+// endpoint silently scopes results to a subset under Private Integration
+// Tokens (we observed it returning only ~150 of 7,000 contacts in
+// practice). The search endpoint:
+//   • returns a real `total` count in the response, so we can sanity-check
+//     pagination immediately instead of guessing
+//   • uses simple page-number pagination (page=1, page=2, …)
+//   • respects locationId properly under PITs
 async function fetchContactsPage(args: {
-  token:   string
+  token:      string
   locationId: string
-  nextPageUrl?: string | null
-  startAfterId?: string | null
-  startAfter?:   number | null
+  page:       number
 }): Promise<GhlPagedResponse> {
-  let urlStr: string
-  if (args.nextPageUrl) {
-    urlStr = args.nextPageUrl
-  } else {
-    const url = new URL(`${GHL_BASE_URL}/contacts/`)
-    url.searchParams.set('locationId', args.locationId)
-    url.searchParams.set('limit',      String(PAGE_LIMIT))
-    if (args.startAfterId) url.searchParams.set('startAfterId', args.startAfterId)
-    if (args.startAfter)   url.searchParams.set('startAfter',   String(args.startAfter))
-    urlStr = url.toString()
-  }
-
-  const res = await fetch(urlStr, {
-    method: 'GET',
+  const res = await fetch(`${GHL_BASE_URL}/contacts/search`, {
+    method: 'POST',
     headers: {
-      Authorization: `Bearer ${args.token}`,
-      Version:       GHL_API_VERSION,
-      Accept:        'application/json',
+      Authorization:  `Bearer ${args.token}`,
+      Version:        GHL_API_VERSION,
+      Accept:         'application/json',
+      'Content-Type': 'application/json',
     },
+    body: JSON.stringify({
+      locationId: args.locationId,
+      page:       args.page,
+      pageLimit:  PAGE_LIMIT,
+      // No filters — we want every contact in the location.
+    }),
   })
 
   let body: unknown = null
@@ -279,16 +272,13 @@ serve(async (req) => {
       .update({ last_run_at: new Date().toISOString(), last_run_status: 'running', last_run_message: '' })
       .eq('object_type', 'contacts')
 
-    // Page through GHL contacts. We stream results into upserts so we don't
-    // have to hold the whole list in memory. Cursor uses both startAfter
-    // (timestamp ms) AND startAfterId — required for stable pagination.
-    let cursor: {
-      nextPageUrl?: string | null
-      startAfterId?: string | null
-      startAfter?: number | null
-    } = {}
+    // Walk pages 1..N from GHL. We rely on the response's `total` field
+    // (returned by /contacts/search) to know when we're done — much more
+    // reliable than guessing from page-size shrinkage.
     let newestSeen: string | null = null
     let pages = 0
+    let reportedTotal: number | null = null
+    let processedCount = 0
     while (true) {
       pages += 1
       if (pages > 200) {
@@ -296,22 +286,20 @@ serve(async (req) => {
         break
       }
       const page = await fetchContactsPage({
-        token:        conn.access_token,
-        locationId:   conn.location_id,
-        nextPageUrl:  cursor.nextPageUrl,
-        startAfterId: cursor.startAfterId,
-        startAfter:   cursor.startAfter,
+        token:      conn.access_token,
+        locationId: conn.location_id,
+        page:       pages,
       })
       const list = page.contacts || []
-      // Lightweight per-page log so we can audit pagination if a sync
-      // returns suspiciously few records.
+      if (page.meta?.total != null) reportedTotal = page.meta.total
+      // Per-page log so we can audit pagination from the database.
       try {
         await sb.from('ghl_sync_log').insert({
           object_type:    'contacts',
           direction:      'inbound',
           status:         'ok',
           records_synced: list.length,
-          message:        `page ${pages}: got ${list.length}, total reported ${page.meta?.total ?? 'n/a'}`,
+          message:        `page ${pages}: got ${list.length}, total reported ${reportedTotal ?? 'n/a'}`,
         })
       } catch { /* log is best-effort */ }
       if (list.length === 0) break
@@ -431,24 +419,11 @@ serve(async (req) => {
         recordsSynced += 1
       }
 
-      // Stop when we got fewer than a full page; GHL is done.
+      processedCount += list.length
+      // Stop when we've seen at least `total` rows or the page returned
+      // fewer than a full page.
       if (list.length < PAGE_LIMIT) break
-
-      // Advance the cursor. Preferred: GHL's own nextPageUrl. Fallback:
-      // (startAfter, startAfterId) tuple based on the last record's
-      // dateAdded (or dateUpdated) and id.
-      const next = page.meta?.nextPageUrl || null
-      if (next) {
-        if (next === cursor.nextPageUrl) break  // safety: no progress
-        cursor = { nextPageUrl: next }
-      } else {
-        const last = list[list.length - 1]
-        const lastId = last?.id
-        const lastTs = last?.dateAdded || last?.dateUpdated
-        const lastMs = lastTs ? Date.parse(lastTs) : null
-        if (!lastId || (lastId === cursor.startAfterId && lastMs === cursor.startAfter)) break
-        cursor = { startAfterId: lastId, startAfter: lastMs }
-      }
+      if (reportedTotal != null && processedCount >= reportedTotal) break
     }
 
     inboundSyncedAt = newestSeen || (state?.inbound_synced_at ?? null)
