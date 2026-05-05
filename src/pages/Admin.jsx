@@ -1821,6 +1821,43 @@ function SmsSettings() {
                         </button>
                       )}
                     </div>
+                    {/* Dry-run preview panel for this object type. */}
+                    {ghlPreview[objType] && (
+                      <div className="mt-2 px-3 py-2 rounded-md bg-blue-50 border border-blue-200 text-xs text-blue-900 space-y-1">
+                        <p className="font-semibold">Preview ({label.toLowerCase()}) — no changes were written.</p>
+                        <p>
+                          <span className="font-medium">Would update:</span>
+                          {' '}
+                          {(ghlPreview[objType].would_update_by_ghl_id || 0)
+                            + (ghlPreview[objType].would_update_by_email || 0)
+                            + (ghlPreview[objType].would_update_by_phone || 0)
+                            + (ghlPreview[objType].would_update_by_name_zip || 0)}
+                          {` (ghl_id:${ghlPreview[objType].would_update_by_ghl_id || 0}, `
+                            + `email:${ghlPreview[objType].would_update_by_email || 0}, `
+                            + `phone:${ghlPreview[objType].would_update_by_phone || 0}, `
+                            + `name+zip:${ghlPreview[objType].would_update_by_name_zip || 0})`}
+                        </p>
+                        <p>
+                          <span className="font-medium">Would insert (new):</span>
+                          {' '}{ghlPreview[objType].would_insert || 0}
+                        </p>
+                        {Array.isArray(ghlPreview[objType].samples) && ghlPreview[objType].samples.length > 0 && (
+                          <details className="text-[11px] text-blue-800">
+                            <summary className="cursor-pointer select-none">Show {ghlPreview[objType].samples.length} samples</summary>
+                            <ul className="mt-1 space-y-0.5">
+                              {ghlPreview[objType].samples.map((s, i) => (
+                                <li key={i} className="font-mono">
+                                  <span className="text-blue-600">{s.reason}</span>:{' '}
+                                  {(s.ghl?.firstName || '') + ' ' + (s.ghl?.lastName || '')}{' '}
+                                  {s.ghl?.email ? `<${s.ghl.email}>` : ''}{' '}
+                                  {s.pbs ? `→ pbs#${s.pbs.id}` : '→ NEW'}
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -2038,7 +2075,10 @@ function IntegrationsSettings() {
   // Per-object-type 'Sync now' state — keyed by object_type so each row's
   // button can show its own spinner without freezing the rest.
   const [ghlSyncing, setGhlSyncing] = useState({}) // { contacts: true, ... }
-  async function runSyncNow(objectType) {
+  // Latest dry-run preview, keyed by object_type. Cleared when a real sync runs.
+  const [ghlPreview, setGhlPreview] = useState({})
+  async function runSyncNow(objectType, opts = {}) {
+    const dryRun = !!opts.dryRun
     const fnSlug = {
       contacts:      'ghl-sync-contacts',
       // wired up in Phase 5–6
@@ -2059,16 +2099,22 @@ function IntegrationsSettings() {
             'Content-Type':  'application/json',
             'Authorization': `Bearer ${jwt}`,
           },
-          body: JSON.stringify({}),
+          body: JSON.stringify({ dry_run: dryRun }),
         }
       )
       const body = await res.json().catch(() => ({}))
       if (!res.ok || body.ok === false) {
         setGhlMsgError(true)
         setGhlMsg(`${objectType} sync: ${body.error || body.message || `HTTP ${res.status}`}`)
+      } else if (dryRun) {
+        setGhlMsgError(false)
+        setGhlMsg(`${objectType} preview ready below.`)
+        setGhlPreview(p => ({ ...p, [objectType]: body }))
       } else {
         setGhlMsgError(false)
         setGhlMsg(`${objectType} sync: pulled ${body.records_synced ?? 0}.`)
+        // Real sync invalidates any earlier preview for this object type.
+        setGhlPreview(p => { const n = { ...p }; delete n[objectType]; return n })
         await loadGhl()
       }
     } catch (e) {
@@ -2372,6 +2418,14 @@ function IntegrationsSettings() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
+                      <button type="button"
+                        onClick={() => runSyncNow(objType, { dryRun: true })}
+                        disabled={!ghl[key] || !!ghlSyncing[objType]}
+                        title="Preview match counts without writing to PBS"
+                        className="text-xs font-semibold text-blue-700 border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-md px-2 py-1 disabled:opacity-40"
+                      >
+                        Preview
+                      </button>
                       <button type="button"
                         onClick={() => runSyncNow(objType)}
                         disabled={!ghl[key] || !!ghlSyncing[objType]}

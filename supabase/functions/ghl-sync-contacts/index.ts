@@ -6,17 +6,38 @@
 //   • Pulls contacts whose dateUpdated is newer than the saved
 //     ghl_sync_state.inbound_synced_at (full pull on the first run).
 //   • Pages through GHL's /contacts/ list endpoint with limit=100.
-//   • Upserts into public.contacts, matching first by ghl_contact_id and
-//     falling back to email when an existing PBS contact has the same
-//     email but no GHL link yet (so re-running a first sync doesn't
-//     create duplicates of contacts the user already has).
+//   • Upserts into public.contacts using a deduplication ladder so we
+//     don't pile duplicates on top of existing imports:
+//        1. exact match on ghl_contact_id
+//        2. exact match on email   (PBS contact must have no GHL link yet)
+//        3. exact match on phone   (digits-only, last 10 digits — same)
+//        4. exact match on (last_name + first_name + zip), all lowercased
+//        5. otherwise insert new
+//     Each rung is only tried if the previous didn't match. Steps 2-4
+//     also stamp the matched PBS row with the GHL id so future syncs
+//     skip straight to step 1.
 //   • Advances ghl_sync_state.inbound_synced_at to the newest dateUpdated
 //     it saw, and appends a row to ghl_sync_log.
 //
 // Auth: must be a signed-in admin (per profiles.role).
 //
-// Request body: empty POST is fine. Optional `{ "full": true }` forces a
-// full re-sync by ignoring the saved high-water-mark.
+// Request body (POST JSON):
+//   {
+//     full?:    boolean,   // ignore saved high-water-mark, pull everything
+//     dry_run?: boolean,   // count matches by category, write nothing
+//   }
+//
+// Dry-run response includes:
+//   {
+//     ok: true,
+//     dry_run: true,
+//     would_update_by_ghl_id: N,
+//     would_update_by_email:  N,
+//     would_update_by_phone:  N,
+//     would_update_by_name_zip: N,
+//     would_insert: N,
+//     samples: [ { reason, ghl: {...}, pbs: {...} | null }, ... up to 25 ]
+//   }
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -136,12 +157,33 @@ async function fetchContactsPage(args: {
 }
 
 // Map a GHL contact onto the PBS contacts schema.
+//
+// PBS contacts.first_name and last_name are NOT NULL, so we coalesce to
+// empty strings rather than null. If a GHL contact carries neither a
+// first_name nor a last_name (a company-only contact, very common for
+// vendors and HOAs in GHL), we drop the company name into last_name so
+// the row has something readable. The original company_name still gets
+// preserved in its own column.
 function toPbsContact(c: GhlContact) {
+  let firstName = (c.firstName || '').trim()
+  let lastName  = (c.lastName  || '').trim()
+  if (!firstName && !lastName) {
+    // Last-resort fallbacks: contactName (full name from GHL) or companyName.
+    const fallback = (c.contactName || c.companyName || '').trim()
+    if (fallback.includes(' ')) {
+      const parts = fallback.split(/\s+/)
+      firstName = parts.slice(0, -1).join(' ')
+      lastName  = parts[parts.length - 1]
+    } else {
+      lastName = fallback // even an empty string keeps the column non-null
+    }
+  }
+
   return {
     ghl_contact_id: c.id,
     ghl_synced_at:  new Date().toISOString(),
-    first_name:     c.firstName || null,
-    last_name:      c.lastName  || null,
+    first_name:     firstName,                 // never null
+    last_name:      lastName,                  // never null
     company_name:   c.companyName || null,
     email:          c.email      || null,
     phone:          c.phone      || null,
@@ -172,6 +214,7 @@ serve(async (req) => {
 
     const reqBody = await req.json().catch(() => ({}))
     const fullSync = !!reqBody.full
+    const dryRun   = !!reqBody.dry_run
 
     // Load the saved connection.
     const { data: conn, error: cErr } = await sb.from('ghl_connections')
@@ -190,6 +233,26 @@ serve(async (req) => {
       .eq('object_type', 'contacts')
       .maybeSingle()
     const sinceIso = (!fullSync && state?.inbound_synced_at) ? state.inbound_synced_at : null
+
+    // Helpers + accumulator for the dedup ladder.
+    const digitsOnly = (s: string) => (s || '').replace(/\D/g, '')
+    const counts = {
+      would_update_by_ghl_id:   0,
+      would_update_by_email:    0,
+      would_update_by_phone:    0,
+      would_update_by_name_zip: 0,
+      would_insert:             0,
+    }
+    const samples: Array<{ reason: string; ghl: any; pbs: any | null }> = []
+    const collectSample = (reason: string, ghl: any, pbs: any | null) => {
+      if (samples.length < 25) {
+        samples.push({
+          reason,
+          ghl: { id: ghl.id, firstName: ghl.firstName, lastName: ghl.lastName, email: ghl.email, phone: ghl.phone },
+          pbs: pbs ? { id: pbs.id, first_name: pbs.first_name, last_name: pbs.last_name } : null,
+        })
+      }
+    }
 
     // Mark the row as running.
     await sb.from('ghl_sync_state')
@@ -227,38 +290,103 @@ serve(async (req) => {
         }
 
         const row = toPbsContact(c)
+        const phoneDigits = digitsOnly(row.phone || '').slice(-10)  // last 10 digits, or ''
+        const namePart    = `${(row.last_name||'').toLowerCase().trim()}|${(row.first_name||'').toLowerCase().trim()}`
+        const zipPart     = (row.zip || '').replace(/\s/g, '').toLowerCase()
+        const hasNameZip  = namePart !== '|' && zipPart !== ''
 
-        // Try the explicit ghl_contact_id match first.
-        const { data: existingByGhl } = await sb.from('contacts')
+        // ── 1. Match on ghl_contact_id (already linked) ──────────────
+        const { data: byGhl } = await sb.from('contacts')
           .select('id')
           .eq('ghl_contact_id', row.ghl_contact_id)
           .maybeSingle()
-
-        if (existingByGhl?.id) {
-          const { error: uErr } = await sb.from('contacts').update(row).eq('id', existingByGhl.id)
-          if (uErr) throw new Error('Update by ghl_id failed: ' + uErr.message)
+        if (byGhl?.id) {
+          counts.would_update_by_ghl_id += 1
+          collectSample('ghl_id', c, { id: byGhl.id })
+          if (!dryRun) {
+            const { error: uErr } = await sb.from('contacts').update(row).eq('id', byGhl.id)
+            if (uErr) throw new Error('Update by ghl_id failed: ' + uErr.message)
+          }
           recordsSynced += 1
           continue
         }
 
-        // Fallback: a PBS contact with the same email but no GHL link yet.
+        // ── 2. Match on email (if PBS contact has no GHL link yet) ───
         if (row.email) {
-          const { data: existingByEmail } = await sb.from('contacts')
-            .select('id, ghl_contact_id')
+          const { data: byEmail } = await sb.from('contacts')
+            .select('id, first_name, last_name')
             .eq('email', row.email)
             .is('ghl_contact_id', null)
             .maybeSingle()
-          if (existingByEmail?.id) {
-            const { error: u2Err } = await sb.from('contacts').update(row).eq('id', existingByEmail.id)
-            if (u2Err) throw new Error('Update by email failed: ' + u2Err.message)
+          if (byEmail?.id) {
+            counts.would_update_by_email += 1
+            collectSample('email', c, byEmail)
+            if (!dryRun) {
+              const { error: u2 } = await sb.from('contacts').update(row).eq('id', byEmail.id)
+              if (u2) throw new Error('Update by email failed: ' + u2.message)
+            }
             recordsSynced += 1
             continue
           }
         }
 
-        // No match — insert new.
-        const { error: iErr } = await sb.from('contacts').insert(row)
-        if (iErr) throw new Error('Insert failed: ' + iErr.message)
+        // ── 3. Match on phone (last 10 digits, no GHL link yet) ──────
+        if (phoneDigits.length >= 7) {  // require something beyond an area code
+          // Postgres-side: compare regexp_replace(phone,'\D','','g') ENDS WITH our digits.
+          // We approximate with a LIKE that targets the last 10 chars after stripping
+          // by pulling candidates and re-checking in JS — simpler than a LIKE on a
+          // computed column, and PBS only has ~5k contacts so the overhead is fine.
+          const { data: phoneCands } = await sb.from('contacts')
+            .select('id, first_name, last_name, phone, cell, ghl_contact_id')
+            .or(`phone.ilike.%${phoneDigits.slice(-7)}%,cell.ilike.%${phoneDigits.slice(-7)}%`)
+            .is('ghl_contact_id', null)
+            .limit(50)
+          const phoneHit = (phoneCands || []).find(p => {
+            const pp = digitsOnly(p.phone || '').slice(-10)
+            const cc = digitsOnly(p.cell  || '').slice(-10)
+            return pp && pp === phoneDigits || cc && cc === phoneDigits
+          })
+          if (phoneHit?.id) {
+            counts.would_update_by_phone += 1
+            collectSample('phone', c, phoneHit)
+            if (!dryRun) {
+              const { error: u3 } = await sb.from('contacts').update(row).eq('id', phoneHit.id)
+              if (u3) throw new Error('Update by phone failed: ' + u3.message)
+            }
+            recordsSynced += 1
+            continue
+          }
+        }
+
+        // ── 4. Match on name + zip (case-insensitive) ────────────────
+        if (hasNameZip) {
+          const { data: nzCands } = await sb.from('contacts')
+            .select('id, first_name, last_name, zip, ghl_contact_id')
+            .ilike('last_name', row.last_name || '')
+            .ilike('first_name', row.first_name || '')
+            .eq('zip', row.zip || '')
+            .is('ghl_contact_id', null)
+            .limit(5)
+          const nzHit = (nzCands || [])[0]
+          if (nzHit?.id) {
+            counts.would_update_by_name_zip += 1
+            collectSample('name_zip', c, nzHit)
+            if (!dryRun) {
+              const { error: u4 } = await sb.from('contacts').update(row).eq('id', nzHit.id)
+              if (u4) throw new Error('Update by name+zip failed: ' + u4.message)
+            }
+            recordsSynced += 1
+            continue
+          }
+        }
+
+        // ── 5. No match — insert new ─────────────────────────────────
+        counts.would_insert += 1
+        collectSample('insert', c, null)
+        if (!dryRun) {
+          const { error: iErr } = await sb.from('contacts').insert(row)
+          if (iErr) throw new Error('Insert failed: ' + iErr.message)
+        }
         recordsSynced += 1
       }
 
@@ -273,9 +401,24 @@ serve(async (req) => {
     }
 
     inboundSyncedAt = newestSeen || (state?.inbound_synced_at ?? null)
-    logMessage = logMessage || `Pulled ${recordsSynced} contact${recordsSynced === 1 ? '' : 's'}.`
+    logMessage = logMessage || (
+      dryRun
+        ? `Dry run: ${counts.would_insert} would insert, ${counts.would_update_by_ghl_id + counts.would_update_by_email + counts.would_update_by_phone + counts.would_update_by_name_zip} would update.`
+        : `Pulled ${recordsSynced} contact${recordsSynced === 1 ? '' : 's'}.`
+    )
 
-    // Update sync state on success.
+    if (dryRun) {
+      // Don't touch sync state on dry runs — just return the preview.
+      return json(200, {
+        ok:      true,
+        dry_run: true,
+        ...counts,
+        samples,
+        pages,
+      })
+    }
+
+    // Real run: update sync state on success.
     await sb.from('ghl_sync_state').update({
       inbound_synced_at:    inboundSyncedAt,
       last_run_at:          new Date().toISOString(),
@@ -301,6 +444,7 @@ serve(async (req) => {
       records_synced:   recordsSynced,
       inbound_synced_at: inboundSyncedAt,
       pages,
+      ...counts,
     })
   } catch (e) {
     const msg = (e as Error)?.message || 'Unknown error'
