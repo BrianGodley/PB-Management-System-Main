@@ -6517,7 +6517,18 @@ export default function Statistics() {
   //   • archivedStats  = archived stats (regardless of ownership) — own folder
   const myStats         = useMemo(() => stats.filter(s => !s.archived && s.owner_user_id === user?.id), [stats, user])
   const sharedStats     = useMemo(() => stats.filter(s => !s.archived && s.owner_user_id !== user?.id && userShares[s.id]), [stats, user, userShares])
-  const accessibleStats = useMemo(() => [...myStats, ...sharedStats], [myStats, sharedStats])
+  // Combined list — sorted by the same sort_order the user controls via
+  // drag-and-drop. Without this `[...myStats, ...sharedStats]` partition,
+  // shared stats always snapped back to the bottom of the sidebar after a
+  // reorder because owned stats came first regardless of sort_order.
+  // Falling back to name keeps deterministic ordering when sort_order ties.
+  const accessibleStats = useMemo(
+    () => [...myStats, ...sharedStats].sort((a, b) =>
+      (a.sort_order ?? 999) - (b.sort_order ?? 999)
+      || (a.name || ).localeCompare(b.name || , undefined, { numeric: true, sensitivity: 'base' })
+    ),
+    [myStats, sharedStats]
+  )
   const archivedStats   = useMemo(() => stats.filter(s => s.archived), [stats])
 
   // Flat searchable list — folders collapsed to All vs Archived, plus an
