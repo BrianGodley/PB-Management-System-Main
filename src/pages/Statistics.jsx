@@ -7303,8 +7303,11 @@ export default function Statistics() {
                   drops onto its own line below the buttons; on desktop the
                   absolutely-centered layout still works. */}
               <div className="relative flex flex-wrap items-center px-1 sm:px-6 py-1.5 bg-gray-100 border-b border-gray-200 flex-shrink-0 gap-y-1">
-                {/* Left — back arrow (mobile only), print, share, auto min/max */}
-                <div className="flex-1 flex items-center gap-2">
+                {/* Left — back arrow (mobile only), print, share, auto min/max.
+                    On mobile we shrink to the back-arrow's natural width so the
+                    stat-name span (flex-1 on mobile) gets nearly the whole row
+                    instead of being squeezed into a third of it. */}
+                <div className="flex-shrink-0 sm:flex-1 flex items-center gap-2">
                   <button
                     title="Back to stat list"
                     onClick={() => setSelectedId(null)}
@@ -7353,17 +7356,18 @@ export default function Statistics() {
                   </div>
                 </div>
 
-                {/* Stat name — single-line on every viewport. text-[13px] +
-                    tracking-tight on mobile gives ~30 chars between the
-                    back arrow and the up/down arrows. md+ keeps text-lg. */}
-                <span className="md:absolute md:left-1/2 md:-translate-x-1/2 flex-1 md:flex-none min-w-0 text-center md:max-w-xs text-[13px] tracking-tight md:tracking-normal md:text-lg font-bold text-gray-800 truncate whitespace-nowrap px-1 md:px-0 pointer-events-none">
+                {/* Stat name — single-line on every viewport.
+                    On mobile the left/right wrappers shrink to natural width,
+                    so the title's flex-1 picks up nearly the whole row and
+                    the name can display in full without truncation. */}
+                <span className="md:absolute md:left-1/2 md:-translate-x-1/2 flex-1 md:flex-none min-w-0 text-center md:max-w-xs text-sm tracking-tight md:tracking-normal md:text-lg font-bold text-gray-800 truncate whitespace-nowrap px-2 md:px-0 pointer-events-none">
                   {selectedStat.name}
                 </span>
 
                 {/* Right — quick entry (hidden for equation stats) + arrows flush right.
                     On mobile the inline entry is hidden — the new Entry popup
                     button (next to the module title) covers the same ground. */}
-                <div className="flex-1 flex items-center justify-end pr-1 sm:pr-2 gap-1 sm:gap-2">
+                <div className="flex-shrink-0 sm:flex-1 flex items-center justify-end pr-1 sm:pr-2 gap-1 sm:gap-2">
                   {!['equation','overlay'].includes(selectedStat?.stat_category) && (
                   <div className="hidden sm:flex items-center gap-1 sm:gap-1.5">
                     <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white">
@@ -7395,18 +7399,18 @@ export default function Statistics() {
                     <div className="w-px h-5 bg-gray-200 mx-0.5 flex-shrink-0" />
                   </div>
                   )}
-                  <div className="flex items-center gap-0 flex-shrink-0">
+                  <div className="flex items-center gap-2 sm:gap-0 flex-shrink-0">
                     <button
                       onClick={() => goTo(-1)}
                       disabled={!hasPrev}
-                      className="px-0.5 sm:px-1 py-0.5 rounded text-blue-700 sm:text-blue-500 hover:bg-blue-50 disabled:opacity-30 text-2xl sm:text-xl font-black leading-none"
+                      className="px-1 sm:px-1 py-0.5 rounded text-blue-700 sm:text-blue-500 hover:bg-blue-50 disabled:opacity-30 text-3xl sm:text-xl font-black leading-none"
                     >
                       ⬆
                     </button>
                     <button
                       onClick={() => goTo(1)}
                       disabled={!hasNext}
-                      className="px-0.5 sm:px-1 py-0.5 rounded text-blue-700 sm:text-blue-500 hover:bg-blue-50 disabled:opacity-30 text-2xl sm:text-xl font-black leading-none"
+                      className="px-1 sm:px-1 py-0.5 rounded text-blue-700 sm:text-blue-500 hover:bg-blue-50 disabled:opacity-30 text-3xl sm:text-xl font-black leading-none"
                     >
                       ⬇
                     </button>
@@ -7529,7 +7533,7 @@ export default function Statistics() {
               {/* Chart — minimal horizontal padding on mobile so the Y axis
                   sits close to the screen edge. No bottom padding on mobile
                   so the slider scrubber sits flush against the x-axis. */}
-              <div ref={chartPrintRef} className="flex-1 px-1 sm:px-4 pt-4 pb-0 sm:pb-4 overflow-hidden relative bg-white">
+              <div ref={chartPrintRef} className="flex-1 max-h-[50vh] sm:max-h-none px-1 sm:px-4 pt-4 pb-0 sm:pb-4 overflow-hidden relative bg-white">
 
                 {selectedStat.stat_category === 'overlay' ? (
                   /* ── Overlay chart ─────────────────────────────────────── */
