@@ -173,15 +173,19 @@ export default function DesignDetail() {
 
   // Drawing
   const [tool,           setTool]           = useState('pointer')
-  const [drawColor,      setDrawColor]      = useState(FG)
-  const [drawLabel,      setDrawLabel]      = useState('')   // label applied to next-drawn shape
-  const [drawSymbol,     setDrawSymbol]     = useState('circle') // count symbol for next marker
-  const [editingAnnId,   setEditingAnnId]   = useState(null) // sidebar inline edit popover
   const [drawing,        setDrawing]        = useState(null)  // { type, points: [[x,y]…] }
   const [hoverPoint,     setHoverPoint]     = useState(null)  // [x,y] in natural coords for preview
   const [annotations,    setAnnotations]    = useState([])
-  const [scaleDialog,    setScaleDialog]    = useState(null)  // { points, distance, unit }
-  const [pageDims,       setPageDims]       = useState(null)  // {width, height} of rendered canvas at current zoom
+  const [scaleDialog,    setScaleDialog]    = useState(null)
+  const [pageDims,       setPageDims]       = useState(null)
+  // Takeoff items — named containers (name+color+symbol) that group multiple
+  // annotations of the same type. The user names an item before drawing.
+  const [items,          setItems]          = useState([])
+  const [activeItemId,   setActiveItemId]   = useState(null)
+  const [itemModal,      setItemModal]      = useState(null)  // { mode:'create'|'edit', type, name, color, symbol, id? }
+  const [editingItemId,  setEditingItemId]  = useState(null)  // expanded sidebar item
+  // Manual double-click detection for finalising linear/area shapes — see onSvgClick
+  const lastClickTimeRef = useRef(0)
 
   // ── Project + files ──────────────────────────────────────────────────────
   useEffect(() => { loadProjectAndFiles() }, [id])
@@ -217,17 +221,31 @@ export default function DesignDetail() {
     return () => { cancelled = true }
   }, [selectedFileId, files])
 
-  // ── Annotations ──────────────────────────────────────────────────────────
+  // ── Annotations + items ─────────────────────────────────────────────────
   useEffect(() => {
-    if (!selectedFileId) { setAnnotations([]); return }
+    if (!selectedFileId) { setAnnotations([]); setItems([]); setActiveItemId(null); return }
     let cancelled = false
     ;(async () => {
-      const { data } = await supabase
-        .from('design_annotations')
-        .select('*')
-        .eq('file_id', selectedFileId)
-        .eq('page_number', currentPage)
-      if (!cancelled) setAnnotations(data || [])
+      const [{ data: annData }, { data: itemData }] = await Promise.all([
+        supabase
+          .from('design_annotations')
+          .select('*')
+          .eq('file_id', selectedFileId)
+          .eq('page_number', currentPage),
+        supabase
+          .from('design_takeoff_items')
+          .select('*')
+          .eq('file_id', selectedFileId)
+          .eq('page_number', currentPage)
+          .order('created_at'),
+      ])
+      if (!cancelled) {
+        setAnnotations(annData || [])
+        setItems(itemData || [])
+        setActiveItemId(null)
+        setDrawing(null)
+        setHoverPoint(null)
+      }
     })()
     return () => { cancelled = true }
   }, [selectedFileId, currentPage])
@@ -356,48 +374,73 @@ export default function DesignDetail() {
   function onSvgClick(e) {
     if (tool === 'pointer') return
     const pt = eventToCoords(e)
+    const now = Date.now()
+    const isRapid = (now - (lastClickTimeRef.current || 0)) < 280
+    lastClickTimeRef.current = now
 
+    // Count: instant single-click drop, with active item id + symbol
     if (tool === 'count') {
-      saveAnnotation({ type: 'count', points: [pt], color: drawColor })
+      const item = items.find(it => it.id === activeItemId)
+      if (!item) { setError('Pick or create a count item first.'); return }
+      saveAnnotation({
+        type: 'count',
+        points: [pt],
+        color: item.color,
+        label: null,           // count items show their own name; no per-point label
+        symbol: item.symbol || 'circle',
+        item_id: item.id,
+      })
       return
     }
 
-    if (tool === 'scale' || tool === 'linear') {
+    // Scale: keep the original 2-click finalize (no double-click)
+    if (tool === 'scale') {
       if (!drawing) {
-        setDrawing({ type: tool, points: [pt] })
+        setDrawing({ type: 'scale', points: [pt] })
       } else {
-        const finalPts = [...drawing.points, pt]
-        if (tool === 'scale') {
-          setScaleDialog({ mode: 'twoPoints', points: finalPts, distance: '', unit: 'ft' })
-        } else {
-          saveAnnotation({ type: 'linear', points: finalPts, color: drawColor })
-        }
+        setScaleDialog({ mode: 'twoPoints', points: [...drawing.points, pt], distance: '', unit: 'ft' })
         setDrawing(null); setHoverPoint(null)
       }
       return
     }
 
-    if (tool === 'area') {
-      if (!drawing) {
-        setDrawing({ type: 'area', points: [pt] })
+    // Linear / Area: rapid second click ⇒ double-click ⇒ finalise
+    if (tool === 'linear' || tool === 'area') {
+      const item = items.find(it => it.id === activeItemId)
+      if (!item) { setError('Pick or create an item first.'); return }
+
+      if (isRapid && drawing && drawing.points.length >= (tool === 'area' ? 3 : 2)) {
+        saveAnnotation({
+          type: tool,
+          points: drawing.points,
+          color: item.color,
+          label: null,
+          item_id: item.id,
+        })
+        setDrawing(null); setHoverPoint(null)
+        lastClickTimeRef.current = 0
         return
       }
-      // If user clicks within 10 natural-pixels of the first vertex AND has 3+ points, close.
-      const first = drawing.points[0]
-      const closing = drawing.points.length >= 3 && distPx(pt, first) < (10 / zoom)
-      if (closing) {
-        saveAnnotation({ type: 'area', points: drawing.points, color: drawColor })
-        setDrawing(null); setHoverPoint(null)
-      } else {
-        setDrawing({ ...drawing, points: [...drawing.points, pt] })
-      }
+
+      if (!drawing) setDrawing({ type: tool, points: [pt] })
+      else          setDrawing({ ...drawing, points: [...drawing.points, pt] })
     }
   }
   function onSvgKeyDown(e) {
-    if (e.key === 'Escape') { setDrawing(null); setHoverPoint(null) }
-    if (e.key === 'Enter' && drawing?.type === 'area' && drawing.points.length >= 3) {
-      saveAnnotation({ type: 'area', points: drawing.points, color: drawColor })
-      setDrawing(null); setHoverPoint(null)
+    if (e.key === 'Escape') { setDrawing(null); setHoverPoint(null); lastClickTimeRef.current = 0 }
+    if (e.key === 'Enter' && drawing && (drawing.type === 'linear' || drawing.type === 'area')) {
+      const minPts = drawing.type === 'area' ? 3 : 2
+      if (drawing.points.length >= minPts) {
+        const item = items.find(it => it.id === activeItemId)
+        saveAnnotation({
+          type: drawing.type,
+          points: drawing.points,
+          color: item?.color || FG,
+          label: null,
+          item_id: item?.id || null,
+        })
+        setDrawing(null); setHoverPoint(null)
+      }
     }
   }
   // Hook keyboard listener on window so it works even without focus on SVG
@@ -406,7 +449,7 @@ export default function DesignDetail() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drawing, drawColor])
+  }, [drawing, activeItemId, items])
 
   // ── Persistence ───────────────────────────────────────────────────────────
   async function saveAnnotation(payload) {
@@ -418,13 +461,12 @@ export default function DesignDetail() {
         page_number:    currentPage,
         type:           payload.type,
         points:         payload.points,
-        color:          payload.color || drawColor,
-        label:          payload.label ?? (drawLabel.trim() || null),
-        symbol:         payload.type === 'count'
-                          ? (payload.symbol || drawSymbol || 'circle')
-                          : null,
+        color:          payload.color || FG,
+        label:          payload.label ?? null,
+        symbol:         payload.type === 'count' ? (payload.symbol || 'circle') : null,
         known_distance: payload.known_distance ?? null,
         unit:           payload.unit ?? null,
+        item_id:        payload.item_id ?? null,
         created_by:     user?.id || null,
       })
       .select().single()
@@ -432,7 +474,6 @@ export default function DesignDetail() {
     setAnnotations(prev => [...prev, data])
   }
 
-  // Inline-edit an existing annotation from the sidebar
   async function updateAnnotation(annId, patch) {
     const { error: upErr } = await supabase
       .from('design_annotations')
@@ -440,6 +481,80 @@ export default function DesignDetail() {
       .eq('id', annId)
     if (upErr) { setError('Update failed: ' + upErr.message); return }
     setAnnotations(prev => prev.map(a => a.id === annId ? { ...a, ...patch } : a))
+  }
+
+  // ── Items ───────────────────────────────────────────────────────────────
+  async function createItem(payload) {
+    const { data, error: insErr } = await supabase
+      .from('design_takeoff_items')
+      .insert({
+        file_id:     selectedFileId,
+        page_number: currentPage,
+        type:        payload.type,
+        name:        payload.name.trim(),
+        color:       payload.color || FG,
+        symbol:      payload.type === 'count' ? (payload.symbol || 'circle') : null,
+        created_by:  user?.id || null,
+      })
+      .select().single()
+    if (insErr) { setError('Could not create item: ' + insErr.message); return null }
+    setItems(prev => [...prev, data])
+    return data
+  }
+
+  async function updateItem(itemId, patch) {
+    const { error: upErr } = await supabase
+      .from('design_takeoff_items')
+      .update(patch)
+      .eq('id', itemId)
+    if (upErr) { setError('Update failed: ' + upErr.message); return }
+    setItems(prev => prev.map(it => it.id === itemId ? { ...it, ...patch } : it))
+    // If color/symbol changed, also reflect it on existing annotations
+    if (patch.color || patch.symbol) {
+      setAnnotations(prev => prev.map(a => {
+        if (a.item_id !== itemId) return a
+        return {
+          ...a,
+          ...(patch.color  ? { color:  patch.color  } : {}),
+          ...(patch.symbol ? { symbol: patch.symbol } : {}),
+        }
+      }))
+    }
+  }
+
+  async function deleteItem(itemId) {
+    if (!confirm('Delete this item and all of its measurements?')) return
+    await supabase.from('design_takeoff_items').delete().eq('id', itemId)
+    setItems(prev => prev.filter(it => it.id !== itemId))
+    setAnnotations(prev => prev.filter(a => a.item_id !== itemId))
+    if (activeItemId === itemId) setActiveItemId(null)
+  }
+
+  function activateItem(item) {
+    setActiveItemId(item.id)
+    setTool(item.type)
+    setDrawing(null); setHoverPoint(null)
+  }
+
+  // Confirm new-item modal → create + activate
+  async function confirmItemModal() {
+    if (!itemModal) return
+    if (!itemModal.name.trim()) { setError('Item name is required.'); return }
+    if (itemModal.mode === 'edit' && itemModal.id) {
+      await updateItem(itemModal.id, {
+        name:   itemModal.name.trim(),
+        color:  itemModal.color,
+        symbol: itemModal.type === 'count' ? itemModal.symbol : null,
+      })
+      setItemModal(null)
+      return
+    }
+    const created = await createItem(itemModal)
+    if (created) {
+      setActiveItemId(created.id)
+      setTool(created.type)
+      setItemModal(null)
+    }
   }
   async function deleteAnnotation(annId) {
     await supabase.from('design_annotations').delete().eq('id', annId)
@@ -587,7 +702,7 @@ export default function DesignDetail() {
           ))}
         </div>
 
-        {/* Takeoff totals + annotations */}
+        {/* Takeoff items + totals */}
         {selectedFile && (
           <div className="flex-1 overflow-y-auto">
             <div className="px-4 py-3 border-b border-gray-100">
@@ -604,67 +719,88 @@ export default function DesignDetail() {
               </div>
             </div>
 
-            {annotations.length > 0 && (
-              <div className="px-4 py-2 border-b border-gray-100">
-                <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Annotations</h3>
-                {annotations.map(a => {
-                  const valueText =
-                    a.type === 'linear' ? fmtLen(polylineLengthPx(a.points), pageScale?.ppu, pageScale?.unit || '')
-                  : a.type === 'area'   ? fmtArea(polygonAreaPx(a.points), pageScale?.ppu, pageScale?.unit || '')
-                  : a.type === 'scale'  ? `${a.known_distance} ${a.unit}`
-                  : ''
-                  const isEditing = editingAnnId === a.id
-                  return (
-                    <div key={a.id} className="py-1 border-b border-gray-50 last:border-b-0">
-                      <div className="flex items-center gap-2 group">
-                        {/* Color swatch — click to expand edit row */}
-                        <button
-                          onClick={() => setEditingAnnId(isEditing ? null : a.id)}
-                          className="w-3 h-3 rounded-sm flex-shrink-0 border border-gray-300"
-                          style={{ backgroundColor: a.color || '#666' }}
-                          title="Edit"
-                        />
-                        <span className="text-[10px] flex-shrink-0 w-3 text-center">{TOOL_META[a.type]?.icon}</span>
-                        {/* Inline name */}
+            {/* Items list — grouped by name; click to activate and add more */}
+            <div className="px-2 py-2 border-b border-gray-100">
+              <h3 className="px-2 text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1 flex items-center justify-between">
+                <span>Items</span>
+                <span className="text-[10px] text-gray-400 normal-case font-normal">{items.length}</span>
+              </h3>
+              {items.length === 0 ? (
+                <p className="px-2 py-3 text-xs text-gray-400">Pick a tool to create your first named item.</p>
+              ) : items.map(it => {
+                const itemAnns = annotations.filter(a => a.item_id === it.id)
+                const total =
+                  it.type === 'linear' ? fmtLen(itemAnns.reduce((s, a) => s + polylineLengthPx(a.points), 0), pageScale?.ppu, pageScale?.unit || '')
+                : it.type === 'area'   ? fmtArea(itemAnns.reduce((s, a) => s + polygonAreaPx(a.points), 0), pageScale?.ppu, pageScale?.unit || '')
+                : `${itemAnns.length} count${itemAnns.length === 1 ? '' : 's'}`
+                const isActive = it.id === activeItemId
+                const isExpanded = editingItemId === it.id
+                return (
+                  <div key={it.id}
+                    className={`mb-1 rounded-lg border transition-colors ${isActive ? 'border-green-500 bg-green-50/60' : 'border-transparent hover:bg-gray-50'}`}
+                  >
+                    <div className="flex items-center gap-2 px-2 py-1.5 cursor-pointer" onClick={() => activateItem(it)}>
+                      <span className="w-3 h-3 rounded-sm flex-shrink-0 border border-gray-300" style={{ backgroundColor: it.color }} />
+                      <span className="text-[10px] flex-shrink-0 w-3 text-center">{TOOL_META[it.type]?.icon}</span>
+                      <span className="text-xs font-semibold flex-1 truncate" title={it.name}>{it.name}</span>
+                      <span className="text-[10px] text-gray-500 flex-shrink-0">{itemAnns.length} · {total}</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setEditingItemId(isExpanded ? null : it.id) }}
+                        className="text-gray-400 hover:text-gray-700 text-xs px-1"
+                        title="Edit item"
+                      >⋯</button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteItem(it.id) }}
+                        className="text-gray-300 hover:text-red-500 text-xs px-1"
+                        title="Delete item"
+                      >✕</button>
+                    </div>
+                    {isExpanded && (
+                      <div className="px-3 pb-2 pt-1 space-y-1">
                         <input
                           type="text"
-                          value={a.label || ''}
-                          placeholder={a.type}
-                          onChange={e => updateAnnotation(a.id, { label: e.target.value || null })}
-                          className="text-xs flex-1 min-w-0 bg-transparent border-0 px-1 py-0.5 focus:bg-white focus:border focus:border-green-500 focus:outline-none rounded"
+                          value={it.name}
+                          onChange={e => updateItem(it.id, { name: e.target.value })}
+                          className="w-full text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-green-700/30 focus:border-green-700"
                         />
-                        {valueText && <span className="text-[10px] text-gray-500 flex-shrink-0">{valueText}</span>}
-                        <button onClick={() => deleteAnnotation(a.id)} className="text-gray-300 group-hover:text-red-500 hover:!text-red-700 text-xs px-1">✕</button>
-                      </div>
-                      {/* Expanded editor: color + (for count) symbol */}
-                      {isEditing && (
-                        <div className="mt-1 pl-5 pr-1 py-1 flex flex-wrap items-center gap-1 bg-gray-50 rounded">
+                        <div className="flex items-center flex-wrap gap-1">
                           {COLOR_PRESETS.map(c => (
-                            <button
-                              key={c}
-                              onClick={() => updateAnnotation(a.id, { color: c })}
-                              className={`w-4 h-4 rounded-full border-2 transition-transform ${a.color === c ? 'border-gray-800 scale-110' : 'border-white shadow'}`}
+                            <button key={c}
+                              onClick={() => updateItem(it.id, { color: c })}
+                              className={`w-4 h-4 rounded-full border-2 ${it.color === c ? 'border-gray-800 scale-110' : 'border-white shadow'}`}
                               style={{ backgroundColor: c }}
                             />
                           ))}
-                          {a.type === 'count' && (
-                            <>
-                              <span className="ml-1 text-[10px] text-gray-500">Sym:</span>
-                              {SYMBOL_OPTIONS.map(s => (
-                                <button
-                                  key={s.key}
-                                  onClick={() => updateAnnotation(a.id, { symbol: s.key })}
-                                  className={`w-5 h-5 rounded text-[10px] font-bold border transition-colors ${
-                                    (a.symbol || 'circle') === s.key ? 'bg-green-700 text-white border-green-700' : 'bg-white border-gray-300 hover:bg-gray-50 text-gray-700'
-                                  }`}
-                                >
-                                  {s.label}
-                                </button>
-                              ))}
-                            </>
-                          )}
+                          {it.type === 'count' && SYMBOL_OPTIONS.map(s => (
+                            <button key={s.key}
+                              onClick={() => updateItem(it.id, { symbol: s.key })}
+                              className={`w-5 h-5 rounded text-[10px] font-bold border ${ (it.symbol || 'circle') === s.key ? 'bg-green-700 text-white border-green-700' : 'bg-white border-gray-300 hover:bg-gray-50 text-gray-700' }`}
+                            >{s.label}</button>
+                          ))}
                         </div>
-                      )}
+                        <p className="text-[10px] text-gray-400">{itemAnns.length} measurement{itemAnns.length === 1 ? '' : 's'} attached.</p>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Standalone annotations not attached to any item (legacy or scale rows) */}
+            {annotations.filter(a => !a.item_id && a.type !== 'scale').length > 0 && (
+              <div className="px-4 py-2 border-b border-gray-100">
+                <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Unlinked</h3>
+                {annotations.filter(a => !a.item_id && a.type !== 'scale').map(a => {
+                  const valueText =
+                    a.type === 'linear' ? fmtLen(polylineLengthPx(a.points), pageScale?.ppu, pageScale?.unit || '')
+                  : a.type === 'area'   ? fmtArea(polygonAreaPx(a.points), pageScale?.ppu, pageScale?.unit || '')
+                  : ''
+                  return (
+                    <div key={a.id} className="flex items-center gap-2 py-1 group">
+                      <span className="w-3 h-3 rounded-sm flex-shrink-0 border border-gray-300" style={{ backgroundColor: a.color || '#666' }} />
+                      <span className="text-[10px] flex-shrink-0">{TOOL_META[a.type]?.icon}</span>
+                      <span className="text-xs flex-1 truncate">{a.label || a.type}{valueText && ` · ${valueText}`}</span>
+                      <button onClick={() => deleteAnnotation(a.id)} className="text-gray-300 group-hover:text-red-500 hover:!text-red-700 text-xs px-1">✕</button>
                     </div>
                   )
                 })}
@@ -696,9 +832,11 @@ export default function DesignDetail() {
               {Object.entries(TOOL_META).map(([k, m]) => (
                 <button key={k}
                   onClick={() => {
-                    if (k === 'scale') {
-                      // Open the scale dialog; it offers Page Scale + Two Points
-                      setTool('pointer'); setDrawing(null); setHoverPoint(null)
+                    setDrawing(null); setHoverPoint(null)
+                    if (k === 'pointer') {
+                      setTool('pointer'); setActiveItemId(null)
+                    } else if (k === 'scale') {
+                      setTool('pointer'); setActiveItemId(null)
                       setScaleDialog({
                         mode: 'page',
                         measurementType: 'imperial',
@@ -709,7 +847,14 @@ export default function DesignDetail() {
                         unit: 'ft',
                       })
                     } else {
-                      setTool(k); setDrawing(null); setHoverPoint(null)
+                      // linear / area / count → name the item first
+                      setItemModal({
+                        mode: 'create',
+                        type: k,
+                        name: '',
+                        color: FG,
+                        symbol: 'circle',
+                      })
                     }
                   }}
                   title={k === 'scale' && !pageScale ? 'Set scale (required for measurements)' : m.label}
@@ -722,42 +867,18 @@ export default function DesignDetail() {
             </div>
           )}
 
-          {/* Color + label + (count) symbol — applied to next-drawn shape */}
-          {selectedFile && tool !== 'pointer' && tool !== 'scale' && (
-            <>
-              <div className="flex items-center gap-1 ml-1">
-                {COLOR_PRESETS.map(c => (
-                  <button key={c} onClick={() => setDrawColor(c)} title={c}
-                    className={`w-5 h-5 rounded-full border-2 transition-transform ${drawColor === c ? 'border-gray-800 scale-110' : 'border-white shadow'}`}
-                    style={{ backgroundColor: c }} />
-                ))}
+          {/* Active item indicator */}
+          {selectedFile && tool !== 'pointer' && tool !== 'scale' && (() => {
+            const ai = items.find(it => it.id === activeItemId)
+            if (!ai) return null
+            return (
+              <div className="flex items-center gap-2 ml-2 px-2 py-1 rounded bg-green-50 border border-green-200">
+                <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: ai.color }} />
+                <span className="text-xs font-semibold text-green-800">{ai.name}</span>
+                <span className="text-[10px] text-green-700">· adding {ai.type}</span>
               </div>
-              <input
-                type="text"
-                value={drawLabel}
-                onChange={e => setDrawLabel(e.target.value)}
-                placeholder="Label (e.g. Front Lawn)"
-                className="ml-2 border border-gray-300 rounded-md px-2 py-1 text-xs w-44 focus:outline-none focus:ring-2 focus:ring-green-700/30 focus:border-green-700"
-                title="Name applied to the next shape you draw"
-              />
-              {tool === 'count' && (
-                <div className="flex items-center gap-1 ml-1">
-                  {SYMBOL_OPTIONS.map(s => (
-                    <button
-                      key={s.key}
-                      onClick={() => setDrawSymbol(s.key)}
-                      title={s.key}
-                      className={`w-7 h-7 rounded text-sm font-bold border transition-colors ${
-                        drawSymbol === s.key ? 'bg-green-700 text-white border-green-700' : 'bg-white border-gray-300 hover:bg-gray-50 text-gray-700'
-                      }`}
-                    >
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
+            )
+          })()}
 
           <div className="flex-1" />
 
@@ -784,9 +905,13 @@ export default function DesignDetail() {
         {tool !== 'pointer' && (
           <div className="bg-amber-50 border-b border-amber-200 px-4 py-1.5 text-xs text-amber-800 flex-shrink-0">
             {tool === 'scale'  && (drawing ? 'Click the second point of a known distance.' : 'Click the first point of a known distance, then click the second.')}
-            {tool === 'linear' && (drawing ? 'Click the end point.' : 'Click the start of a linear measurement.')}
-            {tool === 'area'   && (drawing ? `Click vertices (${drawing.points.length} so far). Click near the first point or press Enter to close. Esc to cancel.` : 'Click the first vertex of an area.')}
-            {tool === 'count'  && 'Click anywhere to drop a count marker.'}
+            {tool === 'linear' && (drawing
+              ? `Click to add points (${drawing.points.length} so far). Double-click to finish, Esc to cancel.`
+              : 'Click the start of a linear measurement. Add as many segments as you want; double-click to finish.')}
+            {tool === 'area'   && (drawing
+              ? `Click vertices (${drawing.points.length} so far). Double-click the last vertex to close, Esc to cancel.`
+              : 'Click the first vertex of an area. Click more vertices, double-click the last one to close.')}
+            {tool === 'count'  && 'Click anywhere to drop a count marker. Click an item in the sidebar to switch the active count.'}
           </div>
         )}
 
@@ -842,6 +967,86 @@ export default function DesignDetail() {
           )}
         </div>
       </main>
+
+      {/* ── New / edit item modal ─────────────────────────────────────────── */}
+      {itemModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setItemModal(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between" style={{ backgroundColor: FG }}>
+              <div>
+                <h2 className="text-base font-bold text-white capitalize">
+                  {itemModal.mode === 'edit' ? 'Edit' : 'New'} {itemModal.type} item
+                </h2>
+                <p className="text-xs text-green-200 mt-0.5">Name your measurement first, then draw on the page.</p>
+              </div>
+              <button onClick={() => setItemModal(null)} className="text-white/70 hover:text-white text-xl leading-none px-2">✕</button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Name <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  autoFocus
+                  value={itemModal.name}
+                  onChange={e => setItemModal({ ...itemModal, name: e.target.value })}
+                  placeholder={itemModal.type === 'linear' ? 'e.g. Concrete Walk' : itemModal.type === 'area' ? 'e.g. Front Lawn' : 'e.g. Trees'}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700/30 focus:border-green-700"
+                  onKeyDown={e => { if (e.key === 'Enter' && itemModal.name.trim()) confirmItemModal() }}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Color</label>
+                <div className="flex items-center flex-wrap gap-2">
+                  {COLOR_PRESETS.map(c => (
+                    <button key={c}
+                      onClick={() => setItemModal({ ...itemModal, color: c })}
+                      className={`w-7 h-7 rounded-full border-2 transition-transform ${itemModal.color === c ? 'border-gray-800 scale-110' : 'border-white shadow'}`}
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {itemModal.type === 'count' && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Marker Symbol</label>
+                  <div className="flex items-center flex-wrap gap-1">
+                    {SYMBOL_OPTIONS.map(s => (
+                      <button key={s.key}
+                        onClick={() => setItemModal({ ...itemModal, symbol: s.key })}
+                        title={s.key}
+                        className={`w-9 h-9 rounded text-base font-bold border transition-colors ${
+                          itemModal.symbol === s.key ? 'bg-green-700 text-white border-green-700' : 'bg-white border-gray-300 hover:bg-gray-50 text-gray-700'
+                        }`}
+                      >{s.label}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <p className="text-xs text-gray-500 pt-1">
+                After saving, click on the drawing to add measurements.
+                {(itemModal.type === 'linear' || itemModal.type === 'area') && ' Double-click to finish a shape.'}
+                {' '}Click an item in the sidebar later to keep adding to it.
+              </p>
+            </div>
+
+            <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 flex justify-end gap-2">
+              <button onClick={() => setItemModal(null)} className="px-4 py-2 rounded-lg text-sm text-gray-600 hover:bg-white border border-gray-300">Cancel</button>
+              <button
+                onClick={confirmItemModal}
+                disabled={!itemModal.name.trim()}
+                className="px-5 py-2 rounded-lg text-sm font-bold text-white disabled:opacity-50"
+                style={{ backgroundColor: FG }}
+              >
+                {itemModal.mode === 'edit' ? 'Save Changes' : 'Create & Start Drawing'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Scale dialog ─────────────────────────────────────────────────── */}
       {scaleDialog && (
