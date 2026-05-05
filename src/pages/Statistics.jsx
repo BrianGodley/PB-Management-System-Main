@@ -1413,23 +1413,40 @@ function DateRangeScrubber({ minDate, maxDate, fromDate, toDate, onFromChange, o
 
   stateRef.current = { fromDate, toDate, onFromChange, onToChange }
 
+  // Shared move/up handlers that work for both mouse and touch input. The
+  // pointer x-coordinate is whatever the active event provides; the rest of
+  // the math is identical for either input source.
   useEffect(() => {
-    const onMove = (e) => {
+    const moveTo = (clientX) => {
       if (!draggingRef.current || !trackRef.current) return
       const rect  = trackRef.current.getBoundingClientRect()
-      const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+      const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
       const ms    = minMs + ratio * span
       const date  = isoDate(new Date(ms))
       const { fromDate: fd, toDate: td, onFromChange: ofc, onToChange: otc } = stateRef.current
       if (draggingRef.current === 'from' && date < td) ofc(date)
       if (draggingRef.current === 'to'   && date > fd) otc(date)
     }
+    const onMouseMove = (e) => moveTo(e.clientX)
+    const onTouchMove = (e) => {
+      if (!draggingRef.current) return
+      // Stop the page from scrolling while the user drags a handle.
+      if (e.cancelable) e.preventDefault()
+      const t = e.touches[0]
+      if (t) moveTo(t.clientX)
+    }
     const onUp = () => { draggingRef.current = null }
-    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mousemove', onMouseMove)
     document.addEventListener('mouseup',   onUp)
+    document.addEventListener('touchmove', onTouchMove, { passive: false })
+    document.addEventListener('touchend',  onUp)
+    document.addEventListener('touchcancel', onUp)
     return () => {
-      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mousemove', onMouseMove)
       document.removeEventListener('mouseup',   onUp)
+      document.removeEventListener('touchmove', onTouchMove)
+      document.removeEventListener('touchend',  onUp)
+      document.removeEventListener('touchcancel', onUp)
     }
   }, [minMs, span])
 
@@ -1438,47 +1455,65 @@ function DateRangeScrubber({ minDate, maxDate, fromDate, toDate, onFromChange, o
 
   const fmtLabel = (d) => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
+  // Handle drag-start helpers — set the active handle for both mouse + touch.
+  const startFrom = (e) => { e.preventDefault?.(); draggingRef.current = 'from' }
+  const startTo   = (e) => { e.preventDefault?.(); draggingRef.current = 'to'   }
+
   return (
-    <div className="px-6 py-3 bg-white border-t border-gray-100 flex-shrink-0">
+    <div className="px-3 sm:px-6 py-3 bg-white border-t border-gray-100 flex-shrink-0">
       {/* End-date labels */}
-      <div className="flex justify-between text-xs text-gray-400 mb-1 px-0.5">
+      <div className="flex justify-between text-[11px] text-gray-400 mb-1 px-0.5">
         <span>{fmtLabel(minDate)}</span>
         <span>{fmtLabel(maxDate)}</span>
       </div>
 
-      {/* Track */}
-      <div ref={trackRef} className="relative h-5 flex items-center select-none">
-        <div className="absolute inset-x-0 h-1.5 bg-gray-200 rounded-full" />
-        <div className="absolute h-1.5 rounded-full" style={{ left: `${leftPct}%`, right: `${100 - rightPct}%`, backgroundColor: FG }} />
+      {/* Track + flag handles. The flags hang OUTSIDE the slider position —
+          From flag extends to the LEFT of its handle, To flag extends to the
+          RIGHT of its handle — so the two date labels never overlap even when
+          the handles are right next to each other. The dates live inside the
+          flags themselves, doubling as both label and oversized touch target. */}
+      <div ref={trackRef} className="relative h-9 flex items-center select-none">
+        {/* Track */}
+        <div className="absolute inset-x-0 h-2 bg-gray-200 rounded-full" />
+        {/* Selected range fill */}
+        <div className="absolute h-2 rounded-full" style={{ left: `${leftPct}%`, right: `${100 - rightPct}%`, backgroundColor: FG }} />
 
-        {/* From handle */}
+        {/* Tiny round dot marking the actual From handle position */}
         <div
-          onMouseDown={(e) => { e.preventDefault(); draggingRef.current = 'from' }}
-          className="absolute w-5 h-5 rounded-full border-2 bg-white shadow-md cursor-grab active:cursor-grabbing z-10 transition-shadow hover:shadow-lg"
+          aria-hidden
+          className="absolute w-3 h-3 rounded-full border-2 bg-white pointer-events-none z-10"
           style={{ left: `${leftPct}%`, transform: 'translateX(-50%)', borderColor: FG }}
         />
-        {/* To handle */}
-        <div
-          onMouseDown={(e) => { e.preventDefault(); draggingRef.current = 'to' }}
-          className="absolute w-5 h-5 rounded-full border-2 bg-white shadow-md cursor-grab active:cursor-grabbing z-10 transition-shadow hover:shadow-lg"
-          style={{ left: `${rightPct}%`, transform: 'translateX(-50%)', borderColor: FG }}
-        />
-      </div>
-
-      {/* Handle date labels — positioned under each handle */}
-      <div className="relative h-4 mt-1">
-        <span
-          className="absolute text-xs font-medium text-gray-600 whitespace-nowrap transform -translate-x-1/2"
-          style={{ left: `${leftPct}%` }}
+        {/* From flag — extends LEFT of the handle position. Whole flag is the
+            grab area so it's easy to hit on a phone. */}
+        <button
+          type="button"
+          onMouseDown={startFrom}
+          onTouchStart={startFrom}
+          className="absolute h-8 px-2 flex items-center text-[11px] font-semibold text-white whitespace-nowrap rounded-l-md cursor-grab active:cursor-grabbing z-20 shadow-md touch-none select-none"
+          style={{ left: `${leftPct}%`, transform: 'translateX(-100%)', backgroundColor: FG }}
+          title="Drag to change start date"
         >
           {fmtLabel(fromDate)}
-        </span>
-        <span
-          className="absolute text-xs font-medium text-gray-600 whitespace-nowrap transform -translate-x-1/2"
-          style={{ left: `${rightPct}%` }}
+        </button>
+
+        {/* Tiny dot for the To handle position */}
+        <div
+          aria-hidden
+          className="absolute w-3 h-3 rounded-full border-2 bg-white pointer-events-none z-10"
+          style={{ left: `${rightPct}%`, transform: 'translateX(-50%)', borderColor: FG }}
+        />
+        {/* To flag — extends RIGHT of the handle position */}
+        <button
+          type="button"
+          onMouseDown={startTo}
+          onTouchStart={startTo}
+          className="absolute h-8 px-2 flex items-center text-[11px] font-semibold text-white whitespace-nowrap rounded-r-md cursor-grab active:cursor-grabbing z-20 shadow-md touch-none select-none"
+          style={{ left: `${rightPct}%`, transform: 'translateX(0)', backgroundColor: FG }}
+          title="Drag to change end date"
         >
           {fmtLabel(toDate)}
-        </span>
+        </button>
       </div>
     </div>
   )
