@@ -2038,8 +2038,13 @@ function IntegrationsSettings() {
   // Per-object-type 'Sync now' state — keyed by object_type so each row's
   // button can show its own spinner without freezing the rest.
   const [ghlSyncing, setGhlSyncing] = useState({}) // { contacts: true, ... }
-  // Latest dry-run preview, keyed by object_type. Cleared when a real sync runs.
+  // Latest dry-run preview, keyed by `${objectType}:${direction}`.
   const [ghlPreview, setGhlPreview] = useState({})
+  // Push auto-loop: ref so the loop body can check abort without restarting effects.
+  const ghlPushAbortRef = useRef(false)
+  // Live progress for the push loop, keyed by objectType.
+  const [ghlPushProgress, setGhlPushProgress] = useState({})
+  function stopGhlPush() { ghlPushAbortRef.current = true }
   async function runSyncNow(objectType, opts = {}) {
     const dryRun    = !!opts.dryRun
     const direction = opts.direction || 'pull'   // 'pull' | 'push'
@@ -2074,22 +2079,65 @@ function IntegrationsSettings() {
       } else if (dryRun) {
         setGhlMsgError(false)
         setGhlMsg(`${objectType} ${direction} preview ready below.`)
-        // Stash under a direction-aware key so push and pull previews don't fight.
         setGhlPreview(p => ({ ...p, [`${objectType}:${direction}`]: body }))
+      } else if (direction === 'push') {
+        // Auto-loop: keep pushing batches until remaining hits 0 or the
+        // user clicks Stop. We accumulate totals across batches so the
+        // message reflects the whole push, not just the last batch.
+        ghlPushAbortRef.current = false
+        let totalPushed   = body.pushed   || 0
+        let totalCreated  = body.created  || 0
+        let totalUpdated  = body.updated  || 0
+        let totalErrors   = body.errors   || 0
+        let remaining     = body.remaining || 0
+        const totalEligible = (body.total_eligible ?? totalPushed + remaining)
+        setGhlPushProgress(p => ({ ...p, [objectType]: { pushed: totalPushed, total: totalEligible, errors: totalErrors } }))
+        setGhlMsgError(false)
+        setGhlMsg(`${objectType} push: ${totalPushed}/${totalEligible} sent…`)
+        // Loop until done or aborted.
+        let safety = 200  // 200 batches × 200/batch = 40,000 records max per session
+        while (remaining > 0 && !ghlPushAbortRef.current && safety-- > 0) {
+          const r2 = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnSlug}`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type':  'application/json',
+                'Authorization': `Bearer ${jwt}`,
+              },
+              body: JSON.stringify({ dry_run: false }),
+            }
+          )
+          const b2 = await r2.json().catch(() => ({}))
+          if (!r2.ok || b2.ok === false) {
+            setGhlMsgError(true)
+            setGhlMsg(`${objectType} push: ${b2.error || b2.message || `HTTP ${r2.status}`} (after ${totalPushed} sent)`)
+            break
+          }
+          totalPushed  += b2.pushed  || 0
+          totalCreated += b2.created || 0
+          totalUpdated += b2.updated || 0
+          totalErrors  += b2.errors  || 0
+          remaining     = b2.remaining || 0
+          setGhlPushProgress(p => ({ ...p, [objectType]: { pushed: totalPushed, total: totalEligible, errors: totalErrors } }))
+          setGhlMsg(`${objectType} push: ${totalPushed}/${totalEligible} sent…`)
+        }
+        // Final message.
+        const tail = ghlPushAbortRef.current
+          ? ' (stopped)'
+          : (remaining > 0 ? ` (paused — ${remaining} still remaining)` : ' (done)')
+        setGhlMsg(
+          `${objectType} push: ${totalPushed} sent — ${totalCreated} new, ${totalUpdated} updated` +
+          (totalErrors ? `, ${totalErrors} errors` : '') + tail
+        )
+        setGhlMsgError(totalErrors > 0)
+        setGhlPreview(p => { const n = { ...p }; delete n[`${objectType}:${direction}`]; return n })
+        // Clear progress after a beat so the row's status text takes over.
+        setTimeout(() => setGhlPushProgress(p => { const n = { ...p }; delete n[objectType]; return n }), 4000)
+        await loadGhl()
       } else {
         setGhlMsgError(false)
-        if (direction === 'push') {
-          const remaining = body.remaining ?? 0
-          const errs = body.errors ?? 0
-          setGhlMsg(
-            `${objectType} push: ${body.pushed ?? 0} sent` +
-            (errs ? ` (${errs} errors)` : '') +
-            (remaining > 0 ? `. ${remaining} remaining — click Push again to continue.` : '. Done.')
-          )
-        } else {
-          setGhlMsg(`${objectType} pull: pulled ${body.records_synced ?? 0}.`)
-        }
-        // Real run invalidates any earlier preview for this direction.
+        setGhlMsg(`${objectType} pull: pulled ${body.records_synced ?? 0}.`)
         setGhlPreview(p => { const n = { ...p }; delete n[`${objectType}:${direction}`]; return n })
         await loadGhl()
       }
@@ -2422,11 +2470,22 @@ function IntegrationsSettings() {
                       <button type="button"
                         onClick={() => runSyncNow(objType, { direction: 'push' })}
                         disabled={!ghl[key] || !!ghlSyncing[objType] || objType !== 'contacts'}
-                        title={objType === 'contacts' ? 'Push PBS → GHL now (batches of 200)' : 'Push for this object type lands in Phase 6'}
+                        title={objType === 'contacts' ? 'Push PBS → GHL — batches of 200, auto-continues until done' : 'Push for this object type lands in Phase 6'}
                         className="text-xs font-semibold text-white border border-amber-600 bg-amber-600 hover:bg-amber-700 rounded-md px-2 py-1 disabled:opacity-40"
                       >
-                        Push
+                        {ghlSyncing[objType] && ghlPushProgress[objType]
+                          ? `Pushing ${ghlPushProgress[objType].pushed}/${ghlPushProgress[objType].total}…`
+                          : 'Push'}
                       </button>
+                      {ghlSyncing[objType] && ghlPushProgress[objType] && (
+                        <button type="button"
+                          onClick={stopGhlPush}
+                          title="Stop the running push loop after the current batch"
+                          className="text-xs font-semibold text-red-700 border border-red-200 bg-red-50 hover:bg-red-100 rounded-md px-2 py-1"
+                        >
+                          Stop
+                        </button>
+                      )}
                       <button type="button"
                         onClick={() => saveGhlToggles({ [key]: !ghl[key] })}
                         className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${
