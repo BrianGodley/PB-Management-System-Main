@@ -1,26 +1,18 @@
 // src/pages/DesignDetail.jsx
 //
-// Phase 2 of Design / CAD-takeoff: upload + multi-page viewer + drag-resize.
+// Design / CAD-takeoff per-project page. Phases 1–4:
+//   • upload + multi-page viewer (Phase 2)
+//   • set-scale tool (Phase 3) — click two points, type the known distance,
+//     stores pixels-per-unit for the page in a type='scale' annotation
+//   • linear / area / count drawing tools (Phase 4) — measurements live-render
+//     using the page's scale and persist to design_annotations
 //
-// Layout:
-//   ┌──────────────┬─┬───────────────────────────────────┐
-//   │  File list   │ │  Toolbar (zoom, page nav)         │
-//   │  + upload    │ │  ┌─────────────────────────────┐  │
-//   │              │ │  │   PDF page / image          │  │
-//   │              │ │  └─────────────────────────────┘  │
-//   └──────────────┴─┴───────────────────────────────────┘
-//        sidebar    splitter     viewer
+// Coordinates are stored in NATURAL page pixels (what they'd be at zoom 1.0)
+// so the same data renders correctly at any zoom level.
 //
-// PDFs are rendered one page at a time via react-pdf (Mozilla's PDF.js
-// wrapper). Images render inline. Files live in the private 'design-files'
-// Supabase Storage bucket; signed URLs are minted on-demand for the viewer.
-//
-// Subsequent phases:
-//   • Phase 3 — scale calibration (click two points + known distance)
-//   • Phase 4 — overlay drawing tools (linear / area / count)
-//   • Phase 5 — aggregated takeoff report
+// Phase 5 (aggregated takeoff report) is still pending.
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
@@ -28,32 +20,65 @@ import 'react-pdf/dist/Page/TextLayer.css'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 
-// PDF.js worker — load from a CDN so Vite doesn't have to bundle it. Local
-// worker imports via new URL(...) work but can break across react-pdf
-// versions; the CDN approach is the most reliable.
 pdfjs.GlobalWorkerOptions.workerSrc =
   `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`
 
 const FG = '#3A5038'
-const SIDEBAR_MIN = 220
-const SIDEBAR_MAX = 560
+const SIDEBAR_MIN = 240
+const SIDEBAR_MAX = 600
+const ACCEPTED = '.pdf,.png,.jpg,.jpeg,.webp,.gif'
 
-const ACCEPTED_EXTENSIONS = '.pdf,.png,.jpg,.jpeg,.webp,.gif'
+const TOOL_META = {
+  pointer: { icon: '➤',  label: 'Pointer' },
+  scale:   { icon: '📏', label: 'Set Scale' },
+  linear:  { icon: '📐', label: 'Linear' },
+  area:    { icon: '⬛', label: 'Area' },
+  count:   { icon: '🎯', label: 'Count' },
+}
 
-function isPdfFile(f) {
-  return f?.file_type === 'application/pdf' ||
-         /\.pdf$/i.test(f?.file_name || '')
-}
-function isImageFile(f) {
-  return (f?.file_type || '').startsWith('image/') ||
-         /\.(png|jpe?g|gif|webp|svg)$/i.test(f?.file_name || '')
-}
+const COLOR_PRESETS = ['#3A5038', '#DC2626', '#2563EB', '#D97706', '#7C3AED', '#0891B2']
+
+function isPdfFile(f) { return f?.file_type === 'application/pdf' || /\.pdf$/i.test(f?.file_name || '') }
+function isImageFile(f) { return (f?.file_type || '').startsWith('image/') || /\.(png|jpe?g|gif|webp|svg)$/i.test(f?.file_name || '') }
 function fmtBytes(n) {
   if (!n) return '—'
-  const units = ['B', 'KB', 'MB', 'GB']
-  let i = 0
-  while (n >= 1024 && i < units.length - 1) { n /= 1024; i++ }
-  return n.toFixed(n < 10 ? 1 : 0) + ' ' + units[i]
+  const u = ['B','KB','MB','GB']; let i = 0
+  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++ }
+  return n.toFixed(n < 10 ? 1 : 0) + ' ' + u[i]
+}
+
+// ── Geometry helpers (in natural-pixel coords) ─────────────────────────────
+function distPx(a, b) { return Math.hypot(b[0] - a[0], b[1] - a[1]) }
+function polylineLengthPx(pts) {
+  let total = 0
+  for (let i = 1; i < pts.length; i++) total += distPx(pts[i-1], pts[i])
+  return total
+}
+function polygonAreaPx(pts) {
+  if (pts.length < 3) return 0
+  let s = 0
+  for (let i = 0; i < pts.length; i++) {
+    const [x1, y1] = pts[i]
+    const [x2, y2] = pts[(i+1) % pts.length]
+    s += x1 * y2 - x2 * y1
+  }
+  return Math.abs(s) / 2
+}
+function polygonCentroid(pts) {
+  if (!pts.length) return [0, 0]
+  let cx = 0, cy = 0
+  for (const [x, y] of pts) { cx += x; cy += y }
+  return [cx / pts.length, cy / pts.length]
+}
+function fmtLen(px, ppu, unit) {
+  if (!ppu) return px.toFixed(0) + ' px'
+  const v = px / ppu
+  return v.toFixed(v < 10 ? 2 : 1) + ' ' + unit
+}
+function fmtArea(pxSq, ppu, unit) {
+  if (!ppu) return pxSq.toFixed(0) + ' px²'
+  const v = pxSq / (ppu * ppu)
+  return v.toFixed(v < 10 ? 2 : 1) + ' sq ' + unit
 }
 
 export default function DesignDetail() {
@@ -61,8 +86,10 @@ export default function DesignDetail() {
   const { user } = useAuth()
   const fileInputRef = useRef(null)
   const containerRef = useRef(null)
+  const pageWrapRef  = useRef(null)
   const draggingRef  = useRef(false)
 
+  // Files / project
   const [project,        setProject]        = useState(null)
   const [files,          setFiles]          = useState([])
   const [selectedFileId, setSelectedFileId] = useState(null)
@@ -77,60 +104,72 @@ export default function DesignDetail() {
   const [sidebarWidth,   setSidebarWidth]   = useState(280)
   const [dropping,       setDropping]       = useState(false)
 
-  // ── Load project + files ──────────────────────────────────────────────────
-  useEffect(() => { loadProjectAndFiles() }, [id])
+  // Drawing
+  const [tool,           setTool]           = useState('pointer')
+  const [drawColor,      setDrawColor]      = useState(FG)
+  const [drawing,        setDrawing]        = useState(null)  // { type, points: [[x,y]…] }
+  const [hoverPoint,     setHoverPoint]     = useState(null)  // [x,y] in natural coords for preview
+  const [annotations,    setAnnotations]    = useState([])
+  const [scaleDialog,    setScaleDialog]    = useState(null)  // { points, distance, unit }
+  const [pageDims,       setPageDims]       = useState(null)  // {width, height} of rendered canvas at current zoom
 
+  // ── Project + files ──────────────────────────────────────────────────────
+  useEffect(() => { loadProjectAndFiles() }, [id])
   async function loadProjectAndFiles() {
     setLoading(true)
-    const [{ data: proj }, { data: filesData, error: filesErr }] = await Promise.all([
-      supabase
-        .from('design_projects')
-        .select('id, name, notes, status, clients(name)')
-        .eq('id', id)
-        .single(),
-      supabase
-        .from('design_files')
-        .select('*')
-        .eq('project_id', id)
-        .order('display_order')
-        .order('uploaded_at'),
+    const [{ data: proj }, { data: filesData }] = await Promise.all([
+      supabase.from('design_projects').select('id, name, notes, status, clients(name)').eq('id', id).single(),
+      supabase.from('design_files').select('*').eq('project_id', id).order('display_order').order('uploaded_at'),
     ])
-    if (filesErr) setError('Failed to load files: ' + filesErr.message)
     setProject(proj || null)
     setFiles(filesData || [])
     setLoading(false)
-    if ((filesData || []).length > 0) {
-      setSelectedFileId(prev => prev || filesData[0].id)
-    } else {
-      setSelectedFileId(null)
-    }
+    if ((filesData || []).length > 0) setSelectedFileId(prev => prev || filesData[0].id)
+    else setSelectedFileId(null)
   }
 
-  // ── Mint signed URL whenever the selected file changes ────────────────────
+  // ── Signed URL ────────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false
     async function go() {
       if (!selectedFileId) { setSignedUrl(null); return }
-      const file = files.find(f => f.id === selectedFileId)
-      if (!file) { setSignedUrl(null); return }
+      const f = files.find(x => x.id === selectedFileId)
+      if (!f) { setSignedUrl(null); return }
       const { data, error: urlErr } = await supabase.storage
-        .from('design-files')
-        .createSignedUrl(file.storage_path, 3600)
+        .from('design-files').createSignedUrl(f.storage_path, 3600)
       if (cancelled) return
-      if (urlErr) {
-        setError('Could not load file: ' + urlErr.message)
-        setSignedUrl(null)
-        return
-      }
+      if (urlErr) { setError('Could not load file: ' + urlErr.message); setSignedUrl(null); return }
       setSignedUrl(data.signedUrl)
-      setNumPages(0)
-      setCurrentPage(1)
-      setZoom(1.0)
-      setError('')
+      setNumPages(0); setCurrentPage(1); setZoom(1.0)
+      setDrawing(null); setHoverPoint(null); setError('')
     }
     go()
     return () => { cancelled = true }
   }, [selectedFileId, files])
+
+  // ── Annotations ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!selectedFileId) { setAnnotations([]); return }
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase
+        .from('design_annotations')
+        .select('*')
+        .eq('file_id', selectedFileId)
+        .eq('page_number', currentPage)
+      if (!cancelled) setAnnotations(data || [])
+    })()
+    return () => { cancelled = true }
+  }, [selectedFileId, currentPage])
+
+  // Scale annotation for current page (if any)
+  const pageScale = useMemo(() => {
+    const s = annotations.find(a => a.type === 'scale')
+    if (!s || !s.known_distance || !s.unit) return null
+    const px = distPx(s.points[0], s.points[1])
+    if (!px) return null
+    return { ppu: px / s.known_distance, unit: s.unit }
+  }, [annotations])
 
   // ── Splitter drag ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -148,12 +187,8 @@ export default function DesignDetail() {
     }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
-    return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
   }, [])
-
   function startDrag(e) {
     e.preventDefault()
     draggingRef.current = true
@@ -164,67 +199,33 @@ export default function DesignDetail() {
   // ── Upload ────────────────────────────────────────────────────────────────
   async function handleUpload(file) {
     if (!file) return
-    setError('')
-    setUploading(true)
+    setError(''); setUploading(true)
     try {
-      const safeName = file.name.replace(/[^a-z0-9._-]/gi, '_')
-      const path = `${id}/${Date.now()}_${safeName}`
-
-      const { error: upErr } = await supabase.storage
-        .from('design-files')
+      const safe = file.name.replace(/[^a-z0-9._-]/gi, '_')
+      const path = `${id}/${Date.now()}_${safe}`
+      const { error: upErr } = await supabase.storage.from('design-files')
         .upload(path, file, { cacheControl: '3600', upsert: false })
       if (upErr) throw upErr
-
-      const { data: row, error: dbErr } = await supabase
-        .from('design_files')
-        .insert({
-          project_id:   id,
-          file_name:    file.name,
-          storage_path: path,
-          file_type:    file.type || null,
-          size_bytes:   file.size || null,
-          uploaded_by:  user?.id || null,
-        })
-        .select()
-        .single()
+      const { data: row, error: dbErr } = await supabase.from('design_files').insert({
+        project_id: id, file_name: file.name, storage_path: path,
+        file_type: file.type || null, size_bytes: file.size || null,
+        uploaded_by: user?.id || null,
+      }).select().single()
       if (dbErr) throw dbErr
-
       await loadProjectAndFiles()
       if (row?.id) setSelectedFileId(row.id)
     } catch (err) {
       setError('Upload failed: ' + err.message + (
         err.message?.toLowerCase().includes('bucket')
-          ? ' — make sure you ran supabase-design-files.sql in Supabase.'
-          : ''
+          ? ' — make sure you ran supabase-design-files.sql in Supabase.' : ''
       ))
-    } finally {
-      setUploading(false)
-    }
+    } finally { setUploading(false) }
   }
-
   function onFileInputChange(e) {
     const f = e.target.files?.[0]
-    if (f) handleUpload(f)
-    e.target.value = ''
+    if (f) handleUpload(f); e.target.value = ''
   }
-
-  function onDragOver(e) {
-    e.preventDefault()
-    setDropping(true)
-  }
-  function onDragLeave(e) {
-    e.preventDefault()
-    setDropping(false)
-  }
-  function onDrop(e) {
-    e.preventDefault()
-    setDropping(false)
-    const f = e.dataTransfer.files?.[0]
-    if (f) handleUpload(f)
-  }
-
-  // ── Delete a file ─────────────────────────────────────────────────────────
-  async function handleDelete(file, ev) {
+  async function handleDeleteFile(file, ev) {
     ev?.stopPropagation?.()
     if (!confirm(`Delete "${file.file_name}"? This cannot be undone.`)) return
     await supabase.storage.from('design-files').remove([file.storage_path])
@@ -233,21 +234,137 @@ export default function DesignDetail() {
     await loadProjectAndFiles()
   }
 
-  // ── PDF callbacks ─────────────────────────────────────────────────────────
+  // ── PDF/page render → measure dims ────────────────────────────────────────
   function onPdfLoad({ numPages: n }) {
-    setNumPages(n)
-    setCurrentPage(1)
-    // Persist num_pages back to the row for future listings
-    const file = files.find(f => f.id === selectedFileId)
-    if (file && file.num_pages !== n) {
-      supabase.from('design_files').update({ num_pages: n }).eq('id', file.id)
-    }
+    setNumPages(n); setCurrentPage(1)
+    const f = files.find(x => x.id === selectedFileId)
+    if (f && f.num_pages !== n) supabase.from('design_files').update({ num_pages: n }).eq('id', f.id)
   }
+  function onPageRender() {
+    const el = pageWrapRef.current?.querySelector('canvas, img')
+    if (el) setPageDims({ width: el.clientWidth, height: el.clientHeight })
+  }
+  // Recompute when zoom or page changes; canvas will redraw and clientWidth reflects new size.
+  useEffect(() => {
+    const t = setTimeout(onPageRender, 50)
+    return () => clearTimeout(t)
+  }, [zoom, currentPage, signedUrl])
 
-  // ── Zoom helpers ──────────────────────────────────────────────────────────
-  const zoomIn  = () => setZoom(z => Math.min(4, +(z + 0.25).toFixed(2)))
+  const zoomIn  = () => setZoom(z => Math.min(4,    +(z + 0.25).toFixed(2)))
   const zoomOut = () => setZoom(z => Math.max(0.25, +(z - 0.25).toFixed(2)))
   const zoomReset = () => setZoom(1.0)
+
+  // ── Drawing click handlers ────────────────────────────────────────────────
+  // Convert mouse event → natural coords (zoom = 1.0)
+  function eventToCoords(e) {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = (e.clientX - rect.left) / zoom
+    const y = (e.clientY - rect.top)  / zoom
+    return [x, y]
+  }
+  function onSvgMouseMove(e) {
+    if (tool === 'pointer') return
+    if (!drawing && tool !== 'count') return
+    setHoverPoint(eventToCoords(e))
+  }
+  function onSvgClick(e) {
+    if (tool === 'pointer') return
+    const pt = eventToCoords(e)
+
+    if (tool === 'count') {
+      saveAnnotation({ type: 'count', points: [pt], color: drawColor })
+      return
+    }
+
+    if (tool === 'scale' || tool === 'linear') {
+      if (!drawing) {
+        setDrawing({ type: tool, points: [pt] })
+      } else {
+        const finalPts = [...drawing.points, pt]
+        if (tool === 'scale') {
+          setScaleDialog({ points: finalPts, distance: '', unit: 'ft' })
+        } else {
+          saveAnnotation({ type: 'linear', points: finalPts, color: drawColor })
+        }
+        setDrawing(null); setHoverPoint(null)
+      }
+      return
+    }
+
+    if (tool === 'area') {
+      if (!drawing) {
+        setDrawing({ type: 'area', points: [pt] })
+        return
+      }
+      // If user clicks within 10 natural-pixels of the first vertex AND has 3+ points, close.
+      const first = drawing.points[0]
+      const closing = drawing.points.length >= 3 && distPx(pt, first) < (10 / zoom)
+      if (closing) {
+        saveAnnotation({ type: 'area', points: drawing.points, color: drawColor })
+        setDrawing(null); setHoverPoint(null)
+      } else {
+        setDrawing({ ...drawing, points: [...drawing.points, pt] })
+      }
+    }
+  }
+  function onSvgKeyDown(e) {
+    if (e.key === 'Escape') { setDrawing(null); setHoverPoint(null) }
+    if (e.key === 'Enter' && drawing?.type === 'area' && drawing.points.length >= 3) {
+      saveAnnotation({ type: 'area', points: drawing.points, color: drawColor })
+      setDrawing(null); setHoverPoint(null)
+    }
+  }
+  // Hook keyboard listener on window so it works even without focus on SVG
+  useEffect(() => {
+    function onKey(e) { onSvgKeyDown(e) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawing, drawColor])
+
+  // ── Persistence ───────────────────────────────────────────────────────────
+  async function saveAnnotation(payload) {
+    if (!selectedFileId) return
+    const { data, error: insErr } = await supabase
+      .from('design_annotations')
+      .insert({
+        file_id:        selectedFileId,
+        page_number:    currentPage,
+        type:           payload.type,
+        points:         payload.points,
+        color:          payload.color || drawColor,
+        label:          payload.label || null,
+        known_distance: payload.known_distance ?? null,
+        unit:           payload.unit ?? null,
+        created_by:     user?.id || null,
+      })
+      .select().single()
+    if (insErr) { setError('Save failed: ' + insErr.message); return }
+    setAnnotations(prev => [...prev, data])
+  }
+  async function deleteAnnotation(annId) {
+    await supabase.from('design_annotations').delete().eq('id', annId)
+    setAnnotations(prev => prev.filter(a => a.id !== annId))
+  }
+
+  // ── Scale dialog: confirm ────────────────────────────────────────────────
+  async function confirmScale() {
+    const dist = parseFloat(scaleDialog.distance)
+    if (!isFinite(dist) || dist <= 0) { setError('Enter a positive distance.'); return }
+    // Replace any existing scale on this page, then insert new.
+    const existing = annotations.find(a => a.type === 'scale')
+    if (existing) await supabase.from('design_annotations').delete().eq('id', existing.id)
+    const newAnn = {
+      type: 'scale',
+      points: scaleDialog.points,
+      color: '#FF8800',
+      known_distance: dist,
+      unit: scaleDialog.unit,
+    }
+    await saveAnnotation(newAnn)
+    if (existing) setAnnotations(prev => prev.filter(a => a.id !== existing.id))
+    setScaleDialog(null)
+  }
 
   // ── Render ────────────────────────────────────────────────────────────────
   if (loading) return (
@@ -255,7 +372,6 @@ export default function DesignDetail() {
       <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-700"></div>
     </div>
   )
-
   if (!project) return (
     <div className="p-6 max-w-3xl mx-auto">
       <Link to="/design" className="text-sm text-green-700 hover:underline">← Back to Design</Link>
@@ -265,198 +381,357 @@ export default function DesignDetail() {
 
   const selectedFile = files.find(f => f.id === selectedFileId) || null
 
+  // Aggregate counts for the sidebar
+  const totals = useMemo(() => {
+    const linears = annotations.filter(a => a.type === 'linear')
+    const areas   = annotations.filter(a => a.type === 'area')
+    const counts  = annotations.filter(a => a.type === 'count')
+    const linearTotal = linears.reduce((s, a) => s + polylineLengthPx(a.points), 0)
+    const areaTotal   = areas  .reduce((s, a) => s + polygonAreaPx(a.points), 0)
+    return {
+      linearCount: linears.length, linearTotal,
+      areaCount:   areas.length,   areaTotal,
+      countTotal:  counts.length,
+    }
+  }, [annotations])
+
   return (
     <div ref={containerRef} className="flex h-[calc(100vh-2.75rem)] -m-4 lg:-m-6 bg-gray-100 overflow-hidden">
 
       {/* ── Sidebar ──────────────────────────────────────────────────────── */}
-      <aside
-        style={{ width: sidebarWidth }}
-        className="flex flex-col bg-white border-r border-gray-200 overflow-hidden flex-shrink-0"
-      >
+      <aside style={{ width: sidebarWidth }} className="flex flex-col bg-white border-r border-gray-200 overflow-hidden flex-shrink-0">
         <div className="px-4 py-3 border-b border-gray-200 flex-shrink-0">
           <Link to="/design" className="text-xs text-green-700 hover:underline block mb-1">← All Projects</Link>
           <h1 className="text-base font-bold text-gray-900 truncate" title={project.name}>{project.name}</h1>
-          {project.clients?.name && (
-            <p className="text-xs text-gray-500 truncate">{project.clients.name}</p>
-          )}
+          {project.clients?.name && <p className="text-xs text-gray-500 truncate">{project.clients.name}</p>}
         </div>
 
         {/* Upload zone */}
         <div className="px-4 py-3 border-b border-gray-200 flex-shrink-0">
           <div
-            onDragOver={onDragOver}
-            onDragLeave={onDragLeave}
-            onDrop={onDrop}
+            onDragOver={(e) => { e.preventDefault(); setDropping(true) }}
+            onDragLeave={(e) => { e.preventDefault(); setDropping(false) }}
+            onDrop={(e) => { e.preventDefault(); setDropping(false); const f = e.dataTransfer.files?.[0]; if (f) handleUpload(f) }}
             onClick={() => fileInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-xl px-3 py-4 text-center cursor-pointer transition-colors ${
-              dropping
-                ? 'border-green-500 bg-green-50'
-                : 'border-gray-300 hover:border-green-500 hover:bg-green-50/40'
+            className={`border-2 border-dashed rounded-xl px-3 py-3 text-center cursor-pointer transition-colors ${
+              dropping ? 'border-green-500 bg-green-50' : 'border-gray-300 hover:border-green-500 hover:bg-green-50/40'
             }`}
           >
-            <p className="text-2xl mb-1">📥</p>
-            <p className="text-xs font-medium text-gray-700">
-              {uploading ? 'Uploading…' : 'Drop file or click to upload'}
-            </p>
-            <p className="text-[10px] text-gray-400 mt-0.5">PDF, PNG, JPG, GIF, WebP</p>
+            <p className="text-xl mb-1">📥</p>
+            <p className="text-xs font-medium text-gray-700">{uploading ? 'Uploading…' : 'Upload drawing'}</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">PDF, PNG, JPG, GIF</p>
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={ACCEPTED_EXTENSIONS}
-            onChange={onFileInputChange}
-            className="hidden"
-          />
+          <input ref={fileInputRef} type="file" accept={ACCEPTED} onChange={onFileInputChange} className="hidden" />
         </div>
 
         {/* File list */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="overflow-y-auto border-b border-gray-200 max-h-48 flex-shrink-0">
           {files.length === 0 ? (
-            <div className="px-4 py-8 text-center text-xs text-gray-400">
-              No files yet. Upload above to start.
-            </div>
+            <div className="px-4 py-4 text-center text-xs text-gray-400">No files yet.</div>
           ) : files.map(f => (
-            <button
-              key={f.id}
-              onClick={() => setSelectedFileId(f.id)}
+            <button key={f.id} onClick={() => setSelectedFileId(f.id)}
               className={`w-full text-left px-4 py-2 border-b border-gray-100 transition-colors flex items-start gap-2 group ${
-                f.id === selectedFileId
-                  ? 'bg-green-50 text-green-800'
-                  : 'hover:bg-gray-50 text-gray-800'
-              }`}
-            >
+                f.id === selectedFileId ? 'bg-green-50 text-green-800' : 'hover:bg-gray-50 text-gray-800'
+              }`}>
               <span className="text-base flex-shrink-0">{isPdfFile(f) ? '📄' : isImageFile(f) ? '🖼️' : '📎'}</span>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium truncate" title={f.file_name}>{f.file_name}</p>
-                <p className="text-[10px] text-gray-400">
-                  {fmtBytes(f.size_bytes)}
-                  {f.num_pages ? ` · ${f.num_pages}p` : ''}
-                </p>
+                <p className="text-[10px] text-gray-400">{fmtBytes(f.size_bytes)}{f.num_pages ? ` · ${f.num_pages}p` : ''}</p>
               </div>
-              <span
-                onClick={e => handleDelete(f, e)}
-                className="text-gray-300 group-hover:text-red-500 hover:!text-red-700 text-xs flex-shrink-0 px-1"
-                title="Delete file"
-              >✕</span>
+              <span onClick={e => handleDeleteFile(f, e)} className="text-gray-300 group-hover:text-red-500 hover:!text-red-700 text-xs flex-shrink-0 px-1" title="Delete file">✕</span>
             </button>
           ))}
         </div>
 
-        {/* Phase progress */}
-        <div className="px-4 py-2 border-t border-gray-200 text-[10px] text-gray-400 flex-shrink-0">
-          Phase 2 of 5 · drawing tools in upcoming releases
-        </div>
+        {/* Takeoff totals + annotations */}
+        {selectedFile && (
+          <div className="flex-1 overflow-y-auto">
+            <div className="px-4 py-3 border-b border-gray-100">
+              <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Takeoff (page {currentPage})</h3>
+              {pageScale ? (
+                <p className="text-[11px] text-green-700 mb-2">Scale: 1 px = {(1 / pageScale.ppu).toFixed(4)} {pageScale.unit}</p>
+              ) : (
+                <p className="text-[11px] text-amber-600 mb-2">⚠ No scale set — measurements show in pixels.</p>
+              )}
+              <div className="text-xs text-gray-700 space-y-1">
+                <p>📐 Linear: <strong>{totals.linearCount}</strong> ({fmtLen(totals.linearTotal, pageScale?.ppu, pageScale?.unit || '')})</p>
+                <p>⬛ Area: <strong>{totals.areaCount}</strong> ({fmtArea(totals.areaTotal, pageScale?.ppu, pageScale?.unit || '')})</p>
+                <p>🎯 Count: <strong>{totals.countTotal}</strong></p>
+              </div>
+            </div>
+
+            {annotations.length > 0 && (
+              <div className="px-4 py-2 border-b border-gray-100">
+                <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Annotations</h3>
+                {annotations.map(a => (
+                  <div key={a.id} className="flex items-center gap-2 py-1 group">
+                    <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: a.color || '#666' }} />
+                    <span className="text-xs flex-1 truncate">
+                      {TOOL_META[a.type]?.icon} {a.type}
+                      {a.type === 'linear' && ` · ${fmtLen(polylineLengthPx(a.points), pageScale?.ppu, pageScale?.unit || '')}`}
+                      {a.type === 'area'   && ` · ${fmtArea(polygonAreaPx(a.points), pageScale?.ppu, pageScale?.unit || '')}`}
+                      {a.type === 'scale'  && ` · ${a.known_distance} ${a.unit}`}
+                    </span>
+                    <button onClick={() => deleteAnnotation(a.id)} className="text-gray-300 group-hover:text-red-500 hover:!text-red-700 text-xs px-1">✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="px-4 py-2 border-t border-gray-200 text-[10px] text-gray-400 flex-shrink-0">Phase 4 of 5 · report coming next</div>
       </aside>
 
       {/* ── Splitter ─────────────────────────────────────────────────────── */}
-      <div
-        onMouseDown={startDrag}
-        className="w-1 bg-gray-200 hover:bg-green-500 cursor-col-resize flex-shrink-0 transition-colors"
-        title="Drag to resize"
-      />
+      <div onMouseDown={startDrag} className="w-1 bg-gray-200 hover:bg-green-500 cursor-col-resize flex-shrink-0 transition-colors" />
 
       {/* ── Viewer ───────────────────────────────────────────────────────── */}
       <main className="flex-1 flex flex-col overflow-hidden">
 
         {/* Toolbar */}
-        <div className="flex items-center gap-2 px-4 py-2 bg-white border-b border-gray-200 flex-shrink-0">
+        <div className="flex items-center gap-2 px-4 py-2 bg-white border-b border-gray-200 flex-shrink-0 flex-wrap">
           {selectedFile ? (
-            <p className="text-sm font-medium text-gray-700 truncate" title={selectedFile.file_name}>
-              {selectedFile.file_name}
-            </p>
+            <p className="text-sm font-medium text-gray-700 truncate max-w-xs" title={selectedFile.file_name}>{selectedFile.file_name}</p>
           ) : (
             <p className="text-sm text-gray-400">No file selected</p>
           )}
 
+          {/* Tool selector */}
+          {selectedFile && (
+            <div className="flex items-center gap-1 ml-2">
+              {Object.entries(TOOL_META).map(([k, m]) => (
+                <button key={k} onClick={() => { setTool(k); setDrawing(null); setHoverPoint(null) }}
+                  title={k === 'scale' && !pageScale ? 'Set scale (required for measurements)' : m.label}
+                  className={`px-2 py-1 rounded text-xs border transition-colors ${
+                    tool === k ? 'bg-green-700 text-white border-green-700' : 'bg-white border-gray-300 hover:bg-gray-50 text-gray-700'
+                  }`}>
+                  <span className="mr-1">{m.icon}</span>{m.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Color picker for active tool */}
+          {selectedFile && tool !== 'pointer' && tool !== 'scale' && (
+            <div className="flex items-center gap-1 ml-1">
+              {COLOR_PRESETS.map(c => (
+                <button key={c} onClick={() => setDrawColor(c)} title={c}
+                  className={`w-5 h-5 rounded-full border-2 transition-transform ${drawColor === c ? 'border-gray-800 scale-110' : 'border-white shadow'}`}
+                  style={{ backgroundColor: c }} />
+              ))}
+            </div>
+          )}
+
           <div className="flex-1" />
 
-          {/* Page nav (PDFs only) */}
+          {/* Page nav */}
           {isPdfFile(selectedFile) && numPages > 0 && (
             <div className="flex items-center gap-1 mr-2">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage <= 1}
-                className="px-2 py-1 rounded text-sm border border-gray-300 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
-              >‹</button>
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1}
+                className="px-2 py-1 rounded text-sm border border-gray-300 hover:bg-gray-50 disabled:opacity-30">‹</button>
               <span className="text-xs text-gray-600 px-2">Page {currentPage} / {numPages}</span>
-              <button
-                onClick={() => setCurrentPage(p => Math.min(numPages, p + 1))}
-                disabled={currentPage >= numPages}
-                className="px-2 py-1 rounded text-sm border border-gray-300 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
-              >›</button>
+              <button onClick={() => setCurrentPage(p => Math.min(numPages, p + 1))} disabled={currentPage >= numPages}
+                className="px-2 py-1 rounded text-sm border border-gray-300 hover:bg-gray-50 disabled:opacity-30">›</button>
             </div>
           )}
 
           {/* Zoom controls */}
           <div className="flex items-center gap-1">
             <button onClick={zoomOut} className="px-2 py-1 rounded text-sm border border-gray-300 hover:bg-gray-50" title="Zoom out">−</button>
-            <button onClick={zoomReset} className="px-2 py-1 rounded text-xs border border-gray-300 hover:bg-gray-50 min-w-[3.25rem]" title="Reset zoom">
-              {Math.round(zoom * 100)}%
-            </button>
+            <button onClick={zoomReset} className="px-2 py-1 rounded text-xs border border-gray-300 hover:bg-gray-50 min-w-[3.25rem]" title="Reset zoom">{Math.round(zoom * 100)}%</button>
             <button onClick={zoomIn} className="px-2 py-1 rounded text-sm border border-gray-300 hover:bg-gray-50" title="Zoom in">+</button>
           </div>
         </div>
 
-        {/* Canvas */}
+        {/* Status hint */}
+        {tool !== 'pointer' && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 py-1.5 text-xs text-amber-800 flex-shrink-0">
+            {tool === 'scale'  && (drawing ? 'Click the second point of a known distance.' : 'Click the first point of a known distance, then click the second.')}
+            {tool === 'linear' && (drawing ? 'Click the end point.' : 'Click the start of a linear measurement.')}
+            {tool === 'area'   && (drawing ? `Click vertices (${drawing.points.length} so far). Click near the first point or press Enter to close. Esc to cancel.` : 'Click the first vertex of an area.')}
+            {tool === 'count'  && 'Click anywhere to drop a count marker.'}
+          </div>
+        )}
+
+        {/* Canvas + overlay */}
         <div className="flex-1 overflow-auto bg-gray-200 p-6">
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm mb-4 max-w-3xl mx-auto">
-              <span className="font-semibold">Error:</span> {error}
-            </div>
-          )}
+          {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm mb-4 max-w-3xl mx-auto"><span className="font-semibold">Error:</span> {error}</div>}
 
           {!selectedFile ? (
             <div className="text-center py-20 text-gray-400">
               <p className="text-5xl mb-3">📐</p>
               <p className="text-base font-medium text-gray-600">Upload a drawing to get started</p>
-              <p className="text-sm mt-1">PDF or image file from the sidebar.</p>
             </div>
           ) : !signedUrl ? (
             <div className="text-center py-20 text-gray-400">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700 mx-auto mb-3"></div>
               <p className="text-sm">Loading file…</p>
             </div>
-          ) : isPdfFile(selectedFile) ? (
-            <div className="flex justify-center">
-              <Document
-                file={signedUrl}
-                onLoadSuccess={onPdfLoad}
-                onLoadError={(err) => setError('PDF load failed: ' + err.message)}
-                loading={(
-                  <div className="text-center py-20 text-gray-400">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700 mx-auto mb-3"></div>
-                    <p className="text-sm">Rendering PDF…</p>
-                  </div>
-                )}
-              >
-                <Page
-                  pageNumber={currentPage}
-                  scale={zoom}
-                  renderTextLayer={false}
-                  renderAnnotationLayer={false}
-                  className="shadow-lg bg-white"
-                />
-              </Document>
-            </div>
-          ) : isImageFile(selectedFile) ? (
-            <div className="flex justify-center">
-              <img
-                src={signedUrl}
-                alt={selectedFile.file_name}
-                style={{ width: `${zoom * 100}%`, maxWidth: 'none' }}
-                className="shadow-lg bg-white"
-              />
-            </div>
           ) : (
-            <div className="text-center py-20 text-gray-500">
-              <p className="text-sm">Preview not available for this file type.</p>
-              <a href={signedUrl} target="_blank" rel="noreferrer" className="text-xs text-green-700 hover:underline mt-2 inline-block">
-                Download original
-              </a>
+            <div className="flex justify-center">
+              <div ref={pageWrapRef} className="relative inline-block shadow-lg bg-white" style={{ lineHeight: 0 }}>
+                {isPdfFile(selectedFile) ? (
+                  <Document file={signedUrl} onLoadSuccess={onPdfLoad} onLoadError={(err) => setError('PDF load failed: ' + err.message)}>
+                    <Page pageNumber={currentPage} scale={zoom} renderTextLayer={false} renderAnnotationLayer={false} onRenderSuccess={onPageRender} />
+                  </Document>
+                ) : isImageFile(selectedFile) ? (
+                  <img src={signedUrl} alt={selectedFile.file_name} onLoad={onPageRender} style={{ width: `${zoom * 100}%`, maxWidth: 'none', display: 'block' }} />
+                ) : (
+                  <div className="p-12 text-center text-gray-500"><p className="text-sm">Preview not available.</p></div>
+                )}
+
+                {/* SVG annotation overlay */}
+                {pageDims && (
+                  <svg
+                    width={pageDims.width}
+                    height={pageDims.height}
+                    onClick={onSvgClick}
+                    onMouseMove={onSvgMouseMove}
+                    onMouseLeave={() => setHoverPoint(null)}
+                    style={{ position: 'absolute', top: 0, left: 0, cursor: tool === 'pointer' ? 'default' : 'crosshair' }}
+                  >
+                    {/* Saved annotations */}
+                    {annotations.map(a => (
+                      <AnnotationShape key={a.id} a={a} zoom={zoom} pageScale={pageScale} />
+                    ))}
+                    {/* In-progress preview */}
+                    {drawing && (
+                      <DrawingPreview drawing={drawing} hover={hoverPoint} zoom={zoom} color={drawing.type === 'scale' ? '#FF8800' : drawColor} pageScale={pageScale} />
+                    )}
+                  </svg>
+                )}
+              </div>
             </div>
           )}
         </div>
       </main>
+
+      {/* ── Scale dialog ─────────────────────────────────────────────────── */}
+      {scaleDialog && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setScaleDialog(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-200" style={{ backgroundColor: FG }}>
+              <h2 className="text-base font-bold text-white">Set Page Scale</h2>
+              <p className="text-xs text-green-200 mt-0.5">Page {currentPage} · drawn distance: {distPx(scaleDialog.points[0], scaleDialog.points[1]).toFixed(1)} px</p>
+            </div>
+            <div className="p-6 space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Real-world distance</label>
+                <div className="flex gap-2">
+                  <input type="number" step="any" autoFocus value={scaleDialog.distance}
+                    onChange={e => setScaleDialog({ ...scaleDialog, distance: e.target.value })}
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700/30 focus:border-green-700"
+                    placeholder="e.g. 10" />
+                  <select value={scaleDialog.unit}
+                    onChange={e => setScaleDialog({ ...scaleDialog, unit: e.target.value })}
+                    className="border border-gray-300 rounded-lg px-2 py-2 text-sm bg-white">
+                    <option value="ft">ft</option><option value="in">in</option><option value="m">m</option><option value="cm">cm</option>
+                  </select>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500">After setting scale, all linear and area measurements on this page convert to {scaleDialog.unit}.</p>
+            </div>
+            <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 flex justify-end gap-2">
+              <button onClick={() => setScaleDialog(null)} className="px-4 py-2 rounded-lg text-sm text-gray-600 hover:bg-white border border-gray-300">Cancel</button>
+              <button onClick={confirmScale} disabled={!scaleDialog.distance || parseFloat(scaleDialog.distance) <= 0}
+                className="px-5 py-2 rounded-lg text-sm font-bold text-white disabled:opacity-50" style={{ backgroundColor: FG }}>
+                Set Scale
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
+}
+
+// ── Sub-components ──────────────────────────────────────────────────────────
+
+function AnnotationShape({ a, zoom, pageScale }) {
+  const z = zoom
+  const pts = a.points.map(([x, y]) => [x * z, y * z])
+  const color = a.color || '#3A5038'
+  if (a.type === 'count') {
+    const [x, y] = pts[0] || [0, 0]
+    return (
+      <g pointerEvents="none">
+        <circle cx={x} cy={y} r={8} fill={color} stroke="#fff" strokeWidth={2} />
+      </g>
+    )
+  }
+  if (a.type === 'linear' || a.type === 'scale') {
+    const [a0, b0] = pts
+    if (!a0 || !b0) return null
+    const lengthPx = distPx(a.points[0], a.points[1])
+    const label = a.type === 'scale'
+      ? `${a.known_distance} ${a.unit}`
+      : fmtLen(lengthPx, pageScale?.ppu, pageScale?.unit || '')
+    const mid = [(a0[0] + b0[0]) / 2, (a0[1] + b0[1]) / 2]
+    return (
+      <g pointerEvents="none">
+        <line x1={a0[0]} y1={a0[1]} x2={b0[0]} y2={b0[1]} stroke={color} strokeWidth={3}
+              strokeDasharray={a.type === 'scale' ? '6 4' : undefined} />
+        <circle cx={a0[0]} cy={a0[1]} r={4} fill={color} stroke="#fff" strokeWidth={1.5} />
+        <circle cx={b0[0]} cy={b0[1]} r={4} fill={color} stroke="#fff" strokeWidth={1.5} />
+        <rect x={mid[0] - 28} y={mid[1] - 10} width={56} height={20} rx={3} fill="white" stroke={color} />
+        <text x={mid[0]} y={mid[1] + 5} textAnchor="middle" fontSize={11} fill="#1f2937" fontWeight={600}>{label}</text>
+      </g>
+    )
+  }
+  if (a.type === 'area') {
+    if (pts.length < 2) return null
+    const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0]} ${p[1]}`).join(' ') + ' Z'
+    const areaPx = polygonAreaPx(a.points)
+    const [cx, cy] = polygonCentroid(pts)
+    const label = fmtArea(areaPx, pageScale?.ppu, pageScale?.unit || '')
+    return (
+      <g pointerEvents="none">
+        <path d={d} fill={color} fillOpacity={0.25} stroke={color} strokeWidth={2} />
+        {pts.map((p, i) => (<circle key={i} cx={p[0]} cy={p[1]} r={3} fill={color} stroke="#fff" strokeWidth={1} />))}
+        <rect x={cx - 36} y={cy - 10} width={72} height={20} rx={3} fill="white" stroke={color} />
+        <text x={cx} y={cy + 5} textAnchor="middle" fontSize={11} fill="#1f2937" fontWeight={600}>{label}</text>
+      </g>
+    )
+  }
+  return null
+}
+
+function DrawingPreview({ drawing, hover, zoom, color, pageScale }) {
+  const z = zoom
+  const pts = drawing.points.map(([x, y]) => [x * z, y * z])
+
+  if (drawing.type === 'scale' || drawing.type === 'linear') {
+    const a0 = pts[0]
+    const tip = hover ? [hover[0] * z, hover[1] * z] : a0
+    if (!a0) return null
+    const lengthPx = distPx(drawing.points[0], hover || drawing.points[0])
+    const label = drawing.type === 'scale'
+      ? `${lengthPx.toFixed(1)} px`
+      : fmtLen(lengthPx, pageScale?.ppu, pageScale?.unit || '')
+    return (
+      <g pointerEvents="none">
+        <line x1={a0[0]} y1={a0[1]} x2={tip[0]} y2={tip[1]} stroke={color} strokeWidth={3} strokeDasharray="6 4" opacity={0.85} />
+        <circle cx={a0[0]} cy={a0[1]} r={4} fill={color} stroke="#fff" strokeWidth={1.5} />
+        {hover && (<>
+          <circle cx={tip[0]} cy={tip[1]} r={4} fill={color} stroke="#fff" strokeWidth={1.5} />
+          <text x={tip[0] + 8} y={tip[1] - 8} fontSize={11} fill="#1f2937" fontWeight={600} style={{ paintOrder: 'stroke', stroke: '#fff', strokeWidth: 3 }}>{label}</text>
+        </>)}
+      </g>
+    )
+  }
+
+  if (drawing.type === 'area' && pts.length > 0) {
+    const tip = hover ? [hover[0] * z, hover[1] * z] : null
+    const allPts = tip ? [...pts, tip] : pts
+    const d = allPts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0]} ${p[1]}`).join(' ')
+    return (
+      <g pointerEvents="none">
+        <path d={d} fill={color} fillOpacity={0.15} stroke={color} strokeWidth={2} strokeDasharray="6 4" />
+        {pts.map((p, i) => (<circle key={i} cx={p[0]} cy={p[1]} r={4} fill={color} stroke="#fff" strokeWidth={1.5} />))}
+      </g>
+    )
+  }
+
+  return null
 }
