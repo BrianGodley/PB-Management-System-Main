@@ -64,6 +64,8 @@ export default function Clients() {
   const [contactsForImport,    setContactsForImport]    = useState([])
   const [contactImportSearch,  setContactImportSearch]  = useState('')
   const [selectedContactId,    setSelectedContactId]    = useState(null)
+  const [contactDropdownOpen, setContactDropdownOpen]   = useState(false)
+  const contactPickerRef = useRef(null)
 
   useEffect(() => { fetchClients() }, [])
   useEffect(() => {
@@ -74,6 +76,16 @@ export default function Clients() {
       .order('last_name')
       .then(({ data }) => setContactsForImport(data || []))
   }, [showForm])
+
+  // Close the typeahead dropdown when clicking outside the picker.
+  useEffect(() => {
+    function onDown(e) {
+      if (!contactPickerRef.current) return
+      if (!contactPickerRef.current.contains(e.target)) setContactDropdownOpen(false)
+    }
+    if (contactDropdownOpen) document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [contactDropdownOpen])
 
   // When the user selects a contact, copy its fields into the form. They can
   // still edit anything before saving.
@@ -142,7 +154,7 @@ export default function Clients() {
     } else {
       setForm({ first_name:'', last_name:'', company_name:'', company_position:'', email:'', phone:'', street:'', city:'', state:'', zip:'', notes:'' })
       setShowForm(false); setSaveError(''); fetchClients()
-      setNewClientMode('scratch'); setSelectedContactId(null); setContactImportSearch('')
+      setNewClientMode('scratch'); setSelectedContactId(null); setContactImportSearch(''); setContactDropdownOpen(false)
     }
   }
 
@@ -383,46 +395,67 @@ export default function Clients() {
           </div>
 
           {newClientMode === 'contact' && (
-            <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+            <div ref={contactPickerRef} className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
               <label className="label">Pick a contact to import</label>
-              <input
-                type="text"
-                placeholder="Search by name, company, email…"
-                value={contactImportSearch}
-                onChange={e => setContactImportSearch(e.target.value)}
-                className="input mb-2"
-              />
-              <div className="max-h-56 overflow-y-auto border border-gray-200 rounded-md bg-white divide-y divide-gray-100">
-                {(() => {
-                  const q = contactImportSearch.trim().toLowerCase()
-                  const list = q
-                    ? contactsForImport.filter(c => {
-                        const hay = [c.first_name, c.last_name, c.company_name, c.email, c.phone].filter(Boolean).join(' ').toLowerCase()
-                        return hay.includes(q)
+              {/* Typeahead: click the field to open the dropdown of all
+                  contacts; typing filters the list live. Picking a contact
+                  fills the form below and collapses the dropdown. */}
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Click to browse, or type a name…"
+                  value={contactImportSearch}
+                  onChange={e => { setContactImportSearch(e.target.value); setContactDropdownOpen(true) }}
+                  onFocus={() => setContactDropdownOpen(true)}
+                  className="input pr-7"
+                />
+                {(selectedContactId || contactImportSearch) && (
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedContactId(null); setContactImportSearch(''); setContactDropdownOpen(false) }}
+                    title="Clear"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 text-lg leading-none"
+                  >
+                    ×
+                  </button>
+                )}
+                {contactDropdownOpen && (
+                  <div className="absolute left-0 right-0 top-full mt-1 z-20 max-h-56 overflow-y-auto border border-gray-200 rounded-md bg-white shadow-lg divide-y divide-gray-100">
+                    {(() => {
+                      const q = contactImportSearch.trim().toLowerCase()
+                      const list = q
+                        ? contactsForImport.filter(c => {
+                            const hay = [c.first_name, c.last_name, c.company_name, c.email, c.phone].filter(Boolean).join(' ').toLowerCase()
+                            return hay.includes(q)
+                          })
+                        : contactsForImport
+                      if (list.length === 0) return (
+                        <p className="px-3 py-3 text-xs text-gray-400">{contactImportSearch ? 'No matches.' : 'No contacts yet.'}</p>
+                      )
+                      return list.slice(0, 50).map(c => {
+                        const isSelected = c.id === selectedContactId
+                        const display    = `${c.last_name || ''}${c.first_name ? `, ${c.first_name}` : ''}`.trim() || c.company_name || '—'
+                        return (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => {
+                              applyContactToForm(c.id)
+                              setContactImportSearch(display)
+                              setContactDropdownOpen(false)
+                            }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-green-50 ${isSelected ? 'bg-green-50' : ''}`}
+                          >
+                            <p className="font-semibold text-gray-800">{display}</p>
+                            <p className="text-xs text-gray-500 truncate">
+                              {[c.company_name, c.email, c.phone].filter(Boolean).join(' · ') || '—'}
+                            </p>
+                          </button>
+                        )
                       })
-                    : contactsForImport
-                  if (list.length === 0) return (
-                    <p className="px-3 py-3 text-xs text-gray-400">{contactImportSearch ? 'No matches.' : 'No contacts yet.'}</p>
-                  )
-                  return list.slice(0, 50).map(c => {
-                    const isSelected = c.id === selectedContactId
-                    return (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => applyContactToForm(c.id)}
-                        className={`w-full text-left px-3 py-2 text-sm hover:bg-green-50 ${isSelected ? 'bg-green-50' : ''}`}
-                      >
-                        <p className="font-semibold text-gray-800">
-                          {c.last_name}{c.first_name ? `, ${c.first_name}` : ''}
-                        </p>
-                        <p className="text-xs text-gray-500 truncate">
-                          {[c.company_name, c.email, c.phone].filter(Boolean).join(' · ') || '—'}
-                        </p>
-                      </button>
-                    )
-                  })
-                })()}
+                    })()}
+                  </div>
+                )}
               </div>
               {selectedContactId && (
                 <p className="text-[11px] text-green-700 mt-2">
