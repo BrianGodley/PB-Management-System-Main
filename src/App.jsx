@@ -11,6 +11,7 @@ import ContactDetail from './pages/ContactDetail'
 import NewJob from './pages/NewJob'
 import JobDetail from './pages/JobDetail'
 import JobsList from './pages/JobsList'
+import Info from './pages/Info'
 import Design from './pages/Design'
 import DesignDetail from './pages/DesignDetail'
 import Bids from './pages/Bids'
@@ -80,6 +81,7 @@ function AppRoutes() {
         <Route path="design" element={<Design />} />
         <Route path="design/:id" element={<DesignDetail />} />
         <Route path="jobs" element={<JobsList />} />
+        <Route path="info" element={<Info />} />
         <Route path="jobs/new" element={<NewJob />} />
         <Route path="jobs/:id" element={<JobDetail />} />
         <Route path="jobs/:id/tracker" element={<JobTracker />} />
