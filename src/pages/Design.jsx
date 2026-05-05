@@ -22,6 +22,9 @@ export default function Design() {
   const [loading,     setLoading]     = useState(true)
   const [search,      setSearch]      = useState('')
   const [showNew,     setShowNew]     = useState(false)
+  // Top-level tabs on the Design index page. The existing project list is
+  // the "Take Offs" tab; the first two are placeholders for now.
+  const [activeTab,   setActiveTab]   = useState('cad') // 'cad' | 'selections' | 'takeoffs'
 
   // New-project form
   const [newName,    setNewName]    = useState('')
@@ -85,11 +88,57 @@ export default function Design() {
     )
   }, [projects, search])
 
+  const TABS = [
+    { id: 'cad',        label: 'CAD Assist Drawing' },
+    { id: 'selections', label: 'Selections' },
+    { id: 'takeoffs',   label: 'Take Offs' },
+  ]
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
+      {/* Page title */}
+      <h1 className="text-2xl font-bold text-gray-900 mb-4">📐 Design</h1>
+
+      {/* Tab bar */}
+      <div className="flex border-b border-gray-200 mb-6">
+        {TABS.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setActiveTab(t.id)}
+            className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+              activeTab === t.id
+                ? 'border-green-700 text-green-800'
+                : 'border-transparent text-gray-500 hover:text-gray-800'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* CAD Assist Drawing — placeholder */}
+      {activeTab === 'cad' && (
+        <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center max-w-2xl mx-auto">
+          <p className="text-4xl mb-2">🛠️</p>
+          <h2 className="text-base font-semibold text-gray-800 mb-1">CAD Assist Drawing</h2>
+          <p className="text-sm text-gray-500">Coming soon — AI-assisted drawing tools will live here.</p>
+        </div>
+      )}
+
+      {/* Selections — placeholder */}
+      {activeTab === 'selections' && (
+        <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center max-w-2xl mx-auto">
+          <p className="text-4xl mb-2">🎨</p>
+          <h2 className="text-base font-semibold text-gray-800 mb-1">Selections</h2>
+          <p className="text-sm text-gray-500">Coming soon — track plant, hardscape, and material selections per project.</p>
+        </div>
+      )}
+
+      {/* Take Offs — the existing project list */}
+      {activeTab === 'takeoffs' && (
+      <>
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">📐 Design</h1>
         <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
           {projects.length} project{projects.length === 1 ? '' : 's'}
         </span>
@@ -172,6 +221,9 @@ export default function Design() {
             </tbody>
           </table>
         </div>
+      )}
+
+      </>
       )}
 
       {/* New Project modal */}
