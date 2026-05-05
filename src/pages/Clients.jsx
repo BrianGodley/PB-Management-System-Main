@@ -70,11 +70,19 @@ export default function Clients() {
   useEffect(() => { fetchClients() }, [])
   useEffect(() => {
     // Lazy-load the contacts list the first time the form is opened.
+    // NOTE: contacts has no `company_position` column (that lives on the
+    // clients table). Including it here previously made the whole SELECT
+    // fail and the list came back empty. We pull the columns that actually
+    // exist on contacts; `cell` is requested as a phone fallback when the
+    // primary `phone` column is blank.
     if (!showForm || contactsForImport.length > 0) return
     supabase.from('contacts')
-      .select('id, first_name, last_name, company_name, company_position, email, phone, street_address, city, state, zip')
+      .select('id, first_name, last_name, company_name, email, phone, cell, street_address, city, state, zip')
       .order('last_name')
-      .then(({ data }) => setContactsForImport(data || []))
+      .then(({ data, error }) => {
+        if (error) console.error('Failed to load contacts for import:', error)
+        setContactsForImport(data || [])
+      })
   }, [showForm])
 
   // Close the typeahead dropdown when clicking outside the picker.
@@ -97,9 +105,11 @@ export default function Clients() {
       first_name:       c.first_name       || '',
       last_name:        c.last_name        || '',
       company_name:     c.company_name     || '',
-      company_position: c.company_position || '',
+      // Contacts don't store a company_position; user can fill it after import.
+      company_position: '',
       email:            c.email            || '',
-      phone:            c.phone            || '',
+      // Prefer office phone but fall back to cell if office is blank.
+      phone:            c.phone            || c.cell || '',
       street:           c.street_address   || '',
       city:             c.city             || '',
       state:            c.state            || '',
