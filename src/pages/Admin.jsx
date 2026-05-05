@@ -1896,7 +1896,7 @@ function IntegrationsSettings() {
   const [loading,  setLoading]  = useState(true)
   const [saving,   setSaving]   = useState(false)
   const [saveMsg,  setSaveMsg]  = useState('')
-  const [activeTab, setActiveTab] = useState('qbo') // 'qbo' | 'qbd'
+  const [activeTab, setActiveTab] = useState('qbo') // 'qbo' | 'qbd' | 'ghl'
 
   // QuickBooks Online
   const [qbo, setQbo] = useState({
@@ -1917,6 +1917,27 @@ function IntegrationsSettings() {
     company_file:    '',
   })
 
+  // GoHighLevel — separate from QBO/QBD because it lives in its own
+  // tables (ghl_connections, ghl_sync_state) and is gated by an admin
+  // role check on the server side.
+  const [ghl, setGhl] = useState({
+    connected:    false,
+    location_id:  '',
+    company_id:   '',
+    contacts_enabled:      true,
+    opportunities_enabled: true,
+    appointments_enabled:  true,
+    notes_enabled:         true,
+  })
+  // The Private Integration Token is never read back from the server
+  // for security; user re-enters it only when they want to (re)connect.
+  const [ghlToken,    setGhlToken]    = useState('')
+  const [ghlLocation, setGhlLocation] = useState('')
+  const [ghlBusy,     setGhlBusy]     = useState(false)
+  const [ghlMsg,      setGhlMsg]      = useState('')
+  const [ghlMsgError, setGhlMsgError] = useState(false)
+  const [ghlSyncState, setGhlSyncState] = useState([])  // rows from ghl_sync_state
+
   const [showSecrets, setShowSecrets] = useState({}) // { field: bool }
 
   useEffect(() => { loadConfig() }, [])
@@ -1930,6 +1951,88 @@ function IntegrationsSettings() {
       if (cfg.qbd) setQbd(q => ({ ...q, ...cfg.qbd }))
     }
     setLoading(false)
+  }
+
+  // Load GHL connection metadata + sync state. Note: we do NOT fetch
+  // the access_token — the column is admin-only and the token never
+  // round-trips through the browser after the initial save.
+  useEffect(() => { loadGhl() }, [])
+  async function loadGhl() {
+    const [{ data: conn }, { data: syncRows }] = await Promise.all([
+      supabase.from('ghl_connections')
+        .select('location_id, company_id, contacts_enabled, opportunities_enabled, appointments_enabled, notes_enabled, created_at')
+        .maybeSingle(),
+      supabase.from('ghl_sync_state').select('*'),
+    ])
+    if (conn) {
+      setGhl({
+        connected:             true,
+        location_id:           conn.location_id || '',
+        company_id:            conn.company_id  || '',
+        contacts_enabled:      !!conn.contacts_enabled,
+        opportunities_enabled: !!conn.opportunities_enabled,
+        appointments_enabled:  !!conn.appointments_enabled,
+        notes_enabled:         !!conn.notes_enabled,
+      })
+      setGhlLocation(conn.location_id || '')
+    }
+    setGhlSyncState(syncRows || [])
+  }
+
+  // Save the per-object enabled flags directly (these aren't secret).
+  async function saveGhlToggles(next) {
+    setGhl(g => ({ ...g, ...next }))
+    await supabase.from('ghl_connections').update(next).eq('singleton', true)
+  }
+
+  // Test the pasted token + location_id and save the connection on success.
+  async function connectGhl() {
+    if (!ghlToken.trim() || !ghlLocation.trim()) {
+      setGhlMsgError(true); setGhlMsg('Token and Location ID are both required.')
+      return
+    }
+    setGhlBusy(true); setGhlMsg(''); setGhlMsgError(false)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const jwt = session?.access_token
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ghl-test-connection`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':  'application/json',
+            'Authorization': `Bearer ${jwt}`,
+          },
+          body: JSON.stringify({
+            access_token: ghlToken.trim(),
+            location_id:  ghlLocation.trim(),
+            save:         true,
+          }),
+        }
+      )
+      const body = await res.json()
+      if (!res.ok || !body.ok) {
+        setGhlMsgError(true)
+        setGhlMsg(body.message || body.error || `HTTP ${res.status}`)
+      } else {
+        setGhlMsgError(false)
+        setGhlMsg(`✓ Connected to ${body.location?.name || 'GHL'}.`)
+        setGhlToken('') // never keep the token in component state after save
+        await loadGhl()
+      }
+    } catch (e) {
+      setGhlMsgError(true); setGhlMsg(e?.message || 'Connection failed.')
+    } finally {
+      setGhlBusy(false)
+    }
+  }
+
+  async function disconnectGhl() {
+    if (!confirm('Disconnect GoHighLevel? Sync will stop. Local data is preserved.')) return
+    await supabase.from('ghl_connections').delete().eq('singleton', true)
+    setGhl(g => ({ ...g, connected: false, location_id: '', company_id: '' }))
+    setGhlMsg('Disconnected.'); setGhlMsgError(false)
+    setGhlLocation('')
   }
 
   async function handleSave() {
@@ -1991,6 +2094,9 @@ function IntegrationsSettings() {
         </button>
         <button className={tabBtnCls('qbd')} onClick={() => setActiveTab('qbd')}>
           QuickBooks Desktop
+        </button>
+        <button className={tabBtnCls('ghl')} onClick={() => setActiveTab('ghl')}>
+          GoHighLevel
         </button>
       </div>
 
@@ -2138,6 +2244,107 @@ function IntegrationsSettings() {
               <li>Open your QB Desktop company file and authorize the connection</li>
             </ol>
           </div>
+        </div>
+      )}
+
+      {/* ── GoHighLevel ── */}
+      {activeTab === 'ghl' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <div>
+              <p className="text-sm font-semibold text-gray-800">GoHighLevel Connection</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Two-way sync of contacts, opportunities, appointments, and notes.
+                Uses a Private Integration Token — generate one in GHL under
+                <em> Settings → Private Integrations</em>.
+              </p>
+            </div>
+            <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${
+              ghl.connected
+                ? 'bg-green-100 text-green-700 border border-green-300'
+                : 'bg-gray-100 text-gray-500 border border-gray-300'
+            }`}>
+              {ghl.connected ? 'Connected' : 'Not connected'}
+            </span>
+          </div>
+
+          <div>
+            <label className={lbl}>Private Integration Token</label>
+            {secretInput(
+              ghlToken,
+              e => setGhlToken(e.target.value),
+              'ghl_token',
+              ghl.connected ? '••• saved … paste a new token to replace' : 'pit-xxxxxxxxxxxxxxxx',
+            )}
+            <p className="text-[11px] text-gray-400 mt-1">
+              The token is verified against GHL before saving and never echoed back to the browser.
+            </p>
+          </div>
+
+          <div>
+            <label className={lbl}>Location ID</label>
+            <input type="text" value={ghlLocation}
+              onChange={e => setGhlLocation(e.target.value)}
+              placeholder="e.g. abc1234DefGhi5678JKL"
+              className={inp} />
+          </div>
+
+          <div className="flex items-center gap-3 flex-wrap">
+            <button type="button" onClick={connectGhl} disabled={ghlBusy}
+              className="px-5 py-2 text-sm font-bold text-white rounded-lg disabled:opacity-50"
+              style={{ backgroundColor: FG }}>
+              {ghlBusy ? 'Testing…' : (ghl.connected ? 'Replace Connection' : 'Test & Save Connection')}
+            </button>
+            {ghl.connected && (
+              <button type="button" onClick={disconnectGhl}
+                className="px-4 py-2 text-sm font-medium rounded-lg border border-red-200 text-red-600 hover:bg-red-50">
+                Disconnect
+              </button>
+            )}
+            {ghlMsg && (
+              <span className={`text-sm font-medium ${ghlMsgError ? 'text-red-600' : 'text-green-700'}`}>
+                {ghlMsg}
+              </span>
+            )}
+          </div>
+
+          {/* Per-object sync toggles — only meaningful while connected */}
+          {ghl.connected && (
+            <div className="mt-4 p-4 bg-white border border-gray-200 rounded-xl space-y-3">
+              <p className="text-sm font-semibold text-gray-800">What to sync</p>
+              {[
+                ['contacts_enabled',      'Contacts',     'contacts'],
+                ['opportunities_enabled', 'Opportunities','opportunities'],
+                ['appointments_enabled',  'Appointments', 'appointments'],
+                ['notes_enabled',         'Notes',        'notes'],
+              ].map(([key, label, objType]) => {
+                const state = ghlSyncState.find(s => s.object_type === objType)
+                return (
+                  <div key={key} className="flex items-center justify-between">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-gray-800">{label}</p>
+                      <p className="text-[11px] text-gray-400">
+                        Last run: {state?.last_run_at ? new Date(state.last_run_at).toLocaleString() : 'never'}
+                        {state?.last_run_status && ` · ${state.last_run_status}`}
+                      </p>
+                    </div>
+                    <button type="button"
+                      onClick={() => saveGhlToggles({ [key]: !ghl[key] })}
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${
+                        ghl[key] ? 'bg-green-600' : 'bg-gray-300'
+                      }`}>
+                      <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        ghl[key] ? 'translate-x-5' : 'translate-x-0'
+                      }`} />
+                    </button>
+                  </div>
+                )
+              })}
+              <p className="text-[11px] text-gray-400 pt-1">
+                Sync runs on a schedule (Phase 7). Manual “Sync now” buttons land in a later phase.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
