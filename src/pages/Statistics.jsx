@@ -5810,6 +5810,10 @@ export default function Statistics() {
   const [autoMin,        setAutoMin]        = useState(true)
   const [autoMax,        setAutoMax]        = useState(true)
   const [openFolder,     setOpenFolder]     = useState('all')  // 'all'|'archived'
+  // Stat groups (defined in Settings → Stat Groups). When a filter is active,
+  // the sidebar list only shows stats whose id is in that group's stat_ids.
+  const [statGroups,     setStatGroups]     = useState([])
+  const [filterGroupId,  setFilterGroupId]  = useState(null)   // null = no filter
   const [showShares,     setShowShares]     = useState(false)
   const [userShares,     setUserShares]     = useState({}) // statId -> 'view'|'edit' for the current user
   // When the Shared Permissions button is clicked from inside a stat-edit
@@ -5921,11 +5925,13 @@ export default function Statistics() {
 
   async function fetchAll() {
     setLoading(true)
-    const [profRes, stsRes, settingsRes] = await Promise.all([
+    const [profRes, stsRes, settingsRes, grpRes] = await Promise.all([
       supabase.from('profiles').select('id, email, full_name, role').order('full_name'),
       supabase.from('statistics').select('*').order('sort_order', { ascending: true }).order('name'),
       supabase.from('company_settings').select('week_ending_day, show_stat_archive_folder').maybeSingle(),
+      supabase.from('stat_groups').select('*').order('sort_order', { ascending: true }).order('name'),
     ])
+    setStatGroups(grpRes.data || [])
     console.log('[Statistics] fetchAll — stats result:', stsRes.data?.length ?? 'null', 'error:', stsRes.error)
     if (profRes.error) console.error('[Statistics] profiles error:', profRes.error)
     if (stsRes.error) console.error('[Statistics] statistics error:', stsRes.error)
@@ -6455,15 +6461,22 @@ export default function Statistics() {
   const accessibleStats = useMemo(() => [...myStats, ...sharedStats], [myStats, sharedStats])
   const archivedStats   = useMemo(() => stats.filter(s => s.archived), [stats])
 
-  // Flat searchable list — folders collapsed to All vs Archived
+  // Flat searchable list — folders collapsed to All vs Archived, plus an
+  // optional stat-group filter that further restricts the list to members
+  // of one named group.
   const folderStats = useMemo(() => {
     // When the archive folder is hidden, always show the accessible list.
     const effectiveFolder = showStatArchiveFolder ? openFolder : 'all'
-    const base = effectiveFolder === 'archived' ? archivedStats : accessibleStats
+    let base = effectiveFolder === 'archived' ? archivedStats : accessibleStats
+    if (filterGroupId) {
+      const g = (statGroups || []).find(x => x.id === filterGroupId)
+      const ids = new Set((g?.stat_ids || []).map(Number))
+      base = base.filter(s => ids.has(Number(s.id)))
+    }
     if (!search.trim()) return base
     const q = search.toLowerCase()
     return base.filter(s => s.name.toLowerCase().includes(q))
-  }, [openFolder, accessibleStats, archivedStats, search, showStatArchiveFolder])
+  }, [openFolder, accessibleStats, archivedStats, search, showStatArchiveFolder, filterGroupId, statGroups])
 
   // Period hierarchy — used to determine valid aggregation options
   const PERIOD_ORDER = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly']
@@ -7046,6 +7059,41 @@ export default function Statistics() {
             <div className="px-2 py-2 border-b border-gray-100 space-y-0.5">
               <FolderRow id="all"      label="All Stats"      count={accessibleStats.length} />
               <FolderRow id="archived" label="Archived"       count={archivedStats.length} />
+            </div>
+          )}
+
+          {/* Stat group filter pills — one button per group, plus an "All"
+              button to clear the filter. Only render when at least one
+              group exists. */}
+          {(statGroups || []).length > 0 && (
+            <div className="px-2 py-2 border-b border-gray-100 flex flex-wrap gap-1">
+              <button
+                onClick={() => setFilterGroupId(null)}
+                className={`px-2 py-0.5 rounded text-[11px] font-medium border transition-colors ${
+                  filterGroupId === null
+                    ? 'bg-green-700 text-white border-green-700'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-green-500'
+                }`}
+              >
+                All
+              </button>
+              {statGroups.map(g => {
+                const active = filterGroupId === g.id
+                return (
+                  <button
+                    key={g.id}
+                    onClick={() => setFilterGroupId(active ? null : g.id)}
+                    title={g.name}
+                    className={`px-2 py-0.5 rounded text-[11px] font-medium border transition-colors max-w-[10rem] truncate ${
+                      active
+                        ? 'bg-green-700 text-white border-green-700'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-green-500'
+                    }`}
+                  >
+                    {g.name}
+                  </button>
+                )
+              })}
             </div>
           )}
 
