@@ -7331,10 +7331,12 @@ export default function Statistics() {
                   {selectedStat.name}
                 </span>
 
-                {/* Right — quick entry (hidden for equation stats) + arrows flush right */}
+                {/* Right — quick entry (hidden for equation stats) + arrows flush right.
+                    On mobile the inline entry is hidden — the new Entry popup
+                    button (next to the module title) covers the same ground. */}
                 <div className="flex-1 flex items-center justify-end pr-1 sm:pr-2 gap-1 sm:gap-2">
                   {!['equation','overlay'].includes(selectedStat?.stat_category) && (
-                  <div className="flex items-center gap-1 sm:gap-1.5">
+                  <div className="hidden sm:flex items-center gap-1 sm:gap-1.5">
                     <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white">
                       <span className="w-20 sm:w-36 flex-shrink-0 text-center px-1 sm:px-2 text-[10px] sm:text-xs text-gray-400 whitespace-nowrap truncate border-r border-gray-200 bg-gray-50 py-1.5 select-none">
                         {quickPeriod.label}
