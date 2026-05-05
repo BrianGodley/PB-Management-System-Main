@@ -81,6 +81,19 @@ export default function StatSharesModal({ statId, statName, ownerUserId, onClose
             email:   e.email || '',
           }))
 
+        // Make sure the signed-in user is always pickable, even when they
+        // have no employees row (e.g. admins managing someone else's stat
+        // from the Master tab). Without this, the current user can't grant
+        // themselves view/edit access on stats they don't own.
+        if (user?.id && !list.some(e => e.user_id === user.id)) {
+          list.unshift({
+            id:      `self-${user.id}`,
+            user_id: user.id,
+            name:    user.user_metadata?.full_name || user.email || 'Me',
+            email:   user.email || '',
+          })
+        }
+
         setEmployees(list)
         setShares(sharesMap)
         setOriginal(sharesMap)
