@@ -52,6 +52,7 @@ export default function Layout() {
     { key: 'main',       label: t('main'),       icon: '⊞' },
   ]
 
+  const [userRole,       setUserRole]       = useState(null)
   const isAdmin = userRole === 'admin' || userRole === 'super_admin'
   const MAIN_MENU_ITEMS = [
     { path: '/contacts',    label: 'Contacts',       icon: '🗂️' },
@@ -70,7 +71,6 @@ export default function Layout() {
   const [showMainMenu,   setShowMainMenu]   = useState(false)
   const [avatarUrl,      setAvatarUrl]      = useState(null)
   const [companyLogoUrl, setCompanyLogoUrl] = useState(null)
-  const [userRole,       setUserRole]       = useState(null)
   const userMenuRef  = useRef(null)
   const mainMenuRef  = useRef(null)
 
