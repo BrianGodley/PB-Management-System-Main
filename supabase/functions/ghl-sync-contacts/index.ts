@@ -126,19 +126,35 @@ interface GhlPagedResponse {
 }
 
 // One page from GHL.
+//
+// We support two cursor inputs:
+//   • nextPageUrl — if GHL gave us one in the previous response's meta,
+//     use it verbatim. This is the most reliable form because GHL signs
+//     it with whatever filter context it expects.
+//   • (startAfter, startAfterId) tuple — the documented v2 cursor.
+//     BOTH must be passed: startAfter is a millisecond timestamp,
+//     startAfterId is the record's id. Without startAfter the cursor
+//     can become ambiguous and the API may return the same page.
 async function fetchContactsPage(args: {
   token:   string
   locationId: string
+  nextPageUrl?: string | null
   startAfterId?: string | null
-  startAfter?:   number
+  startAfter?:   number | null
 }): Promise<GhlPagedResponse> {
-  const url = new URL(`${GHL_BASE_URL}/contacts/`)
-  url.searchParams.set('locationId', args.locationId)
-  url.searchParams.set('limit',      String(PAGE_LIMIT))
-  if (args.startAfterId) url.searchParams.set('startAfterId', args.startAfterId)
-  if (args.startAfter)   url.searchParams.set('startAfter',   String(args.startAfter))
+  let urlStr: string
+  if (args.nextPageUrl) {
+    urlStr = args.nextPageUrl
+  } else {
+    const url = new URL(`${GHL_BASE_URL}/contacts/`)
+    url.searchParams.set('locationId', args.locationId)
+    url.searchParams.set('limit',      String(PAGE_LIMIT))
+    if (args.startAfterId) url.searchParams.set('startAfterId', args.startAfterId)
+    if (args.startAfter)   url.searchParams.set('startAfter',   String(args.startAfter))
+    urlStr = url.toString()
+  }
 
-  const res = await fetch(url.toString(), {
+  const res = await fetch(urlStr, {
     method: 'GET',
     headers: {
       Authorization: `Bearer ${args.token}`,
@@ -264,8 +280,13 @@ serve(async (req) => {
       .eq('object_type', 'contacts')
 
     // Page through GHL contacts. We stream results into upserts so we don't
-    // have to hold the whole list in memory.
-    let cursor: { startAfterId?: string | null; startAfter?: number } = {}
+    // have to hold the whole list in memory. Cursor uses both startAfter
+    // (timestamp ms) AND startAfterId — required for stable pagination.
+    let cursor: {
+      nextPageUrl?: string | null
+      startAfterId?: string | null
+      startAfter?: number | null
+    } = {}
     let newestSeen: string | null = null
     let pages = 0
     while (true) {
@@ -277,10 +298,22 @@ serve(async (req) => {
       const page = await fetchContactsPage({
         token:        conn.access_token,
         locationId:   conn.location_id,
+        nextPageUrl:  cursor.nextPageUrl,
         startAfterId: cursor.startAfterId,
         startAfter:   cursor.startAfter,
       })
       const list = page.contacts || []
+      // Lightweight per-page log so we can audit pagination if a sync
+      // returns suspiciously few records.
+      try {
+        await sb.from('ghl_sync_log').insert({
+          object_type:    'contacts',
+          direction:      'inbound',
+          status:         'ok',
+          records_synced: list.length,
+          message:        `page ${pages}: got ${list.length}, total reported ${page.meta?.total ?? 'n/a'}`,
+        })
+      } catch { /* log is best-effort */ }
       if (list.length === 0) break
 
       // Filter to only contacts updated after the high-water-mark.
@@ -401,11 +434,21 @@ serve(async (req) => {
       // Stop when we got fewer than a full page; GHL is done.
       if (list.length < PAGE_LIMIT) break
 
-      // Advance the cursor. GHL returns nextPageUrl in meta; the simplest
-      // portable approach is to use startAfterId of the last record.
-      const lastId = list[list.length - 1]?.id
-      if (!lastId || lastId === cursor.startAfterId) break
-      cursor = { startAfterId: lastId }
+      // Advance the cursor. Preferred: GHL's own nextPageUrl. Fallback:
+      // (startAfter, startAfterId) tuple based on the last record's
+      // dateAdded (or dateUpdated) and id.
+      const next = page.meta?.nextPageUrl || null
+      if (next) {
+        if (next === cursor.nextPageUrl) break  // safety: no progress
+        cursor = { nextPageUrl: next }
+      } else {
+        const last = list[list.length - 1]
+        const lastId = last?.id
+        const lastTs = last?.dateAdded || last?.dateUpdated
+        const lastMs = lastTs ? Date.parse(lastTs) : null
+        if (!lastId || (lastId === cursor.startAfterId && lastMs === cursor.startAfter)) break
+        cursor = { startAfterId: lastId, startAfter: lastMs }
+      }
     }
 
     inboundSyncedAt = newestSeen || (state?.inbound_synced_at ?? null)
