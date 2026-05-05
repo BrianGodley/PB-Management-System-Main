@@ -466,18 +466,150 @@ const compare_periods_run: ToolExecutor = async (args, ctx) => {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
+// Tool: remember_preference
+// ──────────────────────────────────────────────────────────────────────────
+// Appends a single short note to the current user's agent_user_preferences
+// row. The note is then injected into Sam's system prompt on every future
+// chat call so Sam acts on it without being reminded.
+const remember_preference_def: ToolDefinition = {
+  name: 'remember_preference',
+  description:
+    'Save a single short preference or fact about how the current user wants ' +
+    'to work with you. Use this whenever the user expresses a lasting ' +
+    'preference ("keep answers short", "always show GPM as a percentage", ' +
+    '"we call estimates bids"), a personal note ("my crew is mostly Spanish-' +
+    'speaking"), or a recurring shorthand ("when I say the lake job I mean ' +
+    'project #4421"). Keep each note one short sentence. Do not store ' +
+    'sensitive information (passwords, payment details).',
+  input_schema: {
+    type: 'object',
+    required: ['note'],
+    properties: {
+      note: { type: 'string', description: 'The preference or fact to remember. One short sentence.' },
+    },
+  },
+}
+const remember_preference_run: ToolExecutor = async (args, ctx) => {
+  const sb = userClient(ctx)
+  const note = (args?.note ?? '').toString().trim()
+  if (!note) throw new Error('note is required')
+  if (note.length > 500) throw new Error('note must be 500 characters or fewer')
+
+  const { data: row, error: rErr } = await sb
+    .from('agent_user_preferences')
+    .select('notes')
+    .eq('user_id', ctx.userId)
+    .maybeSingle()
+  if (rErr) throw new Error(rErr.message)
+
+  const list: Array<any> = Array.isArray(row?.notes) ? row.notes : []
+  if (list.length >= 50) {
+    throw new Error('You already have 50 saved preferences — ask the user which one to forget first.')
+  }
+  const entry = {
+    id:         crypto.randomUUID(),
+    text:       note,
+    created_at: new Date().toISOString(),
+  }
+  const next = [...list, entry]
+  const { error: uErr } = await sb
+    .from('agent_user_preferences')
+    .upsert({ user_id: ctx.userId, notes: next }, { onConflict: 'user_id' })
+  if (uErr) throw new Error(uErr.message)
+  return { saved: entry, total_preferences: next.length }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Tool: forget_preference
+// ──────────────────────────────────────────────────────────────────────────
+const forget_preference_def: ToolDefinition = {
+  name: 'forget_preference',
+  description:
+    'Remove a saved preference. Pass the id from a previous list_preferences ' +
+    'or remember_preference result, or pass a substring of the note text. ' +
+    'If the substring matches more than one note this returns the candidates ' +
+    'instead of deleting — confirm with the user before retrying with the id.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      id:    { type: 'string', description: 'Exact id of the preference to remove.' },
+      match: { type: 'string', description: 'Substring of the note text (case-insensitive).' },
+    },
+  },
+}
+const forget_preference_run: ToolExecutor = async (args, ctx) => {
+  const sb = userClient(ctx)
+  const { data: row, error: rErr } = await sb
+    .from('agent_user_preferences')
+    .select('notes')
+    .eq('user_id', ctx.userId)
+    .maybeSingle()
+  if (rErr) throw new Error(rErr.message)
+  const list: Array<any> = Array.isArray(row?.notes) ? row.notes : []
+  if (list.length === 0) return { removed: null, total_preferences: 0, message: 'No preferences saved yet.' }
+
+  let toRemove: any[] = []
+  if (args?.id) {
+    toRemove = list.filter(n => n?.id === args.id)
+  } else if (args?.match) {
+    const q = String(args.match).toLowerCase()
+    toRemove = list.filter(n => (n?.text || '').toLowerCase().includes(q))
+  } else {
+    throw new Error('Pass either id or match.')
+  }
+  if (toRemove.length === 0) return { removed: null, total_preferences: list.length, message: 'No matching preference.' }
+  if (toRemove.length > 1 && args?.match) {
+    return { removed: null, candidates: toRemove, message: 'Multiple matches — confirm which id to forget.' }
+  }
+  const remaining = list.filter(n => !toRemove.includes(n))
+  const { error: uErr } = await sb
+    .from('agent_user_preferences')
+    .upsert({ user_id: ctx.userId, notes: remaining }, { onConflict: 'user_id' })
+  if (uErr) throw new Error(uErr.message)
+  return { removed: toRemove[0], total_preferences: remaining.length }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Tool: list_preferences
+// ──────────────────────────────────────────────────────────────────────────
+const list_preferences_def: ToolDefinition = {
+  name: 'list_preferences',
+  description:
+    'Return the current user saved preferences with their ids. Use when ' +
+    'the user asks what you remember about them, or before forgetting one ' +
+    'so you can show options.',
+  input_schema: { type: 'object', properties: {} },
+}
+const list_preferences_run: ToolExecutor = async (_args, ctx) => {
+  const sb = userClient(ctx)
+  const { data: row, error } = await sb
+    .from('agent_user_preferences')
+    .select('notes, updated_at')
+    .eq('user_id', ctx.userId)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  return {
+    preferences: Array.isArray(row?.notes) ? row.notes : [],
+    updated_at:  row?.updated_at ?? null,
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
 // Registry
 // ──────────────────────────────────────────────────────────────────────────
 export const TOOLS: Array<{ definition: ToolDefinition; execute: ToolExecutor }> = [
-  { definition: today_def,           execute: today_run },
-  { definition: list_stats_def,      execute: list_stats_run },
-  { definition: get_stat_values_def, execute: get_stat_values_run },
-  { definition: list_bids_def,       execute: list_bids_run },
-  { definition: bid_summary_def,     execute: bid_summary_run },
-  { definition: list_jobs_def,       execute: list_jobs_run },
-  { definition: get_job_def,         execute: get_job_run },
-  { definition: list_clients_def,    execute: list_clients_run },
-  { definition: compare_periods_def, execute: compare_periods_run },
+  { definition: today_def,                execute: today_run },
+  { definition: list_stats_def,           execute: list_stats_run },
+  { definition: get_stat_values_def,      execute: get_stat_values_run },
+  { definition: list_bids_def,            execute: list_bids_run },
+  { definition: bid_summary_def,          execute: bid_summary_run },
+  { definition: list_jobs_def,            execute: list_jobs_run },
+  { definition: get_job_def,              execute: get_job_run },
+  { definition: list_clients_def,         execute: list_clients_run },
+  { definition: compare_periods_def,      execute: compare_periods_run },
+  { definition: remember_preference_def,  execute: remember_preference_run },
+  { definition: forget_preference_def,    execute: forget_preference_run },
+  { definition: list_preferences_def,     execute: list_preferences_run },
 ]
 
 export const TOOL_DEFINITIONS = TOOLS.map(t => t.definition)

@@ -65,6 +65,33 @@ async function authFromRequest(req: Request): Promise<{ userId: string; jwt: str
   return { userId: data.user.id, jwt }
 }
 
+// ── User preferences (memory) ──────────────────────────────────────────────
+// Read the current user's saved preferences and append them to Sam's system
+// prompt for this conversation. Empty / missing rows are fine — we just send
+// the base prompt.
+async function buildSystemPrompt(
+  admin: ReturnType<typeof adminClient>,
+  userId: string,
+  basePrompt: string,
+): Promise<string> {
+  const { data, error } = await admin
+    .from('agent_user_preferences')
+    .select('notes')
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (error) {
+    console.warn('[agent-chat] prefs read failed:', error.message)
+    return basePrompt
+  }
+  const list = Array.isArray(data?.notes) ? data.notes : []
+  if (list.length === 0) return basePrompt
+  const lines = list
+    .map((n: any) => n?.text ? `- ${n.text}` : null)
+    .filter(Boolean)
+    .join('\n')
+  return `${basePrompt}\n\nUSER PREFERENCES (saved by you in earlier conversations — honor these without being reminded)\n${lines}`
+}
+
 // ── Conversation helpers ───────────────────────────────────────────────────
 async function getOrCreateConversation(
   admin: ReturnType<typeof adminClient>,
@@ -171,10 +198,14 @@ async function runAgenticLoop(
   let totalIn  = 0
   let totalOut = 0
 
+  // Build the personalised system prompt once per request — it doesn't change
+  // between tool-loop iterations within a single user turn.
+  const personalSystem = await buildSystemPrompt(admin, toolCtx.userId, SYSTEM_PROMPT)
+
   for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
     const resp = await callLLM({
       task:     'analyst_chat',
-      system:   SYSTEM_PROMPT,
+      system:   personalSystem,
       messages,
       tools:    TOOL_DEFINITIONS,
     })
