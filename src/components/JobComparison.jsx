@@ -45,24 +45,24 @@ function KpiCard({ label, est, act, currency = false, inverse = false, sub }) {
     : over ? 'text-red-600 bg-red-50' : 'text-green-700 bg-green-50'
   const display = v => currency ? fmt(v) : fmtD(v)
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col gap-1">
-      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">{label}</span>
-      <div className="flex items-start justify-between gap-2 mt-1">
-        <div>
+    <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4 flex flex-col gap-1 min-w-0 overflow-hidden">
+      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide truncate">{label}</span>
+      <div className="flex items-start justify-between gap-2 mt-1 min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-[10px] text-gray-400">Estimated</p>
-          <p className="text-lg font-bold text-gray-800">{display(est)}</p>
+          <p className="text-base sm:text-lg font-bold text-gray-800 truncate">{display(est)}</p>
         </div>
-        <div className="text-right">
+        <div className="text-right min-w-0 flex-1">
           <p className="text-[10px] text-gray-400">Actual</p>
-          <p className="text-lg font-bold text-gray-900">{display(act)}</p>
+          <p className="text-base sm:text-lg font-bold text-gray-900 truncate">{display(act)}</p>
           {delta !== 0 && (
-            <div className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded mt-1 ${deltaColor}`}>
+            <div className={`inline-block text-[10px] sm:text-[11px] font-semibold px-1.5 sm:px-2 py-0.5 rounded mt-1 ${deltaColor} max-w-full truncate`}>
               {delta > 0 ? '▲' : '▼'} {display(Math.abs(delta))} {over ? '(over)' : '(under)'}
             </div>
           )}
         </div>
       </div>
-      {sub && <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>}
+      {sub && <p className="text-[10px] text-gray-400 mt-0.5 truncate">{sub}</p>}
     </div>
   )
 }

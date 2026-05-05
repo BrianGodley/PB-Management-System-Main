@@ -5388,7 +5388,7 @@ const WEEK_DAYS = [
   { value: 6, label: 'Saturday'  },
 ]
 
-function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, profiles, isAdmin, onEditStat, showStatArchiveFolder, onShowStatArchiveFolderChange }) {
+function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, profiles, isAdmin, onEditStat, onRestored, showStatArchiveFolder, onShowStatArchiveFolderChange }) {
   const [settingsSubTab, setSettingsSubTab] = useState('tracking')
 
   const [wedDay,   setWedDay]   = useState(weekEndingDay ?? 5)
@@ -5420,7 +5420,8 @@ function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, p
     { key: 'tracking', label: '📅 Tracking' },
     { key: 'general',  label: '📖 General' },
     { key: 'groups',   label: '📂 Stat Groups' },
-    ...(isAdmin ? [{ key: 'master', label: '👑 Master' }] : []),
+    ...(isAdmin ? [{ key: 'master',  label: '👑 Master' }] : []),
+    ...(isAdmin ? [{ key: 'archive', label: '📦 Archive' }] : []),
   ]
 
   // Helper for the Master tab: turn a stat's owner_user_id into a display name.
@@ -5669,6 +5670,11 @@ function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, p
               Showing {masterStats.length} {masterSubTab === 'archive' ? 'archived' : 'current'} statistic{masterStats.length === 1 ? '' : 's'}, sorted alphabetically. Click any row to open its edit modal.
             </p>
           </div>
+        )}
+
+        {/* ── ARCHIVE SUB-TAB — admin-only archived-stats list ── */}
+        {settingsSubTab === 'archive' && isAdmin && (
+          <ArchivedView onRestored={onRestored} />
         )}
 
       </div>
@@ -6924,28 +6930,32 @@ export default function Statistics() {
     <div className="h-[calc(100vh-2.75rem)] -m-4 lg:-m-6 flex flex-col overflow-hidden bg-gray-100">
 
       {/* ── MODE TABS — portalled into the green app header bar ─── */}
+      {/* On phones we drop the verbose labels so all six tabs fit; the icons
+          are kept (they double as a visual key the user can tap). Tablets and
+          up show the full label. */}
       {createPortal(
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-0.5 overflow-x-auto max-w-full">
           {[
-            { id: 'graphs',         icon: '📈', label: 'Graphs'          },
-            { id: 'multiple-entry', icon: '📝', label: 'Multiple Entry'  },
-            { id: 'print-multiple', icon: '🖨️',  label: 'Print Multiple' },
-            { id: 'comparison',     icon: '⚖️',  label: 'Comparison'     },
-            { id: 'import-export',  icon: '↕️',  label: 'Import / Export'},
-            { id: 'archive',        icon: '📦', label: 'Archive'         },
-            { id: 'settings',       icon: '⚙️',  label: 'Settings'       },
+            { id: 'graphs',         icon: '📈', label: 'Graphs',          short: 'Graphs'  },
+            { id: 'multiple-entry', icon: '📝', label: 'Multiple Entry',  short: 'Entry'   },
+            { id: 'print-multiple', icon: '🖨️',  label: 'Print Multiple', short: 'Print'   },
+            { id: 'comparison',     icon: '⚖️',  label: 'Comparison',     short: 'Compare' },
+            { id: 'import-export',  icon: '↕️',  label: 'Import / Export', short: 'I/E'     },
+            { id: 'settings',       icon: '⚙️',  label: 'Settings',       short: 'Settings'},
           ].map(m => (
             <button
               key={m.id}
               onClick={() => setViewMode(m.id)}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${
+              title={m.label}
+              className={`flex items-center gap-1 px-1.5 sm:px-2.5 py-1 rounded-md text-[11px] sm:text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-colors ${
                 viewMode === m.id
                   ? 'bg-black/20 text-white'
                   : 'text-white/70 hover:text-white hover:bg-black/15'
               }`}
             >
               <span>{m.icon}</span>
-              <span>{m.label}</span>
+              <span className="hidden sm:inline">{m.label}</span>
+              <span className="sm:hidden">{m.short}</span>
             </button>
           ))}
         </div>,
@@ -7003,10 +7013,6 @@ export default function Statistics() {
         <MultipleEntryView stats={stats} weekEndingDay={weekEndingDay} />
       )}
 
-      {viewMode === 'archive' && (
-        <ArchivedView onRestored={() => { fetchStats() }} />
-      )}
-
       {viewMode === 'import-export' && (
         <ImportExportView
           stats={stats}
@@ -7027,6 +7033,7 @@ export default function Statistics() {
           profiles={profiles}
           isAdmin={isCurrentUserAdmin}
           onEditStat={editStatById}
+          onRestored={() => { fetchStats() }}
           showStatArchiveFolder={showStatArchiveFolder}
           onShowStatArchiveFolderChange={v => setShowStatArchiveFolder(v)}
         />
@@ -7052,7 +7059,10 @@ export default function Statistics() {
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── LEFT PANEL ─────────────────────────────────────────────────── */}
-        <aside className="w-64 xl:w-72 flex-shrink-0 flex flex-col bg-white border-r border-gray-200 overflow-hidden">
+        {/* On phones, once a stat is picked the chart takes over the whole
+            screen — the list slides out of the way and the user gets back to
+            it via the chart-header back arrow. Desktop keeps both visible. */}
+        <aside className={`${selectedStat ? 'hidden md:flex' : 'flex'} w-full md:w-64 xl:w-72 md:flex-shrink-0 flex-col bg-white border-r border-gray-200 overflow-hidden`}>
 
           {/* Folder rows — hidden entirely when admin disables the archive folder */}
           {showStatArchiveFolder && (
@@ -7152,7 +7162,9 @@ export default function Statistics() {
         </aside>
 
         {/* ── RIGHT PANEL ────────────────────────────────────────────────── */}
-        <main className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {/* Hidden on phones until a stat is selected (matches the sidebar
+            swap above). Always visible on tablet and up. */}
+        <main className={`${selectedStat ? 'flex' : 'hidden md:flex'} flex-1 flex-col overflow-hidden min-w-0`}>
 
           {!selectedStat ? (
             <div className="flex-1 flex items-center justify-center">
@@ -7165,9 +7177,16 @@ export default function Statistics() {
           ) : (
             <>
               {/* Chart header: print/share + auto min/max + nav */}
-              <div className="relative flex items-center px-6 py-1.5 bg-gray-100 border-b border-gray-200 flex-shrink-0">
-                {/* Left — print, share, auto min/max */}
+              <div className="relative flex items-center px-3 sm:px-6 py-1.5 bg-gray-100 border-b border-gray-200 flex-shrink-0">
+                {/* Left — back arrow (mobile only), print, share, auto min/max */}
                 <div className="flex-1 flex items-center gap-2">
+                  <button
+                    title="Back to stat list"
+                    onClick={() => setSelectedId(null)}
+                    className="md:hidden p-1.5 rounded-lg hover:bg-gray-200 text-gray-600 flex-shrink-0"
+                  >
+                    <span className="text-xl leading-none">‹</span>
+                  </button>
                   <button title="Print" onClick={handlePrint} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-xl">🖨️</button>
                   <button title="Share" className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-xl">🔗</button>
                   <div className="flex gap-1 ml-1">

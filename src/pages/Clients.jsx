@@ -461,14 +461,14 @@ export default function Clients() {
           )}
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="table-fixed w-full text-xs">
+        <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+          <table className="w-full text-xs min-w-[900px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                {activeCols.map(col => (
+                {activeCols.map((col, ci) => (
                   <th
                     key={col.key}
-                    className="px-4 py-2 text-left font-semibold text-gray-600 uppercase truncate"
+                    className={`px-4 py-2 text-left font-semibold text-gray-600 uppercase truncate ${ci === 0 ? 'sticky left-0 bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]' : ''}`}
                     style={{ width: colWidth(col.key) }}
                   >
                     {col.label}
@@ -480,9 +480,9 @@ export default function Clients() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.map(client => (
-                <tr key={client.id} className="hover:bg-gray-50 transition-colors cursor-pointer">
-                  {activeCols.map(col => (
-                    <td key={col.key} className="px-4 py-2 min-w-0 max-w-0 overflow-hidden text-gray-600">
+                <tr key={client.id} className="group hover:bg-gray-50 transition-colors cursor-pointer">
+                  {activeCols.map((col, ci) => (
+                    <td key={col.key} className={`px-4 py-2 min-w-0 max-w-0 overflow-hidden text-gray-600 ${ci === 0 ? 'sticky left-0 bg-white group-hover:bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]' : ''}`}>
                       {cellContent(col, client)}
                     </td>
                   ))}

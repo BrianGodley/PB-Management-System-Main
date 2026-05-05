@@ -460,22 +460,8 @@ export default function SubsVendors() {
         />
       </div>
 
-      {/* ── Stats row + Type toggle (same row) ──────────────── */}
-      <div className="flex items-center gap-2 mb-4 flex-shrink-0 overflow-x-auto pb-1">
-        {/* Stats pills */}
-        {[
-          { label: 'Total',         count: subs.filter(s => (s.type||'sub') === typeView).length,                                                                            color: 'text-gray-700'   },
-          { label: 'Active',        count: subs.filter(s => (s.type||'sub') === typeView && s.status === 'active').length,                                                   color: 'text-green-700'  },
-          { label: 'Ready',         count: subs.filter(s => (s.type||'sub') === typeView && s.status === 'ready').length,                                                    color: 'text-teal-700'   },
-          { label: 'No Email',      count: subs.filter(s => (s.type||'sub') === typeView && s.status === 'no_email').length,                                                 color: 'text-gray-500'   },
-          { label: 'Ins. Expiring', count: subs.filter(s => (s.type||'sub') === typeView && (isSoonExpiring(s.liability_exp) || isSoonExpiring(s.workers_comp_exp))).length, color: 'text-orange-600' },
-        ].map(s => (
-          <div key={s.label} className="flex-shrink-0 bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm flex items-center gap-2">
-            <span className="text-xs text-gray-500">{s.label}</span>
-            <span className={`text-sm font-bold ${s.color}`}>{s.count}</span>
-          </div>
-        ))}
-
+      {/* ── Type toggle ──────────────────────────────────────── */}
+      <div className="flex items-center gap-2 mb-4 flex-shrink-0">
         {/* Spacer */}
         <div className="flex-1" />
 

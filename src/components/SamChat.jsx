@@ -126,21 +126,22 @@ export default function SamChat() {
 
   return (
     <>
-      {/* Floating button (always visible) */}
+      {/* Floating button (always visible). Smaller + lifted up so iOS / Android
+          home-indicator + browser chrome don't clip it on phones. */}
       {!open && (
         <button
           onClick={() => setOpen(true)}
           title="Chat with Sam"
-          className="fixed bottom-5 right-5 z-40 w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white text-lg font-bold transition-transform hover:scale-105"
-          style={{ backgroundColor: FG }}
+          className="fixed right-4 bottom-20 sm:bottom-5 z-40 w-11 h-11 sm:w-12 sm:h-12 rounded-full shadow-lg flex items-center justify-center text-white font-bold transition-transform hover:scale-105"
+          style={{ backgroundColor: FG, paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
         >
-          <span className="text-2xl leading-none">S</span>
+          <span className="text-xl leading-none">S</span>
         </button>
       )}
 
       {/* Slide-in panel */}
       {open && (
-        <div className="fixed bottom-5 right-5 z-50 w-[380px] max-w-[95vw] h-[70vh] max-h-[640px] flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
+        <div className="fixed bottom-4 right-4 sm:bottom-5 sm:right-5 z-50 w-[380px] max-w-[95vw] h-[70vh] max-h-[640px] flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
           {/* Header */}
           <div className="flex items-center gap-2 px-4 py-3 flex-shrink-0" style={{ backgroundColor: FG }}>
             <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white font-bold">

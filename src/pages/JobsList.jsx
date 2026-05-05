@@ -268,12 +268,15 @@ export default function JobsList() {
       </div>
 
       {/* ── Menu bar ──────────────────────────────────────────── */}
-      <div className="flex border-b border-gray-200 mb-4 pb-0 flex-shrink-0 overflow-x-auto">
+      {/* `flex-nowrap` + `overflow-x-auto` lets the tab row scroll horizontally
+          on mobile instead of squishing the underlines together. Each tab has
+          breathing room so the active underline always looks distinct. */}
+      <div className="flex flex-nowrap border-b border-gray-200 mb-4 pb-0 flex-shrink-0 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-thin">
         {TABS.map(t => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`px-3 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
+            className={`px-3 sm:px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
               tab === t.key
                 ? 'border-green-700 text-green-700 bg-green-50'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
@@ -410,8 +413,9 @@ export default function JobsList() {
           )}
         </div>
 
-        {/* Right panel — only thing that scrolls */}
-        <div className="flex-1 min-w-0 overflow-y-auto lg:-mr-6">
+        {/* Right panel — only thing that scrolls. overflow-x-hidden traps any
+            tiny horizontal overflow from inner cards on mobile. */}
+        <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden lg:-mr-6">
 
           {tab === 'schedule' && (
             <ScheduleCalendar

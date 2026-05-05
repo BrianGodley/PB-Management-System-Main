@@ -468,19 +468,19 @@ export default function Bids() {
         <h1 className="text-xl font-bold text-gray-900">Bids</h1>
       </div>
 
-      {/* Summary */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
-        <div className="card text-center">
-          <p className="text-xs text-gray-500 mb-1">Pipeline Value</p>
-          <p className="font-bold text-gray-900">${totalBidValue.toLocaleString()}</p>
+      {/* Summary — sized so values up to $10,000,000.00 fit without overlap */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-6">
+        <div className="card text-center px-2 py-3 sm:px-4 sm:py-4 min-w-0">
+          <p className="text-[10px] sm:text-xs text-gray-500 mb-1 truncate">Pipeline Value</p>
+          <p className="font-bold text-gray-900 text-sm sm:text-lg leading-tight break-words">${totalBidValue.toLocaleString()}</p>
         </div>
-        <div className="card text-center">
-          <p className="text-xs text-gray-500 mb-1">Sold Value</p>
-          <p className="font-bold text-green-700">${soldValue.toLocaleString()}</p>
+        <div className="card text-center px-2 py-3 sm:px-4 sm:py-4 min-w-0">
+          <p className="text-[10px] sm:text-xs text-gray-500 mb-1 truncate">Sold Value</p>
+          <p className="font-bold text-green-700 text-sm sm:text-lg leading-tight break-words">${soldValue.toLocaleString()}</p>
         </div>
-        <div className="card text-center">
-          <p className="text-xs text-gray-500 mb-1">Close Rate</p>
-          <p className="font-bold text-blue-700">{closeRate.toFixed(0)}%</p>
+        <div className="card text-center px-2 py-3 sm:px-4 sm:py-4 min-w-0">
+          <p className="text-[10px] sm:text-xs text-gray-500 mb-1 truncate">Close Rate</p>
+          <p className="font-bold text-blue-700 text-sm sm:text-lg leading-tight">{closeRate.toFixed(0)}%</p>
         </div>
       </div>
 

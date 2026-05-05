@@ -457,10 +457,13 @@ export default function HR() {
     return <span className="ml-1 text-green-700">{sortDir === 'asc' ? '▲' : '▼'}</span>
   }
 
-  function SortTh({ col, label, className = '' }) {
+  function SortTh({ col, label, className = '', sticky = false }) {
+    const stickyCls = sticky
+      ? 'sticky left-0 bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]'
+      : ''
     return (
       <th
-        className={`text-left px-4 py-2 font-semibold text-gray-600 uppercase cursor-pointer select-none hover:text-green-700 transition-colors ${className}`}
+        className={`text-left px-4 py-2 font-semibold text-gray-600 uppercase cursor-pointer select-none hover:text-green-700 transition-colors ${stickyCls} ${className}`}
         onClick={() => toggleSort(col)}
       >
         {label}<SortIcon col={col} />
@@ -597,11 +600,11 @@ export default function HR() {
                 </button>
               </div>
             ) : (
-              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <table className="table-fixed w-full text-xs">
+              <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+                <table className="w-full text-xs min-w-[860px]">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      <SortTh col="name" label="Name" />
+                      <SortTh col="name" label="Name" sticky />
                       <SortTh col="address" label="Address" />
                       <SortTh col="phone" label="Cell Phone" />
                       <SortTh col="email" label="Email" />
@@ -615,8 +618,8 @@ export default function HR() {
                       const role = profileRoles[emp.email?.toLowerCase()] || null
                       const location = emp.address ? emp.address : (emp.city || emp.state ? `${emp.city}, ${emp.state}`.replace(/^,\s*/, '').replace(/,\s*$/, '') : '—')
                       return (
-                        <tr key={emp.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => navigate(`/hr/employee/${emp.id}`)}>
-                          <td className="px-4 py-2">
+                        <tr key={emp.id} className="group hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => navigate(`/hr/employee/${emp.id}`)}>
+                          <td className="px-4 py-2 sticky left-0 bg-white group-hover:bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]">
                             <button className="text-green-700 hover:underline font-medium">{emp.last_name}, {emp.first_name}</button>
                           </td>
                           <td className="px-4 py-2 text-gray-600">{location}</td>

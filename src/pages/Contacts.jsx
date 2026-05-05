@@ -346,11 +346,11 @@ export default function Contacts() {
       ) : error ? (
         <div className="text-red-500 text-sm py-8 text-center">{error}</div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="table-fixed w-full text-xs">
+        <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+          <table className="w-full text-xs min-w-[900px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className={thCls} onClick={() => toggleSort('last_name')}>Name{arrow('last_name')}</th>
+                <th className={`${thCls} sticky left-0 bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]`} onClick={() => toggleSort('last_name')}>Name{arrow('last_name')}</th>
                 <th className={thCls} onClick={() => toggleSort('company_name')}>Company{arrow('company_name')}</th>
                 <th className={thCls}>Phone</th>
                 <th className={thCls}>Cell</th>
@@ -369,8 +369,8 @@ export default function Contacts() {
                   </td>
                 </tr>
               ) : paginated.map(c => (
-                <tr key={c.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-2">
+                <tr key={c.id} className="group hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-2 sticky left-0 bg-white group-hover:bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]">
                     <button
                       onClick={() => navigate(`/contacts/${c.id}`)}
                       className="font-semibold text-green-700 hover:text-green-900 hover:underline text-left"
