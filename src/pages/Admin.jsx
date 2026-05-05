@@ -2035,6 +2035,49 @@ function IntegrationsSettings() {
     setGhlLocation('')
   }
 
+  // Per-object-type 'Sync now' state — keyed by object_type so each row's
+  // button can show its own spinner without freezing the rest.
+  const [ghlSyncing, setGhlSyncing] = useState({}) // { contacts: true, ... }
+  async function runSyncNow(objectType) {
+    const fnSlug = {
+      contacts:      'ghl-sync-contacts',
+      // wired up in Phase 5–6
+      opportunities: 'ghl-sync-opportunities',
+      appointments:  'ghl-sync-appointments',
+      notes:         'ghl-sync-notes',
+    }[objectType]
+    if (!fnSlug) return
+    setGhlSyncing(s => ({ ...s, [objectType]: true }))
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const jwt = session?.access_token
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnSlug}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':  'application/json',
+            'Authorization': `Bearer ${jwt}`,
+          },
+          body: JSON.stringify({}),
+        }
+      )
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok || body.ok === false) {
+        setGhlMsgError(true)
+        setGhlMsg(`${objectType} sync: ${body.error || body.message || `HTTP ${res.status}`}`)
+      } else {
+        setGhlMsgError(false)
+        setGhlMsg(`${objectType} sync: pulled ${body.records_synced ?? 0}.`)
+        await loadGhl()
+      }
+    } catch (e) {
+      setGhlMsgError(true); setGhlMsg(e?.message || 'Sync failed.')
+    } finally {
+      setGhlSyncing(s => ({ ...s, [objectType]: false }))
+    }
+  }
+
   async function handleSave() {
     setSaving(true); setSaveMsg('')
     const cfg = { qbo, qbd }
@@ -2328,15 +2371,24 @@ function IntegrationsSettings() {
                         {state?.last_run_status && ` · ${state.last_run_status}`}
                       </p>
                     </div>
-                    <button type="button"
-                      onClick={() => saveGhlToggles({ [key]: !ghl[key] })}
-                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${
-                        ghl[key] ? 'bg-green-600' : 'bg-gray-300'
-                      }`}>
-                      <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        ghl[key] ? 'translate-x-5' : 'translate-x-0'
-                      }`} />
-                    </button>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button type="button"
+                        onClick={() => runSyncNow(objType)}
+                        disabled={!ghl[key] || !!ghlSyncing[objType]}
+                        className="text-xs font-semibold text-green-700 border border-green-200 bg-green-50 hover:bg-green-100 rounded-md px-2 py-1 disabled:opacity-40"
+                      >
+                        {ghlSyncing[objType] ? 'Syncing…' : 'Sync now'}
+                      </button>
+                      <button type="button"
+                        onClick={() => saveGhlToggles({ [key]: !ghl[key] })}
+                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${
+                          ghl[key] ? 'bg-green-600' : 'bg-gray-300'
+                        }`}>
+                        <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          ghl[key] ? 'translate-x-5' : 'translate-x-0'
+                        }`} />
+                      </button>
+                    </div>
                   </div>
                 )
               })}
