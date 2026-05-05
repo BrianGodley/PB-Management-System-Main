@@ -7410,30 +7410,34 @@ export default function Statistics() {
                     })}
                   </div>
 
-                  {/* Date range — compact on mobile so it sits alongside the
-                      period tabs and chart-style toggle on a single row. */}
+                  {/* Date range + chart-style toggle. We group these into a
+                      single flex-nowrap row so on mobile they always sit on
+                      the same line — the date inputs are skinnier (w-[88px])
+                      with FROM/TO labels hidden, leaving room for the
+                      bar/line picker on the right. */}
+                  <div className="flex items-center gap-1 flex-nowrap w-full sm:w-auto sm:contents">
                   <div className="flex items-center gap-0.5 sm:gap-1">
-                    <span className="text-[10px] sm:text-xs text-gray-500 font-medium">FROM</span>
+                    <span className="hidden sm:inline text-[10px] sm:text-xs text-gray-500 font-medium">FROM</span>
                     <input
                       type="date"
                       value={fromDate}
                       onChange={e => setFromDate(e.target.value)}
-                      className="border border-gray-300 rounded-md px-1 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs w-[110px] sm:w-auto focus:outline-none focus:ring-2 focus:ring-green-600"
+                      className="border border-gray-300 rounded-md px-1 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs w-[88px] sm:w-auto focus:outline-none focus:ring-2 focus:ring-green-600"
                     />
                   </div>
                   <div className="flex items-center gap-0.5 sm:gap-1">
-                    <span className="text-[10px] sm:text-xs text-gray-500 font-medium">TO</span>
+                    <span className="hidden sm:inline text-[10px] sm:text-xs text-gray-500 font-medium">TO</span>
                     <input
                       type="date"
                       value={toDate}
                       onChange={e => setToDate(e.target.value)}
-                      className="border border-gray-300 rounded-md px-1 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs w-[110px] sm:w-auto focus:outline-none focus:ring-2 focus:ring-green-600"
+                      className="border border-gray-300 rounded-md px-1 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs w-[88px] sm:w-auto focus:outline-none focus:ring-2 focus:ring-green-600"
                     />
                   </div>
 
-                  {/* Bar / Line toggle — flush-right on tablet+, inline on
-                      mobile so the row stays single-line when space allows. */}
-                  <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden flex-shrink-0 sm:ml-auto">
+                  {/* Bar / Line toggle — sits to the right of the date range
+                      on every viewport. */}
+                  <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden flex-shrink-0 ml-auto sm:ml-auto">
                     <button
                       title="Line chart"
                       onClick={() => setChartStyle('line')}
@@ -7464,6 +7468,7 @@ export default function Statistics() {
                       </svg>
                     </button>
                   </div>
+                  </div>{/* /date+chart-style nowrap wrapper */}
                 </div>
               )}
 
