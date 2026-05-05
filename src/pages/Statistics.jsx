@@ -5703,8 +5703,10 @@ function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, p
         {/* ── MASTER SUB-TAB — admin-only listing of every stat ── */}
         {settingsSubTab === 'master' && isAdmin && (
           <div className="p-6">
+            {/* Table is 30% wider than the container — horizontal scroll
+                kicks in on narrower viewports thanks to overflow-x-auto. */}
             <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="text-sm w-[130%] min-w-[130%]">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr className="text-xs uppercase tracking-wide text-gray-500">
                     {/* Name column is ~50% wider than the default auto-fit and
