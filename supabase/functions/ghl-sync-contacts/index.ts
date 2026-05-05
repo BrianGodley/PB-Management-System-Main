@@ -236,6 +236,10 @@ serve(async (req) => {
 
     // Helpers + accumulator for the dedup ladder.
     const digitsOnly = (s: string) => (s || '').replace(/\D/g, '')
+    // GHL's startAfterId pagination is inclusive in some responses, so the
+    // last record of one page can show up as the first record of the next.
+    // Track ids we've already processed in this run so we never double-count.
+    const seenGhlIds = new Set<string>()
     const counts = {
       would_update_by_ghl_id:   0,
       would_update_by_email:    0,
@@ -285,6 +289,10 @@ serve(async (req) => {
         : list
 
       for (const c of fresh) {
+        // Skip records we've already touched in this run (pagination overlap).
+        if (seenGhlIds.has(c.id)) continue
+        seenGhlIds.add(c.id)
+
         if (c.dateUpdated && (!newestSeen || c.dateUpdated > newestSeen)) {
           newestSeen = c.dateUpdated
         }
