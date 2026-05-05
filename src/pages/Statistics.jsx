@@ -290,13 +290,15 @@ function TypeSelectorModal({ onSelect, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden">
-        <div className="flex items-center justify-between px-7 py-4 border-b border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-900">New Statistic — Choose Type</h2>
+    <div className="fixed inset-0 bg-black/40 flex items-start sm:items-center justify-center z-50 p-3 pt-6 sm:p-0">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl sm:mx-4 overflow-hidden">
+        <div className="flex items-center justify-between px-4 sm:px-7 py-3 sm:py-4 border-b border-gray-100">
+          <h2 className="text-sm sm:text-lg font-semibold text-gray-900">New Statistic — Choose Type</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
         </div>
-        <div className="p-7 grid grid-cols-2 gap-5">
+        {/* Mobile: tight 2-col grid of name-only buttons. Tablet+: original
+            illustrated cards. */}
+        <div className="hidden sm:grid p-7 grid-cols-2 gap-5">
           {types.map(t => (
             <button
               key={t.key}
@@ -313,7 +315,6 @@ function TypeSelectorModal({ onSelect, onClose }) {
                   Coming Soon
                 </span>
               )}
-              {/* Mini chart preview — bottom-right background decoration */}
               {STAT_TYPE_PREVIEWS[t.key] && (
                 <div className={`absolute bottom-0 right-0 ${previewSize[t.key] || 'w-32 h-20'} opacity-[0.45] pointer-events-none select-none`}>
                   {STAT_TYPE_PREVIEWS[t.key]}
@@ -325,13 +326,36 @@ function TypeSelectorModal({ onSelect, onClose }) {
           ))}
         </div>
 
-        {/* Target Statistic — full-width button below the grid */}
-        <div className="px-7 pb-7">
+        <div className="grid sm:hidden grid-cols-2 gap-2 p-3">
+          {types.map(t => (
+            <button
+              key={t.key}
+              disabled={!t.available}
+              onClick={() => t.available && onSelect(t.key)}
+              className={`rounded-lg border-2 px-2 py-3 text-center text-xs font-semibold transition-colors ${
+                t.available
+                  ? 'border-green-600 text-green-800 bg-green-50 hover:bg-green-100'
+                  : 'border-gray-200 text-gray-400 bg-gray-50 opacity-60'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+          <button
+            onClick={() => onSelect('target')}
+            className="col-span-2 rounded-lg border-2 border-green-600 px-2 py-3 text-center text-xs font-semibold text-green-800 bg-green-50 hover:bg-green-100"
+          >
+            🎯 Target Statistic
+          </button>
+        </div>
+
+        {/* Target Statistic — full-width button below the grid (desktop only;
+            mobile shows it inline above) */}
+        <div className="hidden sm:block px-7 pb-7">
           <button
             onClick={() => onSelect('target')}
             className="relative w-full rounded-xl border-2 border-green-600 p-5 text-left hover:shadow-md hover:bg-green-50 transition-all overflow-hidden"
           >
-            {/* Wide preview for full-width button */}
             <div className="absolute bottom-0 right-0 w-56 h-14 opacity-[0.45] pointer-events-none select-none">
               {STAT_TYPE_PREVIEWS.target}
             </div>
@@ -1460,9 +1484,10 @@ function DateRangeScrubber({ minDate, maxDate, fromDate, toDate, onFromChange, o
   const startTo   = (e) => { e.preventDefault?.(); draggingRef.current = 'to'   }
 
   return (
-    <div className="px-3 sm:px-6 py-3 bg-white border-t border-gray-100 flex-shrink-0">
-      {/* End-date labels */}
-      <div className="flex justify-between text-[11px] text-gray-400 mb-1 px-0.5">
+    <div className="px-3 sm:px-6 pt-1 pb-2 sm:py-3 bg-white border-t border-gray-100 flex-shrink-0">
+      {/* End-date labels — desktop only; mobile relies on the date flags
+          inside the slider for the same info. */}
+      <div className="hidden sm:flex justify-between text-[11px] text-gray-400 mb-1 px-0.5">
         <span>{fmtLabel(minDate)}</span>
         <span>{fmtLabel(maxDate)}</span>
       </div>
@@ -7094,7 +7119,12 @@ export default function Statistics() {
         )}
         <div className="flex-1 min-w-0" />
         {viewMode !== 'print-multiple' && (
-          <button onClick={() => setShowTypeSelector(true)} className="btn-primary text-sm px-3 py-1.5 flex-shrink-0">
+          /* Mobile: only show Add when there's no selected stat (i.e. user is
+             on the stat-list view). Desktop always shows it. */
+          <button
+            onClick={() => setShowTypeSelector(true)}
+            className={`btn-primary text-sm px-3 py-1.5 flex-shrink-0 ${selectedStat ? 'hidden sm:inline-flex' : ''}`}
+          >
             <span className="sm:hidden">＋ Add</span>
             <span className="hidden sm:inline">+ Add Statistic</span>
           </button>
@@ -7324,8 +7354,10 @@ export default function Statistics() {
                 </div>
 
                 {/* Stat name — sits inline on mobile (between back arrow and
-                    up/down arrows), absolutely centered on md+. */}
-                <span className="md:absolute md:left-1/2 md:-translate-x-1/2 flex-1 md:flex-none text-center md:max-w-xs text-base md:text-lg font-bold text-gray-800 truncate px-2 md:px-0 pointer-events-none">
+                    up/down arrows), absolutely centered on md+. min-w-0 lets
+                    the flex container shrink it naturally; on md+ we cap with
+                    max-w-xs + truncate so wide names don't shove the layout. */}
+                <span className="md:absolute md:left-1/2 md:-translate-x-1/2 flex-1 md:flex-none min-w-0 text-center md:max-w-xs text-base md:text-lg font-bold text-gray-800 md:truncate px-2 md:px-0 pointer-events-none">
                   {selectedStat.name}
                 </span>
 
@@ -7422,7 +7454,7 @@ export default function Statistics() {
                       type="date"
                       value={fromDate}
                       onChange={e => setFromDate(e.target.value)}
-                      className="border border-gray-300 rounded-md px-1 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs w-[88px] sm:w-auto focus:outline-none focus:ring-2 focus:ring-green-600"
+                      className="border border-gray-300 rounded-md px-1.5 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs w-[108px] sm:w-auto focus:outline-none focus:ring-2 focus:ring-green-600"
                     />
                   </div>
                   <div className="flex items-center gap-0.5 sm:gap-1">
@@ -7431,7 +7463,7 @@ export default function Statistics() {
                       type="date"
                       value={toDate}
                       onChange={e => setToDate(e.target.value)}
-                      className="border border-gray-300 rounded-md px-1 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs w-[88px] sm:w-auto focus:outline-none focus:ring-2 focus:ring-green-600"
+                      className="border border-gray-300 rounded-md px-1.5 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs w-[108px] sm:w-auto focus:outline-none focus:ring-2 focus:ring-green-600"
                     />
                   </div>
 
@@ -7473,9 +7505,9 @@ export default function Statistics() {
               )}
 
               {/* Chart — minimal horizontal padding on mobile so the Y axis
-                  sits as close to the screen edge as possible without touching
-                  it. Desktop keeps the comfortable px-4 gutter. */}
-              <div ref={chartPrintRef} className="flex-1 px-1 sm:px-4 py-4 overflow-hidden relative bg-white">
+                  sits close to the screen edge. Bottom padding is reduced
+                  on mobile so the slider scrubber hugs the x-axis values. */}
+              <div ref={chartPrintRef} className="flex-1 px-1 sm:px-4 pt-4 pb-1 sm:pb-4 overflow-hidden relative bg-white">
 
                 {selectedStat.stat_category === 'overlay' ? (
                   /* ── Overlay chart ─────────────────────────────────────── */
