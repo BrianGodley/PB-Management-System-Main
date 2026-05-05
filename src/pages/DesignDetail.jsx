@@ -38,6 +38,61 @@ const TOOL_META = {
 
 const COLOR_PRESETS = ['#3A5038', '#DC2626', '#2563EB', '#D97706', '#7C3AED', '#0891B2']
 
+// Standard architectural + engineering imperial scales. Drawing inches per
+// real-world foot. Assumes the PDF renders at 72 DPI at zoom = 1.0 (PDF
+// standard), so pixels_per_foot = 72 * drawing_in_per_foot.
+const IMPERIAL_SCALES = [
+  { label: '1/64" = 1\'-0"',   ipf: 1/64 },
+  { label: '1/32" = 1\'-0"',   ipf: 1/32 },
+  { label: '1/16" = 1\'-0"',   ipf: 1/16 },
+  { label: '3/32" = 1\'-0"',   ipf: 3/32 },
+  { label: '1/8" = 1\'-0"',    ipf: 1/8 },
+  { label: '3/16" = 1\'-0"',   ipf: 3/16 },
+  { label: '1/4" = 1\'-0"',    ipf: 1/4 },
+  { label: '3/8" = 1\'-0"',    ipf: 3/8 },
+  { label: '1/2" = 1\'-0"',    ipf: 1/2 },
+  { label: '3/4" = 1\'-0"',    ipf: 3/4 },
+  { label: '1" = 1\'-0"',      ipf: 1 },
+  { label: '1 1/2" = 1\'-0"',  ipf: 1.5 },
+  { label: '3" = 1\'-0"',      ipf: 3 },
+  // Engineering scales (1 inch = N feet)
+  { label: '1" = 10\'',         ipf: 1/10 },
+  { label: '1" = 20\'',         ipf: 1/20 },
+  { label: '1" = 30\'',         ipf: 1/30 },
+  { label: '1" = 40\'',         ipf: 1/40 },
+  { label: '1" = 50\'',         ipf: 1/50 },
+  { label: '1" = 60\'',         ipf: 1/60 },
+  { label: '1" = 100\'',        ipf: 1/100 },
+]
+
+// Metric scales: 1:N (drawing units : real units). Same 72 DPI assumption.
+// 1 px at zoom 1.0 = 1/72 inch = 25.4/72 mm on the drawing → * N mm in reality.
+const METRIC_SCALES = [
+  { label: '1:1',    ratio: 1 },
+  { label: '1:5',    ratio: 5 },
+  { label: '1:10',   ratio: 10 },
+  { label: '1:20',   ratio: 20 },
+  { label: '1:25',   ratio: 25 },
+  { label: '1:50',   ratio: 50 },
+  { label: '1:100',  ratio: 100 },
+  { label: '1:200',  ratio: 200 },
+  { label: '1:500',  ratio: 500 },
+  { label: '1:1000', ratio: 1000 },
+]
+
+// Returns { ppu, unit } where ppu is pixels-per-unit at zoom 1.0
+function computePresetPpu(measurementType, presetLabel) {
+  if (measurementType === 'imperial') {
+    const s = IMPERIAL_SCALES.find(x => x.label === presetLabel)
+    if (!s) return null
+    return { ppu: 72 * s.ipf, unit: 'ft' }
+  }
+  const s = METRIC_SCALES.find(x => x.label === presetLabel)
+  if (!s) return null
+  // 72000 / (25.4 * ratio)  ≈  2834.65 / ratio
+  return { ppu: 72000 / (25.4 * s.ratio), unit: 'm' }
+}
+
 function isPdfFile(f) { return f?.file_type === 'application/pdf' || /\.pdf$/i.test(f?.file_name || '') }
 function isImageFile(f) { return (f?.file_type || '').startsWith('image/') || /\.(png|jpe?g|gif|webp|svg)$/i.test(f?.file_name || '') }
 function fmtBytes(n) {
@@ -298,7 +353,7 @@ export default function DesignDetail() {
       } else {
         const finalPts = [...drawing.points, pt]
         if (tool === 'scale') {
-          setScaleDialog({ points: finalPts, distance: '', unit: 'ft' })
+          setScaleDialog({ mode: 'twoPoints', points: finalPts, distance: '', unit: 'ft' })
         } else {
           saveAnnotation({ type: 'linear', points: finalPts, color: drawColor })
         }
@@ -363,23 +418,82 @@ export default function DesignDetail() {
     setAnnotations(prev => prev.filter(a => a.id !== annId))
   }
 
-  // ── Scale dialog: confirm ────────────────────────────────────────────────
-  async function confirmScale() {
-    const dist = parseFloat(scaleDialog.distance)
-    if (!isFinite(dist) || dist <= 0) { setError('Enter a positive distance.'); return }
-    // Replace any existing scale on this page, then insert new.
-    const existing = annotations.find(a => a.type === 'scale')
-    if (existing) await supabase.from('design_annotations').delete().eq('id', existing.id)
-    const newAnn = {
-      type: 'scale',
-      points: scaleDialog.points,
-      color: '#FF8800',
-      known_distance: dist,
-      unit: scaleDialog.unit,
+  // ── Scale dialog: apply ─────────────────────────────────────────────────
+  // Handles BOTH modes: 'page' picks ppu from a preset (no clicking needed),
+  // 'twoPoints' uses the captured points + the user-entered real distance.
+  async function applyScale() {
+    if (!scaleDialog) return
+    let scalePoints, knownDistance, unit, label
+
+    if (scaleDialog.mode === 'page') {
+      const got = computePresetPpu(scaleDialog.measurementType, scaleDialog.preset)
+      if (!got) { setError('Pick a scale preset.'); return }
+      // Synthetic scale: points span exactly 1 unit (ppu pixels) so
+      // distPx / known_distance == ppu / 1 == ppu — same math as two-points.
+      scalePoints   = [[0, 0], [got.ppu, 0]]
+      knownDistance = 1
+      unit          = got.unit
+      label         = scaleDialog.preset
+    } else {
+      const dist = parseFloat(scaleDialog.distance)
+      if (!isFinite(dist) || dist <= 0) { setError('Enter a positive distance.'); return }
+      if (!scaleDialog.points || scaleDialog.points.length !== 2) {
+        setError('No points captured. Click "Click 2 Points on Drawing" and click two points.')
+        return
+      }
+      scalePoints   = scaleDialog.points
+      knownDistance = dist
+      unit          = scaleDialog.unit
+      label         = `${dist} ${unit}`
     }
-    await saveAnnotation(newAnn)
-    if (existing) setAnnotations(prev => prev.filter(a => a.id !== existing.id))
+
+    // Pages we apply to (current, or every page if checkbox is on)
+    const targetPages = (scaleDialog.applyAll && numPages > 1)
+      ? Array.from({ length: numPages }, (_, i) => i + 1)
+      : [currentPage]
+
+    // Replace any existing scale rows on those pages
+    const { data: existingScales } = await supabase
+      .from('design_annotations')
+      .select('id')
+      .eq('file_id', selectedFileId)
+      .eq('type', 'scale')
+      .in('page_number', targetPages)
+    if (existingScales?.length) {
+      await supabase.from('design_annotations').delete().in('id', existingScales.map(r => r.id))
+    }
+
+    // Insert one scale row per target page
+    const rows = targetPages.map(p => ({
+      file_id:        selectedFileId,
+      page_number:    p,
+      type:           'scale',
+      points:         scalePoints,
+      color:          '#FF8800',
+      label:          label,
+      known_distance: knownDistance,
+      unit:           unit,
+      created_by:     user?.id || null,
+    }))
+    const { error: insErr } = await supabase.from('design_annotations').insert(rows)
+    if (insErr) { setError('Save failed: ' + insErr.message); return }
+
+    // Refresh the current page's annotations list
+    const { data: refreshed } = await supabase
+      .from('design_annotations')
+      .select('*')
+      .eq('file_id', selectedFileId)
+      .eq('page_number', currentPage)
+    setAnnotations(refreshed || [])
     setScaleDialog(null)
+  }
+
+  // Trigger the two-points capture flow from inside the dialog
+  function startTwoPointsCapture() {
+    setScaleDialog(null)
+    setTool('scale')
+    setDrawing(null)
+    setHoverPoint(null)
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -503,7 +617,24 @@ export default function DesignDetail() {
           {selectedFile && (
             <div className="flex items-center gap-1 ml-2">
               {Object.entries(TOOL_META).map(([k, m]) => (
-                <button key={k} onClick={() => { setTool(k); setDrawing(null); setHoverPoint(null) }}
+                <button key={k}
+                  onClick={() => {
+                    if (k === 'scale') {
+                      // Open the scale dialog; it offers Page Scale + Two Points
+                      setTool('pointer'); setDrawing(null); setHoverPoint(null)
+                      setScaleDialog({
+                        mode: 'page',
+                        measurementType: 'imperial',
+                        preset: '1/8" = 1\'-0"',
+                        applyAll: false,
+                        points: null,
+                        distance: '',
+                        unit: 'ft',
+                      })
+                    } else {
+                      setTool(k); setDrawing(null); setHoverPoint(null)
+                    }
+                  }}
                   title={k === 'scale' && !pageScale ? 'Set scale (required for measurements)' : m.label}
                   className={`px-2 py-1 rounded text-xs border transition-colors ${
                     tool === k ? 'bg-green-700 text-white border-green-700' : 'bg-white border-gray-300 hover:bg-gray-50 text-gray-700'
@@ -593,8 +724,8 @@ export default function DesignDetail() {
                     onMouseLeave={() => setHoverPoint(null)}
                     style={{ position: 'absolute', top: 0, left: 0, cursor: tool === 'pointer' ? 'default' : 'crosshair' }}
                   >
-                    {/* Saved annotations */}
-                    {annotations.map(a => (
+                    {/* Saved annotations (skip 'scale' — visualised only in sidebar) */}
+                    {annotations.filter(a => a.type !== 'scale').map(a => (
                       <AnnotationShape key={a.id} a={a} zoom={zoom} pageScale={pageScale} />
                     ))}
                     {/* In-progress preview */}
@@ -612,33 +743,153 @@ export default function DesignDetail() {
       {/* ── Scale dialog ─────────────────────────────────────────────────── */}
       {scaleDialog && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setScaleDialog(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-gray-200" style={{ backgroundColor: FG }}>
-              <h2 className="text-base font-bold text-white">Set Page Scale</h2>
-              <p className="text-xs text-green-200 mt-0.5">Page {currentPage} · drawn distance: {distPx(scaleDialog.points[0], scaleDialog.points[1]).toFixed(1)} px</p>
-            </div>
-            <div className="p-6 space-y-3">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between" style={{ backgroundColor: FG }}>
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Real-world distance</label>
-                <div className="flex gap-2">
-                  <input type="number" step="any" autoFocus value={scaleDialog.distance}
-                    onChange={e => setScaleDialog({ ...scaleDialog, distance: e.target.value })}
-                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700/30 focus:border-green-700"
-                    placeholder="e.g. 10" />
-                  <select value={scaleDialog.unit}
-                    onChange={e => setScaleDialog({ ...scaleDialog, unit: e.target.value })}
-                    className="border border-gray-300 rounded-lg px-2 py-2 text-sm bg-white">
-                    <option value="ft">ft</option><option value="in">in</option><option value="m">m</option><option value="cm">cm</option>
+                <h2 className="text-base font-bold text-white">Set Page Scale</h2>
+                <p className="text-xs text-green-200 mt-0.5">Page {currentPage}{numPages > 1 ? ` of ${numPages}` : ''}</p>
+              </div>
+              <button onClick={() => setScaleDialog(null)} className="text-white/70 hover:text-white text-xl leading-none px-2">✕</button>
+            </div>
+
+            {/* Mode toggle */}
+            <div className="px-6 pt-4 pb-2 flex gap-2">
+              <button
+                onClick={() => setScaleDialog({ ...scaleDialog, mode: 'page' })}
+                className={`flex-1 px-3 py-2 text-sm rounded-lg border-2 transition-colors ${
+                  scaleDialog.mode === 'page' ? 'border-green-700 bg-green-50 text-green-800 font-semibold' : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                📐 Set via Page Scale
+              </button>
+              <button
+                onClick={() => setScaleDialog({ ...scaleDialog, mode: 'twoPoints' })}
+                className={`flex-1 px-3 py-2 text-sm rounded-lg border-2 transition-colors ${
+                  scaleDialog.mode === 'twoPoints' ? 'border-green-700 bg-green-50 text-green-800 font-semibold' : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                📏 Set via Two Points
+              </button>
+            </div>
+
+            {/* Page Scale mode body */}
+            {scaleDialog.mode === 'page' && (
+              <div className="p-6 space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Measurement Type</label>
+                  <div className="flex gap-2">
+                    {['imperial', 'metric'].map(t => (
+                      <button
+                        key={t}
+                        onClick={() => setScaleDialog({
+                          ...scaleDialog,
+                          measurementType: t,
+                          preset: t === 'imperial' ? '1/8" = 1\'-0"' : '1:100',
+                        })}
+                        className={`flex-1 px-3 py-2 text-sm rounded-lg border transition-colors ${
+                          scaleDialog.measurementType === t ? 'border-green-700 bg-green-50 text-green-800 font-semibold' : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        {t === 'imperial' ? 'Imperial (ft / in)' : 'Metric (m / mm)'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Drawing Scale</label>
+                  <select
+                    value={scaleDialog.preset}
+                    onChange={e => setScaleDialog({ ...scaleDialog, preset: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-green-700/30 focus:border-green-700"
+                  >
+                    {(scaleDialog.measurementType === 'imperial' ? IMPERIAL_SCALES : METRIC_SCALES).map(s => (
+                      <option key={s.label} value={s.label}>{s.label}</option>
+                    ))}
                   </select>
                 </div>
+
+                {numPages > 1 && (
+                  <label className="flex items-center gap-2 cursor-pointer pt-1">
+                    <input
+                      type="checkbox"
+                      checked={!!scaleDialog.applyAll}
+                      onChange={e => setScaleDialog({ ...scaleDialog, applyAll: e.target.checked })}
+                      className="w-4 h-4 rounded accent-green-700"
+                    />
+                    <span className="text-sm text-gray-700">Apply same scale to all {numPages} pages</span>
+                  </label>
+                )}
+
+                <p className="text-xs text-gray-500 pt-1">
+                  Picks pixels-per-unit from the standard scale assuming the drawing renders at 72 DPI (PDF default).
+                </p>
               </div>
-              <p className="text-xs text-gray-500">After setting scale, all linear and area measurements on this page convert to {scaleDialog.unit}.</p>
-            </div>
+            )}
+
+            {/* Two Points mode body */}
+            {scaleDialog.mode === 'twoPoints' && (
+              <div className="p-6 space-y-3">
+                {!scaleDialog.points ? (
+                  <>
+                    <p className="text-sm text-gray-700">
+                      Click <strong>Click 2 Points on Drawing</strong>, then click two points along something with a known length (a labelled scale bar, a wall whose length you know, etc.). This dialog will reopen so you can enter the real distance.
+                    </p>
+                    <button
+                      onClick={startTwoPointsCapture}
+                      className="w-full py-2 rounded-lg text-sm font-bold text-white"
+                      style={{ backgroundColor: FG }}
+                    >
+                      Click 2 Points on Drawing
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs text-gray-500">
+                      Drawn distance: <strong>{distPx(scaleDialog.points[0], scaleDialog.points[1]).toFixed(1)} px</strong>
+                    </p>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">Real-world distance</label>
+                      <div className="flex gap-2">
+                        <input type="number" step="any" autoFocus value={scaleDialog.distance}
+                          onChange={e => setScaleDialog({ ...scaleDialog, distance: e.target.value })}
+                          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700/30 focus:border-green-700"
+                          placeholder="e.g. 10" />
+                        <select value={scaleDialog.unit}
+                          onChange={e => setScaleDialog({ ...scaleDialog, unit: e.target.value })}
+                          className="border border-gray-300 rounded-lg px-2 py-2 text-sm bg-white">
+                          <option value="ft">ft</option><option value="in">in</option>
+                          <option value="m">m</option><option value="cm">cm</option>
+                        </select>
+                      </div>
+                    </div>
+                    {numPages > 1 && (
+                      <label className="flex items-center gap-2 cursor-pointer pt-1">
+                        <input
+                          type="checkbox"
+                          checked={!!scaleDialog.applyAll}
+                          onChange={e => setScaleDialog({ ...scaleDialog, applyAll: e.target.checked })}
+                          className="w-4 h-4 rounded accent-green-700"
+                        />
+                        <span className="text-sm text-gray-700">Apply same scale to all {numPages} pages</span>
+                      </label>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
             <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 flex justify-end gap-2">
               <button onClick={() => setScaleDialog(null)} className="px-4 py-2 rounded-lg text-sm text-gray-600 hover:bg-white border border-gray-300">Cancel</button>
-              <button onClick={confirmScale} disabled={!scaleDialog.distance || parseFloat(scaleDialog.distance) <= 0}
+              <button
+                onClick={applyScale}
+                disabled={
+                  scaleDialog.mode === 'page'
+                    ? !scaleDialog.preset
+                    : !scaleDialog.points || !scaleDialog.distance || parseFloat(scaleDialog.distance) <= 0
+                }
                 className="px-5 py-2 rounded-lg text-sm font-bold text-white disabled:opacity-50" style={{ backgroundColor: FG }}>
-                Set Scale
+                Apply Scale
               </button>
             </div>
           </div>
