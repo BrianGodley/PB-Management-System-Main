@@ -1484,7 +1484,7 @@ function DateRangeScrubber({ minDate, maxDate, fromDate, toDate, onFromChange, o
   const startTo   = (e) => { e.preventDefault?.(); draggingRef.current = 'to'   }
 
   return (
-    <div className="px-3 sm:px-6 pt-1 pb-2 sm:py-3 bg-white border-t border-gray-100 flex-shrink-0">
+    <div className="px-3 sm:px-6 pt-0 pb-2 sm:py-3 bg-white border-t border-gray-100 flex-shrink-0">
       {/* End-date labels — desktop only; mobile relies on the date flags
           inside the slider for the same info. */}
       <div className="hidden sm:flex justify-between text-[11px] text-gray-400 mb-1 px-0.5">
@@ -7353,11 +7353,12 @@ export default function Statistics() {
                   </div>
                 </div>
 
-                {/* Stat name — sits inline on mobile (between back arrow and
-                    up/down arrows), absolutely centered on md+. min-w-0 lets
-                    the flex container shrink it naturally; on md+ we cap with
-                    max-w-xs + truncate so wide names don't shove the layout. */}
-                <span className="md:absolute md:left-1/2 md:-translate-x-1/2 flex-1 md:flex-none min-w-0 text-center md:max-w-xs text-base md:text-lg font-bold text-gray-800 md:truncate px-2 md:px-0 pointer-events-none">
+                {/* Stat name — single-line on every viewport. min-w-0 +
+                    truncate keeps it from wrapping and clips with an ellipsis
+                    if a name is genuinely too long for the row. On mobile we
+                    drop to text-sm so ~25 chars fit between the back arrow
+                    and the up/down arrows. */}
+                <span className="md:absolute md:left-1/2 md:-translate-x-1/2 flex-1 md:flex-none min-w-0 text-center md:max-w-xs text-sm md:text-lg font-bold text-gray-800 truncate whitespace-nowrap px-1 md:px-0 pointer-events-none">
                   {selectedStat.name}
                 </span>
 
@@ -7505,9 +7506,9 @@ export default function Statistics() {
               )}
 
               {/* Chart — minimal horizontal padding on mobile so the Y axis
-                  sits close to the screen edge. Bottom padding is reduced
-                  on mobile so the slider scrubber hugs the x-axis values. */}
-              <div ref={chartPrintRef} className="flex-1 px-1 sm:px-4 pt-4 pb-1 sm:pb-4 overflow-hidden relative bg-white">
+                  sits close to the screen edge. No bottom padding on mobile
+                  so the slider scrubber sits flush against the x-axis. */}
+              <div ref={chartPrintRef} className="flex-1 px-1 sm:px-4 pt-4 pb-0 sm:pb-4 overflow-hidden relative bg-white">
 
                 {selectedStat.stat_category === 'overlay' ? (
                   /* ── Overlay chart ─────────────────────────────────────── */
@@ -7535,7 +7536,7 @@ export default function Statistics() {
                       </div>
                       <div className="flex-1 min-h-0">
                         <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={overlayChartData} margin={{ top: 10, right: isMobile ? 6 : 24, left: isMobile ? -8 : 16, bottom: 20 }}>
+                          <LineChart data={overlayChartData} margin={{ top: 10, right: isMobile ? 6 : 24, left: isMobile ? -8 : 16, bottom: isMobile ? 6 : 20 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                             <XAxis
                               dataKey="label"
@@ -7625,7 +7626,7 @@ export default function Statistics() {
                       {/* margin/YAxis width shrink on mobile so the chart hugs the screen edge */}
                       <BarChart
                         data={chartDataWithTargets}
-                        margin={{ top: 28, right: isMobile ? 6 : 24, left: isMobile ? -8 : 16, bottom: 20 }}
+                        margin={{ top: 28, right: isMobile ? 6 : 24, left: isMobile ? -8 : 16, bottom: isMobile ? 6 : 20 }}
                         onClick={(chartEvent) => {
                           const pt = chartEvent?.activePayload?.[0]?.payload
                           if (pt?.date) openNoteModal(pt.date, pt.label)
@@ -7729,7 +7730,7 @@ export default function Statistics() {
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart
                         data={chartDataWithTargets}
-                        margin={{ top: 28, right: isMobile ? 6 : 24, left: isMobile ? -8 : 16, bottom: 20 }}
+                        margin={{ top: 28, right: isMobile ? 6 : 24, left: isMobile ? -8 : 16, bottom: isMobile ? 6 : 20 }}
                         onClick={(chartEvent) => {
                           const pt = chartEvent?.activePayload?.[0]?.payload
                           if (pt?.date) openNoteModal(pt.date, pt.label)
