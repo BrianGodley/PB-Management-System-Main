@@ -162,12 +162,15 @@ serve(async (req) => {
         .eq('object_type', 'contacts')
     }
 
-    // Find pushable rows. We don't try to compare updated_at > ghl_synced_at
-    // in SQL because Postgres NULL semantics make it awkward; instead pull
-    // (a) all rows with no GHL link and (b) all rows whose ghl_synced_at is
-    // older than updated_at, and union them in JS. With 5k contacts the
-    // round-trip is trivial.
-    const [{ data: noLink, error: nErr }, { data: stale, error: sErr }] = await Promise.all([
+    // Find pushable rows. PostgREST's .gt() takes a *literal* value (not a
+    // column reference), so we can't ask it to compare two columns
+    // server-side. Instead we pull two batches and combine them in JS:
+    //   (a) rows with no GHL link            — limit to `limit`
+    //   (b) rows that are linked, ordered by updated_at desc; we then
+    //       filter in JS to keep only those where updated_at > ghl_synced_at.
+    // Total round-trip is small even on 5k contacts (linked rows grow
+    // gradually as the integration matures).
+    const [{ data: noLink, error: nErr }, { data: linked, error: sErr }] = await Promise.all([
       sb.from('contacts')
         .select('id, first_name, last_name, company_name, email, phone, cell, street_address, city, state, zip, source, tags, updated_at, ghl_synced_at, ghl_contact_id')
         .is('ghl_contact_id', null)
@@ -176,14 +179,14 @@ serve(async (req) => {
       sb.from('contacts')
         .select('id, first_name, last_name, company_name, email, phone, cell, street_address, city, state, zip, source, tags, updated_at, ghl_synced_at, ghl_contact_id')
         .not('ghl_contact_id', 'is', null)
-        // Postgres treats `updated_at > ghl_synced_at` as NULL when ghl_synced_at is null,
-        // and we already excluded those above. The remaining rows are eligible.
-        .gt('updated_at', 'ghl_synced_at')   // textual comparison; both timestamptz
-        .order('updated_at', { ascending: true })
-        .limit(limit),
+        .order('updated_at', { ascending: false })
+        .limit(2000),  // cap the pre-filter pull; in practice stale rows are a small subset
     ])
     if (nErr) throw new Error('Failed to load no-link rows: ' + nErr.message)
-    if (sErr) throw new Error('Failed to load stale rows: '   + sErr.message)
+    if (sErr) throw new Error('Failed to load linked rows: '  + sErr.message)
+    const stale = (linked || [])
+      .filter(r => r.updated_at && r.ghl_synced_at && r.updated_at > r.ghl_synced_at)
+      .slice(0, limit)
 
     // Combine + de-dupe by id; cap at limit. New rows first so initial
     // bulk push works through your backlog before chasing tiny edits.
@@ -196,14 +199,19 @@ serve(async (req) => {
       if (queue.length >= limit) break
     }
 
-    // For an accurate `remaining`, count everything that *would* push
-    // beyond what fits in this batch.
-    const [{ count: noLinkTotal }, { count: staleTotal }] = await Promise.all([
-      sb.from('contacts').select('id', { count: 'exact', head: true }).is('ghl_contact_id', null),
-      sb.from('contacts').select('id', { count: 'exact', head: true })
-        .not('ghl_contact_id', 'is', null).gt('updated_at', 'ghl_synced_at'),
-    ])
-    const totalEligible = (noLinkTotal || 0) + (staleTotal || 0)
+    // For an accurate `remaining` count we need to know how many rows
+    // *total* are eligible (vs the at-most-`limit` we've loaded into the
+    // queue). PostgREST can answer the no-link count exactly with a HEAD
+    // request; the stale count we approximate from the linked sample we
+    // already pulled (capped at 2000). For an org with thousands of
+    // pending edits we'd build a Postgres view; here it's plenty.
+    const { count: noLinkTotal } = await sb.from('contacts')
+      .select('id', { count: 'exact', head: true })
+      .is('ghl_contact_id', null)
+    const staleTotal = (linked || []).filter(r =>
+      r.updated_at && r.ghl_synced_at && r.updated_at > r.ghl_synced_at
+    ).length
+    const totalEligible = (noLinkTotal || 0) + staleTotal
 
     if (dryRun) {
       // Sample up to 25 rows from the head of the queue.
