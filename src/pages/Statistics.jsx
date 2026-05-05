@@ -5470,7 +5470,10 @@ function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, p
       </div>
 
       <div className="px-6 py-6">
-      <div className="max-w-xl">
+      {/* The Master sub-tab needs the full width — its table has 5 columns
+          and gets clipped by the narrow max-w-xl that's used for the
+          settings forms. */}
+      <div className={settingsSubTab === 'master' ? '' : 'max-w-xl'}>
 
         {/* ── TRACKING SUB-TAB ── */}
         {settingsSubTab === 'tracking' && (
@@ -5609,10 +5612,11 @@ function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, p
                 </button>
               ))}
             </div>
-            {/* Table is 30% wider than the container — horizontal scroll
-                kicks in on narrower viewports thanks to overflow-x-auto. */}
+            {/* Master tab breaks out of the settings max-w-xl wrapper so the
+                table can use the full panel width. overflow-x-auto still
+                allows scrolling on very narrow viewports. */}
             <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-              <table className="text-sm w-[130%] min-w-[130%]">
+              <table className="text-sm w-full min-w-[60rem]">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr className="text-xs uppercase tracking-wide text-gray-500">
                     {/* Name column is ~50% wider than the default auto-fit and
