@@ -6993,14 +6993,14 @@ export default function Statistics() {
             { id: 'multiple-entry', icon: '📝', label: 'Multiple Entry',  short: 'Entry'   },
             { id: 'print-multiple', icon: '🖨️',  label: 'Print Multiple', short: 'Print'   },
             { id: 'comparison',     icon: '⚖️',  label: 'Comparison',     short: 'Compare' },
-            { id: 'import-export',  icon: '↕️',  label: 'Import / Export', short: 'I/E'     },
+            { id: 'import-export',  icon: '↕️',  label: 'Import / Export', short: 'I/E',     mobileHidden: true },
             { id: 'settings',       icon: '⚙️',  label: 'Settings',       short: 'Settings'},
           ].map(m => (
             <button
               key={m.id}
               onClick={() => setViewMode(m.id)}
               title={m.label}
-              className={`flex items-center gap-1 px-1.5 sm:px-2.5 py-1 rounded-md text-[11px] sm:text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-colors ${
+              className={`${m.mobileHidden ? 'hidden sm:flex' : 'flex'} items-center gap-1 px-1.5 sm:px-2.5 py-1 rounded-md text-[11px] sm:text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-colors ${
                 viewMode === m.id
                   ? 'bg-black/20 text-white'
                   : 'text-white/70 hover:text-white hover:bg-black/15'

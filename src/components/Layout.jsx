@@ -52,6 +52,7 @@ export default function Layout() {
     { key: 'main',       label: t('main'),       icon: '⊞' },
   ]
 
+  const isAdmin = userRole === 'admin' || userRole === 'super_admin'
   const MAIN_MENU_ITEMS = [
     { path: '/contacts',    label: 'Contacts',       icon: '🗂️' },
     { path: '/clients',     label: t('clients'),     icon: '👥' },
@@ -61,10 +62,15 @@ export default function Layout() {
     { path: '/statistics',  label: t('statistics'),  icon: '📈' },
     { path: '/portal/subs', label: t('subsVendors'), icon: '🔧' },
     { path: '/hr',          label: t('hr') || 'HR',  icon: '🏢' },
+    // Admin tile — only present when the signed-in user is an admin. Lives
+    // in the mobile main menu instead of the desktop top bar so phones get
+    // a single, consistent place to find every admin tool.
+    ...(isAdmin ? [{ path: '/admin', label: 'Admin', icon: '🛡️' }] : []),
   ]
   const [showMainMenu,   setShowMainMenu]   = useState(false)
   const [avatarUrl,      setAvatarUrl]      = useState(null)
   const [companyLogoUrl, setCompanyLogoUrl] = useState(null)
+  const [userRole,       setUserRole]       = useState(null)
   const userMenuRef  = useRef(null)
   const mainMenuRef  = useRef(null)
 
@@ -73,7 +79,10 @@ export default function Layout() {
     if (!user?.id) return
     supabase.from('profiles').select('role, avatar_url').eq('id', user.id).single()
       .then(({ data }) => {
-        if (data) setAvatarUrl(data.avatar_url || null)
+        if (data) {
+          setAvatarUrl(data.avatar_url || null)
+          setUserRole(data.role || null)
+        }
       })
   }
 
@@ -171,10 +180,12 @@ export default function Layout() {
 
           {/* Right: Admin + user dropdown (desktop) */}
           <div className="flex items-center gap-1 ml-auto">
+            {/* Top-bar Admin link — desktop only. On mobile, Admin lives in
+                the main menu (gated by isAdmin). */}
             <Link
               to="/admin"
               style={isActive('/admin') ? { backgroundColor: forestGreenDark } : {}}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-white/80 hover:text-white hover:bg-black/20 transition-colors"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-white/80 hover:text-white hover:bg-black/20 transition-colors"
             >
               🛡️ <span className="hidden sm:inline">Admin</span>
             </Link>
