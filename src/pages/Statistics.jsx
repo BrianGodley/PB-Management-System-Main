@@ -1475,8 +1475,8 @@ function DateRangeScrubber({ minDate, maxDate, fromDate, toDate, onFromChange, o
       <div ref={trackRef} className="relative h-9 flex items-center select-none">
         {/* Track */}
         <div className="absolute inset-x-0 h-2 bg-gray-200 rounded-full" />
-        {/* Selected range fill */}
-        <div className="absolute h-2 rounded-full" style={{ left: `${leftPct}%`, right: `${100 - rightPct}%`, backgroundColor: FG }} />
+        {/* Selected range fill — light green to match the flag backdrop. */}
+        <div className="absolute h-2 rounded-full bg-green-100 border border-green-200" style={{ left: `${leftPct}%`, right: `${100 - rightPct}%` }} />
 
         {/* Tiny round dot marking the actual From handle position */}
         <div
@@ -1485,13 +1485,14 @@ function DateRangeScrubber({ minDate, maxDate, fromDate, toDate, onFromChange, o
           style={{ left: `${leftPct}%`, transform: 'translateX(-50%)', borderColor: FG }}
         />
         {/* From flag — extends LEFT of the handle position. Whole flag is the
-            grab area so it's easy to hit on a phone. */}
+            grab area so it's easy to hit on a phone. Light-green styling to
+            match the Auto Min / Auto Max active buttons. */}
         <button
           type="button"
           onMouseDown={startFrom}
           onTouchStart={startFrom}
-          className="absolute h-8 px-2 flex items-center text-[11px] font-semibold text-white whitespace-nowrap rounded-l-md cursor-grab active:cursor-grabbing z-20 shadow-md touch-none select-none"
-          style={{ left: `${leftPct}%`, transform: 'translateX(-100%)', backgroundColor: FG }}
+          className="absolute h-8 px-2 flex items-center text-[11px] font-semibold text-green-800 whitespace-nowrap rounded-l-md cursor-grab active:cursor-grabbing z-20 shadow-sm touch-none select-none border border-green-600 bg-green-50 hover:bg-green-100"
+          style={{ left: `${leftPct}%`, transform: 'translateX(-100%)' }}
           title="Drag to change start date"
         >
           {fmtLabel(fromDate)}
@@ -1503,13 +1504,14 @@ function DateRangeScrubber({ minDate, maxDate, fromDate, toDate, onFromChange, o
           className="absolute w-3 h-3 rounded-full border-2 bg-white pointer-events-none z-10"
           style={{ left: `${rightPct}%`, transform: 'translateX(-50%)', borderColor: FG }}
         />
-        {/* To flag — extends RIGHT of the handle position */}
+        {/* To flag — extends RIGHT of the handle position. Same light-green
+            styling as the From flag. */}
         <button
           type="button"
           onMouseDown={startTo}
           onTouchStart={startTo}
-          className="absolute h-8 px-2 flex items-center text-[11px] font-semibold text-white whitespace-nowrap rounded-r-md cursor-grab active:cursor-grabbing z-20 shadow-md touch-none select-none"
-          style={{ left: `${rightPct}%`, transform: 'translateX(0)', backgroundColor: FG }}
+          className="absolute h-8 px-2 flex items-center text-[11px] font-semibold text-green-800 whitespace-nowrap rounded-r-md cursor-grab active:cursor-grabbing z-20 shadow-sm touch-none select-none border border-green-600 bg-green-50 hover:bg-green-100"
+          style={{ left: `${rightPct}%`, transform: 'translateX(0)' }}
           title="Drag to change end date"
         >
           {fmtLabel(toDate)}
