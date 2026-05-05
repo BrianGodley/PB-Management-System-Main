@@ -5707,7 +5707,9 @@ function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, p
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr className="text-xs uppercase tracking-wide text-gray-500">
-                    <th className="text-left px-4 py-2 font-semibold">Name</th>
+                    {/* Name column is ~50% wider than the default auto-fit and
+                        allows long stat names to wrap onto multiple lines. */}
+                    <th className="text-left px-4 py-2 font-semibold w-[42%] min-w-[20rem]">Name</th>
                     <th className="text-left px-3 py-2 font-semibold">Category</th>
                     <th className="text-left px-3 py-2 font-semibold">Tracking</th>
                     <th className="text-left px-3 py-2 font-semibold">Owner</th>
@@ -5725,7 +5727,7 @@ function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, p
                       className="hover:bg-green-50/40 cursor-pointer transition-colors"
                       title="Click to edit"
                     >
-                      <td className="px-4 py-2 font-medium text-gray-900">
+                      <td className="px-4 py-2 font-medium text-gray-900 break-words whitespace-normal">
                         {s.name}
                         {s.stat_category === 'equation' && (
                           <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-semibold">∑</span>
@@ -5979,7 +5981,17 @@ export default function Statistics() {
     const freshStats = stsRes.data || []
     const freshWed   = settingsRes.data?.week_ending_day ?? null
     const freshArc   = settingsRes.data?.show_stat_archive_folder
-    setProfiles(profRes.data || [])
+    // Make sure the signed-in user always appears in the profiles list — RLS
+    // or a missing profile row can otherwise cause the current admin to be
+    // missing from owner dropdowns ("change owner to me" with no self option).
+    let profList = profRes.data || []
+    if (user?.id && !profList.some(p => p.id === user.id)) {
+      profList = [
+        { id: user.id, email: user.email || '', full_name: user.user_metadata?.full_name || user.email || 'Me', role: 'admin' },
+        ...profList,
+      ]
+    }
+    setProfiles(profList)
     setStats(freshStats)
     setWeekEndingDay(freshWed)
     if (freshArc !== null && freshArc !== undefined) setShowStatArchiveFolder(!!freshArc)

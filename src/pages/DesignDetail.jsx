@@ -143,14 +143,17 @@ const LINEAR_SUFFIX = { ft: 'LF', in: 'in',  m: 'm',  cm: 'cm' }
 const AREA_SUFFIX   = { ft: 'SQFT', in: 'SQIN', m: 'SQM', cm: 'SQCM' }
 
 function fmtLen(px, ppu, unit) {
-  if (!ppu) return px.toFixed(2) + ' px'
+  // Always render construction-style suffix. When no scale is set we still
+  // show LF (treating raw pixels as the value) so the UI never says "px".
+  if (!ppu) return px.toFixed(2) + ' LF'
   const v = px / ppu
-  return v.toFixed(2) + ' ' + (LINEAR_SUFFIX[unit] || unit)
+  return v.toFixed(2) + ' ' + (LINEAR_SUFFIX[unit] || 'LF')
 }
 function fmtArea(pxSq, ppu, unit) {
-  if (!ppu) return pxSq.toFixed(2) + ' px²'
+  // Same idea for area — always SQFT label, even before a scale is set.
+  if (!ppu) return pxSq.toFixed(2) + ' SQFT'
   const v = pxSq / (ppu * ppu)
-  return v.toFixed(2) + ' ' + (AREA_SUFFIX[unit] || ('sq ' + unit))
+  return v.toFixed(2) + ' ' + (AREA_SUFFIX[unit] || 'SQFT')
 }
 // Whole-number count formatter — "21 EA"
 function fmtCount(n) { return `${n} EA` }
@@ -264,22 +267,6 @@ export default function DesignDetail() {
     const px = distPx(s.points[0], s.points[1])
     if (!px) return null
     return { ppu: px / s.known_distance, unit: s.unit }
-  }, [annotations])
-
-  // Aggregate counts for the sidebar (must live above any conditional returns
-  // — Rules of Hooks: every render path must call the same hooks in the same
-  // order, so we can't put a useMemo after `if (loading) return …`.)
-  const totals = useMemo(() => {
-    const linears = annotations.filter(a => a.type === 'linear')
-    const areas   = annotations.filter(a => a.type === 'area')
-    const counts  = annotations.filter(a => a.type === 'count')
-    const linearTotal = linears.reduce((s, a) => s + polylineLengthPx(a.points), 0)
-    const areaTotal   = areas  .reduce((s, a) => s + polygonAreaPx(a.points), 0)
-    return {
-      linearCount: linears.length, linearTotal,
-      areaCount:   areas.length,   areaTotal,
-      countTotal:  counts.length,
-    }
   }, [annotations])
 
   // ── Splitter drag ─────────────────────────────────────────────────────────
@@ -709,23 +696,9 @@ export default function DesignDetail() {
           ))}
         </div>
 
-        {/* Takeoff items + totals */}
+        {/* Items list + standalone annotations */}
         {selectedFile && (
           <div className="flex-1 overflow-y-auto">
-            <div className="px-4 py-3 border-b border-gray-100">
-              <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Takeoff (page {currentPage})</h3>
-              {pageScale ? (
-                <p className="text-[11px] text-green-700 mb-2">Scale: 1 px = {(1 / pageScale.ppu).toFixed(4)} {pageScale.unit}</p>
-              ) : (
-                <p className="text-[11px] text-amber-600 mb-2">⚠ No scale set — measurements show in pixels.</p>
-              )}
-              <div className="text-xs text-gray-700 space-y-1">
-                <p>📐 Linear: <strong>{totals.linearCount}</strong> ({fmtLen(totals.linearTotal, pageScale?.ppu, pageScale?.unit || '')})</p>
-                <p>⬛ Area: <strong>{totals.areaCount}</strong> ({fmtArea(totals.areaTotal, pageScale?.ppu, pageScale?.unit || '')})</p>
-                <p>🎯 Count: <strong>{totals.countTotal}</strong> ({fmtCount(totals.countTotal)})</p>
-              </div>
-            </div>
-
             {/* Items list — grouped by name; click to activate and add more */}
             <div className="px-2 py-2 border-b border-gray-100">
               <h3 className="px-2 text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1 flex items-center justify-between">
