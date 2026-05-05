@@ -2041,14 +2041,16 @@ function IntegrationsSettings() {
   // Latest dry-run preview, keyed by object_type. Cleared when a real sync runs.
   const [ghlPreview, setGhlPreview] = useState({})
   async function runSyncNow(objectType, opts = {}) {
-    const dryRun = !!opts.dryRun
-    const fnSlug = {
-      contacts:      'ghl-sync-contacts',
-      // wired up in Phase 5–6
-      opportunities: 'ghl-sync-opportunities',
-      appointments:  'ghl-sync-appointments',
-      notes:         'ghl-sync-notes',
-    }[objectType]
+    const dryRun    = !!opts.dryRun
+    const direction = opts.direction || 'pull'   // 'pull' | 'push'
+    const slugByDir = {
+      contacts: { pull: 'ghl-sync-contacts', push: 'ghl-push-contacts' },
+      // pull/push for the rest land in Phase 6
+      opportunities: { pull: 'ghl-sync-opportunities', push: 'ghl-push-opportunities' },
+      appointments:  { pull: 'ghl-sync-appointments',  push: 'ghl-push-appointments'  },
+      notes:         { pull: 'ghl-sync-notes',         push: 'ghl-push-notes'         },
+    }
+    const fnSlug = slugByDir[objectType]?.[direction]
     if (!fnSlug) return
     setGhlSyncing(s => ({ ...s, [objectType]: true }))
     try {
@@ -2071,13 +2073,24 @@ function IntegrationsSettings() {
         setGhlMsg(`${objectType} sync: ${body.error || body.message || `HTTP ${res.status}`}`)
       } else if (dryRun) {
         setGhlMsgError(false)
-        setGhlMsg(`${objectType} preview ready below.`)
-        setGhlPreview(p => ({ ...p, [objectType]: body }))
+        setGhlMsg(`${objectType} ${direction} preview ready below.`)
+        // Stash under a direction-aware key so push and pull previews don't fight.
+        setGhlPreview(p => ({ ...p, [`${objectType}:${direction}`]: body }))
       } else {
         setGhlMsgError(false)
-        setGhlMsg(`${objectType} sync: pulled ${body.records_synced ?? 0}.`)
-        // Real sync invalidates any earlier preview for this object type.
-        setGhlPreview(p => { const n = { ...p }; delete n[objectType]; return n })
+        if (direction === 'push') {
+          const remaining = body.remaining ?? 0
+          const errs = body.errors ?? 0
+          setGhlMsg(
+            `${objectType} push: ${body.pushed ?? 0} sent` +
+            (errs ? ` (${errs} errors)` : '') +
+            (remaining > 0 ? `. ${remaining} remaining — click Push again to continue.` : '. Done.')
+          )
+        } else {
+          setGhlMsg(`${objectType} pull: pulled ${body.records_synced ?? 0}.`)
+        }
+        // Real run invalidates any earlier preview for this direction.
+        setGhlPreview(p => { const n = { ...p }; delete n[`${objectType}:${direction}`]; return n })
         await loadGhl()
       }
     } catch (e) {
@@ -2381,21 +2394,38 @@ function IntegrationsSettings() {
                         {state?.last_run_status && ` · ${state.last_run_status}`}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
                       <button type="button"
-                        onClick={() => runSyncNow(objType, { dryRun: true })}
+                        onClick={() => runSyncNow(objType, { dryRun: true, direction: 'pull' })}
                         disabled={!ghl[key] || !!ghlSyncing[objType]}
-                        title="Preview match counts without writing to PBS"
+                        title="Preview pull (GHL → PBS) without writing"
                         className="text-xs font-semibold text-blue-700 border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-md px-2 py-1 disabled:opacity-40"
                       >
-                        Preview
+                        Pull preview
                       </button>
                       <button type="button"
-                        onClick={() => runSyncNow(objType)}
+                        onClick={() => runSyncNow(objType, { direction: 'pull' })}
                         disabled={!ghl[key] || !!ghlSyncing[objType]}
+                        title="Pull GHL → PBS now"
                         className="text-xs font-semibold text-green-700 border border-green-200 bg-green-50 hover:bg-green-100 rounded-md px-2 py-1 disabled:opacity-40"
                       >
-                        {ghlSyncing[objType] ? 'Syncing…' : 'Sync now'}
+                        {ghlSyncing[objType] ? 'Syncing…' : 'Pull'}
+                      </button>
+                      <button type="button"
+                        onClick={() => runSyncNow(objType, { dryRun: true, direction: 'push' })}
+                        disabled={!ghl[key] || !!ghlSyncing[objType] || objType !== 'contacts'}
+                        title={objType === 'contacts' ? 'Preview push (PBS → GHL) without writing' : 'Push for this object type lands in Phase 6'}
+                        className="text-xs font-semibold text-amber-700 border border-amber-200 bg-amber-50 hover:bg-amber-100 rounded-md px-2 py-1 disabled:opacity-40"
+                      >
+                        Push preview
+                      </button>
+                      <button type="button"
+                        onClick={() => runSyncNow(objType, { direction: 'push' })}
+                        disabled={!ghl[key] || !!ghlSyncing[objType] || objType !== 'contacts'}
+                        title={objType === 'contacts' ? 'Push PBS → GHL now (batches of 200)' : 'Push for this object type lands in Phase 6'}
+                        className="text-xs font-semibold text-white border border-amber-600 bg-amber-600 hover:bg-amber-700 rounded-md px-2 py-1 disabled:opacity-40"
+                      >
+                        Push
                       </button>
                       <button type="button"
                         onClick={() => saveGhlToggles({ [key]: !ghl[key] })}
@@ -2408,43 +2438,64 @@ function IntegrationsSettings() {
                       </button>
                     </div>
                     </div>
-                    {/* Dry-run preview panel for this object type. */}
-                    {ghlPreview[objType] && (
-                      <div className="mt-2 px-3 py-2 rounded-md bg-blue-50 border border-blue-200 text-xs text-blue-900 space-y-1">
-                        <p className="font-semibold">Preview ({label.toLowerCase()}) — no changes were written.</p>
-                        <p>
-                          <span className="font-medium">Would update:</span>
-                          {' '}
-                          {(ghlPreview[objType].would_update_by_ghl_id || 0)
-                            + (ghlPreview[objType].would_update_by_email || 0)
-                            + (ghlPreview[objType].would_update_by_phone || 0)
-                            + (ghlPreview[objType].would_update_by_name_zip || 0)}
-                          {` (ghl_id:${ghlPreview[objType].would_update_by_ghl_id || 0}, `
-                            + `email:${ghlPreview[objType].would_update_by_email || 0}, `
-                            + `phone:${ghlPreview[objType].would_update_by_phone || 0}, `
-                            + `name+zip:${ghlPreview[objType].would_update_by_name_zip || 0})`}
-                        </p>
-                        <p>
-                          <span className="font-medium">Would insert (new):</span>
-                          {' '}{ghlPreview[objType].would_insert || 0}
-                        </p>
-                        {Array.isArray(ghlPreview[objType].samples) && ghlPreview[objType].samples.length > 0 && (
-                          <details className="text-[11px] text-blue-800">
-                            <summary className="cursor-pointer select-none">Show {ghlPreview[objType].samples.length} samples</summary>
-                            <ul className="mt-1 space-y-0.5">
-                              {ghlPreview[objType].samples.map((s, i) => (
-                                <li key={i} className="font-mono">
-                                  <span className="text-blue-600">{s.reason}</span>:{' '}
-                                  {(s.ghl?.firstName || '') + ' ' + (s.ghl?.lastName || '')}{' '}
-                                  {s.ghl?.email ? `<${s.ghl.email}>` : ''}{' '}
-                                  {s.pbs ? `→ pbs#${s.pbs.id}` : '→ NEW'}
-                                </li>
-                              ))}
-                            </ul>
-                          </details>
-                        )}
-                      </div>
-                    )}
+                    {/* Dry-run preview panels (pull and push). */}
+                    {ghlPreview[`${objType}:pull`] && (() => {
+                      const pv = ghlPreview[`${objType}:pull`]
+                      const upd = (pv.would_update_by_ghl_id || 0)
+                              + (pv.would_update_by_email || 0)
+                              + (pv.would_update_by_phone || 0)
+                              + (pv.would_update_by_name_zip || 0)
+                      return (
+                        <div className="mt-2 px-3 py-2 rounded-md bg-blue-50 border border-blue-200 text-xs text-blue-900 space-y-1">
+                          <p className="font-semibold">Pull preview ({label.toLowerCase()}) — no changes were written.</p>
+                          <p>
+                            <span className="font-medium">Would update:</span> {upd}{' '}
+                            {`(ghl_id:${pv.would_update_by_ghl_id || 0}, email:${pv.would_update_by_email || 0}, phone:${pv.would_update_by_phone || 0}, name+zip:${pv.would_update_by_name_zip || 0})`}
+                          </p>
+                          <p><span className="font-medium">Would insert (new):</span> {pv.would_insert || 0}</p>
+                          {Array.isArray(pv.samples) && pv.samples.length > 0 && (
+                            <details className="text-[11px] text-blue-800">
+                              <summary className="cursor-pointer select-none">Show {pv.samples.length} samples</summary>
+                              <ul className="mt-1 space-y-0.5">
+                                {pv.samples.map((s, i) => (
+                                  <li key={i} className="font-mono">
+                                    <span className="text-blue-600">{s.reason}</span>:{' '}
+                                    {(s.ghl?.firstName || '') + ' ' + (s.ghl?.lastName || '')}{' '}
+                                    {s.ghl?.email ? `<${s.ghl.email}>` : ''}{' '}
+                                    {s.pbs ? `→ pbs#${s.pbs.id}` : '→ NEW'}
+                                  </li>
+                                ))}
+                              </ul>
+                            </details>
+                          )}
+                        </div>
+                      )
+                    })()}
+                    {ghlPreview[`${objType}:push`] && (() => {
+                      const pv = ghlPreview[`${objType}:push`]
+                      return (
+                        <div className="mt-2 px-3 py-2 rounded-md bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1">
+                          <p className="font-semibold">Push preview ({label.toLowerCase()}) — no changes were written.</p>
+                          <p><span className="font-medium">Would create (new in GHL):</span> {pv.would_create || 0}</p>
+                          <p><span className="font-medium">Would update (existing in GHL):</span> {pv.would_update || 0}</p>
+                          <p><span className="font-medium">Total eligible:</span> {pv.total_eligible || 0}{pv.next_batch_size ? ` (next batch: ${pv.next_batch_size})` : ''}</p>
+                          {Array.isArray(pv.samples) && pv.samples.length > 0 && (
+                            <details className="text-[11px] text-amber-800">
+                              <summary className="cursor-pointer select-none">Show {pv.samples.length} samples</summary>
+                              <ul className="mt-1 space-y-0.5">
+                                {pv.samples.map((s, i) => (
+                                  <li key={i} className="font-mono">
+                                    <span className="text-amber-700">{s.kind}</span>:{' '}
+                                    {(s.first_name || '') + ' ' + (s.last_name || '')}{' '}
+                                    {s.email ? `<${s.email}>` : ''}
+                                  </li>
+                                ))}
+                              </ul>
+                            </details>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </div>
                 )
               })}
