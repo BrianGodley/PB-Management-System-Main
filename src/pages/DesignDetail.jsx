@@ -38,6 +38,18 @@ const TOOL_META = {
 
 const COLOR_PRESETS = ['#3A5038', '#DC2626', '#2563EB', '#D97706', '#7C3AED', '#0891B2']
 
+// Count-marker symbol options. SVG renders below in <SymbolMarker>.
+const SYMBOL_OPTIONS = [
+  { key: 'circle',    label: '●' },
+  { key: 'square',    label: '■' },
+  { key: 'triangle',  label: '▲' },
+  { key: 'plus',      label: '✚' },
+  { key: 'pound',     label: '#' },
+  { key: 'asterisk',  label: '*' },
+  { key: 'ampersand', label: '&' },
+  { key: 'percent',   label: '%' },
+]
+
 // Standard architectural + engineering imperial scales. Drawing inches per
 // real-world foot. Assumes the PDF renders at 72 DPI at zoom = 1.0 (PDF
 // standard), so pixels_per_foot = 72 * drawing_in_per_foot.
@@ -162,6 +174,9 @@ export default function DesignDetail() {
   // Drawing
   const [tool,           setTool]           = useState('pointer')
   const [drawColor,      setDrawColor]      = useState(FG)
+  const [drawLabel,      setDrawLabel]      = useState('')   // label applied to next-drawn shape
+  const [drawSymbol,     setDrawSymbol]     = useState('circle') // count symbol for next marker
+  const [editingAnnId,   setEditingAnnId]   = useState(null) // sidebar inline edit popover
   const [drawing,        setDrawing]        = useState(null)  // { type, points: [[x,y]…] }
   const [hoverPoint,     setHoverPoint]     = useState(null)  // [x,y] in natural coords for preview
   const [annotations,    setAnnotations]    = useState([])
@@ -404,7 +419,10 @@ export default function DesignDetail() {
         type:           payload.type,
         points:         payload.points,
         color:          payload.color || drawColor,
-        label:          payload.label || null,
+        label:          payload.label ?? (drawLabel.trim() || null),
+        symbol:         payload.type === 'count'
+                          ? (payload.symbol || drawSymbol || 'circle')
+                          : null,
         known_distance: payload.known_distance ?? null,
         unit:           payload.unit ?? null,
         created_by:     user?.id || null,
@@ -412,6 +430,16 @@ export default function DesignDetail() {
       .select().single()
     if (insErr) { setError('Save failed: ' + insErr.message); return }
     setAnnotations(prev => [...prev, data])
+  }
+
+  // Inline-edit an existing annotation from the sidebar
+  async function updateAnnotation(annId, patch) {
+    const { error: upErr } = await supabase
+      .from('design_annotations')
+      .update(patch)
+      .eq('id', annId)
+    if (upErr) { setError('Update failed: ' + upErr.message); return }
+    setAnnotations(prev => prev.map(a => a.id === annId ? { ...a, ...patch } : a))
   }
   async function deleteAnnotation(annId) {
     await supabase.from('design_annotations').delete().eq('id', annId)
@@ -579,18 +607,67 @@ export default function DesignDetail() {
             {annotations.length > 0 && (
               <div className="px-4 py-2 border-b border-gray-100">
                 <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Annotations</h3>
-                {annotations.map(a => (
-                  <div key={a.id} className="flex items-center gap-2 py-1 group">
-                    <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: a.color || '#666' }} />
-                    <span className="text-xs flex-1 truncate">
-                      {TOOL_META[a.type]?.icon} {a.type}
-                      {a.type === 'linear' && ` · ${fmtLen(polylineLengthPx(a.points), pageScale?.ppu, pageScale?.unit || '')}`}
-                      {a.type === 'area'   && ` · ${fmtArea(polygonAreaPx(a.points), pageScale?.ppu, pageScale?.unit || '')}`}
-                      {a.type === 'scale'  && ` · ${a.known_distance} ${a.unit}`}
-                    </span>
-                    <button onClick={() => deleteAnnotation(a.id)} className="text-gray-300 group-hover:text-red-500 hover:!text-red-700 text-xs px-1">✕</button>
-                  </div>
-                ))}
+                {annotations.map(a => {
+                  const valueText =
+                    a.type === 'linear' ? fmtLen(polylineLengthPx(a.points), pageScale?.ppu, pageScale?.unit || '')
+                  : a.type === 'area'   ? fmtArea(polygonAreaPx(a.points), pageScale?.ppu, pageScale?.unit || '')
+                  : a.type === 'scale'  ? `${a.known_distance} ${a.unit}`
+                  : ''
+                  const isEditing = editingAnnId === a.id
+                  return (
+                    <div key={a.id} className="py-1 border-b border-gray-50 last:border-b-0">
+                      <div className="flex items-center gap-2 group">
+                        {/* Color swatch — click to expand edit row */}
+                        <button
+                          onClick={() => setEditingAnnId(isEditing ? null : a.id)}
+                          className="w-3 h-3 rounded-sm flex-shrink-0 border border-gray-300"
+                          style={{ backgroundColor: a.color || '#666' }}
+                          title="Edit"
+                        />
+                        <span className="text-[10px] flex-shrink-0 w-3 text-center">{TOOL_META[a.type]?.icon}</span>
+                        {/* Inline name */}
+                        <input
+                          type="text"
+                          value={a.label || ''}
+                          placeholder={a.type}
+                          onChange={e => updateAnnotation(a.id, { label: e.target.value || null })}
+                          className="text-xs flex-1 min-w-0 bg-transparent border-0 px-1 py-0.5 focus:bg-white focus:border focus:border-green-500 focus:outline-none rounded"
+                        />
+                        {valueText && <span className="text-[10px] text-gray-500 flex-shrink-0">{valueText}</span>}
+                        <button onClick={() => deleteAnnotation(a.id)} className="text-gray-300 group-hover:text-red-500 hover:!text-red-700 text-xs px-1">✕</button>
+                      </div>
+                      {/* Expanded editor: color + (for count) symbol */}
+                      {isEditing && (
+                        <div className="mt-1 pl-5 pr-1 py-1 flex flex-wrap items-center gap-1 bg-gray-50 rounded">
+                          {COLOR_PRESETS.map(c => (
+                            <button
+                              key={c}
+                              onClick={() => updateAnnotation(a.id, { color: c })}
+                              className={`w-4 h-4 rounded-full border-2 transition-transform ${a.color === c ? 'border-gray-800 scale-110' : 'border-white shadow'}`}
+                              style={{ backgroundColor: c }}
+                            />
+                          ))}
+                          {a.type === 'count' && (
+                            <>
+                              <span className="ml-1 text-[10px] text-gray-500">Sym:</span>
+                              {SYMBOL_OPTIONS.map(s => (
+                                <button
+                                  key={s.key}
+                                  onClick={() => updateAnnotation(a.id, { symbol: s.key })}
+                                  className={`w-5 h-5 rounded text-[10px] font-bold border transition-colors ${
+                                    (a.symbol || 'circle') === s.key ? 'bg-green-700 text-white border-green-700' : 'bg-white border-gray-300 hover:bg-gray-50 text-gray-700'
+                                  }`}
+                                >
+                                  {s.label}
+                                </button>
+                              ))}
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>
@@ -645,15 +722,41 @@ export default function DesignDetail() {
             </div>
           )}
 
-          {/* Color picker for active tool */}
+          {/* Color + label + (count) symbol — applied to next-drawn shape */}
           {selectedFile && tool !== 'pointer' && tool !== 'scale' && (
-            <div className="flex items-center gap-1 ml-1">
-              {COLOR_PRESETS.map(c => (
-                <button key={c} onClick={() => setDrawColor(c)} title={c}
-                  className={`w-5 h-5 rounded-full border-2 transition-transform ${drawColor === c ? 'border-gray-800 scale-110' : 'border-white shadow'}`}
-                  style={{ backgroundColor: c }} />
-              ))}
-            </div>
+            <>
+              <div className="flex items-center gap-1 ml-1">
+                {COLOR_PRESETS.map(c => (
+                  <button key={c} onClick={() => setDrawColor(c)} title={c}
+                    className={`w-5 h-5 rounded-full border-2 transition-transform ${drawColor === c ? 'border-gray-800 scale-110' : 'border-white shadow'}`}
+                    style={{ backgroundColor: c }} />
+                ))}
+              </div>
+              <input
+                type="text"
+                value={drawLabel}
+                onChange={e => setDrawLabel(e.target.value)}
+                placeholder="Label (e.g. Front Lawn)"
+                className="ml-2 border border-gray-300 rounded-md px-2 py-1 text-xs w-44 focus:outline-none focus:ring-2 focus:ring-green-700/30 focus:border-green-700"
+                title="Name applied to the next shape you draw"
+              />
+              {tool === 'count' && (
+                <div className="flex items-center gap-1 ml-1">
+                  {SYMBOL_OPTIONS.map(s => (
+                    <button
+                      key={s.key}
+                      onClick={() => setDrawSymbol(s.key)}
+                      title={s.key}
+                      className={`w-7 h-7 rounded text-sm font-bold border transition-colors ${
+                        drawSymbol === s.key ? 'bg-green-700 text-white border-green-700' : 'bg-white border-gray-300 hover:bg-gray-50 text-gray-700'
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
           )}
 
           <div className="flex-1" />
@@ -901,6 +1004,38 @@ export default function DesignDetail() {
 
 // ── Sub-components ──────────────────────────────────────────────────────────
 
+function SymbolMarker({ symbol = 'circle', x, y, color, size = 16 }) {
+  const half = size / 2
+  switch (symbol) {
+    case 'square':
+      return <rect x={x - half} y={y - half} width={size} height={size} fill={color} stroke="#fff" strokeWidth={2} />
+    case 'triangle':
+      return <polygon points={`${x},${y - half} ${x + half},${y + half} ${x - half},${y + half}`}
+        fill={color} stroke="#fff" strokeWidth={2} />
+    case 'plus':
+      return (
+        <g>
+          <line x1={x - half} y1={y} x2={x + half} y2={y} stroke={color} strokeWidth={3} strokeLinecap="round" />
+          <line x1={x} y1={y - half} x2={x} y2={y + half} stroke={color} strokeWidth={3} strokeLinecap="round" />
+        </g>
+      )
+    case 'pound':
+    case 'asterisk':
+    case 'ampersand':
+    case 'percent': {
+      const ch = { pound: '#', asterisk: '*', ampersand: '&', percent: '%' }[symbol]
+      return (
+        <text x={x} y={y + half - 2} textAnchor="middle" fontSize={size + 2}
+          fill={color} fontWeight="bold"
+          style={{ paintOrder: 'stroke', stroke: '#fff', strokeWidth: 3 }}>{ch}</text>
+      )
+    }
+    case 'circle':
+    default:
+      return <circle cx={x} cy={y} r={half} fill={color} stroke="#fff" strokeWidth={2} />
+  }
+}
+
 function AnnotationShape({ a, zoom, pageScale }) {
   const z = zoom
   const pts = a.points.map(([x, y]) => [x * z, y * z])
@@ -909,7 +1044,13 @@ function AnnotationShape({ a, zoom, pageScale }) {
     const [x, y] = pts[0] || [0, 0]
     return (
       <g pointerEvents="none">
-        <circle cx={x} cy={y} r={8} fill={color} stroke="#fff" strokeWidth={2} />
+        <SymbolMarker symbol={a.symbol || 'circle'} x={x} y={y} color={color} size={16} />
+        {a.label && (
+          <text x={x + 12} y={y + 4} fontSize={11} fill="#1f2937" fontWeight={600}
+                style={{ paintOrder: 'stroke', stroke: '#fff', strokeWidth: 3 }}>
+            {a.label}
+          </text>
+        )}
       </g>
     )
   }
@@ -921,14 +1062,16 @@ function AnnotationShape({ a, zoom, pageScale }) {
       ? `${a.known_distance} ${a.unit}`
       : fmtLen(lengthPx, pageScale?.ppu, pageScale?.unit || '')
     const mid = [(a0[0] + b0[0]) / 2, (a0[1] + b0[1]) / 2]
+    const labelText = a.label ? `${a.label} · ${label}` : label
+    const labelW = Math.max(56, labelText.length * 6 + 12)
     return (
       <g pointerEvents="none">
         <line x1={a0[0]} y1={a0[1]} x2={b0[0]} y2={b0[1]} stroke={color} strokeWidth={3}
               strokeDasharray={a.type === 'scale' ? '6 4' : undefined} />
         <circle cx={a0[0]} cy={a0[1]} r={4} fill={color} stroke="#fff" strokeWidth={1.5} />
         <circle cx={b0[0]} cy={b0[1]} r={4} fill={color} stroke="#fff" strokeWidth={1.5} />
-        <rect x={mid[0] - 28} y={mid[1] - 10} width={56} height={20} rx={3} fill="white" stroke={color} />
-        <text x={mid[0]} y={mid[1] + 5} textAnchor="middle" fontSize={11} fill="#1f2937" fontWeight={600}>{label}</text>
+        <rect x={mid[0] - labelW / 2} y={mid[1] - 10} width={labelW} height={20} rx={3} fill="white" stroke={color} />
+        <text x={mid[0]} y={mid[1] + 5} textAnchor="middle" fontSize={11} fill="#1f2937" fontWeight={600}>{labelText}</text>
       </g>
     )
   }
@@ -937,13 +1080,15 @@ function AnnotationShape({ a, zoom, pageScale }) {
     const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0]} ${p[1]}`).join(' ') + ' Z'
     const areaPx = polygonAreaPx(a.points)
     const [cx, cy] = polygonCentroid(pts)
-    const label = fmtArea(areaPx, pageScale?.ppu, pageScale?.unit || '')
+    const valueLabel = fmtArea(areaPx, pageScale?.ppu, pageScale?.unit || '')
+    const labelText = a.label ? `${a.label} · ${valueLabel}` : valueLabel
+    const labelW = Math.max(72, labelText.length * 6 + 12)
     return (
       <g pointerEvents="none">
         <path d={d} fill={color} fillOpacity={0.25} stroke={color} strokeWidth={2} />
         {pts.map((p, i) => (<circle key={i} cx={p[0]} cy={p[1]} r={3} fill={color} stroke="#fff" strokeWidth={1} />))}
-        <rect x={cx - 36} y={cy - 10} width={72} height={20} rx={3} fill="white" stroke={color} />
-        <text x={cx} y={cy + 5} textAnchor="middle" fontSize={11} fill="#1f2937" fontWeight={600}>{label}</text>
+        <rect x={cx - labelW / 2} y={cy - 10} width={labelW} height={20} rx={3} fill="white" stroke={color} />
+        <text x={cx} y={cy + 5} textAnchor="middle" fontSize={11} fill="#1f2937" fontWeight={600}>{labelText}</text>
       </g>
     )
   }
