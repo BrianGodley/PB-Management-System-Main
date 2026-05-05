@@ -5865,6 +5865,43 @@ export default function Statistics() {
   // Ref to auto-select a stat after stats list refreshes
   const pendingSelectName = useRef(null)
 
+  // ── Per-user "default stat" preference ───────────────────────────────────
+  // The user can star a stat as their default; on the next visit to the
+  // Statistics module that stat is auto-selected. Persisted in localStorage
+  // keyed by user id so each signed-in person has their own default.
+  const defaultStatKey = user?.id ? `stats:defaultStatId:${user.id}` : null
+  const [defaultStatId, setDefaultStatId] = useState(() => {
+    if (typeof window === 'undefined' || !defaultStatKey) return null
+    const v = window.localStorage.getItem(defaultStatKey)
+    return v ? Number(v) || v : null
+  })
+  function toggleDefaultStat(id) {
+    if (!defaultStatKey || !id) return
+    if (String(defaultStatId) === String(id)) {
+      setDefaultStatId(null)
+      try { window.localStorage.removeItem(defaultStatKey) } catch {}
+    } else {
+      setDefaultStatId(id)
+      try { window.localStorage.setItem(defaultStatKey, String(id)) } catch {}
+    }
+  }
+  // Auto-select the default stat on first load. Guarded by a ref so this
+  // doesn't fight the user every time `stats` changes after they've already
+  // navigated to a different stat.
+  const autoSelectedDefaultRef = useRef(false)
+  useEffect(() => {
+    if (autoSelectedDefaultRef.current) return
+    if (!defaultStatId) return
+    if (selectedId) { autoSelectedDefaultRef.current = true; return }
+    if (!stats || stats.length === 0) return
+    const match = stats.find(s => String(s.id) === String(defaultStatId) && !s.archived)
+    if (match) {
+      setOpenFolder('all')
+      setSelectedId(match.id)
+    }
+    autoSelectedDefaultRef.current = true
+  }, [stats, defaultStatId, selectedId])
+
   // When stats list updates, check if we have a pending stat to select
   useEffect(() => {
     if (!pendingSelectName.current || stats.length === 0) return
@@ -7099,6 +7136,28 @@ export default function Statistics() {
                         {lbl}
                       </button>
                     ))}
+                    {/* Default — marks this stat as the user's default view
+                        on next Statistics page load. Per-user, stored in
+                        localStorage. Click again to unset. */}
+                    {(() => {
+                      const isDefault = String(defaultStatId) === String(selectedStat?.id)
+                      return (
+                        <button
+                          onClick={() => toggleDefaultStat(selectedStat?.id)}
+                          title={isDefault
+                            ? 'This stat opens by default — click to clear'
+                            : 'Make this the stat that opens by default for you'}
+                          className={`px-2 py-0.5 rounded text-xs font-medium border transition-colors flex items-center gap-1 ${
+                            isDefault
+                              ? 'border-amber-500 text-amber-700 bg-amber-50'
+                              : 'border-gray-300 text-gray-400 bg-white hover:bg-gray-50'
+                          }`}
+                        >
+                          <span aria-hidden>{isDefault ? '★' : '☆'}</span>
+                          Default
+                        </button>
+                      )
+                    })()}
                   </div>
                 </div>
 
