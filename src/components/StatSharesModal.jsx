@@ -96,16 +96,37 @@ export default function StatSharesModal({ statId, statName, ownerUserId, onClose
             email:   e.email || '',
           }))
 
-        // Make sure the signed-in user is always pickable, even when they
-        // have no employees row (e.g. admins managing someone else's stat
-        // from the Master tab). Without this, the current user can't grant
-        // themselves view/edit access on stats they don't own.
+        // Make sure the signed-in user is always pickable, even when they:
+        //   - have no employees row at all (e.g. admins onboarded outside HR)
+        //   - have an employees row that's archived
+        //   - have an employees row whose user_id wasn't linked to auth
+        // Without this they can't grant themselves view/edit access on stats
+        // they don't own.
         if (user?.id && !list.some(e => e.user_id === user.id)) {
+          // Try to enrich with the user's actual name by querying employees
+          // again without the user_id-null / archived filters, matching by
+          // user_id or email. Falls back to email if nothing found.
+          let displayName = user.user_metadata?.full_name || ''
+          let matchedEmp = null
+          try {
+            const orFilter = `user_id.eq.${user.id}` + (user.email ? `,email.eq.${user.email}` : '')
+            const { data: meData } = await supabase
+              .from('employees')
+              .select('first_name, last_name, email, user_id')
+              .or(orFilter)
+              .limit(1)
+            matchedEmp = meData?.[0] || null
+          } catch { /* swallow — fall back below */ }
+          if (matchedEmp) {
+            const full = [matchedEmp.first_name, matchedEmp.last_name].filter(Boolean).join(' ')
+            if (full) displayName = full
+          }
+          if (!displayName) displayName = user.email || 'Me'
           list.unshift({
             id:      `self-${user.id}`,
             user_id: user.id,
-            name:    user.user_metadata?.full_name || user.email || 'Me',
-            email:   user.email || '',
+            name:    displayName,
+            email:   user.email || matchedEmp?.email || '',
           })
         }
 
