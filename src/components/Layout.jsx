@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LanguageContext'
 import { supabase } from '../lib/supabase'
 import SamChat from './SamChat'
+import JobInfoModal from './JobInfoModal'
 
 const navItems = [
   { path: '/contacts',            label: 'Contacts',          icon: '🗂️' },
@@ -48,7 +49,7 @@ export default function Layout() {
   const DOCK_ITEMS = [
     { to: '/daily-logs', label: t('dailyLogs'), icon: '📋' },
     { to: '/timeclock',  label: t('timeClock'), icon: '⏱️' },
-    { to: '/jobs',       label: t('info'),       icon: 'ℹ️' },
+    { key: 'info',       label: t('info'),       icon: 'ℹ️' },
     { key: 'main',       label: t('main'),       icon: '⊞' },
   ]
 
@@ -73,6 +74,59 @@ export default function Layout() {
   const [companyLogoUrl, setCompanyLogoUrl] = useState(null)
   const userMenuRef  = useRef(null)
   const mainMenuRef  = useRef(null)
+
+  // ── Info dock: job-picker sheet + Job Info modal ──
+  const [showInfoPicker,     setShowInfoPicker]     = useState(false)
+  const [infoJobs,           setInfoJobs]           = useState([])
+  const [infoJobsLoading,    setInfoJobsLoading]    = useState(false)
+  const [infoJobSearch,      setInfoJobSearch]      = useState('')
+  const [selectedJobForInfo, setSelectedJobForInfo] = useState(null)
+
+  // Lazy-load the user's jobs whenever the picker opens. Active jobs are
+  // surfaced first; users can still search by name.
+  useEffect(() => {
+    if (!showInfoPicker) return
+    let cancelled = false
+    setInfoJobsLoading(true)
+    supabase
+      .from('jobs')
+      .select('id, name, client_name, status, job_address, job_city, job_state, job_zip, consultant, project_manager')
+      .order('status', { ascending: true })   // active first (alphabetical: a < c)
+      .order('name',   { ascending: true })
+      .limit(500)
+      .then(({ data }) => {
+        if (cancelled) return
+        setInfoJobs(data || [])
+        setInfoJobsLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [showInfoPicker])
+
+  // Save handler for the shared JobInfoModal — patches the jobs row.
+  async function handleSaveJobInfo(jobId, updates) {
+    const { error } = await supabase.from('jobs').update(updates).eq('id', jobId)
+    if (error) {
+      console.error('Failed to save job from Info dock:', error)
+      return false
+    }
+    // Reflect locally so the picker list shows fresh data if reopened.
+    setInfoJobs(prev => prev.map(j => j.id === jobId ? { ...j, ...updates } : j))
+    setSelectedJobForInfo(prev => prev && prev.id === jobId ? { ...prev, ...updates } : prev)
+    return true
+  }
+
+  // Delete handler — confirms before nuking.
+  async function handleDeleteJobInfo(jobId, jobName) {
+    if (!confirm(`Delete "${jobName || 'this job'}"? This cannot be undone.`)) return
+    const { error } = await supabase.from('jobs').delete().eq('id', jobId)
+    if (error) {
+      console.error('Failed to delete job from Info dock:', error)
+      alert('Failed to delete. ' + (error.message || ''))
+      return
+    }
+    setInfoJobs(prev => prev.filter(j => j.id !== jobId))
+    setSelectedJobForInfo(null)
+  }
 
   // Fetch profile (admin status + avatar)
   const fetchProfile = () => {
@@ -298,6 +352,20 @@ export default function Layout() {
               </button>
             )
           }
+          if (item.key === 'info') {
+            return (
+              <button
+                key="info"
+                onClick={() => { setInfoJobSearch(''); setShowInfoPicker(true) }}
+                className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-xs font-medium transition-colors ${
+                  showInfoPicker ? 'text-green-700 bg-green-50' : 'text-gray-500'
+                }`}
+              >
+                <span className="text-xl leading-none">{item.icon}</span>
+                <span>{item.label}</span>
+              </button>
+            )
+          }
           return (
             <Link
               key={item.to}
@@ -360,6 +428,93 @@ export default function Layout() {
             </button>
           </div>
         </>
+      )}
+
+      {/* ── INFO DOCK: JOB PICKER SHEET ──
+           Slides up when the Info dock item is tapped. The user picks a job,
+           which opens the shared Job Info modal below.
+      ── */}
+      {showInfoPicker && (
+        <>
+          <div
+            className="lg:hidden fixed inset-0 z-40 bg-black/30"
+            onClick={() => setShowInfoPicker(false)}
+          />
+          <div
+            className="lg:hidden fixed bottom-16 inset-x-0 z-50 bg-white rounded-t-2xl shadow-2xl border-t border-gray-200 px-4 pt-4 pb-6 flex flex-col"
+            style={{ marginBottom: 'env(safe-area-inset-bottom)', maxHeight: '70vh' }}
+          >
+            <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-3 flex-shrink-0" />
+            <div className="flex items-center justify-between mb-2 flex-shrink-0">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest px-1">Pick a Job</p>
+              <button
+                onClick={() => setShowInfoPicker(false)}
+                className="text-gray-400 hover:text-gray-600 text-lg leading-none px-2"
+              >
+                ✕
+              </button>
+            </div>
+
+            <input
+              type="text"
+              value={infoJobSearch}
+              onChange={e => setInfoJobSearch(e.target.value)}
+              placeholder="Search jobs…"
+              className="input text-sm w-full mb-2 flex-shrink-0"
+              autoFocus
+            />
+
+            <div className="flex-1 overflow-y-auto -mx-1 px-1">
+              {infoJobsLoading && (
+                <p className="text-sm text-gray-400 italic px-2 py-3">Loading jobs…</p>
+              )}
+              {!infoJobsLoading && infoJobs.length === 0 && (
+                <p className="text-sm text-gray-400 italic px-2 py-3">No jobs found.</p>
+              )}
+              {!infoJobsLoading && infoJobs
+                .filter(j => {
+                  const q = infoJobSearch.trim().toLowerCase()
+                  if (!q) return true
+                  const hay = `${j.name || ''} ${j.client_name || ''} ${j.job_address || ''}`.toLowerCase()
+                  return hay.includes(q)
+                })
+                .map(j => (
+                  <button
+                    key={j.id}
+                    onClick={() => {
+                      setSelectedJobForInfo(j)
+                      setShowInfoPicker(false)
+                    }}
+                    className="w-full text-left px-3 py-2.5 rounded-lg border border-gray-100 mb-1.5 hover:bg-gray-50 active:bg-gray-100 transition-colors flex items-center gap-2"
+                  >
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded font-semibold flex-shrink-0 ${
+                        j.status === 'completed'
+                          ? 'bg-gray-100 text-gray-600'
+                          : 'bg-green-100 text-green-700'
+                      }`}
+                    >
+                      {j.status === 'completed' ? 'Closed' : 'Open'}
+                    </span>
+                    <span className="text-sm text-gray-800 truncate">
+                      {j.name || j.client_name || `Job ${j.id}`}
+                    </span>
+                  </button>
+                ))
+              }
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── INFO DOCK: SHARED JOB INFO MODAL ── */}
+      {selectedJobForInfo && (
+        <JobInfoModal
+          job={selectedJobForInfo}
+          onClose={() => setSelectedJobForInfo(null)}
+          onSave={handleSaveJobInfo}
+          onDelete={handleDeleteJobInfo}
+        />
       )}
 
       {/* Sam — floating AI assistant, available on every page */}
