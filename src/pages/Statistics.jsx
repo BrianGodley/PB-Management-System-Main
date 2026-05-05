@@ -7871,17 +7871,26 @@ export default function Statistics() {
         </div>
       )}
     {/* Shared Permissions modal — sharesTarget wins (set by stat-edit
-       modal buttons), falls back to selectedStat (page-header button). */}
-    {showShares && (sharesTarget || selectedStat) && (
-      <StatSharesModal
-        statId={(sharesTarget || selectedStat).id}
-        statName={(sharesTarget || selectedStat).name}
-        ownerUserId={(sharesTarget || selectedStat).owner_user_id || user?.id}
-        initialShares={sharesTarget?.initialShares}
-        onLocalSave={sharesTarget?.onLocalSave}
-        onClose={() => { setShowShares(false); setSharesTarget(null) }}
-      />
-    )}
+       modal buttons), falls back to selectedStat (page-header button).
+       Look up the actual stat (by id) to get its real owner_user_id —
+       sharesTarget only carries { id, name } so without this we'd default
+       to the current user as "owner" and accidentally hide them from the
+       share list when editing someone else's stat from the Master tab. */}
+    {showShares && (sharesTarget || selectedStat) && (() => {
+      const target = sharesTarget || selectedStat
+      const fullStat = target.id ? (stats || []).find(s => s.id === target.id) : null
+      const realOwner = (fullStat?.owner_user_id) || target.owner_user_id || user?.id
+      return (
+        <StatSharesModal
+          statId={target.id}
+          statName={target.name}
+          ownerUserId={realOwner}
+          initialShares={sharesTarget?.initialShares}
+          onLocalSave={sharesTarget?.onLocalSave}
+          onClose={() => { setShowShares(false); setSharesTarget(null) }}
+        />
+      )
+    })()}
     </div>
   )
 }
