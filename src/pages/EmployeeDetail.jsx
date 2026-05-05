@@ -104,6 +104,8 @@ export default function EmployeeDetail() {
 
   const [employee,      setEmployee]      = useState(null)
   const [linkedProfile, setLinkedProfile] = useState(null)
+  // Sam's per-user greeting signoff (e.g. "Go Rams!"). Stored on profiles.
+  const [greetingTagline, setGreetingTagline] = useState('')
   const [docs,          setDocs]          = useState([])
   const [certs,         setCerts]         = useState([])
   const [training,      setTraining]      = useState([])  // lms_assignments with steps
@@ -387,6 +389,7 @@ export default function EmployeeDetail() {
     if (prof) {
       setLinkedProfile(prof)
       setUserRole(prof.role || 'user')
+      setGreetingTagline(prof.greeting_tagline || '')
       const { data: permsData } = await supabase
         .from('user_permissions').select('*').eq('user_id', prof.id).single()
       if (permsData) setPerms(prev => ({ ...prev, ...permsData }))
@@ -456,6 +459,14 @@ export default function EmployeeDetail() {
     if (linkedProfile?.id && draft.preferred_language) {
       await supabase.from('profiles')
         .update({ preferred_language: draft.preferred_language })
+        .eq('id', linkedProfile.id)
+    }
+
+    // Sync the Sam greeting tagline. Empty string clears it (NULL in DB).
+    if (linkedProfile?.id) {
+      const tail = (greetingTagline || '').trim()
+      await supabase.from('profiles')
+        .update({ greeting_tagline: tail || null })
         .eq('id', linkedProfile.id)
     }
 
@@ -640,7 +651,7 @@ export default function EmployeeDetail() {
                   </button>
                 ) : (
                   <div className="flex gap-2">
-                    <button onClick={() => { setEditing(false); setDraft(employee) }} className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50">
+                    <button onClick={() => { setEditing(false); setDraft(employee); setGreetingTagline(linkedProfile?.greeting_tagline || '') }} className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50">
                       Cancel
                     </button>
                     <button onClick={handleProfileSave} disabled={saving} className="px-3 py-1.5 bg-green-700 text-white rounded-lg text-xs font-semibold hover:bg-green-800 disabled:opacity-50">
@@ -736,6 +747,25 @@ export default function EmployeeDetail() {
                     </div>
                   </div>
                 </div>
+
+                {/* Sam Greeting (sits inside Employment section) */}
+                {linkedProfile?.id && (
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mb-3">
+                    <div className="col-span-2">
+                      <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Sam Greeting Tagline (e.g. "Go Steelers!" — appears after the chat-panel hello)</label>
+                      {editing
+                        ? <input
+                            type="text"
+                            value={greetingTagline}
+                            onChange={e => setGreetingTagline(e.target.value)}
+                            placeholder="(none)"
+                            className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500"
+                          />
+                        : <p className="text-sm text-gray-800 py-0.5">{greetingTagline || <span className="text-gray-400 italic">—</span>}</p>
+                      }
+                    </div>
+                  </div>
+                )}
 
                 {/* Emergency Contact */}
                 <div>

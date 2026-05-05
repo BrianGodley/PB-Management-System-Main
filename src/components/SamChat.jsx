@@ -14,22 +14,63 @@ import { useAuth } from '../contexts/AuthContext'
 
 const FG = '#3A5038'
 
-const FIRST_GREETING =
-  "Hi, I'm Sam — your numbers analyst for Picture Build. Ask me about " +
-  "your stats, sales, or job costs and I'll dig through the data. " +
+// Fallback when we can't fetch the user's name yet (or they have no profile).
+const DEFAULT_GREETING =
+  "Hi! I'm Sam — your numbers analyst for Picture Build. Ask me about your " +
+  "stats, sales, or job costs and I'll dig through the data. " +
   "I'm an AI assistant, so I can be wrong — feel free to push back."
+
+// Build a personalised greeting from the user's first name + an optional
+// tagline ("Go Rams!"). Falls back to a friendly default when fields are
+// missing.
+function buildGreeting({ firstName, tagline }) {
+  if (!firstName) return DEFAULT_GREETING
+  const tail = (tagline || '').trim()
+  return tail
+    ? `Hi ${firstName}, how can I help you? ${tail}`
+    : `Hi ${firstName}, how can I help you?`
+}
 
 export default function SamChat() {
   const { user } = useAuth()
   const [open,            setOpen]            = useState(false)
   const [conversationId,  setConversationId]  = useState(null)
+  const [greeting,        setGreeting]        = useState(DEFAULT_GREETING)
   const [messages,        setMessages]        = useState([
-    { role: 'assistant', content: FIRST_GREETING },
+    { role: 'assistant', content: DEFAULT_GREETING },
   ])
   const [input,           setInput]           = useState('')
   const [sending,         setSending]         = useState(false)
   const [error,           setError]           = useState('')
   const scrollRef = useRef(null)
+
+  // Personalise the greeting once we know who the user is. Pulls full_name +
+  // greeting_tagline from profiles. If the user has no profile row, we leave
+  // the friendly default in place.
+  useEffect(() => {
+    if (!user?.id) return
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('full_name, greeting_tagline')
+        .eq('id', user.id)
+        .maybeSingle()
+      if (cancelled) return
+      const fullName  = (data?.full_name || '').trim()
+      const firstName = fullName ? fullName.split(/\s+/)[0] : ''
+      const g = buildGreeting({ firstName, tagline: data?.greeting_tagline })
+      setGreeting(g)
+      // Only swap the opening message if the user hasn't started chatting yet.
+      setMessages(m => {
+        if (m.length === 1 && m[0].role === 'assistant') {
+          return [{ role: 'assistant', content: g }]
+        }
+        return m
+      })
+    })()
+    return () => { cancelled = true }
+  }, [user?.id])
 
   // Auto-scroll to the latest message whenever the list grows.
   useEffect(() => {
@@ -76,7 +117,7 @@ export default function SamChat() {
 
   function newThread() {
     setConversationId(null)
-    setMessages([{ role: 'assistant', content: FIRST_GREETING }])
+    setMessages([{ role: 'assistant', content: greeting }])
     setError('')
   }
 
