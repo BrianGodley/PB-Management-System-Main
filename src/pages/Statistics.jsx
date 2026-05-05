@@ -7278,9 +7278,9 @@ export default function Statistics() {
                   <button
                     title="Back to stat list"
                     onClick={() => setSelectedId(null)}
-                    className="md:hidden p-1.5 rounded-lg hover:bg-gray-200 text-gray-600 flex-shrink-0"
+                    className="md:hidden px-2 py-0 rounded-lg hover:bg-gray-200 text-gray-900 font-black flex-shrink-0 leading-none"
                   >
-                    <span className="text-xl leading-none">‹</span>
+                    <span className="text-4xl leading-none font-black">‹</span>
                   </button>
                   <button title="Print" onClick={handlePrint} className="hidden sm:inline-flex p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-xl">🖨️</button>
                   <button title="Share" className="hidden sm:inline-flex p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-xl">🔗</button>
@@ -7323,11 +7323,9 @@ export default function Statistics() {
                   </div>
                 </div>
 
-                {/* Stat name. On mobile this drops to its own row (full width,
-                    smaller text, left-aligned). On md+ it returns to the
-                    absolutely-centered position so the desktop header looks
-                    unchanged. */}
-                <span className="block md:absolute md:left-1/2 md:-translate-x-1/2 order-3 md:order-none basis-full md:basis-auto text-sm sm:text-base md:text-lg font-bold text-gray-800 md:max-w-xs truncate md:text-center px-1 md:px-0 pointer-events-none">
+                {/* Stat name — sits inline on mobile (between back arrow and
+                    up/down arrows), absolutely centered on md+. */}
+                <span className="md:absolute md:left-1/2 md:-translate-x-1/2 flex-1 md:flex-none text-center md:max-w-xs text-base md:text-lg font-bold text-gray-800 truncate px-2 md:px-0 pointer-events-none">
                   {selectedStat.name}
                 </span>
 
@@ -7366,18 +7364,18 @@ export default function Statistics() {
                     <div className="w-px h-5 bg-gray-200 mx-0.5 flex-shrink-0" />
                   </div>
                   )}
-                  <div className="flex items-center gap-0">
+                  <div className="flex items-center gap-0 flex-shrink-0">
                     <button
                       onClick={() => goTo(-1)}
                       disabled={!hasPrev}
-                      className="px-1 py-0.5 rounded text-blue-500 hover:bg-blue-50 disabled:opacity-30 text-xl font-black"
+                      className="px-1.5 sm:px-1 py-0.5 rounded text-blue-700 sm:text-blue-500 hover:bg-blue-50 disabled:opacity-30 text-3xl sm:text-xl font-black leading-none"
                     >
                       ⬆
                     </button>
                     <button
                       onClick={() => goTo(1)}
                       disabled={!hasNext}
-                      className="px-1 py-0.5 rounded text-blue-500 hover:bg-blue-50 disabled:opacity-30 text-xl font-black"
+                      className="px-1.5 sm:px-1 py-0.5 rounded text-blue-700 sm:text-blue-500 hover:bg-blue-50 disabled:opacity-30 text-3xl sm:text-xl font-black leading-none"
                     >
                       ⬇
                     </button>
@@ -8046,7 +8044,7 @@ export default function Statistics() {
     {/* ── Mobile Edits modal (Edit Value History + Edit Statistic) ── */}
     {showMobileEditsModal && selectedStat && (
       <div
-        className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-4 sm:hidden"
+        className="fixed inset-0 z-50 bg-black/50 flex items-start sm:items-center justify-center p-3 pt-6 sm:p-4 sm:hidden"
         onClick={() => setShowMobileEditsModal(false)}
       >
         <div
@@ -8089,7 +8087,7 @@ export default function Statistics() {
     {/* ── Mobile Entry popup (record current period's value) ── */}
     {showMobileEntryModal && selectedStat && (
       <div
-        className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-4 sm:hidden"
+        className="fixed inset-0 z-50 bg-black/50 flex items-start sm:items-center justify-center p-3 pt-6 sm:p-4 sm:hidden"
         onClick={() => setShowMobileEntryModal(false)}
       >
         <div
