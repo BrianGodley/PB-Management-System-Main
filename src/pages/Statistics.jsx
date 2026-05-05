@@ -6991,7 +6991,7 @@ export default function Statistics() {
           {[
             { id: 'graphs',         icon: '📈', label: 'Graphs',          short: 'Graphs'  },
             { id: 'multiple-entry', icon: '📝', label: 'Multiple Entry',  short: 'Entry'   },
-            { id: 'print-multiple', icon: '🖨️',  label: 'Print Multiple', short: 'Print'   },
+            { id: 'print-multiple', icon: '🖨️',  label: 'Print Multiple', short: 'Print',   mobileHidden: true },
             { id: 'comparison',     icon: '⚖️',  label: 'Comparison',     short: 'Compare' },
             { id: 'import-export',  icon: '↕️',  label: 'Import / Export', short: 'I/E',     mobileHidden: true },
             { id: 'settings',       icon: '⚙️',  label: 'Settings',       short: 'Settings'},
@@ -7244,9 +7244,9 @@ export default function Statistics() {
                   >
                     <span className="text-xl leading-none">‹</span>
                   </button>
-                  <button title="Print" onClick={handlePrint} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-xl">🖨️</button>
-                  <button title="Share" className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-xl">🔗</button>
-                  <div className="flex gap-1 ml-1">
+                  <button title="Print" onClick={handlePrint} className="hidden sm:inline-flex p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-xl">🖨️</button>
+                  <button title="Share" className="hidden sm:inline-flex p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-xl">🔗</button>
+                  <div className="hidden sm:flex gap-1 ml-1">
                     {[['autoMin', autoMin, setAutoMin, 'Auto Min'], ['autoMax', autoMax, setAutoMax, 'Auto Max']].map(([k, val, setter, lbl]) => (
                       <button
                         key={k}
@@ -7372,27 +7372,30 @@ export default function Statistics() {
                     })}
                   </div>
 
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs text-gray-500 font-medium">FROM</span>
+                  {/* Date range — compact on mobile so it sits alongside the
+                      period tabs and chart-style toggle on a single row. */}
+                  <div className="flex items-center gap-0.5 sm:gap-1">
+                    <span className="text-[10px] sm:text-xs text-gray-500 font-medium">FROM</span>
                     <input
                       type="date"
                       value={fromDate}
                       onChange={e => setFromDate(e.target.value)}
-                      className="border border-gray-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-green-600"
+                      className="border border-gray-300 rounded-md px-1 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs w-[110px] sm:w-auto focus:outline-none focus:ring-2 focus:ring-green-600"
                     />
                   </div>
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs text-gray-500 font-medium">TO</span>
+                  <div className="flex items-center gap-0.5 sm:gap-1">
+                    <span className="text-[10px] sm:text-xs text-gray-500 font-medium">TO</span>
                     <input
                       type="date"
                       value={toDate}
                       onChange={e => setToDate(e.target.value)}
-                      className="border border-gray-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-green-600"
+                      className="border border-gray-300 rounded-md px-1 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs w-[110px] sm:w-auto focus:outline-none focus:ring-2 focus:ring-green-600"
                     />
                   </div>
 
-                  {/* Bar / Line toggle — far right */}
-                  <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden flex-shrink-0 ml-auto">
+                  {/* Bar / Line toggle — flush-right on tablet+, inline on
+                      mobile so the row stays single-line when space allows. */}
+                  <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden flex-shrink-0 sm:ml-auto">
                     <button
                       title="Line chart"
                       onClick={() => setChartStyle('line')}
