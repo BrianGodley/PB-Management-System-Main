@@ -630,10 +630,10 @@ export default function EmployeeDetail() {
 
         {/* ── PROFILE ── */}
         {tab === 'profile' && (
-          <div className="max-w-6xl space-y-5">
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <div className="flex items-center justify-between mb-5">
-                <h3 className="font-semibold text-gray-800">Employee Info</h3>
+          <div className="max-w-6xl space-y-3">
+            <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-gray-800 text-sm">Employee Info</h3>
                 {!editing ? (
                   <button onClick={() => setEditing(true)} className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50">
                     ✏️ Edit
@@ -650,11 +650,11 @@ export default function EmployeeDetail() {
                 )}
               </div>
 
-              <div className="space-y-5">
+              <div className="space-y-3">
                 {/* Personal */}
                 <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Personal</p>
-                  <div className="grid grid-cols-2 gap-3">
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Personal</p>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
                     {[
                       ['first_name', 'First Name'], ['last_name', 'Last Name'],
                       ['email', 'Email'], ['phone', 'Phone (Home/Work)'], ['cell_phone', 'Cell Phone'],
@@ -677,14 +677,14 @@ export default function EmployeeDetail() {
 
                 {/* Employment */}
                 <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Employment</p>
-                  <div className="grid grid-cols-2 gap-3">
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Employment</p>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
                     <Field label="Job Title" value={draft.job_title} editing={editing} onChange={v => set('job_title', v)} />
                     {editing ? (
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Department</label>
+                        <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Department</label>
                         <select value={draft.department || ''} onChange={e => set('department', e.target.value)}
-                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500">
+                          className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500">
                           <option value="">Select…</option>
                           {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
                         </select>
@@ -695,9 +695,9 @@ export default function EmployeeDetail() {
                     {/* Preferred Language */}
                     {editing ? (
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Preferred Language</label>
+                        <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Preferred Language</label>
                         <select value={draft.preferred_language || 'en'} onChange={e => set('preferred_language', e.target.value)}
-                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500">
+                          className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500">
                           {LANGUAGES.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
                         </select>
                       </div>
@@ -710,26 +710,26 @@ export default function EmployeeDetail() {
                       />
                     )}
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Start Date</label>
+                      <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Start Date</label>
                       {editing
-                        ? <input type="date" value={draft.start_date || ''} onChange={e => set('start_date', e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
-                        : <p className="text-sm text-gray-800 py-2">{formatDate(draft.start_date)}</p>
+                        ? <input type="date" value={draft.start_date || ''} onChange={e => set('start_date', e.target.value)} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500" />
+                        : <p className="text-sm text-gray-800 py-0.5">{formatDate(draft.start_date)}</p>
                       }
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Pay Rate</label>
+                      <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Pay Rate</label>
                       {editing ? (
                         <div className="flex gap-2">
                           <input type="number" value={draft.pay_rate || ''} onChange={e => set('pay_rate', e.target.value)} placeholder="0.00"
-                            className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
+                            className="flex-1 border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500" />
                           <select value={draft.pay_type || 'hourly'} onChange={e => set('pay_type', e.target.value)}
-                            className="border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-green-500">
+                            className="border border-gray-200 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:border-green-500">
                             <option value="hourly">hr</option>
                             <option value="salary">yr</option>
                           </select>
                         </div>
                       ) : (
-                        <p className="text-sm text-gray-800 py-2">
+                        <p className="text-sm text-gray-800 py-0.5">
                           {draft.pay_rate ? `$${Number(draft.pay_rate).toLocaleString()}/${draft.pay_type === 'salary' ? 'yr' : 'hr'}` : '—'}
                         </p>
                       )}
@@ -739,8 +739,8 @@ export default function EmployeeDetail() {
 
                 {/* Emergency Contact */}
                 <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Emergency Contact</p>
-                  <div className="grid grid-cols-2 gap-3">
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Emergency Contact</p>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
                     <Field label="Name" value={draft.emergency_contact_name} editing={editing} onChange={v => set('emergency_contact_name', v)} />
                     <Field label="Relationship" value={draft.emergency_contact_relation} editing={editing} onChange={v => set('emergency_contact_relation', v)} />
                     <div className="col-span-2">
@@ -751,10 +751,10 @@ export default function EmployeeDetail() {
 
                 {/* Notes */}
                 <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Notes</p>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Notes</p>
                   {editing
-                    ? <textarea value={draft.notes || ''} onChange={e => set('notes', e.target.value)} rows={3} placeholder="Internal notes…"
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500 resize-none" />
+                    ? <textarea value={draft.notes || ''} onChange={e => set('notes', e.target.value)} rows={2} placeholder="Internal notes…"
+                        className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500 resize-none" />
                     : <p className="text-sm text-gray-600 whitespace-pre-wrap">{draft.notes || <span className="text-gray-400 italic">No notes</span>}</p>
                   }
                 </div>
@@ -1361,11 +1361,11 @@ export default function EmployeeDetail() {
 function Field({ label, value, editing, onChange }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+      <label className="block text-[11px] font-medium text-gray-600 mb-0.5">{label}</label>
       {editing
         ? <input value={value || ''} onChange={e => onChange(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
-        : <p className="text-sm text-gray-800 py-2">{value || <span className="text-gray-400 italic">—</span>}</p>
+            className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500" />
+        : <p className="text-sm text-gray-800 py-0.5">{value || <span className="text-gray-400 italic">—</span>}</p>
       }
     </div>
   )
