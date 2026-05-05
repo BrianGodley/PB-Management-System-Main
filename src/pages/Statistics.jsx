@@ -7302,15 +7302,15 @@ export default function Statistics() {
               {/* Chart header: on mobile we let the row wrap so the stat name
                   drops onto its own line below the buttons; on desktop the
                   absolutely-centered layout still works. */}
-              <div className="relative flex flex-wrap items-center px-2 sm:px-6 py-1.5 bg-gray-100 border-b border-gray-200 flex-shrink-0 gap-y-1">
+              <div className="relative flex flex-wrap items-center px-1 sm:px-6 py-1.5 bg-gray-100 border-b border-gray-200 flex-shrink-0 gap-y-1">
                 {/* Left — back arrow (mobile only), print, share, auto min/max */}
                 <div className="flex-1 flex items-center gap-2">
                   <button
                     title="Back to stat list"
                     onClick={() => setSelectedId(null)}
-                    className="md:hidden px-2 py-0 rounded-lg hover:bg-gray-200 text-gray-900 font-black flex-shrink-0 leading-none"
+                    className="md:hidden px-0.5 py-0 rounded-lg hover:bg-gray-200 text-gray-900 font-black flex-shrink-0 leading-none"
                   >
-                    <span className="text-4xl leading-none font-black">‹</span>
+                    <span className="text-3xl leading-none font-black">‹</span>
                   </button>
                   <button title="Print" onClick={handlePrint} className="hidden sm:inline-flex p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-xl">🖨️</button>
                   <button title="Share" className="hidden sm:inline-flex p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-xl">🔗</button>
@@ -7353,12 +7353,10 @@ export default function Statistics() {
                   </div>
                 </div>
 
-                {/* Stat name — single-line on every viewport. min-w-0 +
-                    truncate keeps it from wrapping and clips with an ellipsis
-                    if a name is genuinely too long for the row. On mobile we
-                    drop to text-sm so ~25 chars fit between the back arrow
-                    and the up/down arrows. */}
-                <span className="md:absolute md:left-1/2 md:-translate-x-1/2 flex-1 md:flex-none min-w-0 text-center md:max-w-xs text-sm md:text-lg font-bold text-gray-800 truncate whitespace-nowrap px-1 md:px-0 pointer-events-none">
+                {/* Stat name — single-line on every viewport. text-[13px] +
+                    tracking-tight on mobile gives ~30 chars between the
+                    back arrow and the up/down arrows. md+ keeps text-lg. */}
+                <span className="md:absolute md:left-1/2 md:-translate-x-1/2 flex-1 md:flex-none min-w-0 text-center md:max-w-xs text-[13px] tracking-tight md:tracking-normal md:text-lg font-bold text-gray-800 truncate whitespace-nowrap px-1 md:px-0 pointer-events-none">
                   {selectedStat.name}
                 </span>
 
@@ -7401,14 +7399,14 @@ export default function Statistics() {
                     <button
                       onClick={() => goTo(-1)}
                       disabled={!hasPrev}
-                      className="px-1.5 sm:px-1 py-0.5 rounded text-blue-700 sm:text-blue-500 hover:bg-blue-50 disabled:opacity-30 text-3xl sm:text-xl font-black leading-none"
+                      className="px-0.5 sm:px-1 py-0.5 rounded text-blue-700 sm:text-blue-500 hover:bg-blue-50 disabled:opacity-30 text-2xl sm:text-xl font-black leading-none"
                     >
                       ⬆
                     </button>
                     <button
                       onClick={() => goTo(1)}
                       disabled={!hasNext}
-                      className="px-1.5 sm:px-1 py-0.5 rounded text-blue-700 sm:text-blue-500 hover:bg-blue-50 disabled:opacity-30 text-3xl sm:text-xl font-black leading-none"
+                      className="px-0.5 sm:px-1 py-0.5 rounded text-blue-700 sm:text-blue-500 hover:bg-blue-50 disabled:opacity-30 text-2xl sm:text-xl font-black leading-none"
                     >
                       ⬇
                     </button>
@@ -7420,6 +7418,29 @@ export default function Statistics() {
                 /* Period tabs + FROM/TO + chart style toggle */
                 <div className="flex items-center gap-2 py-2 px-3 bg-white border-b border-gray-100 flex-shrink-0 flex-wrap">
                   <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+                    {/* Show-values toggle ("V") — sits inside the period-tabs
+                        bar so it shares the same height. Click flips
+                        statistics.show_values for the currently selected stat. */}
+                    {selectedStat && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const next = !selectedStat.show_values
+                          // Optimistic update
+                          setStats(prev => prev.map(s => s.id === selectedStat.id ? { ...s, show_values: next } : s))
+                          await supabase.from('statistics').update({ show_values: next }).eq('id', selectedStat.id)
+                        }}
+                        title={selectedStat.show_values ? 'Hide values on chart' : 'Show values on chart'}
+                        className={`px-2.5 py-1.5 text-base font-black border-r border-gray-200 transition-colors ${
+                          selectedStat.show_values
+                            ? 'text-white'
+                            : 'text-gray-400 hover:bg-gray-50'
+                        }`}
+                        style={selectedStat.show_values ? { backgroundColor: FG } : {}}
+                      >
+                        V
+                      </button>
+                    )}
                     {['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Yearly'].map(p => {
                       const pid        = p.toLowerCase()
                       const nativeIdx  = PERIOD_ORDER.indexOf(selectedStat?.tracking ?? 'daily')
