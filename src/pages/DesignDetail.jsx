@@ -171,6 +171,22 @@ export default function DesignDetail() {
     return { ppu: px / s.known_distance, unit: s.unit }
   }, [annotations])
 
+  // Aggregate counts for the sidebar (must live above any conditional returns
+  // — Rules of Hooks: every render path must call the same hooks in the same
+  // order, so we can't put a useMemo after `if (loading) return …`.)
+  const totals = useMemo(() => {
+    const linears = annotations.filter(a => a.type === 'linear')
+    const areas   = annotations.filter(a => a.type === 'area')
+    const counts  = annotations.filter(a => a.type === 'count')
+    const linearTotal = linears.reduce((s, a) => s + polylineLengthPx(a.points), 0)
+    const areaTotal   = areas  .reduce((s, a) => s + polygonAreaPx(a.points), 0)
+    return {
+      linearCount: linears.length, linearTotal,
+      areaCount:   areas.length,   areaTotal,
+      countTotal:  counts.length,
+    }
+  }, [annotations])
+
   // ── Splitter drag ─────────────────────────────────────────────────────────
   useEffect(() => {
     function onMove(e) {
@@ -380,20 +396,6 @@ export default function DesignDetail() {
   )
 
   const selectedFile = files.find(f => f.id === selectedFileId) || null
-
-  // Aggregate counts for the sidebar
-  const totals = useMemo(() => {
-    const linears = annotations.filter(a => a.type === 'linear')
-    const areas   = annotations.filter(a => a.type === 'area')
-    const counts  = annotations.filter(a => a.type === 'count')
-    const linearTotal = linears.reduce((s, a) => s + polylineLengthPx(a.points), 0)
-    const areaTotal   = areas  .reduce((s, a) => s + polygonAreaPx(a.points), 0)
-    return {
-      linearCount: linears.length, linearTotal,
-      areaCount:   areas.length,   areaTotal,
-      countTotal:  counts.length,
-    }
-  }, [annotations])
 
   return (
     <div ref={containerRef} className="flex h-[calc(100vh-2.75rem)] -m-4 lg:-m-6 bg-gray-100 overflow-hidden">
