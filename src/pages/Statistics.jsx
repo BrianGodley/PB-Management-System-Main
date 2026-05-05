@@ -5806,6 +5806,22 @@ export default function Statistics() {
   const prevDisplayRef  = useRef([])   // frozen frame — last rendered displayChartData
   const chartPrintRef   = useRef(null) // ref to chart area for printing
 
+  // ── Mobile breakpoint (used to tighten Recharts chart margins/Y-axis on phones) ──
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches
+  )
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mq = window.matchMedia('(max-width: 639px)')
+    const handler = e => setIsMobile(e.matches)
+    if (mq.addEventListener) mq.addEventListener('change', handler)
+    else mq.addListener(handler)
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener('change', handler)
+      else mq.removeListener(handler)
+    }
+  }, [])
+
   // UI state
   const [viewMode,       setViewMode]       = useState('graphs')  // 'graphs'|'multiple-entry'|'print-multiple'|'comparison'|'import-export'|'archive'
   const [selectedId,     setSelectedId]     = useState(null)
@@ -6963,12 +6979,14 @@ export default function Statistics() {
       )}
 
       {/* ── COMBINED MODULE HEADER ───────────────────────────────────────── */}
-      <div className="flex items-center gap-2 px-6 pt-6 pb-4 bg-gray-50 border-b border-gray-200 flex-shrink-0">
-        <h1 className="text-xl font-bold text-gray-900 flex-shrink-0">Statistics</h1>
+      <div className="flex items-center gap-2 flex-wrap px-3 sm:px-6 pt-3 sm:pt-6 pb-2 sm:pb-4 bg-gray-50 border-b border-gray-200 flex-shrink-0">
+        <h1 className="text-base sm:text-xl font-bold text-gray-900 flex-shrink-0">Statistics</h1>
         {viewMode === 'graphs' && selectedStat && (
           <>
-            {/* Spacer sized to push edit links flush with the left-panel / right-panel divider */}
-            <div className="w-32 xl:w-40 flex-shrink-0" />
+            {/* Spacer pushes edit links flush with the left-panel / right-panel
+                divider on tablet+; on mobile we drop it so the buttons hug the
+                module title. */}
+            <div className="hidden md:block md:w-32 xl:w-40 flex-shrink-0" />
             {!['equation','overlay'].includes(selectedStat?.stat_category) && (
               <button
                 onClick={() => {
@@ -7176,8 +7194,10 @@ export default function Statistics() {
             </div>
           ) : (
             <>
-              {/* Chart header: print/share + auto min/max + nav */}
-              <div className="relative flex items-center px-3 sm:px-6 py-1.5 bg-gray-100 border-b border-gray-200 flex-shrink-0">
+              {/* Chart header: on mobile we let the row wrap so the stat name
+                  drops onto its own line below the buttons; on desktop the
+                  absolutely-centered layout still works. */}
+              <div className="relative flex flex-wrap items-center px-2 sm:px-6 py-1.5 bg-gray-100 border-b border-gray-200 flex-shrink-0 gap-y-1">
                 {/* Left — back arrow (mobile only), print, share, auto min/max */}
                 <div className="flex-1 flex items-center gap-2">
                   <button
@@ -7228,17 +7248,20 @@ export default function Statistics() {
                   </div>
                 </div>
 
-                {/* Center — absolutely centered so left/right content never shifts it */}
-                <span className="absolute left-1/2 -translate-x-1/2 text-lg font-bold text-gray-800 max-w-xs truncate text-center pointer-events-none">
+                {/* Stat name. On mobile this drops to its own row (full width,
+                    smaller text, left-aligned). On md+ it returns to the
+                    absolutely-centered position so the desktop header looks
+                    unchanged. */}
+                <span className="block md:absolute md:left-1/2 md:-translate-x-1/2 order-3 md:order-none basis-full md:basis-auto text-sm sm:text-base md:text-lg font-bold text-gray-800 md:max-w-xs truncate md:text-center px-1 md:px-0 pointer-events-none">
                   {selectedStat.name}
                 </span>
 
                 {/* Right — quick entry (hidden for equation stats) + arrows flush right */}
-                <div className="flex-1 flex items-center justify-end pr-2 gap-2">
+                <div className="flex-1 flex items-center justify-end pr-1 sm:pr-2 gap-1 sm:gap-2">
                   {!['equation','overlay'].includes(selectedStat?.stat_category) && (
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1 sm:gap-1.5">
                     <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white">
-                      <span className="w-36 flex-shrink-0 text-center px-2 text-xs text-gray-400 whitespace-nowrap border-r border-gray-200 bg-gray-50 py-1.5 select-none">
+                      <span className="w-20 sm:w-36 flex-shrink-0 text-center px-1 sm:px-2 text-[10px] sm:text-xs text-gray-400 whitespace-nowrap truncate border-r border-gray-200 bg-gray-50 py-1.5 select-none">
                         {quickPeriod.label}
                       </span>
                       <input
@@ -7247,7 +7270,7 @@ export default function Statistics() {
                         onChange={e => setQuickValue(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && handleQuickSave()}
                         placeholder="Value"
-                        className="w-20 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white"
+                        className="w-14 sm:w-20 px-1.5 sm:px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white"
                       />
                     </div>
                     <button
@@ -7366,8 +7389,10 @@ export default function Statistics() {
                 </div>
               )}
 
-              {/* Chart */}
-              <div ref={chartPrintRef} className="flex-1 px-4 py-4 overflow-hidden relative bg-white">
+              {/* Chart — minimal horizontal padding on mobile so the Y axis
+                  sits as close to the screen edge as possible without touching
+                  it. Desktop keeps the comfortable px-4 gutter. */}
+              <div ref={chartPrintRef} className="flex-1 px-1 sm:px-4 py-4 overflow-hidden relative bg-white">
 
                 {selectedStat.stat_category === 'overlay' ? (
                   /* ── Overlay chart ─────────────────────────────────────── */
@@ -7395,7 +7420,7 @@ export default function Statistics() {
                       </div>
                       <div className="flex-1 min-h-0">
                         <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={overlayChartData} margin={{ top: 10, right: 24, left: 16, bottom: 20 }}>
+                          <LineChart data={overlayChartData} margin={{ top: 10, right: isMobile ? 6 : 24, left: isMobile ? -8 : 16, bottom: 20 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                             <XAxis
                               dataKey="label"
@@ -7420,7 +7445,7 @@ export default function Statistics() {
                                   if (selectedStat.stat_type === 'percentage') return v + '%'
                                   return Number(v).toLocaleString()
                                 }}
-                                width={72}
+                                width={isMobile ? 44 : 72}
                               />
                             ))}
                             <Tooltip
@@ -7482,9 +7507,10 @@ export default function Statistics() {
                   ) : chartStyle === 'bar' ? (
                     /* ── Bar chart mode ──────────────────────────────────── */
                     <ResponsiveContainer width="100%" height="100%">
+                      {/* margin/YAxis width shrink on mobile so the chart hugs the screen edge */}
                       <BarChart
                         data={chartDataWithTargets}
-                        margin={{ top: 28, right: 24, left: 16, bottom: 20 }}
+                        margin={{ top: 28, right: isMobile ? 6 : 24, left: isMobile ? -8 : 16, bottom: 20 }}
                         onClick={(chartEvent) => {
                           const pt = chartEvent?.activePayload?.[0]?.payload
                           if (pt?.date) openNoteModal(pt.date, pt.label)
@@ -7511,7 +7537,7 @@ export default function Statistics() {
                             if (selectedStat.stat_type === 'percentage') return v + '%'
                             return Number(v).toLocaleString()
                           }}
-                          width={80}
+                          width={isMobile ? 48 : 80}
                         />
                         <Tooltip
                           cursor={{ fill: 'rgba(0,0,0,0.04)' }}
@@ -7588,7 +7614,7 @@ export default function Statistics() {
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart
                         data={chartDataWithTargets}
-                        margin={{ top: 28, right: 24, left: 16, bottom: 20 }}
+                        margin={{ top: 28, right: isMobile ? 6 : 24, left: isMobile ? -8 : 16, bottom: 20 }}
                         onClick={(chartEvent) => {
                           const pt = chartEvent?.activePayload?.[0]?.payload
                           if (pt?.date) openNoteModal(pt.date, pt.label)
@@ -7615,7 +7641,7 @@ export default function Statistics() {
                             if (selectedStat.stat_type === 'percentage')  return v + '%'
                             return Number(v).toLocaleString()
                           }}
-                          width={80}
+                          width={isMobile ? 48 : 80}
                         />
                         <Tooltip
                           cursor={<GraphCursor stat={selectedStat} chartData={displayChartData} />}
