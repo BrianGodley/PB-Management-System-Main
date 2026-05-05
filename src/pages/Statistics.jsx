@@ -5395,34 +5395,8 @@ function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, p
   const [saving,   setSaving]   = useState(false)
   const [msg,      setMsg]      = useState(null)
 
-  // View Data state
-  const [viewSearch,    setViewSearch]    = useState('')
-  const [viewLoading,   setViewLoading]   = useState(false)
-  const [viewData,      setViewData]      = useState(null)  // Map: statId → { stat, values }
-  const [expandedStats, setExpandedStats] = useState(new Set())
-
-  const activeStats = (stats || []).filter(s => !s.archived)
-
   // Keep local state in sync if parent changes
   useEffect(() => { if (weekEndingDay !== null) setWedDay(weekEndingDay) }, [weekEndingDay])
-
-  // Load view data when General tab is selected
-  useEffect(() => { if (settingsSubTab === 'general') loadViewData() }, [settingsSubTab])
-
-  async function loadViewData() {
-    setViewLoading(true)
-    const { data: vals } = await supabase
-      .from('statistic_values')
-      .select('statistic_id, period_date, value')
-      .order('period_date', { ascending: false })
-    const map = new Map()
-    for (const stat of activeStats) map.set(stat.id, { stat, values: [] })
-    for (const v of (vals || [])) {
-      if (map.has(v.statistic_id)) map.get(v.statistic_id).values.push(v)
-    }
-    setViewData(map)
-    setViewLoading(false)
-  }
 
   async function handleSave() {
     setSaving(true); setMsg(null)
@@ -5593,105 +5567,6 @@ function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, p
               </div>
             )}
 
-            {/* View All Stat Data */}
-            <div className="mt-6">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <h3 className="font-semibold text-gray-800">View All Stat Data</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {activeStats.length} stat{activeStats.length !== 1 ? 's' : ''} · click any row to expand its values
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    placeholder="Search…"
-                    value={viewSearch}
-                    onChange={e => setViewSearch(e.target.value)}
-                    className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 w-40"
-                  />
-                  <button
-                    onClick={() => { setViewData(null); setExpandedStats(new Set()); loadViewData() }}
-                    className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1.5 rounded border border-gray-200 hover:border-gray-300 transition-colors"
-                  >↻</button>
-                </div>
-              </div>
-
-              {viewLoading ? (
-                <div className="flex items-center justify-center py-10">
-                  <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-green-700"></div>
-                </div>
-              ) : (
-                <div className="card p-0 overflow-hidden">
-                  {activeStats.length === 0 ? (
-                    <p className="px-5 py-8 text-center text-gray-400 text-sm">No statistics found.</p>
-                  ) : (() => {
-                    const filtered = activeStats.filter(s =>
-                      !viewSearch || s.name.toLowerCase().includes(viewSearch.toLowerCase())
-                    )
-                    if (filtered.length === 0) return (
-                      <p className="px-5 py-8 text-center text-gray-400 text-sm">No stats match "{viewSearch}".</p>
-                    )
-                    return (
-                      <div className="divide-y divide-gray-100">
-                        {filtered.map(s => {
-                          const entry    = viewData?.get(s.id)
-                          const vals     = entry?.values || []
-                          const expanded = expandedStats.has(s.id)
-                          const oldest   = vals.length ? vals[vals.length - 1].period_date : null
-                          const newest   = vals.length ? vals[0].period_date : null
-                          return (
-                            <div key={s.id}>
-                              <button
-                                onClick={() => setExpandedStats(prev => {
-                                  const n = new Set(prev); n.has(s.id) ? n.delete(s.id) : n.add(s.id); return n
-                                })}
-                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left transition-colors"
-                              >
-                                <span className="text-gray-400 text-xs w-3 flex-shrink-0">{expanded ? '▾' : '▸'}</span>
-                                <span className="flex-1 text-sm font-semibold text-gray-800">{s.name}</span>
-                                <span className="text-xs text-gray-400 capitalize w-20 text-center">{s.tracking}</span>
-                                <span className="text-xs text-gray-400 capitalize w-20 text-center">{s.stat_type}</span>
-                                <span className="text-xs text-gray-500 font-medium w-16 text-right">
-                                  {viewData ? `${vals.length} val${vals.length !== 1 ? 's' : ''}` : '…'}
-                                </span>
-                                <span className="text-xs text-gray-400 w-44 text-right">
-                                  {vals.length > 0 ? (oldest === newest ? oldest : `${oldest} → ${newest}`) : '—'}
-                                </span>
-                              </button>
-                              {expanded && (
-                                <div className="border-t border-gray-100 bg-gray-50/60">
-                                  {vals.length === 0 ? (
-                                    <p className="px-10 py-3 text-xs text-gray-400 italic">No values recorded yet.</p>
-                                  ) : (
-                                    <table className="w-full text-sm">
-                                      <thead>
-                                        <tr className="border-b border-gray-200">
-                                          <th className="text-left px-10 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Date</th>
-                                          <th className="text-right px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Value</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody className="divide-y divide-gray-100">
-                                        {vals.map((v, i) => (
-                                          <tr key={i} className="hover:bg-white">
-                                            <td className="px-10 py-2 text-gray-600 font-mono text-xs">{v.period_date}</td>
-                                            <td className="px-4 py-2 text-right font-medium text-gray-800 text-xs">{fmt(v.value, s.stat_type)}</td>
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )
-                  })()}
-                </div>
-              )}
-            </div>
           </>
         )}
 
