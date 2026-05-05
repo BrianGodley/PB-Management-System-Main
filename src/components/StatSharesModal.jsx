@@ -39,6 +39,11 @@ export default function StatSharesModal({ statId, statName, ownerUserId, onClose
   const [saving,     setSaving]     = useState(false)
   const [error,      setError]      = useState('')
   const [search,     setSearch]     = useState('')
+  // Owner discovered from the DB (or seeded from the prop). The DB lookup is
+  // the source of truth — it avoids a long-standing footgun where the parent
+  // didn't have the stat's real owner and accidentally fell back to the
+  // current user, which then hid the current user from the share list.
+  const [resolvedOwnerId, setResolvedOwnerId] = useState(ownerUserId || null)
 
   // ── Load employees with auth accounts + existing shares ───────────────────
   useEffect(() => {
@@ -53,19 +58,29 @@ export default function StatSharesModal({ statId, statName, ownerUserId, onClose
           .order('last_name', { ascending: true })
         if (empErr) throw empErr
 
-        // DB mode (we have a statId) → fetch existing share rows.
+        // DB mode (we have a statId) → fetch existing share rows + the
+        // stat's authoritative owner_user_id.
         // Local mode (no statId — new-stat creation) → seed from initialShares
-        // and skip the DB read entirely.
+        // and skip the DB reads entirely.
         let sharesMap = {}
         if (statId) {
-          const { data: shareData, error: shareErr } = await supabase
-            .from('statistic_shares')
-            .select('user_id, permission')
-            .eq('statistic_id', statId)
+          const [{ data: shareData, error: shareErr }, { data: statRow, error: statErr }] = await Promise.all([
+            supabase
+              .from('statistic_shares')
+              .select('user_id, permission')
+              .eq('statistic_id', statId),
+            supabase
+              .from('statistics')
+              .select('owner_user_id')
+              .eq('id', statId)
+              .maybeSingle(),
+          ])
           if (shareErr) throw shareErr
+          if (statErr) throw statErr
           for (const row of (shareData || [])) {
             sharesMap[row.user_id] = row.permission
           }
+          if (statRow?.owner_user_id) setResolvedOwnerId(statRow.owner_user_id)
         } else {
           sharesMap = { ...(initialShares || {}) }
         }
@@ -220,10 +235,12 @@ export default function StatSharesModal({ statId, statName, ownerUserId, onClose
     return false
   }, [shares, original])
 
-  // Owner is implicit — exclude them so we don't show a meaningless row
+  // Owner is implicit — exclude them so we don't show a meaningless row.
+  // Use the DB-resolved owner first; fall back to the prop only when the DB
+  // lookup hasn't completed yet (or in local-mode for a not-yet-saved stat).
   const visibleEmployees = useMemo(
-    () => filtered.filter(e => e.user_id !== ownerUserId),
-    [filtered, ownerUserId]
+    () => filtered.filter(e => e.user_id !== (resolvedOwnerId || ownerUserId)),
+    [filtered, resolvedOwnerId, ownerUserId]
   )
 
   // ── Render ───────────────────────────────────────────────────────────────
