@@ -137,16 +137,23 @@ function polygonCentroid(pts) {
   for (const [x, y] of pts) { cx += x; cy += y }
   return [cx / pts.length, cy / pts.length]
 }
+// Construction-industry abbreviations:
+//   linear ft → LF, area ft → SQFT, count → EA, etc.
+const LINEAR_SUFFIX = { ft: 'LF', in: 'in',  m: 'm',  cm: 'cm' }
+const AREA_SUFFIX   = { ft: 'SQFT', in: 'SQIN', m: 'SQM', cm: 'SQCM' }
+
 function fmtLen(px, ppu, unit) {
-  if (!ppu) return px.toFixed(0) + ' px'
+  if (!ppu) return px.toFixed(2) + ' px'
   const v = px / ppu
-  return v.toFixed(v < 10 ? 2 : 1) + ' ' + unit
+  return v.toFixed(2) + ' ' + (LINEAR_SUFFIX[unit] || unit)
 }
 function fmtArea(pxSq, ppu, unit) {
-  if (!ppu) return pxSq.toFixed(0) + ' px²'
+  if (!ppu) return pxSq.toFixed(2) + ' px²'
   const v = pxSq / (ppu * ppu)
-  return v.toFixed(v < 10 ? 2 : 1) + ' sq ' + unit
+  return v.toFixed(2) + ' ' + (AREA_SUFFIX[unit] || ('sq ' + unit))
 }
+// Whole-number count formatter — "21 EA"
+function fmtCount(n) { return `${n} EA` }
 
 export default function DesignDetail() {
   const { id } = useParams()
@@ -715,7 +722,7 @@ export default function DesignDetail() {
               <div className="text-xs text-gray-700 space-y-1">
                 <p>📐 Linear: <strong>{totals.linearCount}</strong> ({fmtLen(totals.linearTotal, pageScale?.ppu, pageScale?.unit || '')})</p>
                 <p>⬛ Area: <strong>{totals.areaCount}</strong> ({fmtArea(totals.areaTotal, pageScale?.ppu, pageScale?.unit || '')})</p>
-                <p>🎯 Count: <strong>{totals.countTotal}</strong></p>
+                <p>🎯 Count: <strong>{totals.countTotal}</strong> ({fmtCount(totals.countTotal)})</p>
               </div>
             </div>
 
@@ -732,7 +739,7 @@ export default function DesignDetail() {
                 const total =
                   it.type === 'linear' ? fmtLen(itemAnns.reduce((s, a) => s + polylineLengthPx(a.points), 0), pageScale?.ppu, pageScale?.unit || '')
                 : it.type === 'area'   ? fmtArea(itemAnns.reduce((s, a) => s + polygonAreaPx(a.points), 0), pageScale?.ppu, pageScale?.unit || '')
-                : `${itemAnns.length} count${itemAnns.length === 1 ? '' : 's'}`
+                : fmtCount(itemAnns.length)
                 const isActive = it.id === activeItemId
                 const isExpanded = editingItemId === it.id
                 return (
@@ -1338,11 +1345,4 @@ function DrawingPreview({ drawing, hover, zoom, color, pageScale }) {
     const d = allPts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0]} ${p[1]}`).join(' ')
     return (
       <g pointerEvents="none">
-        <path d={d} fill={color} fillOpacity={0.15} stroke={color} strokeWidth={2} strokeDasharray="6 4" />
-        {pts.map((p, i) => (<circle key={i} cx={p[0]} cy={p[1]} r={4} fill={color} stroke="#fff" strokeWidth={1.5} />))}
-      </g>
-    )
-  }
-
-  return null
-}
+        <path d={d} fill={c
