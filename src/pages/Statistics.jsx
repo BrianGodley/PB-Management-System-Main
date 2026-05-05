@@ -5431,11 +5431,23 @@ function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, p
     return p?.full_name || (p?.email ? p.email.split('@')[0] : '—')
   }
 
-  // Sorted list of every stat for the Master table — newest first by id.
-  const masterStats = useMemo(
-    () => [...(stats || [])].sort((a, b) => (b.id || 0) - (a.id || 0)),
-    [stats]
+  // Master tab: split stats into Current (active) and Archive lists, each
+  // sorted alphanumerically by name (case-insensitive, "natural" comparison
+  // so e.g. "Stat 2" sorts before "Stat 10").
+  const [masterSubTab, setMasterSubTab] = useState('current') // 'current' | 'archive'
+  const masterCollator = useMemo(
+    () => new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' }),
+    []
   )
+  const masterCurrent = useMemo(
+    () => (stats || []).filter(s => !s.archived).sort((a, b) => masterCollator.compare(a.name || '', b.name || '')),
+    [stats, masterCollator]
+  )
+  const masterArchive = useMemo(
+    () => (stats || []).filter(s =>  s.archived).sort((a, b) => masterCollator.compare(a.name || '', b.name || '')),
+    [stats, masterCollator]
+  )
+  const masterStats = masterSubTab === 'archive' ? masterArchive : masterCurrent
 
   return (
     <div className="flex-1 overflow-y-auto bg-gray-50">
@@ -5578,6 +5590,25 @@ function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, p
         {/* ── MASTER SUB-TAB — admin-only listing of every stat ── */}
         {settingsSubTab === 'master' && isAdmin && (
           <div className="p-6">
+            {/* Current / Archive switch */}
+            <div className="flex items-center gap-2 mb-4">
+              {[
+                { key: 'current', label: `Current (${masterCurrent.length})` },
+                { key: 'archive', label: `Archive (${masterArchive.length})` },
+              ].map(t => (
+                <button
+                  key={t.key}
+                  onClick={() => setMasterSubTab(t.key)}
+                  className={`px-4 py-1.5 text-sm font-medium rounded-lg border-2 transition-colors ${
+                    masterSubTab === t.key
+                      ? 'bg-green-700 text-white border-green-700'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-green-500'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
             {/* Table is 30% wider than the container — horizontal scroll
                 kicks in on narrower viewports thanks to overflow-x-auto. */}
             <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
@@ -5595,7 +5626,9 @@ function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, p
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {masterStats.length === 0 && (
-                    <tr><td colSpan={5} className="text-center py-12 text-gray-400">No statistics defined.</td></tr>
+                    <tr><td colSpan={5} className="text-center py-12 text-gray-400">
+                      {masterSubTab === 'archive' ? 'No archived statistics.' : 'No statistics defined.'}
+                    </td></tr>
                   )}
                   {masterStats.map(s => (
                     <tr
@@ -5629,7 +5662,7 @@ function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, p
               </table>
             </div>
             <p className="text-xs text-gray-400 mt-3">
-              Showing {masterStats.length} statistic{masterStats.length === 1 ? '' : 's'}. Click any row to open its edit modal.
+              Showing {masterStats.length} {masterSubTab === 'archive' ? 'archived' : 'current'} statistic{masterStats.length === 1 ? '' : 's'}, sorted alphabetically. Click any row to open its edit modal.
             </p>
           </div>
         )}
