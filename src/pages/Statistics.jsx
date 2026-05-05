@@ -6980,7 +6980,11 @@ export default function Statistics() {
   )
 
   return (
-    <div className="h-[calc(100vh-2.75rem)] -m-4 lg:-m-6 flex flex-col overflow-hidden bg-gray-100">
+    /* Use 100dvh on mobile so the visible viewport height tracks Safari\'s
+       URL-bar collapse — without this the bottom nav dock appears to shift
+       when scrolling. lg+ sticks with 100vh since desktop browsers don\'t
+       have the same dynamic-viewport behavior. */
+    <div className="h-[calc(100dvh-2.75rem)] lg:h-[calc(100vh-2.75rem)] -m-4 lg:-m-6 flex flex-col overflow-hidden bg-gray-100">
 
       {/* ── MODE TABS — portalled into the green app header bar ─── */}
       {/* On phones we drop the verbose labels so all six tabs fit; the icons

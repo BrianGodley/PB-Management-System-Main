@@ -413,10 +413,10 @@ export default function SubsVendors() {
               </button>
             ))}
           </div>
-          {/* Import */}
+          {/* Import — hidden on mobile (admin tool, lives in desktop nav) */}
           <button
             onClick={() => importFileRef.current?.click()}
-            className="text-sm px-3 py-1.5 flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+            className="hidden sm:flex text-sm px-3 py-1.5 items-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -425,10 +425,10 @@ export default function SubsVendors() {
           </button>
           <input ref={importFileRef} type="file" accept=".xlsx" className="hidden" onChange={handleImportFile} />
 
-          {/* Export */}
+          {/* Export — hidden on mobile */}
           <button
             onClick={exportXLSX}
-            className="text-sm px-3 py-1.5 flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+            className="hidden sm:flex text-sm px-3 py-1.5 items-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -436,10 +436,11 @@ export default function SubsVendors() {
             Export
           </button>
 
-          {/* Add */}
+          {/* Add — desktop header version (mobile uses the full-width
+              button below the type toggle) */}
           <button
             onClick={openNew}
-            className="btn-primary text-sm px-3 py-1.5 flex items-center gap-1.5 whitespace-nowrap"
+            className="hidden sm:flex btn-primary text-sm px-3 py-1.5 items-center gap-1.5 whitespace-nowrap"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -460,16 +461,17 @@ export default function SubsVendors() {
         />
       </div>
 
-      {/* ── Type toggle ──────────────────────────────────────── */}
-      <div className="flex items-center gap-2 mb-4 flex-shrink-0">
-        {/* Spacer */}
-        <div className="flex-1" />
+      {/* ── Type toggle ────────────────────────────────────────
+          On mobile the toggle stretches edge-to-edge (each button 50%) so
+          it\'s an obvious primary control. On tablet+ it sits right-aligned
+          like before. */}
+      <div className="flex items-center gap-2 mb-3 flex-shrink-0">
+        <div className="hidden sm:block flex-1" />
 
-        {/* Type toggle — right-aligned */}
-        <div className="flex-shrink-0 flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+        <div className="w-full sm:w-auto flex-shrink-0 flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
           <button
             onClick={() => { setTypeView('sub'); setFilter('all') }}
-            className={`px-4 py-1.5 text-xs font-semibold transition-colors ${
+            className={`flex-1 sm:flex-none px-4 py-2 sm:py-1.5 text-sm sm:text-xs font-semibold transition-colors ${
               typeView === 'sub'
                 ? 'bg-green-700 text-white'
                 : 'bg-white text-gray-500 hover:bg-gray-50'
@@ -479,7 +481,7 @@ export default function SubsVendors() {
           </button>
           <button
             onClick={() => { setTypeView('vendor'); setFilter('all') }}
-            className={`px-4 py-1.5 text-xs font-semibold border-l border-gray-200 transition-colors ${
+            className={`flex-1 sm:flex-none px-4 py-2 sm:py-1.5 text-sm sm:text-xs font-semibold border-l border-gray-200 transition-colors ${
               typeView === 'vendor'
                 ? 'bg-green-700 text-white'
                 : 'bg-white text-gray-500 hover:bg-gray-50'
@@ -489,6 +491,18 @@ export default function SubsVendors() {
           </button>
         </div>
       </div>
+
+      {/* Mobile-only full-width Add button. Sits directly under the type
+          toggle so the primary action follows the type the user just picked. */}
+      <button
+        onClick={openNew}
+        className="sm:hidden btn-primary w-full mb-4 py-2.5 text-sm font-semibold flex-shrink-0 flex items-center justify-center gap-2"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+        </svg>
+        + Add {typeView === 'sub' ? 'Subcontractor' : 'Vendor'}
+      </button>
 
       {loading ? (
         <div className="flex justify-center py-16">
