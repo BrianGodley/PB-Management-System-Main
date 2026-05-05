@@ -180,6 +180,9 @@ export default function DesignDetail() {
 
   const [sidebarWidth,   setSidebarWidth]   = useState(280)
   const [dropping,       setDropping]       = useState(false)
+  // Top-level Design tabs. The existing CAD-takeoff UI lives under "takeoffs"
+  // (the third tab); the first two tabs are placeholders for now.
+  const [activeTab,      setActiveTab]      = useState('cad') // 'cad' | 'selections' | 'takeoffs'
 
   // Drawing
   const [tool,           setTool]           = useState('pointer')
@@ -648,8 +651,60 @@ export default function DesignDetail() {
 
   const selectedFile = files.find(f => f.id === selectedFileId) || null
 
+  const TABS = [
+    { id: 'cad',        label: 'CAD Assist Drawing' },
+    { id: 'selections', label: 'Selections' },
+    { id: 'takeoffs',   label: 'Take Offs' },
+  ]
+
   return (
-    <div ref={containerRef} className="flex h-[calc(100vh-2.75rem)] -m-4 lg:-m-6 bg-gray-100 overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-2.75rem)] -m-4 lg:-m-6 bg-gray-100 overflow-hidden">
+
+      {/* ── Top tab bar ──────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2 px-4 bg-white border-b border-gray-200 flex-shrink-0">
+        <Link to="/design" className="text-xs text-green-700 hover:underline mr-3 flex-shrink-0">← All Projects</Link>
+        <h1 className="text-sm font-semibold text-gray-800 truncate max-w-xs flex-shrink-0" title={project.name}>{project.name}</h1>
+        <div className="w-px h-5 bg-gray-200 mx-1 flex-shrink-0" />
+        {TABS.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setActiveTab(t.id)}
+            className={`px-3 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+              activeTab === t.id
+                ? 'border-green-700 text-green-800'
+                : 'border-transparent text-gray-500 hover:text-gray-800'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── CAD Assist Drawing tab (placeholder) ─────────────────────────── */}
+      {activeTab === 'cad' && (
+        <div className="flex-1 overflow-y-auto p-8">
+          <div className="max-w-2xl mx-auto bg-white border border-gray-200 rounded-2xl p-8 text-center">
+            <p className="text-3xl mb-2">🛠️</p>
+            <h2 className="text-base font-semibold text-gray-800 mb-1">CAD Assist Drawing</h2>
+            <p className="text-sm text-gray-500">Coming soon — AI-assisted drawing tools will live here.</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Selections tab (placeholder) ─────────────────────────────────── */}
+      {activeTab === 'selections' && (
+        <div className="flex-1 overflow-y-auto p-8">
+          <div className="max-w-2xl mx-auto bg-white border border-gray-200 rounded-2xl p-8 text-center">
+            <p className="text-3xl mb-2">🎨</p>
+            <h2 className="text-base font-semibold text-gray-800 mb-1">Selections</h2>
+            <p className="text-sm text-gray-500">Coming soon — track plant, hardscape, and material selections per project.</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Take Offs tab — the existing CAD-takeoff workspace ───────────── */}
+      {activeTab === 'takeoffs' && (
+      <div ref={containerRef} className="flex flex-1 overflow-hidden">
 
       {/* ── Sidebar ──────────────────────────────────────────────────────── */}
       <aside style={{ width: sidebarWidth }} className="flex flex-col bg-white border-r border-gray-200 overflow-hidden flex-shrink-0">
@@ -1190,6 +1245,8 @@ export default function DesignDetail() {
             </div>
           </div>
         </div>
+      )}
+      </div>
       )}
     </div>
   )
