@@ -1188,14 +1188,11 @@ function EditValueHistoryModal({ stat, fromDate, values, onClose, onRefresh, wee
         </div>
 
         {/* ── Footer ──────────────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between px-6 py-3 border-t border-gray-200 flex-shrink-0">
+        {/* Close button removed — header has Save + Close. Footer is now an info strip only. */}
+        <div className="flex items-center px-6 py-3 border-t border-gray-200 flex-shrink-0">
           <span className="text-xs text-gray-400 capitalize">
             {stat.tracking} · {fromDate} → {today()} · {Object.values(valueByPeriod).length} of {periods.length} entered
           </span>
-          <button onClick={onClose}
-            className="px-5 py-2 rounded-lg text-sm font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200">
-            Close
-          </button>
         </div>
       </div>
     </div>
