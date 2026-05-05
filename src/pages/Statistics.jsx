@@ -978,7 +978,6 @@ const TH_BLUE    = '#c5d5e8'
 
 function EditValueHistoryModal({ stat, fromDate, values, onClose, onRefresh, weekEndingDay }) {
   const { user }     = useAuth()
-  const [isEditing,  setIsEditing]  = useState(false)
   const [drafts,     setDrafts]     = useState({})  // periodDate → string
   const [saving,     setSaving]     = useState(false)
   const [saveErr,    setSaveErr]    = useState('')
@@ -999,14 +998,29 @@ function EditValueHistoryModal({ stat, fromDate, values, onClose, onRefresh, wee
     return map
   }, [periods, values, stat.tracking, weekEndingDay])
 
-  // Initialise / reset drafts whenever periods change (= modal open / range change)
+  // Initialise / reset drafts whenever periods change (= modal open / range change).
+  // The table is always in edit mode now — no isEditing toggle.
   useEffect(() => {
     const d = {}
     periods.forEach(p => { d[p] = valueByPeriod[p]?.value?.toString() ?? '' })
     setDrafts(d)
-    setIsEditing(false)
     setSaveErr('')
   }, [periods])   // intentionally NOT on valueByPeriod to avoid resetting mid-edit
+
+  // Dirty = any draft differs from the original DB value for that period
+  const isDirty = useMemo(() => {
+    for (const p of periods) {
+      const draft = (drafts[p] ?? '').trim()
+      const orig  = valueByPeriod[p]?.value?.toString() ?? ''
+      if (draft !== orig) return true
+    }
+    return false
+  }, [drafts, periods, valueByPeriod])
+
+  function handleClose() {
+    if (isDirty && !window.confirm('Leave without saving? Your edits will be lost.')) return
+    onClose()
+  }
 
   // ── Group periods for display ──────────────────────────────────────────────
   // weekly / daily  → group by month  ("January 2026")
@@ -1086,16 +1100,7 @@ function EditValueHistoryModal({ stat, fromDate, values, onClose, onRefresh, wee
     }
 
     setSaving(false)
-    setIsEditing(false)
     await onRefresh()
-  }
-
-  const handleCancel = () => {
-    const d = {}
-    periods.forEach(p => { d[p] = valueByPeriod[p]?.value?.toString() ?? '' })
-    setDrafts(d)
-    setIsEditing(false)
-    setSaveErr('')
   }
 
   // Grid columns: 2 for weekly/daily (matches screenshot), 2 for monthly/quarterly, 1 for yearly
@@ -1112,33 +1117,20 @@ function EditValueHistoryModal({ stat, fromDate, values, onClose, onRefresh, wee
              style={{ backgroundColor: MODAL_BLUE }}>
           <h2 className="text-base font-semibold text-white truncate mr-4">{stat.name}</h2>
           <div className="flex items-center gap-2 flex-shrink-0">
-            {!isEditing ? (
-              <button
-                onClick={() => setIsEditing(true)}
-                className="px-4 py-1.5 rounded text-sm font-bold bg-white hover:bg-gray-100 transition-colors"
-                style={{ color: MODAL_BLUE }}
-              >
-                Edit
-              </button>
-            ) : (
-              <>
-                <button
-                  onClick={handleCancel}
-                  className="px-3 py-1.5 rounded text-sm font-medium text-white border border-white/40 hover:bg-white/10 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="px-4 py-1.5 rounded text-sm font-bold bg-white hover:bg-gray-100 disabled:opacity-50 transition-colors"
-                  style={{ color: MODAL_BLUE }}
-                >
-                  {saving ? 'Saving…' : 'Save'}
-                </button>
-              </>
-            )}
-            <button onClick={onClose} className="text-white/70 hover:text-white text-lg leading-none ml-1">✕</button>
+            <button
+              onClick={handleSave}
+              disabled={saving || !isDirty}
+              className="px-4 py-1.5 rounded text-sm font-bold bg-white hover:bg-gray-100 disabled:opacity-50 transition-colors"
+              style={{ color: MODAL_BLUE }}
+            >
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            <button
+              onClick={handleClose}
+              className="px-4 py-1.5 rounded text-sm font-bold text-white border border-white/40 hover:bg-white/10 transition-colors"
+            >
+              Close
+            </button>
           </div>
         </div>
 
@@ -1176,19 +1168,13 @@ function EditValueHistoryModal({ stat, fromDate, values, onClose, onRefresh, wee
                           <tr key={p}>
                             <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">{rowLabel(p)}</td>
                             <td className="px-3 py-1">
-                              {isEditing ? (
-                                <input
-                                  type="number"
-                                  value={drafts[p] ?? ''}
-                                  onChange={e => setDrafts(d => ({ ...d, [p]: e.target.value }))}
-                                  placeholder="—"
-                                  className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-                                />
-                              ) : (
-                                <span className={hasVal ? 'text-gray-900 font-medium' : 'text-gray-400 italic text-xs'}>
-                                  {hasVal ? fmt(Number(drafts[p]), stat.stat_type) : 'Not Entered'}
-                                </span>
-                              )}
+                              <input
+                                type="number"
+                                value={drafts[p] ?? ''}
+                                onChange={e => setDrafts(d => ({ ...d, [p]: e.target.value }))}
+                                placeholder="—"
+                                className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                              />
                             </td>
                           </tr>
                         )
@@ -5405,7 +5391,7 @@ const WEEK_DAYS = [
   { value: 6, label: 'Saturday'  },
 ]
 
-function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, profiles, isAdmin, onEditStat }) {
+function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, profiles, isAdmin, onEditStat, showStatArchiveFolder, onShowStatArchiveFolderChange }) {
   const [settingsSubTab, setSettingsSubTab] = useState('tracking')
 
   const [wedDay,   setWedDay]   = useState(weekEndingDay ?? 5)
@@ -5580,6 +5566,35 @@ function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, p
                 <p><strong>Inverted (↕)</strong> — reverses the good/bad color coding on the chart. Useful for stats where a lower number is better (e.g. defect rate, days overdue).</p>
               </div>
             </div>
+
+            {/* Sidebar archive folder toggle (admin-only) */}
+            {isAdmin && (
+              <div className="card mb-6">
+                <h3 className="font-semibold text-gray-800 mb-1">Statistics Sidebar Folders</h3>
+                <p className="text-xs text-gray-400 mb-3">
+                  When ON, the left sidebar shows two folder buttons (<strong>All Stats</strong> + <strong>Archived</strong>).
+                  When OFF, archived stats are hidden and the sidebar shows a single flat list — no folder buttons at all.
+                </p>
+                <label className="flex items-center gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={!!showStatArchiveFolder}
+                    onChange={async (e) => {
+                      const v = e.target.checked
+                      onShowStatArchiveFolderChange?.(v)
+                      const { data: row } = await supabase.from('company_settings').select('id').single()
+                      if (row?.id) {
+                        await supabase.from('company_settings')
+                          .update({ show_stat_archive_folder: v, updated_at: new Date().toISOString() })
+                          .eq('id', row.id)
+                      }
+                    }}
+                    className="w-4 h-4 rounded accent-green-700"
+                  />
+                  <span className="text-sm text-gray-700">Show <strong>Archived</strong> folder in the stats sidebar</span>
+                </label>
+              </div>
+            )}
 
             {/* View All Stat Data */}
             <div className="mt-6">
@@ -5902,7 +5917,10 @@ export default function Statistics() {
   const [quickSaveMsg, setQuickSaveMsg] = useState('')
 
   // Company settings
-  const [weekEndingDay, setWeekEndingDay] = useState(null)  // null = not configured, 0-6 = day
+  const [weekEndingDay, setWeekEndingDay] = useState(null)
+  // Whether to show "All Stats" / "Archived" folder buttons in the sidebar.
+  // Loaded from company_settings.show_stat_archive_folder; admin can toggle in Settings → General.
+  const [showStatArchiveFolder, setShowStatArchiveFolder] = useState(true)  // null = not configured, 0-6 = day
 
   // Modal state
   const [showTypeSelector,    setShowTypeSelector]    = useState(false)
@@ -5956,16 +5974,18 @@ export default function Statistics() {
     const [profRes, stsRes, settingsRes] = await Promise.all([
       supabase.from('profiles').select('id, email, full_name, role').order('full_name'),
       supabase.from('statistics').select('*').order('sort_order', { ascending: true }).order('name'),
-      supabase.from('company_settings').select('week_ending_day').maybeSingle(),
+      supabase.from('company_settings').select('week_ending_day, show_stat_archive_folder').maybeSingle(),
     ])
     console.log('[Statistics] fetchAll — stats result:', stsRes.data?.length ?? 'null', 'error:', stsRes.error)
     if (profRes.error) console.error('[Statistics] profiles error:', profRes.error)
     if (stsRes.error) console.error('[Statistics] statistics error:', stsRes.error)
     const freshStats = stsRes.data || []
     const freshWed   = settingsRes.data?.week_ending_day ?? null
+    const freshArc   = settingsRes.data?.show_stat_archive_folder
     setProfiles(profRes.data || [])
     setStats(freshStats)
     setWeekEndingDay(freshWed)
+    if (freshArc !== null && freshArc !== undefined) setShowStatArchiveFolder(!!freshArc)
     setLoading(false)
     // Return fresh data so callers can use it immediately without waiting for state to re-render
     return { stats: freshStats, wed: freshWed }
@@ -6477,11 +6497,13 @@ export default function Statistics() {
 
   // Flat searchable list — folders collapsed to All vs Archived
   const folderStats = useMemo(() => {
-    const base = openFolder === 'archived' ? archivedStats : accessibleStats
+    // When the archive folder is hidden, always show the accessible list.
+    const effectiveFolder = showStatArchiveFolder ? openFolder : 'all'
+    const base = effectiveFolder === 'archived' ? archivedStats : accessibleStats
     if (!search.trim()) return base
     const q = search.toLowerCase()
     return base.filter(s => s.name.toLowerCase().includes(q))
-  }, [openFolder, accessibleStats, archivedStats, search])
+  }, [openFolder, accessibleStats, archivedStats, search, showStatArchiveFolder])
 
   // Period hierarchy — used to determine valid aggregation options
   const PERIOD_ORDER = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly']
@@ -7032,6 +7054,8 @@ export default function Statistics() {
           profiles={profiles}
           isAdmin={isCurrentUserAdmin}
           onEditStat={editStatById}
+          showStatArchiveFolder={showStatArchiveFolder}
+          onShowStatArchiveFolderChange={v => setShowStatArchiveFolder(v)}
         />
       )}
 
@@ -7057,11 +7081,13 @@ export default function Statistics() {
         {/* ── LEFT PANEL ─────────────────────────────────────────────────── */}
         <aside className="w-64 xl:w-72 flex-shrink-0 flex flex-col bg-white border-r border-gray-200 overflow-hidden">
 
-          {/* Folder rows */}
-          <div className="px-2 py-2 border-b border-gray-100 space-y-0.5">
-            <FolderRow id="all"      label="All Stats"      count={accessibleStats.length} />
-            <FolderRow id="archived" label="Archived"       count={archivedStats.length} />
-          </div>
+          {/* Folder rows — hidden entirely when admin disables the archive folder */}
+          {showStatArchiveFolder && (
+            <div className="px-2 py-2 border-b border-gray-100 space-y-0.5">
+              <FolderRow id="all"      label="All Stats"      count={accessibleStats.length} />
+              <FolderRow id="archived" label="Archived"       count={archivedStats.length} />
+            </div>
+          )}
 
           {/* Flat stat list */}
           <div className="flex-1 overflow-y-auto">
