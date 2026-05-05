@@ -5900,6 +5900,11 @@ export default function Statistics() {
 
   // Modal state
   const [showTypeSelector,    setShowTypeSelector]    = useState(false)
+  // Mobile-only: bundles "Edit Value History" + "Edit Statistic" into a
+  // single Edits button-modal so they don't crowd the module header.
+  const [showMobileEditsModal,  setShowMobileEditsModal]  = useState(false)
+  // Mobile-only: small popup for recording the current period's value.
+  const [showMobileEntryModal, setShowMobileEntryModal] = useState(false)
   const [showBasicForm,       setShowBasicForm]       = useState(false)
   const [showEquationForm,    setShowEquationForm]    = useState(false)
   const [showOverlayForm,     setShowOverlayForm]     = useState(false)
@@ -7035,6 +7040,23 @@ export default function Statistics() {
         <h1 className="text-base sm:text-xl font-bold text-gray-900 flex-shrink-0">Statistics</h1>
         {viewMode === 'graphs' && selectedStat && (
           <>
+            {/* ── Mobile-only: Edits + Entry buttons next to the title ── */}
+            <button
+              onClick={() => setShowMobileEditsModal(true)}
+              className="sm:hidden text-xs font-semibold text-blue-700 border border-blue-200 bg-blue-50 rounded-md px-2 py-1 flex-shrink-0"
+            >
+              ✏️ Edits
+            </button>
+            {!['equation','overlay'].includes(selectedStat?.stat_category) && (
+              <button
+                onClick={() => setShowMobileEntryModal(true)}
+                className="sm:hidden text-xs font-semibold text-green-800 border border-green-600 bg-green-50 rounded-md px-2 py-1 flex-shrink-0"
+              >
+                ＋ Entry
+              </button>
+            )}
+
+            {/* ── Desktop inline links ── */}
             {/* Spacer pushes edit links flush with the left-panel / right-panel
                 divider on tablet+; on mobile we drop it so the buttons hug the
                 module title. */}
@@ -7048,20 +7070,20 @@ export default function Statistics() {
                   setWeekEndingError(false)
                   setShowDateRangeSelector(true)
                 }}
-                className="text-sm font-medium text-blue-600 hover:text-blue-800 underline underline-offset-2 transition-colors flex-shrink-0"
+                className="hidden sm:inline-flex text-sm font-medium text-blue-600 hover:text-blue-800 underline underline-offset-2 transition-colors flex-shrink-0"
               >
                 Edit Value History
               </button>
             )}
             <button
               onClick={handleEditStat}
-              className="text-sm font-medium text-blue-600 hover:text-blue-800 underline underline-offset-2 transition-colors flex-shrink-0"
+              className="hidden sm:inline-flex text-sm font-medium text-blue-600 hover:text-blue-800 underline underline-offset-2 transition-colors flex-shrink-0"
             >
               Edit Statistic
             </button>
             <button
               onClick={() => setShowNotesModal(true)}
-              className="text-sm font-medium text-amber-600 hover:text-amber-800 underline underline-offset-2 transition-colors flex-shrink-0 flex items-center gap-1"
+              className="hidden sm:inline-flex text-sm font-medium text-amber-600 hover:text-amber-800 underline underline-offset-2 transition-colors flex-shrink-0 items-center gap-1"
             >
               {statNotes.length > 0 && (
                 <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] font-bold">{statNotes.length}</span>
@@ -7073,7 +7095,8 @@ export default function Statistics() {
         <div className="flex-1 min-w-0" />
         {viewMode !== 'print-multiple' && (
           <button onClick={() => setShowTypeSelector(true)} className="btn-primary text-sm px-3 py-1.5 flex-shrink-0">
-            + Add Statistic
+            <span className="sm:hidden">＋ Add</span>
+            <span className="hidden sm:inline">+ Add Statistic</span>
           </button>
         )}
       </div>
@@ -8018,6 +8041,96 @@ export default function Statistics() {
           </div>
         </div>
       )}
+    {/* ── Mobile Edits modal (Edit Value History + Edit Statistic) ── */}
+    {showMobileEditsModal && selectedStat && (
+      <div
+        className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-4 sm:hidden"
+        onClick={() => setShowMobileEditsModal(false)}
+      >
+        <div
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="text-base font-bold text-gray-800">Edits</h2>
+            <button onClick={() => setShowMobileEditsModal(false)} className="text-gray-400 text-xl leading-none px-1">✕</button>
+          </div>
+          <div className="p-3 space-y-2">
+            {!['equation','overlay'].includes(selectedStat?.stat_category) && (
+              <button
+                onClick={() => {
+                  setShowMobileEditsModal(false)
+                  if (selectedStat?.tracking === 'weekly' && weekEndingDay === null) {
+                    setWeekEndingError(true); return
+                  }
+                  setWeekEndingError(false)
+                  setShowDateRangeSelector(true)
+                }}
+                className="w-full text-left px-3 py-3 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm font-semibold text-blue-700 flex items-center gap-2"
+              >
+                📅 Edit Value History
+                <span className="text-xs text-gray-400 ml-auto">View &amp; tweak past entries</span>
+              </button>
+            )}
+            <button
+              onClick={() => { setShowMobileEditsModal(false); handleEditStat() }}
+              className="w-full text-left px-3 py-3 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm font-semibold text-blue-700 flex items-center gap-2"
+            >
+              ✏️ Edit Statistic
+              <span className="text-xs text-gray-400 ml-auto">Name, type, sharing</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* ── Mobile Entry popup (record current period's value) ── */}
+    {showMobileEntryModal && selectedStat && (
+      <div
+        className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-4 sm:hidden"
+        onClick={() => setShowMobileEntryModal(false)}
+      >
+        <div
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between" style={{ backgroundColor: FG }}>
+            <h2 className="text-base font-bold text-white">Quick Entry</h2>
+            <button onClick={() => setShowMobileEntryModal(false)} className="text-white/80 text-xl leading-none px-1">✕</button>
+          </div>
+          <div className="p-4 space-y-3">
+            <p className="text-xs text-gray-500 uppercase font-semibold tracking-wide">{quickPeriod.label}</p>
+            <p className="text-sm text-gray-700">Recording <strong>{selectedStat.name}</strong> for the period above.</p>
+            <input
+              type="number"
+              value={quickValue}
+              onChange={e => setQuickValue(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { handleQuickSave(); setShowMobileEntryModal(false) } }}
+              placeholder="Enter value"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-green-600"
+              autoFocus
+            />
+            {quickSaveMsg && <p className="text-xs text-green-700">{quickSaveMsg}</p>}
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => setShowMobileEntryModal(false)}
+                className="flex-1 py-2.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-600"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => { await handleQuickSave(); setShowMobileEntryModal(false) }}
+                disabled={quickSaving || !quickValue.trim()}
+                className="flex-1 py-2.5 rounded-lg btn-primary text-sm font-semibold disabled:opacity-50"
+              >
+                {quickSaving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
     {/* Shared Permissions modal — sharesTarget wins (set by stat-edit
        modal buttons), falls back to selectedStat (page-header button).
        Look up the actual stat (by id) to get its real owner_user_id —
