@@ -177,6 +177,33 @@ async function fetchContactsPage(args: {
   return resp as GhlPagedResponse
 }
 
+// Fetches all users for the location and returns a userId → name map.
+// Used to resolve assignedTo IDs to human-readable names.
+async function fetchLocationUsers(
+  token: string,
+  locationId: string,
+): Promise<Map<string, string>> {
+  try {
+    const res = await fetch(
+      `${GHL_BASE_URL}/users?locationId=${locationId}`,
+      { headers: { Authorization: `Bearer ${token}`, Version: GHL_API_VERSION, Accept: 'application/json' } },
+    )
+    if (!res.ok) return new Map()
+    const data: any = await res.json()
+    const users: any[] = data?.users || data?.members || []
+    const map = new Map<string, string>()
+    for (const u of users) {
+      if (u.id && (u.name || u.firstName)) {
+        const name = u.name || [u.firstName, u.lastName].filter(Boolean).join(' ')
+        map.set(u.id, name)
+      }
+    }
+    return map
+  } catch {
+    return new Map()
+  }
+}
+
 async function fetchCustomFieldDefs(
   token: string,
   locationId: string,
@@ -237,7 +264,11 @@ function extractCustomFieldByNames(
   return null
 }
 
-function toPbsContact(c: GhlContact, fieldKeyToId: Map<string, string>) {
+function toPbsContact(
+  c: GhlContact,
+  fieldKeyToId: Map<string, string>,
+  userIdToName: Map<string, string>,
+) {
   // Name — search endpoint may return combined `name` instead of split fields
   let firstName = (c.firstName || '').trim()
   let lastName  = (c.lastName  || '').trim()
@@ -260,9 +291,10 @@ function toPbsContact(c: GhlContact, fieldKeyToId: Map<string, string>) {
   let ghlAssignedTo: string | null = null
   if (c.assignedTo) {
     if (typeof c.assignedTo === 'string') {
-      ghlAssignedTo = c.assignedTo || null
+      // GHL often returns a raw user ID — resolve to name if we have the map.
+      ghlAssignedTo = userIdToName.get(c.assignedTo) || c.assignedTo || null
     } else {
-      ghlAssignedTo = (c.assignedTo as any).name || (c.assignedTo as any).id || null
+      ghlAssignedTo = (c.assignedTo as any).name || userIdToName.get((c.assignedTo as any).id) || (c.assignedTo as any).id || null
     }
   }
 
@@ -393,8 +425,10 @@ serve(async (req) => {
     const sinceIso = state?.inbound_synced_at || null
     const bulkMode = fullSync || !sinceIso || startPage > 1
 
-    const { map: fieldKeyToId, error: cfError } =
-      await fetchCustomFieldDefs(conn.access_token, conn.location_id)
+    const [{ map: fieldKeyToId, error: cfError }, userIdToName] = await Promise.all([
+      fetchCustomFieldDefs(conn.access_token, conn.location_id),
+      fetchLocationUsers(conn.access_token, conn.location_id),
+    ])
 
     const digitsOnly = (s: string) => (s || '').replace(/\D/g, '')
     const seenGhlIds = new Set<string>()
@@ -473,7 +507,7 @@ serve(async (req) => {
           newestSeen = c.dateUpdated
         }
 
-        const row = toPbsContact(c, fieldKeyToId)
+        const row = toPbsContact(c, fieldKeyToId, userIdToName)
         const phoneDigits = digitsOnly(row.phone || '').slice(-10)
         const namePart    = `${(row.last_name||'').toLowerCase().trim()}|${(row.first_name||'').toLowerCase().trim()}`
         const zipPart     = (row.zip || '').replace(/\s/g, '').toLowerCase()
