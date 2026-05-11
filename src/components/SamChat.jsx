@@ -149,7 +149,7 @@ export default function SamChat() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-white text-sm font-semibold leading-tight">Sam</p>
-              <p className="text-green-200 text-[11px] leading-tight">Numbers analyst · AI</p>
+              <p className="text-green-200 text-[11px] leading-tight">Your friendly, neighborhood AI assistant.</p>
             </div>
             <button
               onClick={newThread}

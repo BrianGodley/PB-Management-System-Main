@@ -924,8 +924,8 @@ export default function EmployeeDetail() {
           </div>
         )}
 
-        {/* ── USER ── */}
-        {tab === 'user' && (
+        {/* ── USER (Access and Roles) — admin / super_admin only ── */}
+        {tab === 'user' && currentUserIsAdmin && (
           <div className="max-w-2xl">
             {linkedProfile ? (
               <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
