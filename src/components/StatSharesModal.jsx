@@ -45,41 +45,32 @@ export default function StatSharesModal({ statId, statName, ownerUserId, onClose
   // current user, which then hid the current user from the share list.
   const [resolvedOwnerId, setResolvedOwnerId] = useState(ownerUserId || null)
 
-  // ── Load employees with auth accounts + existing shares ───────────────────
+  // ── Load all users who can log in + existing shares ───────────────────────
   useEffect(() => {
     let cancelled = false
     async function load() {
       try {
-        // Always need the employee list for both modes
-        const { data: empData, error: empErr } = await supabase
-          .from('employees')
-          .select('id, first_name, last_name, email, user_id, status')
-          .not('user_id', 'is', null)
-          .order('last_name', { ascending: true })
+        // Base: every profile = every user who can log in.
+        // Enrich: employees table for first/last name where user_id is linked.
+        const [{ data: profData, error: profErr }, { data: empData, error: empErr }] = await Promise.all([
+          supabase.from('profiles').select('id, email, full_name').order('full_name'),
+          supabase.from('employees').select('id, first_name, last_name, email, user_id, status')
+            .not('user_id', 'is', null),
+        ])
+        if (profErr) throw profErr
         if (empErr) throw empErr
 
-        // DB mode (we have a statId) → fetch existing share rows + the
-        // stat's authoritative owner_user_id.
-        // Local mode (no statId — new-stat creation) → seed from initialShares
-        // and skip the DB reads entirely.
+        // DB mode → fetch existing shares + stat's real owner_user_id
+        // Local mode → seed from initialShares, skip DB reads
         let sharesMap = {}
         if (statId) {
           const [{ data: shareData, error: shareErr }, { data: statRow, error: statErr }] = await Promise.all([
-            supabase
-              .from('statistic_shares')
-              .select('user_id, permission')
-              .eq('statistic_id', statId),
-            supabase
-              .from('statistics')
-              .select('owner_user_id')
-              .eq('id', statId)
-              .maybeSingle(),
+            supabase.from('statistic_shares').select('user_id, permission').eq('statistic_id', statId),
+            supabase.from('statistics').select('owner_user_id').eq('id', statId).maybeSingle(),
           ])
           if (shareErr) throw shareErr
           if (statErr) throw statErr
-          for (const row of (shareData || [])) {
-            sharesMap[row.user_id] = row.permission
-          }
+          for (const row of (shareData || [])) sharesMap[row.user_id] = row.permission
           if (statRow?.owner_user_id) setResolvedOwnerId(statRow.owner_user_id)
         } else {
           sharesMap = { ...(initialShares || {}) }
@@ -87,48 +78,35 @@ export default function StatSharesModal({ statId, statName, ownerUserId, onClose
 
         if (cancelled) return
 
-        const list = (empData || [])
-          .filter(e => e.status !== 'archived')
-          .map(e => ({
-            id:      e.id,
-            user_id: e.user_id,
-            name:    [e.first_name, e.last_name].filter(Boolean).join(' ') || e.email || '—',
-            email:   e.email || '',
-          }))
-
-        // Make sure the signed-in user is always pickable, even when they:
-        //   - have no employees row at all (e.g. admins onboarded outside HR)
-        //   - have an employees row that's archived
-        //   - have an employees row whose user_id wasn't linked to auth
-        // Without this they can't grant themselves view/edit access on stats
-        // they don't own.
-        if (user?.id && !list.some(e => e.user_id === user.id)) {
-          // Try to enrich with the user's actual name by querying employees
-          // again without the user_id-null / archived filters, matching by
-          // user_id or email. Falls back to email if nothing found.
-          let displayName = user.user_metadata?.full_name || ''
-          let matchedEmp = null
-          try {
-            const orFilter = `user_id.eq.${user.id}` + (user.email ? `,email.eq.${user.email}` : '')
-            const { data: meData } = await supabase
-              .from('employees')
-              .select('first_name, last_name, email, user_id')
-              .or(orFilter)
-              .limit(1)
-            matchedEmp = meData?.[0] || null
-          } catch { /* swallow — fall back below */ }
-          if (matchedEmp) {
-            const full = [matchedEmp.first_name, matchedEmp.last_name].filter(Boolean).join(' ')
-            if (full) displayName = full
+        // Build a lookup: auth user_id → employee record (non-archived preferred)
+        const empByUserId = {}
+        for (const e of (empData || [])) {
+          if (!e.user_id) continue
+          // Prefer active over archived if multiple rows somehow share a user_id
+          if (!empByUserId[e.user_id] || e.status !== 'archived') {
+            empByUserId[e.user_id] = e
           }
-          if (!displayName) displayName = user.email || 'Me'
-          list.unshift({
-            id:      `self-${user.id}`,
-            user_id: user.id,
-            name:    displayName,
-            email:   user.email || matchedEmp?.email || '',
-          })
         }
+
+        // Build list from profiles — everyone in profiles can log in.
+        // Use employee first/last name when available; fall back to profile full_name then email.
+        const list = (profData || []).map(p => {
+          const emp = empByUserId[p.id]
+          // Skip if the matched employee is archived (they can still log in but
+          // are no longer active staff — keep them only if no emp record exists).
+          if (emp?.status === 'archived') return null
+          const empName = emp ? [emp.first_name, emp.last_name].filter(Boolean).join(' ') : ''
+          const name    = empName || p.full_name || p.email || '—'
+          return {
+            id:      emp?.id || `profile-${p.id}`,
+            user_id: p.id,
+            name,
+            email:   emp?.email || p.email || '',
+          }
+        }).filter(Boolean)
+
+        // Sort by name
+        list.sort((a, b) => a.name.localeCompare(b.name))
 
         setEmployees(list)
         setShares(sharesMap)
