@@ -142,19 +142,17 @@ function EditContactModal({ contact, onSave, onClose }) {
             <div><label className={lbl}>State</label><input className={inp} value={form.state || ''} onChange={e => set('state', e.target.value)} maxLength={2} /></div>
             <div><label className={lbl}>Zip</label><input className={inp} value={form.zip || ''} onChange={e => set('zip', e.target.value)} /></div>
           </div>
-          {form.company_name?.trim() && (
-            <div className="border border-gray-200 rounded-xl p-3 bg-gray-50">
-              <p className="text-xs font-semibold text-gray-500 mb-2">Company Address</p>
-              <div className="space-y-2">
-                <input className={inp} value={form.company_street || ''} onChange={e => set('company_street', e.target.value)} placeholder="Company Street Address" />
-                <div className="grid grid-cols-3 gap-2">
-                  <input className={inp + ' col-span-1'} value={form.company_city || ''} onChange={e => set('company_city', e.target.value)} placeholder="City" />
-                  <input className={inp} value={form.company_state || ''} onChange={e => set('company_state', e.target.value)} placeholder="ST" maxLength={2} />
-                  <input className={inp} value={form.company_zip || ''} onChange={e => set('company_zip', e.target.value)} placeholder="Zip" />
-                </div>
+          <div className="border border-gray-200 rounded-xl p-3 bg-gray-50">
+            <p className="text-xs font-semibold text-gray-500 mb-2">Company Address</p>
+            <div className="space-y-2">
+              <input className={inp} value={form.company_street || ''} onChange={e => set('company_street', e.target.value)} placeholder="Company Street Address" />
+              <div className="grid grid-cols-3 gap-2">
+                <input className={inp + ' col-span-1'} value={form.company_city || ''} onChange={e => set('company_city', e.target.value)} placeholder="City" />
+                <input className={inp} value={form.company_state || ''} onChange={e => set('company_state', e.target.value)} placeholder="ST" maxLength={2} />
+                <input className={inp} value={form.company_zip || ''} onChange={e => set('company_zip', e.target.value)} placeholder="Zip" />
               </div>
             </div>
-          )}
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={lbl}>Assigned To</label>
