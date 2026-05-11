@@ -131,8 +131,18 @@ export default function Collections() {
   const [newWeekModal,       setNewWeekModal]       = useState(null) // { lastDataWeek, nextDate }
   const [deleteWeekConfirm,  setDeleteWeekConfirm]  = useState(false)
   const [deletingWeek,       setDeletingWeek]       = useState(false)
+  const [solvencyStatIds,    setSolvencyStatIds]    = useState([])
 
   const selectedWeek = weeks[weekIdx] || null
+
+  // Fetch IDs of any stats wired to finance_solvency (once on mount)
+  useEffect(() => {
+    supabase.from('statistics')
+      .select('id')
+      .eq('stat_category', 'auto_internal')
+      .ilike('data_source', '%finance_solvency%')
+      .then(({ data }) => { if (data) setSolvencyStatIds(data.map(s => s.id)) })
+  }, [])
 
   useEffect(() => {
     Promise.all([
@@ -500,6 +510,22 @@ export default function Collections() {
   const payrollAlloc     = finTotal('payroll')
   const payablesAlloc    = financial.filter(f => f.section === 'payables_alloc' && !f.is_formula && f.subsection).reduce((s,f) => s + (parseFloat(f.amount) || 0), 0)
   const netTotal         = cashOnHand - autoAlloc - payrollAlloc - payablesAlloc
+  const solvencyTotal    = totalReceivables + (cashOnHand - payrollAlloc) - totalPayables
+
+  // ── Auto-push solvency total to statistic_values ──────────────────────────
+  useEffect(() => {
+    if (!selectedWeek || !solvencyStatIds.length || loading) return
+    const timer = setTimeout(async () => {
+      const upserts = solvencyStatIds.map(sid => ({
+        statistic_id: sid,
+        period_date:  selectedWeek.week_ending,
+        value:        solvencyTotal,
+      }))
+      await supabase.from('statistic_values')
+        .upsert(upserts, { onConflict: 'statistic_id,period_date' })
+    }, 800)
+    return () => clearTimeout(timer)
+  }, [solvencyTotal, selectedWeek?.id, solvencyStatIds, loading])
 
   if (loading) return (
     <div className="flex items-center justify-center h-full py-20">

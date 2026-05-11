@@ -3300,6 +3300,20 @@ const AUTO_SOURCES = [
       },
     ],
   },
+  {
+    category: 'Finance',
+    icon: '🏦',
+    sources: [
+      {
+        key: 'finance_solvency',
+        label: 'Financial Planning — Total Solvency',
+        source_type: 'push',
+        tracking: 'weekly',
+        stat_type: 'currency',
+        desc: 'Total Solvency (Receivables + Cash − Payroll − Payables) from the Finance weekly planner. Values are automatically recorded when a Finance week is viewed.',
+      },
+    ],
+  },
 ]
 
 // Flatten for quick lookup by key
@@ -3341,11 +3355,12 @@ function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete, onOpen
   const categoryObj = AUTO_SOURCES.find(c => c.category === selectedCategory) || AUTO_SOURCES[0]
   const sourceDef   = AUTO_SOURCE_MAP[selectedKey] || null
 
-  // When source changes, inherit stat_type and suggest name
+  // When source changes, inherit stat_type / tracking and suggest name
   useEffect(() => {
     if (sourceDef && !isEdit) {
       set('stat_type', sourceDef.stat_type)
-      if (!form.name) set('name', `${sourceDef.label} (${form.tracking})`)
+      if (sourceDef.tracking) set('tracking', sourceDef.tracking)
+      if (!form.name) set('name', sourceDef.label)
     }
   }, [selectedKey])
 
@@ -3453,9 +3468,21 @@ function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete, onOpen
 
           {sourceDef && (
             <>
+              {/* Push-model info banner */}
+              {sourceDef.source_type === 'push' && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-800">
+                  <span className="font-semibold">⚡ Auto-push stat</span> — values are automatically recorded when you view a Finance week. No manual entry needed. Tracking is fixed to <span className="font-semibold">Weekly</span>.
+                </div>
+              )}
+
               {/* Tracking period */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">Tracking Period</label>
+                {sourceDef.source_type === 'push' ? (
+                  <div className="px-3 py-1.5 rounded-lg text-xs font-semibold border capitalize inline-block text-white" style={{ backgroundColor: '#1e40af', borderColor: '#1e40af' }}>
+                    weekly (fixed)
+                  </div>
+                ) : (
                 <div className="flex flex-wrap gap-1.5">
                   {['daily','weekly','monthly','quarterly','yearly'].map(t => (
                     <button key={t} type="button" onClick={() => set('tracking', t)}
@@ -3467,6 +3494,7 @@ function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete, onOpen
                     </button>
                   ))}
                 </div>
+                )}
               </div>
 
               {/* Stat type */}
