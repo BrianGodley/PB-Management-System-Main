@@ -1626,10 +1626,22 @@ function MultipleEntryView({ stats, weekEndingDay }) {
   async function loadValues() {
     setLoading(true)
     const ids = filteredStats.map(s => s.id)
-    const { data } = await supabase
-      .from('statistic_values')
-      .select('*')
-      .in('statistic_id', ids)
+
+    // Build a tight date range for the period so we never hit Supabase's
+    // default 1000-row cap from loading all history for every stat.
+    // Multiple Entry always saves the canonical period-end date, so an exact
+    // eq() works for everything except 'weekly' where any day in that week
+    // might have been stored via the single-stat entry view.
+    let q = supabase.from('statistic_values').select('*').in('statistic_id', ids)
+    if (entryTracking === 'weekly') {
+      const end   = periodDate
+      const start = isoDate(new Date(new Date(periodDate + 'T00:00:00').setDate(new Date(periodDate + 'T00:00:00').getDate() - 6)))
+      q = q.gte('period_date', start).lte('period_date', end)
+    } else {
+      q = q.eq('period_date', periodDate)
+    }
+
+    const { data } = await q
     const rows = data || []
     setDbValues(rows)
 
