@@ -451,86 +451,98 @@ export default function ContactDetail() {
             {/* ── MAIN TAB ── */}
             {leftTab === 'main' && (
               <div className="space-y-3 text-sm">
-                {contact.ghl_assigned_to && (
-                  <div>
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Assigned To</p>
-                    <p className="text-gray-700">{contact.ghl_assigned_to}</p>
-                  </div>
-                )}
-                {contact.consultation_type && (
-                  <div>
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Consultation Type</p>
-                    <p className="text-gray-700">{contact.consultation_type}</p>
-                  </div>
-                )}
-                {(contact.secondary_first_name || contact.secondary_last_name) && (
-                  <div>
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Spouse / Partner</p>
-                    <p className="text-gray-700">
-                      {[contact.secondary_first_name, contact.secondary_last_name].filter(Boolean).join(' ')}
-                    </p>
-                  </div>
-                )}
-                {contact.phone && (
-                  <div>
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Phone</p>
-                    <a href={`tel:${contact.phone}`} className="text-gray-700 hover:text-green-700">{contact.phone}</a>
-                  </div>
-                )}
-                {contact.cell && (
-                  <div>
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Cell</p>
-                    <a href={`tel:${contact.cell}`} className="text-gray-700 hover:text-green-700">{contact.cell}</a>
-                  </div>
-                )}
-                {contact.email && (
-                  <div>
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Email</p>
-                    <a href={`mailto:${contact.email}`} className="text-gray-700 hover:text-green-700 break-all">{contact.email}</a>
-                  </div>
-                )}
-                {contact.additional_emails?.length > 0 && (
-                  <div>
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Additional Emails</p>
-                    {contact.additional_emails.map((e, i) => (
-                      <a key={i} href={`mailto:${e}`} className="block text-gray-700 hover:text-green-700 break-all">{e}</a>
-                    ))}
-                  </div>
-                )}
-                {contact.additional_phones?.length > 0 && (
-                  <div>
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Additional Phones</p>
-                    {contact.additional_phones.map((p, i) => (
-                      <a key={i} href={`tel:${p}`} className="block text-gray-700 hover:text-green-700">{p}</a>
-                    ))}
-                  </div>
-                )}
-                {(contact.street_address || contact.city) && (
-                  <div>
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Address</p>
-                    {contact.street_address && <p className="text-gray-700">{contact.street_address}</p>}
-                    <p className="text-gray-700">{[contact.city, contact.state, contact.zip].filter(Boolean).join(', ')}</p>
-                  </div>
-                )}
-                {contact.company_name && (contact.company_street || contact.company_city) && (
-                  <div>
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Company Address</p>
-                    {contact.company_street && <p className="text-gray-700">{contact.company_street}</p>}
-                    <p className="text-gray-700">{[contact.company_city, contact.company_state, contact.company_zip].filter(Boolean).join(', ')}</p>
-                  </div>
-                )}
-                {contact.date_of_birth && (
-                  <div>
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Date of Birth</p>
-                    <p className="text-gray-700">{new Date(contact.date_of_birth + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
-                  </div>
-                )}
-                {contact.project_description && (
-                  <div>
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Project Description</p>
-                    <p className="text-gray-600 text-xs leading-relaxed whitespace-pre-wrap">{contact.project_description}</p>
-                  </div>
-                )}
+                {/* Assigned To */}
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Assigned To</p>
+                  <p className="text-gray-700">{contact.ghl_assigned_to || <span className="text-gray-300">—</span>}</p>
+                </div>
+                {/* Consultation Type */}
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Consultation Type</p>
+                  <p className="text-gray-700">{contact.consultation_type || <span className="text-gray-300">—</span>}</p>
+                </div>
+                {/* Spouse / Partner */}
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Spouse / Partner</p>
+                  <p className="text-gray-700">
+                    {[contact.secondary_first_name, contact.secondary_last_name].filter(Boolean).join(' ') || <span className="text-gray-300">—</span>}
+                  </p>
+                </div>
+                {/* Phone */}
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Phone</p>
+                  {contact.phone
+                    ? <a href={`tel:${contact.phone}`} className="text-gray-700 hover:text-green-700">{contact.phone}</a>
+                    : <span className="text-gray-300">—</span>}
+                </div>
+                {/* Cell */}
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Cell</p>
+                  {contact.cell
+                    ? <a href={`tel:${contact.cell}`} className="text-gray-700 hover:text-green-700">{contact.cell}</a>
+                    : <span className="text-gray-300">—</span>}
+                </div>
+                {/* Email */}
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Email</p>
+                  {contact.email
+                    ? <a href={`mailto:${contact.email}`} className="text-gray-700 hover:text-green-700 break-all">{contact.email}</a>
+                    : <span className="text-gray-300">—</span>}
+                </div>
+                {/* Additional Emails */}
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Additional Emails</p>
+                  {contact.additional_emails?.length > 0
+                    ? contact.additional_emails.map((e, i) => (
+                        <a key={i} href={`mailto:${e}`} className="block text-gray-700 hover:text-green-700 break-all">{e}</a>
+                      ))
+                    : <span className="text-gray-300">—</span>}
+                </div>
+                {/* Additional Phones */}
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Additional Phones</p>
+                  {contact.additional_phones?.length > 0
+                    ? contact.additional_phones.map((p, i) => (
+                        <a key={i} href={`tel:${p}`} className="block text-gray-700 hover:text-green-700">{p}</a>
+                      ))
+                    : <span className="text-gray-300">—</span>}
+                </div>
+                {/* Address */}
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Address</p>
+                  {(contact.street_address || contact.city || contact.state || contact.zip)
+                    ? <>
+                        {contact.street_address && <p className="text-gray-700">{contact.street_address}</p>}
+                        <p className="text-gray-700">{[contact.city, contact.state, contact.zip].filter(Boolean).join(', ')}</p>
+                      </>
+                    : <span className="text-gray-300">—</span>}
+                </div>
+                {/* Company Address */}
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Company Address</p>
+                  {(contact.company_street || contact.company_city)
+                    ? <>
+                        {contact.company_street && <p className="text-gray-700">{contact.company_street}</p>}
+                        <p className="text-gray-700">{[contact.company_city, contact.company_state, contact.company_zip].filter(Boolean).join(', ')}</p>
+                      </>
+                    : <span className="text-gray-300">—</span>}
+                </div>
+                {/* Date of Birth */}
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Date of Birth</p>
+                  <p className="text-gray-700">
+                    {contact.date_of_birth
+                      ? new Date(contact.date_of_birth + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+                      : <span className="text-gray-300">—</span>}
+                  </p>
+                </div>
+                {/* Project Description */}
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Project Description</p>
+                  {contact.project_description
+                    ? <p className="text-gray-600 text-xs leading-relaxed whitespace-pre-wrap">{contact.project_description}</p>
+                    : <span className="text-gray-300">—</span>}
+                </div>
               </div>
             )}
 
