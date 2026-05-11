@@ -24,7 +24,16 @@ const EMPTY_FORM = {
   street_address: '', city: '', state: '', zip: '',
   company_street: '', company_city: '', company_state: '', company_zip: '',
   stage: 'new_lead', contact_type: '', source: '', project_description: '',
+  date_of_birth: '',
+  interest_1: '', interest_2: '', interest_3: '',
 }
+
+const PROJECT_TYPES = [
+  'Artificial Turf','Concrete','Columns','Demo/Excavation','Drainage',
+  'Finishes','Fire Pit','Ground Treatments','Irrigation','Lighting',
+  'Outdoor Kitchen/BBQ','Pavers','Planting/Landscaping','Pool',
+  'Retaining Walls','Steps','Utilities','Other',
+]
 
 // ── Add Contact Modal ─────────────────────────────────────────────────────────
 function AddContactModal({ onSave, onClose }) {
@@ -59,7 +68,11 @@ function AddContactModal({ onSave, onClose }) {
         stage:                form.stage,
         contact_type:         form.contact_type || null,
         source:               form.source.trim() || null,
+        date_of_birth:        form.date_of_birth || null,
         project_description:  form.project_description.trim() || null,
+        interest_1:           form.interest_1 || null,
+        interest_2:           form.interest_2 || null,
+        interest_3:           form.interest_3 || null,
       })
       .select()
       .single()
@@ -156,6 +169,11 @@ function AddContactModal({ onSave, onClose }) {
             </div>
           )}
 
+          <div>
+            <label className={label}>Date of Birth</label>
+            <input className={input} type="date" value={form.date_of_birth} onChange={e => set('date_of_birth', e.target.value)} />
+          </div>
+
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className={label}>Stage</label>
@@ -173,7 +191,7 @@ function AddContactModal({ onSave, onClose }) {
               </select>
             </div>
             <div>
-              <label className={label}>Contact Source</label>
+              <label className={label}>Source Type</label>
               <input className={input} value={form.source} onChange={e => set('source', e.target.value)} placeholder="Referral, Google…" />
             </div>
           </div>
@@ -181,6 +199,26 @@ function AddContactModal({ onSave, onClose }) {
           <div>
             <label className={label}>Project Description</label>
             <textarea className={input + ' resize-none'} rows={3} value={form.project_description} onChange={e => set('project_description', e.target.value)} placeholder="Describe the project or work needed…" />
+          </div>
+
+          {/* Marketing — project interests */}
+          <div className="pt-3 border-t border-gray-100">
+            <p className="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wide">Marketing</p>
+            <div className="space-y-2">
+              {[
+                { key: 'interest_1', fieldLabel: 'Interested In #1' },
+                { key: 'interest_2', fieldLabel: 'Interested In #2' },
+                { key: 'interest_3', fieldLabel: 'Interested In #3' },
+              ].map(({ key, fieldLabel }) => (
+                <div key={key}>
+                  <label className={label}>{fieldLabel}</label>
+                  <select className={input} value={form[key]} onChange={e => set(key, e.target.value)}>
+                    <option value="">— None —</option>
+                    {PROJECT_TYPES.map(pt => <option key={pt} value={pt}>{pt}</option>)}
+                  </select>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
