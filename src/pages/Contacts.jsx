@@ -18,12 +18,14 @@ const STAGES = [
 const stageMap = Object.fromEntries(STAGES.map(s => [s.value, s]))
 
 const EMPTY_FORM = {
+  entity_type: 'individual',
   first_name: '', last_name: '', company_name: '',
   secondary_first_name: '', secondary_last_name: '',
   phone: '', cell: '', email: '',
   _additionalEmailsRaw: '', _additionalPhonesRaw: '',
   street_address: '', city: '', state: '', zip: '',
   company_street: '', company_city: '', company_state: '', company_zip: '',
+  company_contacts: [],
   ghl_assigned_to: '', consultation_type: '',
   date_of_birth: '', notes: '', project_description: '',
   stage: 'new_lead', contact_type: 'Residential',
@@ -39,6 +41,49 @@ const PROJECT_TYPES = [
   'Retaining Walls','Steps','Utilities','Other',
 ]
 
+function CompanyContactsEditor({ contacts, onChange, inp, lbl }) {
+  const list = contacts || []
+  const update = (i, field, val) =>
+    onChange(list.map((c, j) => j === i ? { ...c, [field]: val } : c))
+  const add    = () => onChange([...list, { first_name: '', last_name: '', email: '', phone: '' }])
+  const remove = (i) => onChange(list.filter((_, j) => j !== i))
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <label className={lbl}>Company Contacts</label>
+        {list.length > 0 && (
+          <button type="button" onClick={add} className="text-xs text-green-700 hover:underline font-medium">+ Add</button>
+        )}
+      </div>
+      {list.length === 0 ? (
+        <button type="button" onClick={add}
+          className="w-full border border-dashed border-gray-300 rounded-lg py-3 text-sm text-gray-400 hover:border-green-500 hover:text-green-600 transition-colors">
+          + Add first company contact
+        </button>
+      ) : (
+        <div className="space-y-2">
+          {list.map((cc, i) => (
+            <div key={i} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-gray-500">Contact {i + 1}</span>
+                <button type="button" onClick={() => remove(i)} className="text-xs text-red-400 hover:text-red-600">Remove</button>
+              </div>
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                <input className={inp} value={cc.first_name || ''} onChange={e => update(i, 'first_name', e.target.value)} placeholder="First Name" />
+                <input className={inp} value={cc.last_name  || ''} onChange={e => update(i, 'last_name',  e.target.value)} placeholder="Last Name"  />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input className={inp} value={cc.email || ''} onChange={e => update(i, 'email', e.target.value)} placeholder="Email" type="email" />
+                <input className={inp} value={cc.phone || ''} onChange={e => update(i, 'phone', e.target.value)} placeholder="Phone" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Add Contact Modal ─────────────────────────────────────────────────────────
 function AddContactModal({ onSave, onClose }) {
   const [form, setForm] = useState(EMPTY_FORM)
@@ -53,6 +98,7 @@ function AddContactModal({ onSave, onClose }) {
     const { data, error } = await supabase
       .from('contacts')
       .insert({
+        entity_type:          form.entity_type || 'individual',
         first_name:           form.first_name.trim(),
         last_name:            form.last_name.trim(),
         company_name:         form.company_name.trim() || null,
@@ -75,6 +121,7 @@ function AddContactModal({ onSave, onClose }) {
         company_city:         form.company_city.trim() || null,
         company_state:        form.company_state.trim() || null,
         company_zip:          form.company_zip.trim() || null,
+        company_contacts:     form.company_contacts?.length ? form.company_contacts : [],
         ghl_assigned_to:      form.ghl_assigned_to.trim() || null,
         consultation_type:    form.consultation_type || null,
         stage:                form.stage,
@@ -109,60 +156,76 @@ function AddContactModal({ onSave, onClose }) {
         </div>
 
         <div className="space-y-3">
-          {/* Name */}
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className={label}>First Name</label><input className={input} value={form.first_name} onChange={e => set('first_name', e.target.value)} placeholder="First" /></div>
-            <div><label className={label}>Last Name <span className="text-red-400">*</span></label><input className={input} value={form.last_name} onChange={e => set('last_name', e.target.value)} placeholder="Last" autoFocus /></div>
+          {/* ── Entity Type Toggle ── */}
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+            {['individual', 'company'].map(et => (
+              <button key={et} type="button"
+                onClick={() => set('entity_type', et)}
+                className={`flex-1 py-2 text-sm font-semibold capitalize transition-colors ${
+                  form.entity_type === et ? 'bg-green-700 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
+                }`}
+              >{et}</button>
+            ))}
           </div>
 
-          {/* Company */}
-          <div><label className={label}>Company</label><input className={input} value={form.company_name} onChange={e => set('company_name', e.target.value)} placeholder="Optional" /></div>
+          {/* ── Individual fields ── */}
+          {form.entity_type !== 'company' && (<>
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className={label}>First Name</label><input className={input} value={form.first_name} onChange={e => set('first_name', e.target.value)} placeholder="First" autoFocus /></div>
+              <div><label className={label}>Last Name <span className="text-red-400">*</span></label><input className={input} value={form.last_name} onChange={e => set('last_name', e.target.value)} placeholder="Last" /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className={label}>Spouse / Partner First</label><input className={input} value={form.secondary_first_name} onChange={e => set('secondary_first_name', e.target.value)} placeholder="First" /></div>
+              <div><label className={label}>Spouse / Partner Last</label><input className={input} value={form.secondary_last_name} onChange={e => set('secondary_last_name', e.target.value)} placeholder="Last" /></div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div><label className={label}>Phone</label><input className={input} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(555) 000-0000" /></div>
+              <div><label className={label}>Cell</label><input className={input} value={form.cell} onChange={e => set('cell', e.target.value)} placeholder="(555) 000-0000" /></div>
+              <div><label className={label}>Email</label><input className={input} value={form.email} onChange={e => set('email', e.target.value)} placeholder="email@example.com" type="email" /></div>
+            </div>
+            <div>
+              <label className={label}>Additional Emails <span className="font-normal text-gray-400">(one per line)</span></label>
+              <textarea className={input + ' resize-none'} rows={2} value={form._additionalEmailsRaw} onChange={e => set('_additionalEmailsRaw', e.target.value)} placeholder="extra@email.com" />
+            </div>
+            <div>
+              <label className={label}>Additional Phones <span className="font-normal text-gray-400">(one per line)</span></label>
+              <textarea className={input + ' resize-none'} rows={2} value={form._additionalPhonesRaw} onChange={e => set('_additionalPhonesRaw', e.target.value)} placeholder="+1 (555) 000-0000" />
+            </div>
+            <div><label className={label}>Street Address</label><input className={input} value={form.street_address} onChange={e => set('street_address', e.target.value)} placeholder="123 Main St" /></div>
+            <div className="grid grid-cols-3 gap-3">
+              <div><label className={label}>City</label><input className={input} value={form.city} onChange={e => set('city', e.target.value)} placeholder="City" /></div>
+              <div><label className={label}>State</label><input className={input} value={form.state} onChange={e => set('state', e.target.value)} placeholder="CA" maxLength={2} /></div>
+              <div><label className={label}>Zip</label><input className={input} value={form.zip} onChange={e => set('zip', e.target.value)} placeholder="90210" /></div>
+            </div>
+            <div><label className={label}>Date of Birth</label><input className={input} type="date" value={form.date_of_birth} onChange={e => set('date_of_birth', e.target.value)} /></div>
+          </>)}
 
-          {/* Spouse */}
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className={label}>Spouse / Partner First</label><input className={input} value={form.secondary_first_name} onChange={e => set('secondary_first_name', e.target.value)} placeholder="First" /></div>
-            <div><label className={label}>Spouse / Partner Last</label><input className={input} value={form.secondary_last_name} onChange={e => set('secondary_last_name', e.target.value)} placeholder="Last" /></div>
-          </div>
-
-          {/* Phone / Cell / Email */}
-          <div className="grid grid-cols-3 gap-3">
-            <div><label className={label}>Phone</label><input className={input} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(555) 000-0000" /></div>
-            <div><label className={label}>Cell</label><input className={input} value={form.cell} onChange={e => set('cell', e.target.value)} placeholder="(555) 000-0000" /></div>
-            <div><label className={label}>Email</label><input className={input} value={form.email} onChange={e => set('email', e.target.value)} placeholder="email@example.com" type="email" /></div>
-          </div>
-
-          {/* Additional Emails / Phones */}
-          <div>
-            <label className={label}>Additional Emails <span className="font-normal text-gray-400">(one per line)</span></label>
-            <textarea className={input + ' resize-none'} rows={2} value={form._additionalEmailsRaw} onChange={e => set('_additionalEmailsRaw', e.target.value)} placeholder="extra@email.com" />
-          </div>
-          <div>
-            <label className={label}>Additional Phones <span className="font-normal text-gray-400">(one per line)</span></label>
-            <textarea className={input + ' resize-none'} rows={2} value={form._additionalPhonesRaw} onChange={e => set('_additionalPhonesRaw', e.target.value)} placeholder="+1 (555) 000-0000" />
-          </div>
-
-          {/* Address */}
-          <div><label className={label}>Street Address</label><input className={input} value={form.street_address} onChange={e => set('street_address', e.target.value)} placeholder="123 Main St" /></div>
-          <div className="grid grid-cols-3 gap-3">
-            <div><label className={label}>City</label><input className={input} value={form.city} onChange={e => set('city', e.target.value)} placeholder="City" /></div>
-            <div><label className={label}>State</label><input className={input} value={form.state} onChange={e => set('state', e.target.value)} placeholder="CA" maxLength={2} /></div>
-            <div><label className={label}>Zip</label><input className={input} value={form.zip} onChange={e => set('zip', e.target.value)} placeholder="90210" /></div>
-          </div>
-
-          {/* Company Address */}
-          <div className="border border-gray-200 rounded-xl p-3 bg-gray-50">
-            <p className="text-xs font-semibold text-gray-500 mb-2">Company Address</p>
-            <div className="space-y-2">
-              <input className={input} value={form.company_street} onChange={e => set('company_street', e.target.value)} placeholder="Company Street Address" />
-              <div className="grid grid-cols-3 gap-2">
-                <input className={input + ' col-span-1'} value={form.company_city} onChange={e => set('company_city', e.target.value)} placeholder="City" />
-                <input className={input} value={form.company_state} onChange={e => set('company_state', e.target.value)} placeholder="ST" maxLength={2} />
-                <input className={input} value={form.company_zip} onChange={e => set('company_zip', e.target.value)} placeholder="Zip" />
+          {/* ── Company fields ── */}
+          {form.entity_type === 'company' && (<>
+            <div><label className={label}>Company Name <span className="text-red-400">*</span></label><input className={input} value={form.company_name} onChange={e => set('company_name', e.target.value)} placeholder="Company name" autoFocus /></div>
+            <div className="border border-gray-200 rounded-xl p-3 bg-gray-50">
+              <p className="text-xs font-semibold text-gray-500 mb-2">Company Address</p>
+              <div className="space-y-2">
+                <input className={input} value={form.company_street} onChange={e => set('company_street', e.target.value)} placeholder="Street Address" />
+                <div className="grid grid-cols-3 gap-2">
+                  <input className={input} value={form.company_city} onChange={e => set('company_city', e.target.value)} placeholder="City" />
+                  <input className={input} value={form.company_state} onChange={e => set('company_state', e.target.value)} placeholder="ST" maxLength={2} />
+                  <input className={input} value={form.company_zip} onChange={e => set('company_zip', e.target.value)} placeholder="Zip" />
+                </div>
               </div>
             </div>
-          </div>
+            <CompanyContactsEditor
+              contacts={form.company_contacts}
+              onChange={val => set('company_contacts', val)}
+              inp={input} lbl={label}
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className={label}>Main Phone</label><input className={input} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(555) 000-0000" /></div>
+              <div><label className={label}>Main Email</label><input className={input} value={form.email} onChange={e => set('email', e.target.value)} placeholder="email@example.com" type="email" /></div>
+            </div>
+          </>)}
 
-          {/* Assigned To / Consultation Type */}
+          {/* ── Shared fields ── */}
           <div className="grid grid-cols-2 gap-3">
             <div><label className={label}>Assigned To</label><input className={input} value={form.ghl_assigned_to} onChange={e => set('ghl_assigned_to', e.target.value)} placeholder="Assignee name" /></div>
             <div>
@@ -174,22 +237,13 @@ function AddContactModal({ onSave, onClose }) {
               </select>
             </div>
           </div>
-
-          {/* Stage */}
           <div>
             <label className={label}>Stage</label>
             <select className={input} value={form.stage} onChange={e => set('stage', e.target.value)}>
               {STAGES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
           </div>
-
-          {/* Date of Birth */}
-          <div><label className={label}>Date of Birth</label><input className={input} type="date" value={form.date_of_birth} onChange={e => set('date_of_birth', e.target.value)} /></div>
-
-          {/* Notes */}
           <div><label className={label}>Notes</label><textarea className={input + ' resize-none'} rows={3} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Internal notes…" /></div>
-
-          {/* Project Description */}
           <div><label className={label}>Project Description</label><textarea className={input + ' resize-none'} rows={3} value={form.project_description} onChange={e => set('project_description', e.target.value)} placeholder="Describe the project or work needed…" /></div>
 
           {/* Marketing */}
@@ -223,8 +277,6 @@ function AddContactModal({ onSave, onClose }) {
               ))}
             </div>
           </div>
-
-          {/* Call Center Notes */}
           <div className="pt-3 border-t border-gray-100">
             <label className={label}>Call Center Notes</label>
             <textarea className={input + ' resize-none'} rows={3} value={form.call_center_notes} onChange={e => set('call_center_notes', e.target.value)} placeholder="Notes from call center…" />
@@ -241,7 +293,9 @@ function AddContactModal({ onSave, onClose }) {
           <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">Cancel</button>
           <button
             onClick={handleSave}
-            disabled={saving || (!form.last_name.trim() && !form.first_name.trim())}
+            disabled={saving || (form.entity_type !== 'company'
+              ? (!form.last_name.trim() && !form.first_name.trim())
+              : !form.company_name.trim())}
             className="flex-1 py-2 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800 disabled:opacity-50 transition-colors"
           >
             {saving ? 'Saving…' : 'Add Contact'}
