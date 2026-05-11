@@ -105,9 +105,10 @@ interface GhlContact {
   source?:      string
   type?:        string
   tags?:        string[]
-  dateAdded?:   string
-  dateUpdated?: string
+  dateAdded?:        string
+  dateUpdated?:      string
   dateOfBirth?:      string
+  lastActivityDate?: string
   assignedTo?:       string | { id?: string; name?: string }
   additionalEmails?: string[]
   // GHL returns additionalPhones as strings or {type,phoneNumber} objects
@@ -223,6 +224,19 @@ function extractCustomField(
   return String(v).trim() || null
 }
 
+// Try multiple name/key variants and return the first match.
+function extractCustomFieldByNames(
+  customFields: GhlContact['customFields'],
+  fieldKeyToId: Map<string, string>,
+  ...names: string[]
+): string | null {
+  for (const name of names) {
+    const val = extractCustomField(customFields, fieldKeyToId, name)
+    if (val !== null) return val
+  }
+  return null
+}
+
 function toPbsContact(c: GhlContact, fieldKeyToId: Map<string, string>) {
   // Name — search endpoint may return combined `name` instead of split fields
   let firstName = (c.firstName || '').trim()
@@ -267,9 +281,25 @@ function toPbsContact(c: GhlContact, fieldKeyToId: Map<string, string>) {
         .filter(Boolean)
     : null
 
+  // Resolve consultation_type — must be 'Design' | 'Estimate' | null
+  const rawConsultation = extractCustomFieldByNames(
+    c.customFields, fieldKeyToId,
+    'design or estimate consultation?',
+    'design or estimate consultation',
+    'consultation type',
+  )
+  let consultationType: string | null = null
+  if (rawConsultation) {
+    const lc = rawConsultation.toLowerCase()
+    if (lc.includes('design'))   consultationType = 'Design'
+    else if (lc.includes('estimate')) consultationType = 'Estimate'
+  }
+
   return {
     ghl_contact_id:    c.id,
     ghl_synced_at:     new Date().toISOString(),
+    // created_at is only meaningful on INSERT — callers strip it from UPDATE payloads.
+    ...(c.dateAdded ? { created_at: c.dateAdded } : {}),
     first_name:        firstName,
     last_name:         lastName,
     company_name:      c.companyName || null,
@@ -289,9 +319,38 @@ function toPbsContact(c: GhlContact, fieldKeyToId: Map<string, string>) {
     dnd_phone:         dndPhone,
     dnd_email:         dndEmail,
     dnd_sms:           dndSms,
-    date_of_birth:     c.dateOfBirth || null,
+    date_of_birth:     c.dateOfBirth       || null,
+    last_activity_at:  c.lastActivityDate  || null,
     ghl_assigned_to:   ghlAssignedTo,
     how_did_you_hear:  extractCustomField(c.customFields, fieldKeyToId, 'contact.how_did_you_hear_about_us'),
+    call_center_notes: extractCustomFieldByNames(
+      c.customFields, fieldKeyToId,
+      'call center notes',
+      'call_center_notes',
+    ),
+    consultation_type: consultationType,
+    interest_1:        extractCustomFieldByNames(
+      c.customFields, fieldKeyToId,
+      "i'm interested in #1",
+      'i am interested in #1',
+      "interested in #1",
+      'interest 1',
+    ),
+    interest_2:        extractCustomFieldByNames(
+      c.customFields, fieldKeyToId,
+      "i'm interested in #2",
+      'i am interested in #2',
+      "interested in #2",
+      'interest 2',
+    ),
+    interest_3:        extractCustomFieldByNames(
+      c.customFields, fieldKeyToId,
+      "i'm interested in (check all that apply)",
+      'i am interested in (check all that apply)',
+      "interested in (check all that apply)",
+      'interest 3',
+      'interested in',
+    ),
     additional_emails: additionalEmails,
     additional_phones: additionalPhones,
     ghl_custom_fields: rawCustomFields,
@@ -423,11 +482,14 @@ serve(async (req) => {
         // 1. ghl_contact_id
         const { data: byGhl } = await sb.from('contacts')
           .select('id').eq('ghl_contact_id', row.ghl_contact_id).maybeSingle()
+        // Strip created_at from all UPDATE payloads — it should only be set on INSERT.
+        const { created_at: _ca, ...updateRow } = row as any
+
         if (byGhl?.id) {
           counts.would_update_by_ghl_id += 1
           collectSample('ghl_id', c, { id: byGhl.id })
           if (!dryRun) {
-            const { error: uErr } = await sb.from('contacts').update(row).eq('id', byGhl.id)
+            const { error: uErr } = await sb.from('contacts').update(updateRow).eq('id', byGhl.id)
             if (uErr) throw new Error('Update by ghl_id failed: ' + uErr.message)
           }
           recordsSynced += 1; continue
@@ -441,7 +503,7 @@ serve(async (req) => {
             counts.would_update_by_email += 1
             collectSample('email', c, byEmail)
             if (!dryRun) {
-              const { error: u2 } = await sb.from('contacts').update(row).eq('id', byEmail.id)
+              const { error: u2 } = await sb.from('contacts').update(updateRow).eq('id', byEmail.id)
               if (u2) throw new Error('Update by email failed: ' + u2.message)
             }
             recordsSynced += 1; continue
@@ -463,7 +525,7 @@ serve(async (req) => {
             counts.would_update_by_phone += 1
             collectSample('phone', c, phoneHit)
             if (!dryRun) {
-              const { error: u3 } = await sb.from('contacts').update(row).eq('id', phoneHit.id)
+              const { error: u3 } = await sb.from('contacts').update(updateRow).eq('id', phoneHit.id)
               if (u3) throw new Error('Update by phone failed: ' + u3.message)
             }
             recordsSynced += 1; continue
@@ -481,7 +543,7 @@ serve(async (req) => {
             counts.would_update_by_name_zip += 1
             collectSample('name_zip', c, nzHit)
             if (!dryRun) {
-              const { error: u4 } = await sb.from('contacts').update(row).eq('id', nzHit.id)
+              const { error: u4 } = await sb.from('contacts').update(updateRow).eq('id', nzHit.id)
               if (u4) throw new Error('Update by name+zip failed: ' + u4.message)
             }
             recordsSynced += 1; continue

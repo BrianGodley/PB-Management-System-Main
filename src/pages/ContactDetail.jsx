@@ -72,9 +72,16 @@ function EditContactModal({ contact, onSave, onClose }) {
         company_zip:          form.company_zip?.trim() || null,
         contact_type:         form.contact_type || null,
         source:               form.source?.trim() || null,
+        how_did_you_hear:     form.how_did_you_hear?.trim() || null,
         date_of_birth:        form.date_of_birth || null,
         notes:                form.notes?.trim() || null,
         project_description:  form.project_description?.trim() || null,
+        ghl_assigned_to:      form.ghl_assigned_to?.trim() || null,
+        consultation_type:    form.consultation_type || null,
+        call_center_notes:    form.call_center_notes?.trim() || null,
+        interest_1:           form.interest_1 || null,
+        interest_2:           form.interest_2 || null,
+        interest_3:           form.interest_3 || null,
         additional_emails:    form._additionalEmailsRaw
           ? form._additionalEmailsRaw.split(/[\n,]+/).map(e => e.trim()).filter(Boolean)
           : (form.additional_emails || null),
@@ -149,20 +156,22 @@ function EditContactModal({ contact, onSave, onClose }) {
           )}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={lbl}>Contact Type</label>
-              <select className={inp} value={form.contact_type || ''} onChange={e => set('contact_type', e.target.value)}>
-                <option value="">— None —</option>
-                <option value="Residential">Residential</option>
-                <option value="Commercial">Commercial</option>
-                <option value="Public Works">Public Works</option>
-              </select>
+              <label className={lbl}>Assigned To</label>
+              <input className={inp} value={form.ghl_assigned_to || ''} onChange={e => set('ghl_assigned_to', e.target.value)} placeholder="GHL assignee" />
             </div>
             <div>
-              <label className={lbl}>Date of Birth</label>
-              <input className={inp} type="date" value={form.date_of_birth || ''} onChange={e => set('date_of_birth', e.target.value)} />
+              <label className={lbl}>Consultation Type</label>
+              <select className={inp} value={form.consultation_type || ''} onChange={e => set('consultation_type', e.target.value)}>
+                <option value="">— None —</option>
+                <option value="Design">Design</option>
+                <option value="Estimate">Estimate</option>
+              </select>
             </div>
           </div>
-          <div><label className={lbl}>Contact Source</label><input className={inp} value={form.source || ''} onChange={e => set('source', e.target.value)} /></div>
+          <div>
+            <label className={lbl}>Date of Birth</label>
+            <input className={inp} type="date" value={form.date_of_birth || ''} onChange={e => set('date_of_birth', e.target.value)} />
+          </div>
           <div>
             <label className={lbl}>Notes</label>
             <textarea className={inp + ' resize-none'} rows={3} value={form.notes || ''} onChange={e => set('notes', e.target.value)} placeholder="Internal notes…" />
@@ -170,6 +179,43 @@ function EditContactModal({ contact, onSave, onClose }) {
           <div>
             <label className={lbl}>Project Description</label>
             <textarea className={inp + ' resize-none'} rows={3} value={form.project_description || ''} onChange={e => set('project_description', e.target.value)} placeholder="Describe the project or work needed…" />
+          </div>
+          {/* Marketing section */}
+          <div className="pt-3 border-t border-gray-100">
+            <p className="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wide">Marketing</p>
+            <div className="space-y-3">
+              <div>
+                <label className={lbl}>Contact Type</label>
+                <select className={inp} value={form.contact_type || ''} onChange={e => set('contact_type', e.target.value)}>
+                  <option value="">— None —</option>
+                  <option value="Residential">Residential</option>
+                  <option value="Commercial">Commercial</option>
+                  <option value="Public Works">Public Works</option>
+                </select>
+              </div>
+              <div><label className={lbl}>Source Type</label><input className={inp} value={form.source || ''} onChange={e => set('source', e.target.value)} placeholder="e.g. Google, Referral…" /></div>
+              <div><label className={lbl}>Source Origin</label><input className={inp} value={form.how_did_you_hear || ''} onChange={e => set('how_did_you_hear', e.target.value)} placeholder="How did they hear about us?" /></div>
+              {[
+                { key: 'interest_1', label: 'Interested In #1' },
+                { key: 'interest_2', label: 'Interested In #2' },
+                { key: 'interest_3', label: 'Interested In #3' },
+              ].map(({ key, label }) => (
+                <div key={key}>
+                  <label className={lbl}>{label}</label>
+                  <select className={inp} value={form[key] || ''} onChange={e => set(key, e.target.value)}>
+                    <option value="">— None —</option>
+                    {['Artificial Turf','Concrete','Columns','Demo/Excavation','Drainage','Finishes','Fire Pit','Ground Treatments','Irrigation','Lighting','Outdoor Kitchen/BBQ','Pavers','Planting/Landscaping','Pool','Retaining Walls','Steps','Utilities','Other'].map(pt => (
+                      <option key={pt} value={pt}>{pt}</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Call Center Notes */}
+          <div className="pt-3 border-t border-gray-100">
+            <label className={lbl}>Call Center Notes</label>
+            <textarea className={inp + ' resize-none'} rows={3} value={form.call_center_notes || ''} onChange={e => set('call_center_notes', e.target.value)} placeholder="Notes from call center…" />
           </div>
         </div>
         <div className="flex gap-3 mt-6">
@@ -370,9 +416,10 @@ export default function ContactDetail() {
             {/* ── Tab bar ── */}
             <div className="flex border-b border-gray-200 mb-4 -mx-5 px-5">
               {[
-                { key: 'main', label: 'Main' },
-                { key: 'dnd',  label: 'DND'  },
-                { key: 'tags', label: 'Tags' },
+                { key: 'main',      label: 'Main' },
+                { key: 'marketing', label: 'Marketing' },
+                { key: 'dnd',       label: 'DND'  },
+                { key: 'tags',      label: 'Tags' },
               ].map(t => (
                 <button
                   key={t.key}
@@ -397,18 +444,24 @@ export default function ContactDetail() {
             {/* ── MAIN TAB ── */}
             {leftTab === 'main' && (
               <div className="space-y-3 text-sm">
+                {contact.ghl_assigned_to && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Assigned To</p>
+                    <p className="text-gray-700">{contact.ghl_assigned_to}</p>
+                  </div>
+                )}
+                {contact.consultation_type && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Consultation Type</p>
+                    <p className="text-gray-700">{contact.consultation_type}</p>
+                  </div>
+                )}
                 {(contact.secondary_first_name || contact.secondary_last_name) && (
                   <div>
                     <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Spouse / Partner</p>
                     <p className="text-gray-700">
                       {[contact.secondary_first_name, contact.secondary_last_name].filter(Boolean).join(' ')}
                     </p>
-                  </div>
-                )}
-                {contact.contact_type && (
-                  <div>
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Contact Type</p>
-                    <p className="text-gray-700">{contact.contact_type}</p>
                   </div>
                 )}
                 {contact.phone && (
@@ -465,17 +518,63 @@ export default function ContactDetail() {
                     <p className="text-gray-700">{new Date(contact.date_of_birth + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
                   </div>
                 )}
-                {contact.source && (
-                  <div>
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Contact Source</p>
-                    <p className="text-gray-700">{contact.source}</p>
-                  </div>
-                )}
                 {contact.project_description && (
                   <div>
                     <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Project Description</p>
                     <p className="text-gray-600 text-xs leading-relaxed whitespace-pre-wrap">{contact.project_description}</p>
                   </div>
+                )}
+              </div>
+            )}
+
+            {/* ── MARKETING TAB ── */}
+            {leftTab === 'marketing' && (
+              <div className="space-y-3 text-sm">
+                {contact.contact_type && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Contact Type</p>
+                    <p className="text-gray-700">{contact.contact_type}</p>
+                  </div>
+                )}
+                {contact.source && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Source Type</p>
+                    <p className="text-gray-700">{contact.source}</p>
+                  </div>
+                )}
+                {contact.how_did_you_hear && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Source Origin</p>
+                    <p className="text-gray-700">{contact.how_did_you_hear}</p>
+                  </div>
+                )}
+                {(contact.interest_1 || contact.interest_2 || contact.interest_3) && (
+                  <div className="pt-2 border-t border-gray-100">
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Project Interests</p>
+                    <div className="space-y-1">
+                      {contact.interest_1 && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-gray-400 w-4">#1</span>
+                          <span className="text-xs font-medium text-gray-700 bg-green-50 border border-green-200 rounded-full px-2.5 py-0.5">{contact.interest_1}</span>
+                        </div>
+                      )}
+                      {contact.interest_2 && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-gray-400 w-4">#2</span>
+                          <span className="text-xs font-medium text-gray-700 bg-green-50 border border-green-200 rounded-full px-2.5 py-0.5">{contact.interest_2}</span>
+                        </div>
+                      )}
+                      {contact.interest_3 && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-gray-400 w-4">#3</span>
+                          <span className="text-xs font-medium text-gray-700 bg-green-50 border border-green-200 rounded-full px-2.5 py-0.5">{contact.interest_3}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {!contact.contact_type && !contact.source && !contact.how_did_you_hear && !contact.interest_1 && !contact.interest_2 && !contact.interest_3 && (
+                  <p className="text-xs text-gray-400 italic text-center py-6">No marketing data yet</p>
                 )}
               </div>
             )}
@@ -568,6 +667,14 @@ export default function ContactDetail() {
                 <p className="text-xs text-gray-400 italic">No client linked yet</p>
               )}
             </div>
+
+            {/* Call Center Notes */}
+            {contact.call_center_notes && (
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Call Center Notes</p>
+                <p className="text-gray-600 text-xs leading-relaxed whitespace-pre-wrap max-h-32 overflow-y-auto">{contact.call_center_notes}</p>
+              </div>
+            )}
 
             {/* Notes — always visible above meta regardless of active tab */}
             {contact.notes && (
