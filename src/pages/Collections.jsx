@@ -16,7 +16,7 @@ const DAY_LABELS = { mon:'Monday', tue:'Tuesday', wed:'Wednesday', thu:'Thursday
 
 const PAY_CATS = [
   { key:'prelim',         label:'Prelims',            cols:['payee','starting_balance','new_charges','amount_current'],                           subtotalCol:'amount_current', colLabels:{ amount_current:'New Balance', starting_balance:'Starting Balance', new_charges:'New Charges' }, readOnlyCols:['starting_balance','amount_current'] },
-  { key:'credit_card',    label:'Credit Cards/Lines', cols:['payee','starting_balance','new_charges','amount_current','due_date','rate'],           subtotalCol:'amount_current', colLabels:{ amount_current:'New Balance', starting_balance:'Starting Balance', new_charges:'New Charges' }, readOnlyCols:['starting_balance','amount_current'] },
+  { key:'credit_card',    label:'Credit Cards/Lines', cols:['payee','starting_balance','amount_current','new_charges','due_date','rate'],           subtotalCol:'amount_current', colLabels:{ amount_current:'Ending Balance', starting_balance:'Starting Balance', new_charges:'New Charges' }, readOnlyCols:['starting_balance','new_charges'] },
   { key:'credit_account', label:'Credit Vendors',     cols:['payee','amount_current','amount_future','due_date'],                                   subtotalCol:['amount_current','amount_future'], colLabels:{ amount_current:'Current', amount_future:'Future' } },
   { key:'non_credit',     label:'Standard Vendors',   cols:['payee','amount_current','amount_future','due_date'],                                   subtotalCol:['amount_current','amount_future'], colLabels:{ amount_current:'Current', amount_future:'Future' } },
 ]
@@ -616,13 +616,18 @@ export default function Collections() {
     const numericFields = ['amount_current','amount_future','starting_balance','new_charges']
     const parsed = numericFields.includes(field) ? (parseFloat(value) || 0) : value
 
-    // For credit_card and prelim rows: when new_charges changes, auto-compute New Balance
     const updatePayload = { [field]: parsed }
-    if (field === 'new_charges') {
-      const row = payables.find(p => p.id === id)
-      if (row?.category === 'credit_card' || row?.category === 'prelim') {
-        updatePayload.amount_current = (parseFloat(row.starting_balance) || 0) + parsed
+    const row = payables.find(p => p.id === id)
+
+    if (row?.category === 'credit_card') {
+      // Credit Cards: user enters Ending Balance (amount_current);
+      // New Charges auto-calculates as Ending Balance − Starting Balance.
+      if (field === 'amount_current') {
+        updatePayload.new_charges = parsed - (parseFloat(row.starting_balance) || 0)
       }
+    } else if (field === 'new_charges' && row?.category === 'prelim') {
+      // Prelims keep the original pattern: New Charges → New Balance
+      updatePayload.amount_current = (parseFloat(row.starting_balance) || 0) + parsed
     }
 
     setPayables(prev => prev.map(p => p.id === id ? { ...p, ...updatePayload } : p))
