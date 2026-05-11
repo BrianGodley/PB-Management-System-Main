@@ -1000,7 +1000,7 @@ function DateRangeSelectorModal({ stat, onSelect, onClose }) {
 const MODAL_BLUE = '#354fa0'
 const TH_BLUE    = '#c5d5e8'
 
-function EditValueHistoryModal({ stat, fromDate, values, onClose, onRefresh, weekEndingDay }) {
+function EditValueHistoryModal({ stat, fromDate, values, onClose, onRefresh, weekEndingDay, readOnly = false }) {
   const { user }     = useAuth()
   const [drafts,     setDrafts]     = useState({})  // periodDate → string
   const [saving,     setSaving]     = useState(false)
@@ -1042,7 +1042,7 @@ function EditValueHistoryModal({ stat, fromDate, values, onClose, onRefresh, wee
   }, [drafts, periods, valueByPeriod])
 
   function handleClose() {
-    if (isDirty && !window.confirm('Leave without saving? Your edits will be lost.')) return
+    if (!readOnly && isDirty && !window.confirm('Leave without saving? Your edits will be lost.')) return
     onClose()
   }
 
@@ -1139,16 +1139,23 @@ function EditValueHistoryModal({ stat, fromDate, values, onClose, onRefresh, wee
         {/* ── Header ──────────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between px-6 py-3.5 flex-shrink-0"
              style={{ backgroundColor: MODAL_BLUE }}>
-          <h2 className="text-base font-semibold text-white truncate mr-4">{stat.name}</h2>
+          <div className="flex items-center gap-2 min-w-0 mr-4">
+            <h2 className="text-base font-semibold text-white truncate">{stat.name}</h2>
+            {readOnly && (
+              <span className="flex-shrink-0 text-[10px] bg-white/20 text-white px-2 py-0.5 rounded font-semibold">⚡ Auto · Read Only</span>
+            )}
+          </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              onClick={handleSave}
-              disabled={saving || !isDirty}
-              className="px-4 py-1.5 rounded text-sm font-bold bg-white hover:bg-gray-100 disabled:opacity-50 transition-colors"
-              style={{ color: MODAL_BLUE }}
-            >
-              {saving ? 'Saving…' : 'Save'}
-            </button>
+            {!readOnly && (
+              <button
+                onClick={handleSave}
+                disabled={saving || !isDirty}
+                className="px-4 py-1.5 rounded text-sm font-bold bg-white hover:bg-gray-100 disabled:opacity-50 transition-colors"
+                style={{ color: MODAL_BLUE }}
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+            )}
             <button
               onClick={handleClose}
               className="px-4 py-1.5 rounded text-sm font-bold text-white border border-white/40 hover:bg-white/10 transition-colors"
@@ -1189,9 +1196,14 @@ function EditValueHistoryModal({ stat, fromDate, values, onClose, onRefresh, wee
                       {group.periods.map(p => {
                         const hasVal = (drafts[p] ?? '') !== ''
                         return (
-                          <tr key={p}>
+                          <tr key={p} className={readOnly && !hasVal ? 'opacity-40' : ''}>
                             <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">{rowLabel(p)}</td>
-                            <td className="px-3 py-1">
+                            <td className="px-3 py-1.5">
+                              {readOnly ? (
+                                <span className={`text-sm font-medium ${hasVal ? 'text-gray-900' : 'text-gray-400'}`}>
+                                  {hasVal ? fmt(parseFloat(drafts[p]), stat.stat_type) : '—'}
+                                </span>
+                              ) : (
                               <input
                                 type="number"
                                 value={drafts[p] ?? ''}
@@ -1199,6 +1211,7 @@ function EditValueHistoryModal({ stat, fromDate, values, onClose, onRefresh, wee
                                 placeholder="—"
                                 className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
                               />
+                              )}
                             </td>
                           </tr>
                         )
@@ -1215,8 +1228,11 @@ function EditValueHistoryModal({ stat, fromDate, values, onClose, onRefresh, wee
         {/* Close button removed — header has Save + Close. Footer is now an info strip only. */}
         <div className="flex items-center px-6 py-3 border-t border-gray-200 flex-shrink-0">
           <span className="text-xs text-gray-400 capitalize">
-            {stat.tracking} · {fromDate} → {today()} · {Object.values(valueByPeriod).length} of {periods.length} entered
+            {stat.tracking} · {fromDate} → {today()} · {Object.values(valueByPeriod).length} of {periods.length} {readOnly ? 'auto-filled' : 'entered'}
           </span>
+          {readOnly && (
+            <span className="ml-auto text-xs text-blue-600 font-medium">Values are managed automatically by the Finance page</span>
+          )}
         </div>
       </div>
     </div>
@@ -7103,7 +7119,7 @@ export default function Statistics() {
             >
               ✏️ Edits
             </button>
-            {!['equation','overlay'].includes(selectedStat?.stat_category) && (
+            {!['equation','overlay','auto_internal'].includes(selectedStat?.stat_category) && (
               <button
                 onClick={() => setShowMobileEntryModal(true)}
                 className="sm:hidden text-xs font-semibold text-green-800 border border-green-600 bg-green-50 rounded-md px-2 py-1 flex-shrink-0"
@@ -7128,7 +7144,7 @@ export default function Statistics() {
                 }}
                 className="hidden sm:inline-flex text-sm font-medium text-blue-600 hover:text-blue-800 underline underline-offset-2 transition-colors flex-shrink-0"
               >
-                Edit Value History
+                {selectedStat?.stat_category === 'auto_internal' ? 'View Value History' : 'Edit Value History'}
               </button>
             )}
             <button
@@ -7994,6 +8010,7 @@ export default function Statistics() {
           onClose={() => setShowEditHistory(false)}
           onRefresh={refreshValues}
           weekEndingDay={weekEndingDay}
+          readOnly={selectedStat.stat_category === 'auto_internal'}
         />
       )}
 
@@ -8165,8 +8182,10 @@ export default function Statistics() {
                 }}
                 className="w-full text-left px-3 py-3 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm font-semibold text-blue-700 flex items-center gap-2"
               >
-                📅 Edit Value History
-                <span className="text-xs text-gray-400 ml-auto">View &amp; tweak past entries</span>
+                📅 {selectedStat?.stat_category === 'auto_internal' ? 'View Value History' : 'Edit Value History'}
+                <span className="text-xs text-gray-400 ml-auto">
+                  {selectedStat?.stat_category === 'auto_internal' ? 'Auto-filled · read only' : 'View & tweak past entries'}
+                </span>
               </button>
             )}
             <button
