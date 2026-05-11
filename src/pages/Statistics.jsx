@@ -7315,20 +7315,20 @@ export default function Statistics() {
                 >⠿</span>
                 <div className="flex-1 min-w-0">
                   <div className="truncate flex items-center gap-1">
-                    {s.name}
+                    <span className="font-semibold text-gray-900 truncate">{s.name}</span>
                     {s.stat_category === 'equation' && (
-                      <span className="text-xs bg-purple-100 text-purple-700 px-1 py-0.5 rounded font-semibold flex-shrink-0">∑</span>
+                      <span className="text-[8px] bg-purple-100 text-purple-700 px-0.5 py-px rounded font-semibold flex-shrink-0">∑</span>
                     )}
                     {s.stat_category === 'overlay' && (
-                      <span className="text-xs bg-indigo-100 text-indigo-700 px-1 py-0.5 rounded font-semibold flex-shrink-0">⊕</span>
+                      <span className="text-[8px] bg-indigo-100 text-indigo-700 px-0.5 py-px rounded font-semibold flex-shrink-0">⊕</span>
                     )}
                     {s.stat_category === 'auto_internal' && (
-                      <span className="text-[10px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-semibold flex-shrink-0">⚡</span>
+                      <span className="text-[7px] bg-blue-100 text-blue-700 px-0.5 py-px rounded font-semibold flex-shrink-0">⚡</span>
                     )}
                     {s.owner_user_id === user?.id ? (
-                      <span className="text-[10px] bg-green-100 text-green-700 px-1 py-0.5 rounded font-semibold flex-shrink-0" title="You own this stat">Owner</span>
+                      <span className="text-[7px] bg-green-100 text-green-700 px-0.5 py-px rounded font-semibold flex-shrink-0" title="You own this stat">Owner</span>
                     ) : userShares[s.id] ? (
-                      <span className="text-[10px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-semibold flex-shrink-0" title={`Shared with you (${userShares[s.id]})`}>
+                      <span className="text-[7px] bg-blue-100 text-blue-700 px-0.5 py-px rounded font-semibold flex-shrink-0" title={`Shared with you (${userShares[s.id]})`}>
                         Shared{userShares[s.id] === 'edit' ? ' ✏️' : ''}
                       </span>
                     ) : null}
