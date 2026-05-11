@@ -71,7 +71,7 @@ function addDays(isoDate, n) {
 }
 
 // ── Inline cell components ────────────────────────────────────────────────────
-function CellInput({ value, onSave, placeholder='', align='right' }) {
+function CellInput({ value, onSave, placeholder='', align='right', className:extraCls='' }) {
   const [local, setLocal] = useState(value ?? '')
   const [focused, setFocused] = useState(false)
   useEffect(() => setLocal(value ?? ''), [value])
@@ -88,7 +88,7 @@ function CellInput({ value, onSave, placeholder='', align='right' }) {
       onBlur={() => { setFocused(false); if (String(local) !== String(value ?? '')) onSave(local) }}
       onKeyDown={e => { if (e.key==='Enter') e.target.blur() }}
       placeholder={placeholder}
-      className={`w-full bg-transparent text-${align} text-xs px-1 py-0.5 focus:outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-300 rounded`}
+      className={`w-full bg-transparent text-${align} text-xs px-1 py-0.5 focus:outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-300 rounded ${extraCls}`}
     />
   )
 }
@@ -1108,7 +1108,7 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
           <tr className="bg-gray-100 border-b border-gray-300">
             {DAYS.map(d => (
               <>
-                <th key={d+'i'} className="px-2 py-1 text-center text-gray-600 font-semibold text-[10px] border-l border-gray-400">Invoice</th>
+                <th key={d+'i'} className="px-2 py-1 text-center text-red-500 font-semibold text-[10px] border-l border-gray-400">Invoice</th>
                 <th key={d+'d'} className="px-2 py-1 text-center text-gray-600 font-semibold text-[10px] border-l border-r border-gray-400">Deposit</th>
               </>
             ))}
@@ -1185,7 +1185,7 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
                     {DAYS.map(d => (
                       <>
                         <td key={d+'i'} className="px-1 py-1 border-l border-gray-400">
-                          <CellInput value={row[`${d}_inv`]||''} onSave={v => onUpdate(row.id,`${d}_inv`,v)} />
+                          <CellInput value={row[`${d}_inv`]||''} onSave={v => onUpdate(row.id,`${d}_inv`,v)} className="text-red-600" />
                         </td>
                         <td key={d+'d'} className="px-1 py-1 border-l border-r border-gray-400">
                           <CellInput value={row[`${d}_dep`]||''} onSave={v => onUpdate(row.id,`${d}_dep`,v)} />
@@ -1216,7 +1216,7 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
               const depS = rows.reduce((s,r) => s + (parseFloat(r[`${d}_dep`])||0), 0)
               return (
                 <>
-                  <td key={d+'i'} className="px-2 py-2 text-right text-gray-600 border-l border-amber-200 text-[11px]">{fmtC(invS)}</td>
+                  <td key={d+'i'} className="px-2 py-2 text-right text-red-600 border-l border-amber-200 text-[11px]">{fmtC(invS)}</td>
                   <td key={d+'d'} className="px-2 py-2 text-right text-gray-600 text-[11px]">{fmtC(depS)}</td>
                 </>
               )
@@ -1340,7 +1340,7 @@ function PayablesAllocSection({ rows, onUpdate, onDelete, onAddFromPayable, payS
                 >+</button>
               </div>
               {isOpen && (
-                <div className="absolute right-0 top-full z-30 bg-white border border-gray-200 rounded-lg shadow-xl min-w-[260px]">
+                <div className="absolute right-0 top-full z-30 bg-white border border-gray-200 rounded-lg shadow-xl min-w-[280px] max-h-80 overflow-y-auto">
                   <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Select from {sub.label}</span>
                     <button onClick={() => setOpenDropdown(null)} className="text-gray-400 hover:text-gray-600 text-sm leading-none">✕</button>
@@ -1348,7 +1348,37 @@ function PayablesAllocSection({ rows, onUpdate, onDelete, onAddFromPayable, payS
                   {available.length === 0
                     ? <div className="px-3 py-2 text-xs text-gray-400 italic">All rows already added</div>
                     : available.map(p => {
-                        const cols = Array.isArray(sub.subtotalCol) ? sub.subtotalCol : [sub.subtotalCol]
+                        const isMultiCol = Array.isArray(sub.subtotalCol)
+                        if (isMultiCol) {
+                          // Credit Vendors / Standard Vendors — let user pick Current, Future, or Both
+                          const cur  = parseFloat(p.amount_current)  || 0
+                          const fut  = parseFloat(p.amount_future)   || 0
+                          const both = cur + fut
+                          return (
+                            <div key={p.id} className="border-b border-gray-50 last:border-b-0 px-3 py-2">
+                              <p className="text-[11px] font-semibold text-gray-700 mb-1.5 truncate">{p.payee}</p>
+                              <div className="flex gap-1.5">
+                                {[
+                                  { label: 'Current', amt: cur  },
+                                  { label: 'Future',  amt: fut  },
+                                  { label: 'Both',    amt: both },
+                                ].map(opt => (
+                                  <button
+                                    key={opt.label}
+                                    disabled={opt.amt === 0}
+                                    onClick={() => { onAddFromPayable(sub.key, p, opt.amt); setOpenDropdown(null) }}
+                                    className="flex-1 flex flex-col items-center py-1 px-1 rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                  >
+                                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide">{opt.label}</span>
+                                    <span className="text-[11px] font-semibold text-gray-700 mt-0.5">{fmtC(opt.amt)}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )
+                        }
+                        // Single-column categories (Prelims, Credit Cards) — original single button
+                        const cols = [sub.subtotalCol]
                         const amt = cols.reduce((s,c) => s + (parseFloat(p[c]) || 0), 0)
                         return (
                           <button
