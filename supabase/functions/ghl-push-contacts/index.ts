@@ -155,7 +155,7 @@ const CONTACT_SELECT_COLS = [
   'source', 'tags',
   'dnd', 'dnd_phone', 'dnd_email', 'dnd_sms',
   'date_of_birth',
-  'how_did_you_hear',
+  'how_did_you_hear', 'campaign',
   'additional_emails', 'additional_phones',
   'ghl_custom_fields',
   'updated_at', 'ghl_synced_at', 'ghl_contact_id',

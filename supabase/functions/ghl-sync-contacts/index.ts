@@ -354,7 +354,19 @@ function toPbsContact(
     date_of_birth:     c.dateOfBirth       || null,
     last_activity_at:  c.lastActivityDate  || null,
     ghl_assigned_to:   ghlAssignedTo,
-    how_did_you_hear:  extractCustomField(c.customFields, fieldKeyToId, 'contact.how_did_you_hear_about_us'),
+    how_did_you_hear:  extractCustomFieldByNames(
+      c.customFields, fieldKeyToId,
+      'contact.how_did_you_hear_about_us',
+      'how did you hear about us?',
+      'how did you hear about us',
+      'how_did_you_hear_about_us',
+    ),
+    campaign:          extractCustomFieldByNames(
+      c.customFields, fieldKeyToId,
+      'campaign',
+      'campaign name',
+      'marketing campaign',
+    ),
     call_center_notes: extractCustomFieldByNames(
       c.customFields, fieldKeyToId,
       'call center notes',

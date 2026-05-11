@@ -72,6 +72,7 @@ function EditContactModal({ contact, onSave, onClose }) {
         company_zip:          form.company_zip?.trim() || null,
         contact_type:         form.contact_type || null,
         source:               form.source?.trim() || null,
+        campaign:             form.campaign?.trim() || null,
         how_did_you_hear:     form.how_did_you_hear?.trim() || null,
         date_of_birth:        form.date_of_birth || null,
         notes:                form.notes?.trim() || null,
@@ -194,6 +195,7 @@ function EditContactModal({ contact, onSave, onClose }) {
                 </select>
               </div>
               <div><label className={lbl}>Source Type</label><input className={inp} value={form.source || ''} onChange={e => set('source', e.target.value)} placeholder="e.g. Google, Referral…" /></div>
+              <div><label className={lbl}>Campaign</label><input className={inp} value={form.campaign || ''} onChange={e => set('campaign', e.target.value)} placeholder="e.g. Spring Promo, Google Ads…" /></div>
               <div><label className={lbl}>Source Origin</label><input className={inp} value={form.how_did_you_hear || ''} onChange={e => set('how_did_you_hear', e.target.value)} placeholder="How did they hear about us?" /></div>
               {[
                 { key: 'interest_1', label: 'Interested In #1' },
@@ -289,6 +291,11 @@ export default function ContactDetail() {
     await supabase.from('contact_communications').delete().eq('contact_id', id)
     await supabase.from('contacts').delete().eq('id', id)
     navigate('/contacts')
+  }
+
+  async function handleContactTypeChange(newType) {
+    setContact(p => ({ ...p, contact_type: newType }))
+    await supabase.from('contacts').update({ contact_type: newType }).eq('id', id)
   }
 
   async function handleDndToggle(field) {
@@ -530,52 +537,59 @@ export default function ContactDetail() {
             {/* ── MARKETING TAB ── */}
             {leftTab === 'marketing' && (
               <div className="space-y-3 text-sm">
-                {contact.contact_type && (
-                  <div>
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Contact Type</p>
-                    <p className="text-gray-700">{contact.contact_type}</p>
+
+                {/* Contact Type — interactive dropdown, always visible, defaults to Residential */}
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Contact Type</p>
+                  <select
+                    value={contact.contact_type || 'Residential'}
+                    onChange={e => handleContactTypeChange(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600 bg-white cursor-pointer"
+                  >
+                    <option value="Residential">Residential</option>
+                    <option value="Commercial">Commercial</option>
+                    <option value="Public Works">Public Works</option>
+                  </select>
+                </div>
+
+                {/* Source Type — always visible */}
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Source Type</p>
+                  <p className="text-gray-700">{contact.source || <span className="text-gray-300">—</span>}</p>
+                </div>
+
+                {/* Campaign — always visible */}
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Campaign</p>
+                  <p className="text-gray-700">{contact.campaign || <span className="text-gray-300">—</span>}</p>
+                </div>
+
+                {/* Source Origin — always visible */}
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Source Origin</p>
+                  <p className="text-gray-700">{contact.how_did_you_hear || <span className="text-gray-300">—</span>}</p>
+                </div>
+
+                {/* Project Interests — always visible */}
+                <div className="pt-2 border-t border-gray-100">
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Project Interests</p>
+                  <div className="space-y-1.5">
+                    {[
+                      { label: '#1', val: contact.interest_1 },
+                      { label: '#2', val: contact.interest_2 },
+                      { label: '#3', val: contact.interest_3 },
+                    ].map(({ label, val }) => (
+                      <div key={label} className="flex items-center gap-2">
+                        <span className="text-[10px] text-gray-400 w-4 flex-shrink-0">{label}</span>
+                        {val
+                          ? <span className="text-xs font-medium text-gray-700 bg-green-50 border border-green-200 rounded-full px-2.5 py-0.5">{val}</span>
+                          : <span className="text-xs text-gray-300">—</span>
+                        }
+                      </div>
+                    ))}
                   </div>
-                )}
-                {contact.source && (
-                  <div>
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Source Type</p>
-                    <p className="text-gray-700">{contact.source}</p>
-                  </div>
-                )}
-                {contact.how_did_you_hear && (
-                  <div>
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Source Origin</p>
-                    <p className="text-gray-700">{contact.how_did_you_hear}</p>
-                  </div>
-                )}
-                {(contact.interest_1 || contact.interest_2 || contact.interest_3) && (
-                  <div className="pt-2 border-t border-gray-100">
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Project Interests</p>
-                    <div className="space-y-1">
-                      {contact.interest_1 && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] text-gray-400 w-4">#1</span>
-                          <span className="text-xs font-medium text-gray-700 bg-green-50 border border-green-200 rounded-full px-2.5 py-0.5">{contact.interest_1}</span>
-                        </div>
-                      )}
-                      {contact.interest_2 && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] text-gray-400 w-4">#2</span>
-                          <span className="text-xs font-medium text-gray-700 bg-green-50 border border-green-200 rounded-full px-2.5 py-0.5">{contact.interest_2}</span>
-                        </div>
-                      )}
-                      {contact.interest_3 && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] text-gray-400 w-4">#3</span>
-                          <span className="text-xs font-medium text-gray-700 bg-green-50 border border-green-200 rounded-full px-2.5 py-0.5">{contact.interest_3}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-                {!contact.contact_type && !contact.source && !contact.how_did_you_hear && !contact.interest_1 && !contact.interest_2 && !contact.interest_3 && (
-                  <p className="text-xs text-gray-400 italic text-center py-6">No marketing data yet</p>
-                )}
+                </div>
+
               </div>
             )}
 

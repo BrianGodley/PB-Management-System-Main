@@ -23,7 +23,7 @@ const EMPTY_FORM = {
   phone: '', cell: '', email: '',
   street_address: '', city: '', state: '', zip: '',
   company_street: '', company_city: '', company_state: '', company_zip: '',
-  stage: 'new_lead', contact_type: '', source: '', project_description: '',
+  stage: 'new_lead', contact_type: 'Residential', source: '', campaign: '', project_description: '',
   date_of_birth: '',
   interest_1: '', interest_2: '', interest_3: '',
 }
@@ -68,6 +68,7 @@ function AddContactModal({ onSave, onClose }) {
         stage:                form.stage,
         contact_type:         form.contact_type || null,
         source:               form.source.trim() || null,
+        campaign:             form.campaign.trim() || null,
         date_of_birth:        form.date_of_birth || null,
         project_description:  form.project_description.trim() || null,
         interest_1:           form.interest_1 || null,
@@ -193,6 +194,10 @@ function AddContactModal({ onSave, onClose }) {
             <div>
               <label className={label}>Source Type</label>
               <input className={input} value={form.source} onChange={e => set('source', e.target.value)} placeholder="Referral, Google…" />
+            </div>
+            <div>
+              <label className={label}>Campaign</label>
+              <input className={input} value={form.campaign} onChange={e => set('campaign', e.target.value)} placeholder="e.g. Spring Promo, Google Ads…" />
             </div>
           </div>
 
