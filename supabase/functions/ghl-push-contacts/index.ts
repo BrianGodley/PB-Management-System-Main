@@ -27,10 +27,10 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const GHL_BASE_URL    = 'https://services.leadconnectorhq.com'
-const GHL_API_VERSION = '2021-07-28'
-const DEFAULT_BATCH   = 200    // contacts per invocation
-const MAX_BATCH       = 500    // hard ceiling so we don't blow the timeout
+const GHL_BASE_URL     = 'https://services.leadconnectorhq.com'
+const GHL_API_VERSION  = '2021-07-28'
+const DEFAULT_BATCH    = 200    // contacts per invocation
+const MAX_BATCH        = 500    // hard ceiling so we don't blow the timeout
 const PER_REQ_DELAY_MS = 120   // ~8 req/sec; well under GHL's 10 rps limit
 
 const corsHeaders = {
@@ -72,23 +72,37 @@ async function requireAdmin(req: Request): Promise<{ userId: string }> {
 }
 
 // Build the GHL upsert payload from a PBS contacts row.
+// Includes all fields that GHL's /contacts/upsert accepts.
 function toGhlPayload(c: any, locationId: string) {
   const payload: Record<string, unknown> = {
     locationId,
-    firstName:   c.first_name || undefined,
-    lastName:    c.last_name  || undefined,
+    firstName:   c.first_name   || undefined,
+    lastName:    c.last_name    || undefined,
     name:        [c.first_name, c.last_name].filter(Boolean).join(' ').trim() || undefined,
     companyName: c.company_name || undefined,
-    email:       c.email      || undefined,
+    email:       c.email        || undefined,
     phone:       c.phone || c.cell || undefined,
     address1:    c.street_address || undefined,
-    city:        c.city  || undefined,
-    state:       c.state || undefined,
-    postalCode:  c.zip   || undefined,
-    source:      c.source || undefined,
+    city:        c.city          || undefined,
+    state:       c.state         || undefined,
+    postalCode:  c.zip           || undefined,
+    country:     c.country       || undefined,
+    timezone:    c.timezone      || undefined,
+    website:     c.website       || undefined,
+    source:      c.source        || undefined,
+    // DND — push the overall flag; GHL will apply it to all channels.
+    dnd:         c.dnd ?? undefined,
   }
+
   if (Array.isArray(c.tags) && c.tags.length) payload.tags = c.tags
-  // Drop undefined keys so we don't send them.
+
+  // Push custom fields back if we have them stored as JSONB.
+  // GHL expects customFields as [{id, fieldValue}].
+  if (Array.isArray(c.ghl_custom_fields) && c.ghl_custom_fields.length) {
+    payload.customFields = c.ghl_custom_fields
+  }
+
+  // Drop undefined and empty-string keys.
   for (const k of Object.keys(payload)) {
     if (payload[k] === undefined || payload[k] === '') delete payload[k]
   }
@@ -114,11 +128,10 @@ async function ghlUpsert(token: string, payload: Record<string, unknown>): Promi
   if (!res.ok) {
     const msg = body?.message || body?.error || `GHL ${res.status}`
     const err: any = new Error(msg)
-    err.status = res.status
+    err.status  = res.status
     err.payload = body
     throw err
   }
-  // GHL response shape varies slightly across versions. Be defensive.
   const id    = body?.contact?.id || body?.id
   const isNew = !!(body?.new ?? body?.isNew ?? body?.created)
   if (!id) throw new Error('GHL upsert response missing contact id.')
@@ -127,12 +140,27 @@ async function ghlUpsert(token: string, payload: Record<string, unknown>): Promi
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
+// All PBS contacts columns we read for outbound push (keeps the SELECT minimal
+// but complete for the toGhlPayload mapping).
+const CONTACT_SELECT_COLS = [
+  'id',
+  'first_name', 'last_name', 'company_name',
+  'email', 'phone', 'cell',
+  'street_address', 'city', 'state', 'zip', 'country',
+  'timezone', 'website',
+  'source', 'tags',
+  'dnd', 'dnd_phone', 'dnd_email', 'dnd_sms',
+  'how_did_you_hear',
+  'ghl_custom_fields',
+  'updated_at', 'ghl_synced_at', 'ghl_contact_id',
+].join(', ')
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST')   return json(405, { error: 'Method not allowed' })
 
   const sb = adminClient()
-  let pushedCount = 0
+  let pushedCount  = 0
   let createdCount = 0
   let updatedCount = 0
   let errorCount   = 0
@@ -155,50 +183,37 @@ serve(async (req) => {
       return json(200, { ok: true, skipped: true, reason: 'Contacts sync disabled.' })
     }
 
-    // Mark running.
     if (!dryRun) {
       await sb.from('ghl_sync_state')
         .update({ last_run_at: new Date().toISOString(), last_run_status: 'running', last_run_message: '' })
         .eq('object_type', 'contacts')
     }
 
-    // Find pushable rows. PostgREST's .gt() takes a *literal* value (not a
-    // column reference), so we can't ask it to compare two columns
-    // server-side. Instead we pull two batches and combine them in JS:
-    //   (a) rows with no GHL link            — limit to `limit`
-    //   (b) rows that are linked, ordered by updated_at desc; we then
-    //       filter in JS to keep only those where updated_at > ghl_synced_at.
-    // Total round-trip is small even on 5k contacts (linked rows grow
-    // gradually as the integration matures).
+    // Pull two sets of pushable rows and merge them in JS (PostgREST can't
+    // compare two columns server-side with .gt()).
     const [{ data: noLink, error: nErr }, { data: linked, error: sErr }] = await Promise.all([
       sb.from('contacts')
-        .select('id, first_name, last_name, company_name, email, phone, cell, street_address, city, state, zip, source, tags, updated_at, ghl_synced_at, ghl_contact_id')
+        .select(CONTACT_SELECT_COLS)
         .is('ghl_contact_id', null)
         .order('id', { ascending: true })
         .limit(limit),
       sb.from('contacts')
-        .select('id, first_name, last_name, company_name, email, phone, cell, street_address, city, state, zip, source, tags, updated_at, ghl_synced_at, ghl_contact_id')
+        .select(CONTACT_SELECT_COLS)
         .not('ghl_contact_id', 'is', null)
         .order('updated_at', { ascending: false })
-        .limit(2000),  // cap the pre-filter pull; in practice stale rows are a small subset
+        .limit(2000),
     ])
     if (nErr) throw new Error('Failed to load no-link rows: ' + nErr.message)
     if (sErr) throw new Error('Failed to load linked rows: '  + sErr.message)
+
     const stale = (linked || [])
       .filter(r => r.updated_at && r.ghl_synced_at && r.updated_at > r.ghl_synced_at)
       .slice(0, limit)
 
-    // GHL's /contacts/upsert requires at least one of email or phone to
-    // dedupe against. PBS contacts that have neither (name-only rows from
-    // legacy imports) will always 422 on upsert. Filter them out so they
-    // don't burn API calls and inflate the error count. They'll need
-    // contact info added in PBS before they can sync upward.
+    // GHL /contacts/upsert requires at least one of email or phone.
     const hasEmailOrPhone = (r: any) =>
       (r.email && r.email.trim()) || (r.phone && r.phone.trim()) || (r.cell && r.cell.trim())
 
-    // Combine + de-dupe by id; cap at limit. New rows first so initial
-    // bulk push works through your backlog before chasing tiny edits.
-    // Also skip rows GHL would reject (no email or phone).
     const seen = new Set<string>()
     const queue: any[] = []
     let skippedNoContactInfo = 0
@@ -210,12 +225,7 @@ serve(async (req) => {
       if (queue.length >= limit) break
     }
 
-    // For an accurate `remaining` count we need to know how many rows
-    // *total* are eligible (vs the at-most-`limit` we've loaded into the
-    // queue). PostgREST can answer the no-link count exactly with a HEAD
-    // request; the stale count we approximate from the linked sample we
-    // already pulled (capped at 2000). For an org with thousands of
-    // pending edits we'd build a Postgres view; here it's plenty.
+    // Accurate `remaining` count.
     const { count: noLinkTotal } = await sb.from('contacts')
       .select('id', { count: 'exact', head: true })
       .is('ghl_contact_id', null)
@@ -225,25 +235,26 @@ serve(async (req) => {
     const totalEligible = (noLinkTotal || 0) + staleTotal
 
     if (dryRun) {
-      // Sample up to 25 rows from the head of the queue.
       const samples = queue.slice(0, 25).map(r => ({
-        pbs_id:  r.id,
-        kind:    r.ghl_contact_id ? 'update' : 'create',
-        first_name: r.first_name, last_name: r.last_name, email: r.email,
+        pbs_id:     r.id,
+        kind:       r.ghl_contact_id ? 'update' : 'create',
+        first_name: r.first_name,
+        last_name:  r.last_name,
+        email:      r.email,
       }))
       return json(200, {
-        ok:                          true,
-        dry_run:                     true,
-        would_create:                (noLinkTotal || 0),
-        would_update:                (staleTotal || 0),
-        total_eligible:              totalEligible,
-        next_batch_size:             queue.length,
-        skipped_no_contact_info:     skippedNoContactInfo,
+        ok:                      true,
+        dry_run:                 true,
+        would_create:            (noLinkTotal || 0),
+        would_update:            (staleTotal  || 0),
+        total_eligible:          totalEligible,
+        next_batch_size:         queue.length,
+        skipped_no_contact_info: skippedNoContactInfo,
         samples,
       })
     }
 
-    // Real run: walk the queue, upsert each, stamp the id back.
+    // Real run: upsert each contact in GHL and stamp the id back.
     const nowIso = new Date().toISOString()
     for (const r of queue) {
       try {
@@ -258,8 +269,7 @@ serve(async (req) => {
       } catch (e: any) {
         errorCount += 1
         errors.push({ pbs_id: r.id, message: e?.message || 'unknown' })
-        // Don't bail — log and keep going. Network blips on row N shouldn't
-        // tank rows N+1..N+200.
+        // Don't bail — log and keep going.
       }
     }
 
@@ -285,14 +295,14 @@ serve(async (req) => {
     })
 
     return json(200, {
-      ok:               true,
-      pushed:           pushedCount,
-      created:          createdCount,
-      updated:          updatedCount,
-      errors:           errorCount,
-      first_errors:     errors.slice(0, 10),
+      ok:             true,
+      pushed:         pushedCount,
+      created:        createdCount,
+      updated:        updatedCount,
+      errors:         errorCount,
+      first_errors:   errors.slice(0, 10),
       remaining,
-      total_eligible:   totalEligible,
+      total_eligible: totalEligible,
     })
   } catch (e) {
     const msg = (e as Error)?.message || 'Unknown error'
