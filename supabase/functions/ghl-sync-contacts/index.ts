@@ -601,8 +601,9 @@ serve(async (req) => {
       last_run_message:     logMessage,
     }).eq('object_type', 'contacts')
 
-    await sb.rpc('add_to_ghl_inbound_count', { p_object_type: 'contacts', p_n: recordsSynced })
-      .catch(() => { /* RPC is optional; ignore if not present */ })
+    try {
+      await sb.rpc('add_to_ghl_inbound_count', { p_object_type: 'contacts', p_n: recordsSynced })
+    } catch { /* RPC is optional; ignore if not present */ }
 
     await sb.from('ghl_sync_log').insert({
       object_type:    'contacts',
