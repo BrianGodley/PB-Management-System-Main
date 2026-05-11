@@ -21,11 +21,15 @@ const EMPTY_FORM = {
   first_name: '', last_name: '', company_name: '',
   secondary_first_name: '', secondary_last_name: '',
   phone: '', cell: '', email: '',
+  _additionalEmailsRaw: '', _additionalPhonesRaw: '',
   street_address: '', city: '', state: '', zip: '',
   company_street: '', company_city: '', company_state: '', company_zip: '',
-  stage: 'new_lead', contact_type: 'Residential', source: '', campaign: '', project_description: '',
-  date_of_birth: '',
+  ghl_assigned_to: '', consultation_type: '',
+  date_of_birth: '', notes: '', project_description: '',
+  stage: 'new_lead', contact_type: 'Residential',
+  source: '', campaign: '', how_did_you_hear: '',
   interest_1: '', interest_2: '', interest_3: '',
+  call_center_notes: '',
 }
 
 const PROJECT_TYPES = [
@@ -57,6 +61,12 @@ function AddContactModal({ onSave, onClose }) {
         phone:                form.phone.trim() || null,
         cell:                 form.cell.trim() || null,
         email:                form.email.trim() || null,
+        additional_emails:    form._additionalEmailsRaw
+          ? form._additionalEmailsRaw.split(/[\n,]+/).map(e => e.trim()).filter(Boolean)
+          : null,
+        additional_phones:    form._additionalPhonesRaw
+          ? form._additionalPhonesRaw.split(/[\n,]+/).map(p => p.trim()).filter(Boolean)
+          : null,
         street_address:       form.street_address.trim() || null,
         city:                 form.city.trim() || null,
         state:                form.state.trim() || null,
@@ -65,15 +75,20 @@ function AddContactModal({ onSave, onClose }) {
         company_city:         form.company_city.trim() || null,
         company_state:        form.company_state.trim() || null,
         company_zip:          form.company_zip.trim() || null,
+        ghl_assigned_to:      form.ghl_assigned_to.trim() || null,
+        consultation_type:    form.consultation_type || null,
         stage:                form.stage,
         contact_type:         form.contact_type || null,
         source:               form.source.trim() || null,
         campaign:             form.campaign.trim() || null,
+        how_did_you_hear:     form.how_did_you_hear.trim() || null,
         date_of_birth:        form.date_of_birth || null,
+        notes:                form.notes.trim() || null,
         project_description:  form.project_description.trim() || null,
         interest_1:           form.interest_1 || null,
         interest_2:           form.interest_2 || null,
         interest_3:           form.interest_3 || null,
+        call_center_notes:    form.call_center_notes.trim() || null,
       })
       .select()
       .single()
@@ -94,68 +109,47 @@ function AddContactModal({ onSave, onClose }) {
         </div>
 
         <div className="space-y-3">
+          {/* Name */}
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={label}>First Name</label>
-              <input className={input} value={form.first_name} onChange={e => set('first_name', e.target.value)} placeholder="First" />
-            </div>
-            <div>
-              <label className={label}>Last Name <span className="text-red-400">*</span></label>
-              <input className={input} value={form.last_name} onChange={e => set('last_name', e.target.value)} placeholder="Last" autoFocus />
-            </div>
+            <div><label className={label}>First Name</label><input className={input} value={form.first_name} onChange={e => set('first_name', e.target.value)} placeholder="First" /></div>
+            <div><label className={label}>Last Name <span className="text-red-400">*</span></label><input className={input} value={form.last_name} onChange={e => set('last_name', e.target.value)} placeholder="Last" autoFocus /></div>
           </div>
 
-          <div>
-            <label className={label}>Company Name</label>
-            <input className={input} value={form.company_name} onChange={e => set('company_name', e.target.value)} placeholder="Optional" />
-          </div>
+          {/* Company */}
+          <div><label className={label}>Company</label><input className={input} value={form.company_name} onChange={e => set('company_name', e.target.value)} placeholder="Optional" /></div>
 
+          {/* Spouse */}
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={label}>Spouse / Partner First</label>
-              <input className={input} value={form.secondary_first_name} onChange={e => set('secondary_first_name', e.target.value)} placeholder="First" />
-            </div>
-            <div>
-              <label className={label}>Spouse / Partner Last</label>
-              <input className={input} value={form.secondary_last_name} onChange={e => set('secondary_last_name', e.target.value)} placeholder="Last" />
-            </div>
+            <div><label className={label}>Spouse / Partner First</label><input className={input} value={form.secondary_first_name} onChange={e => set('secondary_first_name', e.target.value)} placeholder="First" /></div>
+            <div><label className={label}>Spouse / Partner Last</label><input className={input} value={form.secondary_last_name} onChange={e => set('secondary_last_name', e.target.value)} placeholder="Last" /></div>
           </div>
 
+          {/* Phone / Cell / Email */}
           <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className={label}>Phone</label>
-              <input className={input} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(555) 000-0000" />
-            </div>
-            <div>
-              <label className={label}>Cell</label>
-              <input className={input} value={form.cell} onChange={e => set('cell', e.target.value)} placeholder="(555) 000-0000" />
-            </div>
-            <div>
-              <label className={label}>Email</label>
-              <input className={input} value={form.email} onChange={e => set('email', e.target.value)} placeholder="email@example.com" type="email" />
-            </div>
+            <div><label className={label}>Phone</label><input className={input} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(555) 000-0000" /></div>
+            <div><label className={label}>Cell</label><input className={input} value={form.cell} onChange={e => set('cell', e.target.value)} placeholder="(555) 000-0000" /></div>
+            <div><label className={label}>Email</label><input className={input} value={form.email} onChange={e => set('email', e.target.value)} placeholder="email@example.com" type="email" /></div>
           </div>
 
+          {/* Additional Emails / Phones */}
           <div>
-            <label className={label}>Street Address</label>
-            <input className={input} value={form.street_address} onChange={e => set('street_address', e.target.value)} placeholder="123 Main St" />
+            <label className={label}>Additional Emails <span className="font-normal text-gray-400">(one per line)</span></label>
+            <textarea className={input + ' resize-none'} rows={2} value={form._additionalEmailsRaw} onChange={e => set('_additionalEmailsRaw', e.target.value)} placeholder="extra@email.com" />
+          </div>
+          <div>
+            <label className={label}>Additional Phones <span className="font-normal text-gray-400">(one per line)</span></label>
+            <textarea className={input + ' resize-none'} rows={2} value={form._additionalPhonesRaw} onChange={e => set('_additionalPhonesRaw', e.target.value)} placeholder="+1 (555) 000-0000" />
           </div>
 
+          {/* Address */}
+          <div><label className={label}>Street Address</label><input className={input} value={form.street_address} onChange={e => set('street_address', e.target.value)} placeholder="123 Main St" /></div>
           <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-1">
-              <label className={label}>City</label>
-              <input className={input} value={form.city} onChange={e => set('city', e.target.value)} placeholder="City" />
-            </div>
-            <div>
-              <label className={label}>State</label>
-              <input className={input} value={form.state} onChange={e => set('state', e.target.value)} placeholder="CA" maxLength={2} />
-            </div>
-            <div>
-              <label className={label}>Zip</label>
-              <input className={input} value={form.zip} onChange={e => set('zip', e.target.value)} placeholder="90210" />
-            </div>
+            <div><label className={label}>City</label><input className={input} value={form.city} onChange={e => set('city', e.target.value)} placeholder="City" /></div>
+            <div><label className={label}>State</label><input className={input} value={form.state} onChange={e => set('state', e.target.value)} placeholder="CA" maxLength={2} /></div>
+            <div><label className={label}>Zip</label><input className={input} value={form.zip} onChange={e => set('zip', e.target.value)} placeholder="90210" /></div>
           </div>
 
+          {/* Company Address — shown when company name is filled */}
           {form.company_name.trim() && (
             <div className="border border-gray-200 rounded-xl p-3 bg-gray-50">
               <p className="text-xs font-semibold text-gray-500 mb-2">Company Address</p>
@@ -170,46 +164,52 @@ function AddContactModal({ onSave, onClose }) {
             </div>
           )}
 
-          <div>
-            <label className={label}>Date of Birth</label>
-            <input className={input} type="date" value={form.date_of_birth} onChange={e => set('date_of_birth', e.target.value)} />
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
+          {/* Assigned To / Consultation Type */}
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className={label}>Assigned To</label><input className={input} value={form.ghl_assigned_to} onChange={e => set('ghl_assigned_to', e.target.value)} placeholder="Assignee name" /></div>
             <div>
-              <label className={label}>Stage</label>
-              <select className={input} value={form.stage} onChange={e => set('stage', e.target.value)}>
-                {STAGES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={label}>Contact Type</label>
-              <select className={input} value={form.contact_type} onChange={e => set('contact_type', e.target.value)}>
+              <label className={label}>Consultation Type</label>
+              <select className={input} value={form.consultation_type} onChange={e => set('consultation_type', e.target.value)}>
                 <option value="">— None —</option>
-                <option value="Residential">Residential</option>
-                <option value="Commercial">Commercial</option>
-                <option value="Public Works">Public Works</option>
+                <option value="Design">Design</option>
+                <option value="Estimate">Estimate</option>
               </select>
             </div>
-            <div>
-              <label className={label}>Source Type</label>
-              <input className={input} value={form.source} onChange={e => set('source', e.target.value)} placeholder="Referral, Google…" />
-            </div>
-            <div>
-              <label className={label}>Campaign</label>
-              <input className={input} value={form.campaign} onChange={e => set('campaign', e.target.value)} placeholder="e.g. Spring Promo, Google Ads…" />
-            </div>
           </div>
 
+          {/* Stage */}
           <div>
-            <label className={label}>Project Description</label>
-            <textarea className={input + ' resize-none'} rows={3} value={form.project_description} onChange={e => set('project_description', e.target.value)} placeholder="Describe the project or work needed…" />
+            <label className={label}>Stage</label>
+            <select className={input} value={form.stage} onChange={e => set('stage', e.target.value)}>
+              {STAGES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
           </div>
 
-          {/* Marketing — project interests */}
+          {/* Date of Birth */}
+          <div><label className={label}>Date of Birth</label><input className={input} type="date" value={form.date_of_birth} onChange={e => set('date_of_birth', e.target.value)} /></div>
+
+          {/* Notes */}
+          <div><label className={label}>Notes</label><textarea className={input + ' resize-none'} rows={3} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Internal notes…" /></div>
+
+          {/* Project Description */}
+          <div><label className={label}>Project Description</label><textarea className={input + ' resize-none'} rows={3} value={form.project_description} onChange={e => set('project_description', e.target.value)} placeholder="Describe the project or work needed…" /></div>
+
+          {/* Marketing */}
           <div className="pt-3 border-t border-gray-100">
             <p className="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wide">Marketing</p>
-            <div className="space-y-2">
+            <div className="space-y-3">
+              <div>
+                <label className={label}>Contact Type</label>
+                <select className={input} value={form.contact_type} onChange={e => set('contact_type', e.target.value)}>
+                  <option value="">— None —</option>
+                  <option value="Residential">Residential</option>
+                  <option value="Commercial">Commercial</option>
+                  <option value="Public Works">Public Works</option>
+                </select>
+              </div>
+              <div><label className={label}>Source Type</label><input className={input} value={form.source} onChange={e => set('source', e.target.value)} placeholder="e.g. Google, Referral…" /></div>
+              <div><label className={label}>Campaign</label><input className={input} value={form.campaign} onChange={e => set('campaign', e.target.value)} placeholder="e.g. Spring Promo, Google Ads…" /></div>
+              <div><label className={label}>Source Origin</label><input className={input} value={form.how_did_you_hear} onChange={e => set('how_did_you_hear', e.target.value)} placeholder="How did they hear about us?" /></div>
               {[
                 { key: 'interest_1', fieldLabel: 'Interested In #1' },
                 { key: 'interest_2', fieldLabel: 'Interested In #2' },
@@ -224,6 +224,12 @@ function AddContactModal({ onSave, onClose }) {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Call Center Notes */}
+          <div className="pt-3 border-t border-gray-100">
+            <label className={label}>Call Center Notes</label>
+            <textarea className={input + ' resize-none'} rows={3} value={form.call_center_notes} onChange={e => set('call_center_notes', e.target.value)} placeholder="Notes from call center…" />
           </div>
         </div>
 
