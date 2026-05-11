@@ -157,16 +157,16 @@ async function fetchContactsPage(args: {
   page:       number
   sinceIso?:  string | null
 }): Promise<GhlPagedResponse> {
+  // Sort newest-first so incremental syncs see recent changes on page 1
+  // and can stop as soon as they hit records older than the high-water-mark.
+  // We do NOT use a server-side date filter — GHL's search endpoint rejects
+  // comparison operators (e.g. gte) on date fields. JS-side filtering handles
+  // the high-water-mark instead.
   const body: Record<string, unknown> = {
     locationId: args.locationId,
     page:       args.page,
     pageLimit:  PAGE_LIMIT,
-    sort: [{ field: 'dateUpdated', direction: 'asc' }],
-  }
-  if (args.sinceIso) {
-    body.filters = [
-      { field: 'dateUpdated', operator: 'gte', value: args.sinceIso },
-    ]
+    sort: [{ field: 'dateUpdated', direction: 'desc' }],
   }
 
   const res = await fetch(`${GHL_BASE_URL}/contacts/search`, {
@@ -453,14 +453,18 @@ serve(async (req) => {
 
       if (list.length === 0) break
 
-      const fresh = sinceIso
-        ? list.filter(c => c.dateUpdated && c.dateUpdated > sinceIso)
-        : list
-
-      for (const c of fresh) {
+      // With desc sort, once we hit a record at-or-before the high-water-mark
+      // everything after it is older — set a flag to break the outer loop too.
+      let hitWatermark = false
+      for (const c of list) {
+        if (sinceIso && c.dateUpdated && c.dateUpdated <= sinceIso) {
+          hitWatermark = true
+          break
+        }
         if (seenGhlIds.has(c.id)) continue
         seenGhlIds.add(c.id)
 
+        // With desc sort the first record on the first page is the newest.
         if (c.dateUpdated && (!newestSeen || c.dateUpdated > newestSeen)) {
           newestSeen = c.dateUpdated
         }
@@ -563,6 +567,7 @@ serve(async (req) => {
       }
 
       processedCount += list.length
+      if (hitWatermark) break          // all remaining records are older than high-water-mark
       if (list.length < PAGE_LIMIT) break
       if (reportedTotal != null && processedCount >= reportedTotal) break
       if (processedCount >= MAX_RECORDS_PER_INVOCATION) break
