@@ -88,7 +88,9 @@ interface GhlDndChannelSetting {
 interface GhlContact {
   id:           string
   locationId?:  string
-  contactName?: string
+  // Name fields — search endpoint may return combined `name` instead of split fields
+  name?:        string   // combined full name (returned by search endpoint)
+  contactName?: string   // alias GHL uses in some versions
   firstName?:   string
   lastName?:    string
   companyName?: string
@@ -188,13 +190,14 @@ async function fetchContactsPage(args: {
 }
 
 // Fetch all custom field definitions for the location so we can map
-// fieldKey → fieldId lookups.  Returns a Map<fieldKey, fieldId>.
-// Failure is non-fatal: we log and return an empty map so the sync
-// continues with only standard fields mapped.
+// fieldKey → fieldId lookups.  Returns { map, error }.
+// Failure is non-fatal — the sync continues with standard fields only.
+// Common failure reason: the PIT does not have "Locations" scope granted
+// in the GHL sub-account settings.
 async function fetchCustomFieldDefs(
   token: string,
   locationId: string,
-): Promise<Map<string, string>> {
+): Promise<{ map: Map<string, string>; error: string | null }> {
   try {
     const res = await fetch(
       `${GHL_BASE_URL}/locations/${locationId}/customFields`,
@@ -206,18 +209,25 @@ async function fetchCustomFieldDefs(
         },
       },
     )
-    if (!res.ok) return new Map()
+    if (!res.ok) {
+      let errText = `HTTP ${res.status}`
+      try { const b: any = await res.json(); errText = b?.message || b?.error || errText } catch { /* */ }
+      return {
+        map:   new Map(),
+        error: `Could not load custom field definitions (${errText}). ` +
+               `Grant "Locations" scope to your Private Integration Token in GHL → Settings → Integrations.`,
+      }
+    }
     const data: any = await res.json()
     const defs: GhlCustomFieldDef[] = data?.customFields || data?.fields || []
     const map = new Map<string, string>()
     for (const d of defs) {
       if (d.fieldKey) map.set(d.fieldKey, d.id)
-      // Also index by lowercased name as a fallback matching strategy.
       if (d.name) map.set(d.name.toLowerCase().trim(), d.id)
     }
-    return map
-  } catch {
-    return new Map()
+    return { map, error: null }
+  } catch (e: any) {
+    return { map: new Map(), error: e?.message || 'Unknown error fetching custom fields.' }
   }
 }
 
@@ -251,10 +261,13 @@ function toPbsContact(
   fieldKeyToId: Map<string, string>,
 ) {
   // ── Name normalisation ──────────────────────────────────────────────────
+  // The search endpoint may return a combined `name` field instead of
+  // separate firstName / lastName. Fall through several options.
   let firstName = (c.firstName || '').trim()
   let lastName  = (c.lastName  || '').trim()
   if (!firstName && !lastName) {
-    const fallback = (c.contactName || c.companyName || '').trim()
+    // Try combined name sources: `name`, `contactName`, then `companyName`.
+    const fallback = (c.name || c.contactName || c.companyName || '').trim()
     if (fallback.includes(' ')) {
       const parts = fallback.split(/\s+/)
       firstName = parts.slice(0, -1).join(' ')
@@ -377,7 +390,7 @@ serve(async (req) => {
     const sinceIso = (!fullSync && state?.inbound_synced_at) ? state.inbound_synced_at : null
 
     // Fetch custom field definitions so we can map known field keys to ids.
-    const fieldKeyToId = await fetchCustomFieldDefs(conn.access_token, conn.location_id)
+    const { map: fieldKeyToId, error: cfError } = await fetchCustomFieldDefs(conn.access_token, conn.location_id)
 
     // Helpers + accumulator for the dedup ladder.
     const digitsOnly = (s: string) => (s || '').replace(/\D/g, '')
@@ -576,6 +589,7 @@ serve(async (req) => {
         remaining,
         total_eligible:         reportedTotal,
         custom_fields_mapped:   fieldKeyToId.size,
+        custom_fields_error:    cfError || undefined,
       })
     }
 
@@ -609,6 +623,7 @@ serve(async (req) => {
       remaining,
       total_eligible:         reportedTotal,
       custom_fields_mapped:   fieldKeyToId.size,
+      custom_fields_error:    cfError || undefined,
       ...counts,
     })
   } catch (e) {

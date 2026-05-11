@@ -2550,8 +2550,11 @@ function IntegrationsSettings() {
                             {`(ghl_id:${pv.would_update_by_ghl_id || 0}, email:${pv.would_update_by_email || 0}, phone:${pv.would_update_by_phone || 0}, name+zip:${pv.would_update_by_name_zip || 0})`}
                           </p>
                           <p><span className="font-medium">Would insert (new):</span> {pv.would_insert || 0}</p>
-                          {pv.custom_fields_mapped != null && (
+                          {pv.custom_fields_mapped != null && !pv.custom_fields_error && (
                             <p className="text-blue-700 text-[11px]">✓ {pv.custom_fields_mapped} GHL custom field definitions mapped (e.g. "How Did You Hear")</p>
+                          )}
+                          {pv.custom_fields_error && (
+                            <p className="text-amber-700 text-[11px]">⚠ Custom fields unavailable: {pv.custom_fields_error}</p>
                           )}
                           {Array.isArray(pv.samples) && pv.samples.length > 0 && (
                             <details className="text-[11px] text-blue-800">
