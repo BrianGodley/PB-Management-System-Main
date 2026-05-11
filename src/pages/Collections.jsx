@@ -166,8 +166,15 @@ function SolvencyMiniChart({ currentWeekEnding }) {
         if (!byDate[r.period_date]) byDate[r.period_date] = []
         byDate[r.period_date].push(r.value)
       }
+      // Trailing 6-month cutoff (≈26 weeks back from the current week or today)
+      const anchor   = currentWeekEnding || new Date().toISOString().slice(0, 10)
+      const cutoff   = new Date(anchor + 'T00:00:00')
+      cutoff.setMonth(cutoff.getMonth() - 6)
+      const cutoffStr = cutoff.toISOString().slice(0, 10)
+
       const points = Object.entries(byDate)
         .sort(([a], [b]) => a.localeCompare(b))
+        .filter(([date]) => date >= cutoffStr)
         .map(([date, vals]) => ({
           date,
           value: vals.reduce((s, v) => s + v, 0) / vals.length,
@@ -214,8 +221,8 @@ function SolvencyMiniChart({ currentWeekEnding }) {
     )
   }
 
-  // Only show every Nth label so the X axis doesn't crowd
-  const step = chartData.length > 20 ? 4 : chartData.length > 10 ? 2 : 1
+  // Show every Nth label — 6-month window is ~26 weekly points; show every 3rd
+  const step = chartData.length > 20 ? 3 : chartData.length > 10 ? 2 : 1
   const xTick = ({ x, y, payload, index }) => {
     if (index % step !== 0) return null
     return (
@@ -226,7 +233,7 @@ function SolvencyMiniChart({ currentWeekEnding }) {
   }
 
   return (
-    <ResponsiveContainer width="100%" height={170}>
+    <ResponsiveContainer width="100%" height={221}>
       <LineChart data={chartData} margin={{ top: 10, right: 12, left: 4, bottom: 16 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
         <XAxis dataKey="label" tick={xTick} axisLine={false} tickLine={false} interval={0} />
