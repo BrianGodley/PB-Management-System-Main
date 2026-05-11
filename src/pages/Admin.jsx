@@ -2550,18 +2550,28 @@ function IntegrationsSettings() {
                             {`(ghl_id:${pv.would_update_by_ghl_id || 0}, email:${pv.would_update_by_email || 0}, phone:${pv.would_update_by_phone || 0}, name+zip:${pv.would_update_by_name_zip || 0})`}
                           </p>
                           <p><span className="font-medium">Would insert (new):</span> {pv.would_insert || 0}</p>
+                          {pv.custom_fields_mapped != null && (
+                            <p className="text-blue-700 text-[11px]">✓ {pv.custom_fields_mapped} GHL custom field definitions mapped (e.g. "How Did You Hear")</p>
+                          )}
                           {Array.isArray(pv.samples) && pv.samples.length > 0 && (
                             <details className="text-[11px] text-blue-800">
                               <summary className="cursor-pointer select-none">Show {pv.samples.length} samples</summary>
                               <ul className="mt-1 space-y-0.5">
-                                {pv.samples.map((s, i) => (
-                                  <li key={i} className="font-mono">
-                                    <span className="text-blue-600">{s.reason}</span>:{' '}
-                                    {(s.ghl?.firstName || '') + ' ' + (s.ghl?.lastName || '')}{' '}
-                                    {s.ghl?.email ? `<${s.ghl.email}>` : ''}{' '}
-                                    {s.pbs ? `→ pbs#${s.pbs.id}` : '→ NEW'}
-                                  </li>
-                                ))}
+                                {pv.samples.map((s, i) => {
+                                  // Build a display name with fallbacks for company-only contacts
+                                  const name = [s.ghl?.firstName, s.ghl?.lastName].filter(Boolean).join(' ')
+                                    || s.ghl?.contactName
+                                    || s.ghl?.companyName
+                                    || '(no name)'
+                                  const contact = s.ghl?.email || s.ghl?.phone || ''
+                                  return (
+                                    <li key={i} className="font-mono">
+                                      <span className="text-blue-600">{s.reason}</span>:{' '}
+                                      {name}{contact ? ` <${contact}>` : ''}{' '}
+                                      {s.pbs ? `→ pbs#${s.pbs.id?.slice(0,8)}` : '→ NEW'}
+                                    </li>
+                                  )
+                                })}
                               </ul>
                             </details>
                           )}
