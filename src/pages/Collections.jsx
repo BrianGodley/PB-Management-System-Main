@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, ReferenceLine,
+} from 'recharts'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const COLL_SECTIONS = [
@@ -113,6 +117,138 @@ function TextCell({ value, onSave, placeholder='', bold=false, onDelete=null }) 
         >✕</button>
       )}
     </div>
+  )
+}
+
+// ── SolvencyMiniChart ─────────────────────────────────────────────────────────
+// Compact solvency trend chart shown at the bottom of Financial Planning.
+// Fetches its own data from statistic_values so it's self-contained.
+const FG = '#3A5038'
+
+function fmtShort(v) {
+  if (v == null) return ''
+  const abs = Math.abs(v)
+  if (abs >= 1_000_000) return (v < 0 ? '-' : '') + '$' + (abs / 1_000_000).toFixed(1) + 'M'
+  if (abs >= 1_000)     return (v < 0 ? '-' : '') + '$' + (abs / 1_000).toFixed(0) + 'k'
+  return '$' + v.toFixed(0)
+}
+
+function SolvencyMiniChart({ currentWeekEnding }) {
+  const [chartData, setChartData] = useState([])
+  const [loading,   setLoading]   = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      // 1. Find the solvency auto_internal stat(s)
+      const { data: stats } = await supabase
+        .from('statistics')
+        .select('id')
+        .eq('stat_category', 'auto_internal')
+        .ilike('data_source', '%finance_solvency%')
+      if (cancelled) return
+      if (!stats?.length) { setLoading(false); return }
+
+      const ids = stats.map(s => s.id)
+
+      // 2. Fetch all saved values, sorted oldest→newest
+      const { data: rows } = await supabase
+        .from('statistic_values')
+        .select('period_date, value')
+        .in('statistic_id', ids)
+        .order('period_date', { ascending: true })
+      if (cancelled) return
+
+      // De-dupe by period_date (average if multiple stat rows for same week)
+      const byDate = {}
+      for (const r of (rows || [])) {
+        if (!byDate[r.period_date]) byDate[r.period_date] = []
+        byDate[r.period_date].push(r.value)
+      }
+      const points = Object.entries(byDate)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, vals]) => ({
+          date,
+          value: vals.reduce((s, v) => s + v, 0) / vals.length,
+          isCurrent: date === currentWeekEnding,
+          label: (() => {
+            const d = new Date(date + 'T00:00:00')
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          })(),
+        }))
+
+      setChartData(points)
+      setLoading(false)
+    }
+    load()
+    return () => { cancelled = true }
+  }, [currentWeekEnding])
+
+  if (loading) return (
+    <div className="flex justify-center items-center h-32">
+      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-700" />
+    </div>
+  )
+  if (!chartData.length) return (
+    <div className="text-center text-gray-400 text-xs py-6">No solvency history yet.</div>
+  )
+
+  const CustomDot = (props) => {
+    const { cx, cy, payload } = props
+    if (!payload.isCurrent) return null
+    return <circle cx={cx} cy={cy} r={5} fill={FG} stroke="#fff" strokeWidth={2} />
+  }
+
+  const TooltipContent = ({ active, payload }) => {
+    if (!active || !payload?.length) return null
+    const d = payload[0].payload
+    const v = payload[0].value
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg shadow px-3 py-1.5 text-xs">
+        <p className="font-semibold text-gray-700">{d.label}{d.isCurrent ? ' ← current' : ''}</p>
+        <p className={`font-bold ${v >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+          {v >= 0 ? '' : '−'}${Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+        </p>
+      </div>
+    )
+  }
+
+  // Only show every Nth label so the X axis doesn't crowd
+  const step = chartData.length > 20 ? 4 : chartData.length > 10 ? 2 : 1
+  const xTick = ({ x, y, payload, index }) => {
+    if (index % step !== 0) return null
+    return (
+      <text x={x} y={y + 10} textAnchor="middle" fontSize={9} fill="#9ca3af">
+        {payload.value}
+      </text>
+    )
+  }
+
+  return (
+    <ResponsiveContainer width="100%" height={170}>
+      <LineChart data={chartData} margin={{ top: 10, right: 12, left: 4, bottom: 16 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+        <XAxis dataKey="label" tick={xTick} axisLine={false} tickLine={false} interval={0} />
+        <YAxis
+          tickFormatter={fmtShort}
+          tick={{ fontSize: 9, fill: '#9ca3af' }}
+          axisLine={false}
+          tickLine={false}
+          width={42}
+        />
+        <Tooltip content={<TooltipContent />} />
+        <ReferenceLine y={0} stroke="#d1d5db" strokeDasharray="4 2" />
+        <Line
+          type="monotone"
+          dataKey="value"
+          stroke={FG}
+          strokeWidth={2}
+          dot={<CustomDot />}
+          activeDot={{ r: 4, fill: FG }}
+        />
+      </LineChart>
+    </ResponsiveContainer>
   )
 }
 
@@ -900,6 +1036,17 @@ export default function Collections() {
                           </div>
                         )
                       })()}
+                    </div>
+
+                    {/* Gap */}
+                    <div className="h-2 bg-gray-100 border-y border-gray-200" />
+
+                    {/* Solvency trend mini-chart */}
+                    <div className="px-4 pt-2 pb-0 bg-blue-50 border-b border-blue-100">
+                      <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wide mb-1.5">Solvency Trend</p>
+                    </div>
+                    <div className="px-2 pt-2 pb-1">
+                      <SolvencyMiniChart currentWeekEnding={selectedWeek?.week_ending ?? null} />
                     </div>
                   </div>
                 </div>
