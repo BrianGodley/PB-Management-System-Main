@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 import ReviewModal from '../components/hr/ReviewModal'
 import { sendSMS } from '../lib/notify'
 
@@ -21,56 +22,174 @@ const LANGUAGES   = [
   { value: 'es', label: 'Español (Spanish)' },
 ]
 
-// Permission groups and defaults (copied from Admin.jsx)
-const PERM_GROUPS = [
+// ── Module permission definitions ─────────────────────────────────────────────
+// Each module has an access toggle (accessKey) and optional sub-permissions.
+// Admins/super_admins always have full access regardless of these flags.
+const MODULES = [
   {
-    label: 'Statistics',
-    icon:  '📈',
+    key: 'contacts', label: 'Contacts', icon: '📇',
+    accessKey: 'access_contacts',
     perms: [
-      { key: 'can_create_stats',      label: 'Create statistics' },
-      { key: 'can_share_stats',       label: 'Share statistics with other users' },
-      { key: 'can_make_stats_public', label: 'Mark statistics as public' },
+      { key: 'contacts_add',  label: 'Add new contacts' },
+      { key: 'contacts_edit', label: 'Edit existing contacts' },
     ],
   },
   {
-    label: 'Financial',
-    icon:  '💰',
+    key: 'clients', label: 'Clients', icon: '🤝',
+    accessKey: 'access_clients',
     perms: [
-      { key: 'can_view_financials', label: 'View collections & invoicing' },
-      { key: 'can_view_reports',    label: 'View financial reports' },
+      { key: 'clients_add',                  label: 'Add new clients' },
+      { key: 'clients_edit',                 label: 'Edit existing clients' },
+      { key: 'clients_add_estimate',         label: 'Add new estimates' },
+      { key: 'clients_edit_other_estimates', label: "Edit other users' estimates" },
+      { key: 'clients_create_bids',          label: 'Create bids' },
     ],
   },
   {
-    label: 'Jobs & Bids',
-    icon:  '🔨',
+    key: 'design', label: 'Design', icon: '✏️',
+    accessKey: 'access_design',
     perms: [
-      { key: 'can_create_jobs', label: 'Create new jobs' },
-      { key: 'can_edit_jobs',   label: 'Edit existing jobs' },
-      { key: 'can_delete_jobs', label: 'Delete jobs' },
-      { key: 'can_create_bids', label: 'Create bids' },
-      { key: 'can_edit_bids',   label: 'Edit bids' },
+      { key: 'design_add_project', label: 'Add new projects' },
+      { key: 'design_edit_other',  label: "Edit other users' projects" },
     ],
   },
   {
-    label: 'Module Access',
-    icon:  '🗂️',
+    key: 'bids', label: 'Bids', icon: '📋',
+    accessKey: 'access_bids',
     perms: [
-      { key: 'access_tracker',      label: 'Tracker' },
-      { key: 'access_collections',  label: 'Collections' },
-      { key: 'access_statistics',   label: 'Statistics' },
-      { key: 'access_master_rates', label: 'Master Rates' },
-      { key: 'access_admin',        label: 'Admin panel' },
+      { key: 'bids_update_other_status', label: "Update status of other users' bids" },
+      { key: 'bids_delete_any',          label: 'Delete any bid' },
     ],
+  },
+  {
+    key: 'jobs', label: 'Jobs', icon: '🏗️',
+    accessKey: 'access_jobs',
+    perms: [
+      { key: 'jobs_add_schedule',          label: 'Add schedule items',                      group: 'Schedule' },
+      { key: 'jobs_edit_schedule',         label: 'Edit schedule items',                     group: 'Schedule' },
+      { key: 'jobs_delete_schedule',       label: 'Delete schedule items',                   group: 'Schedule' },
+      { key: 'jobs_edit',                  label: 'Edit job details (pencil modal)',          group: 'General' },
+      { key: 'jobs_view_work_orders',      label: 'View Work Orders',                        group: 'General' },
+      { key: 'jobs_view_tracking',         label: 'View Tracking',                           group: 'General' },
+      { key: 'jobs_time_clock',            label: 'Add / Edit / Delete Time Clock items',    group: 'Time Clock' },
+      { key: 'jobs_daily_log',             label: 'Daily Log',                               group: 'Daily Log' },
+      { key: 'jobs_edit_other_daily_logs', label: "Edit other users' Daily Logs",            group: 'Daily Log' },
+      { key: 'jobs_tasks',                 label: 'View Tasks',                              group: 'Tasks' },
+      { key: 'jobs_assign_tasks',          label: 'Assign tasks to other users',             group: 'Tasks' },
+      { key: 'jobs_manage_tasks',          label: 'Add / Edit / Delete tasks',              group: 'Tasks' },
+      { key: 'jobs_change_orders',         label: 'View Change Orders',                      group: 'Change Orders' },
+      { key: 'jobs_manage_co',             label: 'Add / Edit / Delete own Change Orders',  group: 'Change Orders' },
+      { key: 'jobs_co_other_users',        label: "Add / Edit / Delete other users' COs",   group: 'Change Orders' },
+      { key: 'jobs_files_other_users',     label: "Edit or Delete other users' Files",      group: 'Files' },
+    ],
+  },
+  {
+    key: 'equipment', label: 'Equipment', icon: '🚜',
+    accessKey: 'access_equipment',
+    perms: [
+      { key: 'equipment_add',    label: 'Add equipment' },
+      { key: 'equipment_edit',   label: 'Edit equipment' },
+      { key: 'equipment_delete', label: 'Delete equipment' },
+    ],
+  },
+  {
+    key: 'finance', label: 'Finance', icon: '💰',
+    accessKey: 'access_finance',
+    perms: [
+      { key: 'finance_add_week',         label: 'Add a new week' },
+      { key: 'finance_edit_collections', label: 'Edit Collections fields' },
+      { key: 'finance_edit_planning',    label: 'Edit Financial Planning fields' },
+    ],
+  },
+  {
+    key: 'statistics', label: 'Statistics', icon: '📈',
+    accessKey: 'access_statistics',
+    perms: [
+      { key: 'stats_multiple_entry', label: 'Multiple Entry' },
+      { key: 'stats_print_multiple', label: 'Print Multiple' },
+      { key: 'stats_comparison',     label: 'Comparison' },
+      { key: 'stats_import_export',  label: 'Import / Export' },
+    ],
+    adminNote: 'Settings tab is visible to Admins and Super Admins only.',
+  },
+  {
+    key: 'org_chart', label: 'Org Chart', icon: '🏢',
+    accessKey: 'access_org_chart',
+    perms: [
+      { key: 'org_chart_manage', label: 'Add / Edit / Delete charts' },
+    ],
+  },
+  {
+    key: 'subs_vendors', label: 'Subs & Vendors', icon: '🔧',
+    accessKey: 'access_subs_vendors',
+    perms: [
+      { key: 'subs_vendors_manage', label: 'Add / Edit / Delete subs or vendors' },
+    ],
+  },
+  {
+    key: 'training', label: 'Training', icon: '🎓',
+    accessKey: 'access_training',
+    perms: [],
+    adminNote: 'Settings is visible to Admins and Super Admins only.',
+  },
+  {
+    key: 'hr', label: 'HR', icon: '👥',
+    accessKey: 'access_hr',
+    perms: [
+      { key: 'hr_add_edit_employee', label: 'Add / Edit employees' },
+      { key: 'hr_delete_employee',   label: 'Delete employees' },
+    ],
+    adminNote: 'Access & Roles management is Admin / Super Admin only.',
+  },
+  {
+    key: 'accounting', label: 'Accounting', icon: '🧾',
+    accessKey: 'access_accounting',
+    perms: [],
+    comingSoon: true,
   },
 ]
 
 const DEFAULT_PERMS = {
-  can_create_stats: true,  can_share_stats: false, can_make_stats_public: false,
+  // Legacy columns (kept for backward compat)
+  can_create_stats: true, can_share_stats: false, can_make_stats_public: false,
   can_view_financials: true, can_view_reports: false,
   can_create_jobs: true, can_edit_jobs: true, can_delete_jobs: false,
   can_create_bids: true, can_edit_bids: true,
-  access_tracker: true, access_collections: true, access_statistics: true,
-  access_master_rates: false, access_admin: false,
+  access_tracker: true, access_collections: true, access_master_rates: false, access_admin: false,
+  // Module access toggles
+  access_contacts: true, access_clients: true, access_design: true, access_bids: true,
+  access_jobs: true, access_equipment: true, access_finance: true, access_statistics: true,
+  access_org_chart: true, access_subs_vendors: true, access_training: true,
+  access_hr: true, access_accounting: true,
+  // Contacts
+  contacts_add: true, contacts_edit: true,
+  // Clients
+  clients_add: true, clients_edit: true, clients_add_estimate: true,
+  clients_edit_other_estimates: false, clients_create_bids: true,
+  // Design
+  design_add_project: true, design_edit_other: false,
+  // Bids
+  bids_update_other_status: false, bids_delete_any: false,
+  // Jobs
+  jobs_add_schedule: true, jobs_edit_schedule: true, jobs_delete_schedule: false,
+  jobs_edit: true, jobs_view_work_orders: true, jobs_view_tracking: true,
+  jobs_time_clock: true, jobs_daily_log: true, jobs_edit_other_daily_logs: false,
+  jobs_tasks: true, jobs_assign_tasks: false, jobs_manage_tasks: true,
+  jobs_change_orders: true, jobs_manage_co: true, jobs_co_other_users: false,
+  jobs_files_other_users: false,
+  // Equipment
+  equipment_add: true, equipment_edit: true, equipment_delete: false,
+  // Finance
+  finance_add_week: true, finance_edit_collections: true, finance_edit_planning: true,
+  // Statistics
+  stats_multiple_entry: true, stats_print_multiple: true, stats_comparison: true,
+  stats_import_export: false,
+  // Org Chart
+  org_chart_manage: true,
+  // Subs & Vendors
+  subs_vendors_manage: true,
+  // HR
+  hr_add_edit_employee: true, hr_delete_employee: false,
 }
 const DOC_CATEGORIES = [
   { key: 'records', label: 'Personnel Records', icon: '📁' },
@@ -101,6 +220,7 @@ function StarDisplay({ value }) {
 export default function EmployeeDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
 
   const [employee,      setEmployee]      = useState(null)
   const [linkedProfile, setLinkedProfile] = useState(null)
@@ -155,10 +275,11 @@ export default function EmployeeDetail() {
   const [createError,    setCreateError]    = useState('')
 
   // Permissions tab state
-  const [perms,         setPerms]         = useState(DEFAULT_PERMS)
-  const [loadingPerms,  setLoadingPerms]  = useState(true)
-  const [savingPerms,   setSavingPerms]   = useState(false)
-  const [permsMsg,      setPermsMsg]      = useState('')
+  const [perms,              setPerms]              = useState(DEFAULT_PERMS)
+  const [loadingPerms,       setLoadingPerms]       = useState(true)
+  const [savingPerms,        setSavingPerms]        = useState(false)
+  const [permsMsg,           setPermsMsg]           = useState('')
+  const [currentUserIsAdmin, setCurrentUserIsAdmin] = useState(false)
 
   // Avatar
   const avatarInputRef = useRef()
@@ -345,6 +466,16 @@ export default function EmployeeDetail() {
   }
 
   useEffect(() => { fetchAll() }, [id])
+
+  // Check whether the currently signed-in user is an admin/super_admin
+  // (determines whether the Permissions tab is visible at all)
+  useEffect(() => {
+    if (!user?.id) return
+    supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+      .then(({ data }) => {
+        setCurrentUserIsAdmin(data?.role === 'admin' || data?.role === 'super_admin')
+      })
+  }, [user?.id])
 
   async function fetchAll() {
     setLoading(true)
@@ -616,13 +747,13 @@ export default function EmployeeDetail() {
       <div className="bg-white border-b border-gray-200 px-6 flex gap-0 flex-shrink-0 overflow-x-auto">
         {[
           { key: 'profile',      label: 'Profile',       icon: '👤' },
-          { key: 'user',         label: 'Access and Roles', icon: '🔑' },
-          { key: 'permissions',  label: 'Permissions',   icon: '🔑' },
-          { key: 'docs',         label: `Documents (${docs.length})`,     icon: '📁' },
+          ...(currentUserIsAdmin ? [{ key: 'user',        label: 'Access and Roles', icon: '🛡️' }] : []),
+          ...(currentUserIsAdmin ? [{ key: 'permissions', label: 'Permissions',      icon: '🔑' }] : []),
+          { key: 'docs',         label: `Documents (${docs.length})`,       icon: '📁' },
           { key: 'certs',        label: `Certifications (${certs.length})`, icon: '🏅' },
-          { key: 'training',     label: `Training (${training.length})`,  icon: '🎓' },
-          { key: 'reviews',      label: `Reviews (${reviews.length})`,   icon: '⭐' },
-          { key: 'testing',      label: 'Testing',       icon: '🔬' },
+          { key: 'training',     label: `Training (${training.length})`,    icon: '🎓' },
+          { key: 'reviews',      label: `Reviews (${reviews.length})`,      icon: '⭐' },
+          { key: 'testing',      label: 'Testing',                          icon: '🔬' },
         ].map(t => (
           <button
             key={t.key}
@@ -1025,44 +1156,100 @@ export default function EmployeeDetail() {
 
         {/* ── PERMISSIONS ── */}
         {tab === 'permissions' && (
-          <div className="max-w-2xl">
+          <div className="max-w-5xl">
             {linkedProfile ? (
-              <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
-                {linkedProfile.role === 'admin' && (
-                  <div className="bg-green-50 border border-green-200 text-green-800 text-sm px-4 py-3 rounded-xl">
-                    🛡️ This user is an <strong>Admin</strong> — they have full access to everything regardless of these settings.
+              <>
+                {/* Admin override banner */}
+                {(linkedProfile.role === 'admin' || linkedProfile.role === 'super_admin') && (
+                  <div className="mb-4 bg-green-50 border border-green-200 text-green-800 text-sm px-4 py-3 rounded-xl">
+                    🛡️ This user is an <strong>{linkedProfile.role === 'super_admin' ? 'Super Admin' : 'Admin'}</strong> — they have full access to everything regardless of these settings.
                   </div>
                 )}
 
                 {loadingPerms ? (
-                  <div className="flex justify-center py-8">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-700"></div>
+                  <div className="flex justify-center py-12">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-700" />
                   </div>
                 ) : (
                   <>
-                    {PERM_GROUPS.map(group => (
-                      <div key={group.label}>
-                        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                          {group.icon} {group.label}
-                        </h3>
-                        <div className="space-y-2 pl-1">
-                          {group.perms.map(p => (
-                            <label key={p.key} className="flex items-center gap-3 cursor-pointer group">
-                              <input
-                                type="checkbox"
-                                checked={!!perms[p.key]}
-                                onChange={e => setPerms(prev => ({ ...prev, [p.key]: e.target.checked }))}
-                                className="w-4 h-4 rounded accent-green-700"
-                              />
-                              <span className="text-sm text-gray-700 group-hover:text-gray-900">{p.label}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+                    {/* Module grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+                      {MODULES.map(mod => {
+                        const hasAccess = !!perms[mod.accessKey]
+                        // Group sub-perms by their group label (if set)
+                        const groups = []
+                        const seen = new Set()
+                        for (const p of mod.perms) {
+                          const g = p.group || ''
+                          if (!seen.has(g)) { seen.add(g); groups.push(g) }
+                        }
+                        return (
+                          <div key={mod.key} className={`bg-white rounded-xl border transition-colors ${
+                            hasAccess ? 'border-gray-200' : 'border-gray-100 opacity-70'
+                          }`}>
+                            {/* Module header */}
+                            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">{mod.icon}</span>
+                                <span className="font-semibold text-gray-800 text-sm">{mod.label}</span>
+                                {mod.comingSoon && (
+                                  <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold">Coming Soon</span>
+                                )}
+                              </div>
+                              {/* Access toggle */}
+                              <button
+                                type="button"
+                                onClick={() => setPerms(p => ({ ...p, [mod.accessKey]: !p[mod.accessKey] }))}
+                                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                                  hasAccess ? 'bg-green-600' : 'bg-gray-300'
+                                }`}
+                                title={hasAccess ? 'Has Access — click to revoke' : 'No Access — click to grant'}
+                              >
+                                <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                  hasAccess ? 'translate-x-5' : 'translate-x-0'
+                                }`} />
+                              </button>
+                            </div>
+
+                            {/* Sub-permissions (shown when module has access) */}
+                            {mod.perms.length > 0 && (
+                              <div className={`px-4 py-3 space-y-3 transition-opacity ${hasAccess ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+                                {groups.map(grp => (
+                                  <div key={grp}>
+                                    {grp && (
+                                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">{grp}</p>
+                                    )}
+                                    <div className="space-y-1.5">
+                                      {mod.perms.filter(p => (p.group || '') === grp).map(p => (
+                                        <label key={p.key} className="flex items-center gap-2.5 cursor-pointer group">
+                                          <input
+                                            type="checkbox"
+                                            checked={!!perms[p.key]}
+                                            onChange={e => setPerms(prev => ({ ...prev, [p.key]: e.target.checked }))}
+                                            className="w-3.5 h-3.5 rounded accent-green-700 flex-shrink-0"
+                                          />
+                                          <span className="text-xs text-gray-700 group-hover:text-gray-900">{p.label}</span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Admin note footer */}
+                            {mod.adminNote && (
+                              <div className="px-4 py-2 border-t border-gray-50 text-[10px] text-blue-600 font-medium">
+                                🛡️ {mod.adminNote}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
 
                     {permsMsg && (
-                      <div className={`text-sm px-3 py-2.5 rounded-lg border ${
+                      <div className={`text-sm px-3 py-2.5 rounded-lg border mb-4 ${
                         permsMsg.startsWith('ok:')
                           ? 'bg-green-50 border-green-200 text-green-800'
                           : 'bg-red-50 border-red-200 text-red-700'
@@ -1071,22 +1258,23 @@ export default function EmployeeDetail() {
                       </div>
                     )}
 
-                    <button onClick={async () => {
-                      setSavingPerms(true)
-                      setPermsMsg('')
-                      const { error } = await supabase
-                        .from('user_permissions')
-                        .upsert({ ...perms, user_id: linkedProfile.id },
-                                 { onConflict: 'user_id' })
-                      setPermsMsg(error ? 'error:' + error.message : 'ok:Permissions saved.')
-                      setSavingPerms(false)
-                    }} disabled={savingPerms}
-                      className="w-full py-2.5 rounded-lg text-sm font-semibold text-white bg-green-700 hover:bg-green-800 disabled:opacity-50">
+                    <button
+                      onClick={async () => {
+                        setSavingPerms(true); setPermsMsg('')
+                        const { error } = await supabase
+                          .from('user_permissions')
+                          .upsert({ ...perms, user_id: linkedProfile.id }, { onConflict: 'user_id' })
+                        setPermsMsg(error ? 'error:' + error.message : 'ok:Permissions saved.')
+                        setSavingPerms(false)
+                      }}
+                      disabled={savingPerms}
+                      className="w-full py-2.5 rounded-lg text-sm font-semibold text-white bg-green-700 hover:bg-green-800 disabled:opacity-50"
+                    >
                       {savingPerms ? 'Saving…' : 'Save Permissions'}
                     </button>
                   </>
                 )}
-              </div>
+              </>
             ) : (
               <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
                 <p className="text-gray-600 mb-3">This employee does not have a system account</p>
