@@ -18,14 +18,12 @@ const STAGES = [
 const stageMap = Object.fromEntries(STAGES.map(s => [s.value, s]))
 
 const EMPTY_FORM = {
-  entity_type: 'individual',
   first_name: '', last_name: '', company_name: '',
   secondary_first_name: '', secondary_last_name: '',
   phone: '', cell: '', email: '',
   _additionalEmailsRaw: '', _additionalPhonesRaw: '',
   street_address: '', city: '', state: '', zip: '',
   company_street: '', company_city: '', company_state: '', company_zip: '',
-  company_contacts: [],
   ghl_assigned_to: '', consultation_type: '',
   date_of_birth: '', notes: '', project_description: '',
   stage: 'new_lead', contact_type: 'Residential',
@@ -41,50 +39,18 @@ const PROJECT_TYPES = [
   'Retaining Walls','Steps','Utilities','Other',
 ]
 
-function CompanyContactsEditor({ contacts, onChange, inp, lbl }) {
-  const list = contacts || []
-  const update = (i, field, val) =>
-    onChange(list.map((c, j) => j === i ? { ...c, [field]: val } : c))
-  const add    = () => onChange([...list, { first_name: '', last_name: '', email: '', phone: '' }])
-  const remove = (i) => onChange(list.filter((_, j) => j !== i))
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1.5">
-        <label className={lbl}>Company Contacts</label>
-        {list.length > 0 && (
-          <button type="button" onClick={add} className="text-xs text-green-700 hover:underline font-medium">+ Add</button>
-        )}
-      </div>
-      {list.length === 0 ? (
-        <button type="button" onClick={add}
-          className="w-full border border-dashed border-gray-300 rounded-lg py-3 text-sm text-gray-400 hover:border-green-500 hover:text-green-600 transition-colors">
-          + Add first company contact
-        </button>
-      ) : (
-        <div className="space-y-2">
-          {list.map((cc, i) => (
-            <div key={i} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-gray-500">Contact {i + 1}</span>
-                <button type="button" onClick={() => remove(i)} className="text-xs text-red-400 hover:text-red-600">Remove</button>
-              </div>
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                <input className={inp} value={cc.first_name || ''} onChange={e => update(i, 'first_name', e.target.value)} placeholder="First Name" />
-                <input className={inp} value={cc.last_name  || ''} onChange={e => update(i, 'last_name',  e.target.value)} placeholder="Last Name"  />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <input className={inp} value={cc.email || ''} onChange={e => update(i, 'email', e.target.value)} placeholder="Email" type="email" />
-                <input className={inp} value={cc.phone || ''} onChange={e => update(i, 'phone', e.target.value)} placeholder="Phone" />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
+const EMPTY_COMPANY_FORM = {
+  company_name: '',
+  company_street: '', company_city: '', company_state: '', company_zip: '',
+  phone: '', email: '', website: '',
+  ghl_assigned_to: '',
+  stage: 'new_lead', contact_type: 'Residential',
+  source: '', campaign: '', how_did_you_hear: '',
+  notes: '', project_description: '', call_center_notes: '',
+  company_contacts: [],
 }
 
-// ── Add Contact Modal ─────────────────────────────────────────────────────────
+// ── Add Individual Contact Modal ──────────────────────────────────────────────
 function AddContactModal({ onSave, onClose }) {
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
@@ -98,7 +64,6 @@ function AddContactModal({ onSave, onClose }) {
     const { data, error } = await supabase
       .from('contacts')
       .insert({
-        entity_type:          form.entity_type || 'individual',
         first_name:           form.first_name.trim(),
         last_name:            form.last_name.trim(),
         company_name:         form.company_name.trim() || null,
@@ -121,7 +86,6 @@ function AddContactModal({ onSave, onClose }) {
         company_city:         form.company_city.trim() || null,
         company_state:        form.company_state.trim() || null,
         company_zip:          form.company_zip.trim() || null,
-        company_contacts:     form.company_contacts?.length ? form.company_contacts : [],
         ghl_assigned_to:      form.ghl_assigned_to.trim() || null,
         consultation_type:    form.consultation_type || null,
         stage:                form.stage,
@@ -156,76 +120,59 @@ function AddContactModal({ onSave, onClose }) {
         </div>
 
         <div className="space-y-3">
-          {/* ── Entity Type Toggle ── */}
-          <div className="flex rounded-lg border border-gray-200 overflow-hidden">
-            {['individual', 'company'].map(et => (
-              <button key={et} type="button"
-                onClick={() => set('entity_type', et)}
-                className={`flex-1 py-2 text-sm font-semibold capitalize transition-colors ${
-                  form.entity_type === et ? 'bg-green-700 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
-                }`}
-              >{et}</button>
-            ))}
+          {/* ── Name ── */}
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className={label}>First Name</label><input className={input} value={form.first_name} onChange={e => set('first_name', e.target.value)} placeholder="First" autoFocus /></div>
+            <div><label className={label}>Last Name <span className="text-red-400">*</span></label><input className={input} value={form.last_name} onChange={e => set('last_name', e.target.value)} placeholder="Last" /></div>
           </div>
 
-          {/* ── Individual fields ── */}
-          {form.entity_type !== 'company' && (<>
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className={label}>First Name</label><input className={input} value={form.first_name} onChange={e => set('first_name', e.target.value)} placeholder="First" autoFocus /></div>
-              <div><label className={label}>Last Name <span className="text-red-400">*</span></label><input className={input} value={form.last_name} onChange={e => set('last_name', e.target.value)} placeholder="Last" /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className={label}>Spouse / Partner First</label><input className={input} value={form.secondary_first_name} onChange={e => set('secondary_first_name', e.target.value)} placeholder="First" /></div>
-              <div><label className={label}>Spouse / Partner Last</label><input className={input} value={form.secondary_last_name} onChange={e => set('secondary_last_name', e.target.value)} placeholder="Last" /></div>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div><label className={label}>Phone</label><input className={input} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(555) 000-0000" /></div>
-              <div><label className={label}>Cell</label><input className={input} value={form.cell} onChange={e => set('cell', e.target.value)} placeholder="(555) 000-0000" /></div>
-              <div><label className={label}>Email</label><input className={input} value={form.email} onChange={e => set('email', e.target.value)} placeholder="email@example.com" type="email" /></div>
-            </div>
-            <div>
-              <label className={label}>Additional Emails <span className="font-normal text-gray-400">(one per line)</span></label>
-              <textarea className={input + ' resize-none'} rows={2} value={form._additionalEmailsRaw} onChange={e => set('_additionalEmailsRaw', e.target.value)} placeholder="extra@email.com" />
-            </div>
-            <div>
-              <label className={label}>Additional Phones <span className="font-normal text-gray-400">(one per line)</span></label>
-              <textarea className={input + ' resize-none'} rows={2} value={form._additionalPhonesRaw} onChange={e => set('_additionalPhonesRaw', e.target.value)} placeholder="+1 (555) 000-0000" />
-            </div>
-            <div><label className={label}>Street Address</label><input className={input} value={form.street_address} onChange={e => set('street_address', e.target.value)} placeholder="123 Main St" /></div>
-            <div className="grid grid-cols-3 gap-3">
-              <div><label className={label}>City</label><input className={input} value={form.city} onChange={e => set('city', e.target.value)} placeholder="City" /></div>
-              <div><label className={label}>State</label><input className={input} value={form.state} onChange={e => set('state', e.target.value)} placeholder="CA" maxLength={2} /></div>
-              <div><label className={label}>Zip</label><input className={input} value={form.zip} onChange={e => set('zip', e.target.value)} placeholder="90210" /></div>
-            </div>
-            <div><label className={label}>Date of Birth</label><input className={input} type="date" value={form.date_of_birth} onChange={e => set('date_of_birth', e.target.value)} /></div>
-          </>)}
+          {/* ── Spouse / Partner ── */}
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className={label}>Spouse / Partner First</label><input className={input} value={form.secondary_first_name} onChange={e => set('secondary_first_name', e.target.value)} placeholder="First" /></div>
+            <div><label className={label}>Spouse / Partner Last</label><input className={input} value={form.secondary_last_name} onChange={e => set('secondary_last_name', e.target.value)} placeholder="Last" /></div>
+          </div>
 
-          {/* ── Company fields ── */}
-          {form.entity_type === 'company' && (<>
-            <div><label className={label}>Company Name <span className="text-red-400">*</span></label><input className={input} value={form.company_name} onChange={e => set('company_name', e.target.value)} placeholder="Company name" autoFocus /></div>
-            <div className="border border-gray-200 rounded-xl p-3 bg-gray-50">
-              <p className="text-xs font-semibold text-gray-500 mb-2">Company Address</p>
-              <div className="space-y-2">
-                <input className={input} value={form.company_street} onChange={e => set('company_street', e.target.value)} placeholder="Street Address" />
-                <div className="grid grid-cols-3 gap-2">
-                  <input className={input} value={form.company_city} onChange={e => set('company_city', e.target.value)} placeholder="City" />
-                  <input className={input} value={form.company_state} onChange={e => set('company_state', e.target.value)} placeholder="ST" maxLength={2} />
-                  <input className={input} value={form.company_zip} onChange={e => set('company_zip', e.target.value)} placeholder="Zip" />
-                </div>
+          {/* ── Contact Info ── */}
+          <div className="grid grid-cols-3 gap-3">
+            <div><label className={label}>Phone</label><input className={input} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(555) 000-0000" /></div>
+            <div><label className={label}>Cell</label><input className={input} value={form.cell} onChange={e => set('cell', e.target.value)} placeholder="(555) 000-0000" /></div>
+            <div><label className={label}>Email</label><input className={input} value={form.email} onChange={e => set('email', e.target.value)} placeholder="email@example.com" type="email" /></div>
+          </div>
+          <div>
+            <label className={label}>Additional Emails <span className="font-normal text-gray-400">(one per line)</span></label>
+            <textarea className={input + ' resize-none'} rows={2} value={form._additionalEmailsRaw} onChange={e => set('_additionalEmailsRaw', e.target.value)} placeholder="extra@email.com" />
+          </div>
+          <div>
+            <label className={label}>Additional Phones <span className="font-normal text-gray-400">(one per line)</span></label>
+            <textarea className={input + ' resize-none'} rows={2} value={form._additionalPhonesRaw} onChange={e => set('_additionalPhonesRaw', e.target.value)} placeholder="+1 (555) 000-0000" />
+          </div>
+
+          {/* ── Home Address ── */}
+          <div><label className={label}>Street Address</label><input className={input} value={form.street_address} onChange={e => set('street_address', e.target.value)} placeholder="123 Main St" /></div>
+          <div className="grid grid-cols-3 gap-3">
+            <div><label className={label}>City</label><input className={input} value={form.city} onChange={e => set('city', e.target.value)} placeholder="City" /></div>
+            <div><label className={label}>State</label><input className={input} value={form.state} onChange={e => set('state', e.target.value)} placeholder="CA" maxLength={2} /></div>
+            <div><label className={label}>Zip</label><input className={input} value={form.zip} onChange={e => set('zip', e.target.value)} placeholder="90210" /></div>
+          </div>
+
+          {/* ── Company Name & Address ── */}
+          <div><label className={label}>Company Name</label><input className={input} value={form.company_name} onChange={e => set('company_name', e.target.value)} placeholder="Company name" /></div>
+          <div className="border border-gray-200 rounded-xl p-3 bg-gray-50">
+            <p className="text-xs font-semibold text-gray-500 mb-2">Company Address</p>
+            <div className="space-y-2">
+              <input className={input} value={form.company_street} onChange={e => set('company_street', e.target.value)} placeholder="Street Address" />
+              <div className="grid grid-cols-3 gap-2">
+                <input className={input} value={form.company_city} onChange={e => set('company_city', e.target.value)} placeholder="City" />
+                <input className={input} value={form.company_state} onChange={e => set('company_state', e.target.value)} placeholder="ST" maxLength={2} />
+                <input className={input} value={form.company_zip} onChange={e => set('company_zip', e.target.value)} placeholder="Zip" />
               </div>
             </div>
-            <CompanyContactsEditor
-              contacts={form.company_contacts}
-              onChange={val => set('company_contacts', val)}
-              inp={input} lbl={label}
-            />
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className={label}>Main Phone</label><input className={input} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(555) 000-0000" /></div>
-              <div><label className={label}>Main Email</label><input className={input} value={form.email} onChange={e => set('email', e.target.value)} placeholder="email@example.com" type="email" /></div>
-            </div>
-          </>)}
+          </div>
 
-          {/* ── Shared fields ── */}
+          {/* ── Date of Birth ── */}
+          <div><label className={label}>Date of Birth</label><input className={input} type="date" value={form.date_of_birth} onChange={e => set('date_of_birth', e.target.value)} /></div>
+
+          {/* ── Assignment ── */}
           <div className="grid grid-cols-2 gap-3">
             <div><label className={label}>Assigned To</label><input className={input} value={form.ghl_assigned_to} onChange={e => set('ghl_assigned_to', e.target.value)} placeholder="Assignee name" /></div>
             <div>
@@ -293,12 +240,193 @@ function AddContactModal({ onSave, onClose }) {
           <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">Cancel</button>
           <button
             onClick={handleSave}
-            disabled={saving || (form.entity_type !== 'company'
-              ? (!form.last_name.trim() && !form.first_name.trim())
-              : !form.company_name.trim())}
+            disabled={saving || (!form.last_name.trim() && !form.first_name.trim())}
             className="flex-1 py-2 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800 disabled:opacity-50 transition-colors"
           >
             {saving ? 'Saving…' : 'Add Contact'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Add Company Modal ─────────────────────────────────────────────────────────
+function CompanyContactRow({ contact, onChange, onRemove, inp, lbl }) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg p-3 space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        <div><label className={lbl}>First Name</label><input className={inp} value={contact.first_name || ''} onChange={e => onChange({ ...contact, first_name: e.target.value })} placeholder="First" /></div>
+        <div><label className={lbl}>Last Name</label><input className={inp} value={contact.last_name || ''} onChange={e => onChange({ ...contact, last_name: e.target.value })} placeholder="Last" /></div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div><label className={lbl}>Phone</label><input className={inp} value={contact.phone || ''} onChange={e => onChange({ ...contact, phone: e.target.value })} placeholder="(555) 000-0000" /></div>
+        <div><label className={lbl}>Email</label><input className={inp} value={contact.email || ''} onChange={e => onChange({ ...contact, email: e.target.value })} placeholder="email@example.com" /></div>
+      </div>
+      <button type="button" onClick={onRemove} className="text-xs text-red-500 hover:text-red-700">Remove contact</button>
+    </div>
+  )
+}
+
+function AddCompanyModal({ onSave, onClose }) {
+  const [form, setForm] = useState(EMPTY_COMPANY_FORM)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState(null)
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+
+  const input = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600'
+  const label = 'block text-xs font-semibold text-gray-500 mb-1'
+
+  function addCompanyContact() {
+    set('company_contacts', [...form.company_contacts, { first_name: '', last_name: '', phone: '', email: '' }])
+  }
+  function updateCompanyContact(i, val) {
+    const arr = [...form.company_contacts]
+    arr[i] = val
+    set('company_contacts', arr)
+  }
+  function removeCompanyContact(i) {
+    set('company_contacts', form.company_contacts.filter((_, idx) => idx !== i))
+  }
+
+  async function handleSave() {
+    if (!form.company_name.trim()) return
+    setSaving(true)
+    setSaveError(null)
+    const { data, error } = await supabase
+      .from('companies')
+      .insert({
+        company_name:    form.company_name.trim(),
+        company_street:  form.company_street.trim() || null,
+        company_city:    form.company_city.trim() || null,
+        company_state:   form.company_state.trim() || null,
+        company_zip:     form.company_zip.trim() || null,
+        phone:           form.phone.trim() || null,
+        email:           form.email.trim() || null,
+        website:         form.website.trim() || null,
+        stage:           form.stage || 'new_lead',
+        contact_type:    form.contact_type || null,
+        source:          form.source.trim() || null,
+        campaign:        form.campaign.trim() || null,
+        how_did_you_hear: form.how_did_you_hear.trim() || null,
+        ghl_assigned_to: form.ghl_assigned_to.trim() || null,
+        notes:           form.notes.trim() || null,
+        project_description: form.project_description.trim() || null,
+        call_center_notes:   form.call_center_notes.trim() || null,
+        company_contacts: form.company_contacts.filter(c => c.first_name || c.last_name || c.email || c.phone),
+      })
+      .select()
+      .single()
+    setSaving(false)
+    if (error) { setSaveError(error.message); return }
+    if (data) onSave(data)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-lg font-bold text-gray-900">New Company</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+        </div>
+
+        <div className="space-y-3">
+          {/* ── Company Name ── */}
+          <div><label className={label}>Company Name <span className="text-red-400">*</span></label><input className={input} value={form.company_name} onChange={e => set('company_name', e.target.value)} placeholder="Company name" autoFocus /></div>
+
+          {/* ── Company Address ── */}
+          <div className="border border-gray-200 rounded-xl p-3 bg-gray-50">
+            <p className="text-xs font-semibold text-gray-500 mb-2">Company Address</p>
+            <div className="space-y-2">
+              <input className={input} value={form.company_street} onChange={e => set('company_street', e.target.value)} placeholder="Street Address" />
+              <div className="grid grid-cols-3 gap-2">
+                <input className={input} value={form.company_city} onChange={e => set('company_city', e.target.value)} placeholder="City" />
+                <input className={input} value={form.company_state} onChange={e => set('company_state', e.target.value)} placeholder="ST" maxLength={2} />
+                <input className={input} value={form.company_zip} onChange={e => set('company_zip', e.target.value)} placeholder="Zip" />
+              </div>
+            </div>
+          </div>
+
+          {/* ── Main Contact Info ── */}
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className={label}>Main Phone</label><input className={input} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(555) 000-0000" /></div>
+            <div><label className={label}>Main Email</label><input className={input} value={form.email} onChange={e => set('email', e.target.value)} placeholder="email@example.com" type="email" /></div>
+          </div>
+          <div><label className={label}>Website</label><input className={input} value={form.website} onChange={e => set('website', e.target.value)} placeholder="https://example.com" /></div>
+
+          {/* ── Company Contacts ── */}
+          <div className="border border-gray-200 rounded-xl p-3 bg-gray-50">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-gray-500">Company Contacts</p>
+              <button type="button" onClick={addCompanyContact} className="text-xs font-semibold text-green-700 hover:text-green-900">+ Add Person</button>
+            </div>
+            {form.company_contacts.length === 0
+              ? <p className="text-xs text-gray-400 italic">No contacts added yet.</p>
+              : <div className="space-y-2">
+                  {form.company_contacts.map((c, i) => (
+                    <CompanyContactRow key={i} contact={c}
+                      onChange={val => updateCompanyContact(i, val)}
+                      onRemove={() => removeCompanyContact(i)}
+                      inp={input} lbl={label}
+                    />
+                  ))}
+                </div>
+            }
+          </div>
+
+          {/* ── Assignment ── */}
+          <div><label className={label}>Assigned To</label><input className={input} value={form.ghl_assigned_to} onChange={e => set('ghl_assigned_to', e.target.value)} placeholder="Assignee name" /></div>
+
+          {/* ── Stage ── */}
+          <div>
+            <label className={label}>Stage</label>
+            <select className={input} value={form.stage} onChange={e => set('stage', e.target.value)}>
+              {STAGES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+          </div>
+
+          <div><label className={label}>Notes</label><textarea className={input + ' resize-none'} rows={3} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Internal notes…" /></div>
+          <div><label className={label}>Project Description</label><textarea className={input + ' resize-none'} rows={3} value={form.project_description} onChange={e => set('project_description', e.target.value)} placeholder="Describe the project or work needed…" /></div>
+
+          {/* ── Marketing ── */}
+          <div className="pt-3 border-t border-gray-100">
+            <p className="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wide">Marketing</p>
+            <div className="space-y-3">
+              <div>
+                <label className={label}>Contact Type</label>
+                <select className={input} value={form.contact_type} onChange={e => set('contact_type', e.target.value)}>
+                  <option value="">— None —</option>
+                  <option value="Residential">Residential</option>
+                  <option value="Commercial">Commercial</option>
+                  <option value="Public Works">Public Works</option>
+                </select>
+              </div>
+              <div><label className={label}>Source Type</label><input className={input} value={form.source} onChange={e => set('source', e.target.value)} placeholder="e.g. Google, Referral…" /></div>
+              <div><label className={label}>Campaign</label><input className={input} value={form.campaign} onChange={e => set('campaign', e.target.value)} placeholder="e.g. Spring Promo, Google Ads…" /></div>
+              <div><label className={label}>Source Origin</label><input className={input} value={form.how_did_you_hear} onChange={e => set('how_did_you_hear', e.target.value)} placeholder="How did they hear about us?" /></div>
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-gray-100">
+            <label className={label}>Call Center Notes</label>
+            <textarea className={input + ' resize-none'} rows={3} value={form.call_center_notes} onChange={e => set('call_center_notes', e.target.value)} placeholder="Notes from call center…" />
+          </div>
+        </div>
+
+        {saveError && (
+          <div className="mt-4 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600">
+            {saveError}
+          </div>
+        )}
+
+        <div className="flex gap-3 mt-4">
+          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button
+            onClick={handleSave}
+            disabled={saving || !form.company_name.trim()}
+            className="flex-1 py-2 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800 disabled:opacity-50 transition-colors"
+          >
+            {saving ? 'Saving…' : 'Add Company'}
           </button>
         </div>
       </div>
@@ -311,9 +439,18 @@ export default function Contacts() {
   const navigate = useNavigate()
   const PAGE_SIZE = 50
 
+  const [activeTab,   setActiveTab]   = useState('individuals') // 'individuals' | 'companies'
+
+  // ── Individuals state ──
   const [contacts,    setContacts]    = useState([])
   const [loading,     setLoading]     = useState(true)
   const [error,       setError]       = useState(null)
+
+  // ── Companies state ──
+  const [companies,        setCompanies]        = useState([])
+  const [companiesLoading, setCompaniesLoading] = useState(true)
+  const [companiesError,   setCompaniesError]   = useState(null)
+
   const [search,      setSearch]      = useState('')
   const [stageFilter, setStageFilter] = useState('all')
   // Mobile-only filter modal — replaces the inline pill row on phones.
@@ -347,10 +484,30 @@ export default function Contacts() {
     setLoading(false)
   }
 
-  useEffect(() => { fetchContacts() }, [])
+  async function fetchCompanies() {
+    setCompaniesLoading(true)
+    let all = []
+    let from = 0
+    const BATCH = 1000
+    while (true) {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('id,company_name,company_city,company_state,phone,email,stage,contact_type,created_at')
+        .order('company_name', { ascending: true })
+        .range(from, from + BATCH - 1)
+      if (error) { setCompaniesError(error.message); break }
+      all = [...all, ...(data || [])]
+      if (!data || data.length < BATCH) break
+      from += BATCH
+    }
+    setCompanies(all)
+    setCompaniesLoading(false)
+  }
+
+  useEffect(() => { fetchContacts(); fetchCompanies() }, [])
 
   // Reset to first page when filters change
-  useEffect(() => { setPage(0) }, [search, stageFilter])
+  useEffect(() => { setPage(0) }, [search, stageFilter, activeTab])
 
   // Filter + sort
   const q = search.toLowerCase()
@@ -372,18 +529,38 @@ export default function Contacts() {
       return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av)
     })
 
+  const filteredCompanies = companies
+    .filter(c => {
+      if (stageFilter !== 'all' && c.stage !== stageFilter) return false
+      if (!q) return true
+      return (
+        (c.company_name || '').toLowerCase().includes(q) ||
+        (c.email || '').toLowerCase().includes(q) ||
+        (c.phone || '').toLowerCase().includes(q) ||
+        (c.company_city || '').toLowerCase().includes(q)
+      )
+    })
+    .sort((a, b) => {
+      const sf = sortField === 'last_name' ? 'company_name' : sortField
+      let av = a[sf] || '', bv = b[sf] || ''
+      return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av)
+    })
+
   function toggleSort(field) {
     if (sortField === field) setSortAsc(v => !v)
     else { setSortField(field); setSortAsc(true) }
   }
 
-  const totalPages  = Math.ceil(filtered.length / PAGE_SIZE)
-  const paginated   = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
-  const rangeStart  = filtered.length === 0 ? 0 : page * PAGE_SIZE + 1
-  const rangeEnd    = Math.min((page + 1) * PAGE_SIZE, filtered.length)
+  const activeList  = activeTab === 'individuals' ? filtered : filteredCompanies
+  const totalPages  = Math.ceil(activeList.length / PAGE_SIZE)
+  const paginated   = activeList.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  const rangeStart  = activeList.length === 0 ? 0 : page * PAGE_SIZE + 1
+  const rangeEnd    = Math.min((page + 1) * PAGE_SIZE, activeList.length)
 
   const thCls = 'text-left px-4 py-2 font-semibold text-gray-600 uppercase cursor-pointer select-none hover:text-gray-800 transition-colors'
   const arrow = field => sortField === field ? (sortAsc ? ' ↑' : ' ↓') : ''
+
+  const isIndividuals = activeTab === 'individuals'
 
   return (
     <div>
@@ -402,33 +579,50 @@ export default function Contacts() {
               <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-green-700 text-white text-[10px] font-bold">1</span>
             )}
           </button>
-          <button
-            onClick={() => setShowImport(true)}
-            className="hidden sm:flex px-3 py-2 border border-gray-200 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-50 transition-colors items-center gap-1.5"
-          >
-            ⬆ Import
-          </button>
-          <button
-            onClick={() => setShowExport(true)}
-            className="hidden sm:flex px-3 py-2 border border-gray-200 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-50 transition-colors items-center gap-1.5"
-          >
-            ⬇ Export
-          </button>
+          {isIndividuals && <>
+            <button
+              onClick={() => setShowImport(true)}
+              className="hidden sm:flex px-3 py-2 border border-gray-200 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-50 transition-colors items-center gap-1.5"
+            >
+              ⬆ Import
+            </button>
+            <button
+              onClick={() => setShowExport(true)}
+              className="hidden sm:flex px-3 py-2 border border-gray-200 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-50 transition-colors items-center gap-1.5"
+            >
+              ⬇ Export
+            </button>
+          </>}
           <button
             onClick={() => setShowAdd(true)}
             className="hidden sm:flex px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 transition-colors"
           >
-            + Add Contact
+            + {isIndividuals ? 'Add Contact' : 'Add Company'}
           </button>
         </div>
       </div>
 
-      {/* Mobile: full-width Add Contact button sits directly above the search field. */}
+      {/* Tab switcher */}
+      <div className="flex rounded-lg border border-gray-200 overflow-hidden mb-4 w-fit">
+        {[
+          { id: 'individuals', label: `Individuals (${contacts.length.toLocaleString()})` },
+          { id: 'companies',   label: `Companies (${companies.length.toLocaleString()})` },
+        ].map(tab => (
+          <button key={tab.id} type="button"
+            onClick={() => { setActiveTab(tab.id); setSearch(''); setStageFilter('all') }}
+            className={`px-5 py-2 text-sm font-semibold transition-colors ${
+              activeTab === tab.id ? 'bg-green-700 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
+            }`}
+          >{tab.label}</button>
+        ))}
+      </div>
+
+      {/* Mobile: full-width Add button sits directly above the search field. */}
       <button
         onClick={() => setShowAdd(true)}
         className="sm:hidden w-full mb-3 py-2.5 bg-green-700 text-white rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
       >
-        + Add Contact
+        + {isIndividuals ? 'Add Contact' : 'Add Company'}
       </button>
 
       {/* Stage filter pills — desktop only; mobile uses the Filter modal */}
@@ -439,16 +633,19 @@ export default function Contacts() {
         >
           All
         </button>
-        {STAGES.map(s => (
-          <button
-            key={s.value}
-            onClick={() => setStageFilter(stageFilter === s.value ? 'all' : s.value)}
-            className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${stageFilter === s.value ? s.cls + ' ring-2 ring-offset-1 ring-current' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'}`}
-          >
-            {s.label}
-            <span className="ml-1.5 opacity-60">{contacts.filter(c => c.stage === s.value).length}</span>
-          </button>
-        ))}
+        {STAGES.map(s => {
+          const src = isIndividuals ? contacts : companies
+          return (
+            <button
+              key={s.value}
+              onClick={() => setStageFilter(stageFilter === s.value ? 'all' : s.value)}
+              className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${stageFilter === s.value ? s.cls + ' ring-2 ring-offset-1 ring-current' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'}`}
+            >
+              {s.label}
+              <span className="ml-1.5 opacity-60">{src.filter(c => c.stage === s.value).length}</span>
+            </button>
+          )
+        })}
       </div>
 
       {/* Search */}
@@ -456,92 +653,159 @@ export default function Contacts() {
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search name, company, email, phone, city…"
+          placeholder={isIndividuals ? 'Search name, company, email, phone, city…' : 'Search company name, email, phone, city…'}
           className="w-full max-w-md border border-gray-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600"
         />
       </div>
 
       {/* Table */}
-      {loading ? (
-        <div className="flex items-center justify-center py-20 text-gray-400">Loading…</div>
-      ) : error ? (
-        <div className="text-red-500 text-sm py-8 text-center">{error}</div>
+      {isIndividuals ? (
+        loading ? (
+          <div className="flex items-center justify-center py-20 text-gray-400">Loading…</div>
+        ) : error ? (
+          <div className="text-red-500 text-sm py-8 text-center">{error}</div>
+        ) : (
+          <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+            <table className="w-full text-xs min-w-[900px]">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className={`${thCls} sticky left-0 bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]`} onClick={() => toggleSort('last_name')}>Name{arrow('last_name')}</th>
+                  <th className={thCls} onClick={() => toggleSort('company_name')}>Company{arrow('company_name')}</th>
+                  <th className={thCls}>Phone</th>
+                  <th className={thCls}>Cell</th>
+                  <th className={thCls}>Email</th>
+                  <th className={thCls} onClick={() => toggleSort('street_address')}>Address{arrow('street_address')}</th>
+                  <th className={thCls} onClick={() => toggleSort('city')}>City / State{arrow('city')}</th>
+                  <th className={thCls} onClick={() => toggleSort('stage')}>Stage{arrow('stage')}</th>
+                  <th className={thCls} onClick={() => toggleSort('created_at')}>Created{arrow('created_at')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="px-4 py-10 text-center text-gray-400">
+                      {search || stageFilter !== 'all' ? 'No contacts match your filters.' : 'No contacts yet — add your first one.'}
+                    </td>
+                  </tr>
+                ) : paginated.map(c => (
+                  <tr key={c.id} className="group hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-2 sticky left-0 bg-white group-hover:bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]">
+                      <button
+                        onClick={() => navigate(`/contacts/${c.id}`)}
+                        className="font-semibold text-green-700 hover:text-green-900 hover:underline text-left"
+                      >
+                        {c.last_name}{c.first_name ? `, ${c.first_name}` : ''}
+                      </button>
+                    </td>
+                    <td className="px-4 py-2 text-gray-600">{c.company_name || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-4 py-2 text-gray-600">
+                      {c.phone
+                        ? <a href={`tel:${c.phone}`} className="hover:text-green-700">{c.phone}</a>
+                        : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-4 py-2 text-gray-600">
+                      {c.cell
+                        ? <a href={`tel:${c.cell}`} className="hover:text-green-700">{c.cell}</a>
+                        : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-4 py-2 text-gray-600">
+                      {c.email
+                        ? <a href={`mailto:${c.email}`} className="hover:text-green-700 truncate max-w-[180px] block">{c.email}</a>
+                        : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-4 py-2 text-gray-600">{c.street_address || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-4 py-2 text-gray-600">
+                      {[c.city, c.state].filter(Boolean).join(', ') || <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-4 py-2">
+                      {stageMap[c.stage] ? (
+                        <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold border ${stageMap[c.stage].cls}`}>
+                          {stageMap[c.stage].label}
+                        </span>
+                      ) : '—'}
+                    </td>
+                    <td className="px-4 py-2 text-gray-400 whitespace-nowrap">
+                      {c.created_at ? new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-          <table className="w-full text-xs min-w-[900px]">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className={`${thCls} sticky left-0 bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]`} onClick={() => toggleSort('last_name')}>Name{arrow('last_name')}</th>
-                <th className={thCls} onClick={() => toggleSort('company_name')}>Company{arrow('company_name')}</th>
-                <th className={thCls}>Phone</th>
-                <th className={thCls}>Cell</th>
-                <th className={thCls}>Email</th>
-                <th className={thCls} onClick={() => toggleSort('street_address')}>Address{arrow('street_address')}</th>
-                <th className={thCls} onClick={() => toggleSort('city')}>City / State{arrow('city')}</th>
-                <th className={thCls} onClick={() => toggleSort('stage')}>Stage{arrow('stage')}</th>
-                <th className={thCls} onClick={() => toggleSort('created_at')}>Created{arrow('created_at')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="px-4 py-10 text-center text-gray-400">
-                    {search || stageFilter !== 'all' ? 'No contacts match your filters.' : 'No contacts yet — add your first one.'}
-                  </td>
+        companiesLoading ? (
+          <div className="flex items-center justify-center py-20 text-gray-400">Loading…</div>
+        ) : companiesError ? (
+          <div className="text-red-500 text-sm py-8 text-center">{companiesError}</div>
+        ) : (
+          <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+            <table className="w-full text-xs min-w-[700px]">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className={`${thCls} sticky left-0 bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]`} onClick={() => toggleSort('company_name')}>Company Name{arrow('company_name')}</th>
+                  <th className={thCls}>Phone</th>
+                  <th className={thCls}>Email</th>
+                  <th className={thCls} onClick={() => toggleSort('company_city')}>City / State{arrow('company_city')}</th>
+                  <th className={thCls} onClick={() => toggleSort('stage')}>Stage{arrow('stage')}</th>
+                  <th className={thCls} onClick={() => toggleSort('created_at')}>Created{arrow('created_at')}</th>
                 </tr>
-              ) : paginated.map(c => (
-                <tr key={c.id} className="group hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-2 sticky left-0 bg-white group-hover:bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]">
-                    <button
-                      onClick={() => navigate(`/contacts/${c.id}`)}
-                      className="font-semibold text-green-700 hover:text-green-900 hover:underline text-left"
-                    >
-                      {c.last_name}{c.first_name ? `, ${c.first_name}` : ''}
-                    </button>
-                  </td>
-                  <td className="px-4 py-2 text-gray-600">{c.company_name || <span className="text-gray-300">—</span>}</td>
-                  <td className="px-4 py-2 text-gray-600">
-                    {c.phone
-                      ? <a href={`tel:${c.phone}`} className="hover:text-green-700">{c.phone}</a>
-                      : <span className="text-gray-300">—</span>}
-                  </td>
-                  <td className="px-4 py-2 text-gray-600">
-                    {c.cell
-                      ? <a href={`tel:${c.cell}`} className="hover:text-green-700">{c.cell}</a>
-                      : <span className="text-gray-300">—</span>}
-                  </td>
-                  <td className="px-4 py-2 text-gray-600">
-                    {c.email
-                      ? <a href={`mailto:${c.email}`} className="hover:text-green-700 truncate max-w-[180px] block">{c.email}</a>
-                      : <span className="text-gray-300">—</span>}
-                  </td>
-                  <td className="px-4 py-2 text-gray-600">{c.street_address || <span className="text-gray-300">—</span>}</td>
-                  <td className="px-4 py-2 text-gray-600">
-                    {[c.city, c.state].filter(Boolean).join(', ') || <span className="text-gray-300">—</span>}
-                  </td>
-                  <td className="px-4 py-2">
-                    {stageMap[c.stage] ? (
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold border ${stageMap[c.stage].cls}`}>
-                        {stageMap[c.stage].label}
-                      </span>
-                    ) : '—'}
-                  </td>
-                  <td className="px-4 py-2 text-gray-400 whitespace-nowrap">
-                    {c.created_at ? new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredCompanies.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-10 text-center text-gray-400">
+                      {search || stageFilter !== 'all' ? 'No companies match your filters.' : 'No companies yet — add your first one.'}
+                    </td>
+                  </tr>
+                ) : paginated.map(c => (
+                  <tr key={c.id} className="group hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-2 sticky left-0 bg-white group-hover:bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]">
+                      <button
+                        onClick={() => navigate(`/companies/${c.id}`)}
+                        className="font-semibold text-green-700 hover:text-green-900 hover:underline text-left"
+                      >
+                        {c.company_name}
+                      </button>
+                    </td>
+                    <td className="px-4 py-2 text-gray-600">
+                      {c.phone
+                        ? <a href={`tel:${c.phone}`} className="hover:text-green-700">{c.phone}</a>
+                        : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-4 py-2 text-gray-600">
+                      {c.email
+                        ? <a href={`mailto:${c.email}`} className="hover:text-green-700 truncate max-w-[180px] block">{c.email}</a>
+                        : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-4 py-2 text-gray-600">
+                      {[c.company_city, c.company_state].filter(Boolean).join(', ') || <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-4 py-2">
+                      {stageMap[c.stage] ? (
+                        <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold border ${stageMap[c.stage].cls}`}>
+                          {stageMap[c.stage].label}
+                        </span>
+                      ) : '—'}
+                    </td>
+                    <td className="px-4 py-2 text-gray-400 whitespace-nowrap">
+                      {c.created_at ? new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
       )}
 
       {/* Pagination */}
-      {filtered.length > 0 && (
+      {activeList.length > 0 && (
         <div className="flex items-center justify-between mt-3">
           <p className="text-xs text-gray-400">
-            {rangeStart}–{rangeEnd} of {filtered.length.toLocaleString()} contact{filtered.length !== 1 ? 's' : ''}
-            {contacts.length !== filtered.length && ` (${contacts.length.toLocaleString()} total)`}
+            {rangeStart}–{rangeEnd} of {activeList.length.toLocaleString()} {isIndividuals ? 'contact' : 'compan'}{isIndividuals ? (activeList.length !== 1 ? 's' : '') : (activeList.length !== 1 ? 'ies' : 'y')}
+            {isIndividuals && contacts.length !== filtered.length && ` (${contacts.length.toLocaleString()} total)`}
+            {!isIndividuals && companies.length !== filteredCompanies.length && ` (${companies.length.toLocaleString()} total)`}
           </p>
 
           {totalPages > 1 && (
@@ -604,9 +868,16 @@ export default function Contacts() {
         </div>
       )}
 
-      {showAdd && (
+      {showAdd && isIndividuals && (
         <AddContactModal
           onSave={c => { setContacts(p => [c, ...p]); setShowAdd(false) }}
+          onClose={() => setShowAdd(false)}
+        />
+      )}
+
+      {showAdd && !isIndividuals && (
+        <AddCompanyModal
+          onSave={c => { setCompanies(p => [c, ...p]); setShowAdd(false) }}
           onClose={() => setShowAdd(false)}
         />
       )}
@@ -644,19 +915,22 @@ export default function Contacts() {
                 onClick={() => { setStageFilter('all'); setShowMobileFilter(false) }}
                 className={`w-full flex items-center justify-between px-3 py-3 rounded-lg border text-sm font-semibold transition-colors ${stageFilter === 'all' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-700 border-gray-200'}`}
               >
-                <span>All contacts</span>
-                <span className="text-xs opacity-70">{contacts.length}</span>
+                <span>All {isIndividuals ? 'contacts' : 'companies'}</span>
+                <span className="text-xs opacity-70">{isIndividuals ? contacts.length : companies.length}</span>
               </button>
-              {STAGES.map(s => (
-                <button
-                  key={s.value}
-                  onClick={() => { setStageFilter(s.value); setShowMobileFilter(false) }}
-                  className={`w-full flex items-center justify-between px-3 py-3 rounded-lg border text-sm font-semibold transition-colors ${stageFilter === s.value ? s.cls + ' ring-2 ring-current' : 'bg-white text-gray-600 border-gray-200'}`}
-                >
-                  <span>{s.label}</span>
-                  <span className="text-xs opacity-60">{contacts.filter(c => c.stage === s.value).length}</span>
-                </button>
-              ))}
+              {STAGES.map(s => {
+                const src = isIndividuals ? contacts : companies
+                return (
+                  <button
+                    key={s.value}
+                    onClick={() => { setStageFilter(s.value); setShowMobileFilter(false) }}
+                    className={`w-full flex items-center justify-between px-3 py-3 rounded-lg border text-sm font-semibold transition-colors ${stageFilter === s.value ? s.cls + ' ring-2 ring-current' : 'bg-white text-gray-600 border-gray-200'}`}
+                  >
+                    <span>{s.label}</span>
+                    <span className="text-xs opacity-60">{src.filter(c => c.stage === s.value).length}</span>
+                  </button>
+                )
+              })}
             </div>
           </div>
         </div>

@@ -44,50 +44,7 @@ function fmtDate(dateStr) {
 }
 
 // ── Shared: Company Contacts Editor ──────────────────────────────────────────
-function CompanyContactsEditor({ contacts, onChange, inp, lbl }) {
-  const list = contacts || []
-  const update = (i, field, val) =>
-    onChange(list.map((c, j) => j === i ? { ...c, [field]: val } : c))
-  const add    = () => onChange([...list, { first_name: '', last_name: '', email: '', phone: '' }])
-  const remove = (i) => onChange(list.filter((_, j) => j !== i))
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1.5">
-        <label className={lbl}>Company Contacts</label>
-        {list.length > 0 && (
-          <button type="button" onClick={add} className="text-xs text-green-700 hover:underline font-medium">+ Add</button>
-        )}
-      </div>
-      {list.length === 0 ? (
-        <button type="button" onClick={add}
-          className="w-full border border-dashed border-gray-300 rounded-lg py-3 text-sm text-gray-400 hover:border-green-500 hover:text-green-600 transition-colors">
-          + Add first company contact
-        </button>
-      ) : (
-        <div className="space-y-2">
-          {list.map((cc, i) => (
-            <div key={i} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-gray-500">Contact {i + 1}</span>
-                <button type="button" onClick={() => remove(i)} className="text-xs text-red-400 hover:text-red-600">Remove</button>
-              </div>
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                <input className={inp} value={cc.first_name || ''} onChange={e => update(i, 'first_name', e.target.value)} placeholder="First Name" />
-                <input className={inp} value={cc.last_name  || ''} onChange={e => update(i, 'last_name',  e.target.value)} placeholder="Last Name"  />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <input className={inp} value={cc.email || ''} onChange={e => update(i, 'email', e.target.value)} placeholder="Email" type="email" />
-                <input className={inp} value={cc.phone || ''} onChange={e => update(i, 'phone', e.target.value)} placeholder="Phone" />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Edit Contact Modal ────────────────────────────────────────────────────────
+// ── Edit Contact Modal (Individual) ──────────────────────────────────────────
 function EditContactModal({ contact, onSave, onClose }) {
   const [form, setForm] = useState({ ...contact })
   const [saving, setSaving] = useState(false)
@@ -114,8 +71,6 @@ function EditContactModal({ contact, onSave, onClose }) {
         company_city:         form.company_city?.trim() || null,
         company_state:        form.company_state?.trim() || null,
         company_zip:          form.company_zip?.trim() || null,
-        entity_type:          form.entity_type || 'individual',
-        company_contacts:     form.company_contacts || [],
         contact_type:         form.contact_type || null,
         source:               form.source?.trim() || null,
         campaign:             form.campaign?.trim() || null,
@@ -154,85 +109,55 @@ function EditContactModal({ contact, onSave, onClose }) {
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
         </div>
         <div className="space-y-3">
-          {/* ── Entity Type Toggle ── */}
-          <div className="flex rounded-lg border border-gray-200 overflow-hidden">
-            {['individual', 'company'].map(et => (
-              <button key={et} type="button"
-                onClick={() => set('entity_type', et)}
-                className={`flex-1 py-2 text-sm font-semibold capitalize transition-colors ${
-                  (form.entity_type || 'individual') === et
-                    ? 'bg-green-700 text-white'
-                    : 'bg-white text-gray-500 hover:bg-gray-50'
-                }`}
-              >{et}</button>
-            ))}
+          {/* Name */}
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className={lbl}>First Name</label><input className={inp} value={form.first_name || ''} onChange={e => set('first_name', e.target.value)} /></div>
+            <div><label className={lbl}>Last Name</label><input className={inp} value={form.last_name || ''} onChange={e => set('last_name', e.target.value)} /></div>
           </div>
-
-          {/* ── Individual fields ── */}
-          {(form.entity_type || 'individual') !== 'company' && (<>
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className={lbl}>First Name</label><input className={inp} value={form.first_name || ''} onChange={e => set('first_name', e.target.value)} /></div>
-              <div><label className={lbl}>Last Name</label><input className={inp} value={form.last_name || ''} onChange={e => set('last_name', e.target.value)} /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className={lbl}>Spouse / Partner First</label><input className={inp} value={form.secondary_first_name || ''} onChange={e => set('secondary_first_name', e.target.value)} placeholder="First" /></div>
-              <div><label className={lbl}>Spouse / Partner Last</label><input className={inp} value={form.secondary_last_name || ''} onChange={e => set('secondary_last_name', e.target.value)} placeholder="Last" /></div>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div><label className={lbl}>Phone</label><input className={inp} value={form.phone || ''} onChange={e => set('phone', e.target.value)} /></div>
-              <div><label className={lbl}>Cell</label><input className={inp} value={form.cell || ''} onChange={e => set('cell', e.target.value)} /></div>
-              <div><label className={lbl}>Email</label><input className={inp} value={form.email || ''} onChange={e => set('email', e.target.value)} /></div>
-            </div>
-            <div>
-              <label className={lbl}>Additional Emails <span className="font-normal text-gray-400">(one per line)</span></label>
-              <textarea className={inp + ' resize-none'} rows={2}
-                value={form._additionalEmailsRaw ?? (form.additional_emails || []).join('\n')}
-                onChange={e => set('_additionalEmailsRaw', e.target.value)} placeholder="extra@email.com" />
-            </div>
-            <div>
-              <label className={lbl}>Additional Phones <span className="font-normal text-gray-400">(one per line)</span></label>
-              <textarea className={inp + ' resize-none'} rows={2}
-                value={form._additionalPhonesRaw ?? (form.additional_phones || []).join('\n')}
-                onChange={e => set('_additionalPhonesRaw', e.target.value)} placeholder="+1 (555) 000-0000" />
-            </div>
-            <div><label className={lbl}>Street Address</label><input className={inp} value={form.street_address || ''} onChange={e => set('street_address', e.target.value)} /></div>
-            <div className="grid grid-cols-3 gap-3">
-              <div><label className={lbl}>City</label><input className={inp} value={form.city || ''} onChange={e => set('city', e.target.value)} /></div>
-              <div><label className={lbl}>State</label><input className={inp} value={form.state || ''} onChange={e => set('state', e.target.value)} maxLength={2} /></div>
-              <div><label className={lbl}>Zip</label><input className={inp} value={form.zip || ''} onChange={e => set('zip', e.target.value)} /></div>
-            </div>
-            <div>
-              <label className={lbl}>Date of Birth</label>
-              <input className={inp} type="date" value={form.date_of_birth || ''} onChange={e => set('date_of_birth', e.target.value)} />
-            </div>
-          </>)}
-
-          {/* ── Company fields ── */}
-          {form.entity_type === 'company' && (<>
-            <div><label className={lbl}>Company Name</label><input className={inp} value={form.company_name || ''} onChange={e => set('company_name', e.target.value)} placeholder="Company name" /></div>
-            <div className="border border-gray-200 rounded-xl p-3 bg-gray-50">
-              <p className="text-xs font-semibold text-gray-500 mb-2">Company Address</p>
-              <div className="space-y-2">
-                <input className={inp} value={form.company_street || ''} onChange={e => set('company_street', e.target.value)} placeholder="Street Address" />
-                <div className="grid grid-cols-3 gap-2">
-                  <input className={inp} value={form.company_city || ''} onChange={e => set('company_city', e.target.value)} placeholder="City" />
-                  <input className={inp} value={form.company_state || ''} onChange={e => set('company_state', e.target.value)} placeholder="ST" maxLength={2} />
-                  <input className={inp} value={form.company_zip || ''} onChange={e => set('company_zip', e.target.value)} placeholder="Zip" />
-                </div>
+          <div><label className={lbl}>Company</label><input className={inp} value={form.company_name || ''} onChange={e => set('company_name', e.target.value)} /></div>
+          {/* Spouse / Partner */}
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className={lbl}>Spouse / Partner First</label><input className={inp} value={form.secondary_first_name || ''} onChange={e => set('secondary_first_name', e.target.value)} placeholder="First" /></div>
+            <div><label className={lbl}>Spouse / Partner Last</label><input className={inp} value={form.secondary_last_name || ''} onChange={e => set('secondary_last_name', e.target.value)} placeholder="Last" /></div>
+          </div>
+          {/* Phone / Cell / Email */}
+          <div className="grid grid-cols-3 gap-3">
+            <div><label className={lbl}>Phone</label><input className={inp} value={form.phone || ''} onChange={e => set('phone', e.target.value)} /></div>
+            <div><label className={lbl}>Cell</label><input className={inp} value={form.cell || ''} onChange={e => set('cell', e.target.value)} /></div>
+            <div><label className={lbl}>Email</label><input className={inp} value={form.email || ''} onChange={e => set('email', e.target.value)} /></div>
+          </div>
+          <div>
+            <label className={lbl}>Additional Emails <span className="font-normal text-gray-400">(one per line)</span></label>
+            <textarea className={inp + ' resize-none'} rows={2}
+              value={form._additionalEmailsRaw ?? (form.additional_emails || []).join('\n')}
+              onChange={e => set('_additionalEmailsRaw', e.target.value)} placeholder="extra@email.com" />
+          </div>
+          <div>
+            <label className={lbl}>Additional Phones <span className="font-normal text-gray-400">(one per line)</span></label>
+            <textarea className={inp + ' resize-none'} rows={2}
+              value={form._additionalPhonesRaw ?? (form.additional_phones || []).join('\n')}
+              onChange={e => set('_additionalPhonesRaw', e.target.value)} placeholder="+1 (555) 000-0000" />
+          </div>
+          {/* Address */}
+          <div><label className={lbl}>Street Address</label><input className={inp} value={form.street_address || ''} onChange={e => set('street_address', e.target.value)} /></div>
+          <div className="grid grid-cols-3 gap-3">
+            <div><label className={lbl}>City</label><input className={inp} value={form.city || ''} onChange={e => set('city', e.target.value)} /></div>
+            <div><label className={lbl}>State</label><input className={inp} value={form.state || ''} onChange={e => set('state', e.target.value)} maxLength={2} /></div>
+            <div><label className={lbl}>Zip</label><input className={inp} value={form.zip || ''} onChange={e => set('zip', e.target.value)} /></div>
+          </div>
+          {/* Company Address */}
+          <div className="border border-gray-200 rounded-xl p-3 bg-gray-50">
+            <p className="text-xs font-semibold text-gray-500 mb-2">Company Address</p>
+            <div className="space-y-2">
+              <input className={inp} value={form.company_street || ''} onChange={e => set('company_street', e.target.value)} placeholder="Street Address" />
+              <div className="grid grid-cols-3 gap-2">
+                <input className={inp} value={form.company_city || ''} onChange={e => set('company_city', e.target.value)} placeholder="City" />
+                <input className={inp} value={form.company_state || ''} onChange={e => set('company_state', e.target.value)} placeholder="ST" maxLength={2} />
+                <input className={inp} value={form.company_zip || ''} onChange={e => set('company_zip', e.target.value)} placeholder="Zip" />
               </div>
             </div>
-            <CompanyContactsEditor
-              contacts={form.company_contacts || []}
-              onChange={val => set('company_contacts', val)}
-              inp={inp} lbl={lbl}
-            />
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className={lbl}>Main Phone</label><input className={inp} value={form.phone || ''} onChange={e => set('phone', e.target.value)} /></div>
-              <div><label className={lbl}>Main Email</label><input className={inp} value={form.email || ''} onChange={e => set('email', e.target.value)} /></div>
-            </div>
-          </>)}
-
-          {/* ── Shared fields ── */}
+          </div>
+          {/* Assigned To / Consultation Type */}
           <div className="grid grid-cols-2 gap-3">
             <div><label className={lbl}>Assigned To</label><input className={inp} value={form.ghl_assigned_to || ''} onChange={e => set('ghl_assigned_to', e.target.value)} placeholder="Assignee name" /></div>
             <div>
@@ -418,13 +343,8 @@ export default function ContactDetail() {
   )
 
   const stage = stageMap[contact.stage] || STAGES[0]
-  const isCompany = contact.entity_type === 'company'
-  const fullName = isCompany
-    ? (contact.company_name || 'Unnamed Company')
-    : [contact.first_name, contact.last_name].filter(Boolean).join(' ')
-  const displayName = isCompany
-    ? (contact.company_name || 'Unnamed Company')
-    : contact.last_name
+  const fullName   = [contact.first_name, contact.last_name].filter(Boolean).join(' ')
+  const displayName = contact.last_name
     ? `${contact.last_name}${contact.first_name ? ', ' + contact.first_name : ''}`
     : contact.first_name || 'Unnamed'
 
@@ -450,14 +370,11 @@ export default function ContactDetail() {
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-green-800 font-bold text-lg flex-shrink-0">
-                  {isCompany
-                    ? (contact.company_name?.[0] || '🏢').toUpperCase()
-                    : (contact.first_name?.[0] || contact.last_name?.[0] || '?').toUpperCase()}
+                  {(contact.first_name?.[0] || contact.last_name?.[0] || '?').toUpperCase()}
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-gray-900 leading-tight">{fullName || 'Unnamed'}</h2>
-                  {!isCompany && contact.company_name && <p className="text-xs text-gray-500 mt-0.5">{contact.company_name}</p>}
-                  {isCompany && <p className="text-xs text-gray-400 mt-0.5">Company</p>}
+                  {contact.company_name && <p className="text-xs text-gray-500 mt-0.5">{contact.company_name}</p>}
                 </div>
               </div>
               <div className="flex items-center gap-1">
@@ -525,117 +442,82 @@ export default function ContactDetail() {
             {/* ── MAIN TAB ── */}
             {leftTab === 'main' && (
               <div className="space-y-3 text-sm">
-
-                {isCompany ? (
-                  /* ── Company view ── */
-                  <>
-                    {/* Company Address */}
-                    <div>
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Company Address</p>
-                      {(contact.company_street || contact.company_city)
-                        ? <>
-                            {contact.company_street && <p className="text-gray-700">{contact.company_street}</p>}
-                            <p className="text-gray-700">{[contact.company_city, contact.company_state, contact.company_zip].filter(Boolean).join(', ')}</p>
-                          </>
-                        : <span className="text-gray-300">—</span>}
-                    </div>
-                    {/* Company Contacts */}
-                    <div>
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Company Contacts</p>
-                      {(contact.company_contacts?.length > 0)
-                        ? <div className="space-y-2">
-                            {contact.company_contacts.map((cc, i) => (
-                              <div key={i} className="border border-gray-100 rounded-lg p-2.5 bg-gray-50">
-                                <p className="font-semibold text-gray-800 text-sm">
-                                  {[cc.first_name, cc.last_name].filter(Boolean).join(' ') || '—'}
-                                </p>
-                                {cc.email && <a href={`mailto:${cc.email}`} className="block text-xs text-gray-600 hover:text-green-700 break-all">{cc.email}</a>}
-                                {cc.phone && <a href={`tel:${cc.phone}`} className="block text-xs text-gray-600 hover:text-green-700">{cc.phone}</a>}
-                              </div>
-                            ))}
-                          </div>
-                        : <span className="text-gray-300">—</span>}
-                    </div>
-                    {/* Main Phone / Cell / Email */}
-                    <div>
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Main Phone</p>
-                      {contact.phone ? <a href={`tel:${contact.phone}`} className="text-gray-700 hover:text-green-700">{contact.phone}</a> : <span className="text-gray-300">—</span>}
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Main Email</p>
-                      {contact.email ? <a href={`mailto:${contact.email}`} className="text-gray-700 hover:text-green-700 break-all">{contact.email}</a> : <span className="text-gray-300">—</span>}
-                    </div>
-                  </>
-                ) : (
-                  /* ── Individual view ── */
-                  <>
-                    {/* Spouse / Partner — first, just below name */}
-                    <div>
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Spouse / Partner</p>
-                      <p className="text-gray-700">
-                        {[contact.secondary_first_name, contact.secondary_last_name].filter(Boolean).join(' ') || <span className="text-gray-300">—</span>}
-                      </p>
-                    </div>
-                    {/* Address */}
-                    <div>
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Address</p>
-                      {(contact.street_address || contact.city || contact.state || contact.zip)
-                        ? <>
-                            {contact.street_address && <p className="text-gray-700">{contact.street_address}</p>}
-                            <p className="text-gray-700">{[contact.city, contact.state, contact.zip].filter(Boolean).join(', ')}</p>
-                          </>
-                        : <span className="text-gray-300">—</span>}
-                    </div>
-                    {/* Phone */}
-                    <div>
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Phone</p>
-                      {contact.phone ? <a href={`tel:${contact.phone}`} className="text-gray-700 hover:text-green-700">{contact.phone}</a> : <span className="text-gray-300">—</span>}
-                    </div>
-                    {/* Cell */}
-                    <div>
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Cell</p>
-                      {contact.cell ? <a href={`tel:${contact.cell}`} className="text-gray-700 hover:text-green-700">{contact.cell}</a> : <span className="text-gray-300">—</span>}
-                    </div>
-                    {/* Email */}
-                    <div>
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Email</p>
-                      {contact.email ? <a href={`mailto:${contact.email}`} className="text-gray-700 hover:text-green-700 break-all">{contact.email}</a> : <span className="text-gray-300">—</span>}
-                    </div>
-                    {/* Additional Emails */}
-                    <div>
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Additional Emails</p>
-                      {contact.additional_emails?.length > 0
-                        ? contact.additional_emails.map((e, i) => <a key={i} href={`mailto:${e}`} className="block text-gray-700 hover:text-green-700 break-all">{e}</a>)
-                        : <span className="text-gray-300">—</span>}
-                    </div>
-                    {/* Additional Phones */}
-                    <div>
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Additional Phones</p>
-                      {contact.additional_phones?.length > 0
-                        ? contact.additional_phones.map((p, i) => <a key={i} href={`tel:${p}`} className="block text-gray-700 hover:text-green-700">{p}</a>)
-                        : <span className="text-gray-300">—</span>}
-                    </div>
-                    {/* Date of Birth */}
-                    <div>
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Date of Birth</p>
-                      <p className="text-gray-700">
-                        {contact.date_of_birth
-                          ? new Date(contact.date_of_birth + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-                          : <span className="text-gray-300">—</span>}
-                      </p>
-                    </div>
-                  </>
-                )}
-
-                {/* Shared fields — both types */}
+                {/* Spouse / Partner */}
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Spouse / Partner</p>
+                  <p className="text-gray-700">
+                    {[contact.secondary_first_name, contact.secondary_last_name].filter(Boolean).join(' ') || <span className="text-gray-300">—</span>}
+                  </p>
+                </div>
+                {/* Address */}
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Address</p>
+                  {(contact.street_address || contact.city || contact.state || contact.zip)
+                    ? <>
+                        {contact.street_address && <p className="text-gray-700">{contact.street_address}</p>}
+                        <p className="text-gray-700">{[contact.city, contact.state, contact.zip].filter(Boolean).join(', ')}</p>
+                      </>
+                    : <span className="text-gray-300">—</span>}
+                </div>
+                {/* Company Address */}
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Company Address</p>
+                  {(contact.company_street || contact.company_city)
+                    ? <>
+                        {contact.company_street && <p className="text-gray-700">{contact.company_street}</p>}
+                        <p className="text-gray-700">{[contact.company_city, contact.company_state, contact.company_zip].filter(Boolean).join(', ')}</p>
+                      </>
+                    : <span className="text-gray-300">—</span>}
+                </div>
+                {/* Phone */}
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Phone</p>
+                  {contact.phone ? <a href={`tel:${contact.phone}`} className="text-gray-700 hover:text-green-700">{contact.phone}</a> : <span className="text-gray-300">—</span>}
+                </div>
+                {/* Cell */}
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Cell</p>
+                  {contact.cell ? <a href={`tel:${contact.cell}`} className="text-gray-700 hover:text-green-700">{contact.cell}</a> : <span className="text-gray-300">—</span>}
+                </div>
+                {/* Email */}
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Email</p>
+                  {contact.email ? <a href={`mailto:${contact.email}`} className="text-gray-700 hover:text-green-700 break-all">{contact.email}</a> : <span className="text-gray-300">—</span>}
+                </div>
+                {/* Additional Emails */}
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Additional Emails</p>
+                  {contact.additional_emails?.length > 0
+                    ? contact.additional_emails.map((e, i) => <a key={i} href={`mailto:${e}`} className="block text-gray-700 hover:text-green-700 break-all">{e}</a>)
+                    : <span className="text-gray-300">—</span>}
+                </div>
+                {/* Additional Phones */}
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Additional Phones</p>
+                  {contact.additional_phones?.length > 0
+                    ? contact.additional_phones.map((p, i) => <a key={i} href={`tel:${p}`} className="block text-gray-700 hover:text-green-700">{p}</a>)
+                    : <span className="text-gray-300">—</span>}
+                </div>
+                {/* Assigned To */}
                 <div>
                   <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Assigned To</p>
                   <p className="text-gray-700">{contact.ghl_assigned_to || <span className="text-gray-300">—</span>}</p>
                 </div>
+                {/* Consultation Type */}
                 <div>
                   <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Consultation Type</p>
                   <p className="text-gray-700">{contact.consultation_type || <span className="text-gray-300">—</span>}</p>
                 </div>
+                {/* Date of Birth */}
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Date of Birth</p>
+                  <p className="text-gray-700">
+                    {contact.date_of_birth
+                      ? new Date(contact.date_of_birth + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+                      : <span className="text-gray-300">—</span>}
+                  </p>
+                </div>
+                {/* Project Description */}
                 <div>
                   <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Project Description</p>
                   {contact.project_description

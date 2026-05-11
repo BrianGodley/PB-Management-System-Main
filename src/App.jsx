@@ -8,6 +8,7 @@ import Clients from './pages/Clients'
 import ClientDetail from './pages/ClientDetail'
 import Contacts from './pages/Contacts'
 import ContactDetail from './pages/ContactDetail'
+import CompanyDetail from './pages/CompanyDetail'
 import NewJob from './pages/NewJob'
 import JobDetail from './pages/JobDetail'
 import JobsList from './pages/JobsList'
@@ -76,6 +77,7 @@ function AppRoutes() {
         <Route index element={<Contacts />} />
         <Route path="contacts" element={<Contacts />} />
         <Route path="contacts/:id" element={<ContactDetail />} />
+        <Route path="companies/:id" element={<CompanyDetail />} />
         <Route path="clients" element={<Clients />} />
         <Route path="clients/:id" element={<ClientDetail />} />
         <Route path="design" element={<Design />} />
