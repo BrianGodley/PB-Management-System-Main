@@ -7329,7 +7329,7 @@ export default function Statistics() {
                       <span className="text-[7px] bg-green-100 text-green-700 px-0.5 py-px rounded font-semibold flex-shrink-0" title="You own this stat">Owner</span>
                     ) : userShares[s.id] ? (
                       <span className="text-[7px] bg-blue-100 text-blue-700 px-0.5 py-px rounded font-semibold flex-shrink-0" title={`Shared with you (${userShares[s.id]})`}>
-                        Shared{userShares[s.id] === 'edit' ? ' ✏️' : ''}
+                        Shared
                       </span>
                     ) : null}
                   </div>
