@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -116,6 +116,52 @@ function TextCell({ value, onSave, placeholder='', bold=false, onDelete=null }) 
   )
 }
 
+// ── Solvency backfill helper (module-level, no closure deps) ─────────────────
+async function backfillSolvencyAllWeeks(statIds, allWeeks) {
+  if (!statIds.length || !allWeeks.length) return
+  const weekIds = allWeeks.map(w => w.id)
+  const [{ data: allRows }, { data: allPay }, { data: allFin }] = await Promise.all([
+    supabase.from('collection_rows').select('*').in('week_id', weekIds),
+    supabase.from('collection_payables').select('*').in('week_id', weekIds),
+    supabase.from('collection_financial').select('*').in('week_id', weekIds),
+  ])
+
+  const upserts = []
+  for (const week of allWeeks) {
+    const wRows = (allRows || []).filter(r => r.week_id === week.id)
+    const wPay  = (allPay  || []).filter(p => p.week_id === week.id)
+    const wFin  = (allFin  || []).filter(f => f.week_id === week.id)
+    if (!wRows.length && !wPay.length && !wFin.length) continue
+
+    const tRec = wRows.reduce((s, r) => s + calcEnd(r), 0)
+    const tPay = PAY_CATS.reduce((s, c) => {
+      const cols = Array.isArray(c.subtotalCol) ? c.subtotalCol : [c.subtotalCol]
+      return s + wPay.filter(p => p.category === c.key)
+        .reduce((ps, p) => ps + cols.reduce((cs, col) => cs + (parseFloat(p[col]) || 0), 0), 0)
+    }, 0)
+    const cash = wFin.filter(f => f.section === 'cash_on_hand')
+      .reduce((s, f) => {
+        if (f.formula_type === 'pct_cash_on_hand') return s
+        return s + (parseFloat(f.amount) || 0)
+      }, 0)
+    const payroll = wFin.filter(f => f.section === 'payroll')
+      .reduce((s, f) => {
+        if (f.formula_type === 'pct_cash_on_hand') return s + (cash * (f.formula_pct ?? 0.01))
+        return s + (parseFloat(f.amount) || 0)
+      }, 0)
+
+    const solvency = tRec + (cash - payroll) - tPay
+    for (const sid of statIds) {
+      upserts.push({ statistic_id: sid, period_date: week.week_ending, value: solvency })
+    }
+  }
+
+  if (upserts.length) {
+    await supabase.from('statistic_values')
+      .upsert(upserts, { onConflict: 'statistic_id,period_date' })
+  }
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function Collections() {
   const [weeks,              setWeeks]              = useState([])
@@ -132,6 +178,7 @@ export default function Collections() {
   const [deleteWeekConfirm,  setDeleteWeekConfirm]  = useState(false)
   const [deletingWeek,       setDeletingWeek]       = useState(false)
   const [solvencyStatIds,    setSolvencyStatIds]    = useState([])
+  const backfillDoneRef = useRef(false)
 
   const selectedWeek = weeks[weekIdx] || null
 
@@ -143,6 +190,13 @@ export default function Collections() {
       .ilike('data_source', '%finance_solvency%')
       .then(({ data }) => { if (data) setSolvencyStatIds(data.map(s => s.id)) })
   }, [])
+
+  // One-time backfill: push solvency for ALL weeks once both stat IDs + weeks are loaded
+  useEffect(() => {
+    if (!solvencyStatIds.length || !weeks.length || backfillDoneRef.current) return
+    backfillDoneRef.current = true
+    backfillSolvencyAllWeeks(solvencyStatIds, weeks)
+  }, [solvencyStatIds, weeks])
 
   useEffect(() => {
     Promise.all([

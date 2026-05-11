@@ -5740,6 +5740,9 @@ function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, p
                         {s.stat_category === 'overlay' && (
                           <span className="ml-2 text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-semibold">⊕</span>
                         )}
+                        {s.stat_category === 'auto_internal' && (
+                          <span className="ml-2 text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-semibold">⚡ Auto</span>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-gray-600 capitalize">{s.stat_category || s.stat_type || '—'}</td>
                       <td className="px-3 py-2 text-gray-600 capitalize">{s.tracking || '—'}</td>
@@ -7290,6 +7293,9 @@ export default function Statistics() {
                     )}
                     {s.stat_category === 'overlay' && (
                       <span className="text-xs bg-indigo-100 text-indigo-700 px-1 py-0.5 rounded font-semibold flex-shrink-0">⊕</span>
+                    )}
+                    {s.stat_category === 'auto_internal' && (
+                      <span className="text-[10px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-semibold flex-shrink-0">⚡</span>
                     )}
                     {s.owner_user_id === user?.id ? (
                       <span className="text-[10px] bg-green-100 text-green-700 px-1 py-0.5 rounded font-semibold flex-shrink-0" title="You own this stat">Owner</span>
