@@ -75,6 +75,12 @@ function EditContactModal({ contact, onSave, onClose }) {
         date_of_birth:        form.date_of_birth || null,
         notes:                form.notes?.trim() || null,
         project_description:  form.project_description?.trim() || null,
+        additional_emails:    form._additionalEmailsRaw
+          ? form._additionalEmailsRaw.split(/[\n,]+/).map(e => e.trim()).filter(Boolean)
+          : (form.additional_emails || null),
+        additional_phones:    form._additionalPhonesRaw
+          ? form._additionalPhonesRaw.split(/[\n,]+/).map(p => p.trim()).filter(Boolean)
+          : (form.additional_phones || null),
       })
       .eq('id', contact.id)
       .select()
@@ -108,6 +114,20 @@ function EditContactModal({ contact, onSave, onClose }) {
             <div><label className={lbl}>Cell</label><input className={inp} value={form.cell || ''} onChange={e => set('cell', e.target.value)} /></div>
             <div><label className={lbl}>Email</label><input className={inp} value={form.email || ''} onChange={e => set('email', e.target.value)} /></div>
           </div>
+          <div>
+              <label className={lbl}>Additional Emails <span className="font-normal text-gray-400">(one per line)</span></label>
+              <textarea className={inp + ' resize-none'} rows={2}
+                value={form._additionalEmailsRaw ?? (form.additional_emails || []).join('\n')}
+                onChange={e => set('_additionalEmailsRaw', e.target.value)}
+                placeholder="extra@email.com" />
+            </div>
+            <div>
+              <label className={lbl}>Additional Phones <span className="font-normal text-gray-400">(one per line)</span></label>
+              <textarea className={inp + ' resize-none'} rows={2}
+                value={form._additionalPhonesRaw ?? (form.additional_phones || []).join('\n')}
+                onChange={e => set('_additionalPhonesRaw', e.target.value)}
+                placeholder="+1 (555) 000-0000" />
+            </div>
           <div><label className={lbl}>Street Address</label><input className={inp} value={form.street_address || ''} onChange={e => set('street_address', e.target.value)} /></div>
           <div className="grid grid-cols-3 gap-3">
             <div><label className={lbl}>City</label><input className={inp} value={form.city || ''} onChange={e => set('city', e.target.value)} /></div>
@@ -409,6 +429,22 @@ export default function ContactDetail() {
                     <a href={`mailto:${contact.email}`} className="text-gray-700 hover:text-green-700 break-all">{contact.email}</a>
                   </div>
                 )}
+                {contact.additional_emails?.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Additional Emails</p>
+                    {contact.additional_emails.map((e, i) => (
+                      <a key={i} href={`mailto:${e}`} className="block text-gray-700 hover:text-green-700 break-all">{e}</a>
+                    ))}
+                  </div>
+                )}
+                {contact.additional_phones?.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Additional Phones</p>
+                    {contact.additional_phones.map((p, i) => (
+                      <a key={i} href={`tel:${p}`} className="block text-gray-700 hover:text-green-700">{p}</a>
+                    ))}
+                  </div>
+                )}
                 {(contact.street_address || contact.city) && (
                   <div>
                     <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Address</p>
@@ -433,12 +469,6 @@ export default function ContactDetail() {
                   <div>
                     <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Contact Source</p>
                     <p className="text-gray-700">{contact.source}</p>
-                  </div>
-                )}
-                {contact.notes && (
-                  <div>
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Notes</p>
-                    <p className="text-gray-600 text-xs leading-relaxed whitespace-pre-wrap">{contact.notes}</p>
                   </div>
                 )}
                 {contact.project_description && (
@@ -538,6 +568,14 @@ export default function ContactDetail() {
                 <p className="text-xs text-gray-400 italic">No client linked yet</p>
               )}
             </div>
+
+            {/* Notes — always visible above meta regardless of active tab */}
+            {contact.notes && (
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Notes</p>
+                <p className="text-gray-600 text-xs leading-relaxed whitespace-pre-wrap max-h-40 overflow-y-auto">{contact.notes}</p>
+              </div>
+            )}
 
             {/* Meta */}
             <div className="mt-4 pt-4 border-t border-gray-100 text-xs text-gray-400 space-y-1">

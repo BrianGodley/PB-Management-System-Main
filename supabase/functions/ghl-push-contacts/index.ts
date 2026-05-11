@@ -89,9 +89,13 @@ function toGhlPayload(c: any, locationId: string) {
     country:     c.country       || undefined,
     timezone:    c.timezone      || undefined,
     website:     c.website       || undefined,
-    source:      c.source        || undefined,
-    // DND — push the overall flag; GHL will apply it to all channels.
-    dnd:         c.dnd ?? undefined,
+    source:            c.source        || undefined,
+    dateOfBirth:       c.date_of_birth || undefined,
+    dnd:               c.dnd ?? undefined,
+    additionalEmails:  Array.isArray(c.additional_emails) && c.additional_emails.length
+                         ? c.additional_emails : undefined,
+    additionalPhones:  Array.isArray(c.additional_phones) && c.additional_phones.length
+                         ? c.additional_phones : undefined,
   }
 
   if (Array.isArray(c.tags) && c.tags.length) payload.tags = c.tags
@@ -150,7 +154,9 @@ const CONTACT_SELECT_COLS = [
   'timezone', 'website',
   'source', 'tags',
   'dnd', 'dnd_phone', 'dnd_email', 'dnd_sms',
+  'date_of_birth',
   'how_did_you_hear',
+  'additional_emails', 'additional_phones',
   'ghl_custom_fields',
   'updated_at', 'ghl_synced_at', 'ghl_contact_id',
 ].join(', ')

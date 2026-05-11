@@ -107,8 +107,12 @@ interface GhlContact {
   tags?:        string[]
   dateAdded?:   string
   dateUpdated?: string
-  assignedTo?:  string | { id?: string; name?: string }
-  dnd?:         boolean
+  dateOfBirth?:      string
+  assignedTo?:       string | { id?: string; name?: string }
+  additionalEmails?: string[]
+  // GHL returns additionalPhones as strings or {type,phoneNumber} objects
+  additionalPhones?: Array<string | { type?: string; phoneNumber?: string; number?: string }>
+  dnd?:              boolean
   dndSettings?: {
     Call?:     GhlDndChannelSetting
     Email?:    GhlDndChannelSetting
@@ -251,6 +255,18 @@ function toPbsContact(c: GhlContact, fieldKeyToId: Map<string, string>) {
   const rawCustomFields = Array.isArray(c.customFields) && c.customFields.length
     ? c.customFields : null
 
+  // Additional emails — GHL returns as string[]
+  const additionalEmails = Array.isArray(c.additionalEmails) && c.additionalEmails.length
+    ? c.additionalEmails.filter(e => typeof e === 'string' && e.trim()).map(e => (e as string).trim())
+    : null
+
+  // Additional phones — GHL returns as string[] OR {type, phoneNumber/number}[]
+  const additionalPhones = Array.isArray(c.additionalPhones) && c.additionalPhones.length
+    ? c.additionalPhones
+        .map(p => typeof p === 'string' ? p.trim() : ((p as any).phoneNumber || (p as any).number || '').trim())
+        .filter(Boolean)
+    : null
+
   return {
     ghl_contact_id:    c.id,
     ghl_synced_at:     new Date().toISOString(),
@@ -273,8 +289,11 @@ function toPbsContact(c: GhlContact, fieldKeyToId: Map<string, string>) {
     dnd_phone:         dndPhone,
     dnd_email:         dndEmail,
     dnd_sms:           dndSms,
+    date_of_birth:     c.dateOfBirth || null,
     ghl_assigned_to:   ghlAssignedTo,
     how_did_you_hear:  extractCustomField(c.customFields, fieldKeyToId, 'contact.how_did_you_hear_about_us'),
+    additional_emails: additionalEmails,
+    additional_phones: additionalPhones,
     ghl_custom_fields: rawCustomFields,
     updated_at:        c.dateUpdated || new Date().toISOString(),
   }
