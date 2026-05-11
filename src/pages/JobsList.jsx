@@ -121,6 +121,7 @@ function lastName(name = '') {
 const ALL_JOBS = '__all__'
 
 export default function JobsList() {
+  const { user } = useAuth()
   const [searchParams] = useSearchParams()
   const [jobs,       setJobs]       = useState([])
   const [loading,    setLoading]    = useState(true)
@@ -133,8 +134,18 @@ export default function JobsList() {
   const [showExceptions,    setShowExceptions]    = useState(false)
   const [exceptionsCount,   setExceptionsCount]   = useState(0)
   const [addScheduleTrigger, setAddScheduleTrigger] = useState(0)
+  const [isAdmin,    setIsAdmin]    = useState(false)
 
   useEffect(() => { fetchJobs(); fetchStages() }, [])
+
+  // Gate Settings tab to admin / super_admin only
+  useEffect(() => {
+    if (!user?.id) return
+    supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+      .then(({ data }) => {
+        setIsAdmin(data?.role === 'admin' || data?.role === 'super_admin')
+      })
+  }, [user?.id])
 
   // Sync tab when dock link changes the ?tab= URL param
   useEffect(() => {
@@ -241,7 +252,7 @@ export default function JobsList() {
     { key: 'change-orders', label: 'Change Orders' },
     { key: 'finance',       label: 'Finance'       },
     { key: 'files',         label: 'Files'         },
-    { key: 'settings',      label: '⚙️ Settings'   },
+    ...(isAdmin ? [{ key: 'settings', label: '⚙️ Settings' }] : []),
   ]
 
   return (

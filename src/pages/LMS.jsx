@@ -163,7 +163,7 @@ export default function LMS() {
   useEffect(() => {
     if (!user?.id) return
     supabase.from('profiles').select('role').eq('id', user.id).single()
-      .then(({ data }) => { if (data?.role === 'admin') setIsAdmin(true) })
+      .then(({ data }) => { if (data?.role === 'admin' || data?.role === 'super_admin') setIsAdmin(true) })
   }, [user?.id])
 
   useEffect(() => {
@@ -473,7 +473,7 @@ export default function LMS() {
           <div className="ml-auto flex gap-2 bg-gray-100 rounded-xl p-1">
             <button onClick={() => setMainTab('admin')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${mainTab === 'admin' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>
-              🛡️ Admin
+              ⚙️ Settings
             </button>
             <button onClick={() => setMainTab('training')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${mainTab === 'training' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>

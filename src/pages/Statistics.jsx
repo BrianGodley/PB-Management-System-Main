@@ -5910,7 +5910,7 @@ export default function Statistics() {
   const [profiles,     setProfiles]     = useState([])
   // Admin flag derived from profiles.role for the current user. Used to
   // gate admin-only UI like the Master tab in Settings.
-  const isCurrentUserAdmin = (profiles || []).some(p => p.id === user?.id && p.role === 'admin')
+  const isCurrentUserAdmin = (profiles || []).some(p => p.id === user?.id && (p.role === 'admin' || p.role === 'super_admin'))
   const [loading,      setLoading]      = useState(true)
   const prevDisplayRef  = useRef([])   // frozen frame — last rendered displayChartData
   const chartPrintRef   = useRef(null) // ref to chart area for printing
@@ -7086,7 +7086,7 @@ export default function Statistics() {
             { id: 'print-multiple', icon: '🖨️',  label: 'Print Multiple', short: 'Print',   mobileHidden: true },
             { id: 'comparison',     icon: '⚖️',  label: 'Comparison',     short: 'Compare' },
             { id: 'import-export',  icon: '↕️',  label: 'Import / Export', short: 'I/E',     mobileHidden: true },
-            { id: 'settings',       icon: '⚙️',  label: 'Settings',       short: 'Settings'},
+            ...(isCurrentUserAdmin ? [{ id: 'settings', icon: '⚙️', label: 'Settings', short: 'Settings' }] : []),
           ].map(m => (
             <button
               key={m.id}
