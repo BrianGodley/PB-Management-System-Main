@@ -2,38 +2,42 @@
 //
 // Pulls GoHighLevel contacts into PBS.
 //
-// Behaviour:
-//   • Pulls contacts whose dateUpdated is newer than the saved
-//     ghl_sync_state.inbound_synced_at (full pull on the first run).
-//   • Pages through GHL's POST /contacts/search endpoint with limit=100.
-//   • Upserts into public.contacts using a deduplication ladder:
-//        1. exact match on ghl_contact_id
-//        2. exact match on email   (PBS contact must have no GHL link yet)
-//        3. exact match on phone   (digits-only, last 10 digits — same)
-//        4. exact match on (last_name + first_name + zip), all lowercased
-//        5. otherwise insert new
-//     Each rung is only tried if the previous didn't match. Steps 2-4
-//     also stamp the matched PBS row with the GHL id so future syncs
-//     skip straight to step 1.
-//   • Fetches GHL custom field definitions once per run so known fieldKeys
-//     can be extracted into dedicated PBS columns.
-//   • Advances ghl_sync_state.inbound_synced_at to the newest dateUpdated
-//     it saw, and appends a row to ghl_sync_log.
+// Two modes:
 //
-// Auth: must be a signed-in admin (per profiles.role).
+//   BULK mode  (inbound_synced_at is null, or full:true passed)
+//     Sorts by id ASC — stable across the whole 7k+ record set so every
+//     contact is fetched regardless of whether dateUpdated is populated.
+//     Paginates via a numeric `page` cursor the UI passes back on each
+//     loop call.  Does NOT update inbound_synced_at until the very last
+//     page so a partial run can resume safely.
 //
-// Request body (POST JSON):
-//   {
-//     full?:    boolean,   // ignore saved high-water-mark, pull everything
-//     dry_run?: boolean,   // count matches by category, write nothing
-//   }
+//   INCREMENTAL mode  (inbound_synced_at is set)
+//     Sorts by dateUpdated DESC — newest contacts on page 1.  Stops
+//     processing as soon as it sees a record at-or-before the watermark,
+//     so only the delta since the last run is touched.  Updates the
+//     watermark to the newest dateUpdated seen.
+//
+// Deduplication ladder (same in both modes):
+//   1. ghl_contact_id match (already linked) → update
+//   2. email match, no GHL link yet          → link + update
+//   3. phone match (last 10 digits)           → link + update
+//   4. name + zip match                       → link + update
+//   5. no match                               → insert
+//
+// Auth: signed-in admin only.
+//
+// Request body:
+//   { full?: boolean, dry_run?: boolean, start_page?: number }
+//
+// Response includes `next_page` when more records remain (bulk mode only).
+// The UI passes start_page = next_page on the next call to resume.
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const GHL_BASE_URL    = 'https://services.leadconnectorhq.com'
 const GHL_API_VERSION = '2021-07-28'
-const PAGE_LIMIT      = 100   // GHL's max for /contacts/search
+const PAGE_LIMIT      = 100
 
 const corsHeaders = {
   'Access-Control-Allow-Origin':  '*',
@@ -65,19 +69,14 @@ async function requireAdmin(req: Request): Promise<{ userId: string }> {
   const { data: { user }, error } = await sb.auth.getUser()
   if (error || !user) throw new Error('Not signed in.')
   const { data: profile, error: pErr } = await sb
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .maybeSingle()
+    .from('profiles').select('role').eq('id', user.id).maybeSingle()
   if (pErr) throw new Error('Failed to load profile: ' + pErr.message)
   const role = profile?.role
-  if (role !== 'admin' && role !== 'super_admin') {
-    throw new Error('Admin role required.')
-  }
+  if (role !== 'admin' && role !== 'super_admin') throw new Error('Admin role required.')
   return { userId: user.id }
 }
 
-// ── GHL API type definitions ───────────────────────────────────────────────
+// ── GHL types ──────────────────────────────────────────────────────────────
 
 interface GhlDndChannelSetting {
   status?: 'active' | 'inactive'
@@ -88,16 +87,15 @@ interface GhlDndChannelSetting {
 interface GhlContact {
   id:           string
   locationId?:  string
-  // Name fields — search endpoint may return combined `name` instead of split fields
-  name?:        string   // combined full name (returned by search endpoint)
-  contactName?: string   // alias GHL uses in some versions
+  name?:        string        // combined full name (search endpoint)
+  contactName?: string
   firstName?:   string
   lastName?:    string
   companyName?: string
   email?:       string
   phone?:       string
   address1?:    string
-  address?:     string  // older API fallback
+  address?:     string
   city?:        string
   state?:       string
   postalCode?:  string
@@ -105,23 +103,20 @@ interface GhlContact {
   timezone?:    string
   website?:     string
   source?:      string
-  type?:        string  // contact type: "lead" | "customer" | etc.
+  type?:        string
   tags?:        string[]
   dateAdded?:   string
   dateUpdated?: string
-  // assignedTo can be a plain id string or an object depending on GHL version
   assignedTo?:  string | { id?: string; name?: string }
-  // DND
   dnd?:         boolean
   dndSettings?: {
-    Call?:      GhlDndChannelSetting
-    Email?:     GhlDndChannelSetting
-    SMS?:       GhlDndChannelSetting
-    WhatsApp?:  GhlDndChannelSetting
-    GMB?:       GhlDndChannelSetting
-    FB?:        GhlDndChannelSetting
+    Call?:     GhlDndChannelSetting
+    Email?:    GhlDndChannelSetting
+    SMS?:      GhlDndChannelSetting
+    WhatsApp?: GhlDndChannelSetting
+    GMB?:      GhlDndChannelSetting
+    FB?:       GhlDndChannelSetting
   }
-  // Custom fields returned as [{id, fieldValue}]
   customFields?: Array<{ id: string; fieldValue: unknown }>
 }
 
@@ -129,46 +124,35 @@ interface GhlPagedResponse {
   contacts?: GhlContact[]
   meta?: {
     total?:        number
-    nextPageUrl?:  string | null
-    startAfter?:   number
-    startAfterId?: string | null
     currentPage?:  number
     nextPage?:     number | null
     prevPage?:     number | null
   }
 }
 
-// GHL custom field definition from GET /locations/{id}/customFields
 interface GhlCustomFieldDef {
   id:        string
   name:      string
-  fieldKey?: string  // e.g. "contact.how_did_you_hear_about_us"
+  fieldKey?: string
   dataType?: string
 }
 
-// ── GHL API helpers ────────────────────────────────────────────────────────
+// ── API helpers ────────────────────────────────────────────────────────────
 
-// Fetch one page of contacts via the v2 search endpoint.
-// POST /contacts/search returns a real `total` in meta so we can accurately
-// detect when pagination is done.
 async function fetchContactsPage(args: {
   token:      string
   locationId: string
   page:       number
-  sinceIso?:  string | null
+  bulk:       boolean   // true → sort by id ASC; false → sort by dateUpdated DESC
 }): Promise<GhlPagedResponse> {
-  // Sort newest-first so incremental syncs see recent changes on page 1
-  // and can stop as soon as they hit records older than the high-water-mark.
-  // We do NOT use a server-side date filter — GHL's search endpoint rejects
-  // comparison operators (e.g. gte) on date fields. JS-side filtering handles
-  // the high-water-mark instead.
+  const sortField = args.bulk ? 'id' : 'dateUpdated'
+  const sortDir   = args.bulk ? 'asc' : 'desc'
   const body: Record<string, unknown> = {
     locationId: args.locationId,
     page:       args.page,
     pageLimit:  PAGE_LIMIT,
-    sort: [{ field: 'dateUpdated', direction: 'desc' }],
+    sort: [{ field: sortField, direction: sortDir }],
   }
-
   const res = await fetch(`${GHL_BASE_URL}/contacts/search`, {
     method: 'POST',
     headers: {
@@ -179,7 +163,6 @@ async function fetchContactsPage(args: {
     },
     body: JSON.stringify(body),
   })
-
   let resp: unknown = null
   try { resp = await res.json() } catch { /* */ }
   if (!res.ok) {
@@ -189,11 +172,6 @@ async function fetchContactsPage(args: {
   return resp as GhlPagedResponse
 }
 
-// Fetch all custom field definitions for the location so we can map
-// fieldKey → fieldId lookups.  Returns { map, error }.
-// Failure is non-fatal — the sync continues with standard fields only.
-// Common failure reason: the PIT does not have "Locations" scope granted
-// in the GHL sub-account settings.
 async function fetchCustomFieldDefs(
   token: string,
   locationId: string,
@@ -201,13 +179,7 @@ async function fetchCustomFieldDefs(
   try {
     const res = await fetch(
       `${GHL_BASE_URL}/locations/${locationId}/customFields`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Version:       GHL_API_VERSION,
-          Accept:        'application/json',
-        },
-      },
+      { headers: { Authorization: `Bearer ${token}`, Version: GHL_API_VERSION, Accept: 'application/json' } },
     )
     if (!res.ok) {
       let errText = `HTTP ${res.status}`
@@ -223,7 +195,7 @@ async function fetchCustomFieldDefs(
     const map = new Map<string, string>()
     for (const d of defs) {
       if (d.fieldKey) map.set(d.fieldKey, d.id)
-      if (d.name) map.set(d.name.toLowerCase().trim(), d.id)
+      if (d.name)     map.set(d.name.toLowerCase().trim(), d.id)
     }
     return { map, error: null }
   } catch (e: any) {
@@ -231,8 +203,6 @@ async function fetchCustomFieldDefs(
   }
 }
 
-// Extract a single custom field value by its fieldKey.
-// e.g. extractCustomField(c.customFields, fieldKeyToId, 'contact.how_did_you_hear_about_us')
 function extractCustomField(
   customFields: GhlContact['customFields'],
   fieldKeyToId: Map<string, string>,
@@ -249,24 +219,11 @@ function extractCustomField(
   return String(v).trim() || null
 }
 
-// Map a GHL contact onto the PBS contacts schema.
-//
-// PBS contacts.first_name and last_name are NOT NULL, so we coalesce to
-// empty strings rather than null. If a GHL contact carries neither a
-// first_name nor a last_name (a company-only contact, very common for
-// vendors and HOAs in GHL), we drop the company name into last_name so
-// the row has something readable.
-function toPbsContact(
-  c: GhlContact,
-  fieldKeyToId: Map<string, string>,
-) {
-  // ── Name normalisation ──────────────────────────────────────────────────
-  // The search endpoint may return a combined `name` field instead of
-  // separate firstName / lastName. Fall through several options.
+function toPbsContact(c: GhlContact, fieldKeyToId: Map<string, string>) {
+  // Name — search endpoint may return combined `name` instead of split fields
   let firstName = (c.firstName || '').trim()
   let lastName  = (c.lastName  || '').trim()
   if (!firstName && !lastName) {
-    // Try combined name sources: `name`, `contactName`, then `companyName`.
     const fallback = (c.name || c.contactName || c.companyName || '').trim()
     if (fallback.includes(' ')) {
       const parts = fallback.split(/\s+/)
@@ -277,78 +234,48 @@ function toPbsContact(
     }
   }
 
-  // ── DND — overall flag + per-channel flags from dndSettings ────────────
   const dnd      = !!c.dnd
-  const dndPhone = c.dndSettings?.Call?.status  === 'active' ? true : (dnd || false)
-  const dndEmail = c.dndSettings?.Email?.status === 'active' ? true : (dnd || false)
-  const dndSms   = c.dndSettings?.SMS?.status   === 'active' ? true : (dnd || false)
+  const dndPhone = c.dndSettings?.Call?.status  === 'active' || dnd
+  const dndEmail = c.dndSettings?.Email?.status === 'active' || dnd
+  const dndSms   = c.dndSettings?.SMS?.status   === 'active' || dnd
 
-  // ── assignedTo — GHL may return a string id or {id, name} object ───────
   let ghlAssignedTo: string | null = null
   if (c.assignedTo) {
     if (typeof c.assignedTo === 'string') {
       ghlAssignedTo = c.assignedTo || null
-    } else if (typeof c.assignedTo === 'object') {
-      // Prefer the name if available so it's human-readable in the DB.
+    } else {
       ghlAssignedTo = (c.assignedTo as any).name || (c.assignedTo as any).id || null
     }
   }
 
-  // ── Custom fields ───────────────────────────────────────────────────────
-  // Store the full array as JSONB for queryability, then extract known keys
-  // into dedicated columns.
   const rawCustomFields = Array.isArray(c.customFields) && c.customFields.length
-    ? c.customFields
-    : null
-
-  const howDidYouHear = extractCustomField(
-    c.customFields, fieldKeyToId, 'contact.how_did_you_hear_about_us',
-  )
+    ? c.customFields : null
 
   return {
-    // Identity / linkage
     ghl_contact_id:    c.id,
     ghl_synced_at:     new Date().toISOString(),
-
-    // Name
-    first_name:        firstName,   // never null (NOT NULL column)
-    last_name:         lastName,    // never null (NOT NULL column)
-
-    // Contact info
+    first_name:        firstName,
+    last_name:         lastName,
     company_name:      c.companyName || null,
     email:             c.email       || null,
     phone:             c.phone       || null,
-
-    // Address
     street_address:    c.address1 || c.address || null,
     city:              c.city       || null,
     state:             c.state      || null,
     zip:               c.postalCode || null,
     country:           c.country    || null,
-
-    // Contact metadata
-    contact_type:      c.type       || null,  // "lead" | "customer" | etc.
+    contact_type:      c.type       || null,
     source:            c.source     || null,
     tags:              Array.isArray(c.tags) && c.tags.length ? c.tags : null,
     website:           c.website    || null,
     timezone:          c.timezone   || null,
-
-    // DND
-    dnd:               dnd,
+    dnd,
     dnd_phone:         dndPhone,
     dnd_email:         dndEmail,
     dnd_sms:           dndSms,
-
-    // Assignment
     ghl_assigned_to:   ghlAssignedTo,
-
-    // Known custom fields extracted into dedicated columns
-    how_did_you_hear:  howDidYouHear,
-
-    // Full custom fields blob for anything else
+    how_did_you_hear:  extractCustomField(c.customFields, fieldKeyToId, 'contact.how_did_you_hear_about_us'),
     ghl_custom_fields: rawCustomFields,
-
-    // GHL audit timestamps
     updated_at:        c.dateUpdated || new Date().toISOString(),
   }
 }
@@ -360,39 +287,37 @@ serve(async (req) => {
   if (req.method !== 'POST')   return json(405, { error: 'Method not allowed' })
 
   const sb = adminClient()
-  let inboundSyncedAt: string | null = null
-  let recordsSynced  = 0
-  let logMessage     = ''
+  let recordsSynced = 0
 
   try {
     await requireAdmin(req)
 
-    const reqBody  = await req.json().catch(() => ({}))
-    const fullSync = !!reqBody.full
-    const dryRun   = !!reqBody.dry_run
+    const reqBody   = await req.json().catch(() => ({}))
+    const fullSync  = !!reqBody.full
+    const dryRun    = !!reqBody.dry_run
+    // start_page is passed by the UI on subsequent loop calls (bulk mode).
+    const startPage = Math.max(1, parseInt(reqBody.start_page) || 1)
 
-    // Load the saved connection.
     const { data: conn, error: cErr } = await sb.from('ghl_connections')
       .select('access_token, location_id, contacts_enabled')
-      .eq('singleton', true)
-      .maybeSingle()
+      .eq('singleton', true).maybeSingle()
     if (cErr) throw new Error('Failed to load connection: ' + cErr.message)
     if (!conn) throw new Error('No GHL connection saved. Configure it in Admin → Integrations.')
     if (!conn.contacts_enabled) {
-      return json(200, { ok: true, skipped: true, reason: 'Contacts sync disabled in connection settings.' })
+      return json(200, { ok: true, skipped: true, reason: 'Contacts sync disabled.' })
     }
 
-    // Load the high-water-mark.
     const { data: state } = await sb.from('ghl_sync_state')
-      .select('inbound_synced_at')
-      .eq('object_type', 'contacts')
-      .maybeSingle()
-    const sinceIso = (!fullSync && state?.inbound_synced_at) ? state.inbound_synced_at : null
+      .select('inbound_synced_at').eq('object_type', 'contacts').maybeSingle()
 
-    // Fetch custom field definitions so we can map known field keys to ids.
-    const { map: fieldKeyToId, error: cfError } = await fetchCustomFieldDefs(conn.access_token, conn.location_id)
+    // BULK mode when: no high-water-mark yet, full:true requested, or UI is
+    // resuming a bulk run (start_page > 1).
+    const sinceIso = state?.inbound_synced_at || null
+    const bulkMode = fullSync || !sinceIso || startPage > 1
 
-    // Helpers + accumulator for the dedup ladder.
+    const { map: fieldKeyToId, error: cfError } =
+      await fetchCustomFieldDefs(conn.access_token, conn.location_id)
+
     const digitsOnly = (s: string) => (s || '').replace(/\D/g, '')
     const seenGhlIds = new Set<string>()
     const counts = {
@@ -404,67 +329,68 @@ serve(async (req) => {
     }
     const samples: Array<{ reason: string; ghl: any; pbs: any | null }> = []
     const collectSample = (reason: string, ghl: any, pbs: any | null) => {
-      if (samples.length < 25) {
-        samples.push({
-          reason,
-          ghl: { id: ghl.id, firstName: ghl.firstName, lastName: ghl.lastName, email: ghl.email, phone: ghl.phone },
-          pbs: pbs ? { id: pbs.id, first_name: pbs.first_name, last_name: pbs.last_name } : null,
-        })
-      }
+      if (samples.length < 25) samples.push({
+        reason,
+        ghl: { id: ghl.id, name: ghl.name, firstName: ghl.firstName, lastName: ghl.lastName,
+               contactName: ghl.contactName, companyName: ghl.companyName,
+               email: ghl.email, phone: ghl.phone },
+        pbs: pbs ? { id: pbs.id, first_name: pbs.first_name, last_name: pbs.last_name } : null,
+      })
     }
 
-    // Mark the row as running.
-    await sb.from('ghl_sync_state')
-      .update({ last_run_at: new Date().toISOString(), last_run_status: 'running', last_run_message: '' })
-      .eq('object_type', 'contacts')
+    if (!dryRun) {
+      await sb.from('ghl_sync_state')
+        .update({ last_run_at: new Date().toISOString(), last_run_status: 'running', last_run_message: '' })
+        .eq('object_type', 'contacts')
+    }
 
-    const MAX_RECORDS_PER_INVOCATION = 500
-    const MAX_WALL_BUDGET_MS         = 100_000   // 100s, leaves headroom for 150s limit
+    // Per-invocation budget — stay well inside Supabase's 150s wall time.
+    // Each contact needs ~3-5 DB round-trips for dedup, so ~200ms each.
+    const MAX_CONTACTS_PER_INVOCATION = 400
+    const MAX_WALL_BUDGET_MS          = 95_000
     const startedAt = Date.now()
+
     let newestSeen: string | null = null
-    let pages = 0
-    let reportedTotal: number | null = null
-    let processedCount = 0
+    let page = startPage
+    let processedContacts = 0
+    let lastPageWasFull   = true   // assume more until we see a short page
+    let hitWatermark      = false
 
     while (true) {
-      pages += 1
-      if (pages > 200) {
-        logMessage = 'Aborted after 200 pages — possible loop.'
-        break
-      }
-      const page = await fetchContactsPage({
+      if (page > startPage + 100) { break }  // safety: max 100 pages per invocation
+
+      const ghlPage = await fetchContactsPage({
         token:      conn.access_token,
         locationId: conn.location_id,
-        page:       pages,
-        sinceIso,
+        page,
+        bulk:       bulkMode,
       })
-      const list = page.contacts || []
-      if (page.meta?.total != null) reportedTotal = page.meta.total
+      const list = ghlPage.contacts || []
 
+      // Log each page for debugging.
       try {
         await sb.from('ghl_sync_log').insert({
           object_type:    'contacts',
           direction:      'inbound',
           status:         'ok',
           records_synced: list.length,
-          message:        `page ${pages}: got ${list.length}, total reported ${reportedTotal ?? 'n/a'}`,
+          message:        `page ${page} (${bulkMode ? 'bulk' : 'incremental'}): got ${list.length}`,
         })
-      } catch { /* log is best-effort */ }
+      } catch { /* best-effort */ }
 
+      lastPageWasFull = list.length >= PAGE_LIMIT
       if (list.length === 0) break
 
-      // With desc sort, once we hit a record at-or-before the high-water-mark
-      // everything after it is older — set a flag to break the outer loop too.
-      let hitWatermark = false
       for (const c of list) {
-        if (sinceIso && c.dateUpdated && c.dateUpdated <= sinceIso) {
+        // In incremental mode, stop when we hit records at-or-before the watermark.
+        if (!bulkMode && sinceIso && c.dateUpdated && c.dateUpdated <= sinceIso) {
           hitWatermark = true
           break
         }
+
         if (seenGhlIds.has(c.id)) continue
         seenGhlIds.add(c.id)
 
-        // With desc sort the first record on the first page is the newest.
         if (c.dateUpdated && (!newestSeen || c.dateUpdated > newestSeen)) {
           newestSeen = c.dateUpdated
         }
@@ -475,11 +401,9 @@ serve(async (req) => {
         const zipPart     = (row.zip || '').replace(/\s/g, '').toLowerCase()
         const hasNameZip  = namePart !== '|' && zipPart !== ''
 
-        // ── 1. Match on ghl_contact_id (already linked) ──────────────
+        // 1. ghl_contact_id
         const { data: byGhl } = await sb.from('contacts')
-          .select('id')
-          .eq('ghl_contact_id', row.ghl_contact_id)
-          .maybeSingle()
+          .select('id').eq('ghl_contact_id', row.ghl_contact_id).maybeSingle()
         if (byGhl?.id) {
           counts.would_update_by_ghl_id += 1
           collectSample('ghl_id', c, { id: byGhl.id })
@@ -487,17 +411,13 @@ serve(async (req) => {
             const { error: uErr } = await sb.from('contacts').update(row).eq('id', byGhl.id)
             if (uErr) throw new Error('Update by ghl_id failed: ' + uErr.message)
           }
-          recordsSynced += 1
-          continue
+          recordsSynced += 1; continue
         }
 
-        // ── 2. Match on email (PBS contact has no GHL link yet) ───────
+        // 2. email
         if (row.email) {
           const { data: byEmail } = await sb.from('contacts')
-            .select('id, first_name, last_name')
-            .eq('email', row.email)
-            .is('ghl_contact_id', null)
-            .maybeSingle()
+            .select('id, first_name, last_name').eq('email', row.email).is('ghl_contact_id', null).maybeSingle()
           if (byEmail?.id) {
             counts.would_update_by_email += 1
             collectSample('email', c, byEmail)
@@ -505,18 +425,16 @@ serve(async (req) => {
               const { error: u2 } = await sb.from('contacts').update(row).eq('id', byEmail.id)
               if (u2) throw new Error('Update by email failed: ' + u2.message)
             }
-            recordsSynced += 1
-            continue
+            recordsSynced += 1; continue
           }
         }
 
-        // ── 3. Match on phone (last 10 digits, no GHL link yet) ───────
+        // 3. phone
         if (phoneDigits.length >= 7) {
           const { data: phoneCands } = await sb.from('contacts')
             .select('id, first_name, last_name, phone, cell, ghl_contact_id')
             .or(`phone.ilike.%${phoneDigits.slice(-7)}%,cell.ilike.%${phoneDigits.slice(-7)}%`)
-            .is('ghl_contact_id', null)
-            .limit(50)
+            .is('ghl_contact_id', null).limit(50)
           const phoneHit = (phoneCands || []).find(p => {
             const pp = digitsOnly(p.phone || '').slice(-10)
             const cc = digitsOnly(p.cell  || '').slice(-10)
@@ -529,20 +447,16 @@ serve(async (req) => {
               const { error: u3 } = await sb.from('contacts').update(row).eq('id', phoneHit.id)
               if (u3) throw new Error('Update by phone failed: ' + u3.message)
             }
-            recordsSynced += 1
-            continue
+            recordsSynced += 1; continue
           }
         }
 
-        // ── 4. Match on name + zip (case-insensitive) ─────────────────
+        // 4. name + zip
         if (hasNameZip) {
           const { data: nzCands } = await sb.from('contacts')
             .select('id, first_name, last_name, zip, ghl_contact_id')
-            .ilike('last_name', row.last_name || '')
-            .ilike('first_name', row.first_name || '')
-            .eq('zip', row.zip || '')
-            .is('ghl_contact_id', null)
-            .limit(5)
+            .ilike('last_name', row.last_name || '').ilike('first_name', row.first_name || '')
+            .eq('zip', row.zip || '').is('ghl_contact_id', null).limit(5)
           const nzHit = (nzCands || [])[0]
           if (nzHit?.id) {
             counts.would_update_by_name_zip += 1
@@ -551,12 +465,11 @@ serve(async (req) => {
               const { error: u4 } = await sb.from('contacts').update(row).eq('id', nzHit.id)
               if (u4) throw new Error('Update by name+zip failed: ' + u4.message)
             }
-            recordsSynced += 1
-            continue
+            recordsSynced += 1; continue
           }
         }
 
-        // ── 5. No match — insert new ──────────────────────────────────
+        // 5. insert
         counts.would_insert += 1
         collectSample('insert', c, null)
         if (!dryRun) {
@@ -566,90 +479,86 @@ serve(async (req) => {
         recordsSynced += 1
       }
 
-      processedCount += list.length
-      if (hitWatermark) break          // all remaining records are older than high-water-mark
-      if (list.length < PAGE_LIMIT) break
-      if (reportedTotal != null && processedCount >= reportedTotal) break
-      if (processedCount >= MAX_RECORDS_PER_INVOCATION) break
-      if (Date.now() - startedAt > MAX_WALL_BUDGET_MS) break
+      processedContacts += list.length
+      page += 1
+
+      if (hitWatermark) break
+      if (!lastPageWasFull) break                               // natural end
+      if (processedContacts >= MAX_CONTACTS_PER_INVOCATION) break  // per-invocation cap
+      if (Date.now() - startedAt > MAX_WALL_BUDGET_MS) break       // wall-time guard
     }
 
-    inboundSyncedAt = newestSeen || (state?.inbound_synced_at ?? null)
-    logMessage = logMessage || (
-      dryRun
-        ? `Dry run: ${counts.would_insert} would insert, ${counts.would_update_by_ghl_id + counts.would_update_by_email + counts.would_update_by_phone + counts.would_update_by_name_zip} would update.`
-        : `Pulled ${recordsSynced} contact${recordsSynced === 1 ? '' : 's'}.`
-    )
+    // Are there more records?  In bulk mode, more exist when the last page
+    // was full AND we hit a budget cap (not a watermark or natural end).
+    const budgetHit = processedContacts >= MAX_CONTACTS_PER_INVOCATION
+                   || Date.now() - startedAt > MAX_WALL_BUDGET_MS
+    const moreExist = bulkMode && lastPageWasFull && budgetHit && !hitWatermark
+    const nextPage  = moreExist ? page : null
+
+    const logMsg = dryRun
+      ? `Dry run: ${counts.would_insert} insert, ${counts.would_update_by_ghl_id + counts.would_update_by_email + counts.would_update_by_phone + counts.would_update_by_name_zip} update.`
+      : `Pulled ${recordsSynced} (pages ${startPage}–${page - 1}, ${bulkMode ? 'bulk' : 'incremental'}).${nextPage ? ` Next page: ${nextPage}.` : ' Done.'}`
 
     if (dryRun) {
-      const remaining = (reportedTotal != null)
-        ? Math.max(0, reportedTotal - processedCount)
-        : 0
       return json(200, {
-        ok:      true,
-        dry_run: true,
-        ...counts,
-        samples,
-        pages,
-        remaining,
-        total_eligible:         reportedTotal,
-        custom_fields_mapped:   fieldKeyToId.size,
-        custom_fields_error:    cfError || undefined,
+        ok: true, dry_run: true,
+        ...counts, samples,
+        bulk_mode: bulkMode,
+        next_page: nextPage,
+        custom_fields_mapped: fieldKeyToId.size,
+        custom_fields_error:  cfError || undefined,
       })
     }
 
-    // Real run: update sync state on success.
+    // Update sync state.
+    // In bulk mode we only set inbound_synced_at on the final page so that
+    // a crash mid-run doesn't set a watermark that skips unprocessed contacts.
+    const newWatermark = !nextPage
+      ? (newestSeen || sinceIso || new Date().toISOString())
+      : sinceIso   // leave unchanged during a multi-invocation bulk run
+
     await sb.from('ghl_sync_state').update({
-      inbound_synced_at:    inboundSyncedAt,
-      last_run_at:          new Date().toISOString(),
-      last_run_status:      'ok',
-      last_run_message:     logMessage,
+      inbound_synced_at: newWatermark,
+      last_run_at:       new Date().toISOString(),
+      last_run_status:   'ok',
+      last_run_message:  logMsg,
     }).eq('object_type', 'contacts')
 
     try {
       await sb.rpc('add_to_ghl_inbound_count', { p_object_type: 'contacts', p_n: recordsSynced })
-    } catch { /* RPC is optional; ignore if not present */ }
+    } catch { /* optional RPC */ }
 
     await sb.from('ghl_sync_log').insert({
       object_type:    'contacts',
       direction:      'inbound',
       status:         'ok',
       records_synced: recordsSynced,
-      message:        logMessage,
+      message:        logMsg,
     })
 
-    const remaining = (reportedTotal != null)
-      ? Math.max(0, reportedTotal - processedCount)
-      : 0
     return json(200, {
-      ok:                     true,
-      records_synced:         recordsSynced,
-      inbound_synced_at:      inboundSyncedAt,
-      pages,
-      remaining,
-      total_eligible:         reportedTotal,
-      custom_fields_mapped:   fieldKeyToId.size,
-      custom_fields_error:    cfError || undefined,
+      ok:                   true,
+      records_synced:       recordsSynced,
+      inbound_synced_at:    newWatermark,
+      bulk_mode:            bulkMode,
+      next_page:            nextPage,
+      // `remaining` kept for UI compatibility — non-zero signals the loop to continue
+      remaining:            nextPage ? 1 : 0,
+      custom_fields_mapped: fieldKeyToId.size,
+      custom_fields_error:  cfError || undefined,
       ...counts,
     })
   } catch (e) {
     const msg = (e as Error)?.message || 'Unknown error'
     try {
       await sb.from('ghl_sync_state').update({
-        last_run_at:      new Date().toISOString(),
-        last_run_status:  'error',
-        last_run_message: msg,
+        last_run_at: new Date().toISOString(), last_run_status: 'error', last_run_message: msg,
       }).eq('object_type', 'contacts')
       await sb.from('ghl_sync_log').insert({
-        object_type:    'contacts',
-        direction:      'inbound',
-        status:         'error',
-        records_synced: recordsSynced,
-        message:        msg,
-        error_payload:  { error: msg },
+        object_type: 'contacts', direction: 'inbound', status: 'error',
+        records_synced: recordsSynced, message: msg, error_payload: { error: msg },
       })
     } catch { /* */ }
-
     const status = /signed in|Authorization|Admin role/i.test(msg) ? 401 : 500
     return json(status, { ok: false, error: msg })
   }

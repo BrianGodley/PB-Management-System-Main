@@ -2069,7 +2069,9 @@ function IntegrationsSettings() {
             'Content-Type':  'application/json',
             'Authorization': `Bearer ${jwt}`,
           },
-          body: JSON.stringify({ dry_run: dryRun }),
+          // For pull, always send full:true on the initial call so it uses
+          // stable id-sorted bulk pagination regardless of any stale watermark.
+          body: JSON.stringify({ dry_run: dryRun, ...(direction === 'pull' && !dryRun ? { full: true } : {}) }),
         }
       )
       const body = await res.json().catch(() => ({}))
@@ -2147,7 +2149,8 @@ function IntegrationsSettings() {
         setGhlPushProgress(p => ({ ...p, [objectType]: { pushed: totalPulled, total: totalEligible, errors: 0 } }))
         setGhlMsgError(false)
         setGhlMsg(`${objectType} pull: ${totalPulled}/${totalEligible} pulled…`)
-        let safety = 200
+        let safety   = 500   // up to 500 pages × 400/page = 200k contacts max
+        let nextPage = body.next_page || null
         while (remaining > 0 && !ghlPushAbortRef.current && safety-- > 0) {
           const r2 = await fetch(
             `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnSlug}`,
@@ -2157,7 +2160,9 @@ function IntegrationsSettings() {
                 'Content-Type':  'application/json',
                 'Authorization': `Bearer ${jwt}`,
               },
-              body: JSON.stringify({}),
+              // Pass next_page so the edge function resumes from the right page
+              // rather than restarting the bulk load from page 1.
+              body: JSON.stringify(nextPage ? { start_page: nextPage } : {}),
             }
           )
           const b2 = await r2.json().catch(() => ({}))
@@ -2168,6 +2173,7 @@ function IntegrationsSettings() {
           }
           totalPulled += b2.records_synced || 0
           remaining    = b2.remaining || 0
+          nextPage     = b2.next_page  || null
           setGhlPushProgress(p => ({ ...p, [objectType]: { pushed: totalPulled, total: totalEligible, errors: 0 } }))
           setGhlMsg(`${objectType} pull: ${totalPulled}/${totalEligible} pulled…`)
         }
