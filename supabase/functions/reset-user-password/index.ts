@@ -21,17 +21,28 @@ serve(async (req) => {
     const SUPABASE_URL              = Deno.env.get('SUPABASE_URL')!
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
-    const { userId, newPassword } = await req.json()
+    const body = await req.json()
+    const { userId, email, newPassword } = body
 
-    if (!userId || !newPassword) {
-      return respond({ error: 'userId and newPassword are required' })
-    }
+    if (!newPassword) return respond({ error: 'newPassword is required' })
+    if (!userId && !email) return respond({ error: 'userId or email is required' })
 
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false },
     })
 
-    const { error } = await adminClient.auth.admin.updateUserById(userId, {
+    let targetUserId = userId
+
+    // If only email provided, look up the user's auth id
+    if (!targetUserId && email) {
+      const { data: { users }, error: listErr } = await adminClient.auth.admin.listUsers()
+      if (listErr) return respond({ error: listErr.message })
+      const match = users.find(u => u.email?.toLowerCase() === email.toLowerCase())
+      if (!match) return respond({ error: 'No account found for that email address.' })
+      targetUserId = match.id
+    }
+
+    const { error } = await adminClient.auth.admin.updateUserById(targetUserId, {
       password: newPassword,
     })
 

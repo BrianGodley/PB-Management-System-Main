@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { sendSMS, sendEmail } from '../lib/notify'
 
 const FG       = '#3A5038'
 const FG_DARK  = '#2E4030'
@@ -49,6 +50,7 @@ export default function Login() {
   const [resetPhoneMasked, setResetPhoneMasked] = useState('')
   const [resetEmailMasked, setResetEmailMasked] = useState('')
   const [verifyMethod,     setVerifyMethod]     = useState('')   // 'sms' | 'email'
+  const [pendingOtp,       setPendingOtp]       = useState('')   // generated code
   const [otpCode,          setOtpCode]          = useState('')
   const [newPassword,      setNewPassword]      = useState('')
   const [confirmPassword,  setConfirmPassword]  = useState('')
@@ -64,6 +66,7 @@ export default function Login() {
     setResetPhoneMasked('')
     setResetEmailMasked('')
     setVerifyMethod('')
+    setPendingOtp('')
     setOtpCode('')
     setNewPassword('')
     setConfirmPassword('')
@@ -136,63 +139,74 @@ export default function Login() {
     setResetLoading(false)
   }
 
-  // ── Step 2: send 6-digit OTP via SMS or email ────────────────────────────
+  // ── Step 2: generate OTP and send via existing SMS/email provider ─────────
   async function handleSendCode(method) {
     setResetMsg('')
     setResetLoading(true)
     setVerifyMethod(method)
 
+    // Generate a fresh 6-digit code
+    const code = Math.floor(100000 + Math.random() * 900000).toString()
+    setPendingOtp(code)
+    setOtpCode('')
+
     try {
       if (method === 'sms') {
-        const { error: otpErr } = await supabase.auth.signInWithOtp({ phone: resetPhone })
-        if (otpErr) throw new Error(otpErr.message)
-      } else {
-        const { error: otpErr } = await supabase.auth.signInWithOtp({
-          email: resetEmail,
-          options: { shouldCreateUser: false },
+        const { error } = await sendSMS({
+          to: resetPhone,
+          message: `Your Picture Build verification code is: ${code}. It expires in 10 minutes.`,
         })
-        if (otpErr) throw new Error(otpErr.message)
+        if (error) throw new Error(error.message)
+      } else {
+        const { error } = await sendEmail({
+          to: resetEmail,
+          subject: 'Picture Build — Password Reset Code',
+          html: `
+            <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#f9fafb;border-radius:16px;">
+              <div style="text-align:center;margin-bottom:24px;">
+                <span style="font-size:2.5rem;">🌿</span>
+                <h2 style="margin:8px 0 0;color:#1f2937;font-size:20px;">Picture Build System</h2>
+              </div>
+              <div style="background:#fff;border-radius:12px;padding:28px;border:1px solid #e5e7eb;">
+                <h3 style="margin:0 0 8px;color:#111827;font-size:17px;">Password Reset Code</h3>
+                <p style="margin:0 0 20px;color:#6b7280;font-size:14px;">
+                  Use the code below to reset your password. It expires in 10 minutes.
+                </p>
+                <div style="background:#f0fdf4;border:2px solid #bbf7d0;border-radius:10px;padding:18px;text-align:center;margin-bottom:20px;">
+                  <span style="font-size:36px;font-weight:700;letter-spacing:0.25em;color:#14532d;font-family:monospace;">${code}</span>
+                </div>
+                <p style="margin:0;color:#9ca3af;font-size:12px;">
+                  If you didn't request this, you can safely ignore this email.
+                </p>
+              </div>
+            </div>`,
+          text: `Your Picture Build verification code is: ${code}. It expires in 10 minutes.`,
+        })
+        if (error) throw new Error(error.message)
       }
       setMode('verify')
     } catch (err) {
       setResetMsg('error:' + (err.message || 'Failed to send code. Please try again.'))
+      setPendingOtp('')
     }
     setResetLoading(false)
   }
 
-  // ── Step 3: verify OTP ─────────────────────────────────────────────────────
+  // ── Step 3: verify OTP against stored code ─────────────────────────────────
   async function handleVerifyOtp(e) {
     e.preventDefault()
     setResetMsg('')
     const code = otpCode.trim()
-    if (!code || code.length < 4) { setResetMsg('error:Please enter the 6-digit code.'); return }
-    setResetLoading(true)
-
-    try {
-      let verifyErr
-      if (verifyMethod === 'sms') {
-        ({ error: verifyErr } = await supabase.auth.verifyOtp({
-          phone: resetPhone,
-          token: code,
-          type: 'sms',
-        }))
-      } else {
-        ({ error: verifyErr } = await supabase.auth.verifyOtp({
-          email: resetEmail,
-          token: code,
-          type: 'email',
-        }))
-      }
-      if (verifyErr) throw new Error('Invalid or expired code. Please try again.')
-      setMode('newpass')
-      setResetMsg('')
-    } catch (err) {
-      setResetMsg('error:' + (err.message || 'Verification failed.'))
+    if (!code || code.length < 6) { setResetMsg('error:Please enter the 6-digit code.'); return }
+    if (code !== pendingOtp) {
+      setResetMsg('error:Incorrect code. Please try again.')
+      return
     }
-    setResetLoading(false)
+    setMode('newpass')
+    setResetMsg('')
   }
 
-  // ── Step 4: set new password ───────────────────────────────────────────────
+  // ── Step 4: set new password via edge function ─────────────────────────────
   async function handleSetPassword(e) {
     e.preventDefault()
     setResetMsg('')
@@ -202,9 +216,20 @@ export default function Login() {
     setResetLoading(true)
 
     try {
-      const { error: updateErr } = await supabase.auth.updateUser({ password: newPassword })
-      if (updateErr) throw new Error(updateErr.message)
-      await supabase.auth.signOut()
+      const supabaseUrl  = import.meta.env.VITE_SUPABASE_URL
+      const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY
+      const res = await fetch(`${supabaseUrl}/functions/v1/reset-user-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${supabaseAnon}`,
+          'apikey':        supabaseAnon,
+        },
+        body: JSON.stringify({ email: resetEmail, newPassword }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+
       setResetMsg('ok:Password updated! Returning to sign in…')
       setTimeout(() => resetFlow(), 2500)
     } catch (err) {
