@@ -395,14 +395,19 @@ export default function SubsVendors() {
   return (
     <div className="flex flex-col h-full">
 
+      {/* ── Page title ── */}
+      <div className="mb-4 flex-shrink-0">
+        <h1 className="text-xl font-bold text-gray-900">Subs &amp; Vendors</h1>
+      </div>
+
       {/* ── Module tab bar ─────────────────────────────────── */}
-      <div className="flex border-b border-gray-200 mb-4 gap-1 flex-shrink-0">
+      <div className="flex flex-nowrap border-b border-gray-200 mb-4 pb-0 flex-shrink-0 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-thin">
         {[
           { key: 'directory', label: 'Directory' },
           { key: 'settings',  label: '⚙️ Settings' },
         ].map(t => (
           <button key={t.key} onClick={() => setSvTab(t.key)}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
+            className={`px-3 sm:px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
               svTab === t.key ? 'border-green-700 text-green-700 bg-green-50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
             }`}
           >{t.label}</button>
@@ -438,11 +443,8 @@ export default function SubsVendors() {
       )}
 
       {svTab === 'directory' && <>
-      {/* ── Page header ─────────────────────────────────────── */}
-      <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
-        <h1 className="text-xl font-bold text-gray-900">
-          {typeView === 'sub' ? 'Subcontractors' : 'Vendors'}
-        </h1>
+      {/* ── Directory header ────────────────────────────────── */}
+      <div className="flex items-center justify-end mb-4 flex-shrink-0 gap-3">
         <div className="flex items-center gap-2 ml-auto">
           {/* Filter tabs */}
           <div className="hidden sm:flex items-center gap-1 bg-gray-100 rounded-lg p-1">

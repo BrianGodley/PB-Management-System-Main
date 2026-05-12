@@ -690,7 +690,7 @@ function JobScheduleSettings({ stages = [], onAddStage, onUpdateStage, onDeleteS
         {[
           { key: 'general',   label: '⚙️ General'   },
           { key: 'templates', label: '📋 Templates'  },
-          { key: 'crews',     label: '👷 Crews'      },
+          { key: 'crews',     label: '👷 Master Crews' },
         ].map(t => (
           <button key={t.key} onClick={() => setSettingsTab(t.key)}
             className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${

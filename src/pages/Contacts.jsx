@@ -593,8 +593,8 @@ export default function Contacts() {
         </div>
       </div>
 
-      {/* Tab switcher */}
-      <div className="flex rounded-lg border border-gray-200 overflow-hidden mb-4 w-fit">
+      {/* Tab bar */}
+      <div className="flex flex-nowrap border-b border-gray-200 mb-4 pb-0 flex-shrink-0 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-thin">
         {[
           { id: 'individuals', label: `Individuals (${contacts.length.toLocaleString()})` },
           { id: 'companies',   label: `Companies (${companies.length.toLocaleString()})` },
@@ -602,8 +602,10 @@ export default function Contacts() {
         ].map(tab => (
           <button key={tab.id} type="button"
             onClick={() => { setActiveTab(tab.id); setSearch(''); setStageFilter('all') }}
-            className={`px-5 py-2 text-sm font-semibold transition-colors border-l border-gray-200 first:border-l-0 ${
-              activeTab === tab.id ? 'bg-green-700 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
+            className={`px-3 sm:px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
+              activeTab === tab.id
+                ? 'border-green-700 text-green-700 bg-green-50'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
             }`}
           >{tab.label}</button>
         ))}

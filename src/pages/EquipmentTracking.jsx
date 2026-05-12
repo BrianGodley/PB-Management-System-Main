@@ -307,7 +307,7 @@ export default function EquipmentTracking() {
           <div className="flex border-b border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0">
             {[
               { key: 'general',   label: '⚙️ General'   },
-              { key: 'equipment', label: '🚜 Equipment'  },
+              { key: 'equipment', label: '🚜 Master Equipment' },
             ].map(t => (
               <button key={t.key} onClick={() => setEqSettingsTab(t.key)}
                 className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${

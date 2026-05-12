@@ -760,7 +760,7 @@ export default function Clients() {
           <div className="flex border-b border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0">
             {[
               { key: 'general', label: '⚙️ General' },
-              { key: 'rates',   label: '📊 Rates'   },
+              { key: 'rates',   label: '📊 Master Rates' },
             ].map(t => (
               <button key={t.key} onClick={() => setClientSettingsTab(t.key)}
                 className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
