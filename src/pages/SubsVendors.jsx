@@ -95,9 +95,9 @@ export default function SubsVendors() {
     setLoading(false)
   }
 
-  function openNew() {
+  function openNew(type) {
     setEditSub(null)
-    setForm({ ...EMPTY_FORM, type: typeView })
+    setForm({ ...EMPTY_FORM, type: type || typeView })
     setError('')
     setShowModal(true)
   }
@@ -395,13 +395,21 @@ export default function SubsVendors() {
   return (
     <div className="flex flex-col h-full">
 
-      {/* ── Page title ── */}
-      <div className="mb-4 flex-shrink-0">
+      {/* ── Page title + Add buttons ── */}
+      <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
         <h1 className="text-xl font-bold text-gray-900">Subs &amp; Vendors</h1>
+        <div className="flex items-center gap-2">
+          <button onClick={() => openNew('sub')} className="btn-primary text-sm px-3 py-1.5">
+            + Add Subcontractor
+          </button>
+          <button onClick={() => openNew('vendor')} className="btn-primary text-sm px-3 py-1.5">
+            + Add Vendor
+          </button>
+        </div>
       </div>
 
       {/* ── Module tab bar ── */}
-      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0 items-center">
+      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0">
         {[
           { key: 'directory', label: '📋 Directory' },
           { key: 'settings',  label: '⚙️ Settings' },
@@ -412,19 +420,6 @@ export default function SubsVendors() {
             }`}
           >{t.label}</button>
         ))}
-
-        {/* Spacer + Add button in tab bar */}
-        {svTab === 'directory' && (
-          <>
-            <div className="flex-1" />
-            <button
-              onClick={openNew}
-              className="mr-3 btn-primary text-sm px-4 py-1.5"
-            >
-              + {typeView === 'sub' ? 'Subcontractor' : 'Vendor'}
-            </button>
-          </>
-        )}
       </div>
 
       {/* ── Settings ── */}
