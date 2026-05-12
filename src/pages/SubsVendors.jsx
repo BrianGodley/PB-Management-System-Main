@@ -61,7 +61,6 @@ export default function SubsVendors() {
   const [svTab,     setSvTab]     = useState('directory') // 'directory' | 'settings'
   const [svSettingsTab, setSvSettingsTab] = useState('general')
   const [typeView,  setTypeView]  = useState('sub')      // 'sub' | 'vendor'
-  const [filter,    setFilter]    = useState('all')      // 'all' | status value
   const [showModal, setShowModal] = useState(false)
   const [editSub,   setEditSub]   = useState(null)
   const [form,      setForm]      = useState(EMPTY_FORM)
@@ -69,8 +68,11 @@ export default function SubsVendors() {
   const [error,     setError]     = useState('')
   const [sortDir,       setSortDir]       = useState('asc')
   const [selected,      setSelected]      = useState(new Set())
+  // Import/Export panel type selector (inside Settings)
+  const [ieType,        setIeType]        = useState('sub')  // 'sub' | 'vendor'
   // Import flow: null → 'mapping' → 'preview'
   const [importStep,    setImportStep]    = useState(null)
+  const [importType,    setImportType]    = useState('sub')  // type being imported
   const [importMeta,    setImportMeta]    = useState(null)   // { name, rowCount }
   const [importHeaders, setImportHeaders] = useState([])     // column names from file
   const [importRawData, setImportRawData] = useState([])     // raw rows from XLSX
@@ -173,8 +175,9 @@ export default function SubsVendors() {
   }
 
   // ── Export ─────────────────────────────────────────────────
-  function exportXLSX() {
-    const data = filtered.map(s => ({
+  function exportXLSX(type) {
+    const rows = subs.filter(s => (s.type || 'sub') === type)
+    const data = rows.map(s => ({
       'Company Name':            s.company_name || '',
       'Divisions':               (s.divisions || []).join(' | '),
       'Status':                  statusInfo(s.status).label,
@@ -194,8 +197,9 @@ export default function SubsVendors() {
       { wch: 18 }, { wch: 22 }, { wch: 35 },
     ]
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Subs & Vendors')
-    XLSX.writeFile(wb, `subs-vendors-${new Date().toISOString().split('T')[0]}.xlsx`)
+    const label = type === 'sub' ? 'Subcontractors' : 'Vendors'
+    XLSX.utils.book_append_sheet(wb, ws, label)
+    XLSX.writeFile(wb, `${label.toLowerCase()}-${new Date().toISOString().split('T')[0]}.xlsx`)
   }
 
   // ── Import — Step 1: read file, extract headers ───────────
@@ -209,17 +213,14 @@ export default function SubsVendors() {
         const wb  = XLSX.read(new Uint8Array(ev.target.result), { type: 'array', cellDates: true })
         const ws  = wb.Sheets[wb.SheetNames[0]]
 
-        // Read raw rows as arrays so we can find the real header row
         const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
 
-        // Find the first row with 3+ non-empty cells — that's the header row
         let headerRowIndex = 0
         for (let i = 0; i < Math.min(10, rawRows.length); i++) {
           const nonEmpty = rawRows[i].filter(c => String(c).trim() !== '').length
           if (nonEmpty >= 3) { headerRowIndex = i; break }
         }
 
-        // Re-parse starting at the detected header row
         const json = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false, range: headerRowIndex })
         if (!json.length) { setImportError('No data found in file.'); return }
 
@@ -238,7 +239,6 @@ export default function SubsVendors() {
     e.target.value = ''
   }
 
-  // Auto-guess column mappings from header names
   function autoMap(headers) {
     const aliases = {
       company_name: [
@@ -317,6 +317,7 @@ export default function SubsVendors() {
       )?.value || 'no_email'
       return {
         _row: i + 2,
+        type:                   importType,
         company_name:           company,
         divisions,
         status,
@@ -368,7 +369,6 @@ export default function SubsVendors() {
   // Filter + search
   const filtered = subs
     .filter(s => (s.type || 'sub') === typeView)
-    .filter(s => filter === 'all' || s.status === filter)
     .filter(s => {
       const q = search.toLowerCase()
       return !q
@@ -401,7 +401,7 @@ export default function SubsVendors() {
       </div>
 
       {/* ── Module tab bar ── */}
-      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0">
+      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0 items-center">
         {[
           { key: 'directory', label: '📋 Directory' },
           { key: 'settings',  label: '⚙️ Settings' },
@@ -412,6 +412,20 @@ export default function SubsVendors() {
             }`}
           >{t.label}</button>
         ))}
+
+        {/* Spacer + Add button in tab bar */}
+        {svTab === 'directory' && (
+          <>
+            <div className="flex-1" />
+            <button
+              onClick={openNew}
+              className="mr-3 text-sm font-bold text-white px-4 py-1.5 rounded-lg"
+              style={{ backgroundColor: '#3A5038' }}
+            >
+              + {typeView === 'sub' ? 'Subcontractor' : 'Vendor'}
+            </button>
+          </>
+        )}
       </div>
 
       {/* ── Settings ── */}
@@ -419,7 +433,8 @@ export default function SubsVendors() {
         <div className="-mb-6 mt-3 flex-1 flex flex-col">
           <div className="flex border-b border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0">
             {[
-              { key: 'general', label: '⚙️ General' },
+              { key: 'general',       label: '⚙️ General' },
+              { key: 'import-export', label: '📥 Import / Export' },
             ].map(t => (
               <button key={t.key} onClick={() => setSvSettingsTab(t.key)}
                 className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
@@ -429,6 +444,8 @@ export default function SubsVendors() {
             ))}
           </div>
           <div className="bg-gray-50 px-6 py-6 flex-1 overflow-y-auto">
+
+            {/* General */}
             {svSettingsTab === 'general' && (
               <div className="flex items-center justify-center py-20 text-center">
                 <div>
@@ -438,87 +455,101 @@ export default function SubsVendors() {
                 </div>
               </div>
             )}
+
+            {/* Import / Export */}
+            {svSettingsTab === 'import-export' && (
+              <div className="max-w-lg">
+                <h2 className="text-sm font-semibold text-gray-800 mb-4">Import / Export</h2>
+
+                {/* Type selector */}
+                <div className="mb-5">
+                  <p className="text-xs font-medium text-gray-500 mb-2">Choose record type</p>
+                  <div className="inline-flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+                    <button
+                      onClick={() => setIeType('sub')}
+                      className={`px-5 py-2 text-sm font-semibold transition-colors ${
+                        ieType === 'sub' ? 'bg-green-700 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >🔨 Subcontractors</button>
+                    <button
+                      onClick={() => setIeType('vendor')}
+                      className={`px-5 py-2 text-sm font-semibold border-l border-gray-200 transition-colors ${
+                        ieType === 'vendor' ? 'bg-green-700 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >🛒 Vendors</button>
+                  </div>
+                </div>
+
+                {/* Import card */}
+                <div className="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+                  <div className="flex items-start gap-4">
+                    <div className="text-2xl">📥</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 mb-0.5">
+                        Import {ieType === 'sub' ? 'Subcontractors' : 'Vendors'}
+                      </p>
+                      <p className="text-xs text-gray-500 mb-3">
+                        Upload an .xlsx file. You'll map columns before anything is saved.
+                      </p>
+                      <button
+                        onClick={() => { setImportType(ieType); importFileRef.current?.click() }}
+                        className="text-sm px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors font-medium"
+                      >
+                        Choose File…
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Export card */}
+                <div className="bg-white rounded-xl border border-gray-200 p-5">
+                  <div className="flex items-start gap-4">
+                    <div className="text-2xl">📤</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 mb-0.5">
+                        Export {ieType === 'sub' ? 'Subcontractors' : 'Vendors'}
+                      </p>
+                      <p className="text-xs text-gray-500 mb-3">
+                        Download all {ieType === 'sub' ? 'subcontractors' : 'vendors'} as an Excel spreadsheet.
+                      </p>
+                      <button
+                        onClick={() => exportXLSX(ieType)}
+                        className="text-sm px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors font-medium"
+                      >
+                        Download .xlsx
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {importError && (
+                  <p className="text-xs text-red-500 mt-3">{importError}</p>
+                )}
+              </div>
+            )}
+
           </div>
         </div>
       )}
 
+      {/* Hidden file input for import */}
+      <input ref={importFileRef} type="file" accept=".xlsx" className="hidden" onChange={handleImportFile} />
+
       {svTab === 'directory' && <>
-      {/* ── Directory header ────────────────────────────────── */}
-      <div className="flex items-center justify-end mb-4 mt-4 flex-shrink-0 gap-3">
-        <div className="flex items-center gap-2 ml-auto">
-          {/* Filter tabs */}
-          <div className="hidden sm:flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-            {[{ v: 'all', l: 'All' }, ...STATUS_OPTIONS.map(s => ({ v: s.value, l: s.label }))].map(opt => (
-              <button
-                key={opt.v}
-                onClick={() => setFilter(opt.v)}
-                className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                  filter === opt.v ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                {opt.l}
-              </button>
-            ))}
-          </div>
-          {/* Import — hidden on mobile (admin tool, lives in desktop nav) */}
-          <button
-            onClick={() => importFileRef.current?.click()}
-            className="hidden sm:flex text-sm px-3 py-1.5 items-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-            </svg>
-            Import
-          </button>
-          <input ref={importFileRef} type="file" accept=".xlsx" className="hidden" onChange={handleImportFile} />
 
-          {/* Export — hidden on mobile */}
-          <button
-            onClick={exportXLSX}
-            className="hidden sm:flex text-sm px-3 py-1.5 items-center gap-1.5 whitespace-nowrap rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Export
-          </button>
-
-          {/* Add — desktop header version (mobile uses the full-width
-              button below the type toggle) */}
-          <button
-            onClick={openNew}
-            className="hidden sm:flex btn-primary text-sm px-3 py-1.5 items-center gap-1.5 whitespace-nowrap"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            + {typeView === 'sub' ? 'Subcontractor' : 'Vendor'}
-          </button>
-        </div>
-      </div>
-
-      {/* ── Search bar ──────────────────────────────────────── */}
-      <div className="mb-3 flex-shrink-0">
+      {/* ── Search + Type toggle on one row ────────────────── */}
+      <div className="flex items-center gap-3 mb-4 mt-4 flex-shrink-0">
         <input
           type="text"
           placeholder="Search by company, contact, division, or phone…"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="input text-sm w-full max-w-md"
+          className="input text-sm flex-1 max-w-md"
         />
-      </div>
-
-      {/* ── Type toggle ────────────────────────────────────────
-          On mobile the toggle stretches edge-to-edge (each button 50%) so
-          it\'s an obvious primary control. On tablet+ it sits right-aligned
-          like before. */}
-      <div className="flex items-center gap-2 mb-3 flex-shrink-0">
-        <div className="hidden sm:block flex-1" />
-
-        <div className="w-full sm:w-auto flex-shrink-0 flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+        <div className="flex-shrink-0 flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
           <button
-            onClick={() => { setTypeView('sub'); setFilter('all') }}
-            className={`flex-1 sm:flex-none px-4 py-2 sm:py-1.5 text-sm sm:text-xs font-semibold transition-colors ${
+            onClick={() => setTypeView('sub')}
+            className={`px-4 py-1.5 text-xs font-semibold transition-colors ${
               typeView === 'sub'
                 ? 'bg-green-700 text-white'
                 : 'bg-white text-gray-500 hover:bg-gray-50'
@@ -527,8 +558,8 @@ export default function SubsVendors() {
             🔨 Subcontractors
           </button>
           <button
-            onClick={() => { setTypeView('vendor'); setFilter('all') }}
-            className={`flex-1 sm:flex-none px-4 py-2 sm:py-1.5 text-sm sm:text-xs font-semibold border-l border-gray-200 transition-colors ${
+            onClick={() => setTypeView('vendor')}
+            className={`px-4 py-1.5 text-xs font-semibold border-l border-gray-200 transition-colors ${
               typeView === 'vendor'
                 ? 'bg-green-700 text-white'
                 : 'bg-white text-gray-500 hover:bg-gray-50'
@@ -538,18 +569,6 @@ export default function SubsVendors() {
           </button>
         </div>
       </div>
-
-      {/* Mobile-only full-width Add button. Sits directly under the type
-          toggle so the primary action follows the type the user just picked. */}
-      <button
-        onClick={openNew}
-        className="sm:hidden btn-primary w-full mb-4 py-2.5 text-sm font-semibold flex-shrink-0 flex items-center justify-center gap-2"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
-        + Add {typeView === 'sub' ? 'Subcontractor' : 'Vendor'}
-      </button>
 
       {loading ? (
         <div className="flex justify-center py-16">
@@ -571,8 +590,8 @@ export default function SubsVendors() {
                 <col style={{ width: '22%'   }} />  {/* company name */}
                 <col style={{ width: '15%'   }} />  {/* primary contact */}
                 <col style={{ width: '20%'   }} />  {/* trades / materials */}
-                {typeView === 'sub' && <col style={{ width: '150px' }} />}   {/* services pricing */}
-                {typeView === 'vendor' && <col style={{ width: '150px' }} />}  {/* price list */}
+                {typeView === 'sub' && <col style={{ width: '150px' }} />}
+                {typeView === 'vendor' && <col style={{ width: '150px' }} />}
                 <col style={{ width: '120px' }} />  {/* cell */}
                 <col style={{ width: '120px' }} />  {/* phone */}
                 <col style={{ width: '44px'  }} />  {/* actions */}
@@ -710,6 +729,7 @@ export default function SubsVendors() {
                 <h2 className="text-base font-bold text-gray-900">Map Columns</h2>
                 <p className="text-xs text-gray-400 mt-0.5">
                   {importMeta?.name} · {importMeta?.rowCount} rows · {importHeaders.length} columns detected
+                  {' '}· importing as <strong>{importType === 'sub' ? 'Subcontractors' : 'Vendors'}</strong>
                 </p>
               </div>
               <button onClick={closeImport} className="text-gray-300 hover:text-gray-500 p-2">
@@ -720,7 +740,6 @@ export default function SubsVendors() {
             </div>
 
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-1">
-              {/* Show detected headers so user can see what we found */}
               <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2.5 mb-3">
                 <p className="text-xs font-semibold text-blue-700 mb-1">Columns found in your file:</p>
                 <div className="flex flex-wrap gap-1">
@@ -794,7 +813,7 @@ export default function SubsVendors() {
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
               <div>
                 <h2 className="text-base font-bold text-gray-900">Preview Import</h2>
-                <p className="text-xs text-gray-400 mt-0.5">{importRows.length} records ready to import</p>
+                <p className="text-xs text-gray-400 mt-0.5">{importRows.length} records ready to import as {importType === 'sub' ? 'Subcontractors' : 'Vendors'}</p>
               </div>
               <button onClick={closeImport} className="text-gray-300 hover:text-gray-500 p-2">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -935,7 +954,6 @@ function SubModal({ form, setForm, isEdit, onSave, onClose, onDelete, saving, er
           {/* Divisions */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-2">{recordType === 'vendor' ? 'Materials' : 'Trades'}</label>
-            {/* Dropdown selector */}
             <select
               value=""
               onChange={e => {
@@ -953,7 +971,6 @@ function SubModal({ form, setForm, isEdit, onSave, onClose, onDelete, saving, er
               }
             </select>
 
-            {/* Selected items */}
             {form.divisions.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {form.divisions.map(div => (
@@ -972,7 +989,6 @@ function SubModal({ form, setForm, isEdit, onSave, onClose, onDelete, saving, er
               </div>
             )}
 
-            {/* Add custom trade / material */}
             <div className="flex gap-2 mt-2">
               <input
                 type="text"
