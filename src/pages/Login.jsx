@@ -119,23 +119,14 @@ export default function Login() {
         email = resolvedEmail
       }
 
-      // Try to find phone number (employees table first, then profiles)
+      // Look up cell phone from the employees table
       let phoneRaw = null
       const { data: empRow } = await supabase
         .from('employees')
-        .select('phone')
+        .select('cell_phone')
         .eq('email', email)
         .maybeSingle()
-      phoneRaw = empRow?.phone
-
-      if (!phoneRaw) {
-        const { data: profRow } = await supabase
-          .from('profiles')
-          .select('phone')
-          .eq('email', email)
-          .maybeSingle()
-        phoneRaw = profRow?.phone
-      }
+      phoneRaw = empRow?.cell_phone
 
       setResetEmail(email)
       setResetEmailMasked(maskEmail(email))
