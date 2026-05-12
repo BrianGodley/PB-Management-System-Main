@@ -315,12 +315,12 @@ export default function JobsList() {
       <div className="flex gap-2 flex-1 min-h-0 pt-4">
 
         {/* Jobs sidebar — desktop only */}
-        <div className="hidden lg:flex w-56 flex-shrink-0 flex-col min-h-0 -ml-6 pl-3 bg-white border-r border-gray-200">
+        <div className="hidden lg:flex w-56 flex-shrink-0 flex-col min-h-0 pl-3 bg-white border-r border-gray-200">
           {/* Add Schedule button — only visible on Schedule tab */}
           {tab === 'schedule' && (
             <button
               onClick={() => setAddScheduleTrigger(v => v + 1)}
-              className="w-full flex items-center gap-1.5 px-2.5 py-1.5 mb-2 rounded-lg bg-green-700 text-white text-xs font-semibold hover:bg-green-800 transition-colors flex-shrink-0"
+              className="w-full flex items-center gap-1.5 px-2.5 py-1.5 mb-2 mt-2 rounded-lg bg-green-700 text-white text-xs font-semibold hover:bg-green-800 transition-colors flex-shrink-0"
             >
               <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
