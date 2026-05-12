@@ -345,20 +345,20 @@ export default function CompanyDetail() {
             {/* Quick info: Address, Phone, Email above Stage */}
             <div className="space-y-2 mb-4 pb-4 border-b border-gray-100 text-sm">
               <div>
-                <p className={lbl}>Address</p>
+                <p className={lbl}>Company Address</p>
                 {addressLine
                   ? <p className="text-gray-900">{addressLine}</p>
                   : <span className="text-gray-300">—</span>}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <p className={lbl}>Phone</p>
+                  <p className={lbl}>Main Phone</p>
                   {company.phone
                     ? <a href={`tel:${company.phone}`} className="text-gray-900 hover:text-green-700">{company.phone}</a>
                     : <span className="text-gray-300">—</span>}
                 </div>
                 <div>
-                  <p className={lbl}>Email</p>
+                  <p className={lbl}>Main Email</p>
                   {company.email
                     ? <a href={`mailto:${company.email}`} className="text-gray-900 hover:text-green-700 break-all">{company.email}</a>
                     : <span className="text-gray-300">—</span>}
@@ -384,6 +384,7 @@ export default function CompanyDetail() {
                 { key: 'main',      label: 'More Info' },
                 { key: 'contacts',  label: `Contacts${contacts.length > 0 ? ` (${contacts.length})` : ''}` },
                 { key: 'marketing', label: 'Marketing' },
+                { key: 'tags',      label: 'Tags' },
               ].map(t => (
                 <button key={t.key} onClick={() => setLeftTab(t.key)}
                   className={`px-3 py-2 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${
@@ -463,6 +464,23 @@ export default function CompanyDetail() {
                   <p className={lbl}>Source Origin</p>
                   <p className="text-gray-900">{company.how_did_you_hear || <span className="text-gray-300">—</span>}</p>
                 </div>
+              </div>
+            )}
+
+            {/* ── TAGS TAB ── */}
+            {leftTab === 'tags' && (
+              <div>
+                {(!company.tags || company.tags.length === 0) ? (
+                  <p className="text-xs text-gray-400 italic text-center py-6">No tags on file — click edit to add.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {company.tags.map((tag, i) => (
+                      <span key={i} className="inline-flex items-center px-2.5 py-1 rounded-full bg-green-50 text-green-800 text-xs font-medium border border-green-200">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
