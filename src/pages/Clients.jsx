@@ -717,15 +717,15 @@ export default function Clients() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setClientModal('individual')}
-            className="text-sm px-3 py-1.5 rounded-lg border-2 border-green-700 text-green-700 font-semibold hover:bg-green-50 transition-colors"
+            className="btn-primary text-sm px-3 py-1.5"
           >
-            + Individual
+            + Add Individual
           </button>
           <button
             onClick={() => setClientModal('company')}
             className="btn-primary text-sm px-3 py-1.5"
           >
-            + Company
+            + Add Company
           </button>
         </div>
       </div>
