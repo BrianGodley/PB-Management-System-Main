@@ -225,6 +225,8 @@ export default function CompanyDetail() {
   const [loading,     setLoading]     = useState(true)
   const [showEdit,    setShowEdit]    = useState(false)
   const [showDelete,  setShowDelete]  = useState(false)
+  const [showMove,    setShowMove]    = useState(false)
+  const [moving,      setMoving]      = useState(false)
   const [deleting,    setDeleting]    = useState(false)
   const [leftTab,     setLeftTab]     = useState('main')
 
@@ -293,6 +295,51 @@ export default function CompanyDetail() {
     navigate('/contacts')
   }
 
+  async function handleMoveToIndividual() {
+    setMoving(true)
+    const c = company
+
+    // Put full company name as last_name so the record is searchable
+    // first_name is left blank — user can split it in edit if needed
+    const { data: newContact, error } = await supabase.from('contacts').insert({
+      first_name:          '',
+      last_name:           c.company_name || '',
+      phone:               c.phone || null,
+      cell:                null,
+      email:               c.email || null,
+      street_address:      c.company_street || null,
+      city:                c.company_city || null,
+      state:               c.company_state || null,
+      zip:                 c.company_zip || null,
+      ghl_assigned_to:     c.ghl_assigned_to || null,
+      stage:               c.stage || 'new_lead',
+      contact_type:        c.contact_type || null,
+      source:              c.source || null,
+      campaign:            c.campaign || null,
+      how_did_you_hear:    c.how_did_you_hear || null,
+      notes:               c.notes || null,
+      project_description: c.project_description || null,
+      call_center_notes:   c.call_center_notes || null,
+    }).select().single()
+
+    if (error || !newContact) { setMoving(false); alert('Move failed: ' + (error?.message || 'unknown error')); return }
+
+    // Migrate communication history
+    if (comms.length > 0) {
+      const migratedComms = comms.map(({ id: _id, company_id: _cid, ...rest }) => ({
+        ...rest,
+        contact_id: newContact.id,
+      }))
+      await supabase.from('contact_communications').insert(migratedComms)
+    }
+
+    // Remove original company record
+    await supabase.from('company_communications').delete().eq('company_id', id)
+    await supabase.from('companies').delete().eq('id', id)
+
+    navigate(`/contacts/${newContact.id}`)
+  }
+
   if (loading) return <div className="flex items-center justify-center h-64 text-gray-400">Loading…</div>
   if (!company) return (
     <div className="flex flex-col items-center justify-center h-64 text-gray-400">
@@ -347,6 +394,9 @@ export default function CompanyDetail() {
                 <div className="flex items-center gap-1">
                   <button onClick={() => setShowEdit(true)} className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-slate-200 transition-colors" title="Edit company">
                     <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M11.5 1.5a1.414 1.414 0 0 1 2 2L5 12l-3 1 1-3 8.5-8.5z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </button>
+                  <button onClick={() => setShowMove(true)} className="text-gray-400 hover:text-blue-500 p-1 rounded hover:bg-blue-50 transition-colors" title="Convert to Individual">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2 5h9M8 2l3 3-3 3M14 11H5M8 8l-3 3 3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </button>
                   <button onClick={() => setShowDelete(true)} className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors" title="Delete company">
                     <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 9a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -659,6 +709,36 @@ export default function CompanyDetail() {
           onSave={updated => { setCompany(updated); setShowEdit(false) }}
           onClose={() => setShowEdit(false)}
         />
+      )}
+
+      {/* Move confirmation */}
+      {showMove && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M2 5h9M8 2l3 3-3 3M14 11H5M8 8l-3 3 3 3" stroke="#3b82f6" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-900">Convert to Individual</h3>
+                <p className="text-xs text-gray-400 mt-0.5">This will move the record to Individuals</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 mb-5">
+              <span className="font-semibold text-gray-800">{company.company_name}</span> will become an Individual contact. All communication history will be carried over. You can split the name into first/last after converting.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowMove(false)} disabled={moving}
+                className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+                Cancel
+              </button>
+              <button onClick={handleMoveToIndividual} disabled={moving}
+                className="flex-1 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                {moving ? 'Converting…' : 'Convert to Individual'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Delete confirmation */}

@@ -230,6 +230,8 @@ export default function ContactDetail() {
   const [loading,    setLoading]    = useState(true)
   const [showEdit,   setShowEdit]   = useState(false)
   const [showDelete, setShowDelete] = useState(false)
+  const [showMove,   setShowMove]   = useState(false)
+  const [moving,     setMoving]     = useState(false)
   const [deleting,   setDeleting]   = useState(false)
   const [leftTab,    setLeftTab]    = useState('main')   // 'main' | 'dnd' | 'tags'
   const [tagInput,   setTagInput]   = useState('')
@@ -278,6 +280,53 @@ export default function ContactDetail() {
     await supabase.from('contact_communications').delete().eq('contact_id', id)
     await supabase.from('contacts').delete().eq('id', id)
     navigate('/contacts')
+  }
+
+  async function handleMoveToCompany() {
+    setMoving(true)
+    const c = contact
+    const companyName = [c.first_name, c.last_name].filter(Boolean).join(' ') || 'Unnamed'
+
+    // Only pass contact_type values that pass the companies check constraint
+    const VALID_COMPANY_TYPES = ['Residential', 'Commercial', 'HOA', 'Government', 'Other']
+    const safeType = VALID_COMPANY_TYPES.includes(c.contact_type) ? c.contact_type : null
+
+    const { data: newCompany, error } = await supabase.from('companies').insert({
+      company_name:        companyName,
+      company_street:      c.street_address || null,
+      company_city:        c.city || null,
+      company_state:       c.state || null,
+      company_zip:         c.zip || null,
+      phone:               c.phone || c.cell || null,
+      email:               c.email || null,
+      ghl_assigned_to:     c.ghl_assigned_to || null,
+      stage:               c.stage || 'new_lead',
+      contact_type:        safeType,
+      source:              c.source || null,
+      campaign:            c.campaign || null,
+      how_did_you_hear:    c.how_did_you_hear || null,
+      notes:               c.notes || null,
+      project_description: c.project_description || null,
+      call_center_notes:   c.call_center_notes || null,
+      company_contacts:    [],
+    }).select().single()
+
+    if (error || !newCompany) { setMoving(false); alert('Move failed: ' + (error?.message || 'unknown error')); return }
+
+    // Migrate communication history
+    if (comms.length > 0) {
+      const migratedComms = comms.map(({ id: _id, contact_id: _cid, ...rest }) => ({
+        ...rest,
+        company_id: newCompany.id,
+      }))
+      await supabase.from('company_communications').insert(migratedComms)
+    }
+
+    // Remove original individual record
+    await supabase.from('contact_communications').delete().eq('contact_id', id)
+    await supabase.from('contacts').delete().eq('id', id)
+
+    navigate(`/companies/${newCompany.id}`)
   }
 
   async function handleContactTypeChange(newType) {
@@ -381,6 +430,9 @@ export default function ContactDetail() {
                 <div className="flex items-center gap-1">
                   <button onClick={() => setShowEdit(true)} className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-slate-200 transition-colors" title="Edit contact">
                     <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M11.5 1.5a1.414 1.414 0 0 1 2 2L5 12l-3 1 1-3 8.5-8.5z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </button>
+                  <button onClick={() => setShowMove(true)} className="text-gray-400 hover:text-blue-500 p-1 rounded hover:bg-blue-50 transition-colors" title="Convert to Company">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2 5h9M8 2l3 3-3 3M14 11H5M8 8l-3 3 3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </button>
                   <button onClick={() => setShowDelete(true)} className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors" title="Delete contact">
                     <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 9a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -792,6 +844,41 @@ export default function ContactDetail() {
           onSave={updated => { setContact(updated); setShowEdit(false) }}
           onClose={() => setShowEdit(false)}
         />
+      )}
+
+      {showMove && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M2 5h9M8 2l3 3-3 3M14 11H5M8 8l-3 3 3 3" stroke="#3b82f6" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-900">Convert to Company</h3>
+                <p className="text-xs text-gray-400 mt-0.5">This will move the record to Companies</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 mb-5">
+              <span className="font-semibold text-gray-800">{displayName}</span> will become a Company record named <span className="font-semibold text-gray-800">{[contact.first_name, contact.last_name].filter(Boolean).join(' ')}</span>. All communication history will be carried over.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowMove(false)}
+                disabled={moving}
+                className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleMoveToCompany}
+                disabled={moving}
+                className="flex-1 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {moving ? 'Converting…' : 'Convert to Company'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showDelete && (
