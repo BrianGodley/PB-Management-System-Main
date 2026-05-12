@@ -3,7 +3,7 @@
 
 CREATE TABLE IF NOT EXISTS stat_reminders (
   id             uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  statistic_id   uuid        NOT NULL REFERENCES statistics(id) ON DELETE CASCADE,
+  statistic_id   bigint      NOT NULL REFERENCES statistics(id) ON DELETE CASCADE,
   enabled        boolean     NOT NULL DEFAULT false,
   delay_days     int         NOT NULL DEFAULT 3 CHECK (delay_days BETWEEN 1 AND 60),
   notify_email   boolean     NOT NULL DEFAULT true,
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS stat_reminders (
 
 CREATE TABLE IF NOT EXISTS stat_reminder_log (
   id             uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  statistic_id   uuid        NOT NULL REFERENCES statistics(id) ON DELETE CASCADE,
+  statistic_id   bigint      NOT NULL REFERENCES statistics(id) ON DELETE CASCADE,
   period_date    date        NOT NULL,
   sent_count     int         NOT NULL DEFAULT 0,
   last_sent_at   timestamptz,

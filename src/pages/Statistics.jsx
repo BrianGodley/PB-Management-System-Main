@@ -5849,13 +5849,28 @@ function RemindersSettingsTab({ stats, profiles }) {
   function update(statId, patch) {
     setReminders(prev => ({
       ...prev,
-      [statId]: { ...getReminder(statId), ...patch },
+      [statId]: { ...(prev[statId] || getReminder(statId)), ...patch },
     }))
   }
 
-  async function save(statId) {
+  async function save(statId, patch = null) {
     setSaving(s => ({ ...s, [statId]: true }))
-    const row = getReminder(statId)
+    // If a patch is provided (e.g. from toggle), apply it to the current row
+    // synchronously so we don't depend on state having flushed yet.
+    const base = reminders[statId] || {
+      statistic_id:   statId,
+      enabled:        false,
+      delay_days:     3,
+      notify_email:   true,
+      notify_sms:     false,
+      repeat_enabled: false,
+      repeat_value:   1,
+      repeat_unit:    'weeks',
+    }
+    const row = patch ? { ...base, ...patch } : base
+    // Optimistically update local state
+    if (patch) setReminders(prev => ({ ...prev, [statId]: row }))
+
     const { error } = await supabase.from('stat_reminders').upsert(
       { ...row, statistic_id: statId, updated_at: new Date().toISOString() },
       { onConflict: 'statistic_id' }
@@ -5914,7 +5929,7 @@ function RemindersSettingsTab({ stats, profiles }) {
                 <label className="flex items-center gap-2 cursor-pointer">
                   <span className="text-xs text-gray-500 font-medium">{r.enabled ? 'On' : 'Off'}</span>
                   <div
-                    onClick={() => { update(stat.id, { enabled: !r.enabled }); setTimeout(() => save(stat.id), 50) }}
+                    onClick={() => save(stat.id, { enabled: !r.enabled })}
                     className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${r.enabled ? 'bg-green-600' : 'bg-gray-300'}`}
                   >
                     <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${r.enabled ? 'translate-x-5' : ''}`} />
