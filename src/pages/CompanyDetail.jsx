@@ -294,7 +294,7 @@ export default function CompanyDetail() {
   const lbl = 'text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5'
 
   return (
-    <div className="flex flex-col h-full bg-slate-300">
+    <div className="flex flex-col h-full bg-slate-100">
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
       {/* Top bar */}
       <div className="flex items-center gap-3 px-6 py-3 bg-white border-b border-gray-200 flex-shrink-0">
@@ -311,7 +311,7 @@ export default function CompanyDetail() {
       <div className="flex-1 min-h-0 overflow-hidden grid" style={{gridTemplateColumns: '23rem minmax(0,1fr) 15rem'}}>
 
         {/* ── LEFT COLUMN ───────────────────────────────────────────────── */}
-        <div className="border-r border-slate-300 bg-slate-300 overflow-y-auto">
+        <div className="border-r border-slate-300 bg-slate-100 overflow-y-auto">
           <div className="p-3 space-y-2">
 
             {/* Card 1: Identity */}
@@ -327,7 +327,7 @@ export default function CompanyDetail() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button onClick={() => setShowEdit(true)} className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-slate-300 transition-colors" title="Edit company">
+                  <button onClick={() => setShowEdit(true)} className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-slate-100 transition-colors" title="Edit company">
                     <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M11.5 1.5a1.414 1.414 0 0 1 2 2L5 12l-3 1 1-3 8.5-8.5z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </button>
                   <button onClick={() => setShowDelete(true)} className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors" title="Delete company">
@@ -472,7 +472,7 @@ export default function CompanyDetail() {
         </div>
 
         {/* ── MIDDLE COLUMN: Communication Log ──────────────────────────── */}
-        <div className="flex flex-col bg-slate-300">
+        <div className="flex flex-col bg-slate-100">
 
           <div className="px-5 py-3 bg-white border-b border-slate-300 flex-shrink-0">
             <h3 className="text-sm font-bold text-gray-700">Communication Log</h3>
@@ -554,7 +554,7 @@ export default function CompanyDetail() {
         </div>
 
         {/* ── RIGHT COLUMN: Pipeline & Activity ─────────────────────────── */}
-        <div className="border-l border-slate-300 bg-slate-300 overflow-y-auto">
+        <div className="border-l border-slate-300 bg-slate-100 overflow-y-auto">
           <div className="p-3 space-y-2">
 
             {/* Pipeline card */}
@@ -606,7 +606,7 @@ export default function CompanyDetail() {
                   const t = commTypeMap[last.type] || { icon: '📝', label: 'Note' }
                   return (
                     <div className="flex items-start gap-2.5">
-                      <div className="w-6 h-6 rounded-full bg-slate-300 border border-slate-300 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">{t.icon}</div>
+                      <div className="w-6 h-6 rounded-full bg-slate-100 border border-slate-300 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">{t.icon}</div>
                       <div>
                         <p className="text-xs font-medium text-gray-700">Last {t.label}</p>
                         <p className="text-[10px] text-gray-500 truncate max-w-[100px]">{last.content}</p>
