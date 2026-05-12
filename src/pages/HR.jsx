@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 import ReviewBuilder from '../components/hr/ReviewBuilder'
 
 const DEPARTMENTS = ['Operations', 'Landscaping', 'Pool', 'Admin', 'Sales', 'Other']
@@ -351,12 +352,15 @@ function AddApplicantModal({ onSave, onClose }) {
 // ── Main HR Component ─────────────────────────────────────────────────────────
 export default function HR() {
   const navigate = useNavigate()
+  const { user } = useAuth()
 
   const [tab,           setTab]           = useState('employees')
+  const [settingsTab,   setSettingsTab]   = useState('employee-groups')
   const [employees,     setEmployees]     = useState([])
   const [applicants,    setApplicants]    = useState([])
   const [reviewForms,   setReviewForms]   = useState([])
   const [profileRoles,  setProfileRoles]  = useState({})  // email -> role mapping
+  const [profiles,      setProfiles]      = useState([])
   const [loading,       setLoading]       = useState(true)
   const [empFilter,     setEmpFilter]     = useState('active')  // active | archived | all
   const [appFilter,     setAppFilter]     = useState('all')
@@ -369,19 +373,33 @@ export default function HR() {
   const [sortCol,       setSortCol]       = useState('name')
   const [sortDir,       setSortDir]       = useState('asc')
 
+  // Employee Groups state
+  const [groups,        setGroups]        = useState([])
+  const [groupMembers,  setGroupMembers]  = useState({})  // groupId -> Set of employee_ids
+  const [editingGroup,  setEditingGroup]  = useState(null) // null | 'new' | group object
+  const [groupForm,     setGroupForm]     = useState({ name: '', description: '', color: '#16a34a' })
+  const [groupSaving,   setGroupSaving]   = useState(false)
+  const [selectedMembers, setSelectedMembers] = useState(new Set())
+
+  const isAdmin = (profiles || []).some(p => p.id === user?.id && (p.role === 'admin' || p.role === 'super_admin'))
+
   useEffect(() => { fetchAll() }, [])
 
   async function fetchAll() {
     setLoading(true)
-    const [{ data: eData }, { data: aData }, { data: fData }, { data: pData }] = await Promise.all([
+    const [{ data: eData }, { data: aData }, { data: fData }, { data: pData }, { data: gData }, { data: gmData }] = await Promise.all([
       supabase.from('employees').select('*').order('last_name'),
       supabase.from('applicants').select('*').order('applied_at', { ascending: false }),
       supabase.from('hr_review_forms').select('*').order('created_at', { ascending: false }),
-      supabase.from('profiles').select('email, role'),
+      supabase.from('profiles').select('id, email, role'),
+      supabase.from('employee_groups').select('*').order('name'),
+      supabase.from('employee_group_members').select('group_id, employee_id'),
     ])
     setEmployees(eData || [])
     setApplicants(aData || [])
     setReviewForms(fData || [])
+    setProfiles(pData || [])
+    setGroups(gData || [])
 
     // Build email -> role map
     const roles = {}
@@ -390,7 +408,83 @@ export default function HR() {
     })
     setProfileRoles(roles)
 
+    // Build groupId -> Set<employee_id>
+    const memberMap = {}
+    gmData?.forEach(m => {
+      if (!memberMap[m.group_id]) memberMap[m.group_id] = new Set()
+      memberMap[m.group_id].add(m.employee_id)
+    })
+    setGroupMembers(memberMap)
+
     setLoading(false)
+  }
+
+  async function fetchGroups() {
+    const [{ data: gData }, { data: gmData }] = await Promise.all([
+      supabase.from('employee_groups').select('*').order('name'),
+      supabase.from('employee_group_members').select('group_id, employee_id'),
+    ])
+    setGroups(gData || [])
+    const memberMap = {}
+    gmData?.forEach(m => {
+      if (!memberMap[m.group_id]) memberMap[m.group_id] = new Set()
+      memberMap[m.group_id].add(m.employee_id)
+    })
+    setGroupMembers(memberMap)
+  }
+
+  function openNewGroup() {
+    setGroupForm({ name: '', description: '', color: '#16a34a' })
+    setSelectedMembers(new Set())
+    setEditingGroup('new')
+  }
+
+  function openEditGroup(group) {
+    setGroupForm({ name: group.name, description: group.description || '', color: group.color || '#16a34a' })
+    setSelectedMembers(new Set(groupMembers[group.id] || []))
+    setEditingGroup(group)
+  }
+
+  async function saveGroup() {
+    if (!groupForm.name.trim()) return
+    setGroupSaving(true)
+    try {
+      let groupId
+      if (editingGroup === 'new') {
+        const { data, error } = await supabase.from('employee_groups')
+          .insert({ name: groupForm.name.trim(), description: groupForm.description.trim() || null, color: groupForm.color })
+          .select().single()
+        if (error) throw error
+        groupId = data.id
+      } else {
+        await supabase.from('employee_groups').update({
+          name: groupForm.name.trim(), description: groupForm.description.trim() || null, color: groupForm.color,
+        }).eq('id', editingGroup.id)
+        groupId = editingGroup.id
+        await supabase.from('employee_group_members').delete().eq('group_id', groupId)
+      }
+      if (selectedMembers.size > 0) {
+        const rows = [...selectedMembers].map(emp_id => ({ group_id: groupId, employee_id: emp_id }))
+        await supabase.from('employee_group_members').insert(rows)
+      }
+      setEditingGroup(null)
+      await fetchGroups()
+    } catch (e) { console.error(e) }
+    setGroupSaving(false)
+  }
+
+  async function deleteGroup(id) {
+    if (!confirm('Delete this employee group?')) return
+    await supabase.from('employee_groups').delete().eq('id', id)
+    await fetchGroups()
+  }
+
+  function toggleMember(empId) {
+    setSelectedMembers(prev => {
+      const next = new Set(prev)
+      if (next.has(empId)) next.delete(empId); else next.add(empId)
+      return next
+    })
   }
 
   function copyApplicationLink() {
@@ -544,6 +638,7 @@ export default function HR() {
           { key: 'applicants', label: `Applicants (${applicants.length})`, icon: '📋' },
           { key: 'forms',      label: `Review Forms (${reviewForms.length})`, icon: '⭐' },
           { key: 'archive',    label: `Archive (${employees.filter(e => e.status === 'archived').length})`, icon: '📦' },
+          ...(isAdmin ? [{ key: 'settings', label: 'Settings', icon: '⚙️' }] : []),
         ].map(t => (
           <button
             key={t.key}
@@ -557,8 +652,8 @@ export default function HR() {
         ))}
       </div>
 
-      {/* Search + filter bar */}
-      <div className="bg-gray-50 border-b border-gray-200 px-6 py-3 flex items-center gap-3 flex-shrink-0">
+      {/* Search + filter bar — hidden on Settings tab */}
+      {tab !== 'settings' && <div className="bg-gray-50 border-b border-gray-200 px-6 py-3 flex items-center gap-3 flex-shrink-0">
         <input
           type="text"
           value={search}
@@ -581,7 +676,7 @@ export default function HR() {
             ))}
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto p-6">
@@ -730,6 +825,198 @@ export default function HR() {
                 </table>
               </div>
             )
+
+          /* ── SETTINGS TAB ── */
+          ) : tab === 'settings' && isAdmin ? (
+            <div className="max-w-4xl">
+              {/* Settings sub-tab bar */}
+              <div className="flex gap-1 mb-5 bg-gray-100 p-1 rounded-xl w-fit">
+                {[
+                  { key: 'employee-groups', label: '👥 Employee Groups' },
+                ].map(st => (
+                  <button
+                    key={st.key}
+                    onClick={() => setSettingsTab(st.key)}
+                    className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                      settingsTab === st.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    {st.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* ── Employee Groups ── */}
+              {settingsTab === 'employee-groups' && (
+                <div>
+                  {/* Group editor */}
+                  {editingGroup ? (
+                    <div className="bg-white border border-gray-200 rounded-xl p-5 mb-5 shadow-sm">
+                      <h3 className="font-semibold text-gray-900 mb-4">
+                        {editingGroup === 'new' ? 'New Employee Group' : `Edit: ${editingGroup.name}`}
+                      </h3>
+                      <div className="space-y-3 mb-4">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs font-medium text-gray-500 block mb-1">Group Name *</label>
+                            <input
+                              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500"
+                              value={groupForm.name}
+                              onChange={e => setGroupForm(f => ({ ...f, name: e.target.value }))}
+                              placeholder="e.g. Landscaping Crew A"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-500 block mb-1">Color</label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                className="w-10 h-9 border border-gray-200 rounded-lg cursor-pointer p-0.5"
+                                value={groupForm.color}
+                                onChange={e => setGroupForm(f => ({ ...f, color: e.target.value }))}
+                              />
+                              <span className="text-xs text-gray-400">{groupForm.color}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-500 block mb-1">Description</label>
+                          <input
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500"
+                            value={groupForm.description}
+                            onChange={e => setGroupForm(f => ({ ...f, description: e.target.value }))}
+                            placeholder="Optional description"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-500 block mb-2">
+                            Members <span className="text-gray-400 font-normal">({selectedMembers.size} selected)</span>
+                          </label>
+                          <div className="border border-gray-200 rounded-xl overflow-hidden max-h-72 overflow-y-auto">
+                            {employees.filter(e => e.status === 'active').length === 0 ? (
+                              <p className="text-sm text-gray-400 p-4">No active employees found.</p>
+                            ) : (
+                              <div className="divide-y divide-gray-100">
+                                {employees
+                                  .filter(e => e.status === 'active')
+                                  .sort((a, b) => `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`))
+                                  .map(emp => (
+                                    <label
+                                      key={emp.id}
+                                      className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedMembers.has(emp.id)}
+                                        onChange={() => toggleMember(emp.id)}
+                                        className="accent-green-700"
+                                      />
+                                      <div
+                                        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                                        style={{ backgroundColor: groupForm.color }}
+                                      >
+                                        {emp.first_name?.[0]}{emp.last_name?.[0]}
+                                      </div>
+                                      <div>
+                                        <p className="text-sm font-medium text-gray-900">{emp.last_name}, {emp.first_name}</p>
+                                        {emp.job_title && <p className="text-xs text-gray-400">{emp.job_title}</p>}
+                                      </div>
+                                    </label>
+                                  ))
+                                }
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={() => setEditingGroup(null)}
+                          className="px-4 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={saveGroup}
+                          disabled={groupSaving || !groupForm.name.trim()}
+                          className="px-4 py-2 text-sm bg-green-700 text-white rounded-lg font-semibold hover:bg-green-800 disabled:opacity-50"
+                        >
+                          {groupSaving ? 'Saving…' : editingGroup === 'new' ? 'Create Group' : 'Save Changes'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex justify-end mb-3">
+                      <button
+                        onClick={openNewGroup}
+                        className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800"
+                      >
+                        + New Group
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Groups list */}
+                  {groups.length === 0 && !editingGroup ? (
+                    <div className="bg-white border border-gray-200 rounded-xl p-10 text-center text-gray-400">
+                      <p className="text-3xl mb-2">👥</p>
+                      <p className="font-medium">No employee groups yet</p>
+                      <p className="text-sm mt-1">Create a group to organize employees into crews or teams.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {groups.map(group => {
+                        const members = [...(groupMembers[group.id] || [])]
+                        const memberEmps = employees.filter(e => members.includes(e.id))
+                        return (
+                          <div key={group.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-3">
+                                <div className="w-4 h-8 rounded-full flex-shrink-0" style={{ backgroundColor: group.color }} />
+                                <div>
+                                  <p className="font-semibold text-gray-900">{group.name}</p>
+                                  {group.description && <p className="text-xs text-gray-500 mt-0.5">{group.description}</p>}
+                                  <p className="text-xs text-gray-400 mt-1">{memberEmps.length} member{memberEmps.length !== 1 ? 's' : ''}</p>
+                                </div>
+                              </div>
+                              <div className="flex gap-2 flex-shrink-0">
+                                <button
+                                  onClick={() => openEditGroup(group)}
+                                  className="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50"
+                                >
+                                  ✏️ Edit
+                                </button>
+                                <button
+                                  onClick={() => deleteGroup(group.id)}
+                                  className="px-3 py-1.5 text-xs font-medium border border-red-200 rounded-lg text-red-600 hover:bg-red-50"
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            </div>
+                            {memberEmps.length > 0 && (
+                              <div className="mt-3 flex flex-wrap gap-1.5 pl-7">
+                                {memberEmps
+                                  .sort((a, b) => `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`))
+                                  .map(emp => (
+                                    <span
+                                      key={emp.id}
+                                      className="text-xs px-2.5 py-1 rounded-full font-medium text-white"
+                                      style={{ backgroundColor: group.color }}
+                                    >
+                                      {emp.first_name} {emp.last_name}
+                                    </span>
+                                  ))}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
           /* ── REVIEW FORMS TAB ── */
           ) : (
