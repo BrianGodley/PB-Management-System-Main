@@ -5,8 +5,8 @@
 // Two modes:
 //
 //   BULK mode  (inbound_synced_at is null, or full:true passed)
-//     Sorts by id ASC — stable across the whole 7k+ record set so every
-//     contact is fetched regardless of whether dateUpdated is populated.
+//     Sorts by dateAdded ASC via GET /contacts — stable across the full
+//     record set so every contact is fetched regardless of dateUpdated.
 //     Paginates via a numeric `page` cursor the UI passes back on each
 //     loop call.  Does NOT update inbound_synced_at until the very last
 //     page so a partial run can resume safely.
@@ -148,25 +148,27 @@ async function fetchContactsPage(args: {
   token:      string
   locationId: string
   page:       number
-  bulk:       boolean   // true → sort by id ASC; false → sort by dateUpdated DESC
+  bulk:       boolean   // true → sort by dateAdded ASC; false → sort by dateUpdated DESC
 }): Promise<GhlPagedResponse> {
-  const sortField = args.bulk ? 'id' : 'dateUpdated'
-  const sortDir   = args.bulk ? 'asc' : 'desc'
-  const body: Record<string, unknown> = {
+  // Use the GET /contacts endpoint — simpler and more reliable than POST /contacts/search.
+  // GHL's search endpoint rejects certain sort fields (e.g. "id") and can return
+  // "Error occurred while searching for contact" for subtle body-format issues.
+  const sortBy    = args.bulk ? 'dateAdded' : 'dateUpdated'
+  const sortOrder = args.bulk ? 'asc'       : 'desc'
+  const params = new URLSearchParams({
     locationId: args.locationId,
-    page:       args.page,
-    pageLimit:  PAGE_LIMIT,
-    sort: [{ field: sortField, direction: sortDir }],
-  }
-  const res = await fetch(`${GHL_BASE_URL}/contacts/search`, {
-    method: 'POST',
+    page:       String(args.page),
+    limit:      String(PAGE_LIMIT),
+    sortBy,
+    sortOrder,
+  })
+  const res = await fetch(`${GHL_BASE_URL}/contacts?${params}`, {
+    method: 'GET',
     headers: {
-      Authorization:  `Bearer ${args.token}`,
-      Version:        GHL_API_VERSION,
-      Accept:         'application/json',
-      'Content-Type': 'application/json',
+      Authorization: `Bearer ${args.token}`,
+      Version:       GHL_API_VERSION,
+      Accept:        'application/json',
     },
-    body: JSON.stringify(body),
   })
   let resp: unknown = null
   try { resp = await res.json() } catch { /* */ }
@@ -174,6 +176,7 @@ async function fetchContactsPage(args: {
     const msg = (resp as any)?.message || (resp as any)?.error || `GHL ${res.status}`
     throw new Error(msg)
   }
+  // GET /contacts wraps results in { contacts: [...], meta: {...} } — same shape as search.
   return resp as GhlPagedResponse
 }
 
