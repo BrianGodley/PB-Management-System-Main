@@ -31,6 +31,7 @@ import HR from './pages/HR'
 import EmployeeDetail from './pages/EmployeeDetail'
 import ApplicantDetail from './pages/ApplicantDetail'
 import ApplyForm from './pages/ApplyForm'
+import ResetPassword from './pages/ResetPassword'
 import Accounting from './pages/Accounting'
 import TimeClockPage from './pages/TimeClockPage'
 import DailyLogsPage from './pages/DailyLogsPage'
@@ -69,6 +70,7 @@ function AppRoutes() {
       {/* Public routes — no auth required */}
       <Route path="/apply" element={<ApplyForm />} />
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/" element={
         <ProtectedRoute>
           <Layout />
