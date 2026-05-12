@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import MasterRates from './MasterRates'
 
 const US_STATES = [
   'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA',
@@ -752,15 +753,9 @@ export default function Clients() {
         ))}
       </div>
 
-      {/* ── Settings tab placeholder ── */}
+      {/* ── Settings tab ── */}
       {tab === 'settings' && (
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center">
-            <p className="text-4xl mb-3">⚙️</p>
-            <h2 className="text-base font-semibold text-gray-800 mb-1">Clients Settings</h2>
-            <p className="text-sm text-gray-500">Configuration options for this module will be available here.</p>
-          </div>
-        </div>
+        <MasterRates />
       )}
 
       {tab !== 'settings' && <>

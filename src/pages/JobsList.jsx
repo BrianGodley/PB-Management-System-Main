@@ -8,6 +8,7 @@ import TimeClock from '../components/TimeClock'
 import WorkOrders from '../components/WorkOrders'
 import JobComparison from '../components/JobComparison'
 import TemplatesManager from '../components/TemplatesManager'
+import MasterCrews from './MasterCrews'
 import COEstimatePanel  from '../components/COEstimatePanel'
 import JobInfoModal     from '../components/JobInfoModal'
 
@@ -683,6 +684,7 @@ function JobScheduleSettings({ stages = [], onAddStage, onUpdateStage, onDeleteS
         {[
           { key: 'general',   label: '⚙️ General'   },
           { key: 'templates', label: '📋 Templates'  },
+          { key: 'crews',     label: '👷 Crews'      },
         ].map(t => (
           <button key={t.key} onClick={() => setSettingsTab(t.key)}
             className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
@@ -693,6 +695,8 @@ function JobScheduleSettings({ stages = [], onAddStage, onUpdateStage, onDeleteS
       </div>
 
       {settingsTab === 'templates' && <TemplatesManager />}
+
+      {settingsTab === 'crews' && <MasterCrews />}
 
       {settingsTab === 'general' && <div className="max-w-2xl space-y-6">
 

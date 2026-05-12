@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import MasterEquipment from './MasterEquipment'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -299,15 +300,9 @@ export default function EquipmentTracking() {
         ))}
       </div>
 
-      {/* ── Settings placeholder ── */}
+      {/* ── Settings ── */}
       {eqTab === 'settings' && (
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center">
-            <p className="text-4xl mb-3">⚙️</p>
-            <h2 className="text-base font-semibold text-gray-800 mb-1">Equipment Settings</h2>
-            <p className="text-sm text-gray-500">Configuration options for this module will be available here.</p>
-          </div>
-        </div>
+        <MasterEquipment />
       )}
 
       {eqTab === 'equipment' && <>
