@@ -2038,6 +2038,8 @@ function IntegrationsSettings() {
   // Per-object-type 'Sync now' state — keyed by object_type so each row's
   // button can show its own spinner without freezing the rest.
   const [ghlSyncing, setGhlSyncing] = useState({}) // { contacts: true, ... }
+  // Stores { objectType, nextPage } when a pull loop pauses mid-bulk so Resume can continue it.
+  const [ghlResumeNext, setGhlResumeNext] = useState(null)
   // Latest dry-run preview, keyed by `${objectType}:${direction}`.
   const [ghlPreview, setGhlPreview] = useState({})
   // Push auto-loop: ref so the loop body can check abort without restarting effects.
@@ -2045,6 +2047,53 @@ function IntegrationsSettings() {
   // Live progress for the push loop, keyed by objectType.
   const [ghlPushProgress, setGhlPushProgress] = useState({})
   function stopGhlPush() { ghlPushAbortRef.current = true }
+
+  async function resumePull() {
+    if (!ghlResumeNext) return
+    const { objectType, nextPage, fnSlug, totalPulled: alreadyPulled } = ghlResumeNext
+    setGhlResumeNext(null)
+    setGhlSyncing(s => ({ ...s, [objectType]: true }))
+    ghlPushAbortRef.current = false
+    let totalPulled = alreadyPulled
+    let remaining   = 1
+    let nextPg      = nextPage
+    let loopError   = false
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const jwt = session?.access_token
+      let safety = 500
+      while (remaining > 0 && !ghlPushAbortRef.current && safety-- > 0) {
+        setGhlMsg(`${objectType} pull: ${totalPulled} pulled… (resuming)`)
+        const r2 = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnSlug}`,
+          { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwt}` },
+            body: JSON.stringify(nextPg ? { start_page: nextPg } : {}) }
+        )
+        const b2 = await r2.json().catch(() => ({}))
+        if (!r2.ok || b2.ok === false) {
+          loopError = true
+          setGhlMsgError(true)
+          setGhlMsg(`${objectType} pull: ${b2.error || b2.message || `HTTP ${r2.status}`} (after ${totalPulled} pulled)`)
+          break
+        }
+        totalPulled += b2.records_synced || 0
+        remaining    = b2.remaining || 0
+        nextPg       = b2.next_page  || null
+        setGhlMsg(`${objectType} pull: ${totalPulled} pulled…`)
+      }
+      if (!loopError) {
+        const paused = !ghlPushAbortRef.current && remaining > 0
+        setGhlMsg(`${objectType} pull: ${totalPulled} pulled${paused ? ' (paused — resume to finish)' : ' (done)'}`)
+        if (paused && nextPg) setGhlResumeNext({ objectType, nextPage: nextPg, fnSlug, totalPulled })
+      }
+      await loadGhl()
+    } catch (e) {
+      setGhlMsgError(true); setGhlMsg(e?.message || 'Resume failed.')
+    } finally {
+      setGhlSyncing(s => ({ ...s, [objectType]: false }))
+    }
+  }
+
   async function runSyncNow(objectType, opts = {}) {
     const dryRun    = !!opts.dryRun
     const direction = opts.direction || 'pull'   // 'pull' | 'push'
@@ -2143,14 +2192,16 @@ function IntegrationsSettings() {
         // limits each invocation to ~500 records so it doesn't trip
         // Supabase's 150s wall time.
         ghlPushAbortRef.current = false
+        setGhlResumeNext(null)
         let totalPulled = body.records_synced || 0
         let remaining   = body.remaining || 0
         const totalEligible = (body.total_eligible ?? totalPulled + remaining)
         setGhlPushProgress(p => ({ ...p, [objectType]: { pushed: totalPulled, total: totalEligible, errors: 0 } }))
         setGhlMsgError(false)
         setGhlMsg(`${objectType} pull: ${totalPulled}/${totalEligible} pulled…`)
-        let safety   = 500   // up to 500 pages × 400/page = 200k contacts max
-        let nextPage = body.next_page || null
+        let safety    = 500   // up to 500 pages × 400/page = 200k contacts max
+        let nextPage  = body.next_page || null
+        let loopError = false
         while (remaining > 0 && !ghlPushAbortRef.current && safety-- > 0) {
           const r2 = await fetch(
             `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnSlug}`,
@@ -2167,6 +2218,7 @@ function IntegrationsSettings() {
           )
           const b2 = await r2.json().catch(() => ({}))
           if (!r2.ok || b2.ok === false) {
+            loopError = true
             setGhlMsgError(true)
             setGhlMsg(`${objectType} pull: ${b2.error || b2.message || `HTTP ${r2.status}`} (after ${totalPulled} pulled)`)
             break
@@ -2177,10 +2229,12 @@ function IntegrationsSettings() {
           setGhlPushProgress(p => ({ ...p, [objectType]: { pushed: totalPulled, total: totalEligible, errors: 0 } }))
           setGhlMsg(`${objectType} pull: ${totalPulled}/${totalEligible} pulled…`)
         }
-        const tail = ghlPushAbortRef.current
-          ? ' (stopped)'
-          : (remaining > 0 ? ` (paused — ${remaining} still remaining)` : ' (done)')
-        setGhlMsg(`${objectType} pull: ${totalPulled} pulled${tail}`)
+        if (!loopError) {
+          const paused = !ghlPushAbortRef.current && remaining > 0
+          const tail = ghlPushAbortRef.current ? ' (stopped)' : (paused ? ` (paused — resume to finish)` : ' (done)')
+          setGhlMsg(`${objectType} pull: ${totalPulled} pulled${tail}`)
+          if (paused && nextPage) setGhlResumeNext({ objectType, nextPage, fnSlug, totalPulled })
+        }
         setGhlPreview(p => { const n = { ...p }; delete n[`${objectType}:${direction}`]; return n })
         setTimeout(() => setGhlPushProgress(p => { const n = { ...p }; delete n[objectType]; return n }), 4000)
         await loadGhl()
@@ -2456,6 +2510,13 @@ function IntegrationsSettings() {
               <button type="button" onClick={disconnectGhl}
                 className="px-4 py-2 text-sm font-medium rounded-lg border border-red-200 text-red-600 hover:bg-red-50">
                 Disconnect
+              </button>
+            )}
+            {ghlResumeNext && (
+              <button type="button" onClick={resumePull}
+                disabled={!!ghlSyncing[ghlResumeNext.objectType]}
+                className="px-3 py-1.5 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg disabled:opacity-50">
+                Resume Pull
               </button>
             )}
             {ghlMsg && (
