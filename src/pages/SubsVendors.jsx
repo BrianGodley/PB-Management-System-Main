@@ -59,6 +59,7 @@ export default function SubsVendors() {
   const [loading,   setLoading]   = useState(true)
   const [search,    setSearch]    = useState('')
   const [svTab,     setSvTab]     = useState('directory') // 'directory' | 'settings'
+  const [svSettingsTab, setSvSettingsTab] = useState('general')
   const [typeView,  setTypeView]  = useState('sub')      // 'sub' | 'vendor'
   const [filter,    setFilter]    = useState('all')      // 'all' | status value
   const [showModal, setShowModal] = useState(false)
@@ -408,13 +409,30 @@ export default function SubsVendors() {
         ))}
       </div>
 
-      {/* ── Settings placeholder ── */}
+      {/* ── Settings ── */}
       {svTab === 'settings' && (
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center">
-            <p className="text-4xl mb-3">⚙️</p>
-            <h2 className="text-base font-semibold text-gray-800 mb-1">Subs & Vendors Settings</h2>
-            <p className="text-sm text-gray-500">Configuration options for this module will be available here.</p>
+        <div className="-mx-6 -mb-6 flex-1 flex flex-col">
+          <div className="flex border-b border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0">
+            {[
+              { key: 'general', label: '⚙️ General' },
+            ].map(t => (
+              <button key={t.key} onClick={() => setSvSettingsTab(t.key)}
+                className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
+                  svSettingsTab === t.key ? 'border-green-700 text-green-800' : 'border-transparent text-gray-500 hover:text-gray-800'
+                }`}
+              >{t.label}</button>
+            ))}
+          </div>
+          <div className="bg-gray-50 px-6 py-6 flex-1 overflow-y-auto">
+            {svSettingsTab === 'general' && (
+              <div className="flex items-center justify-center py-20 text-center">
+                <div>
+                  <p className="text-4xl mb-3">⚙️</p>
+                  <h2 className="text-base font-semibold text-gray-800 mb-1">Subs & Vendors Settings</h2>
+                  <p className="text-sm text-gray-500">Configuration options will be available here.</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

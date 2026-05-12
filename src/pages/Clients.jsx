@@ -520,6 +520,7 @@ export default function Clients() {
   const [clientModal, setClientModal] = useState(null) // null | 'individual' | 'company'
   const [search,     setSearch]     = useState('')
   const [tab,        setTab]        = useState('active')
+  const [clientSettingsTab, setClientSettingsTab] = useState('general')
   const [visibleCols, setVisibleCols] = useState(DEFAULT_VISIBLE)
   const [colPickerOpen, setColPickerOpen] = useState(false)
   const colPickerRef = useRef(null)
@@ -755,7 +756,34 @@ export default function Clients() {
 
       {/* ── Settings tab ── */}
       {tab === 'settings' && (
-        <MasterRates />
+        <div className="-mx-6">
+          <div className="flex border-b border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0">
+            {[
+              { key: 'general', label: '⚙️ General' },
+              { key: 'rates',   label: '📊 Rates'   },
+            ].map(t => (
+              <button key={t.key} onClick={() => setClientSettingsTab(t.key)}
+                className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
+                  clientSettingsTab === t.key ? 'border-green-700 text-green-800' : 'border-transparent text-gray-500 hover:text-gray-800'
+                }`}
+              >{t.label}</button>
+            ))}
+          </div>
+          <div className="bg-gray-50 px-6 py-6">
+            {clientSettingsTab === 'general' && (
+              <div className="flex items-center justify-center py-20 text-center">
+                <div>
+                  <p className="text-4xl mb-3">⚙️</p>
+                  <h2 className="text-base font-semibold text-gray-800 mb-1">Clients Settings</h2>
+                  <p className="text-sm text-gray-500">Configuration options will be available here.</p>
+                </div>
+              </div>
+            )}
+            {clientSettingsTab === 'rates' && (
+              <MasterRates />
+            )}
+          </div>
+        </div>
       )}
 
       {tab !== 'settings' && <>

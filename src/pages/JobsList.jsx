@@ -300,7 +300,21 @@ export default function JobsList() {
         ))}
       </div>
 
-      {/* ── Main content: sidebar (desktop only) + right panel ── */}
+      {/* Settings panel — full-width, no sidebar */}
+      {tab === 'settings' && (
+        <div className="-mx-6 -mb-6 flex-1 flex flex-col overflow-hidden">
+          <JobScheduleSettings
+            stages={stages}
+            onAddStage={addStage}
+            onUpdateStage={updateStage}
+            onDeleteStage={deleteStage}
+            onReorderStages={reorderStages}
+          />
+        </div>
+      )}
+
+      {/* Main content: sidebar + right panel (non-settings tabs) */}
+      {tab !== 'settings' && (
       <div className="flex gap-2 flex-1 min-h-0">
 
         {/* Jobs sidebar — desktop only */}
@@ -476,17 +490,9 @@ export default function JobsList() {
           {tab === 'change-orders'  && <JobChangeOrdersPanel job={selectedJobObj} />}
           {tab === 'finance'        && <ComingSoon label="Finance" />}
           {tab === 'files'          && <JobFilesPanel job={selectedJobObj} />}
-          {tab === 'settings'       && (
-            <JobScheduleSettings
-              stages={stages}
-              onAddStage={addStage}
-              onUpdateStage={updateStage}
-              onDeleteStage={deleteStage}
-              onReorderStages={reorderStages}
-            />
-          )}
         </div>
       </div>
+      )}
 
       {/* ── Job Info Modal ─────────────────────────────────────── */}
       {jobModal && (
@@ -678,22 +684,22 @@ function JobScheduleSettings({ stages = [], onAddStage, onUpdateStage, onDeleteS
   }
 
   return (
-    <div className="space-y-4">
-      {/* Settings sub-tabs */}
-      <div className="flex gap-1 border-b border-gray-200 mb-2">
+    <div className="flex flex-col flex-1 overflow-hidden">
+      {/* White sub-tab bar */}
+      <div className="flex border-b border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0">
         {[
           { key: 'general',   label: '⚙️ General'   },
           { key: 'templates', label: '📋 Templates'  },
           { key: 'crews',     label: '👷 Crews'      },
         ].map(t => (
           <button key={t.key} onClick={() => setSettingsTab(t.key)}
-            className={`px-4 py-2 text-sm font-semibold border-b-2 -mb-px transition-colors ${
-              settingsTab === t.key ? 'border-green-700 text-green-800' : 'border-transparent text-gray-500 hover:text-gray-700'
+            className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
+              settingsTab === t.key ? 'border-green-700 text-green-800' : 'border-transparent text-gray-500 hover:text-gray-800'
             }`}
           >{t.label}</button>
         ))}
       </div>
-
+      <div className="bg-gray-50 px-6 py-6 flex-1 overflow-y-auto">
       {settingsTab === 'templates' && <TemplatesManager />}
 
       {settingsTab === 'crews' && <MasterCrews />}
@@ -841,6 +847,7 @@ function JobScheduleSettings({ stages = [], onAddStage, onUpdateStage, onDeleteS
       </div>
 
       </div>}
+      </div>
     </div>
   )
 }

@@ -611,43 +611,43 @@ export default function Contacts() {
 
       {/* Settings panel */}
       {activeTab === 'settings' && (
-        <div>
-          {/* Sub-tab bar */}
-          <div className="flex gap-1 mb-6 border-b border-gray-200">
+        <div className="-mx-6">
+          <div className="flex border-b border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0">
             {[
               { id: 'import', label: '⬆ Import' },
               { id: 'export', label: '⬇ Export' },
             ].map(t => (
               <button key={t.id} type="button"
                 onClick={() => setSettingsSubTab(t.id)}
-                className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors -mb-px ${
+                className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
                   settingsSubTab === t.id
-                    ? 'border-green-700 text-green-700'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                    ? 'border-green-700 text-green-800'
+                    : 'border-transparent text-gray-500 hover:text-gray-800'
                 }`}
               >{t.label}</button>
             ))}
           </div>
+          <div className="bg-gray-50 px-6 py-6">
+            {settingsSubTab === 'import' && (
+              <div className="max-w-2xl">
+                <ImportModal
+                  inline
+                  onDone={() => { fetchContacts(); fetchCompanies() }}
+                  onClose={null}
+                />
+              </div>
+            )}
 
-          {settingsSubTab === 'import' && (
-            <div className="max-w-2xl">
-              <ImportModal
-                inline
-                onDone={() => { fetchContacts(); fetchCompanies() }}
-                onClose={null}
-              />
-            </div>
-          )}
-
-          {settingsSubTab === 'export' && (
-            <div className="max-w-lg">
-              <ExportModal
-                inline
-                contacts={contacts}
-                onClose={null}
-              />
-            </div>
-          )}
+            {settingsSubTab === 'export' && (
+              <div className="max-w-lg">
+                <ExportModal
+                  inline
+                  contacts={contacts}
+                  onClose={null}
+                />
+              </div>
+            )}
+          </div>
         </div>
       )}
 

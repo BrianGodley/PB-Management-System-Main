@@ -39,6 +39,7 @@ export default function Bids() {
   const [profiles,      setProfiles]      = useState({})
   const [loading,       setLoading]       = useState(true)
   const [bidTab,        setBidTab]        = useState('bids') // 'bids' | 'settings'
+  const [bidsSettingsTab, setBidsSettingsTab] = useState('general')
   const [filter,        setFilter]        = useState('all')
   const [search,        setSearch]        = useState('')
   const [updatingId,    setUpdatingId]    = useState(null)
@@ -483,13 +484,30 @@ export default function Bids() {
         ))}
       </div>
 
-      {/* ── Settings placeholder ── */}
+      {/* ── Settings ── */}
       {bidTab === 'settings' && (
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center">
-            <p className="text-4xl mb-3">⚙️</p>
-            <h2 className="text-base font-semibold text-gray-800 mb-1">Bids Settings</h2>
-            <p className="text-sm text-gray-500">Configuration options for this module will be available here.</p>
+        <div className="-mx-6">
+          <div className="flex border-b border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0">
+            {[
+              { key: 'general', label: '⚙️ General' },
+            ].map(t => (
+              <button key={t.key} onClick={() => setBidsSettingsTab(t.key)}
+                className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
+                  bidsSettingsTab === t.key ? 'border-green-700 text-green-800' : 'border-transparent text-gray-500 hover:text-gray-800'
+                }`}
+              >{t.label}</button>
+            ))}
+          </div>
+          <div className="bg-gray-50 px-6 py-6">
+            {bidsSettingsTab === 'general' && (
+              <div className="flex items-center justify-center py-20 text-center">
+                <div>
+                  <p className="text-4xl mb-3">⚙️</p>
+                  <h2 className="text-base font-semibold text-gray-800 mb-1">Bids Settings</h2>
+                  <p className="text-sm text-gray-500">Configuration options will be available here.</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
