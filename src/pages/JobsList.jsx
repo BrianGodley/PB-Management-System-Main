@@ -80,7 +80,7 @@ function JobItem({ job, stages, selectedJob, setSelectedJob, setJobModal, onMove
           selectedJob === job.id ? 'bg-green-50 border border-green-200' : 'hover:bg-gray-100 border border-transparent'
         }`}
       >
-        <button className="flex-1 text-left px-2 py-1.5 text-xs min-w-0">
+        <button className="flex-1 text-center px-2 py-1.5 text-xs min-w-0">
           <p className={`font-bold truncate ${selectedJob === job.id ? 'text-green-800' : 'text-gray-800'}`}>
             {job.name || job.client_name}
           </p>
@@ -315,30 +315,32 @@ export default function JobsList() {
       <div className="flex gap-2 flex-1 min-h-0 pt-4">
 
         {/* Jobs sidebar — desktop only */}
-        <div className="hidden lg:flex w-56 flex-shrink-0 flex-col min-h-0 pl-3 bg-white border-r border-gray-200">
+        <div className="hidden lg:flex w-56 flex-shrink-0 flex-col min-h-0 bg-white border-r border-gray-200">
+          {/* Inner column: 90% wide, centered */}
+          <div className="flex flex-col w-[90%] mx-auto mt-2 flex-shrink-0">
           {/* Add Schedule button — only visible on Schedule tab */}
           {tab === 'schedule' && (
             <button
               onClick={() => setAddScheduleTrigger(v => v + 1)}
-              className="w-full flex items-center gap-1.5 px-2.5 py-1.5 mb-2 mt-2 rounded-lg bg-green-700 text-white text-xs font-semibold hover:bg-green-800 transition-colors flex-shrink-0"
+              className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 mb-2 rounded-lg bg-green-700 text-white text-xs font-semibold hover:bg-green-800 transition-colors flex-shrink-0"
             >
               <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-              <span className="flex-1 text-left">Add Schedule</span>
+              <span>Add Schedule</span>
             </button>
           )}
 
           {/* Workday Exceptions button */}
           <button
             onClick={() => setShowExceptions(true)}
-            className="w-full flex items-center gap-1.5 px-2.5 py-1.5 mb-2 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors flex-shrink-0"
+            className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 mb-2 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors flex-shrink-0"
           >
             <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
             </svg>
-            <span className="flex-1 text-left">Workday Exceptions</span>
+            <span>Workday Exceptions</span>
             {exceptionsCount > 0 && (
               <span className="bg-gray-200 text-gray-700 rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none">
                 {exceptionsCount}
@@ -351,18 +353,20 @@ export default function JobsList() {
             placeholder="Search jobs…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="input text-xs mb-2 py-1.5 flex-shrink-0"
+            className="input text-xs mb-2 py-1.5 flex-shrink-0 text-center"
           />
+          </div>{/* end centered controls column */}
+
           {loading ? (
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-700" />
             </div>
           ) : (
-            <div className="overflow-y-auto flex-1">
+            <div className="overflow-y-auto flex-1 w-[90%] mx-auto">
               {/* All Jobs button */}
               <button
                 onClick={() => setSelectedJob(ALL_JOBS)}
-                className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors border mb-1 ${
+                className={`w-full text-center px-3 py-2 rounded-lg text-sm font-medium transition-colors border mb-1 ${
                   selectedJob === ALL_JOBS ? 'bg-green-50 border-green-200 text-green-800' : 'border-transparent text-gray-500 hover:bg-gray-100 hover:text-gray-700'
                 }`}
               >
