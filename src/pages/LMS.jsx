@@ -472,7 +472,7 @@ export default function LMS() {
       </div>
 
       {/* Tab bar */}
-      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0 -mx-6">
+      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0">
         <button onClick={() => setMainTab('training')}
           className={`flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
             mainTab === 'training' ? 'border-green-700 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'

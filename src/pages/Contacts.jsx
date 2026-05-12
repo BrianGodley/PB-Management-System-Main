@@ -594,10 +594,10 @@ export default function Contacts() {
       </div>
 
       {/* Tab bar */}
-      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0 -mx-6">
+      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0">
         {[
-          { id: 'individuals', label: `Individuals (${contacts.length.toLocaleString()})` },
-          { id: 'companies',   label: `Companies (${companies.length.toLocaleString()})` },
+          { id: 'individuals', label: `👤 Individuals (${contacts.length.toLocaleString()})` },
+          { id: 'companies',   label: `🏢 Companies (${companies.length.toLocaleString()})` },
           { id: 'settings',    label: '⚙️ Settings' },
         ].map(tab => (
           <button key={tab.id} type="button"

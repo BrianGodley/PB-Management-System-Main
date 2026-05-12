@@ -288,9 +288,9 @@ export default function EquipmentTracking() {
       </div>
 
       {/* ── Module tabs ── */}
-      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0 -mx-6">
+      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0">
         {[
-          { key: 'equipment', label: 'Equipment' },
+          { key: 'equipment', label: `🚜 Equipment (${equipment.length})` },
           { key: 'settings',  label: '⚙️ Settings' },
         ].map(t => (
           <button key={t.key} onClick={() => setEqTab(t.key)}

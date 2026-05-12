@@ -1299,12 +1299,12 @@ function ReportsTab({ invoices, bills, accounts, bankAccounts }) {
 // MAIN ACCOUNTING PAGE
 // ═════════════════════════════════════════════════════════════════════════════
 const TABS = [
-  { key: 'dashboard', label: 'Dashboard'        },
-  { key: 'invoices',  label: 'Invoices'          },
-  { key: 'bills',     label: 'Bills & Expenses'  },
-  { key: 'banking',   label: 'Banking'           },
-  { key: 'accounts',  label: 'Chart of Accounts' },
-  { key: 'reports',   label: 'Reports'           },
+  { key: 'dashboard', label: '📊 Dashboard'        },
+  { key: 'invoices',  label: '📄 Invoices'          },
+  { key: 'bills',     label: '💳 Bills & Expenses'  },
+  { key: 'banking',   label: '🏦 Banking'           },
+  { key: 'accounts',  label: '📒 Chart of Accounts' },
+  { key: 'reports',   label: '📈 Reports'           },
 ]
 
 export default function Accounting() {
@@ -1355,7 +1355,7 @@ export default function Accounting() {
       </div>
 
       {/* Tab bar */}
-      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0 -mx-6">
+      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0">
         {TABS.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
             className={`flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${

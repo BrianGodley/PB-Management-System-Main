@@ -90,9 +90,9 @@ export default function Design() {
   }, [projects, search])
 
   const TABS = [
-    { id: 'cad',        label: 'CAD Assist Drawing' },
-    { id: 'selections', label: 'Selections' },
-    { id: 'takeoffs',   label: 'Take Offs' },
+    { id: 'cad',        label: '📐 CAD Assist Drawing' },
+    { id: 'selections', label: '🎨 Selections' },
+    { id: 'takeoffs',   label: '📊 Take Offs' },
     { id: 'settings',   label: '⚙️ Settings' },
   ]
 
@@ -104,7 +104,7 @@ export default function Design() {
       </div>
 
       {/* Tab bar */}
-      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0 -mx-6">
+      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0">
         {TABS.map(t => (
           <button
             key={t.id}

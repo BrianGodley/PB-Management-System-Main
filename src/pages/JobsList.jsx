@@ -244,15 +244,15 @@ export default function JobsList() {
   const selectedJobObj = selectedJob === ALL_JOBS ? null : jobs.find(j => j.id === selectedJob) || null
 
   const TABS = [
-    { key: 'schedule',      label: 'Schedule'      },
-    { key: 'work-orders',   label: 'Work Orders'   },
-    { key: 'tracking',      label: 'Tracking'      },
-    { key: 'timeclock',     label: 'Time Clock'    },
-    { key: 'daily-logs',    label: 'Daily Logs'    },
-    { key: 'tasks',         label: 'Tasks'         },
-    { key: 'change-orders', label: 'Change Orders' },
-    { key: 'finance',       label: 'Finance'       },
-    { key: 'files',         label: 'Files'         },
+    { key: 'schedule',      label: '📅 Schedule'      },
+    { key: 'work-orders',   label: '📋 Work Orders'   },
+    { key: 'tracking',      label: '📍 Tracking'      },
+    { key: 'timeclock',     label: '⏱️ Time Clock'    },
+    { key: 'daily-logs',    label: '📝 Daily Logs'    },
+    { key: 'tasks',         label: '✅ Tasks'         },
+    { key: 'change-orders', label: '🔄 Change Orders' },
+    { key: 'finance',       label: '💰 Finance'       },
+    { key: 'files',         label: '📁 Files'         },
     ...(isAdmin ? [{ key: 'settings', label: '⚙️ Settings' }] : []),
   ]
 
@@ -281,7 +281,7 @@ export default function JobsList() {
       </div>
 
       {/* ── Menu bar ── */}
-      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0 -mx-6">
+      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0">
         {TABS.map(t => (
           <button
             key={t.key}

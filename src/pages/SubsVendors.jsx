@@ -401,9 +401,9 @@ export default function SubsVendors() {
       </div>
 
       {/* ── Module tab bar ── */}
-      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0 -mx-6">
+      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0">
         {[
-          { key: 'directory', label: 'Directory' },
+          { key: 'directory', label: '📋 Directory' },
           { key: 'settings',  label: '⚙️ Settings' },
         ].map(t => (
           <button key={t.key} onClick={() => setSvTab(t.key)}

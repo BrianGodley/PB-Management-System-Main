@@ -731,10 +731,10 @@ export default function Clients() {
       </div>
 
       {/* ── Active / Inactive / Settings tabs ── */}
-      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0 -mx-6">
+      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0">
         {[
-          { key: 'active',   label: 'Current',  count: sorted.filter(c => (c.status || 'active') === 'active').length },
-          { key: 'inactive', label: 'Past',      count: sorted.filter(c => (c.status || 'active') === 'inactive').length },
+          { key: 'active',   label: '✅ Current', count: sorted.filter(c => (c.status || 'active') === 'active').length },
+          { key: 'inactive', label: '📦 Past',     count: sorted.filter(c => (c.status || 'active') === 'inactive').length },
           { key: 'settings', label: '⚙️ Settings', count: null },
         ].map(t => (
           <button

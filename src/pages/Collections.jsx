@@ -873,7 +873,7 @@ export default function Collections() {
       ) : (
         <>
           {/* ── Main tabs ──────────────────────────────────────────────────── */}
-          <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0 -mx-6">
+          <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0">
             {[
               { key:'collections', label:'💰 Collections'        },
               { key:'payables',    label:'💳 Payables'           },
