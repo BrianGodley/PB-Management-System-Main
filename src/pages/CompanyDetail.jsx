@@ -225,9 +225,11 @@ export default function CompanyDetail() {
   const [loading,     setLoading]     = useState(true)
   const [showEdit,    setShowEdit]    = useState(false)
   const [showDelete,  setShowDelete]  = useState(false)
-  const [showMove,    setShowMove]    = useState(false)
-  const [moving,      setMoving]      = useState(false)
-  const [deleting,    setDeleting]    = useState(false)
+  const [showMove,       setShowMove]       = useState(false)
+  const [moving,         setMoving]         = useState(false)
+  const [addingAsClient, setAddingAsClient] = useState(false)
+  const [clientAdded,    setClientAdded]    = useState(false)
+  const [deleting,       setDeleting]       = useState(false)
   const [leftTab,     setLeftTab]     = useState('main')
 
   // Communication log
@@ -338,6 +340,30 @@ export default function CompanyDetail() {
     await supabase.from('companies').delete().eq('id', id)
 
     navigate(`/contacts/${newContact.id}`)
+  }
+
+  async function handleAddAsClient() {
+    setAddingAsClient(true)
+    const c = company
+    const { error } = await supabase.from('clients').insert({
+      client_type:      'company',
+      company_name:     c.company_name        || null,
+      name:             c.company_name        || null,
+      first_name:       null,
+      last_name:        null,
+      email:            c.email               || null,
+      phone:            c.phone               || null,
+      website:          c.website             || null,
+      street:           c.company_street      || null,
+      city:             c.company_city        || null,
+      state:            c.company_state       || null,
+      zip:              c.company_zip         || null,
+      notes:            c.notes               || null,
+      company_contacts: Array.isArray(c.company_contacts) && c.company_contacts.length ? c.company_contacts : null,
+      created_by:       user?.id,
+    })
+    setAddingAsClient(false)
+    if (!error) setClientAdded(true)
   }
 
   if (loading) return <div className="flex items-center justify-center h-64 text-gray-400">Loading…</div>
@@ -694,6 +720,25 @@ export default function CompanyDetail() {
                 })()}
                 {comms.length === 0 && <p className="text-xs text-gray-400 italic">No activity yet</p>}
               </div>
+            </div>
+
+            {/* Add as Client card */}
+            <div className="bg-white border border-slate-300 rounded-xl p-3 shadow-sm">
+              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Clients</p>
+              {clientAdded ? (
+                <div className="flex items-center gap-2 py-1">
+                  <span className="text-green-600 text-sm">✓</span>
+                  <p className="text-xs text-green-700 font-semibold">Added as client!</p>
+                </div>
+              ) : (
+                <button
+                  onClick={handleAddAsClient}
+                  disabled={addingAsClient}
+                  className="w-full py-2 rounded-lg bg-green-700 text-white text-xs font-semibold hover:bg-green-800 disabled:opacity-50 transition-colors"
+                >
+                  {addingAsClient ? 'Adding…' : '+ Add as Client'}
+                </button>
+              )}
             </div>
 
           </div>

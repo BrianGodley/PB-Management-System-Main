@@ -230,9 +230,11 @@ export default function ContactDetail() {
   const [loading,    setLoading]    = useState(true)
   const [showEdit,   setShowEdit]   = useState(false)
   const [showDelete, setShowDelete] = useState(false)
-  const [showMove,   setShowMove]   = useState(false)
-  const [moving,     setMoving]     = useState(false)
-  const [deleting,   setDeleting]   = useState(false)
+  const [showMove,       setShowMove]       = useState(false)
+  const [moving,         setMoving]         = useState(false)
+  const [addingAsClient, setAddingAsClient] = useState(false)
+  const [clientAdded,    setClientAdded]    = useState(false)
+  const [deleting,       setDeleting]       = useState(false)
   const [leftTab,    setLeftTab]    = useState('main')   // 'main' | 'dnd' | 'tags'
   const [tagInput,   setTagInput]   = useState('')
 
@@ -327,6 +329,30 @@ export default function ContactDetail() {
     await supabase.from('contacts').delete().eq('id', id)
 
     navigate(`/companies/${newCompany.id}`)
+  }
+
+  async function handleAddAsClient() {
+    setAddingAsClient(true)
+    const c = contact
+    const name = [c.first_name, c.last_name].filter(Boolean).join(' ')
+    const { error } = await supabase.from('clients').insert({
+      client_type:       'individual',
+      first_name:        c.first_name                || null,
+      last_name:         c.last_name                 || null,
+      name,
+      spouse_first_name: c.secondary_first_name      || null,
+      spouse_last_name:  c.secondary_last_name       || null,
+      email:             c.email                     || null,
+      phone:             c.phone || c.cell           || null,
+      street:            c.street_address            || null,
+      city:              c.city                      || null,
+      state:             c.state                     || null,
+      zip:               c.zip                       || null,
+      notes:             c.notes                     || null,
+      created_by:        user?.id,
+    })
+    setAddingAsClient(false)
+    if (!error) setClientAdded(true)
   }
 
   async function handleContactTypeChange(newType) {
@@ -830,6 +856,25 @@ export default function ContactDetail() {
                 })()}
                 {comms.length === 0 && <p className="text-xs text-gray-400 italic">No activity yet</p>}
               </div>
+            </div>
+
+            {/* Add as Client card */}
+            <div className="bg-white border border-slate-300 rounded-xl p-3 shadow-sm">
+              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Clients</p>
+              {clientAdded ? (
+                <div className="flex items-center gap-2 py-1">
+                  <span className="text-green-600 text-sm">✓</span>
+                  <p className="text-xs text-green-700 font-semibold">Added as client!</p>
+                </div>
+              ) : (
+                <button
+                  onClick={handleAddAsClient}
+                  disabled={addingAsClient}
+                  className="w-full py-2 rounded-lg bg-green-700 text-white text-xs font-semibold hover:bg-green-800 disabled:opacity-50 transition-colors"
+                >
+                  {addingAsClient ? 'Adding…' : '+ Add as Client'}
+                </button>
+              )}
             </div>
 
           </div>
