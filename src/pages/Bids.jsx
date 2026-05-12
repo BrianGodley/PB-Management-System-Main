@@ -41,6 +41,8 @@ export default function Bids() {
   const [bidTab,        setBidTab]        = useState('bids') // 'bids' | 'settings'
   const [bidsSettingsTab, setBidsSettingsTab] = useState('general')
   const [filter,        setFilter]        = useState('all')
+  const [sortCol,       setSortCol]       = useState('client_name')
+  const [sortDir,       setSortDir]       = useState('asc')
   const [search,        setSearch]        = useState('')
   const [updatingId,    setUpdatingId]    = useState(null)
   const [viewingBid, setViewingBid]         = useState(null)
@@ -329,12 +331,39 @@ export default function Bids() {
     })
   }
 
-  const filtered = bids.filter(b => {
-    const matchStatus = filter === 'all' || b.status === filter
-    const matchSearch = b.client_name.toLowerCase().includes(search.toLowerCase()) ||
-      (b.job_address || '').toLowerCase().includes(search.toLowerCase())
-    return matchStatus && matchSearch
-  })
+  function toggleSort(col) {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
+
+  function getVal(bid, col) {
+    switch (col) {
+      case 'client_name':   return (bid.client_name || '').toLowerCase()
+      case 'estimate_name': return (bid.estimates?.estimate_name || '').toLowerCase()
+      case 'created_at':    return bid.created_at || ''
+      case 'salesperson':   return (bid.salesperson || '').toLowerCase()
+      case 'gross_profit':  return parseFloat(bid.gross_profit || 0)
+      case 'gpmd':          return parseFloat(bid.gpmd || 0)
+      case 'bid_amount':    return parseFloat(bid.bid_amount || 0)
+      case 'status':        return bid.status || ''
+      default:              return ''
+    }
+  }
+
+  const filtered = bids
+    .filter(b => {
+      const matchStatus = filter === 'all' || b.status === filter
+      const matchSearch = b.client_name.toLowerCase().includes(search.toLowerCase()) ||
+        (b.job_address || '').toLowerCase().includes(search.toLowerCase())
+      return matchStatus && matchSearch
+    })
+    .sort((a, b) => {
+      const av = getVal(a, sortCol)
+      const bv = getVal(b, sortCol)
+      if (av < bv) return sortDir === 'asc' ? -1 : 1
+      if (av > bv) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
 
   const totalBidValue = bids.filter(b => b.status !== 'lost').reduce((s, b) => s + parseFloat(b.bid_amount || 0), 0)
   const soldValue     = bids.filter(b => b.status === 'sold').reduce((s, b) => s + parseFloat(b.bid_amount || 0), 0)
@@ -553,16 +582,33 @@ export default function Bids() {
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-4 py-3 font-semibold text-gray-700">Client</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-700">Bid Doc</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-700 w-72" style={{ width: '288px' }}>Projects</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-700">Created</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-700">Estimated By</th>
-                <th className="text-right px-4 py-3 font-semibold text-gray-700">Gross Profit</th>
-                <th className="text-right px-4 py-3 font-semibold text-gray-700">GPMD</th>
-                <th className="text-right px-4 py-3 font-semibold text-gray-700">Bid Amount</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-700">Status</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-700">Delete</th>
+                {[
+                  { col: 'client_name',   label: 'Client',       align: 'left'   },
+                  { col: null,            label: 'Bid Doc',      align: 'center' },
+                  { col: null,            label: 'Projects',     align: 'left',  cls: 'w-72' },
+                  { col: 'created_at',    label: 'Created',      align: 'left'   },
+                  { col: 'salesperson',   label: 'Estimated By', align: 'left'   },
+                  { col: 'gross_profit',  label: 'Gross Profit', align: 'right'  },
+                  { col: 'gpmd',          label: 'GPMD',         align: 'right'  },
+                  { col: 'bid_amount',    label: 'Bid Amount',   align: 'right'  },
+                  { col: 'status',        label: 'Status',       align: 'center' },
+                  { col: null,            label: 'Delete',       align: 'center' },
+                ].map(({ col, label, align, cls }) => (
+                  <th
+                    key={label}
+                    onClick={col ? () => toggleSort(col) : undefined}
+                    className={`px-4 py-3 font-semibold text-gray-700 text-${align} ${cls || ''} ${col ? 'cursor-pointer select-none hover:bg-gray-100 transition-colors' : ''}`}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      {label}
+                      {col && (
+                        <span className="text-gray-400 text-xs">
+                          {sortCol === col ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
+                        </span>
+                      )}
+                    </span>
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
