@@ -469,7 +469,7 @@ export default function SubsVendors() {
                       className={`px-5 py-2 text-sm font-semibold transition-colors ${
                         ieType === 'sub' ? 'bg-green-700 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
                       }`}
-                    >🔨 Subcontractors</button>
+                    >🚜 Subcontractors</button>
                     <button
                       onClick={() => setIeType('vendor')}
                       className={`px-5 py-2 text-sm font-semibold border-l border-gray-200 transition-colors ${
@@ -555,7 +555,7 @@ export default function SubsVendors() {
                 : 'bg-white text-gray-500 hover:bg-gray-50'
             }`}
           >
-            🔨 Subcontractors
+            🚜 Subcontractors
           </button>
           <button
             onClick={() => setTypeView('vendor')}

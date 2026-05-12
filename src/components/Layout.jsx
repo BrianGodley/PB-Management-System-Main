@@ -11,11 +11,11 @@ const navItems = [
   { path: '/design',              label: 'Design',            icon: '📐' },
   { path: '/bids',                label: 'Bids',              icon: '📋' },
   { path: '/jobs',                label: 'Jobs',              icon: '🔨' },
-  { path: '/equipment-tracking',  label: 'Equipment',         icon: '🚜' },
+  { path: '/equipment-tracking',  label: 'Equipment',         icon: '🛠️' },
   { path: '/collections',         label: 'Finance',           icon: '🏦' },
   { path: '/statistics',          label: 'Statistics',        icon: '📈' },
   { path: '/org-chart',           label: 'Org Chart',         icon: '🏗️' },
-  { path: '/portal/subs',         label: 'Subs & Vendors',    icon: '🔧' },
+  { path: '/portal/subs',         label: 'Subs & Vendors',    icon: '🚜' },
   { path: '/training',            label: 'Training',          icon: '🎓' },
   { path: '/hr',                  label: 'HR',                icon: '🏢' },
   { path: '/accounting',          label: 'Accounting',        icon: '💼' },
@@ -61,7 +61,7 @@ export default function Layout() {
     { path: '/bids',        label: 'Bids',           icon: '📋' },
     { path: '/jobs',        label: t('jobs'),        icon: '🔨' },
     { path: '/statistics',  label: t('statistics'),  icon: '📈' },
-    { path: '/portal/subs', label: t('subsVendors'), icon: '🔧' },
+    { path: '/portal/subs', label: t('subsVendors'), icon: '🚜' },
     { path: '/hr',          label: t('hr') || 'HR',  icon: '🏢' },
     // Admin tile — only present when the signed-in user is an admin. Lives
     // in the mobile main menu instead of the desktop top bar so phones get

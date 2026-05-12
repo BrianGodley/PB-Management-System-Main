@@ -290,7 +290,7 @@ export default function EquipmentTracking() {
       {/* ── Module tabs ── */}
       <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0">
         {[
-          { key: 'equipment', label: `🚜 Equipment (${equipment.length})` },
+          { key: 'equipment', label: `🛠️ Equipment (${equipment.length})` },
           { key: 'settings',  label: '⚙️ Settings' },
         ].map(t => (
           <button key={t.key} onClick={() => setEqTab(t.key)}
@@ -307,7 +307,7 @@ export default function EquipmentTracking() {
           <div className="flex border-b border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0">
             {[
               { key: 'general',   label: '⚙️ General'   },
-              { key: 'equipment', label: '🚜 Master Equipment' },
+              { key: 'equipment', label: '🛠️ Master Equipment' },
             ].map(t => (
               <button key={t.key} onClick={() => setEqSettingsTab(t.key)}
                 className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
@@ -352,7 +352,7 @@ export default function EquipmentTracking() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
-            <p className="text-4xl mb-2">🚜</p>
+            <p className="text-4xl mb-2">🛠️</p>
             <p className="text-sm">
               {search ? 'No equipment matches your search.' : 'No equipment yet. Click + Add Equipment to get started.'}
             </p>
