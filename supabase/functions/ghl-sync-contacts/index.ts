@@ -151,16 +151,13 @@ async function fetchContactsPage(args: {
   bulk:       boolean   // true → sort by dateAdded ASC; false → sort by dateUpdated DESC
 }): Promise<GhlPagedResponse> {
   // Use the GET /contacts endpoint — simpler and more reliable than POST /contacts/search.
-  // GHL's search endpoint rejects certain sort fields (e.g. "id") and can return
-  // "Error occurred while searching for contact" for subtle body-format issues.
-  const sortBy    = args.bulk ? 'dateAdded' : 'dateUpdated'
-  const sortOrder = args.bulk ? 'asc'       : 'desc'
+  // GHL only accepts sortBy = 'date_added' | 'date_updated', ascending only (no sortOrder param).
+  const sortBy = args.bulk ? 'date_added' : 'date_updated'
   const params = new URLSearchParams({
     locationId: args.locationId,
     page:       String(args.page),
     limit:      String(PAGE_LIMIT),
     sortBy,
-    sortOrder,
   })
   const res = await fetch(`${GHL_BASE_URL}/contacts?${params}`, {
     method: 'GET',
@@ -481,7 +478,6 @@ serve(async (req) => {
     let page = startPage
     let processedContacts = 0
     let lastPageWasFull   = true   // assume more until we see a short page
-    let hitWatermark      = false
 
     while (true) {
       if (page > startPage + 100) { break }  // safety: max 100 pages per invocation
@@ -509,10 +505,10 @@ serve(async (req) => {
       if (list.length === 0) break
 
       for (const c of list) {
-        // In incremental mode, stop when we hit records at-or-before the watermark.
+        // In incremental mode GHL sorts date_updated ASC (oldest first), so we
+        // skip contacts at-or-before the watermark and process the rest.
         if (!bulkMode && sinceIso && c.dateUpdated && c.dateUpdated <= sinceIso) {
-          hitWatermark = true
-          break
+          continue
         }
 
         if (seenGhlIds.has(c.id)) continue
@@ -612,7 +608,6 @@ serve(async (req) => {
       processedContacts += list.length
       page += 1
 
-      if (hitWatermark) break
       if (!lastPageWasFull) break                               // natural end
       if (processedContacts >= MAX_CONTACTS_PER_INVOCATION) break  // per-invocation cap
       if (Date.now() - startedAt > MAX_WALL_BUDGET_MS) break       // wall-time guard
