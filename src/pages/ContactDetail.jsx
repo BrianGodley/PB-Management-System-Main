@@ -331,7 +331,7 @@ export default function ContactDetail() {
     : contact.first_name || 'Unnamed'
 
   return (
-    <div className="flex flex-col h-full bg-slate-200 p-3">
+    <div className="flex flex-col h-full bg-slate-100">
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
       {/* Top bar */}
       <div className="flex items-center gap-3 px-6 py-3 bg-white border-b border-gray-200 flex-shrink-0">
