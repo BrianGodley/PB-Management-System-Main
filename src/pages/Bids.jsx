@@ -572,8 +572,8 @@ export default function Bids() {
                 return (
                   <tr key={bid.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
                     <td className="px-4 py-3">
-                      <p className="font-semibold text-gray-900">{bid.estimates?.estimate_name || bid.client_name}</p>
-                      <p className="text-xs text-gray-500">{bid.client_name}</p>
+                      <p className="font-bold text-gray-900">{bid.client_name}</p>
+                      {bid.estimates?.estimate_name && <p className="text-xs text-gray-500">{bid.estimates.estimate_name}</p>}
                       {bid.job_address && <p className="text-xs text-gray-400 truncate max-w-[180px]">{bid.job_address}</p>}
                       {bid.salesperson && <p className="text-xs text-gray-400">👤 {bid.salesperson}</p>}
                       {bid.estimate_id && (
