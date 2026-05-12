@@ -873,7 +873,7 @@ export default function Collections() {
       ) : (
         <>
           {/* ── Main tabs ──────────────────────────────────────────────────── */}
-          <div className="flex gap-0 border-b border-gray-200 mb-4 flex-shrink-0">
+          <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0 -mx-6">
             {[
               { key:'collections', label:'💰 Collections'        },
               { key:'payables',    label:'💳 Payables'           },
@@ -881,8 +881,8 @@ export default function Collections() {
               { key:'settings',    label:'⚙️ Settings'           },
             ].map(t => (
               <button key={t.key} onClick={() => setMainTab(t.key)}
-                className={`px-5 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
-                  mainTab === t.key ? 'border-green-700 text-green-800' : 'border-transparent text-gray-500 hover:text-gray-700'
+                className={`flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  mainTab === t.key ? 'border-green-700 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >{t.label}</button>
             ))}
@@ -890,7 +890,7 @@ export default function Collections() {
 
           {/* ── Collections ────────────────────────────────────────────────── */}
           {mainTab === 'collections' && (
-            <div className="flex flex-col flex-1 overflow-hidden">
+            <div className="flex flex-col flex-1 overflow-hidden pt-4">
               <div className="flex items-center gap-1.5 mb-3 flex-shrink-0">
                 {COLL_SECTIONS.map(s => (
                   <button key={s.key} onClick={() => setCollTab(s.key)}
@@ -926,7 +926,7 @@ export default function Collections() {
 
           {/* ── Payables ───────────────────────────────────────────────────── */}
           {mainTab === 'payables' && (
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto pt-4">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pb-4 items-start">
                 {PAY_CATS.map(cat => (
                   <PayableTable
@@ -945,7 +945,7 @@ export default function Collections() {
 
           {/* ── Financial Planning ─────────────────────────────────────────── */}
           {mainTab === 'financial' && (
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto pt-4">
               <div className="flex gap-4 pb-4 items-start">
 
                 {/* Left column: sections 1, 2, 3 */}

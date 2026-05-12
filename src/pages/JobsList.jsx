@@ -280,19 +280,16 @@ export default function JobsList() {
         </select>
       </div>
 
-      {/* ── Menu bar ──────────────────────────────────────────── */}
-      {/* `flex-nowrap` + `overflow-x-auto` lets the tab row scroll horizontally
-          on mobile instead of squishing the underlines together. Each tab has
-          breathing room so the active underline always looks distinct. */}
-      <div className="flex flex-nowrap border-b border-gray-200 mb-4 pb-0 flex-shrink-0 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-thin">
+      {/* ── Menu bar ── */}
+      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0 -mx-6">
         {TABS.map(t => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`px-3 sm:px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
+            className={`flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
               tab === t.key
-                ? 'border-green-700 text-green-700 bg-green-50'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                ? 'border-green-700 text-green-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
             {t.label}
@@ -315,7 +312,7 @@ export default function JobsList() {
 
       {/* Main content: sidebar + right panel (non-settings tabs) */}
       {tab !== 'settings' && (
-      <div className="flex gap-2 flex-1 min-h-0">
+      <div className="flex gap-2 flex-1 min-h-0 pt-4">
 
         {/* Jobs sidebar — desktop only */}
         <div className="hidden lg:flex w-56 flex-shrink-0 flex-col min-h-0 -ml-6 pl-3 bg-white border-r border-gray-200">

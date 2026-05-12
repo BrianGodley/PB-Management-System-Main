@@ -731,7 +731,7 @@ export default function Clients() {
       </div>
 
       {/* ── Active / Inactive / Settings tabs ── */}
-      <div className="flex border-b border-gray-200 mb-4 gap-1">
+      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0 -mx-6">
         {[
           { key: 'active',   label: 'Current',  count: sorted.filter(c => (c.status || 'active') === 'active').length },
           { key: 'inactive', label: 'Past',      count: sorted.filter(c => (c.status || 'active') === 'inactive').length },
@@ -740,10 +740,10 @@ export default function Clients() {
           <button
             key={t.key}
             onClick={() => { setTab(t.key); setSearch('') }}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors flex items-center gap-1.5 ${
+            className={`flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
               tab === t.key
-                ? 'border-green-700 text-green-700 bg-green-50'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                ? 'border-green-700 text-green-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
             {t.label}
@@ -788,7 +788,7 @@ export default function Clients() {
 
       {tab !== 'settings' && <>
         {/* ── Search + Column picker ── */}
-        <div className="flex items-center justify-between mb-3 gap-3">
+        <div className="flex items-center justify-between mb-3 gap-3 mt-4">
           <input
             type="text"
             placeholder="Search by name, company, email, phone or city..."

@@ -288,14 +288,14 @@ export default function EquipmentTracking() {
       </div>
 
       {/* ── Module tabs ── */}
-      <div className="flex border-b border-gray-200 mb-4 gap-1 flex-shrink-0">
+      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0 -mx-6">
         {[
           { key: 'equipment', label: 'Equipment' },
           { key: 'settings',  label: '⚙️ Settings' },
         ].map(t => (
           <button key={t.key} onClick={() => setEqTab(t.key)}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
-              eqTab === t.key ? 'border-green-700 text-green-700 bg-green-50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+            className={`flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+              eqTab === t.key ? 'border-green-700 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >{t.label}</button>
         ))}
@@ -335,7 +335,7 @@ export default function EquipmentTracking() {
 
       {eqTab === 'equipment' && <>
       {/* Search */}
-      <div className="mb-3 flex-shrink-0">
+      <div className="mb-3 mt-4 flex-shrink-0">
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}

@@ -594,7 +594,7 @@ export default function Contacts() {
       </div>
 
       {/* Tab bar */}
-      <div className="flex flex-nowrap border-b border-gray-200 mb-4 pb-0 flex-shrink-0 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-thin">
+      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0 -mx-6">
         {[
           { id: 'individuals', label: `Individuals (${contacts.length.toLocaleString()})` },
           { id: 'companies',   label: `Companies (${companies.length.toLocaleString()})` },
@@ -602,10 +602,10 @@ export default function Contacts() {
         ].map(tab => (
           <button key={tab.id} type="button"
             onClick={() => { setActiveTab(tab.id); setSearch(''); setStageFilter('all') }}
-            className={`px-3 sm:px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
+            className={`flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === tab.id
-                ? 'border-green-700 text-green-700 bg-green-50'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                ? 'border-green-700 text-green-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >{tab.label}</button>
         ))}
@@ -657,13 +657,13 @@ export default function Contacts() {
       {/* Mobile: full-width Add button sits directly above the search field. */}
       <button
         onClick={() => setShowAdd(true)}
-        className="sm:hidden w-full mb-3 py-2.5 bg-green-700 text-white rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
+        className="sm:hidden w-full mb-3 mt-4 py-2.5 bg-green-700 text-white rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
       >
         + {isIndividuals ? 'Add Contact' : 'Add Company'}
       </button>
 
       {/* Stage filter pills — desktop only; mobile uses the Filter modal */}
-      <div className="hidden sm:flex flex-wrap gap-2 mb-4">
+      <div className="hidden sm:flex flex-wrap gap-2 mb-4 mt-4">
         <button
           onClick={() => setStageFilter('all')}
           className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${stageFilter === 'all' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}

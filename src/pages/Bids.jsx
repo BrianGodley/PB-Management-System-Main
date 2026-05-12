@@ -471,14 +471,14 @@ export default function Bids() {
       </div>
 
       {/* ── Module tabs ── */}
-      <div className="flex border-b border-gray-200 mb-4 gap-1">
+      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0 -mx-6">
         {[
           { key: 'bids',     label: 'Bids' },
           { key: 'settings', label: '⚙️ Settings' },
         ].map(t => (
           <button key={t.key} onClick={() => setBidTab(t.key)}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
-              bidTab === t.key ? 'border-green-700 text-green-700 bg-green-50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+            className={`flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+              bidTab === t.key ? 'border-green-700 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >{t.label}</button>
         ))}
@@ -514,7 +514,7 @@ export default function Bids() {
 
       {bidTab === 'bids' && <>
       {/* Summary — sized so values up to $10,000,000.00 fit without overlap */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-6">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-6 mt-4">
         <div className="card text-center px-2 py-3 sm:px-4 sm:py-4 min-w-0">
           <p className="text-[10px] sm:text-xs text-gray-500 mb-1 truncate">Pipeline Value</p>
           <p className="font-bold text-gray-900 text-sm sm:text-lg leading-tight break-words">${totalBidValue.toLocaleString()}</p>

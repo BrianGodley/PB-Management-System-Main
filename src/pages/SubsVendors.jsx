@@ -400,15 +400,15 @@ export default function SubsVendors() {
         <h1 className="text-xl font-bold text-gray-900">Subs &amp; Vendors</h1>
       </div>
 
-      {/* ── Module tab bar ─────────────────────────────────── */}
-      <div className="flex flex-nowrap border-b border-gray-200 mb-4 pb-0 flex-shrink-0 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-thin">
+      {/* ── Module tab bar ── */}
+      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0 -mx-6">
         {[
           { key: 'directory', label: 'Directory' },
           { key: 'settings',  label: '⚙️ Settings' },
         ].map(t => (
           <button key={t.key} onClick={() => setSvTab(t.key)}
-            className={`px-3 sm:px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
-              svTab === t.key ? 'border-green-700 text-green-700 bg-green-50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+            className={`flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+              svTab === t.key ? 'border-green-700 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >{t.label}</button>
         ))}
@@ -444,7 +444,7 @@ export default function SubsVendors() {
 
       {svTab === 'directory' && <>
       {/* ── Directory header ────────────────────────────────── */}
-      <div className="flex items-center justify-end mb-4 flex-shrink-0 gap-3">
+      <div className="flex items-center justify-end mb-4 mt-4 flex-shrink-0 gap-3">
         <div className="flex items-center gap-2 ml-auto">
           {/* Filter tabs */}
           <div className="hidden sm:flex items-center gap-1 bg-gray-100 rounded-lg p-1">

@@ -469,23 +469,29 @@ export default function LMS() {
       {/* Page header */}
       <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
         <h1 className="text-xl font-bold text-gray-900">Training</h1>
+      </div>
+
+      {/* Tab bar */}
+      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0 -mx-6">
+        <button onClick={() => setMainTab('training')}
+          className={`flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+            mainTab === 'training' ? 'border-green-700 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}>
+          🎓 My Training
+        </button>
         {isAdmin && (
-          <div className="ml-auto flex gap-2 bg-gray-100 rounded-xl p-1">
-            <button onClick={() => setMainTab('admin')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${mainTab === 'admin' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>
-              ⚙️ Settings
-            </button>
-            <button onClick={() => setMainTab('training')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${mainTab === 'training' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>
-              🎓 My Training
-            </button>
-          </div>
+          <button onClick={() => setMainTab('admin')}
+            className={`flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+              mainTab === 'admin' ? 'border-green-700 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}>
+            ⚙️ Settings
+          </button>
         )}
       </div>
 
       {/* Admin section */}
       {mainTab === 'admin' && isAdmin && (
-        <div className="flex gap-6">
+        <div className="flex gap-6 pt-4">
           <div className="w-52 flex-shrink-0">
             <nav className="space-y-0.5">
               {ADMIN_TABS.map(tab => (
@@ -514,7 +520,7 @@ export default function LMS() {
 
       {/* My Training */}
       {mainTab === 'training' && (
-        <div>
+        <div className="pt-4">
           <h2 className="text-lg font-semibold text-gray-800 mb-5">
             {myEmployee ? `${myEmployee.first_name}'s Courses` : 'My Courses'}
           </h2>

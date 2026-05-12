@@ -104,15 +104,15 @@ export default function Design() {
       </div>
 
       {/* Tab bar */}
-      <div className="flex flex-nowrap border-b border-gray-200 mb-4 pb-0 flex-shrink-0 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-thin">
+      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0 -mx-6">
         {TABS.map(t => (
           <button
             key={t.id}
             onClick={() => setActiveTab(t.id)}
-            className={`px-3 sm:px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap flex-shrink-0 ${
+            className={`flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === t.id
-                ? 'border-green-700 text-green-800'
-                : 'border-transparent text-gray-500 hover:text-gray-800'
+                ? 'border-green-700 text-green-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
             {t.label}
@@ -122,7 +122,7 @@ export default function Design() {
 
       {/* CAD Assist Drawing — placeholder */}
       {activeTab === 'cad' && (
-        <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center max-w-2xl mx-auto">
+        <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center max-w-2xl mx-auto mt-4">
           <p className="text-4xl mb-2">🛠️</p>
           <h2 className="text-base font-semibold text-gray-800 mb-1">CAD Assist Drawing</h2>
           <p className="text-sm text-gray-500">Coming soon — AI-assisted drawing tools will live here.</p>
@@ -131,7 +131,7 @@ export default function Design() {
 
       {/* Selections — placeholder */}
       {activeTab === 'selections' && (
-        <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center max-w-2xl mx-auto">
+        <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center max-w-2xl mx-auto mt-4">
           <p className="text-4xl mb-2">🎨</p>
           <h2 className="text-base font-semibold text-gray-800 mb-1">Selections</h2>
           <p className="text-sm text-gray-500">Coming soon — track plant, hardscape, and material selections per project.</p>
@@ -142,7 +142,7 @@ export default function Design() {
       {activeTab === 'takeoffs' && (
       <>
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-6 mt-4">
         <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
           {projects.length} project{projects.length === 1 ? '' : 's'}
         </span>
