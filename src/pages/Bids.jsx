@@ -38,6 +38,7 @@ export default function Bids() {
   const [bids,          setBids]          = useState([])
   const [profiles,      setProfiles]      = useState({})
   const [loading,       setLoading]       = useState(true)
+  const [bidTab,        setBidTab]        = useState('bids') // 'bids' | 'settings'
   const [filter,        setFilter]        = useState('all')
   const [search,        setSearch]        = useState('')
   const [updatingId,    setUpdatingId]    = useState(null)
@@ -468,6 +469,32 @@ export default function Bids() {
         <h1 className="text-xl font-bold text-gray-900">Bids</h1>
       </div>
 
+      {/* ── Module tabs ── */}
+      <div className="flex border-b border-gray-200 mb-4 gap-1">
+        {[
+          { key: 'bids',     label: 'Bids' },
+          { key: 'settings', label: '⚙️ Settings' },
+        ].map(t => (
+          <button key={t.key} onClick={() => setBidTab(t.key)}
+            className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
+              bidTab === t.key ? 'border-green-700 text-green-700 bg-green-50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+            }`}
+          >{t.label}</button>
+        ))}
+      </div>
+
+      {/* ── Settings placeholder ── */}
+      {bidTab === 'settings' && (
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <p className="text-4xl mb-3">⚙️</p>
+            <h2 className="text-base font-semibold text-gray-800 mb-1">Bids Settings</h2>
+            <p className="text-sm text-gray-500">Configuration options for this module will be available here.</p>
+          </div>
+        </div>
+      )}
+
+      {bidTab === 'bids' && <>
       {/* Summary — sized so values up to $10,000,000.00 fit without overlap */}
       <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-6">
         <div className="card text-center px-2 py-3 sm:px-4 sm:py-4 min-w-0">
@@ -603,6 +630,7 @@ export default function Bids() {
           onClose={() => setViewingBid(null)}
         />
       )}
+      </>}
     </div>
   )
 }

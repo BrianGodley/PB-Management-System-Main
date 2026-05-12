@@ -728,11 +728,12 @@ export default function Clients() {
         </div>
       </div>
 
-      {/* ── Active / Inactive tabs ── */}
+      {/* ── Active / Inactive / Settings tabs ── */}
       <div className="flex border-b border-gray-200 mb-4 gap-1">
         {[
-          { key: 'active',   label: 'Current', count: sorted.filter(c => (c.status || 'active') === 'active').length },
-          { key: 'inactive', label: 'Past',    count: sorted.filter(c => (c.status || 'active') === 'inactive').length },
+          { key: 'active',   label: 'Current',  count: sorted.filter(c => (c.status || 'active') === 'active').length },
+          { key: 'inactive', label: 'Past',      count: sorted.filter(c => (c.status || 'active') === 'inactive').length },
+          { key: 'settings', label: '⚙️ Settings', count: null },
         ].map(t => (
           <button
             key={t.key}
@@ -744,72 +745,84 @@ export default function Clients() {
             }`}
           >
             {t.label}
-            <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
+            {t.count !== null && <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
               tab === t.key ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-            }`}>{t.count}</span>
+            }`}>{t.count}</span>}
           </button>
         ))}
       </div>
 
-      {/* ── Search + Column picker ── */}
-      <div className="flex items-center justify-between mb-3 gap-3">
-        <input
-          type="text"
-          placeholder="Search by name, company, email, phone or city..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="input max-w-sm"
-        />
-
-        {/* Column picker */}
-        <div className="relative flex-shrink-0" ref={colPickerRef}>
-          <button
-            onClick={() => setColPickerOpen(o => !o)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
-              colPickerOpen
-                ? 'border-green-600 text-green-700 bg-green-50'
-                : 'border-gray-300 text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-            Columns
-            <svg className={`w-3 h-3 transition-transform ${colPickerOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-
-          {colPickerOpen && (
-            <div className="absolute right-0 top-full mt-1.5 z-20 bg-white border border-gray-200 rounded-xl shadow-lg py-2 w-44">
-              <p className="px-3 pb-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wide border-b border-gray-100 mb-1">
-                Show / Hide Columns
-              </p>
-              {COLUMNS.map(col => (
-                <label
-                  key={col.key}
-                  className={`flex items-center gap-2.5 px-3 py-1.5 text-sm cursor-pointer select-none transition-colors ${
-                    col.always ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={col.always || visibleCols.has(col.key)}
-                    disabled={col.always}
-                    onChange={() => !col.always && toggleCol(col.key)}
-                    className="w-3.5 h-3.5 rounded accent-green-600 flex-shrink-0"
-                  />
-                  {col.label}
-                  {col.always && <span className="ml-auto text-xs text-gray-300">always</span>}
-                </label>
-              ))}
-            </div>
-          )}
+      {/* ── Settings tab placeholder ── */}
+      {tab === 'settings' && (
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <p className="text-4xl mb-3">⚙️</p>
+            <h2 className="text-base font-semibold text-gray-800 mb-1">Clients Settings</h2>
+            <p className="text-sm text-gray-500">Configuration options for this module will be available here.</p>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* ── Client table ── */}
-      {filtered.length === 0 ? (
+      {tab !== 'settings' && <>
+        {/* ── Search + Column picker ── */}
+        <div className="flex items-center justify-between mb-3 gap-3">
+          <input
+            type="text"
+            placeholder="Search by name, company, email, phone or city..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="input max-w-sm"
+          />
+
+          {/* Column picker */}
+          <div className="relative flex-shrink-0" ref={colPickerRef}>
+            <button
+              onClick={() => setColPickerOpen(o => !o)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                colPickerOpen
+                  ? 'border-green-600 text-green-700 bg-green-50'
+                  : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              Columns
+              <svg className={`w-3 h-3 transition-transform ${colPickerOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {colPickerOpen && (
+              <div className="absolute right-0 top-full mt-1.5 z-20 bg-white border border-gray-200 rounded-xl shadow-lg py-2 w-44">
+                <p className="px-3 pb-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wide border-b border-gray-100 mb-1">
+                  Show / Hide Columns
+                </p>
+                {COLUMNS.map(col => (
+                  <label
+                    key={col.key}
+                    className={`flex items-center gap-2.5 px-3 py-1.5 text-sm cursor-pointer select-none transition-colors ${
+                      col.always ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={col.always || visibleCols.has(col.key)}
+                      disabled={col.always}
+                      onChange={() => !col.always && toggleCol(col.key)}
+                      className="w-3.5 h-3.5 rounded accent-green-600 flex-shrink-0"
+                    />
+                    {col.label}
+                    {col.always && <span className="ml-auto text-xs text-gray-300">always</span>}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Client table ── */}
+        {filtered.length === 0 ? (
         <div className="card text-center py-12">
           <p className="text-4xl mb-3">👥</p>
           <p className="text-gray-500 mb-4">
@@ -883,6 +896,7 @@ export default function Clients() {
           </table>
         </div>
       )}
+      </>}
     </div>
   )
 }

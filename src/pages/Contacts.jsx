@@ -613,16 +613,29 @@ export default function Contacts() {
         {[
           { id: 'individuals', label: `Individuals (${contacts.length.toLocaleString()})` },
           { id: 'companies',   label: `Companies (${companies.length.toLocaleString()})` },
+          { id: 'settings',    label: '⚙️ Settings' },
         ].map(tab => (
           <button key={tab.id} type="button"
             onClick={() => { setActiveTab(tab.id); setSearch(''); setStageFilter('all') }}
-            className={`px-5 py-2 text-sm font-semibold transition-colors ${
+            className={`px-5 py-2 text-sm font-semibold transition-colors border-l border-gray-200 first:border-l-0 ${
               activeTab === tab.id ? 'bg-green-700 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
             }`}
           >{tab.label}</button>
         ))}
       </div>
 
+      {/* Settings placeholder */}
+      {activeTab === 'settings' && (
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <p className="text-4xl mb-3">⚙️</p>
+            <h2 className="text-base font-semibold text-gray-800 mb-1">Contacts Settings</h2>
+            <p className="text-sm text-gray-500">Configuration options for this module will be available here.</p>
+          </div>
+        </div>
+      )}
+
+      {activeTab !== 'settings' && <>
       {/* Mobile: full-width Add button sits directly above the search field. */}
       <button
         onClick={() => setShowAdd(true)}
@@ -943,6 +956,7 @@ export default function Contacts() {
           </div>
         </div>
       )}
+      </>}
     </div>
   )
 }
