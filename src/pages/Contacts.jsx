@@ -563,7 +563,7 @@ export default function Contacts() {
   const isIndividuals = activeTab === 'individuals'
 
   return (
-    <div>
+    <div className="h-full flex flex-col">
 
       {/* Header */}
       <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
@@ -598,7 +598,7 @@ export default function Contacts() {
 
       {/* Settings panel */}
       {activeTab === 'settings' && (
-        <div className="mt-3">
+        <div className="mt-3 flex-1 flex flex-col overflow-hidden">
           <div className="flex border-b border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0">
             {[
               { id: 'import', label: '⬆ Import' },
@@ -614,7 +614,7 @@ export default function Contacts() {
               >{t.label}</button>
             ))}
           </div>
-          <div className="bg-gray-50 px-6 py-6">
+          <div className="bg-gray-50 px-6 py-6 flex-1 overflow-y-auto">
             {settingsSubTab === 'import' && (
               <div className="max-w-2xl">
                 <ImportModal
@@ -642,13 +642,13 @@ export default function Contacts() {
       {/* Mobile: full-width Add button sits directly above the search field. */}
       <button
         onClick={() => setShowAdd(true)}
-        className="sm:hidden w-full mb-3 mt-4 py-2.5 bg-green-700 text-white rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
+        className="sm:hidden w-full mb-3 mt-4 py-2.5 bg-green-700 text-white rounded-lg text-sm font-semibold flex items-center justify-center gap-2 flex-shrink-0"
       >
         + {isIndividuals ? 'Add Contact' : 'Add Company'}
       </button>
 
       {/* Search */}
-      <div className="mb-4 mt-4">
+      <div className="mb-4 mt-4 flex-shrink-0">
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -656,6 +656,9 @@ export default function Contacts() {
           className="w-full max-w-md border border-gray-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600"
         />
       </div>
+
+      {/* Scrollable table + pagination */}
+      <div className="flex-1 overflow-y-auto min-h-0">
 
       {/* Table */}
       {isIndividuals ? (
@@ -869,6 +872,8 @@ export default function Contacts() {
         </div>
       )}
 
+      </div>{/* end scrollable */}
+
       {showAdd && isIndividuals && (
         <AddContactModal
           onSave={c => { setContacts(p => [c, ...p]); setShowAdd(false) }}
@@ -882,7 +887,6 @@ export default function Contacts() {
           onClose={() => setShowAdd(false)}
         />
       )}
-
 
       </>}
     </div>

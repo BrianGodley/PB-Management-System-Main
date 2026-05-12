@@ -661,7 +661,7 @@ export default function Clients() {
   )
 
   return (
-    <div>
+    <div className="h-full flex flex-col">
       {/* ── Client Delete Cascade Modal ── */}
       {deleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
@@ -756,7 +756,7 @@ export default function Clients() {
 
       {/* ── Settings tab ── */}
       {tab === 'settings' && (
-        <div className="mt-3">
+        <div className="mt-3 flex-1 flex flex-col overflow-hidden">
           <div className="flex border-b border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0">
             {[
               { key: 'general', label: '⚙️ General' },
@@ -769,7 +769,7 @@ export default function Clients() {
               >{t.label}</button>
             ))}
           </div>
-          <div className="bg-gray-50 px-6 py-6">
+          <div className="bg-gray-50 px-6 py-6 flex-1 overflow-y-auto">
             {clientSettingsTab === 'general' && (
               <div className="flex items-center justify-center py-20 text-center">
                 <div>
@@ -788,7 +788,7 @@ export default function Clients() {
 
       {tab !== 'settings' && <>
         {/* ── Search + Column picker ── */}
-        <div className="flex items-center justify-between mb-3 gap-3 mt-4">
+        <div className="flex items-center justify-between mb-3 gap-3 mt-4 flex-shrink-0">
           <input
             type="text"
             placeholder="Search by name, company, email, phone or city..."
@@ -845,6 +845,7 @@ export default function Clients() {
         </div>
 
         {/* ── Client table ── */}
+        <div className="flex-1 overflow-y-auto min-h-0">
         {filtered.length === 0 ? (
         <div className="card text-center py-12">
           <p className="text-4xl mb-3">👥</p>
@@ -919,6 +920,7 @@ export default function Clients() {
           </table>
         </div>
       )}
+        </div>
       </>}
     </div>
   )
