@@ -331,9 +331,8 @@ export default function ContactDetail() {
     : contact.first_name || 'Unnamed'
 
   return (
-    <div className="flex flex-col h-full bg-slate-200">
-      <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-      {/* Top bar */}
+    <div className="flex flex-col h-full">
+      {/* Top nav bar — sits on the main page background */}
       <div className="flex items-center gap-3 px-6 py-3 bg-white border-b border-gray-200 flex-shrink-0">
         <button onClick={() => navigate('/contacts')} className="text-gray-400 hover:text-gray-600 text-sm flex items-center gap-1">
           ← Contacts
@@ -342,8 +341,13 @@ export default function ContactDetail() {
         <span className="text-sm font-semibold text-gray-700">{displayName}</span>
       </div>
 
+      {/* Padded wrapper — exposes the main background around the slate block */}
+      <div className="flex-1 min-h-0 p-3">
+        {/* Rounded slate container */}
+        <div className="h-full bg-slate-200 rounded-xl overflow-hidden">
+
       {/* 3-column layout */}
-      <div className="flex-1 min-h-0 overflow-hidden grid" style={{gridTemplateColumns: '23rem minmax(0,1fr) 15rem'}}>
+      <div className="h-full overflow-hidden grid" style={{gridTemplateColumns: '23rem minmax(0,1fr) 15rem'}}>
 
         {/* ── LEFT COLUMN ───────────────────────────────────────────────── */}
         <div className="border-r border-slate-300 bg-slate-200 overflow-y-auto">
@@ -763,7 +767,8 @@ export default function ContactDetail() {
           </div>
         </div>
       </div>
-      </div>{/* end bordered card */}
+        </div>{/* end rounded slate container */}
+      </div>{/* end padded wrapper */}
 
       {showEdit && (
         <EditContactModal
