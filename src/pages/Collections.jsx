@@ -88,7 +88,7 @@ function CellInput({ value, onSave, placeholder='', align='right', className:ext
       onBlur={() => { setFocused(false); if (String(local) !== String(value ?? '')) onSave(local) }}
       onKeyDown={e => { if (e.key==='Enter') e.target.blur() }}
       placeholder={placeholder}
-      className={`w-full bg-transparent text-${align} text-xs px-1 py-0.5 focus:outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-300 rounded ${extraCls}`}
+      className={`w-full bg-transparent font-bold text-${align} text-xs px-1 py-0.5 focus:outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-300 rounded ${extraCls}`}
     />
   )
 }
@@ -1012,7 +1012,7 @@ export default function Collections() {
                       ].map(({ label, value, color }) => (
                         <div key={label} className="flex items-center justify-between px-4 py-2 text-xs">
                           <span className="text-gray-600">{label}</span>
-                          <span className={`font-medium ${color}`}>{fmtC(value)}</span>
+                          <span className={`font-bold ${color}`}>{fmtC(value)}</span>
                         </div>
                       ))}
                       <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50">
@@ -1199,7 +1199,7 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
                         </td>
                       </>
                     ))}
-                    <td className={`px-2 py-1 text-right font-semibold border-l border-gray-100 ${end < 0 ? 'text-red-600' : end > 0 ? 'text-gray-800' : 'text-gray-400'}`}>
+                    <td className={`px-2 py-1 text-right font-bold border-l border-gray-100 ${end < 0 ? 'text-red-600' : end > 0 ? 'text-gray-800' : 'text-gray-400'}`}>
                       {fmtC(end)}
                     </td>
                     <td className="px-1 py-1 border-l border-gray-100">
@@ -1217,18 +1217,18 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
           {/* Subtotals */}
           <tr className="bg-amber-50 font-semibold border-t-2 border-amber-200">
             <td className="px-3 py-2 text-gray-700 text-[11px] font-bold">Subtotals</td>
-            <td className="px-2 py-2 text-right text-gray-600 border-r border-amber-200 text-[11px]">{fmtC(rows.reduce((s,r) => s + (parseFloat(r.starting_balance)||0), 0))}</td>
+            <td className="px-2 py-2 text-right font-bold text-gray-700 border-r border-amber-200 text-[11px]">{fmtC(rows.reduce((s,r) => s + (parseFloat(r.starting_balance)||0), 0))}</td>
             {DAYS.map(d => {
               const invS = rows.reduce((s,r) => s + (parseFloat(r[`${d}_inv`])||0), 0)
               const depS = rows.reduce((s,r) => s + (parseFloat(r[`${d}_dep`])||0), 0)
               return (
                 <>
-                  <td key={d+'i'} className="px-2 py-2 text-right text-red-600 border-l border-amber-200 text-[11px]">{fmtC(invS)}</td>
-                  <td key={d+'d'} className="px-2 py-2 text-right text-gray-600 text-[11px]">{fmtC(depS)}</td>
+                  <td key={d+'i'} className="px-2 py-2 text-right font-bold text-red-600 border-l border-amber-200 text-[11px]">{fmtC(invS)}</td>
+                  <td key={d+'d'} className="px-2 py-2 text-right font-bold text-gray-700 text-[11px]">{fmtC(depS)}</td>
                 </>
               )
             })}
-            <td className="px-2 py-2 text-right text-gray-800 border-l border-amber-200">{fmtC(summary.totEnd)}</td>
+            <td className="px-2 py-2 text-right font-bold text-gray-900 border-l border-amber-200">{fmtC(summary.totEnd)}</td>
             <td /><td />
           </tr>
 
@@ -1269,7 +1269,7 @@ function PayableTable({ cat, rows, subtotal, onUpdate, onDelete, onAdd }) {
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
       <div className="bg-green-800 text-white px-4 py-2.5 flex items-center justify-between flex-shrink-0">
         <h3 className="text-sm font-bold">{cat.label}</h3>
-        <span className="text-xs font-semibold text-green-100">{fmtC(subtotal)}</span>
+        <span className="text-xs font-bold text-green-100">{fmtC(subtotal)}</span>
       </div>
       <table className="w-full text-xs">
         <thead className="bg-gray-50 border-b border-gray-200">
@@ -1289,7 +1289,7 @@ function PayableTable({ cat, rows, subtotal, onUpdate, onDelete, onAdd }) {
                 <td key={c} className={`px-2 py-1 ${AMOUNT_COLS.has(c) ? 'text-right' : ''}`}>
                   {AMOUNT_COLS.has(c)
                     ? readOnly.has(c)
-                      ? <span className="block text-right text-xs text-gray-500 px-1 py-0.5">{fmtC(parseFloat(row[c]) || 0)}</span>
+                      ? <span className="block text-right text-xs font-bold text-gray-700 px-1 py-0.5">{fmtC(parseFloat(row[c]) || 0)}</span>
                       : <CellInput value={row[c]||''} onSave={v => onUpdate(row.id, c, v)} align="right" />
                     : <TextCell value={row[c]||''} onSave={v => onUpdate(row.id, c, v)} placeholder={getLabel(c)} />}
                 </td>
@@ -1303,7 +1303,7 @@ function PayableTable({ cat, rows, subtotal, onUpdate, onDelete, onAdd }) {
       </table>
       <div className="px-3 py-2 border-t border-gray-100 bg-gray-50 flex items-center justify-between flex-shrink-0">
         <button onClick={onAdd} className="text-xs text-green-700 hover:text-green-900 font-medium">+ Add row</button>
-        <span className="text-xs font-semibold text-gray-700">Subtotal: {fmtC(subtotal)}</span>
+        <span className="text-xs font-bold text-gray-900">Subtotal: {fmtC(subtotal)}</span>
       </div>
     </div>
   )
@@ -1325,7 +1325,7 @@ function PayablesAllocSection({ rows, onUpdate, onDelete, onAddFromPayable, payS
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col">
       <div className="bg-blue-800 text-white px-4 py-2.5 flex items-center justify-between flex-shrink-0 rounded-t-xl">
         <h3 className="text-sm font-bold">4 — Payables Allocations</h3>
-        <span className="text-xs font-semibold text-blue-100">{fmtC(sectionTotal)}</span>
+        <span className="text-xs font-bold text-blue-100">{fmtC(sectionTotal)}</span>
       </div>
       {PAY_ALLOC_SUBS.map(sub => {
         const subRows = rows.filter(r => r.subsection === sub.key)
@@ -1377,7 +1377,7 @@ function PayablesAllocSection({ rows, onUpdate, onDelete, onAddFromPayable, payS
                                     className="flex-1 flex flex-col items-center py-1 px-1 rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                                   >
                                     <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wide">{opt.label}</span>
-                                    <span className="text-[11px] font-semibold text-gray-700 mt-0.5">{fmtC(opt.amt)}</span>
+                                    <span className="text-[11px] font-bold text-gray-800 mt-0.5">{fmtC(opt.amt)}</span>
                                   </button>
                                 ))}
                               </div>
@@ -1394,7 +1394,7 @@ function PayablesAllocSection({ rows, onUpdate, onDelete, onAddFromPayable, payS
                             className="w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 flex justify-between items-center gap-3 border-b border-gray-50 last:border-b-0"
                           >
                             <span className="text-gray-700">{p.payee}</span>
-                            <span className="text-gray-500 font-medium shrink-0">{fmtC(amt)}</span>
+                            <span className="text-gray-800 font-bold shrink-0">{fmtC(amt)}</span>
                           </button>
                         )
                       })
@@ -1484,7 +1484,7 @@ function FinancialTable({ sec, rows, total, onUpdate, onDelete, onAdd, canAdd = 
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
       <div className="bg-blue-800 text-white px-4 py-2.5 flex items-center justify-between flex-shrink-0">
         <h3 className="text-sm font-bold">{sec.label}</h3>
-        <span className="text-xs font-semibold text-blue-100">{fmtC(total)}</span>
+        <span className="text-xs font-bold text-blue-100">{fmtC(total)}</span>
       </div>
       <table className="w-full text-xs">
         <thead className="bg-gray-50 border-b border-gray-200">
