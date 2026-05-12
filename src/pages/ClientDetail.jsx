@@ -224,10 +224,12 @@ export default function ClientDetail() {
       )}
 
       {/* ── Top nav bar ── */}
-      <div className="flex items-center gap-3 px-6 py-3 bg-white border-b border-gray-200 flex-shrink-0">
-        <button onClick={() => navigate('/clients')} className="text-gray-400 hover:text-gray-600 text-sm">← Clients</button>
+      <div className="flex items-center gap-2 px-6 py-3 bg-white border-b border-gray-200 flex-shrink-0">
+        <button onClick={() => navigate('/clients')} className="text-gray-900 hover:text-gray-600 text-sm font-medium">Clients</button>
         <span className="text-gray-300">/</span>
-        <span className="text-sm font-semibold text-gray-700">{displayName(client) || client.name}</span>
+        <span className="text-sm font-semibold text-gray-900 bg-gray-100 px-2 py-0.5 rounded-md">
+          {[client.first_name, client.last_name].filter(Boolean).join(' ') || client.name || 'Unnamed'}
+        </span>
       </div>
 
       {/* ── Padded wrapper → rounded slate block ── */}

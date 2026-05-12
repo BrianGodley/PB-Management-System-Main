@@ -296,14 +296,14 @@ export default function CompanyDetail() {
   return (
     <div className="flex flex-col h-full">
       {/* Top nav bar — sits on the main page background */}
-      <div className="flex items-center gap-3 px-6 py-3 bg-white border-b border-gray-200 flex-shrink-0">
-        <button onClick={() => navigate('/contacts')} className="text-gray-400 hover:text-gray-600 text-sm flex items-center gap-1">
-          ← Contacts
+      <div className="flex items-center gap-2 px-6 py-3 bg-white border-b border-gray-200 flex-shrink-0">
+        <button onClick={() => navigate('/contacts')} className="text-gray-900 hover:text-gray-600 text-sm font-medium">
+          Contacts
         </button>
         <span className="text-gray-300">/</span>
-        <span className="text-xs text-gray-400">Companies</span>
+        <span className="text-sm text-gray-900">Company Contact</span>
         <span className="text-gray-300">/</span>
-        <span className="text-sm font-semibold text-gray-700 truncate">{company.company_name}</span>
+        <span className="text-sm font-semibold text-gray-900 bg-gray-100 px-2 py-0.5 rounded-md truncate">{company.company_name}</span>
       </div>
 
       {/* Padded wrapper — exposes the main background around the slate block */}
