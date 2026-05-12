@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { ExportModal, ImportModal } from '../components/ContactImportExport'
+import { fetchAssignableEmployees } from '../lib/assignableEmployees'
 
 // ── Stage config ──────────────────────────────────────────────────────────────
 const STAGES = [
@@ -154,7 +155,17 @@ function AddContactModal({ onSave, onClose }) {
 
           {/* ── Assignment ── */}
           <div className="grid grid-cols-2 gap-3">
-            <div><label className={label}>Assigned To</label><input className={input} value={form.ghl_assigned_to} onChange={e => set('ghl_assigned_to', e.target.value)} placeholder="Assignee name" /></div>
+            <div>
+              <label className={label}>Assigned To</label>
+              <select className={input} value={form.ghl_assigned_to} onChange={e => set('ghl_assigned_to', e.target.value)}>
+                <option value="">— Unassigned —</option>
+                {assignees.map(e => (
+                  <option key={e.id} value={`${e.first_name} ${e.last_name}`}>
+                    {e.first_name} {e.last_name}{e.job_title ? ` — ${e.job_title}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div>
               <label className={label}>Consultation Type</label>
               <select className={input} value={form.consultation_type} onChange={e => set('consultation_type', e.target.value)}>
@@ -356,7 +367,17 @@ function AddCompanyModal({ onSave, onClose }) {
           </div>
 
           {/* ── Assignment ── */}
-          <div><label className={label}>Assigned To</label><input className={input} value={form.ghl_assigned_to} onChange={e => set('ghl_assigned_to', e.target.value)} placeholder="Assignee name" /></div>
+          <div>
+            <label className={label}>Assigned To</label>
+            <select className={input} value={form.ghl_assigned_to} onChange={e => set('ghl_assigned_to', e.target.value)}>
+              <option value="">— Unassigned —</option>
+              {assignees.map(e => (
+                <option key={e.id} value={`${e.first_name} ${e.last_name}`}>
+                  {e.first_name} {e.last_name}{e.job_title ? ` — ${e.job_title}` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {/* ── Stage ── */}
           <div>
@@ -442,6 +463,7 @@ export default function Contacts() {
   const [sortField,   setSortField]   = useState('last_name')
   const [sortAsc,     setSortAsc]     = useState(true)
   const [page,        setPage]        = useState(0)
+  const [assignees,   setAssignees]   = useState([])
 
   async function fetchContacts() {
     setLoading(true)
@@ -485,7 +507,11 @@ export default function Contacts() {
     setCompaniesLoading(false)
   }
 
-  useEffect(() => { fetchContacts(); fetchCompanies() }, [])
+  useEffect(() => {
+    fetchContacts()
+    fetchCompanies()
+    fetchAssignableEmployees().then(setAssignees)
+  }, [])
 
   // Reset to first page when filters change
   useEffect(() => { setPage(0) }, [search, stageFilter, activeTab])

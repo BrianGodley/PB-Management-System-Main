@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { fetchAssignableEmployees } from '../lib/assignableEmployees'
 
 // ── Stage config ──────────────────────────────────────────────────────────────
 const STAGES = [
@@ -47,7 +48,10 @@ function fmtDate(dateStr) {
 function EditCompanyModal({ company, onSave, onClose }) {
   const [form, setForm] = useState({ ...company })
   const [saving, setSaving] = useState(false)
+  const [assignees, setAssignees] = useState([])
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
+
+  useEffect(() => { fetchAssignableEmployees().then(setAssignees) }, [])
 
   function addCompanyContact() {
     const arr = Array.isArray(form.company_contacts) ? form.company_contacts : []
@@ -153,7 +157,17 @@ function EditCompanyModal({ company, onSave, onClose }) {
             }
           </div>
 
-          <div><label className={lbl}>Assigned To</label><input className={inp} value={form.ghl_assigned_to || ''} onChange={e => set('ghl_assigned_to', e.target.value)} placeholder="Assignee name" /></div>
+          <div>
+            <label className={lbl}>Assigned To</label>
+            <select className={inp} value={form.ghl_assigned_to || ''} onChange={e => set('ghl_assigned_to', e.target.value)}>
+              <option value="">— Unassigned —</option>
+              {assignees.map(e => (
+                <option key={e.id} value={`${e.first_name} ${e.last_name}`}>
+                  {e.first_name} {e.last_name}{e.job_title ? ` — ${e.job_title}` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className={lbl}>Stage</label>
             <select className={inp} value={form.stage || 'new_lead'} onChange={e => set('stage', e.target.value)}>
