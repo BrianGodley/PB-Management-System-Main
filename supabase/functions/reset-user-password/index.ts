@@ -33,13 +33,36 @@ serve(async (req) => {
 
     let targetUserId = userId
 
-    // If only email provided, look up the user's auth id
+    // If only email provided, find the auth user id by scanning all users
     if (!targetUserId && email) {
-      const { data: { users }, error: listErr } = await adminClient.auth.admin.listUsers()
-      if (listErr) return respond({ error: listErr.message })
-      const match = users.find(u => u.email?.toLowerCase() === email.toLowerCase())
-      if (!match) return respond({ error: 'No account found for that email address.' })
-      targetUserId = match.id
+      const normalised = email.trim().toLowerCase()
+
+      // Page through all users until we find a match
+      let found = false
+      let page = 1
+      while (!found) {
+        const { data, error: listErr } = await adminClient.auth.admin.listUsers({
+          page,
+          perPage: 1000,
+        })
+        if (listErr) return respond({ error: listErr.message })
+
+        const users = data?.users ?? []
+        const match = users.find(u => u.email?.trim().toLowerCase() === normalised)
+
+        if (match) {
+          targetUserId = match.id
+          found = true
+        } else if (users.length < 1000) {
+          // Last page — user not found
+          break
+        }
+        page++
+      }
+
+      if (!targetUserId) {
+        return respond({ error: `No account found for ${email}. Please contact your administrator.` })
+      }
     }
 
     const { error } = await adminClient.auth.admin.updateUserById(targetUserId, {
