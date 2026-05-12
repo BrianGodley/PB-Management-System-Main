@@ -119,14 +119,8 @@ export default function Login() {
         email = resolvedEmail
       }
 
-      // Look up cell phone from the employees table
-      let phoneRaw = null
-      const { data: empRow } = await supabase
-        .from('employees')
-        .select('cell_phone')
-        .eq('email', email)
-        .maybeSingle()
-      phoneRaw = empRow?.cell_phone
+      // Look up cell phone via SECURITY DEFINER RPC (bypasses RLS on login screen)
+      const { data: phoneRaw } = await supabase.rpc('get_phone_by_email', { p_email: email })
 
       setResetEmail(email)
       setResetEmailMasked(maskEmail(email))
@@ -142,7 +136,7 @@ export default function Login() {
     setResetLoading(false)
   }
 
-  // ── Step 2: send OTP (SMS) or reset link (email) ─────────────────────────
+  // ── Step 2: send 6-digit OTP via SMS or email ────────────────────────────
   async function handleSendCode(method) {
     setResetMsg('')
     setResetLoading(true)
@@ -150,20 +144,18 @@ export default function Login() {
 
     try {
       if (method === 'sms') {
-        // SMS: sends a 6-digit OTP code
         const { error: otpErr } = await supabase.auth.signInWithOtp({ phone: resetPhone })
         if (otpErr) throw new Error(otpErr.message)
-        setMode('verify')
       } else {
-        // Email: sends a magic link → user clicks → lands on /reset-password
-        const { error: resetErr } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-          redirectTo: window.location.origin + '/reset-password',
+        const { error: otpErr } = await supabase.auth.signInWithOtp({
+          email: resetEmail,
+          options: { shouldCreateUser: false },
         })
-        if (resetErr) throw new Error(resetErr.message)
-        setMode('emailsent')
+        if (otpErr) throw new Error(otpErr.message)
       }
+      setMode('verify')
     } catch (err) {
-      setResetMsg('error:' + (err.message || 'Failed to send. Please try again.'))
+      setResetMsg('error:' + (err.message || 'Failed to send code. Please try again.'))
     }
     setResetLoading(false)
   }
@@ -400,9 +392,9 @@ export default function Login() {
             <div className="p-8 space-y-5">
               <div>
                 <BackBtn label="← Change account" onClick={() => { setMode('forgot'); setResetMsg('') }} />
-                <h2 className="text-lg font-bold text-gray-900">How would you like to verify?</h2>
-                <p className="text-sm text-gray-500 mt-0.5">
-                  We'll send a 6-digit code to confirm it's you.
+                <h2 className="text-lg font-bold text-gray-900">Verification required</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Identity verification is required before you can reset your password. Please choose which method you would like to use.
                 </p>
               </div>
 
@@ -417,8 +409,8 @@ export default function Login() {
                   >
                     <span className="text-2xl">📱</span>
                     <div>
-                      <p className="text-sm font-semibold text-gray-800 group-hover:text-green-700">Text message</p>
-                      <p className="text-xs text-gray-500 mt-0.5">Send code to {resetPhoneMasked}</p>
+                      <p className="text-sm font-semibold text-gray-800 group-hover:text-green-700">Text message to {resetPhoneMasked}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Send a text with a 6-digit code for entry</p>
                     </div>
                   </button>
                 )}
@@ -432,8 +424,8 @@ export default function Login() {
                 >
                   <span className="text-2xl">✉️</span>
                   <div>
-                    <p className="text-sm font-semibold text-gray-800 group-hover:text-green-700">Email</p>
-                    <p className="text-xs text-gray-500 mt-0.5">Send code to {resetEmailMasked}</p>
+                    <p className="text-sm font-semibold text-gray-800 group-hover:text-green-700">Email to {resetEmailMasked}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Email a 6-digit code for entry</p>
                   </div>
                 </button>
               </div>
@@ -446,42 +438,6 @@ export default function Login() {
               )}
 
               <MsgBox msg={resetMsg} />
-            </div>
-          )}
-
-          {/* ── EMAIL SENT — check inbox ───────────────────────────────── */}
-          {mode === 'emailsent' && (
-            <div className="p-8 space-y-5">
-              <div className="text-center">
-                <div className="text-5xl mb-4">📬</div>
-                <h2 className="text-lg font-bold text-gray-900">Check your inbox</h2>
-                <p className="text-sm text-gray-500 mt-2">
-                  We sent a password reset link to{' '}
-                  <span className="font-semibold text-gray-700">{resetEmailMasked}</span>.
-                  Click the link in that email to create a new password.
-                </p>
-                <p className="text-xs text-gray-400 mt-3">
-                  The link expires in 1 hour. Check your spam folder if you don't see it.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                disabled={resetLoading}
-                onClick={() => handleSendCode('email')}
-                className="w-full text-sm text-center py-2 rounded-xl border border-gray-200 text-gray-500 hover:text-gray-700 hover:border-gray-300 transition-all disabled:opacity-40"
-              >
-                {resetLoading ? 'Resending…' : 'Resend email'}
-              </button>
-
-              <button
-                type="button"
-                onClick={resetFlow}
-                className="w-full py-3 rounded-xl text-sm font-bold text-white"
-                style={{ backgroundColor: FG }}
-              >
-                Back to Sign In
-              </button>
             </div>
           )}
 
