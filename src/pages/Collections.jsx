@@ -1072,7 +1072,7 @@ export default function Collections() {
 
           {/* ── Settings ── */}
           {mainTab === 'settings' && (
-            <div className="-mx-6 -mb-6 mt-3 flex-1 flex flex-col">
+            <div className="-mb-6 mt-3 flex-1 flex flex-col">
               <div className="flex border-b border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0">
                 {[
                   { key: 'general', label: '⚙️ General' },
