@@ -617,7 +617,7 @@ serve(async (req) => {
     // was full AND we hit a budget cap (not a watermark or natural end).
     const budgetHit = processedContacts >= MAX_CONTACTS_PER_INVOCATION
                    || Date.now() - startedAt > MAX_WALL_BUDGET_MS
-    const moreExist = bulkMode && lastPageWasFull && budgetHit && !hitWatermark
+    const moreExist = bulkMode && lastPageWasFull && budgetHit
     const nextPage  = moreExist ? page : null
 
     const logMsg = dryRun
