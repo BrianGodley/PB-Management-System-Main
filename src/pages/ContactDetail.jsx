@@ -332,7 +332,7 @@ export default function ContactDetail() {
 
   return (
     <div className="flex flex-col h-full bg-slate-200 p-3">
-      <div className="flex flex-col flex-1 min-h-0 rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
       {/* Top bar */}
       <div className="flex items-center gap-3 px-6 py-3 bg-white border-b border-gray-200 flex-shrink-0">
         <button onClick={() => navigate('/contacts')} className="text-gray-400 hover:text-gray-600 text-sm flex items-center gap-1">
