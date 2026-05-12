@@ -455,9 +455,6 @@ export default function Contacts() {
   const [companiesError,   setCompaniesError]   = useState(null)
 
   const [search,      setSearch]      = useState('')
-  const [stageFilter, setStageFilter] = useState('all')
-  // Mobile-only filter modal — replaces the inline pill row on phones.
-  const [showMobileFilter, setShowMobileFilter] = useState(false)
   const [showAdd,     setShowAdd]     = useState(false)
   const [sortField,   setSortField]   = useState('last_name')
   const [sortAsc,     setSortAsc]     = useState(true)
@@ -513,13 +510,12 @@ export default function Contacts() {
   }, [])
 
   // Reset to first page when filters change
-  useEffect(() => { setPage(0) }, [search, stageFilter, activeTab])
+  useEffect(() => { setPage(0) }, [search, activeTab])
 
   // Filter + sort
   const q = search.toLowerCase()
   const filtered = contacts
     .filter(c => {
-      if (stageFilter !== 'all' && c.stage !== stageFilter) return false
       if (!q) return true
       return (
         `${c.last_name} ${c.first_name}`.toLowerCase().includes(q) ||
@@ -536,7 +532,6 @@ export default function Contacts() {
 
   const filteredCompanies = companies
     .filter(c => {
-      if (stageFilter !== 'all' && c.stage !== stageFilter) return false
       if (!q) return true
       return (
         (c.company_name || '').toLowerCase().includes(q) ||
@@ -574,16 +569,6 @@ export default function Contacts() {
       <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
         <h1 className="text-xl font-bold text-gray-900">Contacts</h1>
         <div className="flex items-center gap-2">
-          {/* Filter — mobile-only entry to the new filter modal. */}
-          <button
-            onClick={() => setShowMobileFilter(true)}
-            className="sm:hidden px-3 py-2 border border-gray-200 text-sm font-medium text-gray-700 rounded-lg flex items-center gap-1.5"
-          >
-            🔎 Filter
-            {stageFilter !== 'all' && (
-              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-green-700 text-white text-[10px] font-bold">1</span>
-            )}
-          </button>
           <button
             onClick={() => setShowAdd(true)}
             className="hidden sm:flex px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 transition-colors"
@@ -601,7 +586,7 @@ export default function Contacts() {
           { id: 'settings',    label: '⚙️ Settings' },
         ].map(tab => (
           <button key={tab.id} type="button"
-            onClick={() => { setActiveTab(tab.id); setSearch(''); setStageFilter('all') }}
+            onClick={() => { setActiveTab(tab.id); setSearch('') }}
             className={`flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === tab.id
                 ? 'border-green-700 text-green-700'
@@ -661,29 +646,6 @@ export default function Contacts() {
       >
         + {isIndividuals ? 'Add Contact' : 'Add Company'}
       </button>
-
-      {/* Stage filter pills — desktop only; mobile uses the Filter modal */}
-      <div className="hidden sm:flex flex-wrap gap-2 mb-4 mt-4">
-        <button
-          onClick={() => setStageFilter('all')}
-          className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${stageFilter === 'all' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'}`}
-        >
-          All
-        </button>
-        {STAGES.map(s => {
-          const src = isIndividuals ? contacts : companies
-          return (
-            <button
-              key={s.value}
-              onClick={() => setStageFilter(stageFilter === s.value ? 'all' : s.value)}
-              className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${stageFilter === s.value ? s.cls + ' ring-2 ring-offset-1 ring-current' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'}`}
-            >
-              {s.label}
-              <span className="ml-1.5 opacity-60">{src.filter(c => c.stage === s.value).length}</span>
-            </button>
-          )
-        })}
-      </div>
 
       {/* Search */}
       <div className="mb-4">
@@ -922,45 +884,6 @@ export default function Contacts() {
       )}
 
 
-      {/* Mobile filter modal — picks the stage filter and closes. */}
-      {showMobileFilter && (
-        <div
-          className="fixed inset-0 z-50 bg-black/50 flex items-start sm:items-center justify-center p-4 pt-16 sm:pt-4 sm:hidden"
-          onClick={() => setShowMobileFilter(false)}
-        >
-          <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-              <h2 className="text-base font-bold text-gray-800">Filter contacts</h2>
-              <button onClick={() => setShowMobileFilter(false)} className="text-gray-400 text-xl leading-none px-1">✕</button>
-            </div>
-            <div className="p-3 space-y-2 max-h-[60vh] overflow-y-auto">
-              <button
-                onClick={() => { setStageFilter('all'); setShowMobileFilter(false) }}
-                className={`w-full flex items-center justify-between px-3 py-3 rounded-lg border text-sm font-semibold transition-colors ${stageFilter === 'all' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-700 border-gray-200'}`}
-              >
-                <span>All {isIndividuals ? 'contacts' : 'companies'}</span>
-                <span className="text-xs opacity-70">{isIndividuals ? contacts.length : companies.length}</span>
-              </button>
-              {STAGES.map(s => {
-                const src = isIndividuals ? contacts : companies
-                return (
-                  <button
-                    key={s.value}
-                    onClick={() => { setStageFilter(s.value); setShowMobileFilter(false) }}
-                    className={`w-full flex items-center justify-between px-3 py-3 rounded-lg border text-sm font-semibold transition-colors ${stageFilter === s.value ? s.cls + ' ring-2 ring-current' : 'bg-white text-gray-600 border-gray-200'}`}
-                  >
-                    <span>{s.label}</span>
-                    <span className="text-xs opacity-60">{src.filter(c => c.stage === s.value).length}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-      )}
       </>}
     </div>
   )
