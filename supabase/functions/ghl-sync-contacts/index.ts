@@ -183,25 +183,31 @@ async function fetchLocationUsers(
   token: string,
   locationId: string,
 ): Promise<Map<string, string>> {
-  try {
-    const res = await fetch(
-      `${GHL_BASE_URL}/users?locationId=${locationId}`,
-      { headers: { Authorization: `Bearer ${token}`, Version: GHL_API_VERSION, Accept: 'application/json' } },
-    )
-    if (!res.ok) return new Map()
-    const data: any = await res.json()
-    const users: any[] = data?.users || data?.members || []
-    const map = new Map<string, string>()
-    for (const u of users) {
-      if (u.id && (u.name || u.firstName)) {
-        const name = u.name || [u.firstName, u.lastName].filter(Boolean).join(' ')
-        map.set(u.id, name)
+  // Try two GHL endpoints — which one works depends on token scopes.
+  const endpoints = [
+    `${GHL_BASE_URL}/users?locationId=${locationId}`,
+    `${GHL_BASE_URL}/locations/${locationId}/users`,
+  ]
+  for (const url of endpoints) {
+    try {
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}`, Version: GHL_API_VERSION, Accept: 'application/json' },
+      })
+      if (!res.ok) continue
+      const data: any = await res.json()
+      const users: any[] = data?.users || data?.members || []
+      if (!users.length) continue
+      const map = new Map<string, string>()
+      for (const u of users) {
+        if (u.id && (u.name || u.firstName)) {
+          const name = u.name || [u.firstName, u.lastName].filter(Boolean).join(' ')
+          map.set(u.id, name)
+        }
       }
-    }
-    return map
-  } catch {
-    return new Map()
+      if (map.size > 0) return map
+    } catch { /* try next */ }
   }
+  return new Map()
 }
 
 async function fetchCustomFieldDefs(
@@ -291,10 +297,11 @@ function toPbsContact(
   let ghlAssignedTo: string | null = null
   if (c.assignedTo) {
     if (typeof c.assignedTo === 'string') {
-      // GHL often returns a raw user ID — resolve to name if we have the map.
-      ghlAssignedTo = userIdToName.get(c.assignedTo) || c.assignedTo || null
+      // Resolve user ID → name; if map lookup fails store null (not the raw ID).
+      ghlAssignedTo = userIdToName.get(c.assignedTo) || null
     } else {
-      ghlAssignedTo = (c.assignedTo as any).name || userIdToName.get((c.assignedTo as any).id) || (c.assignedTo as any).id || null
+      const obj = c.assignedTo as any
+      ghlAssignedTo = obj.name || userIdToName.get(obj.id) || null
     }
   }
 
