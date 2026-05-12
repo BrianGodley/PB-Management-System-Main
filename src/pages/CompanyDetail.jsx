@@ -294,7 +294,7 @@ export default function CompanyDetail() {
   const lbl = 'text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5'
 
   return (
-    <div className="flex flex-col h-full bg-slate-100">
+    <div className="flex flex-col h-full bg-slate-200">
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
       {/* Top bar */}
       <div className="flex items-center gap-3 px-6 py-3 bg-white border-b border-gray-200 flex-shrink-0">
@@ -311,7 +311,7 @@ export default function CompanyDetail() {
       <div className="flex-1 min-h-0 overflow-hidden grid" style={{gridTemplateColumns: '23rem minmax(0,1fr) 15rem'}}>
 
         {/* ── LEFT COLUMN ───────────────────────────────────────────────── */}
-        <div className="border-r border-slate-300 bg-slate-100 overflow-y-auto">
+        <div className="border-r border-slate-300 bg-slate-200 overflow-y-auto">
           <div className="p-3 space-y-2">
 
             {/* Card 1: Identity */}
@@ -327,7 +327,7 @@ export default function CompanyDetail() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button onClick={() => setShowEdit(true)} className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-slate-100 transition-colors" title="Edit company">
+                  <button onClick={() => setShowEdit(true)} className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-slate-200 transition-colors" title="Edit company">
                     <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M11.5 1.5a1.414 1.414 0 0 1 2 2L5 12l-3 1 1-3 8.5-8.5z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </button>
                   <button onClick={() => setShowDelete(true)} className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors" title="Delete company">
@@ -472,89 +472,98 @@ export default function CompanyDetail() {
         </div>
 
         {/* ── MIDDLE COLUMN: Communication Log ──────────────────────────── */}
-        <div className="flex flex-col bg-slate-100">
+        <div className="flex flex-col bg-slate-200 p-3">
+          {/* Rounded card — same style as pipeline/activity cards */}
+          <div className="flex flex-col flex-1 min-h-0 bg-white border border-slate-300 rounded-xl shadow-sm overflow-hidden">
 
-          <div className="px-5 py-3 bg-white border-b border-slate-300 flex-shrink-0">
-            <h3 className="text-sm font-bold text-gray-700">Communication Log</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Notes, calls, emails, texts and updates</p>
-          </div>
-
-          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-            {comms.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-                <p className="text-4xl mb-2">💬</p>
-                <p className="text-sm">No communications yet — add the first entry below.</p>
+            {/* Title + type selector buttons in the header */}
+            <div className="flex-shrink-0 px-4 pt-3 pb-2.5 border-b border-slate-200">
+              <div className="flex items-center justify-between mb-2.5">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-700">Communication Log</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">Notes, calls, emails, texts and updates</p>
+                </div>
               </div>
-            )}
-            {comms.map(comm => {
-              const isSystem = comm.type === 'stage_change' || comm.type === 'system'
-              if (isSystem) return (
-                <div key={comm.id} className="flex items-center gap-2 text-xs text-gray-400 py-1">
-                  <span>{systemIcon[comm.type] || '⚙️'}</span>
-                  <span>{comm.content}</span>
-                  <span className="ml-auto flex-shrink-0">{timeAgo(comm.created_at)}</span>
-                </div>
-              )
-              const t = commTypeMap[comm.type] || { icon: '📝', label: 'Note' }
-              const isOut = comm.direction === 'outbound'
-              return (
-                <div key={comm.id} className={`flex gap-3 ${isOut ? 'flex-row-reverse' : ''}`}>
-                  <div className="w-7 h-7 rounded-full bg-white border border-slate-300 flex items-center justify-center text-sm flex-shrink-0">{t.icon}</div>
-                  <div className={`max-w-[75%] ${isOut ? 'items-end' : 'items-start'} flex flex-col`}>
-                    <div className={`rounded-2xl px-4 py-2.5 text-sm shadow-sm ${isOut ? 'bg-green-700 text-white rounded-tr-sm' : 'bg-white text-gray-800 border border-slate-300 rounded-tl-sm'}`}>
-                      <p className="whitespace-pre-wrap leading-relaxed">{comm.content}</p>
-                    </div>
-                    <div className={`flex items-center gap-2 mt-1 ${isOut ? 'flex-row-reverse' : ''}`}>
-                      <span className="text-[10px] text-gray-400">{t.label}</span>
-                      {comm.direction && <span className="text-[10px] text-gray-300">·</span>}
-                      {comm.direction && <span className="text-[10px] text-gray-400 capitalize">{comm.direction}</span>}
-                      <span className="text-[10px] text-gray-300">·</span>
-                      <span className="text-[10px] text-gray-400">{timeAgo(comm.created_at)}</span>
-                    </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {COMM_TYPES.map(t => (
+                  <button key={t.value} onClick={() => setCommType(t.value)}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
+                      commType === t.value ? 'bg-green-700 text-white border-green-700' : 'bg-slate-50 text-gray-500 border-slate-300 hover:border-slate-400'
+                    }`}>
+                    <span>{t.icon}</span> {t.label}
+                  </button>
+                ))}
+                {commType !== 'note' && (
+                  <div className="ml-auto flex items-center gap-2">
+                    {['inbound', 'outbound'].map(d => (
+                      <button key={d} onClick={() => setCommDir(d)}
+                        className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors capitalize ${
+                          commDir === d ? 'bg-gray-800 text-white border-gray-800' : 'bg-slate-50 text-gray-500 border-slate-300 hover:border-slate-400'
+                        }`}>{d}</button>
+                    ))}
                   </div>
-                </div>
-              )
-            })}
-            <div ref={commsEndRef} />
-          </div>
+                )}
+              </div>
+            </div>
 
-          {/* Input — floating white card */}
-          <div className="flex-shrink-0 mx-3 mb-3 bg-white border border-slate-300 rounded-xl px-4 py-3 shadow-sm">
-            <div className="flex items-center gap-2 mb-3">
-              {COMM_TYPES.map(t => (
-                <button key={t.value} onClick={() => setCommType(t.value)}
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
-                    commType === t.value ? 'bg-green-700 text-white border-green-700' : 'bg-slate-50 text-gray-500 border-slate-300 hover:border-slate-400'
-                  }`}>
-                  <span>{t.icon}</span> {t.label}
-                </button>
-              ))}
-              {commType !== 'note' && (
-                <div className="ml-auto flex items-center gap-2">
-                  {['inbound', 'outbound'].map(d => (
-                    <button key={d} onClick={() => setCommDir(d)}
-                      className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors capitalize ${
-                        commDir === d ? 'bg-gray-800 text-white border-gray-800' : 'bg-slate-50 text-gray-500 border-slate-300 hover:border-slate-400'
-                      }`}>{d}</button>
-                  ))}
+            {/* Messages — scrollable middle */}
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-slate-50">
+              {comms.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                  <p className="text-4xl mb-2">💬</p>
+                  <p className="text-sm">No communications yet — add the first entry below.</p>
                 </div>
               )}
+              {comms.map(comm => {
+                const isSystem = comm.type === 'stage_change' || comm.type === 'system'
+                if (isSystem) return (
+                  <div key={comm.id} className="flex items-center gap-2 text-xs text-gray-400 py-1">
+                    <span>{systemIcon[comm.type] || '⚙️'}</span>
+                    <span>{comm.content}</span>
+                    <span className="ml-auto flex-shrink-0">{timeAgo(comm.created_at)}</span>
+                  </div>
+                )
+                const t = commTypeMap[comm.type] || { icon: '📝', label: 'Note' }
+                const isOut = comm.direction === 'outbound'
+                return (
+                  <div key={comm.id} className={`flex gap-3 ${isOut ? 'flex-row-reverse' : ''}`}>
+                    <div className="w-7 h-7 rounded-full bg-white border border-slate-300 flex items-center justify-center text-sm flex-shrink-0">{t.icon}</div>
+                    <div className={`max-w-[75%] ${isOut ? 'items-end' : 'items-start'} flex flex-col`}>
+                      <div className={`rounded-2xl px-4 py-2.5 text-sm shadow-sm ${isOut ? 'bg-green-700 text-white rounded-tr-sm' : 'bg-white text-gray-800 border border-slate-300 rounded-tl-sm'}`}>
+                        <p className="whitespace-pre-wrap leading-relaxed">{comm.content}</p>
+                      </div>
+                      <div className={`flex items-center gap-2 mt-1 ${isOut ? 'flex-row-reverse' : ''}`}>
+                        <span className="text-[10px] text-gray-400">{t.label}</span>
+                        {comm.direction && <span className="text-[10px] text-gray-300">·</span>}
+                        {comm.direction && <span className="text-[10px] text-gray-400 capitalize">{comm.direction}</span>}
+                        <span className="text-[10px] text-gray-300">·</span>
+                        <span className="text-[10px] text-gray-400">{timeAgo(comm.created_at)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+              <div ref={commsEndRef} />
             </div>
-            <div className="flex gap-2">
-              <textarea value={commContent} onChange={e => setCommContent(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddComm() } }}
-                placeholder={`Add a ${commType}… (Enter to send)`} rows={2}
-                className="flex-1 border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600 resize-none bg-slate-50" />
-              <button onClick={handleAddComm} disabled={sending || !commContent.trim()}
-                className="px-4 py-2 bg-green-700 text-white rounded-xl text-sm font-semibold hover:bg-green-800 disabled:opacity-40 transition-colors self-end">
-                {sending ? '…' : 'Send'}
-              </button>
+
+            {/* Input — fixed at bottom, inside the card */}
+            <div className="flex-shrink-0 px-4 py-3 border-t border-slate-200 bg-white">
+              <div className="flex gap-2">
+                <textarea value={commContent} onChange={e => setCommContent(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddComm() } }}
+                  placeholder={`Add a ${commType}… (Enter to send)`} rows={2}
+                  className="flex-1 border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600 resize-none bg-slate-50" />
+                <button onClick={handleAddComm} disabled={sending || !commContent.trim()}
+                  className="px-4 py-2 bg-green-700 text-white rounded-xl text-sm font-semibold hover:bg-green-800 disabled:opacity-40 transition-colors self-end">
+                  {sending ? '…' : 'Send'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
         {/* ── RIGHT COLUMN: Pipeline & Activity ─────────────────────────── */}
-        <div className="border-l border-slate-300 bg-slate-100 overflow-y-auto">
+        <div className="border-l border-slate-300 bg-slate-200 overflow-y-auto">
           <div className="p-3 space-y-2">
 
             {/* Pipeline card */}
@@ -606,7 +615,7 @@ export default function CompanyDetail() {
                   const t = commTypeMap[last.type] || { icon: '📝', label: 'Note' }
                   return (
                     <div className="flex items-start gap-2.5">
-                      <div className="w-6 h-6 rounded-full bg-slate-100 border border-slate-300 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">{t.icon}</div>
+                      <div className="w-6 h-6 rounded-full bg-slate-200 border border-slate-300 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">{t.icon}</div>
                       <div>
                         <p className="text-xs font-medium text-gray-700">Last {t.label}</p>
                         <p className="text-[10px] text-gray-500 truncate max-w-[100px]">{last.content}</p>
