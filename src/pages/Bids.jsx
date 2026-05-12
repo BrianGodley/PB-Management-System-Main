@@ -486,7 +486,7 @@ export default function Bids() {
 
       {/* ── Settings ── */}
       {bidTab === 'settings' && (
-        <div className="-mx-6 mt-6">
+        <div className="-mx-6 mt-3">
           <div className="flex border-b border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0">
             {[
               { key: 'general', label: '⚙️ General' },
