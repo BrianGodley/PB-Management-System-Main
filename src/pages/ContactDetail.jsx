@@ -331,7 +331,7 @@ export default function ContactDetail() {
     : contact.first_name || 'Unnamed'
 
   return (
-    <div className="flex flex-col h-full bg-gray-100 p-3">
+    <div className="flex flex-col h-full bg-slate-200 p-3">
       <div className="flex flex-col flex-1 min-h-0 rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       {/* Top bar */}
       <div className="flex items-center gap-3 px-6 py-3 bg-white border-b border-gray-200 flex-shrink-0">
@@ -345,346 +345,271 @@ export default function ContactDetail() {
       {/* 3-column layout */}
       <div className="flex-1 min-h-0 overflow-hidden grid" style={{gridTemplateColumns: '23rem minmax(0,1fr) 15rem'}}>
 
-        {/* ── LEFT COLUMN: Contact Details ──────────────────────────────── */}
-        <div className="border-r border-gray-200 bg-white overflow-y-auto">
-          <div className="p-5">
+        {/* ── LEFT COLUMN ───────────────────────────────────────────────── */}
+        <div className="border-r border-slate-200 bg-slate-100 overflow-y-auto">
+          <div className="p-3 space-y-2">
 
-            {/* Avatar + name */}
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-green-800 font-bold text-lg flex-shrink-0">
-                  {(contact.first_name?.[0] || contact.last_name?.[0] || '?').toUpperCase()}
-                </div>
-                <div>
+            {/* Card 1: Identity */}
+            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-full bg-green-100 flex items-center justify-center text-green-800 font-bold text-lg flex-shrink-0">
+                    {(contact.first_name?.[0] || contact.last_name?.[0] || '?').toUpperCase()}
+                  </div>
                   <h2 className="text-base font-bold text-gray-900 leading-tight">{fullName || 'Unnamed'}</h2>
                 </div>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setShowEdit(true)} className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-slate-100 transition-colors" title="Edit contact">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M11.5 1.5a1.414 1.414 0 0 1 2 2L5 12l-3 1 1-3 8.5-8.5z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </button>
+                  <button onClick={() => setShowDelete(true)} className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors" title="Delete contact">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 9a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setShowEdit(true)}
-                  className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100 transition-colors"
-                  title="Edit contact"
-                >
-                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-                    <path d="M11.5 1.5a1.414 1.414 0 0 1 2 2L5 12l-3 1 1-3 8.5-8.5z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </button>
-                <button
-                  onClick={() => setShowDelete(true)}
-                  className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors"
-                  title="Delete contact"
-                >
-                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-                    <path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 9a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </button>
+              <div className="space-y-2 text-sm">
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Spouse / Partner</p>
+                  <p className="font-semibold text-gray-900">{[contact.secondary_first_name, contact.secondary_last_name].filter(Boolean).join(' ') || <span className="text-gray-300">—</span>}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Address</p>
+                  {(contact.street_address || contact.city || contact.state || contact.zip)
+                    ? <><p className="font-semibold text-gray-900">{contact.street_address}</p><p className="font-semibold text-gray-900">{[contact.city, contact.state, contact.zip].filter(Boolean).join(', ')}</p></>
+                    : <span className="text-gray-300">—</span>}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Phone</p>
+                    {contact.phone ? <a href={`tel:${contact.phone}`} className="font-semibold text-gray-900 hover:text-green-700">{contact.phone}</a> : <span className="text-gray-300">—</span>}
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Cell</p>
+                    {contact.cell ? <a href={`tel:${contact.cell}`} className="font-semibold text-gray-900 hover:text-green-700">{contact.cell}</a> : <span className="text-gray-300">—</span>}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Email</p>
+                  {contact.email ? <a href={`mailto:${contact.email}`} className="font-semibold text-gray-900 hover:text-green-700 break-all">{contact.email}</a> : <span className="text-gray-300">—</span>}
+                </div>
               </div>
             </div>
 
-            {/* Quick info: Spouse/Partner, Address, Phone, Cell, Email */}
-            <div className="space-y-2 mb-4 pb-4 border-b border-gray-100 text-sm">
-              <div>
-                <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Spouse / Partner</p>
-                <p className="text-gray-700">
-                  {[contact.secondary_first_name, contact.secondary_last_name].filter(Boolean).join(' ') || <span className="text-gray-300">—</span>}
-                </p>
-              </div>
-              <div>
-                <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Address</p>
-                {(contact.street_address || contact.city || contact.state || contact.zip)
-                  ? <>
-                      {contact.street_address && <p className="font-semibold text-gray-900">{contact.street_address}</p>}
-                      <p className="text-gray-700">{[contact.city, contact.state, contact.zip].filter(Boolean).join(', ')}</p>
-                    </>
-                  : <span className="text-gray-300">—</span>}
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Phone</p>
-                  {contact.phone ? <a href={`tel:${contact.phone}`} className="font-semibold text-gray-900 hover:text-green-700">{contact.phone}</a> : <span className="text-gray-300">—</span>}
-                </div>
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Cell</p>
-                  {contact.cell ? <a href={`tel:${contact.cell}`} className="font-semibold text-gray-900 hover:text-green-700">{contact.cell}</a> : <span className="text-gray-300">—</span>}
-                </div>
-              </div>
-              <div>
-                <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Email</p>
-                {contact.email ? <a href={`mailto:${contact.email}`} className="font-semibold text-gray-900 hover:text-green-700 break-all">{contact.email}</a> : <span className="text-gray-300">—</span>}
-              </div>
-            </div>
-
-            {/* Stage selector */}
-            <div className="mb-4">
-              <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-1.5">Stage</label>
-              <select
-                value={contact.stage}
-                onChange={e => handleStageChange(e.target.value)}
-                className={`w-full border rounded-lg px-3 py-1.5 text-sm font-semibold focus:outline-none cursor-pointer ${stage.cls}`}
-              >
+            {/* Card 2: Stage */}
+            <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+              <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Stage</label>
+              <select value={contact.stage} onChange={e => handleStageChange(e.target.value)}
+                className={`w-full border rounded-lg px-3 py-1.5 text-sm font-semibold focus:outline-none cursor-pointer ${stage.cls}`}>
                 {STAGES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
             </div>
 
-            {/* ── Tab bar ── */}
-            <div className="flex border-b border-gray-200 mb-4 -mx-5 px-5">
+            {/* Tab bar — sits on the slate-100 background */}
+            <div className="flex px-1 border-b border-slate-300">
               {[
                 { key: 'main',      label: 'More Info' },
                 { key: 'marketing', label: 'Marketing' },
                 { key: 'dnd',       label: 'DND'  },
                 { key: 'tags',      label: 'Tags' },
               ].map(t => (
-                <button
-                  key={t.key}
-                  onClick={() => setLeftTab(t.key)}
+                <button key={t.key} onClick={() => setLeftTab(t.key)}
                   className={`px-3 py-2 text-xs font-semibold border-b-2 transition-colors ${
-                    leftTab === t.key
-                      ? 'border-green-600 text-green-700'
-                      : 'border-transparent text-gray-900 hover:text-black'
-                  }`}
-                >
+                    leftTab === t.key ? 'border-green-600 text-green-700' : 'border-transparent text-gray-900 hover:text-black'
+                  }`}>
                   {t.label}
                   {t.key === 'dnd' && (contact.dnd_phone || contact.dnd_email || contact.dnd_sms) && (
                     <span className="ml-1 w-1.5 h-1.5 rounded-full bg-red-500 inline-block align-middle" />
                   )}
                   {t.key === 'tags' && (contact.tags?.length > 0) && (
-                    <span className="ml-1 text-[10px] bg-gray-100 text-gray-500 rounded-full px-1">{contact.tags.length}</span>
+                    <span className="ml-1 text-[10px] bg-slate-200 text-gray-600 rounded-full px-1">{contact.tags.length}</span>
                   )}
                 </button>
               ))}
             </div>
 
-            {/* ── MAIN TAB ── */}
-            {leftTab === 'main' && (
-              <div className="space-y-3 text-sm">
-                {/* Additional Emails */}
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Additional Emails</p>
-                  {contact.additional_emails?.length > 0
-                    ? contact.additional_emails.map((e, i) => <a key={i} href={`mailto:${e}`} className="block font-semibold text-gray-900 hover:text-green-700 break-all">{e}</a>)
-                    : <span className="text-gray-300">—</span>}
-                </div>
-                {/* Additional Phones */}
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Additional Phones</p>
-                  {contact.additional_phones?.length > 0
-                    ? contact.additional_phones.map((p, i) => <a key={i} href={`tel:${p}`} className="block font-semibold text-gray-900 hover:text-green-700">{p}</a>)
-                    : <span className="text-gray-300">—</span>}
-                </div>
-                {/* Assigned To */}
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Assigned To</p>
-                  <p className="font-semibold text-gray-900">{contact.ghl_assigned_to || <span className="text-gray-300">—</span>}</p>
-                </div>
-                {/* Consultation Type */}
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Consultation Type</p>
-                  <p className="font-semibold text-gray-900">{contact.consultation_type || <span className="text-gray-300">—</span>}</p>
-                </div>
-                {/* Date of Birth */}
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Date of Birth</p>
-                  <p className="text-gray-700">
-                    {contact.date_of_birth
-                      ? new Date(contact.date_of_birth + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+            {/* Card 3: Tab content */}
+            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+
+              {/* MAIN TAB */}
+              {leftTab === 'main' && (
+                <div className="space-y-3 text-sm">
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Additional Emails</p>
+                    {contact.additional_emails?.length > 0
+                      ? contact.additional_emails.map((e, i) => <a key={i} href={`mailto:${e}`} className="block font-semibold text-gray-900 hover:text-green-700 break-all">{e}</a>)
                       : <span className="text-gray-300">—</span>}
-                  </p>
-                </div>
-                {/* Project Description */}
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Project Description</p>
-                  {contact.project_description
-                    ? <p className="font-semibold text-gray-900 text-xs leading-relaxed whitespace-pre-wrap">{contact.project_description}</p>
-                    : <span className="text-gray-300">—</span>}
-                </div>
-              </div>
-            )}
-
-            {/* ── MARKETING TAB ── */}
-            {leftTab === 'marketing' && (
-              <div className="space-y-3 text-sm">
-
-                {/* Contact Type — interactive dropdown, always visible, defaults to Residential */}
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-1">Contact Type</p>
-                  <select
-                    value={contact.contact_type || 'Residential'}
-                    onChange={e => handleContactTypeChange(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600 bg-white cursor-pointer"
-                  >
-                    <option value="Residential">Residential</option>
-                    <option value="Commercial">Commercial</option>
-                    <option value="Public Works">Public Works</option>
-                  </select>
-                </div>
-
-                {/* Source Type — always visible */}
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Source Type</p>
-                  <p className="font-semibold text-gray-900">{contact.source || <span className="text-gray-300">—</span>}</p>
-                </div>
-
-                {/* Campaign — always visible */}
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Campaign</p>
-                  <p className="font-semibold text-gray-900">{contact.campaign || <span className="text-gray-300">—</span>}</p>
-                </div>
-
-                {/* Source Origin — always visible */}
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Source Origin</p>
-                  <p className="font-semibold text-gray-900">{contact.how_did_you_hear || <span className="text-gray-300">—</span>}</p>
-                </div>
-
-                {/* Project Interests — always visible */}
-                <div className="pt-2 border-t border-gray-100">
-                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-1.5">Project Interests</p>
-                  <div className="space-y-1.5">
-                    {[
-                      { label: '#1', val: contact.interest_1 },
-                      { label: '#2', val: contact.interest_2 },
-                      { label: '#3', val: contact.interest_3 },
-                    ].map(({ label, val }) => (
-                      <div key={label} className="flex items-center gap-2">
-                        <span className="text-[10px] text-gray-400 w-4 flex-shrink-0">{label}</span>
-                        {val
-                          ? <span className="text-xs font-medium text-gray-700 bg-green-50 border border-green-200 rounded-full px-2.5 py-0.5">{val}</span>
-                          : <span className="text-xs text-gray-300">—</span>
-                        }
-                      </div>
-                    ))}
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Additional Phones</p>
+                    {contact.additional_phones?.length > 0
+                      ? contact.additional_phones.map((p, i) => <a key={i} href={`tel:${p}`} className="block font-semibold text-gray-900 hover:text-green-700">{p}</a>)
+                      : <span className="text-gray-300">—</span>}
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Assigned To</p>
+                    <p className="font-semibold text-gray-900">{contact.ghl_assigned_to || <span className="text-gray-300">—</span>}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Consultation Type</p>
+                    <p className="font-semibold text-gray-900">{contact.consultation_type || <span className="text-gray-300">—</span>}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Date of Birth</p>
+                    <p className="font-semibold text-gray-900">{contact.date_of_birth ? new Date(contact.date_of_birth + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : <span className="text-gray-300">—</span>}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Project Description</p>
+                    {contact.project_description
+                      ? <p className="font-semibold text-gray-900 text-xs leading-relaxed whitespace-pre-wrap">{contact.project_description}</p>
+                      : <span className="text-gray-300">—</span>}
                   </div>
                 </div>
+              )}
 
-              </div>
-            )}
-
-            {/* ── DND TAB ── */}
-            {leftTab === 'dnd' && (
-              <div className="space-y-1">
-                <p className="text-xs text-gray-400 mb-3">Toggle channels to stop all outreach on that medium. Changes save instantly.</p>
-                {[
-                  { field: 'dnd_phone', label: 'Phone Calls',  icon: '📞', desc: 'No outbound calls' },
-                  { field: 'dnd_email', label: 'Email',        icon: '✉️', desc: 'No marketing emails' },
-                  { field: 'dnd_sms',   label: 'SMS / Text',   icon: '💬', desc: 'No text messages' },
-                ].map(({ field, label, icon, desc }) => (
-                  <div
-                    key={field}
-                    onClick={() => handleDndToggle(field)}
-                    className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-colors ${
-                      contact[field]
-                        ? 'bg-red-50 border-red-200'
-                        : 'bg-gray-50 border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-base">{icon}</span>
-                      <div>
-                        <p className={`text-xs font-semibold ${contact[field] ? 'text-red-700' : 'text-gray-700'}`}>{label}</p>
-                        <p className="text-[10px] text-gray-400">{contact[field] ? 'DND active' : desc}</p>
-                      </div>
-                    </div>
-                    {/* Toggle switch */}
-                    <div className={`w-9 h-5 rounded-full transition-colors relative flex-shrink-0 ${contact[field] ? 'bg-red-500' : 'bg-gray-300'}`}>
-                      <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${contact[field] ? 'translate-x-4' : 'translate-x-0.5'}`} />
+              {/* MARKETING TAB */}
+              {leftTab === 'marketing' && (
+                <div className="space-y-3 text-sm">
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Contact Type</p>
+                    <select value={contact.contact_type || 'Residential'} onChange={e => handleContactTypeChange(e.target.value)}
+                      className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600 bg-white cursor-pointer">
+                      <option value="Residential">Residential</option>
+                      <option value="Commercial">Commercial</option>
+                      <option value="Public Works">Public Works</option>
+                    </select>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Source Type</p>
+                    <p className="font-semibold text-gray-900">{contact.source || <span className="text-gray-300">—</span>}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Campaign</p>
+                    <p className="font-semibold text-gray-900">{contact.campaign || <span className="text-gray-300">—</span>}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Source Origin</p>
+                    <p className="font-semibold text-gray-900">{contact.how_did_you_hear || <span className="text-gray-300">—</span>}</p>
+                  </div>
+                  <div className="pt-2 border-t border-slate-100">
+                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Project Interests</p>
+                    <div className="space-y-1.5">
+                      {[
+                        { label: '#1', val: contact.interest_1 },
+                        { label: '#2', val: contact.interest_2 },
+                        { label: '#3', val: contact.interest_3 },
+                      ].map(({ label, val }) => (
+                        <div key={label} className="flex items-center gap-2">
+                          <span className="text-[10px] text-gray-400 w-4 flex-shrink-0">{label}</span>
+                          {val ? <span className="text-xs font-medium text-gray-700 bg-green-50 border border-green-200 rounded-full px-2.5 py-0.5">{val}</span>
+                               : <span className="text-xs text-gray-300">—</span>}
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ))}
-                {(contact.dnd_phone || contact.dnd_email || contact.dnd_sms) && (
-                  <div className="mt-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-xs font-semibold text-red-700">⚠ DND Active</p>
-                    <p className="text-[10px] text-red-500 mt-0.5">
-                      {[contact.dnd_phone && 'Phone', contact.dnd_email && 'Email', contact.dnd_sms && 'SMS'].filter(Boolean).join(', ')} restricted
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
+                </div>
+              )}
 
-            {/* ── TAGS TAB ── */}
-            {leftTab === 'tags' && (
-              <div>
-                <p className="text-xs text-gray-400 mb-3">Type a tag and press Enter to add it.</p>
-                <input
-                  type="text"
-                  value={tagInput}
-                  onChange={e => setTagInput(e.target.value)}
-                  onKeyDown={handleTagAdd}
-                  placeholder="Add tag…"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600"
-                />
-                {contact.tags?.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {contact.tags.map(tag => (
-                      <span
-                        key={tag}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-green-50 border border-green-200 text-green-800 text-xs font-medium rounded-full"
-                      >
-                        {tag}
-                        <button
-                          onClick={() => handleTagRemove(tag)}
-                          className="text-green-500 hover:text-red-500 transition-colors leading-none"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-gray-400 italic text-center py-4">No tags yet</p>
-                )}
-              </div>
-            )}
+              {/* DND TAB */}
+              {leftTab === 'dnd' && (
+                <div className="space-y-1">
+                  <p className="text-xs text-gray-400 mb-3">Toggle channels to stop all outreach on that medium. Changes save instantly.</p>
+                  {[
+                    { field: 'dnd_phone', label: 'Phone Calls', icon: '📞', desc: 'No outbound calls' },
+                    { field: 'dnd_email', label: 'Email',       icon: '✉️', desc: 'No marketing emails' },
+                    { field: 'dnd_sms',   label: 'SMS / Text',  icon: '💬', desc: 'No text messages' },
+                  ].map(({ field, label, icon, desc }) => (
+                    <div key={field} onClick={() => handleDndToggle(field)}
+                      className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-colors ${
+                        contact[field] ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                      }`}>
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-base">{icon}</span>
+                        <div>
+                          <p className={`text-xs font-semibold ${contact[field] ? 'text-red-700' : 'text-gray-700'}`}>{label}</p>
+                          <p className="text-[10px] text-gray-400">{contact[field] ? 'DND active' : desc}</p>
+                        </div>
+                      </div>
+                      <div className={`w-9 h-5 rounded-full transition-colors relative flex-shrink-0 ${contact[field] ? 'bg-red-500' : 'bg-gray-300'}`}>
+                        <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${contact[field] ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                      </div>
+                    </div>
+                  ))}
+                  {(contact.dnd_phone || contact.dnd_email || contact.dnd_sms) && (
+                    <div className="mt-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-xs font-semibold text-red-700">⚠ DND Active</p>
+                      <p className="text-[10px] text-red-500 mt-0.5">
+                        {[contact.dnd_phone && 'Phone', contact.dnd_email && 'Email', contact.dnd_sms && 'SMS'].filter(Boolean).join(', ')} restricted
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
 
-            {/* Linked client */}
-            <div className="mt-5 pt-4 border-t border-gray-100">
-              <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-2">Linked Client</p>
-              {client ? (
-                <Link to={`/clients/${client.id}`} className="flex items-center gap-2 text-sm text-green-700 hover:text-green-900 font-medium hover:underline">
-                  <span>👥</span> {client.name}
-                </Link>
-              ) : (
-                <p className="text-xs text-gray-400 italic">No client linked yet</p>
+              {/* TAGS TAB */}
+              {leftTab === 'tags' && (
+                <div>
+                  <p className="text-xs text-gray-400 mb-3">Type a tag and press Enter to add it.</p>
+                  <input type="text" value={tagInput} onChange={e => setTagInput(e.target.value)}
+                    onKeyDown={handleTagAdd} placeholder="Add tag…"
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600" />
+                  {contact.tags?.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {contact.tags.map(tag => (
+                        <span key={tag} className="inline-flex items-center gap-1 px-2.5 py-1 bg-green-50 border border-green-200 text-green-800 text-xs font-medium rounded-full">
+                          {tag}
+                          <button onClick={() => handleTagRemove(tag)} className="text-green-500 hover:text-red-500 transition-colors leading-none">×</button>
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-400 italic text-center py-4">No tags yet</p>
+                  )}
+                </div>
               )}
             </div>
 
-            {/* Call Center Notes */}
-            {contact.call_center_notes && (
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-1.5">Call Center Notes</p>
-                <p className="font-semibold text-gray-900 text-xs leading-relaxed whitespace-pre-wrap max-h-32 overflow-y-auto">{contact.call_center_notes}</p>
+            {/* Card 4: Notes + Linked Client + Meta */}
+            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-3">
+              <div>
+                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Linked Client</p>
+                {client
+                  ? <Link to={`/clients/${client.id}`} className="flex items-center gap-2 text-sm text-green-700 hover:text-green-900 font-medium hover:underline"><span>👥</span> {client.name}</Link>
+                  : <p className="text-xs text-gray-400 italic">No client linked yet</p>}
               </div>
-            )}
-
-            {/* Notes — always visible above meta regardless of active tab */}
-            {contact.notes && (
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-1.5">Notes</p>
-                <p className="font-semibold text-gray-900 text-xs leading-relaxed whitespace-pre-wrap max-h-40 overflow-y-auto">{contact.notes}</p>
+              {contact.call_center_notes && (
+                <div className="pt-2 border-t border-slate-100">
+                  <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Call Center Notes</p>
+                  <p className="font-semibold text-gray-900 text-xs leading-relaxed whitespace-pre-wrap max-h-32 overflow-y-auto">{contact.call_center_notes}</p>
+                </div>
+              )}
+              {contact.notes && (
+                <div className="pt-2 border-t border-slate-100">
+                  <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Notes</p>
+                  <p className="font-semibold text-gray-900 text-xs leading-relaxed whitespace-pre-wrap max-h-40 overflow-y-auto">{contact.notes}</p>
+                </div>
+              )}
+              <div className="pt-2 border-t border-slate-100 text-xs text-gray-400 space-y-0.5">
+                <p>Created: {fmtDate(contact.created_at)}</p>
+                {contact.updated_at !== contact.created_at && <p>Updated: {fmtDate(contact.updated_at)}</p>}
               </div>
-            )}
-
-            {/* Meta */}
-            <div className="mt-4 pt-4 border-t border-gray-100 text-xs text-gray-400 space-y-1">
-              <p>Created: {fmtDate(contact.created_at)}</p>
-              {contact.updated_at !== contact.created_at && <p>Updated: {fmtDate(contact.updated_at)}</p>}
             </div>
+
           </div>
         </div>
 
         {/* ── MIDDLE COLUMN: Communication Log ──────────────────────────── */}
-        <div className="flex flex-col bg-gray-50">
+        <div className="flex flex-col bg-slate-100">
 
-          {/* Log header */}
-          <div className="px-5 py-3 bg-white border-b border-gray-200 flex-shrink-0">
+          {/* Header */}
+          <div className="px-5 py-3 bg-white border-b border-slate-200 flex-shrink-0">
             <h3 className="text-sm font-bold text-gray-700">Communication Log</h3>
             <p className="text-xs text-gray-400 mt-0.5">Notes, calls, emails, texts and updates</p>
           </div>
 
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+          {/* Messages — slate bg, each message is a white card */}
+          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
             {comms.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-16 text-gray-300">
+              <div className="flex flex-col items-center justify-center py-16 text-gray-400">
                 <p className="text-4xl mb-2">💬</p>
                 <p className="text-sm">No communications yet — add the first entry below.</p>
               </div>
@@ -698,17 +623,16 @@ export default function ContactDetail() {
                   <span className="ml-auto flex-shrink-0">{timeAgo(comm.created_at)}</span>
                 </div>
               )
-
               const t = commTypeMap[comm.type] || { icon: '📝', label: 'Note' }
               const isOut = comm.direction === 'outbound'
               return (
                 <div key={comm.id} className={`flex gap-3 ${isOut ? 'flex-row-reverse' : ''}`}>
-                  <div className="w-7 h-7 rounded-full bg-white border border-gray-200 flex items-center justify-center text-sm flex-shrink-0">
+                  <div className="w-7 h-7 rounded-full bg-white border border-slate-200 flex items-center justify-center text-sm flex-shrink-0">
                     {t.icon}
                   </div>
                   <div className={`max-w-[75%] ${isOut ? 'items-end' : 'items-start'} flex flex-col`}>
                     <div className={`rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
-                      isOut ? 'bg-green-700 text-white rounded-tr-sm' : 'bg-white text-gray-800 border border-gray-200 rounded-tl-sm'
+                      isOut ? 'bg-green-700 text-white rounded-tr-sm' : 'bg-white text-gray-800 border border-slate-200 rounded-tl-sm'
                     }`}>
                       <p className="whitespace-pre-wrap leading-relaxed">{comm.content}</p>
                     </div>
@@ -726,32 +650,24 @@ export default function ContactDetail() {
             <div ref={commsEndRef} />
           </div>
 
-          {/* Add entry form */}
-          <div className="flex-shrink-0 bg-white border-t border-gray-200 px-5 py-4">
+          {/* Input — white card floating at bottom */}
+          <div className="flex-shrink-0 mx-3 mb-3 bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
             <div className="flex items-center gap-2 mb-3">
               {COMM_TYPES.map(t => (
-                <button
-                  key={t.value}
-                  onClick={() => setCommType(t.value)}
+                <button key={t.value} onClick={() => setCommType(t.value)}
                   className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
-                    commType === t.value
-                      ? 'bg-green-700 text-white border-green-700'
-                      : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
-                  }`}
-                >
+                    commType === t.value ? 'bg-green-700 text-white border-green-700' : 'bg-slate-50 text-gray-500 border-slate-200 hover:border-slate-400'
+                  }`}>
                   <span>{t.icon}</span> {t.label}
                 </button>
               ))}
               {commType !== 'note' && (
                 <div className="ml-auto flex items-center gap-2">
                   {['inbound', 'outbound'].map(d => (
-                    <button
-                      key={d}
-                      onClick={() => setCommDir(d)}
+                    <button key={d} onClick={() => setCommDir(d)}
                       className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors capitalize ${
-                        commDir === d ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
-                      }`}
-                    >
+                        commDir === d ? 'bg-gray-800 text-white border-gray-800' : 'bg-slate-50 text-gray-500 border-slate-200 hover:border-slate-400'
+                      }`}>
                       {d}
                     </button>
                   ))}
@@ -759,49 +675,37 @@ export default function ContactDetail() {
               )}
             </div>
             <div className="flex gap-2">
-              <textarea
-                value={commContent}
-                onChange={e => setCommContent(e.target.value)}
+              <textarea value={commContent} onChange={e => setCommContent(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddComm() } }}
-                placeholder={`Add a ${commType}… (Enter to send)`}
-                rows={2}
-                className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600 resize-none"
-              />
-              <button
-                onClick={handleAddComm}
-                disabled={sending || !commContent.trim()}
-                className="px-4 py-2 bg-green-700 text-white rounded-xl text-sm font-semibold hover:bg-green-800 disabled:opacity-40 transition-colors self-end"
-              >
+                placeholder={`Add a ${commType}… (Enter to send)`} rows={2}
+                className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600 resize-none bg-slate-50" />
+              <button onClick={handleAddComm} disabled={sending || !commContent.trim()}
+                className="px-4 py-2 bg-green-700 text-white rounded-xl text-sm font-semibold hover:bg-green-800 disabled:opacity-40 transition-colors self-end">
                 {sending ? '…' : 'Send'}
               </button>
             </div>
           </div>
         </div>
 
-        {/* ── RIGHT COLUMN: Activity & Pipeline ─────────────────────────── */}
-        <div className="border-l border-gray-200 bg-white overflow-y-auto">
-          <div className="p-5">
+        {/* ── RIGHT COLUMN: Pipeline & Activity ─────────────────────────── */}
+        <div className="border-l border-slate-200 bg-slate-100 overflow-y-auto">
+          <div className="p-3 space-y-2">
 
-            {/* Pipeline stages */}
-            <div className="mb-6">
-              <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-3">Pipeline</p>
+            {/* Pipeline card */}
+            <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Pipeline</p>
               <div className="space-y-1">
                 {STAGES.map((s, i) => {
                   const isActive = contact.stage === s.value
                   const stageOrder = STAGES.findIndex(x => x.value === contact.stage)
                   const isPast = i < stageOrder && s.value !== 'lost' && contact.stage !== 'lost'
                   return (
-                    <button
-                      key={s.value}
-                      onClick={() => handleStageChange(s.value)}
+                    <button key={s.value} onClick={() => handleStageChange(s.value)}
                       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors text-left ${
-                        isActive
-                          ? s.cls + ' ring-1 ring-current'
-                          : isPast
-                          ? 'bg-gray-50 text-gray-400 border border-transparent'
-                          : 'hover:bg-gray-50 text-gray-400 border border-transparent hover:border-gray-200'
-                      }`}
-                    >
+                        isActive ? s.cls + ' ring-1 ring-current'
+                        : isPast ? 'bg-slate-50 text-gray-400 border border-transparent'
+                        : 'hover:bg-slate-50 text-gray-400 border border-transparent hover:border-slate-200'
+                      }`}>
                       <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isActive ? s.dot : isPast ? 'bg-gray-300' : 'bg-gray-200'}`} />
                       {s.label}
                       {isActive && <span className="ml-auto text-[9px] opacity-60">CURRENT</span>}
@@ -811,11 +715,10 @@ export default function ContactDetail() {
               </div>
             </div>
 
-            {/* Recent activity */}
-            <div>
-              <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-3">Recent Activity</p>
+            {/* Activity card */}
+            <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Recent Activity</p>
               <div className="space-y-3">
-                {/* Contact created */}
                 <div className="flex items-start gap-2.5">
                   <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">✓</div>
                   <div>
@@ -823,44 +726,33 @@ export default function ContactDetail() {
                     <p className="text-[10px] text-gray-400">{fmtDate(contact.created_at)}</p>
                   </div>
                 </div>
-
-                {/* Stage changes from comms log */}
-                {[...comms]
-                  .filter(c => c.type === 'stage_change')
-                  .reverse()
-                  .slice(0, 5)
-                  .map(c => (
-                    <div key={c.id} className="flex items-start gap-2.5">
-                      <div className="w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">🔄</div>
-                      <div>
-                        <p className="text-xs font-medium text-gray-700">{c.content}</p>
-                        <p className="text-[10px] text-gray-400">{timeAgo(c.created_at)}</p>
-                      </div>
+                {[...comms].filter(c => c.type === 'stage_change').reverse().slice(0, 5).map(c => (
+                  <div key={c.id} className="flex items-start gap-2.5">
+                    <div className="w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">🔄</div>
+                    <div>
+                      <p className="text-xs font-medium text-gray-700">{c.content}</p>
+                      <p className="text-[10px] text-gray-400">{timeAgo(c.created_at)}</p>
                     </div>
-                  ))
-                }
-
-                {/* Last communication */}
+                  </div>
+                ))}
                 {comms.filter(c => c.type !== 'stage_change' && c.type !== 'system').length > 0 && (() => {
                   const last = [...comms].filter(c => c.type !== 'stage_change' && c.type !== 'system').at(-1)
                   const t = commTypeMap[last.type] || { icon: '📝', label: 'Note' }
                   return (
                     <div className="flex items-start gap-2.5">
-                      <div className="w-6 h-6 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">{t.icon}</div>
+                      <div className="w-6 h-6 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">{t.icon}</div>
                       <div>
                         <p className="text-xs font-medium text-gray-700">Last {t.label}</p>
-                        <p className="text-[10px] text-gray-500 truncate max-w-[140px]">{last.content}</p>
+                        <p className="text-[10px] text-gray-500 truncate max-w-[120px]">{last.content}</p>
                         <p className="text-[10px] text-gray-400">{timeAgo(last.created_at)}</p>
                       </div>
                     </div>
                   )
                 })()}
-
-                {comms.length === 0 && (
-                  <p className="text-xs text-gray-400 italic">No activity yet</p>
-                )}
+                {comms.length === 0 && <p className="text-xs text-gray-400 italic">No activity yet</p>}
               </div>
             </div>
+
           </div>
         </div>
       </div>
