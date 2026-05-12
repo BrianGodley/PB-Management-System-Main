@@ -331,7 +331,7 @@ export default function ContactDetail() {
     : contact.first_name || 'Unnamed'
 
   return (
-    <div className="flex flex-col h-full bg-slate-100">
+    <div className="flex flex-col h-full bg-slate-400">
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
       {/* Top bar */}
       <div className="flex items-center gap-3 px-6 py-3 bg-white border-b border-gray-200 flex-shrink-0">
@@ -346,11 +346,11 @@ export default function ContactDetail() {
       <div className="flex-1 min-h-0 overflow-hidden grid" style={{gridTemplateColumns: '23rem minmax(0,1fr) 15rem'}}>
 
         {/* ── LEFT COLUMN ───────────────────────────────────────────────── */}
-        <div className="border-r border-slate-200 bg-slate-100 overflow-y-auto">
+        <div className="border-r border-slate-300 bg-slate-400 overflow-y-auto">
           <div className="p-3 space-y-2">
 
             {/* Card 1: Identity */}
-            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+            <div className="bg-white border border-slate-300 rounded-xl p-4 shadow-sm">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <div className="w-11 h-11 rounded-full bg-green-100 flex items-center justify-center text-green-800 font-bold text-lg flex-shrink-0">
@@ -359,7 +359,7 @@ export default function ContactDetail() {
                   <h2 className="text-base font-bold text-gray-900 leading-tight">{fullName || 'Unnamed'}</h2>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button onClick={() => setShowEdit(true)} className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-slate-100 transition-colors" title="Edit contact">
+                  <button onClick={() => setShowEdit(true)} className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-slate-400 transition-colors" title="Edit contact">
                     <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M11.5 1.5a1.414 1.414 0 0 1 2 2L5 12l-3 1 1-3 8.5-8.5z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </button>
                   <button onClick={() => setShowDelete(true)} className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors" title="Delete contact">
@@ -396,7 +396,7 @@ export default function ContactDetail() {
             </div>
 
             {/* Card 2: Stage */}
-            <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+            <div className="bg-white border border-slate-300 rounded-xl p-3 shadow-sm">
               <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Stage</label>
               <select value={contact.stage} onChange={e => handleStageChange(e.target.value)}
                 className={`w-full border rounded-lg px-3 py-1.5 text-sm font-semibold focus:outline-none cursor-pointer ${stage.cls}`}>
@@ -428,7 +428,7 @@ export default function ContactDetail() {
             </div>
 
             {/* Card 3: Tab content */}
-            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+            <div className="bg-white border border-slate-300 rounded-xl p-4 shadow-sm">
 
               {/* MAIN TAB */}
               {leftTab === 'main' && (
@@ -472,7 +472,7 @@ export default function ContactDetail() {
                   <div>
                     <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Contact Type</p>
                     <select value={contact.contact_type || 'Residential'} onChange={e => handleContactTypeChange(e.target.value)}
-                      className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600 bg-white cursor-pointer">
+                      className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600 bg-white cursor-pointer">
                       <option value="Residential">Residential</option>
                       <option value="Commercial">Commercial</option>
                       <option value="Public Works">Public Works</option>
@@ -520,7 +520,7 @@ export default function ContactDetail() {
                   ].map(({ field, label, icon, desc }) => (
                     <div key={field} onClick={() => handleDndToggle(field)}
                       className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-colors ${
-                        contact[field] ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                        contact[field] ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-300 hover:border-slate-300'
                       }`}>
                       <div className="flex items-center gap-2.5">
                         <span className="text-base">{icon}</span>
@@ -551,7 +551,7 @@ export default function ContactDetail() {
                   <p className="text-xs text-gray-400 mb-3">Type a tag and press Enter to add it.</p>
                   <input type="text" value={tagInput} onChange={e => setTagInput(e.target.value)}
                     onKeyDown={handleTagAdd} placeholder="Add tag…"
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600" />
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600" />
                   {contact.tags?.length > 0 ? (
                     <div className="flex flex-wrap gap-1.5">
                       {contact.tags.map(tag => (
@@ -569,7 +569,7 @@ export default function ContactDetail() {
             </div>
 
             {/* Card 4: Notes + Linked Client + Meta */}
-            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-3">
+            <div className="bg-white border border-slate-300 rounded-xl p-4 shadow-sm space-y-3">
               <div>
                 <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Linked Client</p>
                 {client
@@ -598,10 +598,10 @@ export default function ContactDetail() {
         </div>
 
         {/* ── MIDDLE COLUMN: Communication Log ──────────────────────────── */}
-        <div className="flex flex-col bg-slate-100">
+        <div className="flex flex-col bg-slate-400">
 
           {/* Header */}
-          <div className="px-5 py-3 bg-white border-b border-slate-200 flex-shrink-0">
+          <div className="px-5 py-3 bg-white border-b border-slate-300 flex-shrink-0">
             <h3 className="text-sm font-bold text-gray-700">Communication Log</h3>
             <p className="text-xs text-gray-400 mt-0.5">Notes, calls, emails, texts and updates</p>
           </div>
@@ -627,12 +627,12 @@ export default function ContactDetail() {
               const isOut = comm.direction === 'outbound'
               return (
                 <div key={comm.id} className={`flex gap-3 ${isOut ? 'flex-row-reverse' : ''}`}>
-                  <div className="w-7 h-7 rounded-full bg-white border border-slate-200 flex items-center justify-center text-sm flex-shrink-0">
+                  <div className="w-7 h-7 rounded-full bg-white border border-slate-300 flex items-center justify-center text-sm flex-shrink-0">
                     {t.icon}
                   </div>
                   <div className={`max-w-[75%] ${isOut ? 'items-end' : 'items-start'} flex flex-col`}>
                     <div className={`rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
-                      isOut ? 'bg-green-700 text-white rounded-tr-sm' : 'bg-white text-gray-800 border border-slate-200 rounded-tl-sm'
+                      isOut ? 'bg-green-700 text-white rounded-tr-sm' : 'bg-white text-gray-800 border border-slate-300 rounded-tl-sm'
                     }`}>
                       <p className="whitespace-pre-wrap leading-relaxed">{comm.content}</p>
                     </div>
@@ -651,12 +651,12 @@ export default function ContactDetail() {
           </div>
 
           {/* Input — white card floating at bottom */}
-          <div className="flex-shrink-0 mx-3 mb-3 bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
+          <div className="flex-shrink-0 mx-3 mb-3 bg-white border border-slate-300 rounded-xl px-4 py-3 shadow-sm">
             <div className="flex items-center gap-2 mb-3">
               {COMM_TYPES.map(t => (
                 <button key={t.value} onClick={() => setCommType(t.value)}
                   className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
-                    commType === t.value ? 'bg-green-700 text-white border-green-700' : 'bg-slate-50 text-gray-500 border-slate-200 hover:border-slate-400'
+                    commType === t.value ? 'bg-green-700 text-white border-green-700' : 'bg-slate-50 text-gray-500 border-slate-300 hover:border-slate-400'
                   }`}>
                   <span>{t.icon}</span> {t.label}
                 </button>
@@ -666,7 +666,7 @@ export default function ContactDetail() {
                   {['inbound', 'outbound'].map(d => (
                     <button key={d} onClick={() => setCommDir(d)}
                       className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors capitalize ${
-                        commDir === d ? 'bg-gray-800 text-white border-gray-800' : 'bg-slate-50 text-gray-500 border-slate-200 hover:border-slate-400'
+                        commDir === d ? 'bg-gray-800 text-white border-gray-800' : 'bg-slate-50 text-gray-500 border-slate-300 hover:border-slate-400'
                       }`}>
                       {d}
                     </button>
@@ -678,7 +678,7 @@ export default function ContactDetail() {
               <textarea value={commContent} onChange={e => setCommContent(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddComm() } }}
                 placeholder={`Add a ${commType}… (Enter to send)`} rows={2}
-                className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600 resize-none bg-slate-50" />
+                className="flex-1 border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600 resize-none bg-slate-50" />
               <button onClick={handleAddComm} disabled={sending || !commContent.trim()}
                 className="px-4 py-2 bg-green-700 text-white rounded-xl text-sm font-semibold hover:bg-green-800 disabled:opacity-40 transition-colors self-end">
                 {sending ? '…' : 'Send'}
@@ -688,11 +688,11 @@ export default function ContactDetail() {
         </div>
 
         {/* ── RIGHT COLUMN: Pipeline & Activity ─────────────────────────── */}
-        <div className="border-l border-slate-200 bg-slate-100 overflow-y-auto">
+        <div className="border-l border-slate-300 bg-slate-400 overflow-y-auto">
           <div className="p-3 space-y-2">
 
             {/* Pipeline card */}
-            <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+            <div className="bg-white border border-slate-300 rounded-xl p-3 shadow-sm">
               <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Pipeline</p>
               <div className="space-y-1">
                 {STAGES.map((s, i) => {
@@ -704,7 +704,7 @@ export default function ContactDetail() {
                       className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors text-left ${
                         isActive ? s.cls + ' ring-1 ring-current'
                         : isPast ? 'bg-slate-50 text-gray-400 border border-transparent'
-                        : 'hover:bg-slate-50 text-gray-400 border border-transparent hover:border-slate-200'
+                        : 'hover:bg-slate-50 text-gray-400 border border-transparent hover:border-slate-300'
                       }`}>
                       <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isActive ? s.dot : isPast ? 'bg-gray-300' : 'bg-gray-200'}`} />
                       {s.label}
@@ -716,7 +716,7 @@ export default function ContactDetail() {
             </div>
 
             {/* Activity card */}
-            <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+            <div className="bg-white border border-slate-300 rounded-xl p-3 shadow-sm">
               <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Recent Activity</p>
               <div className="space-y-3">
                 <div className="flex items-start gap-2.5">
@@ -740,7 +740,7 @@ export default function ContactDetail() {
                   const t = commTypeMap[last.type] || { icon: '📝', label: 'Note' }
                   return (
                     <div className="flex items-start gap-2.5">
-                      <div className="w-6 h-6 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">{t.icon}</div>
+                      <div className="w-6 h-6 rounded-full bg-slate-400 border border-slate-300 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">{t.icon}</div>
                       <div>
                         <p className="text-xs font-medium text-gray-700">Last {t.label}</p>
                         <p className="text-[10px] text-gray-500 truncate max-w-[120px]">{last.content}</p>
