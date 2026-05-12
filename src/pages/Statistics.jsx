@@ -5535,11 +5535,12 @@ function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, p
   }
 
   const SUB_TABS = [
-    { key: 'tracking', label: '📅 Tracking' },
-    { key: 'general',  label: '📖 General' },
-    { key: 'groups',   label: '📂 Stat Groups' },
-    ...(isAdmin ? [{ key: 'master',  label: '👑 Master' }] : []),
-    ...(isAdmin ? [{ key: 'archive', label: '📦 Archive' }] : []),
+    { key: 'tracking',   label: '📅 Tracking' },
+    { key: 'general',    label: '📖 General' },
+    { key: 'groups',     label: '📂 Stat Groups' },
+    ...(isAdmin ? [{ key: 'reminders', label: '🔔 Reminders' }] : []),
+    ...(isAdmin ? [{ key: 'master',    label: '👑 Master' }] : []),
+    ...(isAdmin ? [{ key: 'archive',   label: '📦 Archive' }] : []),
   ]
 
   // Helper for the Master tab: turn a stat's owner_user_id into a display name.
@@ -5592,7 +5593,7 @@ function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, p
       {/* The Master sub-tab needs the full width — its table has 5 columns
           and gets clipped by the narrow max-w-xl that's used for the
           settings forms. */}
-      <div className={settingsSubTab === 'master' ? '' : 'max-w-xl'}>
+      <div className={settingsSubTab === 'master' || settingsSubTab === 'reminders' ? '' : 'max-w-xl'}>
 
         {/* ── TRACKING SUB-TAB ── */}
         {settingsSubTab === 'tracking' && (
@@ -5794,12 +5795,217 @@ function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, p
         )}
 
         {/* ── ARCHIVE SUB-TAB — admin-only archived-stats list ── */}
+        {settingsSubTab === 'reminders' && isAdmin && (
+          <RemindersSettingsTab stats={stats} profiles={profiles} />
+        )}
+
         {settingsSubTab === 'archive' && isAdmin && (
           <ArchivedView onRestored={onRestored} />
         )}
 
       </div>
       </div>
+    </div>
+  )
+}
+
+// ── RemindersSettingsTab ──────────────────────────────────────────────────────
+function RemindersSettingsTab({ stats, profiles }) {
+  const [reminders, setReminders] = useState({})   // { [statistic_id]: row }
+  const [saving,    setSaving]    = useState({})    // { [statistic_id]: bool }
+  const [msg,       setMsg]       = useState({})    // { [statistic_id]: 'ok'|'error' }
+  const [loading,   setLoading]   = useState(true)
+
+  const manualStats = useMemo(
+    () => (stats || []).filter(s => !s.archived).sort((a, b) => (a.name || '').localeCompare(b.name || '')),
+    [stats]
+  )
+
+  useEffect(() => { loadReminders() }, [manualStats])
+
+  async function loadReminders() {
+    if (!manualStats.length) { setLoading(false); return }
+    const ids = manualStats.map(s => s.id)
+    const { data } = await supabase.from('stat_reminders').select('*').in('statistic_id', ids)
+    const map = {}
+    ;(data || []).forEach(r => { map[r.statistic_id] = r })
+    setReminders(map)
+    setLoading(false)
+  }
+
+  function getReminder(statId) {
+    return reminders[statId] || {
+      statistic_id:   statId,
+      enabled:        false,
+      delay_days:     3,
+      notify_email:   true,
+      notify_sms:     false,
+      repeat_enabled: false,
+      repeat_value:   1,
+      repeat_unit:    'weeks',
+    }
+  }
+
+  function update(statId, patch) {
+    setReminders(prev => ({
+      ...prev,
+      [statId]: { ...getReminder(statId), ...patch },
+    }))
+  }
+
+  async function save(statId) {
+    setSaving(s => ({ ...s, [statId]: true }))
+    const row = getReminder(statId)
+    const { error } = await supabase.from('stat_reminders').upsert(
+      { ...row, statistic_id: statId, updated_at: new Date().toISOString() },
+      { onConflict: 'statistic_id' }
+    )
+    setSaving(s => ({ ...s, [statId]: false }))
+    setMsg(m => ({ ...m, [statId]: error ? 'error' : 'ok' }))
+    setTimeout(() => setMsg(m => ({ ...m, [statId]: null })), 2500)
+    if (!error) {
+      const { data: fresh } = await supabase.from('stat_reminders').select('*').eq('statistic_id', statId).single()
+      if (fresh) setReminders(prev => ({ ...prev, [statId]: fresh }))
+    }
+  }
+
+  function ownerName(stat) {
+    if (!stat.owner_user_id) return '—'
+    const p = (profiles || []).find(x => x.id === stat.owner_user_id)
+    return p?.full_name || (p?.email ? p.email.split('@')[0] : '—')
+  }
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-16">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700" />
+    </div>
+  )
+
+  if (!manualStats.length) return (
+    <div className="text-center py-12 text-gray-400">
+      <p className="text-3xl mb-2">📊</p>
+      <p className="text-sm">No active statistics found.</p>
+    </div>
+  )
+
+  return (
+    <div className="space-y-3">
+      <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-800">
+        <strong>How reminders work:</strong> After a period ends, if no value has been entered and the delay passes, the stat owner receives a notification. Repeat reminders continue on the configured interval until a value is entered.
+      </div>
+
+      {manualStats.map(stat => {
+        const r = getReminder(stat.id)
+        const isSaving = saving[stat.id]
+        const status   = msg[stat.id]
+
+        return (
+          <div key={stat.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            {/* Header row */}
+            <div className="flex items-center justify-between px-4 py-3 gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-gray-900 text-sm truncate">{stat.name}</p>
+                <p className="text-xs text-gray-400">{stat.tracking} · Owner: {ownerName(stat)}</p>
+              </div>
+              <div className="flex items-center gap-3 flex-shrink-0">
+                {status === 'ok'    && <span className="text-xs text-green-600 font-medium">Saved ✓</span>}
+                {status === 'error' && <span className="text-xs text-red-500 font-medium">Error saving</span>}
+                {/* Enable toggle */}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <span className="text-xs text-gray-500 font-medium">{r.enabled ? 'On' : 'Off'}</span>
+                  <div
+                    onClick={() => { update(stat.id, { enabled: !r.enabled }); setTimeout(() => save(stat.id), 50) }}
+                    className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${r.enabled ? 'bg-green-600' : 'bg-gray-300'}`}
+                  >
+                    <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${r.enabled ? 'translate-x-5' : ''}`} />
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Config panel — only shown when enabled */}
+            {r.enabled && (
+              <div className="border-t border-gray-100 bg-gray-50 px-4 py-4 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+                  {/* Delay */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">Delay after period ends</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number" min={1} max={60}
+                        value={r.delay_days}
+                        onChange={e => update(stat.id, { delay_days: Math.min(60, Math.max(1, parseInt(e.target.value) || 1)) })}
+                        className="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-green-600"
+                      />
+                      <span className="text-sm text-gray-500">days</span>
+                    </div>
+                  </div>
+
+                  {/* Notify via */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">Notify via</label>
+                    <div className="flex gap-3">
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked={r.notify_email}
+                          onChange={e => update(stat.id, { notify_email: e.target.checked })}
+                          className="accent-green-700 w-3.5 h-3.5" />
+                        <span className="text-sm text-gray-700">✉️ Email</span>
+                      </label>
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked={r.notify_sms}
+                          onChange={e => update(stat.id, { notify_sms: e.target.checked })}
+                          className="accent-green-700 w-3.5 h-3.5" />
+                        <span className="text-sm text-gray-700">📱 Text</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Repeat */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">Repeat reminder</label>
+                    <label className="flex items-center gap-2 cursor-pointer mb-2">
+                      <input type="checkbox" checked={r.repeat_enabled}
+                        onChange={e => update(stat.id, { repeat_enabled: e.target.checked })}
+                        className="accent-green-700 w-3.5 h-3.5" />
+                      <span className="text-sm text-gray-700">Repeat until value entered</span>
+                    </label>
+                    {r.repeat_enabled && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500">Every</span>
+                        <input
+                          type="number" min={1}
+                          value={r.repeat_value}
+                          onChange={e => update(stat.id, { repeat_value: Math.max(1, parseInt(e.target.value) || 1) })}
+                          className="w-14 border border-gray-300 rounded-lg px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-green-600"
+                        />
+                        <select
+                          value={r.repeat_unit}
+                          onChange={e => update(stat.id, { repeat_unit: e.target.value })}
+                          className="border border-gray-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                        >
+                          <option value="days">days</option>
+                          <option value="weeks">weeks</option>
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => save(stat.id)}
+                    disabled={isSaving}
+                    className="btn-primary text-sm px-4 py-1.5 disabled:opacity-50"
+                  >
+                    {isSaving ? 'Saving…' : 'Save Reminder'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
