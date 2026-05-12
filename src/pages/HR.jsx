@@ -34,7 +34,7 @@ const STATUS_LABELS = {
 }
 
 // ── Add Employee Modal ────────────────────────────────────────────────────────
-function AddEmployeeModal({ onSave, onClose }) {
+function AddEmployeeModal({ onSave, onClose, positions = [] }) {
   const [form, setForm] = useState({
     first_name: '', last_name: '', nickname: '', email: '', phone: '', cell_phone: '',
     job_title: '', department: '', start_date: '', pay_rate: '', pay_type: 'hourly',
@@ -190,9 +190,12 @@ function AddEmployeeModal({ onSave, onClose }) {
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Job Title</label>
-            <input value={form.job_title} onChange={e => set('job_title', e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
+            <label className="block text-xs font-medium text-gray-600 mb-1">Position</label>
+            <select value={form.job_title} onChange={e => set('job_title', e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500">
+              <option value="">Select position…</option>
+              {positions.map(p => <option key={p.id} value={p.title}>{p.title}</option>)}
+            </select>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Department</label>
@@ -381,25 +384,45 @@ export default function HR() {
   const [groupSaving,   setGroupSaving]   = useState(false)
   const [selectedMembers, setSelectedMembers] = useState(new Set())
 
+  // Positions state
+  const [positions,       setPositions]       = useState([])
+  const [positionCourses, setPositionCourses] = useState({})  // positionId -> Set of course_ids
+  const [courses,         setCourses]         = useState([])  // all LMS courses
+  const [editingPosition, setEditingPosition] = useState(null) // null | 'new' | position object
+  const [positionForm,    setPositionForm]    = useState({ title: '', description: '', vfp: '', write_up_url: '' })
+  const [positionSaving,  setPositionSaving]  = useState(false)
+  const [selectedCourses, setSelectedCourses] = useState(new Set())
+  const [posWriteUpFile,  setPosWriteUpFile]  = useState(null)
+  const posWriteUpRef = useRef()
+
   const isAdmin = (profiles || []).some(p => p.id === user?.id && (p.role === 'admin' || p.role === 'super_admin'))
 
   useEffect(() => { fetchAll() }, [])
 
   async function fetchAll() {
     setLoading(true)
-    const [{ data: eData }, { data: aData }, { data: fData }, { data: pData }, { data: gData }, { data: gmData }] = await Promise.all([
+    const [
+      { data: eData }, { data: aData }, { data: fData }, { data: pData },
+      { data: gData }, { data: gmData },
+      { data: posData }, { data: pcData }, { data: cData },
+    ] = await Promise.all([
       supabase.from('employees').select('*').order('last_name'),
       supabase.from('applicants').select('*').order('applied_at', { ascending: false }),
       supabase.from('hr_review_forms').select('*').order('created_at', { ascending: false }),
       supabase.from('profiles').select('id, email, role'),
       supabase.from('employee_groups').select('*').order('name'),
       supabase.from('employee_group_members').select('group_id, employee_id'),
+      supabase.from('positions').select('*').order('title'),
+      supabase.from('position_courses').select('position_id, course_id'),
+      supabase.from('lms_courses').select('id, title, category').order('title'),
     ])
     setEmployees(eData || [])
     setApplicants(aData || [])
     setReviewForms(fData || [])
     setProfiles(pData || [])
     setGroups(gData || [])
+    setPositions(posData || [])
+    setCourses(cData || [])
 
     // Build email -> role map
     const roles = {}
@@ -415,6 +438,14 @@ export default function HR() {
       memberMap[m.group_id].add(m.employee_id)
     })
     setGroupMembers(memberMap)
+
+    // Build positionId -> Set<course_id>
+    const pcMap = {}
+    pcData?.forEach(r => {
+      if (!pcMap[r.position_id]) pcMap[r.position_id] = new Set()
+      pcMap[r.position_id].add(r.course_id)
+    })
+    setPositionCourses(pcMap)
 
     setLoading(false)
   }
@@ -483,6 +514,96 @@ export default function HR() {
     setSelectedMembers(prev => {
       const next = new Set(prev)
       if (next.has(empId)) next.delete(empId); else next.add(empId)
+      return next
+    })
+  }
+
+  async function fetchPositions() {
+    const [{ data: posData }, { data: pcData }] = await Promise.all([
+      supabase.from('positions').select('*').order('title'),
+      supabase.from('position_courses').select('position_id, course_id'),
+    ])
+    setPositions(posData || [])
+    const pcMap = {}
+    pcData?.forEach(r => {
+      if (!pcMap[r.position_id]) pcMap[r.position_id] = new Set()
+      pcMap[r.position_id].add(r.course_id)
+    })
+    setPositionCourses(pcMap)
+  }
+
+  function openNewPosition() {
+    setPositionForm({ title: '', description: '', vfp: '', write_up_url: '' })
+    setSelectedCourses(new Set())
+    setPosWriteUpFile(null)
+    setEditingPosition('new')
+  }
+
+  function openEditPosition(pos) {
+    setPositionForm({ title: pos.title, description: pos.description || '', vfp: pos.vfp || '', write_up_url: pos.write_up_url || '' })
+    setSelectedCourses(new Set(positionCourses[pos.id] || []))
+    setPosWriteUpFile(null)
+    setEditingPosition(pos)
+  }
+
+  async function savePosition() {
+    if (!positionForm.title.trim()) return
+    setPositionSaving(true)
+    try {
+      let writeUpUrl = positionForm.write_up_url
+
+      // Upload file if chosen
+      if (posWriteUpFile) {
+        const path = `positions/${Date.now()}_${posWriteUpFile.name}`
+        const { error: upErr } = await supabase.storage.from('employee-files').upload(path, posWriteUpFile)
+        if (!upErr) {
+          const { data: { publicUrl } } = supabase.storage.from('employee-files').getPublicUrl(path)
+          writeUpUrl = publicUrl
+        }
+      }
+
+      let positionId
+      if (editingPosition === 'new') {
+        const { data, error } = await supabase.from('positions').insert({
+          title: positionForm.title.trim(),
+          description: positionForm.description.trim() || null,
+          vfp: positionForm.vfp.trim() || null,
+          write_up_url: writeUpUrl || null,
+        }).select().single()
+        if (error) throw error
+        positionId = data.id
+      } else {
+        await supabase.from('positions').update({
+          title: positionForm.title.trim(),
+          description: positionForm.description.trim() || null,
+          vfp: positionForm.vfp.trim() || null,
+          write_up_url: writeUpUrl || null,
+        }).eq('id', editingPosition.id)
+        positionId = editingPosition.id
+        await supabase.from('position_courses').delete().eq('position_id', positionId)
+      }
+
+      if (selectedCourses.size > 0) {
+        const rows = [...selectedCourses].map(cid => ({ position_id: positionId, course_id: cid }))
+        await supabase.from('position_courses').insert(rows)
+      }
+
+      setEditingPosition(null)
+      await fetchPositions()
+    } catch (e) { console.error(e) }
+    setPositionSaving(false)
+  }
+
+  async function deletePosition(id) {
+    if (!confirm('Delete this position?')) return
+    await supabase.from('positions').delete().eq('id', id)
+    await fetchPositions()
+  }
+
+  function toggleCourse(courseId) {
+    setSelectedCourses(prev => {
+      const next = new Set(prev)
+      if (next.has(courseId)) next.delete(courseId); else next.add(courseId)
       return next
     })
   }
@@ -623,6 +744,11 @@ export default function HR() {
               </button>
             </>
           )}
+          {tab === 'positions' && !editingPosition && (
+            <button onClick={openNewPosition} className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800">
+              + New Position
+            </button>
+          )}
           {tab === 'forms' && (
             <button onClick={() => { setEditForm(null); setShowBuilder(true) }} className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800">
               + New Review Form
@@ -634,8 +760,9 @@ export default function HR() {
       {/* Tab bar */}
       <div className="bg-white border-b border-gray-200 px-6 flex gap-0 flex-shrink-0">
         {[
-          { key: 'employees', label: `Employees (${employees.filter(e => e.status === 'active').length})`, icon: '👤' },
+          { key: 'employees',  label: `Employees (${employees.filter(e => e.status === 'active').length})`, icon: '👤' },
           { key: 'applicants', label: `Applicants (${applicants.length})`, icon: '📋' },
+          { key: 'positions',  label: `Positions (${positions.length})`, icon: '🏷️' },
           { key: 'forms',      label: `Review Forms (${reviewForms.length})`, icon: '⭐' },
           { key: 'archive',    label: `Archive (${employees.filter(e => e.status === 'archived').length})`, icon: '📦' },
           ...(isAdmin ? [{ key: 'settings', label: 'Settings', icon: '⚙️' }] : []),
@@ -652,8 +779,8 @@ export default function HR() {
         ))}
       </div>
 
-      {/* Search + filter bar — hidden on Settings tab */}
-      {tab !== 'settings' && <div className="bg-gray-50 border-b border-gray-200 px-6 py-3 flex items-center gap-3 flex-shrink-0">
+      {/* Search + filter bar — hidden on Settings and Positions tabs */}
+      {tab !== 'settings' && tab !== 'positions' && <div className="bg-gray-50 border-b border-gray-200 px-6 py-3 flex items-center gap-3 flex-shrink-0">
         <input
           type="text"
           value={search}
@@ -825,6 +952,217 @@ export default function HR() {
                 </table>
               </div>
             )
+
+          /* ── POSITIONS TAB ── */
+          ) : tab === 'positions' ? (
+            <div className="max-w-4xl">
+              {/* Position editor form */}
+              {editingPosition ? (
+                <div className="bg-white border border-gray-200 rounded-xl p-5 mb-5 shadow-sm">
+                  <h3 className="font-semibold text-gray-900 mb-4">
+                    {editingPosition === 'new' ? 'New Position' : `Edit: ${editingPosition.title}`}
+                  </h3>
+                  <div className="space-y-3 mb-4">
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 block mb-1">Position Title *</label>
+                      <input
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500"
+                        value={positionForm.title}
+                        onChange={e => setPositionForm(f => ({ ...f, title: e.target.value }))}
+                        placeholder="e.g. Crew Leader, Sales Manager"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 block mb-1">Description</label>
+                      <textarea
+                        rows={3}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500 resize-none"
+                        value={positionForm.description}
+                        onChange={e => setPositionForm(f => ({ ...f, description: e.target.value }))}
+                        placeholder="Brief summary of this role…"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 block mb-1">Valuable Final Product (VFP)</label>
+                      <textarea
+                        rows={3}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500 resize-none"
+                        value={positionForm.vfp}
+                        onChange={e => setPositionForm(f => ({ ...f, vfp: e.target.value }))}
+                        placeholder="Describe the end result this position produces…"
+                      />
+                    </div>
+
+                    {/* Position Write-Up / Hat */}
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 block mb-1">Position Write-Up / Hat</label>
+                      {positionForm.write_up_url && !posWriteUpFile && (
+                        <div className="flex items-center gap-2 mb-2">
+                          <a href={positionForm.write_up_url} target="_blank" rel="noopener noreferrer"
+                            className="text-sm text-green-700 underline truncate max-w-xs">
+                            View current file
+                          </a>
+                          <button
+                            onClick={() => setPositionForm(f => ({ ...f, write_up_url: '' }))}
+                            className="text-xs text-red-500 hover:text-red-700"
+                          >Remove</button>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="file"
+                          ref={posWriteUpRef}
+                          className="hidden"
+                          accept=".pdf,.doc,.docx,.txt"
+                          onChange={e => setPosWriteUpFile(e.target.files?.[0] || null)}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => posWriteUpRef.current?.click()}
+                          className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50"
+                        >
+                          📎 {posWriteUpFile ? posWriteUpFile.name : 'Choose File'}
+                        </button>
+                        {posWriteUpFile && (
+                          <button onClick={() => setPosWriteUpFile(null)} className="text-xs text-red-500 hover:text-red-700">Remove</button>
+                        )}
+                        <span className="text-xs text-gray-400">or paste URL:</span>
+                        <input
+                          className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-green-500"
+                          value={posWriteUpFile ? '' : positionForm.write_up_url}
+                          onChange={e => setPositionForm(f => ({ ...f, write_up_url: e.target.value }))}
+                          placeholder="https://…"
+                          disabled={!!posWriteUpFile}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Required LMS Courses */}
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 block mb-2">
+                        Required Training Courses <span className="text-gray-400 font-normal">({selectedCourses.size} selected)</span>
+                      </label>
+                      {courses.length === 0 ? (
+                        <p className="text-sm text-gray-400 border border-gray-200 rounded-xl p-4">No training courses found. Add courses in the Training module first.</p>
+                      ) : (
+                        <div className="border border-gray-200 rounded-xl overflow-hidden max-h-60 overflow-y-auto">
+                          <div className="divide-y divide-gray-100">
+                            {courses.map(course => (
+                              <label key={course.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedCourses.has(course.id)}
+                                  onChange={() => toggleCourse(course.id)}
+                                  className="accent-green-700"
+                                />
+                                <div>
+                                  <p className="text-sm font-medium text-gray-900">{course.title}</p>
+                                  {course.category && <p className="text-xs text-gray-400">{course.category}</p>}
+                                </div>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={() => setEditingPosition(null)}
+                      className="px-4 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={savePosition}
+                      disabled={positionSaving || !positionForm.title.trim()}
+                      className="px-4 py-2 text-sm bg-green-700 text-white rounded-lg font-semibold hover:bg-green-800 disabled:opacity-50"
+                    >
+                      {positionSaving ? 'Saving…' : editingPosition === 'new' ? 'Create Position' : 'Save Changes'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex justify-end mb-3">
+                  <button
+                    onClick={openNewPosition}
+                    className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800"
+                  >
+                    + New Position
+                  </button>
+                </div>
+              )}
+
+              {/* Positions list */}
+              {positions.length === 0 && !editingPosition ? (
+                <div className="bg-white border border-gray-200 rounded-xl p-10 text-center text-gray-400">
+                  <p className="text-3xl mb-2">🏷️</p>
+                  <p className="font-medium">No positions yet</p>
+                  <p className="text-sm mt-1">Create positions to define roles within your company.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {positions.map(pos => {
+                    const reqCourseIds = [...(positionCourses[pos.id] || [])]
+                    const reqCourses = courses.filter(c => reqCourseIds.includes(c.id))
+                    const assignedCount = employees.filter(e => e.status === 'active' && e.job_title === pos.title).length
+                    return (
+                      <div key={pos.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-3 mb-1">
+                              <p className="font-semibold text-gray-900">{pos.title}</p>
+                              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                                {assignedCount} employee{assignedCount !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                            {pos.description && (
+                              <p className="text-sm text-gray-600 mb-1 line-clamp-2">{pos.description}</p>
+                            )}
+                            {pos.vfp && (
+                              <p className="text-xs text-gray-400"><span className="font-medium text-gray-500">VFP:</span> {pos.vfp}</p>
+                            )}
+                            <div className="flex items-center gap-3 mt-2 flex-wrap">
+                              {pos.write_up_url && (
+                                <a href={pos.write_up_url} target="_blank" rel="noopener noreferrer"
+                                  className="text-xs text-green-700 underline flex items-center gap-1">
+                                  📄 Position Write-Up
+                                </a>
+                              )}
+                              {reqCourses.length > 0 && (
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-xs text-gray-400">Required courses:</span>
+                                  {reqCourses.map(c => (
+                                    <span key={c.id} className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                                      {c.title}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex gap-2 flex-shrink-0">
+                            <button
+                              onClick={() => openEditPosition(pos)}
+                              className="px-3 py-1.5 text-xs font-medium border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50"
+                            >
+                              ✏️ Edit
+                            </button>
+                            <button
+                              onClick={() => deletePosition(pos.id)}
+                              className="px-3 py-1.5 text-xs font-medium border border-red-200 rounded-lg text-red-600 hover:bg-red-50"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
 
           /* ── SETTINGS TAB ── */
           ) : tab === 'settings' && isAdmin ? (
@@ -1060,7 +1398,7 @@ export default function HR() {
       </div>
 
       {/* Modals */}
-      {showAddEmp && <AddEmployeeModal onSave={() => { setShowAddEmp(false); fetchAll() }} onClose={() => setShowAddEmp(false)} />}
+      {showAddEmp && <AddEmployeeModal onSave={() => { setShowAddEmp(false); fetchAll() }} onClose={() => setShowAddEmp(false)} positions={positions} />}
       {showAddApp && <AddApplicantModal onSave={() => { setShowAddApp(false); fetchAll() }} onClose={() => setShowAddApp(false)} />}
       {showBuilder && (
         <ReviewBuilder

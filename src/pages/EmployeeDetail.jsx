@@ -256,6 +256,9 @@ export default function EmployeeDetail() {
   // Review state
   const [showReview,  setShowReview]   = useState(false)
 
+  // Positions (for Job Title dropdown)
+  const [positions,   setPositions]    = useState([])
+
   // User tab state
   const [userRole,         setUserRole]         = useState('user')
   const [savingRole,       setSavingRole]       = useState(false)
@@ -486,6 +489,7 @@ export default function EmployeeDetail() {
       { data: trainingData },
       { data: reviewsData },
       { data: formsData },
+      { data: posData },
     ] = await Promise.all([
       supabase.from('employees').select('*').eq('id', id).single(),
       supabase.from('employee_documents').select('*').eq('employee_id', id).order('created_at', { ascending: false }),
@@ -493,6 +497,7 @@ export default function EmployeeDetail() {
       supabase.from('lms_assignments').select('*, lms_courses(title, category), lms_step_completions(id)').eq('employee_id', id),
       supabase.from('hr_reviews').select('*, hr_review_forms(title)').eq('employee_id', id).order('review_date', { ascending: false }),
       supabase.from('hr_review_forms').select('*').order('title'),
+      supabase.from('positions').select('id, title').order('title'),
     ])
     setEmployee(emp)
     setDraft(emp || {})
@@ -502,6 +507,7 @@ export default function EmployeeDetail() {
     setTraining(trainingData || [])
     setReviews(reviewsData || [])
     setReviewForms(formsData || [])
+    setPositions(posData || [])
 
     // Fetch linked profile — by user_id first (definitive), then email as fallback
     let prof = null
@@ -821,7 +827,18 @@ export default function EmployeeDetail() {
                 <div>
                   <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Employment</p>
                   <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-                    <Field label="Job Title" value={draft.job_title} editing={editing} onChange={v => set('job_title', v)} />
+                    {editing ? (
+                      <div>
+                        <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Position</label>
+                        <select value={draft.job_title || ''} onChange={e => set('job_title', e.target.value)}
+                          className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500">
+                          <option value="">Select position…</option>
+                          {positions.map(p => <option key={p.id} value={p.title}>{p.title}</option>)}
+                        </select>
+                      </div>
+                    ) : (
+                      <Field label="Position" value={draft.job_title} editing={false} onChange={() => {}} />
+                    )}
                     {editing ? (
                       <div>
                         <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Department</label>
