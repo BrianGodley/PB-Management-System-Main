@@ -18,12 +18,11 @@ const STAGES = [
 const stageMap = Object.fromEntries(STAGES.map(s => [s.value, s]))
 
 const EMPTY_FORM = {
-  first_name: '', last_name: '', company_name: '',
+  first_name: '', last_name: '',
   secondary_first_name: '', secondary_last_name: '',
   phone: '', cell: '', email: '',
   _additionalEmailsRaw: '', _additionalPhonesRaw: '',
   street_address: '', city: '', state: '', zip: '',
-  company_street: '', company_city: '', company_state: '', company_zip: '',
   ghl_assigned_to: '', consultation_type: '',
   date_of_birth: '', notes: '', project_description: '',
   stage: 'new_lead', contact_type: 'Residential',
@@ -66,7 +65,6 @@ function AddContactModal({ onSave, onClose }) {
       .insert({
         first_name:           form.first_name.trim(),
         last_name:            form.last_name.trim(),
-        company_name:         form.company_name.trim() || null,
         secondary_first_name: form.secondary_first_name.trim() || null,
         secondary_last_name:  form.secondary_last_name.trim() || null,
         phone:                form.phone.trim() || null,
@@ -82,10 +80,6 @@ function AddContactModal({ onSave, onClose }) {
         city:                 form.city.trim() || null,
         state:                form.state.trim() || null,
         zip:                  form.zip.trim() || null,
-        company_street:       form.company_street.trim() || null,
-        company_city:         form.company_city.trim() || null,
-        company_state:        form.company_state.trim() || null,
-        company_zip:          form.company_zip.trim() || null,
         ghl_assigned_to:      form.ghl_assigned_to.trim() || null,
         consultation_type:    form.consultation_type || null,
         stage:                form.stage,
@@ -115,7 +109,7 @@ function AddContactModal({ onSave, onClose }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-bold text-gray-900">New Contact</h2>
+          <h2 className="text-lg font-bold text-gray-900">New Individual Contact</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
         </div>
 
@@ -153,20 +147,6 @@ function AddContactModal({ onSave, onClose }) {
             <div><label className={label}>City</label><input className={input} value={form.city} onChange={e => set('city', e.target.value)} placeholder="City" /></div>
             <div><label className={label}>State</label><input className={input} value={form.state} onChange={e => set('state', e.target.value)} placeholder="CA" maxLength={2} /></div>
             <div><label className={label}>Zip</label><input className={input} value={form.zip} onChange={e => set('zip', e.target.value)} placeholder="90210" /></div>
-          </div>
-
-          {/* ── Company Name & Address ── */}
-          <div><label className={label}>Company Name</label><input className={input} value={form.company_name} onChange={e => set('company_name', e.target.value)} placeholder="Company name" /></div>
-          <div className="border border-gray-200 rounded-xl p-3 bg-gray-50">
-            <p className="text-xs font-semibold text-gray-500 mb-2">Company Address</p>
-            <div className="space-y-2">
-              <input className={input} value={form.company_street} onChange={e => set('company_street', e.target.value)} placeholder="Street Address" />
-              <div className="grid grid-cols-3 gap-2">
-                <input className={input} value={form.company_city} onChange={e => set('company_city', e.target.value)} placeholder="City" />
-                <input className={input} value={form.company_state} onChange={e => set('company_state', e.target.value)} placeholder="ST" maxLength={2} />
-                <input className={input} value={form.company_zip} onChange={e => set('company_zip', e.target.value)} placeholder="Zip" />
-              </div>
-            </div>
           </div>
 
           {/* ── Date of Birth ── */}
@@ -326,7 +306,7 @@ function AddCompanyModal({ onSave, onClose }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-bold text-gray-900">New Company</h2>
+          <h2 className="text-lg font-bold text-gray-900">New Company Contact</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
         </div>
 

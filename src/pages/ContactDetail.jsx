@@ -57,7 +57,6 @@ function EditContactModal({ contact, onSave, onClose }) {
       .update({
         first_name:           form.first_name?.trim() || '',
         last_name:            form.last_name?.trim()  || '',
-        company_name:         form.company_name?.trim() || null,
         secondary_first_name: form.secondary_first_name?.trim() || null,
         secondary_last_name:  form.secondary_last_name?.trim() || null,
         phone:                form.phone?.trim() || null,
@@ -67,10 +66,6 @@ function EditContactModal({ contact, onSave, onClose }) {
         city:                 form.city?.trim() || null,
         state:                form.state?.trim() || null,
         zip:                  form.zip?.trim() || null,
-        company_street:       form.company_street?.trim() || null,
-        company_city:         form.company_city?.trim() || null,
-        company_state:        form.company_state?.trim() || null,
-        company_zip:          form.company_zip?.trim() || null,
         contact_type:         form.contact_type || null,
         source:               form.source?.trim() || null,
         campaign:             form.campaign?.trim() || null,
@@ -114,7 +109,6 @@ function EditContactModal({ contact, onSave, onClose }) {
             <div><label className={lbl}>First Name</label><input className={inp} value={form.first_name || ''} onChange={e => set('first_name', e.target.value)} /></div>
             <div><label className={lbl}>Last Name</label><input className={inp} value={form.last_name || ''} onChange={e => set('last_name', e.target.value)} /></div>
           </div>
-          <div><label className={lbl}>Company</label><input className={inp} value={form.company_name || ''} onChange={e => set('company_name', e.target.value)} /></div>
           {/* Spouse / Partner */}
           <div className="grid grid-cols-2 gap-3">
             <div><label className={lbl}>Spouse / Partner First</label><input className={inp} value={form.secondary_first_name || ''} onChange={e => set('secondary_first_name', e.target.value)} placeholder="First" /></div>
@@ -144,18 +138,6 @@ function EditContactModal({ contact, onSave, onClose }) {
             <div><label className={lbl}>City</label><input className={inp} value={form.city || ''} onChange={e => set('city', e.target.value)} /></div>
             <div><label className={lbl}>State</label><input className={inp} value={form.state || ''} onChange={e => set('state', e.target.value)} maxLength={2} /></div>
             <div><label className={lbl}>Zip</label><input className={inp} value={form.zip || ''} onChange={e => set('zip', e.target.value)} /></div>
-          </div>
-          {/* Company Address */}
-          <div className="border border-gray-200 rounded-xl p-3 bg-gray-50">
-            <p className="text-xs font-semibold text-gray-500 mb-2">Company Address</p>
-            <div className="space-y-2">
-              <input className={inp} value={form.company_street || ''} onChange={e => set('company_street', e.target.value)} placeholder="Street Address" />
-              <div className="grid grid-cols-3 gap-2">
-                <input className={inp} value={form.company_city || ''} onChange={e => set('company_city', e.target.value)} placeholder="City" />
-                <input className={inp} value={form.company_state || ''} onChange={e => set('company_state', e.target.value)} placeholder="ST" maxLength={2} />
-                <input className={inp} value={form.company_zip || ''} onChange={e => set('company_zip', e.target.value)} placeholder="Zip" />
-              </div>
-            </div>
           </div>
           {/* Assigned To / Consultation Type */}
           <div className="grid grid-cols-2 gap-3">
@@ -374,7 +356,11 @@ export default function ContactDetail() {
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-gray-900 leading-tight">{fullName || 'Unnamed'}</h2>
-                  {contact.company_name && <p className="text-xs text-gray-500 mt-0.5">{contact.company_name}</p>}
+                  {(contact.secondary_first_name || contact.secondary_last_name) && (
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {[contact.secondary_first_name, contact.secondary_last_name].filter(Boolean).join(' ')}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-1">
