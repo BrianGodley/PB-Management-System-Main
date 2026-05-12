@@ -727,7 +727,7 @@ export default function HR() {
         <h1 className="text-xl font-bold text-gray-900">Human Resources</h1>
         <div className="flex gap-2">
           {tab === 'employees' && (
-            <button onClick={() => setShowAddEmp(true)} className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800">
+            <button onClick={() => setShowAddEmp(true)} className="btn-primary text-sm px-3 py-1.5">
               + Add Employee
             </button>
           )}
@@ -739,7 +739,7 @@ export default function HR() {
               >
                 {linkCopied ? '✓ Link Copied!' : '🔗 Copy Apply Link'}
               </button>
-              <button onClick={() => setShowAddApp(true)} className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800">
+              <button onClick={() => setShowAddApp(true)} className="btn-primary text-sm px-3 py-1.5">
                 + Add Applicant
               </button>
             </>
