@@ -331,7 +331,7 @@ export default function ContactDetail() {
     : contact.first_name || 'Unnamed'
 
   return (
-    <div className="flex flex-col h-full bg-slate-400">
+    <div className="flex flex-col h-full bg-slate-300">
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
       {/* Top bar */}
       <div className="flex items-center gap-3 px-6 py-3 bg-white border-b border-gray-200 flex-shrink-0">
@@ -346,7 +346,7 @@ export default function ContactDetail() {
       <div className="flex-1 min-h-0 overflow-hidden grid" style={{gridTemplateColumns: '23rem minmax(0,1fr) 15rem'}}>
 
         {/* ── LEFT COLUMN ───────────────────────────────────────────────── */}
-        <div className="border-r border-slate-300 bg-slate-400 overflow-y-auto">
+        <div className="border-r border-slate-300 bg-slate-300 overflow-y-auto">
           <div className="p-3 space-y-2">
 
             {/* Card 1: Identity */}
@@ -359,7 +359,7 @@ export default function ContactDetail() {
                   <h2 className="text-base font-bold text-gray-900 leading-tight">{fullName || 'Unnamed'}</h2>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button onClick={() => setShowEdit(true)} className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-slate-400 transition-colors" title="Edit contact">
+                  <button onClick={() => setShowEdit(true)} className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-slate-300 transition-colors" title="Edit contact">
                     <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M11.5 1.5a1.414 1.414 0 0 1 2 2L5 12l-3 1 1-3 8.5-8.5z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </button>
                   <button onClick={() => setShowDelete(true)} className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors" title="Delete contact">
@@ -598,7 +598,7 @@ export default function ContactDetail() {
         </div>
 
         {/* ── MIDDLE COLUMN: Communication Log ──────────────────────────── */}
-        <div className="flex flex-col bg-slate-400">
+        <div className="flex flex-col bg-slate-300">
 
           {/* Header */}
           <div className="px-5 py-3 bg-white border-b border-slate-300 flex-shrink-0">
@@ -688,7 +688,7 @@ export default function ContactDetail() {
         </div>
 
         {/* ── RIGHT COLUMN: Pipeline & Activity ─────────────────────────── */}
-        <div className="border-l border-slate-300 bg-slate-400 overflow-y-auto">
+        <div className="border-l border-slate-300 bg-slate-300 overflow-y-auto">
           <div className="p-3 space-y-2">
 
             {/* Pipeline card */}
@@ -740,7 +740,7 @@ export default function ContactDetail() {
                   const t = commTypeMap[last.type] || { icon: '📝', label: 'Note' }
                   return (
                     <div className="flex items-start gap-2.5">
-                      <div className="w-6 h-6 rounded-full bg-slate-400 border border-slate-300 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">{t.icon}</div>
+                      <div className="w-6 h-6 rounded-full bg-slate-300 border border-slate-300 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">{t.icon}</div>
                       <div>
                         <p className="text-xs font-medium text-gray-700">Last {t.label}</p>
                         <p className="text-[10px] text-gray-500 truncate max-w-[120px]">{last.content}</p>
