@@ -419,8 +419,7 @@ export default function SubsVendors() {
             <div className="flex-1" />
             <button
               onClick={openNew}
-              className="mr-3 text-sm font-bold text-white px-4 py-1.5 rounded-lg"
-              style={{ backgroundColor: '#3A5038' }}
+              className="mr-3 btn-primary text-sm px-4 py-1.5"
             >
               + {typeView === 'sub' ? 'Subcontractor' : 'Vendor'}
             </button>
@@ -544,8 +543,9 @@ export default function SubsVendors() {
           placeholder="Search by company, contact, division, or phone…"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="input text-sm flex-1 max-w-md"
+          className="input text-sm w-64"
         />
+        <div className="flex-1" />
         <div className="flex-shrink-0 flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
           <button
             onClick={() => setTypeView('sub')}
