@@ -495,7 +495,7 @@ export default function Contacts() {
     while (true) {
       const { data, error } = await supabase
         .from('companies')
-        .select('id,company_name,company_city,company_state,phone,email,stage,contact_type,created_at')
+        .select('id,company_name,company_city,company_state,phone,email,stage,contact_type,ghl_assigned_to,created_at')
         .order('company_name', { ascending: true })
         .range(from, from + BATCH - 1)
       if (error) { setCompaniesError(error.message); break }
@@ -524,7 +524,6 @@ export default function Contacts() {
       if (!q) return true
       return (
         `${c.last_name} ${c.first_name}`.toLowerCase().includes(q) ||
-        (c.company_name || '').toLowerCase().includes(q) ||
         (c.email || '').toLowerCase().includes(q) ||
         (c.phone || '').toLowerCase().includes(q) ||
         (c.cell || '').toLowerCase().includes(q) ||
@@ -660,7 +659,7 @@ export default function Contacts() {
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder={isIndividuals ? 'Search name, company, email, phone, city…' : 'Search company name, email, phone, city…'}
+          placeholder={isIndividuals ? 'Search name, email, phone, city…' : 'Search company name, email, phone, city…'}
           className="w-full max-w-md border border-gray-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600"
         />
       </div>
@@ -677,7 +676,7 @@ export default function Contacts() {
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className={`${thCls} sticky left-0 bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]`} onClick={() => toggleSort('last_name')}>Name{arrow('last_name')}</th>
-                  <th className={thCls} onClick={() => toggleSort('company_name')}>Company{arrow('company_name')}</th>
+                  <th className={thCls} onClick={() => toggleSort('ghl_assigned_to')}>Assigned To{arrow('ghl_assigned_to')}</th>
                   <th className={thCls}>Phone</th>
                   <th className={thCls}>Cell</th>
                   <th className={thCls}>Email</th>
@@ -704,7 +703,7 @@ export default function Contacts() {
                         {c.last_name}{c.first_name ? `, ${c.first_name}` : ''}
                       </button>
                     </td>
-                    <td className="px-4 py-2 text-gray-600">{c.company_name || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-4 py-2 text-gray-600">{c.ghl_assigned_to || <span className="text-gray-300">—</span>}</td>
                     <td className="px-4 py-2 text-gray-600">
                       {c.phone
                         ? <a href={`tel:${c.phone}`} className="hover:text-green-700">{c.phone}</a>
@@ -751,6 +750,7 @@ export default function Contacts() {
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className={`${thCls} sticky left-0 bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]`} onClick={() => toggleSort('company_name')}>Company Name{arrow('company_name')}</th>
+                  <th className={thCls} onClick={() => toggleSort('ghl_assigned_to')}>Assigned To{arrow('ghl_assigned_to')}</th>
                   <th className={thCls}>Phone</th>
                   <th className={thCls}>Email</th>
                   <th className={thCls} onClick={() => toggleSort('company_city')}>City / State{arrow('company_city')}</th>
@@ -761,7 +761,7 @@ export default function Contacts() {
               <tbody className="divide-y divide-gray-100">
                 {filteredCompanies.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center text-gray-400">
+                    <td colSpan={7} className="px-4 py-10 text-center text-gray-400">
                       {search || stageFilter !== 'all' ? 'No companies match your filters.' : 'No companies yet — add your first one.'}
                     </td>
                   </tr>
@@ -775,6 +775,7 @@ export default function Contacts() {
                         {c.company_name}
                       </button>
                     </td>
+                    <td className="px-4 py-2 text-gray-600">{c.ghl_assigned_to || <span className="text-gray-300">—</span>}</td>
                     <td className="px-4 py-2 text-gray-600">
                       {c.phone
                         ? <a href={`tel:${c.phone}`} className="hover:text-green-700">{c.phone}</a>
