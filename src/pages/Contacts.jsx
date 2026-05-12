@@ -239,6 +239,7 @@ function CompanyContactRow({ contact, onChange, onRemove, inp, lbl }) {
         <div><label className={lbl}>First Name</label><input className={inp} value={contact.first_name || ''} onChange={e => onChange({ ...contact, first_name: e.target.value })} placeholder="First" /></div>
         <div><label className={lbl}>Last Name</label><input className={inp} value={contact.last_name || ''} onChange={e => onChange({ ...contact, last_name: e.target.value })} placeholder="Last" /></div>
       </div>
+      <div><label className={lbl}>Position / Title</label><input className={inp} value={contact.position || ''} onChange={e => onChange({ ...contact, position: e.target.value })} placeholder="e.g. Project Manager" /></div>
       <div className="grid grid-cols-2 gap-2">
         <div><label className={lbl}>Phone</label><input className={inp} value={contact.phone || ''} onChange={e => onChange({ ...contact, phone: e.target.value })} placeholder="(555) 000-0000" /></div>
         <div><label className={lbl}>Email</label><input className={inp} value={contact.email || ''} onChange={e => onChange({ ...contact, email: e.target.value })} placeholder="email@example.com" /></div>
@@ -258,7 +259,7 @@ function AddCompanyModal({ onSave, onClose }) {
   const label = 'block text-xs font-semibold text-gray-500 mb-1'
 
   function addCompanyContact() {
-    set('company_contacts', [...form.company_contacts, { first_name: '', last_name: '', phone: '', email: '' }])
+    set('company_contacts', [...form.company_contacts, { first_name: '', last_name: '', position: '', phone: '', email: '' }])
   }
   function updateCompanyContact(i, val) {
     const arr = [...form.company_contacts]

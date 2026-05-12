@@ -37,7 +37,7 @@ function EditCompanyModal({ company, onSave, onClose }) {
 
   function addCompanyContact() {
     const arr = Array.isArray(form.company_contacts) ? form.company_contacts : []
-    set('company_contacts', [...arr, { first_name: '', last_name: '', phone: '', email: '' }])
+    set('company_contacts', [...arr, { first_name: '', last_name: '', position: '', phone: '', email: '' }])
   }
   function updateCompanyContact(i, val) {
     const arr = [...(form.company_contacts || [])]
@@ -131,6 +131,7 @@ function EditCompanyModal({ company, onSave, onClose }) {
                         <div><label className={lbl}>First Name</label><input className={inp} value={c.first_name || ''} onChange={e => updateCompanyContact(i, { ...c, first_name: e.target.value })} placeholder="First" /></div>
                         <div><label className={lbl}>Last Name</label><input className={inp} value={c.last_name || ''} onChange={e => updateCompanyContact(i, { ...c, last_name: e.target.value })} placeholder="Last" /></div>
                       </div>
+                      <div><label className={lbl}>Position / Title</label><input className={inp} value={c.position || ''} onChange={e => updateCompanyContact(i, { ...c, position: e.target.value })} placeholder="e.g. Project Manager" /></div>
                       <div className="grid grid-cols-2 gap-2">
                         <div><label className={lbl}>Phone</label><input className={inp} value={c.phone || ''} onChange={e => updateCompanyContact(i, { ...c, phone: e.target.value })} placeholder="(555) 000-0000" /></div>
                         <div><label className={lbl}>Email</label><input className={inp} value={c.email || ''} onChange={e => updateCompanyContact(i, { ...c, email: e.target.value })} placeholder="email@example.com" /></div>
@@ -403,12 +404,16 @@ export default function CompanyDetail() {
                     </p>
                   </div>
                   <div>
+                    <p className="text-xs text-gray-400 font-semibold mb-0.5">Position</p>
+                    <p className="text-sm text-gray-700">{c.position || <span className="text-gray-300">—</span>}</p>
+                  </div>
+                  <div>
                     <p className="text-xs text-gray-400 font-semibold mb-0.5">Phone</p>
                     <p className="text-sm text-gray-800">
                       {c.phone ? <a href={`tel:${c.phone}`} className="text-green-700 hover:underline">{c.phone}</a> : <span className="text-gray-300">—</span>}
                     </p>
                   </div>
-                  <div className="sm:col-span-2">
+                  <div>
                     <p className="text-xs text-gray-400 font-semibold mb-0.5">Email</p>
                     <p className="text-sm text-gray-800">
                       {c.email ? <a href={`mailto:${c.email}`} className="text-green-700 hover:underline">{c.email}</a> : <span className="text-gray-300">—</span>}

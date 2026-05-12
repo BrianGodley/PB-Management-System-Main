@@ -342,10 +342,10 @@ export default function ContactDetail() {
       </div>
 
       {/* 3-column layout */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-hidden grid" style={{gridTemplateColumns: '18rem minmax(0,1fr) 20rem'}}>
 
         {/* ── LEFT COLUMN: Contact Details ──────────────────────────────── */}
-        <div className="w-72 flex-shrink-0 border-r border-gray-200 bg-white overflow-y-auto">
+        <div className="border-r border-gray-200 bg-white overflow-y-auto">
           <div className="p-5">
 
             {/* Avatar + name */}
@@ -356,11 +356,6 @@ export default function ContactDetail() {
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-gray-900 leading-tight">{fullName || 'Unnamed'}</h2>
-                  {(contact.secondary_first_name || contact.secondary_last_name) && (
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {[contact.secondary_first_name, contact.secondary_last_name].filter(Boolean).join(' ')}
-                    </p>
-                  )}
                 </div>
               </div>
               <div className="flex items-center gap-1">
@@ -382,6 +377,39 @@ export default function ContactDetail() {
                     <path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 9a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </button>
+              </div>
+            </div>
+
+            {/* Quick info: Spouse/Partner, Address, Phone, Cell, Email */}
+            <div className="space-y-2 mb-4 pb-4 border-b border-gray-100 text-sm">
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Spouse / Partner</p>
+                <p className="text-gray-700">
+                  {[contact.secondary_first_name, contact.secondary_last_name].filter(Boolean).join(' ') || <span className="text-gray-300">—</span>}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Address</p>
+                {(contact.street_address || contact.city || contact.state || contact.zip)
+                  ? <>
+                      {contact.street_address && <p className="text-gray-700">{contact.street_address}</p>}
+                      <p className="text-gray-700">{[contact.city, contact.state, contact.zip].filter(Boolean).join(', ')}</p>
+                    </>
+                  : <span className="text-gray-300">—</span>}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Phone</p>
+                  {contact.phone ? <a href={`tel:${contact.phone}`} className="text-gray-700 hover:text-green-700">{contact.phone}</a> : <span className="text-gray-300">—</span>}
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Cell</p>
+                  {contact.cell ? <a href={`tel:${contact.cell}`} className="text-gray-700 hover:text-green-700">{contact.cell}</a> : <span className="text-gray-300">—</span>}
+                </div>
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Email</p>
+                {contact.email ? <a href={`mailto:${contact.email}`} className="text-gray-700 hover:text-green-700 break-all">{contact.email}</a> : <span className="text-gray-300">—</span>}
               </div>
             </div>
 
@@ -428,48 +456,6 @@ export default function ContactDetail() {
             {/* ── MAIN TAB ── */}
             {leftTab === 'main' && (
               <div className="space-y-3 text-sm">
-                {/* Spouse / Partner */}
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Spouse / Partner</p>
-                  <p className="text-gray-700">
-                    {[contact.secondary_first_name, contact.secondary_last_name].filter(Boolean).join(' ') || <span className="text-gray-300">—</span>}
-                  </p>
-                </div>
-                {/* Address */}
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Address</p>
-                  {(contact.street_address || contact.city || contact.state || contact.zip)
-                    ? <>
-                        {contact.street_address && <p className="text-gray-700">{contact.street_address}</p>}
-                        <p className="text-gray-700">{[contact.city, contact.state, contact.zip].filter(Boolean).join(', ')}</p>
-                      </>
-                    : <span className="text-gray-300">—</span>}
-                </div>
-                {/* Company Address */}
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Company Address</p>
-                  {(contact.company_street || contact.company_city)
-                    ? <>
-                        {contact.company_street && <p className="text-gray-700">{contact.company_street}</p>}
-                        <p className="text-gray-700">{[contact.company_city, contact.company_state, contact.company_zip].filter(Boolean).join(', ')}</p>
-                      </>
-                    : <span className="text-gray-300">—</span>}
-                </div>
-                {/* Phone */}
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Phone</p>
-                  {contact.phone ? <a href={`tel:${contact.phone}`} className="text-gray-700 hover:text-green-700">{contact.phone}</a> : <span className="text-gray-300">—</span>}
-                </div>
-                {/* Cell */}
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Cell</p>
-                  {contact.cell ? <a href={`tel:${contact.cell}`} className="text-gray-700 hover:text-green-700">{contact.cell}</a> : <span className="text-gray-300">—</span>}
-                </div>
-                {/* Email */}
-                <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Email</p>
-                  {contact.email ? <a href={`mailto:${contact.email}`} className="text-gray-700 hover:text-green-700 break-all">{contact.email}</a> : <span className="text-gray-300">—</span>}
-                </div>
                 {/* Additional Emails */}
                 <div>
                   <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Additional Emails</p>
@@ -686,7 +672,7 @@ export default function ContactDetail() {
         </div>
 
         {/* ── MIDDLE COLUMN: Communication Log ──────────────────────────── */}
-        <div className="flex-1 flex flex-col min-w-0 bg-gray-50">
+        <div className="flex flex-col bg-gray-50">
 
           {/* Log header */}
           <div className="px-5 py-3 bg-white border-b border-gray-200 flex-shrink-0">
@@ -792,7 +778,7 @@ export default function ContactDetail() {
         </div>
 
         {/* ── RIGHT COLUMN: Activity & Pipeline ─────────────────────────── */}
-        <div className="w-64 flex-shrink-0 border-l border-gray-200 bg-white overflow-y-auto">
+        <div className="border-l border-gray-200 bg-white overflow-y-auto">
           <div className="p-5">
 
             {/* Pipeline stages */}
