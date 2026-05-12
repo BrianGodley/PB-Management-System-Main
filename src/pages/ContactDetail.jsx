@@ -342,7 +342,7 @@ export default function ContactDetail() {
       </div>
 
       {/* 3-column layout */}
-      <div className="flex-1 min-h-0 overflow-hidden grid" style={{gridTemplateColumns: '18rem minmax(0,1fr) 20rem'}}>
+      <div className="flex-1 min-h-0 overflow-hidden grid" style={{gridTemplateColumns: '23rem minmax(0,1fr) 15rem'}}>
 
         {/* ── LEFT COLUMN: Contact Details ──────────────────────────────── */}
         <div className="border-r border-gray-200 bg-white overflow-y-auto">
@@ -383,39 +383,39 @@ export default function ContactDetail() {
             {/* Quick info: Spouse/Partner, Address, Phone, Cell, Email */}
             <div className="space-y-2 mb-4 pb-4 border-b border-gray-100 text-sm">
               <div>
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Spouse / Partner</p>
+                <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Spouse / Partner</p>
                 <p className="text-gray-700">
                   {[contact.secondary_first_name, contact.secondary_last_name].filter(Boolean).join(' ') || <span className="text-gray-300">—</span>}
                 </p>
               </div>
               <div>
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Address</p>
+                <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Address</p>
                 {(contact.street_address || contact.city || contact.state || contact.zip)
                   ? <>
-                      {contact.street_address && <p className="text-gray-700">{contact.street_address}</p>}
+                      {contact.street_address && <p className="text-gray-900">{contact.street_address}</p>}
                       <p className="text-gray-700">{[contact.city, contact.state, contact.zip].filter(Boolean).join(', ')}</p>
                     </>
                   : <span className="text-gray-300">—</span>}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Phone</p>
-                  {contact.phone ? <a href={`tel:${contact.phone}`} className="text-gray-700 hover:text-green-700">{contact.phone}</a> : <span className="text-gray-300">—</span>}
+                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Phone</p>
+                  {contact.phone ? <a href={`tel:${contact.phone}`} className="text-gray-900 hover:text-green-700">{contact.phone}</a> : <span className="text-gray-300">—</span>}
                 </div>
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Cell</p>
-                  {contact.cell ? <a href={`tel:${contact.cell}`} className="text-gray-700 hover:text-green-700">{contact.cell}</a> : <span className="text-gray-300">—</span>}
+                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Cell</p>
+                  {contact.cell ? <a href={`tel:${contact.cell}`} className="text-gray-900 hover:text-green-700">{contact.cell}</a> : <span className="text-gray-300">—</span>}
                 </div>
               </div>
               <div>
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Email</p>
-                {contact.email ? <a href={`mailto:${contact.email}`} className="text-gray-700 hover:text-green-700 break-all">{contact.email}</a> : <span className="text-gray-300">—</span>}
+                <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Email</p>
+                {contact.email ? <a href={`mailto:${contact.email}`} className="text-gray-900 hover:text-green-700 break-all">{contact.email}</a> : <span className="text-gray-300">—</span>}
               </div>
             </div>
 
             {/* Stage selector */}
             <div className="mb-4">
-              <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Stage</label>
+              <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-1.5">Stage</label>
               <select
                 value={contact.stage}
                 onChange={e => handleStageChange(e.target.value)}
@@ -428,7 +428,7 @@ export default function ContactDetail() {
             {/* ── Tab bar ── */}
             <div className="flex border-b border-gray-200 mb-4 -mx-5 px-5">
               {[
-                { key: 'main',      label: 'Main' },
+                { key: 'main',      label: 'More Info' },
                 { key: 'marketing', label: 'Marketing' },
                 { key: 'dnd',       label: 'DND'  },
                 { key: 'tags',      label: 'Tags' },
@@ -458,31 +458,31 @@ export default function ContactDetail() {
               <div className="space-y-3 text-sm">
                 {/* Additional Emails */}
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Additional Emails</p>
+                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Additional Emails</p>
                   {contact.additional_emails?.length > 0
-                    ? contact.additional_emails.map((e, i) => <a key={i} href={`mailto:${e}`} className="block text-gray-700 hover:text-green-700 break-all">{e}</a>)
+                    ? contact.additional_emails.map((e, i) => <a key={i} href={`mailto:${e}`} className="block text-gray-900 hover:text-green-700 break-all">{e}</a>)
                     : <span className="text-gray-300">—</span>}
                 </div>
                 {/* Additional Phones */}
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Additional Phones</p>
+                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Additional Phones</p>
                   {contact.additional_phones?.length > 0
-                    ? contact.additional_phones.map((p, i) => <a key={i} href={`tel:${p}`} className="block text-gray-700 hover:text-green-700">{p}</a>)
+                    ? contact.additional_phones.map((p, i) => <a key={i} href={`tel:${p}`} className="block text-gray-900 hover:text-green-700">{p}</a>)
                     : <span className="text-gray-300">—</span>}
                 </div>
                 {/* Assigned To */}
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Assigned To</p>
-                  <p className="text-gray-700">{contact.ghl_assigned_to || <span className="text-gray-300">—</span>}</p>
+                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Assigned To</p>
+                  <p className="text-gray-900">{contact.ghl_assigned_to || <span className="text-gray-300">—</span>}</p>
                 </div>
                 {/* Consultation Type */}
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Consultation Type</p>
-                  <p className="text-gray-700">{contact.consultation_type || <span className="text-gray-300">—</span>}</p>
+                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Consultation Type</p>
+                  <p className="text-gray-900">{contact.consultation_type || <span className="text-gray-300">—</span>}</p>
                 </div>
                 {/* Date of Birth */}
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Date of Birth</p>
+                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Date of Birth</p>
                   <p className="text-gray-700">
                     {contact.date_of_birth
                       ? new Date(contact.date_of_birth + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
@@ -491,9 +491,9 @@ export default function ContactDetail() {
                 </div>
                 {/* Project Description */}
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Project Description</p>
+                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Project Description</p>
                   {contact.project_description
-                    ? <p className="text-gray-600 text-xs leading-relaxed whitespace-pre-wrap">{contact.project_description}</p>
+                    ? <p className="text-gray-800 text-xs leading-relaxed whitespace-pre-wrap">{contact.project_description}</p>
                     : <span className="text-gray-300">—</span>}
                 </div>
               </div>
@@ -505,7 +505,7 @@ export default function ContactDetail() {
 
                 {/* Contact Type — interactive dropdown, always visible, defaults to Residential */}
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Contact Type</p>
+                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-1">Contact Type</p>
                   <select
                     value={contact.contact_type || 'Residential'}
                     onChange={e => handleContactTypeChange(e.target.value)}
@@ -519,25 +519,25 @@ export default function ContactDetail() {
 
                 {/* Source Type — always visible */}
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Source Type</p>
-                  <p className="text-gray-700">{contact.source || <span className="text-gray-300">—</span>}</p>
+                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Source Type</p>
+                  <p className="text-gray-900">{contact.source || <span className="text-gray-300">—</span>}</p>
                 </div>
 
                 {/* Campaign — always visible */}
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Campaign</p>
-                  <p className="text-gray-700">{contact.campaign || <span className="text-gray-300">—</span>}</p>
+                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Campaign</p>
+                  <p className="text-gray-900">{contact.campaign || <span className="text-gray-300">—</span>}</p>
                 </div>
 
                 {/* Source Origin — always visible */}
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Source Origin</p>
-                  <p className="text-gray-700">{contact.how_did_you_hear || <span className="text-gray-300">—</span>}</p>
+                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Source Origin</p>
+                  <p className="text-gray-900">{contact.how_did_you_hear || <span className="text-gray-300">—</span>}</p>
                 </div>
 
                 {/* Project Interests — always visible */}
                 <div className="pt-2 border-t border-gray-100">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Project Interests</p>
+                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-1.5">Project Interests</p>
                   <div className="space-y-1.5">
                     {[
                       { label: '#1', val: contact.interest_1 },
@@ -637,7 +637,7 @@ export default function ContactDetail() {
 
             {/* Linked client */}
             <div className="mt-5 pt-4 border-t border-gray-100">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Linked Client</p>
+              <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-2">Linked Client</p>
               {client ? (
                 <Link to={`/clients/${client.id}`} className="flex items-center gap-2 text-sm text-green-700 hover:text-green-900 font-medium hover:underline">
                   <span>👥</span> {client.name}
@@ -650,16 +650,16 @@ export default function ContactDetail() {
             {/* Call Center Notes */}
             {contact.call_center_notes && (
               <div className="mt-4 pt-4 border-t border-gray-100">
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Call Center Notes</p>
-                <p className="text-gray-600 text-xs leading-relaxed whitespace-pre-wrap max-h-32 overflow-y-auto">{contact.call_center_notes}</p>
+                <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-1.5">Call Center Notes</p>
+                <p className="text-gray-800 text-xs leading-relaxed whitespace-pre-wrap max-h-32 overflow-y-auto">{contact.call_center_notes}</p>
               </div>
             )}
 
             {/* Notes — always visible above meta regardless of active tab */}
             {contact.notes && (
               <div className="mt-4 pt-4 border-t border-gray-100">
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Notes</p>
-                <p className="text-gray-600 text-xs leading-relaxed whitespace-pre-wrap max-h-40 overflow-y-auto">{contact.notes}</p>
+                <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-1.5">Notes</p>
+                <p className="text-gray-800 text-xs leading-relaxed whitespace-pre-wrap max-h-40 overflow-y-auto">{contact.notes}</p>
               </div>
             )}
 
@@ -783,7 +783,7 @@ export default function ContactDetail() {
 
             {/* Pipeline stages */}
             <div className="mb-6">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-3">Pipeline</p>
+              <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-3">Pipeline</p>
               <div className="space-y-1">
                 {STAGES.map((s, i) => {
                   const isActive = contact.stage === s.value
@@ -812,7 +812,7 @@ export default function ContactDetail() {
 
             {/* Recent activity */}
             <div>
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-3">Recent Activity</p>
+              <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-3">Recent Activity</p>
               <div className="space-y-3">
                 {/* Contact created */}
                 <div className="flex items-start gap-2.5">
