@@ -441,7 +441,8 @@ export default function Contacts() {
   const navigate = useNavigate()
   const PAGE_SIZE = 50
 
-  const [activeTab,   setActiveTab]   = useState('individuals') // 'individuals' | 'companies'
+  const [activeTab,   setActiveTab]   = useState('individuals') // 'individuals' | 'companies' | 'settings'
+  const [settingsSubTab, setSettingsSubTab] = useState('import') // 'import' | 'export'
 
   // ── Individuals state ──
   const [contacts,    setContacts]    = useState([])
@@ -458,8 +459,6 @@ export default function Contacts() {
   // Mobile-only filter modal — replaces the inline pill row on phones.
   const [showMobileFilter, setShowMobileFilter] = useState(false)
   const [showAdd,     setShowAdd]     = useState(false)
-  const [showImport,  setShowImport]  = useState(false)
-  const [showExport,  setShowExport]  = useState(false)
   const [sortField,   setSortField]   = useState('last_name')
   const [sortAsc,     setSortAsc]     = useState(true)
   const [page,        setPage]        = useState(0)
@@ -585,20 +584,6 @@ export default function Contacts() {
               <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-green-700 text-white text-[10px] font-bold">1</span>
             )}
           </button>
-          {isIndividuals && <>
-            <button
-              onClick={() => setShowImport(true)}
-              className="hidden sm:flex px-3 py-2 border border-gray-200 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-50 transition-colors items-center gap-1.5"
-            >
-              ⬆ Import
-            </button>
-            <button
-              onClick={() => setShowExport(true)}
-              className="hidden sm:flex px-3 py-2 border border-gray-200 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-50 transition-colors items-center gap-1.5"
-            >
-              ⬇ Export
-            </button>
-          </>}
           <button
             onClick={() => setShowAdd(true)}
             className="hidden sm:flex px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 transition-colors"
@@ -624,14 +609,45 @@ export default function Contacts() {
         ))}
       </div>
 
-      {/* Settings placeholder */}
+      {/* Settings panel */}
       {activeTab === 'settings' && (
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center">
-            <p className="text-4xl mb-3">⚙️</p>
-            <h2 className="text-base font-semibold text-gray-800 mb-1">Contacts Settings</h2>
-            <p className="text-sm text-gray-500">Configuration options for this module will be available here.</p>
+        <div>
+          {/* Sub-tab bar */}
+          <div className="flex gap-1 mb-6 border-b border-gray-200">
+            {[
+              { id: 'import', label: '⬆ Import' },
+              { id: 'export', label: '⬇ Export' },
+            ].map(t => (
+              <button key={t.id} type="button"
+                onClick={() => setSettingsSubTab(t.id)}
+                className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors -mb-px ${
+                  settingsSubTab === t.id
+                    ? 'border-green-700 text-green-700'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >{t.label}</button>
+            ))}
           </div>
+
+          {settingsSubTab === 'import' && (
+            <div className="max-w-2xl">
+              <ImportModal
+                inline
+                onDone={() => { fetchContacts(); fetchCompanies() }}
+                onClose={null}
+              />
+            </div>
+          )}
+
+          {settingsSubTab === 'export' && (
+            <div className="max-w-lg">
+              <ExportModal
+                inline
+                contacts={contacts}
+                onClose={null}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -903,19 +919,6 @@ export default function Contacts() {
         />
       )}
 
-      {showImport && (
-        <ImportModal
-          onDone={() => fetchContacts()}
-          onClose={() => setShowImport(false)}
-        />
-      )}
-
-      {showExport && (
-        <ExportModal
-          contacts={filtered}
-          onClose={() => setShowExport(false)}
-        />
-      )}
 
       {/* Mobile filter modal — picks the stage filter and closes. */}
       {showMobileFilter && (

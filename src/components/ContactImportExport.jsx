@@ -142,7 +142,7 @@ const btnSecondary = 'px-4 py-2 border border-gray-200 text-sm font-medium text-
 // ══════════════════════════════════════════════════════════════════════════════
 // EXPORT MODAL
 // ══════════════════════════════════════════════════════════════════════════════
-export function ExportModal({ contacts, onClose }) {
+export function ExportModal({ contacts, onClose, inline = false }) {
   const [format,     setFormat]     = useState('csv')
   const [selected,   setSelected]   = useState(new Set(EXPORT_FIELDS.filter(f => f.on).map(f => f.value)))
   const [exporting,  setExporting]  = useState(false)
@@ -198,17 +198,20 @@ export function ExportModal({ contacts, onClose }) {
   const allOn  = EXPORT_FIELDS.every(f => selected.has(f.value))
   const allOff = selected.size === 0
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6">
+  const inner = (
+    <div className={inline ? 'w-full max-w-lg' : 'bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6'}>
 
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h2 className="text-lg font-bold text-gray-900">Export Contacts</h2>
-            <p className="text-xs text-gray-400 mt-0.5">{contacts.length.toLocaleString()} contact{contacts.length !== 1 ? 's' : ''} selected</p>
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+      <div className={`flex items-center justify-between mb-5 ${inline ? 'hidden' : ''}`}>
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">Export Contacts</h2>
+          <p className="text-xs text-gray-400 mt-0.5">{contacts.length.toLocaleString()} contact{contacts.length !== 1 ? 's' : ''} selected</p>
         </div>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+      </div>
+
+      {inline && (
+        <p className="text-xs text-gray-400 mb-5">{contacts.length.toLocaleString()} contact{contacts.length !== 1 ? 's' : ''} will be exported</p>
+      )}
 
         {/* Format */}
         <div className="mb-4">
@@ -254,17 +257,23 @@ export function ExportModal({ contacts, onClose }) {
           </div>
         </div>
 
-        <div className="flex gap-3">
-          <button onClick={onClose} className={btnSecondary + ' flex-1'}>Cancel</button>
-          <button
-            onClick={doExport}
-            disabled={exporting || selected.size === 0}
-            className={btnPrimary + ' flex-1'}
-          >
-            {exporting ? 'Exporting…' : `Export ${contacts.length} Contact${contacts.length !== 1 ? 's' : ''}`}
-          </button>
-        </div>
+      <div className="flex gap-3">
+        {!inline && <button onClick={onClose} className={btnSecondary + ' flex-1'}>Cancel</button>}
+        <button
+          onClick={doExport}
+          disabled={exporting || selected.size === 0}
+          className={btnPrimary + ' flex-1'}
+        >
+          {exporting ? 'Exporting…' : `Export ${contacts.length} Contact${contacts.length !== 1 ? 's' : ''}`}
+        </button>
       </div>
+    </div>
+  )
+
+  if (inline) return inner
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      {inner}
     </div>
   )
 }
@@ -272,7 +281,7 @@ export function ExportModal({ contacts, onClose }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // IMPORT MODAL
 // ══════════════════════════════════════════════════════════════════════════════
-export function ImportModal({ onDone, onClose }) {
+export function ImportModal({ onDone, onClose, inline = false }) {
   const [step,      setStep]      = useState(1)   // 1 upload · 2 map · 3 preview · 4 done
   const [fileRows,  setFileRows]  = useState([])
   const [headers,   setHeaders]   = useState([])
@@ -432,14 +441,13 @@ export function ImportModal({ onDone, onClose }) {
   // ── Preview sample helper ─────────────────────────────────────────────────
   const SAMPLE = 3
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[92vh] flex flex-col">
+  const inner = (
+    <div className={inline ? 'w-full flex flex-col' : 'bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[92vh] flex flex-col'}>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100 flex-shrink-0">
+        <div className={`flex items-center justify-between ${inline ? 'mb-4' : 'px-6 pt-5 pb-4 border-b border-gray-100'} flex-shrink-0`}>
           <div>
-            <h2 className="text-lg font-bold text-gray-900">Import Contacts</h2>
+            {!inline && <h2 className="text-lg font-bold text-gray-900">Import Contacts</h2>}
             <div className="flex items-center gap-2 mt-1">
               {[1,2,3,4].map(n => (
                 <div key={n} className="flex items-center gap-2">
@@ -458,11 +466,11 @@ export function ImportModal({ onDone, onClose }) {
               ))}
             </div>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl flex-shrink-0">✕</button>
+          {!inline && <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl flex-shrink-0">✕</button>}
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5">
+        <div className={`flex-1 overflow-y-auto ${inline ? 'py-4' : 'px-6 py-5'}`}>
 
           {/* ── STEP 1: Upload ── */}
           {step === 1 && (
@@ -667,8 +675,8 @@ export function ImportModal({ onDone, onClose }) {
         </div>
 
         {/* Footer actions */}
-        <div className="flex gap-3 px-6 py-4 border-t border-gray-100 flex-shrink-0">
-          {step === 1 && (
+        <div className={`flex gap-3 ${inline ? 'pt-4' : 'px-6 py-4 border-t border-gray-100'} flex-shrink-0`}>
+          {step === 1 && !inline && (
             <button onClick={onClose} className={btnSecondary + ' flex-1'}>Cancel</button>
           )}
 
@@ -699,10 +707,21 @@ export function ImportModal({ onDone, onClose }) {
           )}
 
           {step === 4 && (
-            <button onClick={onClose} className={btnPrimary + ' flex-1'}>Done</button>
+            <button
+              onClick={() => { if (inline) { setStep(1); setResult(null); setPreview(null); setFileRows([]); setHeaders([]); setMapping({}) } else onClose() }}
+              className={btnPrimary + ' flex-1'}
+            >
+              {inline ? 'Import Another File' : 'Done'}
+            </button>
           )}
         </div>
-      </div>
+    </div>
+  )
+
+  if (inline) return inner
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      {inner}
     </div>
   )
 }
