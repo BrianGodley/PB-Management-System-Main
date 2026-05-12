@@ -96,17 +96,19 @@ export default function Design() {
   ]
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="flex flex-col h-full">
       {/* Page title */}
-      <h1 className="text-2xl font-bold text-gray-900 mb-4">📐 Design</h1>
+      <div className="mb-4 flex-shrink-0">
+        <h1 className="text-xl font-bold text-gray-900">Design</h1>
+      </div>
 
       {/* Tab bar */}
-      <div className="flex border-b border-gray-200 mb-6">
+      <div className="flex flex-nowrap border-b border-gray-200 mb-4 pb-0 flex-shrink-0 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-thin">
         {TABS.map(t => (
           <button
             key={t.id}
             onClick={() => setActiveTab(t.id)}
-            className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
+            className={`px-3 sm:px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap flex-shrink-0 ${
               activeTab === t.id
                 ? 'border-green-700 text-green-800'
                 : 'border-transparent text-gray-500 hover:text-gray-800'
