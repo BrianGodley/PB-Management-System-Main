@@ -1349,14 +1349,19 @@ export default function Accounting() {
 
   return (
     <div className="flex flex-col h-full">
+      {/* Page header */}
+      <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
+        <h1 className="text-xl font-bold text-gray-900">Accounting</h1>
+      </div>
+
       {/* Tab bar */}
-      <div className="flex border-b border-gray-200 mb-6 overflow-x-auto flex-shrink-0">
+      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0 -mx-6">
         {TABS.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors flex-shrink-0 ${
+            className={`flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
               tab === t.key
-                ? 'border-green-700 text-green-700 bg-green-50'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                ? 'border-green-700 text-green-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}>
             {t.label}
           </button>
@@ -1364,7 +1369,7 @@ export default function Accounting() {
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto pt-4">
         {tab === 'dashboard' && (
           <DashboardTab invoices={invoices} bills={bills} bankAccounts={bankAccounts} accounts={accounts} onNavigate={setTab} />
         )}

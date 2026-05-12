@@ -613,7 +613,7 @@ export default function Contacts() {
 
       {/* Settings panel */}
       {activeTab === 'settings' && (
-        <div className="-mx-6">
+        <div className="-mx-6 mt-6">
           <div className="flex border-b border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0">
             {[
               { id: 'import', label: '⬆ Import' },
