@@ -769,7 +769,7 @@ export default function Collections() {
         )}
         <button
           onClick={handleNewWeekClick} disabled={creatingWeek}
-          className="text-sm px-3 py-1.5 rounded-lg bg-green-700 text-white font-medium hover:bg-green-800 disabled:opacity-50 mr-16"
+          className="text-sm px-3 py-1.5 rounded-lg bg-green-700 text-white font-medium hover:bg-green-800 disabled:opacity-50"
         >{creatingWeek ? 'Loading…' : '+ New Week'}</button>
       </div>
 
