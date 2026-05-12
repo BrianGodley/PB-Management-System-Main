@@ -648,7 +648,7 @@ export default function Contacts() {
       </button>
 
       {/* Search */}
-      <div className="mb-4">
+      <div className="mb-4 mt-4">
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
