@@ -348,20 +348,20 @@ export default function CompanyDetail() {
               <div>
                 <p className={lbl}>Company Address</p>
                 {addressLine
-                  ? <p className="text-gray-900">{addressLine}</p>
+                  ? <p className="font-semibold text-gray-900">{addressLine}</p>
                   : <span className="text-gray-300">—</span>}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <p className={lbl}>Main Phone</p>
                   {company.phone
-                    ? <a href={`tel:${company.phone}`} className="text-gray-900 hover:text-green-700">{company.phone}</a>
+                    ? <a href={`tel:${company.phone}`} className="font-semibold text-gray-900 hover:text-green-700">{company.phone}</a>
                     : <span className="text-gray-300">—</span>}
                 </div>
                 <div>
                   <p className={lbl}>Main Email</p>
                   {company.email
-                    ? <a href={`mailto:${company.email}`} className="text-gray-900 hover:text-green-700 break-all">{company.email}</a>
+                    ? <a href={`mailto:${company.email}`} className="font-semibold text-gray-900 hover:text-green-700 break-all">{company.email}</a>
                     : <span className="text-gray-300">—</span>}
                 </div>
               </div>
@@ -389,7 +389,7 @@ export default function CompanyDetail() {
               ].map(t => (
                 <button key={t.key} onClick={() => setLeftTab(t.key)}
                   className={`px-3 py-2 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${
-                    leftTab === t.key ? 'border-green-600 text-green-700' : 'border-transparent text-gray-400 hover:text-gray-600'
+                    leftTab === t.key ? 'border-green-600 text-green-700' : 'border-transparent text-gray-900 hover:text-black'
                   }`}>
                   {t.label}
                 </button>
@@ -401,16 +401,16 @@ export default function CompanyDetail() {
               <div className="space-y-3 text-sm">
                 <div>
                   <p className={lbl}>Assigned To</p>
-                  <p className="text-gray-900">{company.ghl_assigned_to || <span className="text-gray-300">—</span>}</p>
+                  <p className="font-semibold text-gray-900">{company.ghl_assigned_to || <span className="text-gray-300">—</span>}</p>
                 </div>
                 <div>
                   <p className={lbl}>Contact Type</p>
-                  <p className="text-gray-900">{company.contact_type || <span className="text-gray-300">—</span>}</p>
+                  <p className="font-semibold text-gray-900">{company.contact_type || <span className="text-gray-300">—</span>}</p>
                 </div>
                 <div>
                   <p className={lbl}>Project Description</p>
                   {company.project_description
-                    ? <p className="text-gray-800 text-xs leading-relaxed whitespace-pre-wrap">{company.project_description}</p>
+                    ? <p className="font-semibold text-gray-900 text-xs leading-relaxed whitespace-pre-wrap">{company.project_description}</p>
                     : <span className="text-gray-300">—</span>}
                 </div>
               </div>
@@ -429,8 +429,8 @@ export default function CompanyDetail() {
                           {[c.first_name, c.last_name].filter(Boolean).join(' ') || '—'}
                         </p>
                         {c.position && <p className="text-xs text-green-700 font-medium">{c.position}</p>}
-                        {c.phone && <a href={`tel:${c.phone}`} className="block text-xs text-gray-900 hover:text-green-700">{c.phone}</a>}
-                        {c.email && <a href={`mailto:${c.email}`} className="block text-xs text-gray-900 hover:text-green-700 break-all">{c.email}</a>}
+                        {c.phone && <a href={`tel:${c.phone}`} className="block text-xs font-semibold text-gray-900 hover:text-green-700">{c.phone}</a>}
+                        {c.email && <a href={`mailto:${c.email}`} className="block text-xs font-semibold text-gray-900 hover:text-green-700 break-all">{c.email}</a>}
                       </div>
                     ))}
                   </div>
@@ -455,15 +455,15 @@ export default function CompanyDetail() {
                 </div>
                 <div>
                   <p className={lbl}>Source Type</p>
-                  <p className="text-gray-900">{company.source || <span className="text-gray-300">—</span>}</p>
+                  <p className="font-semibold text-gray-900">{company.source || <span className="text-gray-300">—</span>}</p>
                 </div>
                 <div>
                   <p className={lbl}>Campaign</p>
-                  <p className="text-gray-900">{company.campaign || <span className="text-gray-300">—</span>}</p>
+                  <p className="font-semibold text-gray-900">{company.campaign || <span className="text-gray-300">—</span>}</p>
                 </div>
                 <div>
                   <p className={lbl}>Source Origin</p>
-                  <p className="text-gray-900">{company.how_did_you_hear || <span className="text-gray-300">—</span>}</p>
+                  <p className="font-semibold text-gray-900">{company.how_did_you_hear || <span className="text-gray-300">—</span>}</p>
                 </div>
               </div>
             )}
@@ -489,13 +489,13 @@ export default function CompanyDetail() {
             {company.call_center_notes && (
               <div className="mt-5 pt-4 border-t border-gray-100">
                 <p className={lbl}>Call Center Notes</p>
-                <p className="text-gray-800 text-xs leading-relaxed whitespace-pre-wrap max-h-32 overflow-y-auto">{company.call_center_notes}</p>
+                <p className="font-semibold text-gray-900 text-xs leading-relaxed whitespace-pre-wrap max-h-32 overflow-y-auto">{company.call_center_notes}</p>
               </div>
             )}
             {company.notes && (
               <div className="mt-4 pt-4 border-t border-gray-100">
                 <p className={lbl}>Notes</p>
-                <p className="text-gray-800 text-xs leading-relaxed whitespace-pre-wrap max-h-40 overflow-y-auto">{company.notes}</p>
+                <p className="font-semibold text-gray-900 text-xs leading-relaxed whitespace-pre-wrap max-h-40 overflow-y-auto">{company.notes}</p>
               </div>
             )}
             <div className="mt-4 pt-4 border-t border-gray-100 text-xs text-gray-400 space-y-1">

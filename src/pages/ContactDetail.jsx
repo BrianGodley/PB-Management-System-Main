@@ -393,7 +393,7 @@ export default function ContactDetail() {
                 <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Address</p>
                 {(contact.street_address || contact.city || contact.state || contact.zip)
                   ? <>
-                      {contact.street_address && <p className="text-gray-900">{contact.street_address}</p>}
+                      {contact.street_address && <p className="font-semibold text-gray-900">{contact.street_address}</p>}
                       <p className="text-gray-700">{[contact.city, contact.state, contact.zip].filter(Boolean).join(', ')}</p>
                     </>
                   : <span className="text-gray-300">—</span>}
@@ -401,16 +401,16 @@ export default function ContactDetail() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Phone</p>
-                  {contact.phone ? <a href={`tel:${contact.phone}`} className="text-gray-900 hover:text-green-700">{contact.phone}</a> : <span className="text-gray-300">—</span>}
+                  {contact.phone ? <a href={`tel:${contact.phone}`} className="font-semibold text-gray-900 hover:text-green-700">{contact.phone}</a> : <span className="text-gray-300">—</span>}
                 </div>
                 <div>
                   <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Cell</p>
-                  {contact.cell ? <a href={`tel:${contact.cell}`} className="text-gray-900 hover:text-green-700">{contact.cell}</a> : <span className="text-gray-300">—</span>}
+                  {contact.cell ? <a href={`tel:${contact.cell}`} className="font-semibold text-gray-900 hover:text-green-700">{contact.cell}</a> : <span className="text-gray-300">—</span>}
                 </div>
               </div>
               <div>
                 <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Email</p>
-                {contact.email ? <a href={`mailto:${contact.email}`} className="text-gray-900 hover:text-green-700 break-all">{contact.email}</a> : <span className="text-gray-300">—</span>}
+                {contact.email ? <a href={`mailto:${contact.email}`} className="font-semibold text-gray-900 hover:text-green-700 break-all">{contact.email}</a> : <span className="text-gray-300">—</span>}
               </div>
             </div>
 
@@ -440,7 +440,7 @@ export default function ContactDetail() {
                   className={`px-3 py-2 text-xs font-semibold border-b-2 transition-colors ${
                     leftTab === t.key
                       ? 'border-green-600 text-green-700'
-                      : 'border-transparent text-gray-400 hover:text-gray-600'
+                      : 'border-transparent text-gray-900 hover:text-black'
                   }`}
                 >
                   {t.label}
@@ -461,25 +461,25 @@ export default function ContactDetail() {
                 <div>
                   <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Additional Emails</p>
                   {contact.additional_emails?.length > 0
-                    ? contact.additional_emails.map((e, i) => <a key={i} href={`mailto:${e}`} className="block text-gray-900 hover:text-green-700 break-all">{e}</a>)
+                    ? contact.additional_emails.map((e, i) => <a key={i} href={`mailto:${e}`} className="block font-semibold text-gray-900 hover:text-green-700 break-all">{e}</a>)
                     : <span className="text-gray-300">—</span>}
                 </div>
                 {/* Additional Phones */}
                 <div>
                   <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Additional Phones</p>
                   {contact.additional_phones?.length > 0
-                    ? contact.additional_phones.map((p, i) => <a key={i} href={`tel:${p}`} className="block text-gray-900 hover:text-green-700">{p}</a>)
+                    ? contact.additional_phones.map((p, i) => <a key={i} href={`tel:${p}`} className="block font-semibold text-gray-900 hover:text-green-700">{p}</a>)
                     : <span className="text-gray-300">—</span>}
                 </div>
                 {/* Assigned To */}
                 <div>
                   <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Assigned To</p>
-                  <p className="text-gray-900">{contact.ghl_assigned_to || <span className="text-gray-300">—</span>}</p>
+                  <p className="font-semibold text-gray-900">{contact.ghl_assigned_to || <span className="text-gray-300">—</span>}</p>
                 </div>
                 {/* Consultation Type */}
                 <div>
                   <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Consultation Type</p>
-                  <p className="text-gray-900">{contact.consultation_type || <span className="text-gray-300">—</span>}</p>
+                  <p className="font-semibold text-gray-900">{contact.consultation_type || <span className="text-gray-300">—</span>}</p>
                 </div>
                 {/* Date of Birth */}
                 <div>
@@ -494,7 +494,7 @@ export default function ContactDetail() {
                 <div>
                   <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Project Description</p>
                   {contact.project_description
-                    ? <p className="text-gray-800 text-xs leading-relaxed whitespace-pre-wrap">{contact.project_description}</p>
+                    ? <p className="font-semibold text-gray-900 text-xs leading-relaxed whitespace-pre-wrap">{contact.project_description}</p>
                     : <span className="text-gray-300">—</span>}
                 </div>
               </div>
@@ -521,19 +521,19 @@ export default function ContactDetail() {
                 {/* Source Type — always visible */}
                 <div>
                   <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Source Type</p>
-                  <p className="text-gray-900">{contact.source || <span className="text-gray-300">—</span>}</p>
+                  <p className="font-semibold text-gray-900">{contact.source || <span className="text-gray-300">—</span>}</p>
                 </div>
 
                 {/* Campaign — always visible */}
                 <div>
                   <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Campaign</p>
-                  <p className="text-gray-900">{contact.campaign || <span className="text-gray-300">—</span>}</p>
+                  <p className="font-semibold text-gray-900">{contact.campaign || <span className="text-gray-300">—</span>}</p>
                 </div>
 
                 {/* Source Origin — always visible */}
                 <div>
                   <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-0.5">Source Origin</p>
-                  <p className="text-gray-900">{contact.how_did_you_hear || <span className="text-gray-300">—</span>}</p>
+                  <p className="font-semibold text-gray-900">{contact.how_did_you_hear || <span className="text-gray-300">—</span>}</p>
                 </div>
 
                 {/* Project Interests — always visible */}
@@ -652,7 +652,7 @@ export default function ContactDetail() {
             {contact.call_center_notes && (
               <div className="mt-4 pt-4 border-t border-gray-100">
                 <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-1.5">Call Center Notes</p>
-                <p className="text-gray-800 text-xs leading-relaxed whitespace-pre-wrap max-h-32 overflow-y-auto">{contact.call_center_notes}</p>
+                <p className="font-semibold text-gray-900 text-xs leading-relaxed whitespace-pre-wrap max-h-32 overflow-y-auto">{contact.call_center_notes}</p>
               </div>
             )}
 
@@ -660,7 +660,7 @@ export default function ContactDetail() {
             {contact.notes && (
               <div className="mt-4 pt-4 border-t border-gray-100">
                 <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-1.5">Notes</p>
-                <p className="text-gray-800 text-xs leading-relaxed whitespace-pre-wrap max-h-40 overflow-y-auto">{contact.notes}</p>
+                <p className="font-semibold text-gray-900 text-xs leading-relaxed whitespace-pre-wrap max-h-40 overflow-y-auto">{contact.notes}</p>
               </div>
             )}
 
