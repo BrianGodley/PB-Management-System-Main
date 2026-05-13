@@ -1584,7 +1584,7 @@ export default function ScheduleCalendar({
 
         return (
           <ModalOverlay onClose={closeModal}>
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 flex flex-col max-h-[85vh] overflow-hidden">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-[605px] mx-4 flex flex-col max-h-[85vh] overflow-hidden">
               {/* Header */}
               <div className="px-5 pt-5 pb-3 border-b border-gray-100 flex-shrink-0">
                 <div className="flex items-baseline justify-between gap-2 mb-2">
