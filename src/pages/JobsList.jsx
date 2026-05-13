@@ -198,6 +198,12 @@ export default function JobsList() {
   const [optResult,        setOptResult]        = useState(null) // { ordered_jobs, legs, totals }
   const [optError,         setOptError]         = useState('')
   const [applying,         setApplying]         = useState(false)
+  // Supervisor optimization state
+  const [supervisors,      setSupervisors]      = useState([])  // [{id, name, job_title, included}]
+  const [supLoading,       setSupLoading]       = useState(false)
+  const [supResult,        setSupResult]        = useState(null) // { supervisors: [{id, name, jobs:[]}] }
+  const [supRunning,       setSupRunning]       = useState(false)
+  const [supApplying,      setSupApplying]      = useState(false)
   // Geocoding readiness state for the Schedule Assistance modal
   const [geoStats, setGeoStats] = useState({ ok: 0, pending: 0, not_found: 0, error: 0, total: 0 })
   const [geocoding, setGeocoding] = useState(false)
@@ -370,6 +376,96 @@ export default function JobsList() {
       setOptError(e instanceof Error ? e.message : String(e))
     }
     setOptimizing(false)
+  }
+
+  // Load active employees whose job_title contains "supervisor". User can
+  // deselect any of them in the configure view before running the optimizer.
+  async function loadSupervisors() {
+    setSupLoading(true)
+    const { data } = await supabase.from('employees')
+      .select('id, first_name, last_name, job_title')
+      .eq('status', 'active')
+      .ilike('job_title', '%supervisor%')
+      .order('first_name')
+    const sups = (data || []).map(e => ({ ...e, included: true }))
+    setSupervisors(sups)
+    setSupLoading(false)
+  }
+
+  // Call the assign-supervisors edge function with the picked supervisors.
+  async function runSupervisorOptimization() {
+    setSupRunning(true); setOptError(''); setSupResult(null)
+    try {
+      const ids = supervisors.filter(s => s.included).map(s => s.id)
+      if (ids.length === 0) { setOptError('Pick at least one supervisor.'); setSupRunning(false); return }
+
+      const { data: { session } } = await supabase.auth.getSession()
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/assign-supervisors`
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ supervisor_employee_ids: ids }),
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) { setOptError(data.error || `HTTP ${res.status}`); setSupRunning(false); return }
+
+      setSupResult(data)
+      setSchedAssistView('supervisor-result')
+    } catch (e) {
+      setOptError(e instanceof Error ? e.message : String(e))
+    }
+    setSupRunning(false)
+  }
+
+  // Move one job from one supervisor's bucket to another (UI edit).
+  function moveJobBetweenSupervisors(jobId, fromSupId, toSupId) {
+    if (fromSupId === toSupId) return
+    setSupResult(prev => {
+      if (!prev) return prev
+      const next = { ...prev, supervisors: prev.supervisors.map(s => ({ ...s, jobs: [...s.jobs] })) }
+      const fromSup = next.supervisors.find(s => s.id === fromSupId)
+      const toSup   = next.supervisors.find(s => s.id === toSupId)
+      if (!fromSup || !toSup) return prev
+      const idx = fromSup.jobs.findIndex(j => j.id === jobId)
+      if (idx < 0) return prev
+      const [job] = fromSup.jobs.splice(idx, 1)
+      toSup.jobs.push(job)
+      return next
+    })
+  }
+
+  // Apply the supervisor assignments — write the supervisor's name to
+  // each job's project_manager column.
+  async function applySupervisorAssignments() {
+    if (!supResult) return
+    setSupApplying(true)
+    try {
+      const updates = []
+      for (const sup of supResult.supervisors) {
+        for (const job of sup.jobs) {
+          // Skip if this job already has the right PM (saves writes)
+          if (job.current_pm === sup.name) continue
+          updates.push({ id: job.id, project_manager: sup.name })
+        }
+      }
+      // Process updates in parallel batches of 10 to keep things fast but
+      // not pound Supabase too hard
+      const CONC = 10
+      for (let i = 0; i < updates.length; i += CONC) {
+        await Promise.all(updates.slice(i, i + CONC).map(u =>
+          supabase.from('jobs').update({ project_manager: u.project_manager }).eq('id', u.id)
+        ))
+      }
+      // Refresh the local jobs list so the new PMs reflect immediately
+      await fetchJobs()
+      setShowSchedAssist(false)
+      setSchedAssistView('mode')
+      setSupResult(null)
+      setSchedAssistMode(null)
+    } catch (e) {
+      alert('Error applying assignments: ' + (e instanceof Error ? e.message : String(e)))
+    }
+    setSupApplying(false)
   }
 
   // Move a job up/down within the ordered route (manual edit of the result).
@@ -929,6 +1025,8 @@ export default function JobsList() {
                   {schedAssistView === 'mode' && 'Pick which optimization to run.'}
                   {schedAssistView === 'configure' && 'Choose start location, dates, and which jobs to include.'}
                   {schedAssistView === 'result' && 'Review the route — edit order if needed — then apply.'}
+                  {schedAssistView === 'supervisor-config' && 'Pick the supervisors to include in the assignment.'}
+                  {schedAssistView === 'supervisor-result' && 'Review the proposed assignments — drag jobs between supervisors if needed — then apply.'}
                 </p>
               </div>
               <button onClick={() => { setShowSchedAssist(false); setSchedAssistView('mode'); setOptResult(null) }} className="text-gray-300 hover:text-gray-500">
@@ -978,7 +1076,7 @@ export default function JobsList() {
                 <div className="space-y-2">
                   {[
                     { key: 'supervisor', emoji: '👥', title: 'Optimize Job Supervisor Assignment',
-                      desc: 'Cluster open jobs by location and balance them across your Job Supervisors. (Phase 3 — coming soon)' },
+                      desc: 'Cluster open jobs by location and balance them across your Job Supervisors with equal job count.' },
                     { key: 'yard',       emoji: '🌿', title: 'Optimize Yard Checks',
                       desc: 'Route a single person efficiently through all jobs currently in the Yard Check stage. Respects yard check #s.' },
                     { key: 'warranty',   emoji: '🛡️', title: 'Optimize Warranties',
@@ -1006,11 +1104,19 @@ export default function JobsList() {
 
                 <div className="mt-5 flex items-center gap-2">
                   <button
-                    disabled={!schedAssistMode || schedAssistMode === 'supervisor'}
-                    onClick={() => { loadEligibleJobs(schedAssistMode); setSchedAssistView('configure') }}
+                    disabled={!schedAssistMode}
+                    onClick={() => {
+                      if (schedAssistMode === 'supervisor') {
+                        loadSupervisors()
+                        setSchedAssistView('supervisor-config')
+                      } else {
+                        loadEligibleJobs(schedAssistMode)
+                        setSchedAssistView('configure')
+                      }
+                    }}
                     className="flex-1 py-2.5 bg-indigo-700 text-white text-sm font-semibold rounded-xl hover:bg-indigo-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
-                    {schedAssistMode === 'supervisor' ? 'Supervisor mode — Phase 3' : 'Next →'}
+                    Next →
                   </button>
                   <button
                     onClick={() => { setShowSchedAssist(false); setSchedAssistMode(null) }}
@@ -1235,6 +1341,147 @@ export default function JobsList() {
                   </button>
                   <button
                     onClick={() => setSchedAssistView('configure')}
+                    className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm hover:bg-gray-50"
+                  >
+                    ← Back
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* ════ SUPERVISOR CONFIGURE VIEW ════ */}
+            {schedAssistView === 'supervisor-config' && (
+              <>
+                <div className="space-y-3">
+                  <p className="text-xs text-gray-500">
+                    Pick the supervisors to include in the assignment.
+                    Default: every active employee whose position contains "supervisor".
+                  </p>
+                  {supLoading ? (
+                    <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-700" /></div>
+                  ) : supervisors.length === 0 ? (
+                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      No active employees have a position containing "supervisor". Add or rename a position in HR → Positions, then assign at least one employee to it.
+                    </p>
+                  ) : (
+                    <div className="border border-gray-200 rounded-lg max-h-72 overflow-y-auto">
+                      {supervisors.map(s => (
+                        <label key={s.id} className={`flex items-center gap-2 px-3 py-2 text-sm border-b border-gray-100 last:border-b-0 cursor-pointer hover:bg-gray-50 ${!s.included ? 'opacity-50' : ''}`}>
+                          <input type="checkbox" checked={s.included}
+                            onChange={() => setSupervisors(prev => prev.map(p => p.id === s.id ? { ...p, included: !p.included } : p))}
+                            className="accent-indigo-600 flex-shrink-0" />
+                          <span className="flex-1 text-gray-800 font-medium">{s.first_name} {s.last_name}</span>
+                          <span className="text-[11px] text-gray-400">{s.job_title}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-[11px] text-gray-400">
+                    The optimizer will cluster all open geocoded jobs by location and assign each cluster to one supervisor, balancing for equal job count.
+                  </p>
+                  {optError && <p className="text-xs text-red-600">{optError}</p>}
+                </div>
+
+                <div className="mt-5 flex items-center gap-2">
+                  <button
+                    disabled={supRunning || supervisors.filter(s => s.included).length === 0}
+                    onClick={runSupervisorOptimization}
+                    className="flex-1 py-2.5 bg-indigo-700 text-white text-sm font-semibold rounded-xl hover:bg-indigo-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {supRunning ? 'Running…' : 'Run optimization'}
+                  </button>
+                  <button
+                    onClick={() => { setSchedAssistView('mode'); setOptError('') }}
+                    className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm hover:bg-gray-50"
+                  >
+                    ← Back
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* ════ SUPERVISOR RESULT VIEW ════ */}
+            {schedAssistView === 'supervisor-result' && supResult && (
+              <>
+                {/* Summary */}
+                {(() => {
+                  const counts = supResult.supervisors.map(s => s.jobs.length)
+                  const total = counts.reduce((a, b) => a + b, 0)
+                  const min = Math.min(...counts), max = Math.max(...counts)
+                  return (
+                    <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 mb-4 grid grid-cols-3 gap-3 text-center">
+                      <div>
+                        <p className="text-xs text-indigo-700">Supervisors</p>
+                        <p className="text-xl font-bold text-indigo-900">{supResult.supervisors.length}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-indigo-700">Jobs assigned</p>
+                        <p className="text-xl font-bold text-indigo-900">{total}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-indigo-700">Per-supervisor range</p>
+                        <p className="text-xl font-bold text-indigo-900">{min}–{max}</p>
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                <p className="text-[11px] text-gray-500 mb-2 italic">
+                  Each job's "Move to" dropdown lets you reassign manually before applying.
+                </p>
+
+                <div className="space-y-3">
+                  {supResult.supervisors.map(sup => (
+                    <div key={sup.id} className="border border-gray-200 rounded-xl overflow-hidden">
+                      <div className="bg-indigo-50 border-b border-indigo-200 px-3 py-2 flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-bold text-indigo-900">{sup.name || '(unnamed)'}</p>
+                          {sup.job_title && <p className="text-[10px] text-indigo-700">{sup.job_title}</p>}
+                        </div>
+                        <span className="text-xs font-semibold text-indigo-700">{sup.jobs.length} job{sup.jobs.length === 1 ? '' : 's'}</span>
+                      </div>
+                      <div className="divide-y divide-gray-100 max-h-56 overflow-y-auto">
+                        {sup.jobs.length === 0 ? (
+                          <p className="text-xs text-gray-400 italic text-center py-4">No jobs assigned to this supervisor.</p>
+                        ) : sup.jobs.map(job => (
+                          <div key={job.id} className="flex items-center gap-2 px-3 py-1.5 text-sm">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-gray-800 truncate">{job.name || job.client_name}</p>
+                              <p className="text-[10px] text-gray-400 truncate">
+                                {[job.job_address, job.job_city].filter(Boolean).join(', ')}
+                              </p>
+                            </div>
+                            <select
+                              value={sup.id}
+                              onChange={e => moveJobBetweenSupervisors(job.id, sup.id, e.target.value)}
+                              className="text-[11px] border border-gray-200 rounded px-1.5 py-0.5 bg-white text-gray-600 max-w-[120px]"
+                              title="Move to other supervisor"
+                            >
+                              {supResult.supervisors.map(s => (
+                                <option key={s.id} value={s.id}>{s.name || '(unnamed)'}</option>
+                              ))}
+                            </select>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-[11px] text-gray-400 mt-3 italic">
+                  Applying will set <code className="text-gray-600">project_manager</code> on every assigned job to the supervisor's name.
+                </p>
+
+                <div className="mt-5 flex items-center gap-2">
+                  <button
+                    disabled={supApplying}
+                    onClick={applySupervisorAssignments}
+                    className="flex-1 py-2.5 bg-green-700 text-white text-sm font-semibold rounded-xl hover:bg-green-800 disabled:opacity-40 transition-colors"
+                  >
+                    {supApplying ? 'Applying…' : '✓ Apply assignments'}
+                  </button>
+                  <button
+                    onClick={() => setSchedAssistView('supervisor-config')}
                     className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm hover:bg-gray-50"
                   >
                     ← Back
