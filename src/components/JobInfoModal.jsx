@@ -15,6 +15,14 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
+// Same list ClientDetail uses for its state dropdown — keep them in sync.
+const US_STATES = [
+  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA',
+  'KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
+  'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT',
+  'VA','WA','WV','WI','WY',
+]
+
 export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
   const [activeTab, setActiveTab] = useState('info')
   const [saving,    setSaving]    = useState(false)
@@ -24,6 +32,10 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
   const [clientData,  setClientData]  = useState(null)
   const [contactData, setContactData] = useState(null)
   const [loadingClient, setLoadingClient] = useState(false)
+  // Inline client edit state (mirrors the ClientDetail page's edit card).
+  const [editingClient, setEditingClient] = useState(false)
+  const [clientForm,    setClientForm]    = useState({})
+  const [savingClient,  setSavingClient]  = useState(false)
   // Site Access fields (live on jobs). Editable.
   const [gateCode,    setGateCode]    = useState(job.gate_code || '')
   const [hasDog,      setHasDog]      = useState(!!job.has_dog)
@@ -122,6 +134,54 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
     })
     setSaving(false)
     if (!ok) setError('Failed to save. Please try again.')
+  }
+
+  // Start editing the client: copy the loaded row into a form buffer.
+  function startEditClient() {
+    if (!clientData) return
+    setClientForm({
+      first_name:       clientData.first_name       || '',
+      last_name:        clientData.last_name        || '',
+      company_name:     clientData.company_name     || '',
+      company_position: clientData.company_position || '',
+      email:            clientData.email            || '',
+      phone:            clientData.phone            || '',
+      street:           clientData.street           || '',
+      city:             clientData.city             || '',
+      state:            clientData.state            || '',
+      zip:              clientData.zip              || '',
+      notes:            clientData.notes            || '',
+    })
+    setEditingClient(true)
+  }
+
+  // Persist the edited client back to clients. Also rebuilds the composed
+  // `name` field so it stays in sync (same convention ClientDetail follows).
+  async function saveClient() {
+    if (!clientData?.id) return
+    setSavingClient(true)
+    const f = clientForm
+    const fullName = [f.first_name, f.last_name].filter(Boolean).join(' ').trim()
+    const updates = {
+      first_name:       f.first_name?.trim()       || null,
+      last_name:        f.last_name?.trim()        || null,
+      name:             fullName || clientData.name,
+      company_name:     f.company_name?.trim()     || null,
+      company_position: f.company_position?.trim() || null,
+      email:            f.email?.trim()            || null,
+      phone:            f.phone?.trim()            || null,
+      street:           f.street?.trim()           || null,
+      city:             f.city?.trim()             || null,
+      state:            f.state                    || null,
+      zip:              f.zip?.trim()              || null,
+      notes:            f.notes?.trim()            || null,
+    }
+    const { data, error } = await supabase.from('clients')
+      .update(updates).eq('id', clientData.id).select().single()
+    setSavingClient(false)
+    if (error) { alert('Failed to save client: ' + error.message); return }
+    if (data) setClientData(data)
+    setEditingClient(false)
   }
 
   const TABS = [
@@ -337,63 +397,147 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
                 </div>
               ) : (
                 <>
-                  {/* IDENTITY */}
-                  <Section title="Identity">
-                    {clientData.client_type === 'company' || clientData.company_name ? (
-                      <>
-                        <Field label="Company" value={clientData.company_name || clientData.name} />
-                        {clientData.company_position && <Field label="Position" value={clientData.company_position} />}
-                        {(clientData.first_name || clientData.last_name) && (
-                          <Field label="Primary contact" value={`${clientData.first_name || ''} ${clientData.last_name || ''}`.trim()} />
-                        )}
-                      </>
+                  {/* ── Client card — mirrors ClientDetail's left column.
+                      Toggles between read view and inline edit form. ── */}
+                  <div className="bg-white border border-slate-300 rounded-xl p-4">
+                    {editingClient ? (
+                      <form onSubmit={e => { e.preventDefault(); saveClient() }} className="space-y-2.5">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Edit Client</p>
+                          <button type="button" onClick={() => setEditingClient(false)}
+                            className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
+                        </div>
+                        {[
+                          { label: 'First Name',     key: 'first_name',       type: 'text'  },
+                          { label: 'Last Name',      key: 'last_name',        type: 'text'  },
+                          { label: 'Company',        key: 'company_name',     type: 'text'  },
+                          { label: 'Position',       key: 'company_position', type: 'text'  },
+                          { label: 'Email',          key: 'email',            type: 'email' },
+                          { label: 'Phone',          key: 'phone',            type: 'tel'   },
+                          { label: 'Street',         key: 'street',           type: 'text'  },
+                          { label: 'City',           key: 'city',             type: 'text'  },
+                          { label: 'Zip',            key: 'zip',              type: 'text'  },
+                        ].map(f => (
+                          <div key={f.key}>
+                            <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">{f.label}</label>
+                            <input type={f.type}
+                              value={clientForm[f.key] || ''}
+                              onChange={e => setClientForm(p => ({ ...p, [f.key]: e.target.value }))}
+                              className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600" />
+                          </div>
+                        ))}
+                        <div>
+                          <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">State</label>
+                          <select
+                            value={clientForm.state || ''}
+                            onChange={e => setClientForm(p => ({ ...p, state: e.target.value }))}
+                            className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30">
+                            <option value="">-- State --</option>
+                            {US_STATES.map(s => <option key={s}>{s}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Notes</label>
+                          <textarea rows={2}
+                            value={clientForm.notes || ''}
+                            onChange={e => setClientForm(p => ({ ...p, notes: e.target.value }))}
+                            className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-600/30" />
+                        </div>
+                        <div className="flex gap-2 pt-1">
+                          <button type="submit" disabled={savingClient}
+                            className="flex-1 py-1.5 rounded-lg bg-green-700 text-white text-xs font-semibold hover:bg-green-800 disabled:opacity-50">
+                            {savingClient ? 'Saving…' : 'Save Client'}
+                          </button>
+                          <button type="button" onClick={() => setEditingClient(false)}
+                            className="flex-1 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50">Cancel</button>
+                        </div>
+                      </form>
                     ) : (
                       <>
-                        <Field label="Name" value={clientData.name || `${clientData.first_name || ''} ${clientData.last_name || ''}`.trim()} />
-                        {(clientData.spouse_first_name || clientData.spouse_last_name) && (
-                          <Field
-                            label="Spouse / partner"
-                            value={`${clientData.spouse_first_name || ''} ${clientData.spouse_last_name || ''}`.trim()}
-                          />
-                        )}
-                        {(contactData?.secondary_first_name || contactData?.secondary_last_name) && (
-                          <Field
-                            label="Secondary contact (from contact)"
-                            value={`${contactData.secondary_first_name || ''} ${contactData.secondary_last_name || ''}`.trim()}
-                          />
-                        )}
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="min-w-0">
+                            <h3 className="text-base font-bold text-gray-900 leading-tight truncate">
+                              {[clientData.first_name, clientData.last_name].filter(Boolean).join(' ') || clientData.name || '—'}
+                            </h3>
+                            {clientData.company_name && (
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                {clientData.company_name}{clientData.company_position ? ` · ${clientData.company_position}` : ''}
+                              </p>
+                            )}
+                          </div>
+                          <button onClick={startEditClient}
+                            className="text-gray-400 hover:text-gray-700 p-1 rounded hover:bg-slate-100 transition-colors flex-shrink-0" title="Edit client">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                              <path d="M11.5 1.5a1.414 1.414 0 0 1 2 2L5 12l-3 1 1-3 8.5-8.5z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </button>
+                        </div>
+                        <div className="space-y-1.5 text-xs">
+                          {(clientData.street || clientData.city) && (
+                            <div className="flex items-start gap-1.5 text-gray-700">
+                              <span className="flex-shrink-0 mt-0.5">📍</span>
+                              <span className="font-semibold">
+                                {[clientData.street, [clientData.city, clientData.state, clientData.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')}
+                              </span>
+                            </div>
+                          )}
+                          {clientData.phone && (
+                            <div className="flex items-center gap-1.5">
+                              <span>📞</span>
+                              <a href={`tel:${clientData.phone}`} className="font-semibold text-gray-900 hover:text-green-700">{clientData.phone}</a>
+                            </div>
+                          )}
+                          {clientData.email && (
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="flex-shrink-0">✉️</span>
+                              <a href={`mailto:${clientData.email}`} className="font-semibold text-gray-900 hover:text-green-700 truncate">{clientData.email}</a>
+                            </div>
+                          )}
+                          {clientData.notes && (
+                            <div className="pt-2 border-t border-slate-100">
+                              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Notes</p>
+                              <p className="font-semibold text-gray-700 leading-relaxed whitespace-pre-wrap">{clientData.notes}</p>
+                            </div>
+                          )}
+                        </div>
                       </>
                     )}
-                    <Field label="Client type" value={clientData.client_type || 'individual'} mono />
-                    {contactData?.source        && <Field label="Source"          value={contactData.source} />}
-                    {contactData?.how_did_you_hear && <Field label="How did you hear?" value={contactData.how_did_you_hear} />}
-                    {contactData?.campaign      && <Field label="Campaign"        value={contactData.campaign} />}
-                  </Section>
+                  </div>
 
-                  {/* CONTACT INFO */}
-                  <Section title="Contact info">
-                    <Field label="Phone"        value={clientData.phone || '—'} link={clientData.phone ? `tel:${clientData.phone}` : null} />
-                    {contactData?.cell && contactData.cell !== clientData.phone && (
-                      <Field label="Cell"       value={contactData.cell} link={`tel:${contactData.cell}`} />
-                    )}
-                    <Field label="Email"        value={clientData.email || '—'} link={clientData.email ? `mailto:${clientData.email}` : null} />
-                    {clientData.other_email   && <Field label="Other email"   value={clientData.other_email} link={`mailto:${clientData.other_email}`} />}
-                    {clientData.website       && <Field label="Website"       value={clientData.website} link={clientData.website.startsWith('http') ? clientData.website : `https://${clientData.website}`} />}
-                  </Section>
-
-                  {/* BILLING / MAILING ADDRESS */}
-                  <Section title="Billing / mailing address">
-                    {(clientData.street || clientData.city || clientData.state || clientData.zip) ? (
-                      <>
-                        {clientData.street && <Field label="Street" value={clientData.street} />}
-                        <Field label="City / State / Zip"
-                          value={[clientData.city, clientData.state, clientData.zip].filter(Boolean).join(', ') || '—'} />
-                        {clientData.other_address && <Field label="Other address" value={clientData.other_address} />}
-                      </>
-                    ) : (
-                      <p className="text-xs text-gray-400 italic">No billing address on file.</p>
-                    )}
-                  </Section>
+                  {/* ── Additional client info (not in the ClientDetail edit form
+                       but still useful — shown read-only here; edit in Clients
+                       module for now). ── */}
+                  {(clientData.spouse_first_name || clientData.spouse_last_name
+                    || (contactData?.secondary_first_name || contactData?.secondary_last_name)
+                    || clientData.other_email || clientData.other_address || clientData.website
+                    || contactData?.cell || contactData?.source || contactData?.how_did_you_hear
+                    || contactData?.campaign || contactData?.project_description) && (
+                    <Section title="Additional info">
+                      {(clientData.spouse_first_name || clientData.spouse_last_name) && (
+                        <Field label="Spouse / partner"
+                          value={`${clientData.spouse_first_name || ''} ${clientData.spouse_last_name || ''}`.trim()} />
+                      )}
+                      {(contactData?.secondary_first_name || contactData?.secondary_last_name) && (
+                        <Field label="Secondary contact"
+                          value={`${contactData.secondary_first_name || ''} ${contactData.secondary_last_name || ''}`.trim()} />
+                      )}
+                      {contactData?.cell && contactData.cell !== clientData.phone && (
+                        <Field label="Cell" value={contactData.cell} link={`tel:${contactData.cell}`} />
+                      )}
+                      {clientData.other_email && <Field label="Other email" value={clientData.other_email} link={`mailto:${clientData.other_email}`} />}
+                      {clientData.website     && <Field label="Website"     value={clientData.website} link={clientData.website.startsWith('http') ? clientData.website : `https://${clientData.website}`} />}
+                      {clientData.other_address && <Field label="Other address" value={clientData.other_address} />}
+                      {contactData?.source        && <Field label="Source"           value={contactData.source} />}
+                      {contactData?.how_did_you_hear && <Field label="How did you hear?" value={contactData.how_did_you_hear} />}
+                      {contactData?.campaign      && <Field label="Campaign"         value={contactData.campaign} />}
+                      {contactData?.project_description && (
+                        <div className="pt-2 border-t border-slate-100">
+                          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Project description</p>
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap">{contactData.project_description}</p>
+                        </div>
+                      )}
+                    </Section>
+                  )}
 
                   {/* COMPANY CONTACTS (only for company clients) */}
                   {(clientData.client_type === 'company' || (clientData.company_contacts || []).length > 0) && (
@@ -418,13 +562,6 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
                           ))}
                         </div>
                       )}
-                    </Section>
-                  )}
-
-                  {/* PROJECT NOTES (from contact, when available) */}
-                  {contactData?.project_description && (
-                    <Section title="Project description (from contact)">
-                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{contactData.project_description}</p>
                     </Section>
                   )}
                 </>
