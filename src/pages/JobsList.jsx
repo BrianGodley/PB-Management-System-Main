@@ -172,8 +172,13 @@ export default function JobsList() {
     if (!confirm('Delete this stage? Jobs in this stage will become unassigned.')) return
     await supabase.from('jobs').update({ stage_id: null }).eq('stage_id', id)
     await supabase.from('job_stages').delete().eq('id', id)
-    setStages(prev => prev.filter(s => s.id !== id))
+    const remaining = stages.filter(s => s.id !== id)
+    setStages(remaining)
     setJobs(prev => prev.map(j => j.stage_id === id ? { ...j, stage_id: null } : j))
+    // Renumber remaining stages so sort_order stays contiguous (1..N)
+    await Promise.all(remaining.map((s, i) =>
+      supabase.from('job_stages').update({ sort_order: i + 1 }).eq('id', s.id)
+    ))
   }
 
   async function reorderStages(reordered) {
@@ -716,6 +721,7 @@ function JobScheduleSettings({ stages = [], onAddStage, onUpdateStage, onDeleteS
       <div className="flex border-b border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0">
         {[
           { key: 'general',   label: '⚙️ General'   },
+          { key: 'stages',    label: '🪜 Job Stages' },
           { key: 'templates', label: '📋 Templates'  },
           { key: 'crews',     label: '👷 Master Crews' },
         ].map(t => (
@@ -775,11 +781,14 @@ function JobScheduleSettings({ stages = [], onAddStage, onUpdateStage, onDeleteS
         </p>
       </div>
 
+      </div>}
+
+      {settingsTab === 'stages' && <div className="max-w-2xl space-y-6">
       {/* Job Stages */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h2 className="text-base font-bold text-gray-800 mb-1">Job Stages</h2>
         <p className="text-sm text-gray-500 mb-4">
-          Stages group jobs in the sidebar. Drag to reorder.
+          Stages group jobs in the sidebar. Drag to reorder — numbers (1, 2, 3, …) automatically update to match the new order.
         </p>
 
         {/* Add new stage */}
@@ -824,8 +833,10 @@ function JobScheduleSettings({ stages = [], onAddStage, onUpdateStage, onDeleteS
                 </svg>
               </span>
 
-              {/* Sort order badge */}
-              <span className="text-[10px] font-bold text-gray-400 w-4 text-center flex-shrink-0">{idx + 1}</span>
+              {/* Sort order badge — auto-updates with drag order */}
+              <span className="text-xs font-bold text-blue-900 w-6 text-center flex-shrink-0 bg-blue-50 border border-blue-200 rounded px-1 py-0.5">
+                {idx + 1}
+              </span>
 
               {/* Name / edit field */}
               {editingId === stage.id ? (
@@ -872,7 +883,6 @@ function JobScheduleSettings({ stages = [], onAddStage, onUpdateStage, onDeleteS
           )}
         </div>
       </div>
-
       </div>}
       </div>
     </div>
