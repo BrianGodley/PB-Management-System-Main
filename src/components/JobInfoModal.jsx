@@ -459,11 +459,10 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
                             <h3 className="text-base font-bold text-gray-900 leading-tight truncate">
                               {[clientData.first_name, clientData.last_name].filter(Boolean).join(' ') || clientData.name || '—'}
                             </h3>
-                            {clientData.company_name && (
-                              <p className="text-xs text-gray-500 mt-0.5">
-                                {clientData.company_name}{clientData.company_position ? ` · ${clientData.company_position}` : ''}
-                              </p>
-                            )}
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {clientData.company_name || <span className="text-gray-300">No company</span>}
+                              {clientData.company_position ? ` · ${clientData.company_position}` : ''}
+                            </p>
                           </div>
                           <button onClick={startEditClient}
                             className="text-gray-400 hover:text-gray-700 p-1 rounded hover:bg-slate-100 transition-colors flex-shrink-0" title="Edit client">
@@ -472,72 +471,56 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
                             </svg>
                           </button>
                         </div>
-                        <div className="space-y-1.5 text-xs">
-                          {(clientData.street || clientData.city) && (
-                            <div className="flex items-start gap-1.5 text-gray-700">
-                              <span className="flex-shrink-0 mt-0.5">📍</span>
-                              <span className="font-semibold">
-                                {[clientData.street, [clientData.city, clientData.state, clientData.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')}
-                              </span>
-                            </div>
-                          )}
-                          {clientData.phone && (
-                            <div className="flex items-center gap-1.5">
-                              <span>📞</span>
-                              <a href={`tel:${clientData.phone}`} className="font-semibold text-gray-900 hover:text-green-700">{clientData.phone}</a>
-                            </div>
-                          )}
-                          {clientData.email && (
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <span className="flex-shrink-0">✉️</span>
-                              <a href={`mailto:${clientData.email}`} className="font-semibold text-gray-900 hover:text-green-700 truncate">{clientData.email}</a>
-                            </div>
-                          )}
-                          {clientData.notes && (
-                            <div className="pt-2 border-t border-slate-100">
-                              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Notes</p>
-                              <p className="font-semibold text-gray-700 leading-relaxed whitespace-pre-wrap">{clientData.notes}</p>
-                            </div>
-                          )}
+
+                        {/* Every field is always rendered — empty values show "—" */}
+                        <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                          <Field label="First name"  value={clientData.first_name} />
+                          <Field label="Last name"   value={clientData.last_name}  />
+                          <Field label="Company"     value={clientData.company_name} />
+                          <Field label="Position"    value={clientData.company_position} />
+                          <Field label="Email"       value={clientData.email} link={clientData.email ? `mailto:${clientData.email}` : null} />
+                          <Field label="Phone"       value={clientData.phone} link={clientData.phone ? `tel:${clientData.phone}` : null} />
+                          <Field label="Street"      value={clientData.street} />
+                          <Field label="City"        value={clientData.city} />
+                          <Field label="State"       value={clientData.state} />
+                          <Field label="Zip"         value={clientData.zip} />
+                          <div className="pt-2 border-t border-slate-100">
+                            <p className="text-xs text-gray-400 mb-1">Notes</p>
+                            {clientData.notes ? (
+                              <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{clientData.notes}</p>
+                            ) : (
+                              <p className="text-sm text-gray-300">—</p>
+                            )}
+                          </div>
                         </div>
                       </>
                     )}
                   </div>
 
-                  {/* ── Additional client info (not in the ClientDetail edit form
-                       but still useful — shown read-only here; edit in Clients
-                       module for now). ── */}
-                  {(clientData.spouse_first_name || clientData.spouse_last_name
-                    || (contactData?.secondary_first_name || contactData?.secondary_last_name)
-                    || clientData.other_email || clientData.other_address || clientData.website
-                    || contactData?.cell || contactData?.source || contactData?.how_did_you_hear
-                    || contactData?.campaign || contactData?.project_description) && (
-                    <Section title="Additional info">
-                      {(clientData.spouse_first_name || clientData.spouse_last_name) && (
-                        <Field label="Spouse / partner"
-                          value={`${clientData.spouse_first_name || ''} ${clientData.spouse_last_name || ''}`.trim()} />
+                  {/* ── Additional client info — always rendered. Read-only
+                       here; the canonical edit surface lives in the Clients
+                       module (and Contacts for the contact-only fields). ── */}
+                  <Section title="Additional info">
+                    <Field label="Spouse / partner"
+                      value={`${clientData.spouse_first_name || ''} ${clientData.spouse_last_name || ''}`.trim()} />
+                    <Field label="Secondary contact"
+                      value={`${contactData?.secondary_first_name || ''} ${contactData?.secondary_last_name || ''}`.trim()} />
+                    <Field label="Cell"            value={contactData?.cell || ''} link={contactData?.cell ? `tel:${contactData.cell}` : null} />
+                    <Field label="Other email"     value={clientData.other_email} link={clientData.other_email ? `mailto:${clientData.other_email}` : null} />
+                    <Field label="Website"         value={clientData.website} link={clientData.website ? (clientData.website.startsWith('http') ? clientData.website : `https://${clientData.website}`) : null} />
+                    <Field label="Other address"   value={clientData.other_address} />
+                    <Field label="Source"          value={contactData?.source} />
+                    <Field label="How did you hear?" value={contactData?.how_did_you_hear} />
+                    <Field label="Campaign"        value={contactData?.campaign} />
+                    <div className="pt-2 border-t border-slate-100">
+                      <p className="text-xs text-gray-400 mb-1">Project description</p>
+                      {contactData?.project_description ? (
+                        <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{contactData.project_description}</p>
+                      ) : (
+                        <p className="text-sm text-gray-300">—</p>
                       )}
-                      {(contactData?.secondary_first_name || contactData?.secondary_last_name) && (
-                        <Field label="Secondary contact"
-                          value={`${contactData.secondary_first_name || ''} ${contactData.secondary_last_name || ''}`.trim()} />
-                      )}
-                      {contactData?.cell && contactData.cell !== clientData.phone && (
-                        <Field label="Cell" value={contactData.cell} link={`tel:${contactData.cell}`} />
-                      )}
-                      {clientData.other_email && <Field label="Other email" value={clientData.other_email} link={`mailto:${clientData.other_email}`} />}
-                      {clientData.website     && <Field label="Website"     value={clientData.website} link={clientData.website.startsWith('http') ? clientData.website : `https://${clientData.website}`} />}
-                      {clientData.other_address && <Field label="Other address" value={clientData.other_address} />}
-                      {contactData?.source        && <Field label="Source"           value={contactData.source} />}
-                      {contactData?.how_did_you_hear && <Field label="How did you hear?" value={contactData.how_did_you_hear} />}
-                      {contactData?.campaign      && <Field label="Campaign"         value={contactData.campaign} />}
-                      {contactData?.project_description && (
-                        <div className="pt-2 border-t border-slate-100">
-                          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Project description</p>
-                          <p className="text-sm text-gray-700 whitespace-pre-wrap">{contactData.project_description}</p>
-                        </div>
-                      )}
-                    </Section>
-                  )}
+                    </div>
+                  </Section>
 
                   {/* COMPANY CONTACTS (only for company clients) */}
                   {(clientData.client_type === 'company' || (clientData.company_contacts || []).length > 0) && (
@@ -669,10 +652,14 @@ function Section({ title, children }) {
 }
 
 function Field({ label, value, link, mono }) {
-  if (value === null || value === undefined || value === '') return null
-  const valEl = link
-    ? <a href={link} className="text-sm text-gray-800 hover:text-green-700 underline-offset-2 hover:underline">{value}</a>
-    : <span className={`text-sm text-gray-800 ${mono ? 'font-mono text-xs' : ''}`}>{value}</span>
+  const isEmpty = value === null || value === undefined || value === ''
+  // Render the row even when empty — show a "—" placeholder so the user
+  // can see the full data model at a glance.
+  const valEl = isEmpty
+    ? <span className="text-sm text-gray-300">—</span>
+    : link
+      ? <a href={link} className="text-sm text-gray-800 hover:text-green-700 underline-offset-2 hover:underline">{value}</a>
+      : <span className={`text-sm text-gray-800 ${mono ? 'font-mono text-xs' : ''}`}>{value}</span>
   return (
     <div className="grid grid-cols-3 gap-2">
       <span className="text-xs text-gray-400 col-span-1">{label}</span>
