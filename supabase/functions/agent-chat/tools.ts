@@ -11,8 +11,9 @@
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 export type ToolContext = {
-  userJwt: string
-  userId:  string
+  userJwt:         string
+  userId:          string
+  conversationId?: string  // current conversation, used by log_feature_request to link the request back to the chat
 }
 
 export type ToolDefinition = {
@@ -595,6 +596,99 @@ const list_preferences_run: ToolExecutor = async (_args, ctx) => {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
+// Tool: log_feature_request
+// ──────────────────────────────────────────────────────────────────────────
+// Persists a feature request, bug report, or enhancement idea to the
+// feature_requests table and emails Brian via the send-email function so
+// he gets notified the moment one comes in. Sam should call this whenever
+// the user asks "yes, log it" (or equivalent) after Sam offers to log a
+// product gap. Never claim to log without invoking this tool.
+const log_feature_request_def: ToolDefinition = {
+  name: 'log_feature_request',
+  description:
+    'Log a feature request, bug report, or enhancement idea so the product team is notified. ' +
+    'Call this whenever the user asks you to log/file/track a request or product gap, OR after ' +
+    'they confirm "yes" to your offer to log one. NEVER tell the user a request was logged ' +
+    'unless you actually called this tool. The request is saved to the feature_requests table ' +
+    'and an email goes to the product owner.',
+  input_schema: {
+    type: 'object',
+    required: ['title', 'body', 'category'],
+    properties: {
+      title:    { type: 'string', description: 'Short summary, ~3-10 words. Example: "GPM by salesperson breakdown"' },
+      body:     { type: 'string', description: 'Full description of what the user wants, in their own words where possible. Include any context that would help an engineer understand it.' },
+      category: { type: 'string', enum: ['feature','bug','enhancement','other'], description: 'feature = new capability; bug = something is broken; enhancement = small tweak to existing capability; other = anything else (e.g. UX feedback).' },
+    },
+  },
+}
+const log_feature_request_run: ToolExecutor = async (args, ctx) => {
+  const sb = userClient(ctx)
+
+  const title    = (args?.title    || '').toString().trim().slice(0, 200)
+  const body     = (args?.body     || '').toString().trim().slice(0, 5000)
+  const category = (args?.category || 'feature').toString()
+
+  if (!title || !body) throw new Error('title and body are required')
+  if (!['feature','bug','enhancement','other'].includes(category)) {
+    throw new Error('category must be feature, bug, enhancement, or other')
+  }
+
+  // Insert. RLS allows users to insert rows where user_id = auth.uid().
+  const { data: row, error } = await sb.from('feature_requests').insert({
+    user_id:         ctx.userId,
+    conversation_id: ctx.conversationId || null,
+    title,
+    body,
+    category,
+    source:          'sam',
+    status:          'new',
+    priority:        'medium',
+  }).select('id').single()
+  if (error) throw new Error('Could not save request: ' + error.message)
+
+  // Look up reporter name for the email
+  let reporter = 'a user'
+  try {
+    const { data: prof } = await sb.from('profiles')
+      .select('full_name, email').eq('id', ctx.userId).maybeSingle()
+    if (prof?.full_name) reporter = prof.full_name
+    else if (prof?.email) reporter = prof.email
+  } catch { /* non-fatal */ }
+
+  // Fire-and-forget email notification to Brian. Don't block the user reply if it fails.
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+    const html = `
+      <p><strong>${reporter}</strong> just logged a ${category} via Sam:</p>
+      <p style="font-size:18px;margin:12px 0;"><strong>${title.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]!))}</strong></p>
+      <p style="white-space:pre-wrap;">${body.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]!))}</p>
+      <hr>
+      <p style="font-size:12px;color:#666;">
+        Open the Admin → Feedback Inbox to triage. Request id: <code>${row.id}</code>
+      </p>
+    `.trim()
+    await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ctx.userJwt}` },
+      body: JSON.stringify({
+        to:      'brian@picturebuild.com',
+        subject: `[PBS feedback · ${category}] ${title}`,
+        html,
+        text:    `${reporter} logged a ${category}: ${title}\n\n${body}\n\nRequest id: ${row.id}`,
+      }),
+    })
+  } catch (e) {
+    console.warn('feature_request email notify failed:', e)
+  }
+
+  return {
+    saved:       true,
+    request_id:  row.id,
+    confirmation: `Logged as ${category} #${row.id.slice(0, 8)}. Brian was notified by email.`,
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
 // Registry
 // ──────────────────────────────────────────────────────────────────────────
 export const TOOLS: Array<{ definition: ToolDefinition; execute: ToolExecutor }> = [
@@ -610,6 +704,7 @@ export const TOOLS: Array<{ definition: ToolDefinition; execute: ToolExecutor }>
   { definition: remember_preference_def,  execute: remember_preference_run },
   { definition: forget_preference_def,    execute: forget_preference_run },
   { definition: list_preferences_def,     execute: list_preferences_run },
+  { definition: log_feature_request_def,  execute: log_feature_request_run },
 ]
 
 export const TOOL_DEFINITIONS = TOOLS.map(t => t.definition)

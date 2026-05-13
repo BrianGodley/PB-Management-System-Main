@@ -2701,6 +2701,236 @@ function IntegrationsSettings() {
   )
 }
 
+// ── FeedbackInbox ─────────────────────────────────────────────────────────────
+// Lists feature_requests captured via Sam (or filed manually). Click a row to
+// expand details, change status/priority, add admin notes. RLS lets only
+// admins see all rows; Sam logs them under each user's own JWT.
+const CATEGORY_STYLE = {
+  feature:     'bg-blue-50   text-blue-800   border-blue-200',
+  bug:         'bg-red-50    text-red-800    border-red-200',
+  enhancement: 'bg-purple-50 text-purple-800 border-purple-200',
+  other:       'bg-gray-50   text-gray-700   border-gray-200',
+}
+const STATUS_STYLE = {
+  new:         'bg-yellow-50 text-yellow-800 border-yellow-200',
+  triaged:     'bg-blue-50   text-blue-800   border-blue-200',
+  in_progress: 'bg-purple-50 text-purple-800 border-purple-200',
+  done:        'bg-green-50  text-green-800  border-green-200',
+  declined:    'bg-gray-100  text-gray-600   border-gray-300',
+}
+const PRIORITY_STYLE = {
+  low:    'text-gray-500',
+  medium: 'text-gray-700',
+  high:   'text-red-700 font-bold',
+}
+
+function FeedbackInbox() {
+  const [requests,  setRequests]  = useState([])
+  const [loading,   setLoading]   = useState(true)
+  const [filter,    setFilter]    = useState('open') // 'open' | 'all' | 'done'
+  const [expanded,  setExpanded]  = useState(null)   // id of expanded row
+  const [userMap,   setUserMap]   = useState({})
+
+  useEffect(() => { fetchAll() }, [])
+
+  async function fetchAll() {
+    setLoading(true)
+    const { data } = await supabase.from('feature_requests')
+      .select('*').order('created_at', { ascending: false }).limit(500)
+    const rows = data || []
+    setRequests(rows)
+    // Hydrate user names
+    const ids = [...new Set(rows.map(r => r.user_id).filter(Boolean))]
+    if (ids.length) {
+      const { data: profs } = await supabase.from('profiles')
+        .select('id, full_name, email').in('id', ids)
+      setUserMap(Object.fromEntries((profs || []).map(p => [p.id, p])))
+    }
+    setLoading(false)
+  }
+
+  async function patch(id, fields) {
+    setRequests(prev => prev.map(r => r.id === id ? { ...r, ...fields } : r))
+    await supabase.from('feature_requests').update(fields).eq('id', id)
+  }
+
+  async function remove(id) {
+    if (!confirm('Delete this request? This cannot be undone.')) return
+    await supabase.from('feature_requests').delete().eq('id', id)
+    setRequests(prev => prev.filter(r => r.id !== id))
+    if (expanded === id) setExpanded(null)
+  }
+
+  const visible = requests.filter(r => {
+    if (filter === 'open') return !['done', 'declined'].includes(r.status)
+    if (filter === 'done') return ['done', 'declined'].includes(r.status)
+    return true
+  })
+
+  const counts = {
+    open: requests.filter(r => !['done','declined'].includes(r.status)).length,
+    all:  requests.length,
+    done: requests.filter(r => ['done','declined'].includes(r.status)).length,
+  }
+
+  return (
+    <div>
+      {/* Filter chips */}
+      <div className="flex items-center gap-2 mb-4">
+        {[
+          { key: 'open', label: `Open (${counts.open})` },
+          { key: 'all',  label: `All (${counts.all})`   },
+          { key: 'done', label: `Done (${counts.done})` },
+        ].map(f => (
+          <button key={f.key} onClick={() => setFilter(f.key)}
+            className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ${
+              filter === f.key
+                ? 'bg-green-700 text-white border-green-700'
+                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+            }`}>
+            {f.label}
+          </button>
+        ))}
+        <div className="flex-1" />
+        <button onClick={fetchAll} className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1">↻ Refresh</button>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-16"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700" /></div>
+      ) : visible.length === 0 ? (
+        <div className="text-center py-16 text-gray-400">
+          <p className="text-4xl mb-3">📭</p>
+          <p className="text-sm font-medium text-gray-500">No requests in this view</p>
+          <p className="text-xs mt-1">Sam will log them here when users ask him to.</p>
+        </div>
+      ) : (
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500">
+                <th className="px-3 py-2 text-left font-semibold w-28">Date</th>
+                <th className="px-3 py-2 text-left font-semibold w-44">User</th>
+                <th className="px-3 py-2 text-left font-semibold w-28">Category</th>
+                <th className="px-3 py-2 text-left font-semibold">Title</th>
+                <th className="px-3 py-2 text-left font-semibold w-24">Priority</th>
+                <th className="px-3 py-2 text-left font-semibold w-32">Status</th>
+                <th className="px-3 py-2 w-10"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map(r => {
+                const user = userMap[r.user_id]
+                const userName = user?.full_name || user?.email || (r.user_id ? r.user_id.slice(0, 8) : '—')
+                const dateStr = new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
+                const isOpen = expanded === r.id
+                return (
+                  <>
+                    <tr key={r.id}
+                        className={`border-b border-gray-100 hover:bg-gray-50/70 cursor-pointer ${isOpen ? 'bg-gray-50' : ''}`}
+                        onClick={() => setExpanded(isOpen ? null : r.id)}>
+                      <td className="px-3 py-2 text-xs text-gray-500">{dateStr}</td>
+                      <td className="px-3 py-2 text-xs text-gray-700 truncate">{userName}</td>
+                      <td className="px-3 py-2">
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold uppercase ${CATEGORY_STYLE[r.category] || CATEGORY_STYLE.other}`}>
+                          {r.category}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-sm font-medium text-gray-800 truncate">{r.title}</td>
+                      <td className="px-3 py-2 text-xs">
+                        <span className={PRIORITY_STYLE[r.priority] || PRIORITY_STYLE.medium}>{r.priority}</span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold uppercase ${STATUS_STYLE[r.status] || STATUS_STYLE.new}`}>
+                          {r.status.replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-center text-gray-300">
+                        <span className="text-xs">{isOpen ? '▴' : '▾'}</span>
+                      </td>
+                    </tr>
+                    {isOpen && (
+                      <tr key={r.id + '-detail'} className="bg-gray-50 border-b border-gray-200">
+                        <td colSpan={7} className="px-6 py-4">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {/* Body */}
+                            <div className="md:col-span-2">
+                              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Description</p>
+                              <p className="text-sm text-gray-800 whitespace-pre-wrap bg-white border border-gray-200 rounded-lg p-3">{r.body}</p>
+
+                              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-4 mb-1">Admin notes</p>
+                              <textarea
+                                defaultValue={r.admin_notes || ''}
+                                onBlur={e => {
+                                  const v = e.target.value
+                                  if (v !== (r.admin_notes || '')) patch(r.id, { admin_notes: v })
+                                }}
+                                placeholder="Triage notes, links, decision rationale…"
+                                className="w-full text-sm bg-white border border-gray-200 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-green-500"
+                                rows={3}
+                              />
+                            </div>
+
+                            {/* Right column: controls */}
+                            <div className="space-y-3">
+                              <div>
+                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Status</p>
+                                <select
+                                  value={r.status}
+                                  onChange={e => patch(r.id, { status: e.target.value })}
+                                  className="w-full text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white"
+                                >
+                                  {['new','triaged','in_progress','done','declined'].map(s =>
+                                    <option key={s} value={s}>{s.replace('_',' ')}</option>
+                                  )}
+                                </select>
+                              </div>
+                              <div>
+                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Priority</p>
+                                <select
+                                  value={r.priority}
+                                  onChange={e => patch(r.id, { priority: e.target.value })}
+                                  className="w-full text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white"
+                                >
+                                  {['low','medium','high'].map(p => <option key={p} value={p}>{p}</option>)}
+                                </select>
+                              </div>
+                              <div>
+                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Category</p>
+                                <select
+                                  value={r.category}
+                                  onChange={e => patch(r.id, { category: e.target.value })}
+                                  className="w-full text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white"
+                                >
+                                  {['feature','bug','enhancement','other'].map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                              </div>
+                              <div className="text-[11px] text-gray-400 pt-2 border-t border-gray-200">
+                                <p>Source: {r.source}</p>
+                                <p>Logged: {new Date(r.created_at).toLocaleString()}</p>
+                                {r.updated_at !== r.created_at && <p>Updated: {new Date(r.updated_at).toLocaleString()}</p>}
+                                {user?.email && <p>Reporter: {user.email}</p>}
+                                <p className="font-mono text-[10px] mt-1">id: {r.id}</p>
+                              </div>
+                              <button onClick={() => remove(r.id)}
+                                className="w-full text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 hover:text-red-700 transition-colors">
+                                Delete request
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Admin() {
   const { user } = useAuth()
   const [tab, setTab] = useState('overview')
@@ -2746,6 +2976,7 @@ export default function Admin() {
   const tabs = [
     { key: 'overview',      label: 'Overview' },
     { key: 'settings',      label: 'Company Settings' },
+    { key: 'feedback',      label: '📬 Feedback Inbox' },
     { key: 'sms',           label: '📱 SMS Settings' },
     { key: 'email',         label: '✉️ Email Settings' },
     { key: 'integrations',  label: '🔗 Integrations' },
@@ -2842,6 +3073,10 @@ export default function Admin() {
       {/* ── SETTINGS TAB ──────────────────────────────────────────────────── */}
       {tab === 'settings' && (
         <CompanySettings currentUserIsAdmin={currentUserIsAdmin} />
+      )}
+
+      {tab === 'feedback' && (
+        <FeedbackInbox />
       )}
 
       {tab === 'sms' && (

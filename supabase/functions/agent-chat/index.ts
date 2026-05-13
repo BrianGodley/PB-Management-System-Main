@@ -302,6 +302,7 @@ serve(async (req: Request) => {
     const result = await runAgenticLoop(admin, conversationId, history, {
       userJwt: jwt,
       userId,
+      conversationId,
     })
 
     await admin
