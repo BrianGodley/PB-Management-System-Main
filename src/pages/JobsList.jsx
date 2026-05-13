@@ -173,6 +173,80 @@ export default function JobsList() {
   const [showExceptions,    setShowExceptions]    = useState(false)
   const [exceptionsCount,   setExceptionsCount]   = useState(0)
   const [addScheduleTrigger, setAddScheduleTrigger] = useState(0)
+  // Schedule Assistance modal: null when closed, or the chosen mode key.
+  // Phase 1 just opens the picker; running optimization arrives in Phase 2/3.
+  const [schedAssistMode, setSchedAssistMode] = useState(null) // null | 'supervisor' | 'yard' | 'warranty' | 'both'
+  const [showSchedAssist, setShowSchedAssist] = useState(false)
+  // Geocoding readiness state for the Schedule Assistance modal
+  const [geoStats, setGeoStats] = useState({ ok: 0, pending: 0, not_found: 0, error: 0, total: 0 })
+  const [geocoding, setGeocoding] = useState(false)
+  const [geoMsg, setGeoMsg] = useState('')
+
+  // Pull geocoding status for the Schedule Assistance dashboard
+  async function refreshGeoStats() {
+    const queries = [
+      supabase.from('jobs').select('id', { count: 'exact', head: true }),
+      supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('geocode_status', 'ok'),
+      supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('geocode_status', 'pending'),
+      supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('geocode_status', 'not_found'),
+      supabase.from('jobs').select('id', { count: 'exact', head: true }).eq('geocode_status', 'error'),
+    ]
+    const [total, ok, pending, notFound, error] = await Promise.all(queries)
+    setGeoStats({
+      total:    total.count    || 0,
+      ok:       ok.count       || 0,
+      pending:  pending.count  || 0,
+      not_found: notFound.count || 0,
+      error:    error.count    || 0,
+    })
+  }
+
+  // Loop through batches until there's nothing left to geocode (or we hit an error).
+  // Each call processes up to 200 jobs, so 1k+ jobs = ~5-7 calls. We surface live
+  // progress to the modal so the user knows it's working.
+  async function runGeocoder() {
+    setGeocoding(true)
+    setGeoMsg('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { setGeoMsg('Not signed in.'); setGeocoding(false); return }
+
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/geocode-jobs`
+      let totalOk = 0, totalNotFound = 0, totalError = 0
+      // Safety cap: don't loop more than 20 times even if something goes weird
+      for (let i = 0; i < 20; i++) {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ limit: 200 }),
+        })
+        const data = await res.json()
+        if (!res.ok || data.error) {
+          setGeoMsg('Error: ' + (data.error || `HTTP ${res.status}`))
+          break
+        }
+        const c = data.counts || {}
+        totalOk       += c.ok        || 0
+        totalNotFound += c.not_found || 0
+        totalError    += c.error     || 0
+        setGeoMsg(`Batch ${i+1}: ${c.processed} processed (${c.ok || 0} ok). Total geocoded: ${totalOk}.`)
+        await refreshGeoStats()
+        if (!c.processed) break // nothing left to do
+      }
+      if (!geoMsg.startsWith('Error')) {
+        setGeoMsg(`Done. Geocoded ${totalOk}, not found ${totalNotFound}, errors ${totalError}.`)
+      }
+    } catch (e) {
+      setGeoMsg('Error: ' + (e instanceof Error ? e.message : String(e)))
+    }
+    setGeocoding(false)
+  }
+
+  // Refresh geo stats whenever the modal opens
+  useEffect(() => {
+    if (showSchedAssist) refreshGeoStats()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showSchedAssist])
   // When a job is moved into the Yard Check stage we bump this so the
   // ScheduleCalendar auto-opens the yard check config modal for that job.
   const [yardCheckTrigger, setYardCheckTrigger] = useState(null) // { jobId, ts } | null
@@ -419,6 +493,17 @@ export default function JobsList() {
             </button>
           )}
 
+          {/* Schedule Assistance — geographic + traffic-aware optimization */}
+          {tab === 'schedule' && (
+            <button
+              onClick={() => { setSchedAssistMode(null); setShowSchedAssist(true) }}
+              className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 mb-2 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-semibold hover:from-purple-700 hover:to-indigo-700 transition-colors flex-shrink-0"
+            >
+              <span>✨</span>
+              <span>Schedule Assistance</span>
+            </button>
+          )}
+
           {/* Workday Exceptions button */}
           <button
             onClick={() => setShowExceptions(true)}
@@ -622,6 +707,120 @@ export default function JobsList() {
             setJobModal(null)
           }}
         />
+      )}
+
+      {/* ── Schedule Assistance: mode picker (Phase 1) ───────────
+           Picks which optimization to run; Phase 2/3 wire the
+           actual optimizer + apply flow. ───────────────────────── */}
+      {showSchedAssist && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={e => { if (e.target === e.currentTarget) setShowSchedAssist(false) }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">✨ Schedule Assistance</h2>
+                <p className="text-xs text-gray-500 mt-0.5">Geographic + traffic-aware optimization powered by route planning.</p>
+              </div>
+              <button onClick={() => setShowSchedAssist(false)} className="text-gray-300 hover:text-gray-500">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            {/* Geocoding status — optimization can't run without lat/lon */}
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <p className="text-xs font-semibold text-gray-700">Geocoding status</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">
+                    {geoStats.total > 0 ? (
+                      <>
+                        <span className="font-semibold text-gray-700">{geoStats.ok}</span> of {geoStats.total} jobs geocoded
+                        {geoStats.pending  > 0 && <> · <span className="text-amber-700">{geoStats.pending} pending</span></>}
+                        {geoStats.not_found > 0 && <> · <span className="text-gray-500">{geoStats.not_found} not found</span></>}
+                        {geoStats.error   > 0 && <> · <span className="text-red-600">{geoStats.error} errors</span></>}
+                      </>
+                    ) : 'Loading…'}
+                  </p>
+                </div>
+                <button
+                  onClick={runGeocoder}
+                  disabled={geocoding || geoStats.pending === 0}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-indigo-700 text-white hover:bg-indigo-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+                >
+                  {geocoding ? 'Geocoding…' : geoStats.pending === 0 ? 'All set' : 'Geocode pending jobs'}
+                </button>
+              </div>
+              {/* Progress bar */}
+              {geoStats.total > 0 && (
+                <div className="bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                  <div className="bg-green-600 h-1.5 transition-all"
+                       style={{ width: `${Math.round((geoStats.ok / geoStats.total) * 100)}%` }} />
+                </div>
+              )}
+              {geoMsg && (
+                <p className={`text-[11px] mt-2 ${geoMsg.startsWith('Error') ? 'text-red-600' : 'text-gray-500'}`}>{geoMsg}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              {[
+                { key: 'supervisor', emoji: '👥', title: 'Optimize Job Supervisor Assignment',
+                  desc: 'Cluster open jobs by location and balance them across your Job Supervisors.' },
+                { key: 'yard',       emoji: '🌿', title: 'Optimize Yard Checks',
+                  desc: 'Route a single person efficiently through all jobs currently in the Yard Check stage. Respects yard check #s (#4 is typically the last).' },
+                { key: 'warranty',   emoji: '🛡️', title: 'Optimize Warranties',
+                  desc: 'Same idea, but for jobs in the Warranty stage.' },
+                { key: 'both',       emoji: '🌿🛡️', title: 'Optimize Yard Checks + Warranties',
+                  desc: 'Combined route across both Yard Check and Warranty jobs.' },
+              ].map(opt => (
+                <button
+                  key={opt.key}
+                  onClick={() => setSchedAssistMode(opt.key)}
+                  className={`w-full flex items-start gap-3 p-3.5 rounded-xl border-2 text-left transition-colors ${
+                    schedAssistMode === opt.key
+                      ? 'border-indigo-500 bg-indigo-50'
+                      : 'border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/40'
+                  }`}
+                >
+                  <span className="text-2xl mt-0.5">{opt.emoji}</span>
+                  <div>
+                    <p className={`text-sm font-bold ${schedAssistMode === opt.key ? 'text-indigo-900' : 'text-gray-800'}`}>{opt.title}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{opt.desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-5 flex items-center gap-2">
+              <button
+                disabled={!schedAssistMode}
+                onClick={() => {
+                  // Phase 1 stub — the actual optimization runs in Phase 2/3.
+                  alert(
+                    `Schedule Assistance: "${schedAssistMode}" is ready to wire up in Phase 2/3.\n\n` +
+                    `Phase 1 just confirms the entry point + mode picker. To unlock running it:\n` +
+                    `1) Run supabase-schedule-assistant-phase1.sql in Supabase.\n` +
+                    `2) Deploy the geocode-jobs edge function and set the GOOGLE_MAPS_API_KEY secret.\n` +
+                    `3) Bulk-geocode existing jobs (one-time pass).\n` +
+                    `Then we'll build the optimizer.`
+                  )
+                }}
+                className="flex-1 py-2.5 bg-indigo-700 text-white text-sm font-semibold rounded-xl hover:bg-indigo-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Run optimization
+              </button>
+              <button
+                onClick={() => setShowSchedAssist(false)}
+                className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+            <p className="text-[11px] text-gray-400 mt-3 text-center italic">Phase 1 of 3 — entry point and mode picker. Optimization logic ships next.</p>
+          </div>
+        </div>
       )}
     </div>
   )
