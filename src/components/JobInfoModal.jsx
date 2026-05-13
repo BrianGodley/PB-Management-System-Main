@@ -20,6 +20,14 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
   const [saving,    setSaving]    = useState(false)
   const [error,     setError]     = useState('')
   const [employees, setEmployees] = useState([])
+  // Joined client + contact data for the Client tab. Loaded once on mount.
+  const [clientData,  setClientData]  = useState(null)
+  const [contactData, setContactData] = useState(null)
+  const [loadingClient, setLoadingClient] = useState(false)
+  // Site Access fields (live on jobs). Editable.
+  const [gateCode,    setGateCode]    = useState(job.gate_code || '')
+  const [hasDog,      setHasDog]      = useState(!!job.has_dog)
+  const [accessNotes, setAccessNotes] = useState(job.access_notes || '')
 
   // Job Info tab fields
   const [status,         setStatus]         = useState(job.status || 'active')
@@ -47,6 +55,45 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
       .then(({ data }) => { if (data) setEmployees(data) })
   }, [])
 
+  // Load the joined client + contact for the Client tab.
+  // Tries the real FK first (job.client_id), falls back to a name match
+  // for jobs created before the bid→job FK fix landed. After resolving the
+  // client, we look up the contacts row that points back via contacts.client_id
+  // so we can surface contact-only fields (cell, marketing source, etc.).
+  useEffect(() => {
+    let cancelled = false
+    setLoadingClient(true)
+    ;(async () => {
+      let client = null
+
+      if (job.client_id) {
+        const { data } = await supabase.from('clients')
+          .select('*').eq('id', job.client_id).maybeSingle()
+        client = data || null
+      }
+      if (!client && job.client_name) {
+        const { data: matches } = await supabase.from('clients')
+          .select('*').ilike('name', job.client_name.trim()).limit(2)
+        if (matches?.length === 1) client = matches[0]
+      }
+
+      let contact = null
+      if (client) {
+        const { data } = await supabase.from('contacts')
+          .select('id, first_name, last_name, phone, cell, email, source, how_did_you_hear, campaign, project_description, tags')
+          .eq('client_id', client.id).maybeSingle()
+        contact = data || null
+      }
+
+      if (!cancelled) {
+        setClientData(client)
+        setContactData(contact)
+        setLoadingClient(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [job.id, job.client_id, job.client_name])
+
   const employeeOptions = employees.map(e => ({
     value: `${e.first_name} ${e.last_name}`.trim(),
     label: `${e.last_name}, ${e.first_name}`.trim(),
@@ -67,6 +114,9 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
       job_zip:         zip.trim(),
       total_price:     Number.isFinite(cpNum) ? cpNum : null,
       permit_number:   permitNumber.trim() || null,
+      gate_code:       gateCode.trim() || null,
+      has_dog:         !!hasDog,
+      access_notes:    accessNotes.trim() || null,
       consultant:      consultant || null,
       project_manager: projectManager || null,
     })
@@ -271,20 +321,147 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
 
           {/* ── Client tab ── */}
           {activeTab === 'client' && (
-            <div className="px-5 py-4 space-y-3">
-              {job.client_name && (
-                <div>
-                  <p className="text-xs text-gray-400 mb-0.5">Client</p>
-                  <p className="text-sm font-medium text-gray-800">{job.client_name}</p>
+            <div className="px-5 py-4 space-y-5">
+              {loadingClient ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-700" />
                 </div>
-              )}
-              {job.job_address && (
-                <div>
-                  <p className="text-xs text-gray-400 mb-0.5">Job Address</p>
-                  <p className="text-sm text-gray-700">{job.job_address}</p>
+              ) : !clientData ? (
+                <div className="text-sm text-gray-500 space-y-2">
+                  <p>
+                    <span className="font-semibold text-gray-800">{job.client_name || 'Unknown client'}</span>
+                  </p>
+                  <p className="text-xs text-gray-400 italic">
+                    No matching client record found. This usually means the job was imported from BuilderTrend or the client name on the job doesn't exactly match a record in the Clients module. Open the contact or client manually to fill in details.
+                  </p>
                 </div>
+              ) : (
+                <>
+                  {/* IDENTITY */}
+                  <Section title="Identity">
+                    {clientData.client_type === 'company' || clientData.company_name ? (
+                      <>
+                        <Field label="Company" value={clientData.company_name || clientData.name} />
+                        {clientData.company_position && <Field label="Position" value={clientData.company_position} />}
+                        {(clientData.first_name || clientData.last_name) && (
+                          <Field label="Primary contact" value={`${clientData.first_name || ''} ${clientData.last_name || ''}`.trim()} />
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <Field label="Name" value={clientData.name || `${clientData.first_name || ''} ${clientData.last_name || ''}`.trim()} />
+                        {(clientData.spouse_first_name || clientData.spouse_last_name) && (
+                          <Field
+                            label="Spouse / partner"
+                            value={`${clientData.spouse_first_name || ''} ${clientData.spouse_last_name || ''}`.trim()}
+                          />
+                        )}
+                        {(contactData?.secondary_first_name || contactData?.secondary_last_name) && (
+                          <Field
+                            label="Secondary contact (from contact)"
+                            value={`${contactData.secondary_first_name || ''} ${contactData.secondary_last_name || ''}`.trim()}
+                          />
+                        )}
+                      </>
+                    )}
+                    <Field label="Client type" value={clientData.client_type || 'individual'} mono />
+                    {contactData?.source        && <Field label="Source"          value={contactData.source} />}
+                    {contactData?.how_did_you_hear && <Field label="How did you hear?" value={contactData.how_did_you_hear} />}
+                    {contactData?.campaign      && <Field label="Campaign"        value={contactData.campaign} />}
+                  </Section>
+
+                  {/* CONTACT INFO */}
+                  <Section title="Contact info">
+                    <Field label="Phone"        value={clientData.phone || '—'} link={clientData.phone ? `tel:${clientData.phone}` : null} />
+                    {contactData?.cell && contactData.cell !== clientData.phone && (
+                      <Field label="Cell"       value={contactData.cell} link={`tel:${contactData.cell}`} />
+                    )}
+                    <Field label="Email"        value={clientData.email || '—'} link={clientData.email ? `mailto:${clientData.email}` : null} />
+                    {clientData.other_email   && <Field label="Other email"   value={clientData.other_email} link={`mailto:${clientData.other_email}`} />}
+                    {clientData.website       && <Field label="Website"       value={clientData.website} link={clientData.website.startsWith('http') ? clientData.website : `https://${clientData.website}`} />}
+                  </Section>
+
+                  {/* BILLING / MAILING ADDRESS */}
+                  <Section title="Billing / mailing address">
+                    {(clientData.street || clientData.city || clientData.state || clientData.zip) ? (
+                      <>
+                        {clientData.street && <Field label="Street" value={clientData.street} />}
+                        <Field label="City / State / Zip"
+                          value={[clientData.city, clientData.state, clientData.zip].filter(Boolean).join(', ') || '—'} />
+                        {clientData.other_address && <Field label="Other address" value={clientData.other_address} />}
+                      </>
+                    ) : (
+                      <p className="text-xs text-gray-400 italic">No billing address on file.</p>
+                    )}
+                  </Section>
+
+                  {/* COMPANY CONTACTS (only for company clients) */}
+                  {(clientData.client_type === 'company' || (clientData.company_contacts || []).length > 0) && (
+                    <Section title="Company contacts">
+                      {(clientData.company_contacts || []).length === 0 ? (
+                        <p className="text-xs text-gray-400 italic">No company contacts listed.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {clientData.company_contacts.map((cc, i) => (
+                            <div key={i} className="border border-gray-200 rounded-lg p-2.5">
+                              <p className="text-sm font-semibold text-gray-800">
+                                {`${cc.first_name || ''} ${cc.last_name || ''}`.trim() || '—'}
+                                {cc.position && <span className="text-xs text-gray-500 font-normal ml-2">· {cc.position}</span>}
+                              </p>
+                              {(cc.phone || cc.email) && (
+                                <p className="text-xs text-gray-600 mt-0.5 flex gap-3">
+                                  {cc.phone && <a href={`tel:${cc.phone}`} className="hover:text-green-700">{cc.phone}</a>}
+                                  {cc.email && <a href={`mailto:${cc.email}`} className="hover:text-green-700">{cc.email}</a>}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </Section>
+                  )}
+
+                  {/* PROJECT NOTES (from contact, when available) */}
+                  {contactData?.project_description && (
+                    <Section title="Project description (from contact)">
+                      <p className="text-sm text-gray-700 whitespace-pre-wrap">{contactData.project_description}</p>
+                    </Section>
+                  )}
+                </>
               )}
-              <p className="text-xs text-gray-400 italic pt-2">Additional client details coming soon.</p>
+
+              {/* SITE ACCESS — always editable, lives on the job row */}
+              <Section title="Site access">
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Gate code</label>
+                    <input
+                      type="text" value={gateCode}
+                      onChange={e => setGateCode(e.target.value)}
+                      className="input text-sm w-full"
+                      placeholder="e.g. 1234#"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="has-dog" type="checkbox" checked={hasDog}
+                      onChange={e => setHasDog(e.target.checked)}
+                      className="w-4 h-4 rounded accent-amber-600"
+                    />
+                    <label htmlFor="has-dog" className="text-sm text-gray-700 cursor-pointer">🐕 Dog on premises</label>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Access notes</label>
+                    <textarea
+                      rows={3} value={accessNotes}
+                      onChange={e => setAccessNotes(e.target.value)}
+                      className="input text-sm w-full"
+                      placeholder="e.g. Keys with neighbor at #45 · Park on the street · Side gate sticks"
+                    />
+                  </div>
+                  <p className="text-[11px] text-gray-400 italic">These will move into the Job Details questionnaire when that lands; safe to fill in for now.</p>
+                </div>
+              </Section>
             </div>
           )}
 
@@ -340,6 +517,29 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Small presentational helpers for the Client tab ──────────────────────────
+function Section({ title, children }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{title}</p>
+      <div className="space-y-1.5">{children}</div>
+    </div>
+  )
+}
+
+function Field({ label, value, link, mono }) {
+  if (value === null || value === undefined || value === '') return null
+  const valEl = link
+    ? <a href={link} className="text-sm text-gray-800 hover:text-green-700 underline-offset-2 hover:underline">{value}</a>
+    : <span className={`text-sm text-gray-800 ${mono ? 'font-mono text-xs' : ''}`}>{value}</span>
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      <span className="text-xs text-gray-400 col-span-1">{label}</span>
+      <div className="col-span-2 min-w-0 truncate">{valEl}</div>
     </div>
   )
 }

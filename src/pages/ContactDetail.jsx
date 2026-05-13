@@ -335,7 +335,10 @@ export default function ContactDetail() {
     setAddingAsClient(true)
     const c = contact
     const name = [c.first_name, c.last_name].filter(Boolean).join(' ')
-    const { error } = await supabase.from('clients').insert({
+    // Capture the new client's id (.select().single()) so we can write it
+    // back to contacts.client_id below — this makes the contact↔client
+    // link bidirectional and lets the Job's Client tab join across both.
+    const { data: newClient, error } = await supabase.from('clients').insert({
       client_type:       'individual',
       first_name:        c.first_name                || null,
       last_name:         c.last_name                 || null,
@@ -350,7 +353,13 @@ export default function ContactDetail() {
       zip:               c.zip                       || null,
       notes:             c.notes                     || null,
       created_by:        user?.id,
-    })
+    }).select('id').single()
+
+    if (!error && newClient?.id) {
+      // Stamp the new client's id on the contact so the reverse link works.
+      await supabase.from('contacts').update({ client_id: newClient.id }).eq('id', id)
+      setContact(p => ({ ...p, client_id: newClient.id }))
+    }
     setAddingAsClient(false)
     if (!error) setClientAdded(true)
   }

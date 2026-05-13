@@ -144,10 +144,26 @@ export default function Bids() {
     setSavingJob(true)
 
     try {
+      // Resolve client_id so the new job carries a real FK back to clients.
+      // Try the estimate first (estimates.client_id is populated when an
+      // estimate is created from a client). Fall back to an exact name match
+      // on clients.name only if exactly one row matches.
+      let resolvedClientId = null
+      if (bid.estimate_id) {
+        const { data: est } = await supabase.from('estimates')
+          .select('client_id').eq('id', bid.estimate_id).maybeSingle()
+        if (est?.client_id) resolvedClientId = est.client_id
+      }
+      if (!resolvedClientId && bid.client_name) {
+        const { data: matches } = await supabase.from('clients')
+          .select('id').ilike('name', bid.client_name.trim()).limit(2)
+        if (matches?.length === 1) resolvedClientId = matches[0].id
+      }
+
       // Create the job via RPC
       const { data: jobId, error: jobErr } = await supabase.rpc('create_job_from_bid', {
         p_estimate_id:  bid.estimate_id || null,
-        p_client_id:    null,
+        p_client_id:    resolvedClientId,
         p_client_name:  bid.client_name || '',
         p_name:         jobName.trim(),
         p_job_address:  bid.job_address || '',
