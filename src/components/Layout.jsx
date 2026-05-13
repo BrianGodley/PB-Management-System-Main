@@ -43,6 +43,12 @@ export default function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
   const [showUserMenu,   setShowUserMenu]   = useState(false)
+  const [navCollapsed,   setNavCollapsed]   = useState(() => {
+    try { return localStorage.getItem('navCollapsed') === '1' } catch { return false }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('navCollapsed', navCollapsed ? '1' : '0') } catch {}
+  }, [navCollapsed])
 
   // Translated dock + main-menu items (re-computed whenever t() changes)
   const DOCK_ITEMS = [
@@ -233,29 +239,51 @@ export default function Layout() {
       <div className="flex flex-1 min-h-0">
 
         {/* LEFT SIDEBAR — desktop only */}
-        <aside className="hidden lg:flex flex-col w-32 bg-white border-r border-gray-200 sticky top-11 h-[calc(100vh-2.75rem)] overflow-y-auto">
-          <nav className="flex-1 px-1.5 py-3 space-y-0.5">
+        <aside
+          className={`hidden lg:flex flex-col bg-white border-r border-gray-200 sticky top-11 h-[calc(100vh-2.75rem)] overflow-y-auto transition-[width] duration-200 ${
+            navCollapsed ? 'w-12' : 'w-32'
+          }`}
+        >
+          {/* Collapse / expand toggle */}
+          <button
+            onClick={() => setNavCollapsed(v => !v)}
+            title={navCollapsed ? 'Expand menu' : 'Collapse menu'}
+            className="self-end m-1 p-1 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {navCollapsed ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              )}
+            </svg>
+          </button>
+
+          <nav className="flex-1 px-1.5 py-1 space-y-0.5">
             {navItems.map(item => (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-2 px-2 py-2 rounded-lg text-xs font-medium transition-colors ${
+                title={navCollapsed ? item.label : undefined}
+                className={`flex items-center ${navCollapsed ? 'justify-center' : 'gap-2'} px-2 py-2 rounded-lg text-xs font-medium transition-colors ${
                   isActive(item.path)
                     ? 'bg-gray-100 text-gray-900'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 }`}
               >
                 <span className="text-sm">{item.icon}</span>
-                {item.label}
+                {!navCollapsed && item.label}
               </Link>
             ))}
           </nav>
           <div className="px-1.5 py-3 border-t border-gray-100">
             <button
               onClick={handleSignOut}
-              className="w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-colors"
+              title={navCollapsed ? 'Sign Out' : undefined}
+              className={`w-full flex items-center ${navCollapsed ? 'justify-center' : 'gap-2'} px-2 py-2 rounded-lg text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-colors`}
             >
-              🚪 Sign Out
+              <span>🚪</span>
+              {!navCollapsed && <span>Sign Out</span>}
             </button>
           </div>
         </aside>

@@ -60,9 +60,6 @@ function MoveJobModal({ job, stages, onMove, onClose }) {
 
 function JobItem({ job, stages, selectedJob, setSelectedJob, setJobModal, onMove }) {
   const [showMoveModal, setShowMoveModal] = useState(false)
-  const btnCls = `flex-shrink-0 p-1 rounded transition-colors ${
-    selectedJob === job.id ? 'text-green-500 hover:text-green-800 hover:bg-green-100' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-200'
-  }`
 
   return (
     <>
@@ -76,11 +73,11 @@ function JobItem({ job, stages, selectedJob, setSelectedJob, setJobModal, onMove
       )}
       <div
         onClick={() => setSelectedJob(job.id)}
-        className={`flex items-center gap-0.5 rounded-lg cursor-pointer transition-colors ${
+        className={`flex items-center rounded-lg cursor-pointer transition-colors ${
           selectedJob === job.id ? 'bg-green-50 border border-green-200' : 'hover:bg-gray-100 border border-transparent'
         }`}
       >
-        <button className="flex-1 text-center px-2 py-1.5 text-xs min-w-0">
+        <button className="flex-1 px-2 py-1.5 text-xs min-w-0 text-left">
           <p className={`font-bold truncate ${selectedJob === job.id ? 'text-green-800' : 'text-gray-800'}`}>
             {job.name || job.client_name}
           </p>
@@ -88,10 +85,10 @@ function JobItem({ job, stages, selectedJob, setSelectedJob, setJobModal, onMove
         {/* Move stage button */}
         <button
           onClick={e => { e.stopPropagation(); setShowMoveModal(true) }}
-          className={btnCls}
+          className="flex-shrink-0 p-1 rounded transition-colors text-blue-500 hover:text-blue-700 hover:bg-blue-100"
           title="Move to stage"
         >
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
           </svg>
@@ -99,10 +96,10 @@ function JobItem({ job, stages, selectedJob, setSelectedJob, setJobModal, onMove
         {/* Edit button */}
         <button
           onClick={e => { e.stopPropagation(); setJobModal(job) }}
-          className={`${btnCls} mr-1`}
+          className="flex-shrink-0 p-1 rounded transition-colors text-amber-500 hover:text-amber-700 hover:bg-amber-100 mr-1"
           title="Edit job"
         >
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 0l.172.172a2 2 0 010 2.828L12 16H9v-3z" />
           </svg>
@@ -315,7 +312,7 @@ export default function JobsList() {
       <div className="flex gap-2 flex-1 min-h-0 pt-4">
 
         {/* Jobs sidebar — desktop only */}
-        <div className="hidden lg:flex w-56 flex-shrink-0 flex-col min-h-0 bg-white border-r border-gray-200">
+        <div className="hidden lg:flex w-80 flex-shrink-0 flex-col min-h-0 bg-white border-r border-gray-200">
           {/* Inner column: 90% wide, centered */}
           <div className="flex flex-col w-[90%] mx-auto mt-2 flex-shrink-0">
           {/* Add Schedule button — only visible on Schedule tab */}
