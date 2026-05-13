@@ -787,6 +787,10 @@ export default function ScheduleCalendar({
   // object like { jobId, ts } and bump `ts` to re-trigger; the modal opens
   // for whatever jobId is set. User can close to skip.
   yardCheckTrigger = null,
+  // Mirrors the Open/Closed/Both filter on the JobsList sidebar. Controls
+  // which jobs appear in the Add-Schedule job picker so it stays in sync
+  // with whatever the user is filtering to.
+  statusFilter = 'open', // 'open' | 'closed' | 'both'
 }) {
   const today = new Date()
   const [year,  setYear]  = useState(today.getFullYear())
@@ -799,6 +803,7 @@ export default function ScheduleCalendar({
   const [editItem,    setEditItem]    = useState(null)
   const [form,        setForm]        = useState(EMPTY_FORM)
   const [modalJobId,  setModalJobId]  = useState(null)
+  const [jobPickerSearch, setJobPickerSearch] = useState('')
   const [saving,      setSaving]      = useState(false)
   const [entryMode,          setEntryMode]          = useState('crew')
   const [crews,              setCrews]              = useState([])
@@ -1147,7 +1152,7 @@ export default function ScheduleCalendar({
     setForm({ ...EMPTY_FORM, display_color: defaultSchedColor, start_date: ds, end_date: ds, work_days: 1 })
     setEditItem(null)
     if (selectedJob === 'all') {
-      setModalJobId(null); setPhase('job-select')
+      setModalJobId(null); setJobPickerSearch(''); setPhase('job-select')
     } else {
       setModalJobId(selectedJob); setPhase('type-select')
     }
@@ -1160,7 +1165,7 @@ export default function ScheduleCalendar({
     setForm({ ...EMPTY_FORM, display_color: defaultSchedColor, start_date: ds, end_date: ds, work_days: 1 })
     setEditItem(null)
     if (selectedJob === 'all') {
-      setModalJobId(null); setPhase('job-select')
+      setModalJobId(null); setJobPickerSearch(''); setPhase('job-select')
     } else {
       setModalJobId(selectedJob); setPhase('type-select')
     }
@@ -1506,26 +1511,86 @@ export default function ScheduleCalendar({
       )}
 
       {/* Job Selector */}
-      {phase === 'job-select' && (
-        <ModalOverlay onClose={closeModal}>
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-5">
-            <h3 className="text-sm font-bold text-gray-800 mb-1">Select a Job</h3>
-            <p className="text-xs text-gray-400 mb-3">{clickedDate}</p>
-            <div className="space-y-1 max-h-64 overflow-y-auto">
-              {jobs.map(j => (
-                <button
-                  key={j.id}
-                  onClick={() => { setModalJobId(j.id); setPhase('type-select') }}
-                  className="w-full text-left px-3 py-2.5 rounded-lg text-sm hover:bg-green-50 hover:text-green-700 transition-colors text-gray-700 border border-transparent hover:border-green-200"
-                >
-                  {j.name || j.client_name}
+      {phase === 'job-select' && (() => {
+        // Match the JobsList sidebar's Open/Closed/Both filter so the picker
+        // shows the same set of jobs the user is already looking at.
+        const matchesStatus = j => {
+          const s = j.status || 'active'
+          const isOpen = s === 'active' || s === 'on_hold'
+          if (statusFilter === 'open')   return isOpen
+          if (statusFilter === 'closed') return !isOpen
+          return true
+        }
+        const q = jobPickerSearch.trim().toLowerCase()
+        const matchesSearch = j => {
+          if (!q) return true
+          const name   = (j.name || '').toLowerCase()
+          const client = (j.client_name || '').toLowerCase()
+          const addr   = (j.job_address || '').toLowerCase()
+          return name.includes(q) || client.includes(q) || addr.includes(q)
+        }
+        const filtered = (jobs || [])
+          .filter(j => matchesStatus(j) && matchesSearch(j))
+          .sort((a, b) =>
+            (a.name || a.client_name || '').localeCompare(
+              b.name || b.client_name || '', undefined, { numeric: true, sensitivity: 'base' }
+            )
+          )
+        const filterLabel = statusFilter === 'open' ? 'Open' : statusFilter === 'closed' ? 'Closed' : 'All'
+
+        return (
+          <ModalOverlay onClose={closeModal}>
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 flex flex-col max-h-[85vh] overflow-hidden">
+              {/* Header */}
+              <div className="px-5 pt-5 pb-3 border-b border-gray-100 flex-shrink-0">
+                <div className="flex items-baseline justify-between gap-2 mb-2">
+                  <h3 className="text-sm font-bold text-gray-800">Select a Job</h3>
+                  <p className="text-[11px] text-gray-400">{clickedDate}</p>
+                </div>
+                <input
+                  autoFocus
+                  type="text"
+                  value={jobPickerSearch}
+                  onChange={e => setJobPickerSearch(e.target.value)}
+                  placeholder="Search jobs by name, client, or address…"
+                  className="input text-sm w-full py-1.5"
+                />
+                <p className="text-[11px] text-gray-400 mt-1.5">
+                  Showing <span className="font-semibold text-gray-600">{filterLabel}</span> jobs ({filtered.length})
+                </p>
+              </div>
+
+              {/* List — scrolls within the modal */}
+              <div className="overflow-y-auto flex-1 px-2 py-2">
+                {filtered.length === 0 ? (
+                  <p className="text-xs text-gray-400 text-center py-8 italic">
+                    {q ? 'No jobs match your search.' : `No ${filterLabel.toLowerCase()} jobs.`}
+                  </p>
+                ) : (
+                  <div className="divide-y divide-gray-100">
+                    {filtered.map(j => (
+                      <button
+                        key={j.id}
+                        onClick={() => { setModalJobId(j.id); setPhase('type-select') }}
+                        className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-green-50 hover:text-green-800 transition-colors truncate"
+                      >
+                        {j.name || j.client_name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="px-5 py-3 border-t border-gray-100 flex-shrink-0">
+                <button onClick={closeModal} className="w-full text-xs text-gray-400 hover:text-gray-600 text-center">
+                  Cancel
                 </button>
-              ))}
+              </div>
             </div>
-            <button onClick={closeModal} className="mt-3 text-xs text-gray-400 hover:text-gray-600 w-full text-center">Cancel</button>
-          </div>
-        </ModalOverlay>
-      )}
+          </ModalOverlay>
+        )
+      })()}
 
       {/* ── Scheduling Type Selector ──────────────────────────── */}
       {phase === 'type-select' && (

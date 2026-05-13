@@ -500,6 +500,7 @@ export default function JobsList() {
               onExceptionsLoaded={setExceptionsCount}
               addScheduleTrigger={addScheduleTrigger}
               yardCheckTrigger={yardCheckTrigger}
+              statusFilter={statusFilter}
             />
           )}
 
