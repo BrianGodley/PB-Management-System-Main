@@ -1004,12 +1004,15 @@ export default function ScheduleCalendar({
       orderedJobs.forEach((job, stopIdx) => {
         items.push({
           job_id:           job.id,
-          title:            `Yard Check ${stopIdx + 1}`,
+          // Number each yard check sequentially in date order — #1 is the
+          // earliest, #ycWeeks is the latest. Same numbering applies whether
+          // it's 2 checks or 4 (or any count).
+          title:            `Yard Check #${week + 1}`,
           start_date:       ds,
           end_date:         ds,
           work_days:        1,
           scheduling_type:  'yard_check',
-          notes:            `Week ${week + 1} of ${ycWeeks}${ycOptimize ? ` · Stop ${stopIdx + 1} of ${orderedJobs.length}` : ''}`,
+          notes:            `Yard Check ${week + 1} of ${ycWeeks}${ycOptimize ? ` · Stop ${stopIdx + 1} of ${orderedJobs.length}` : ''}`,
           progress:         0,
           reminder:         'None',
           display_color:    '#3b82f6',
