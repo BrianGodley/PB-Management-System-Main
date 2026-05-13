@@ -565,6 +565,10 @@ export default function JobsList() {
               addScheduleTrigger={addScheduleTrigger}
               yardCheckTrigger={yardCheckTrigger}
               statusFilter={statusFilter}
+              stages={stages}
+              onReopenJob={(jobId) =>
+                setJobs(prev => prev.map(j => j.id === jobId ? { ...j, status: 'active' } : j))
+              }
             />
           )}
 

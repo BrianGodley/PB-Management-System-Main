@@ -791,6 +791,12 @@ export default function ScheduleCalendar({
   // which jobs appear in the Add-Schedule job picker so it stays in sync
   // with whatever the user is filtering to.
   statusFilter = 'open', // 'open' | 'closed' | 'both'
+  // Stage list from JobsList (already sorted by sort_order). Used to group
+  // the Add-Schedule job picker by stage, matching the sidebar layout.
+  stages = [],
+  // Called after a closed job is reopened from the picker so the parent
+  // can patch its local jobs array. Signature: (jobId) => void
+  onReopenJob,
 }) {
   const today = new Date()
   const [year,  setYear]  = useState(today.getFullYear())
@@ -876,6 +882,28 @@ export default function ScheduleCalendar({
     setScheduledWOIds(alreadyScheduled)
     setWorkOrders(woRes.data || [])
     setWoLoading(false)
+  }
+
+  // Handle a click on a job in the Add-Schedule picker. If the job is
+  // closed (status = completed / cancelled), confirm with the user before
+  // flipping it back to active and proceeding into the scheduling flow.
+  // If the user declines, stay in the picker.
+  async function pickJobForSchedule(job) {
+    const s = job?.status || 'active'
+    const isClosed = s === 'completed' || s === 'cancelled'
+    if (isClosed) {
+      const ok = confirm(
+        `"${job.name || job.client_name}" is currently ${s === 'cancelled' ? 'cancelled' : 'closed'}.\n\n` +
+        `You'll need to re-open it before you can schedule anything against it.\n\n` +
+        `Re-open this job now?`
+      )
+      if (!ok) return
+      const { error } = await supabase.from('jobs').update({ status: 'active' }).eq('id', job.id)
+      if (error) { alert('Could not reopen the job: ' + error.message); return }
+      if (typeof onReopenJob === 'function') onReopenJob(job.id)
+    }
+    setModalJobId(job.id)
+    setPhase('type-select')
   }
 
   // Open the Yard Check config modal preloaded with a single job. Used when:
@@ -1538,6 +1566,22 @@ export default function ScheduleCalendar({
           )
         const filterLabel = statusFilter === 'open' ? 'Open' : statusFilter === 'closed' ? 'Closed' : 'All'
 
+        // Group the filtered jobs by stage_id so the picker mirrors the
+        // sidebar layout. Stages come pre-sorted by sort_order; jobs within
+        // each stage are already alpha-numeric from the sort above.
+        const stageGroups = []
+        const byStage = {}
+        for (const s of stages) byStage[s.id] = []
+        const unassigned = []
+        for (const j of filtered) {
+          if (j.stage_id && byStage[j.stage_id]) byStage[j.stage_id].push(j)
+          else unassigned.push(j)
+        }
+        if (unassigned.length > 0) stageGroups.push({ id: '__none__', label: 'Unassigned', jobs: unassigned })
+        stages.forEach((s, idx) => {
+          if (byStage[s.id]?.length) stageGroups.push({ id: s.id, label: `${idx + 1} - ${s.name}`, jobs: byStage[s.id] })
+        })
+
         return (
           <ModalOverlay onClose={closeModal}>
             <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 flex flex-col max-h-[85vh] overflow-hidden">
@@ -1560,22 +1604,48 @@ export default function ScheduleCalendar({
                 </p>
               </div>
 
-              {/* List — scrolls within the modal */}
-              <div className="overflow-y-auto flex-1 px-2 py-2">
+              {/* List — scrolls within the modal. Jobs are grouped by stage
+                  so the user can quickly scroll to a known stage section. */}
+              <div className="overflow-y-auto flex-1">
                 {filtered.length === 0 ? (
                   <p className="text-xs text-gray-400 text-center py-8 italic">
                     {q ? 'No jobs match your search.' : `No ${filterLabel.toLowerCase()} jobs.`}
                   </p>
                 ) : (
-                  <div className="divide-y divide-gray-100">
-                    {filtered.map(j => (
-                      <button
-                        key={j.id}
-                        onClick={() => { setModalJobId(j.id); setPhase('type-select') }}
-                        className="w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-green-50 hover:text-green-800 transition-colors truncate"
-                      >
-                        {j.name || j.client_name}
-                      </button>
+                  <div>
+                    {stageGroups.map(group => (
+                      <div key={group.id}>
+                        {/* Sticky stage header — keeps current section visible while scrolling */}
+                        <div className="sticky top-0 z-10 bg-gray-50 border-y border-gray-200 px-3 py-1.5">
+                          <p className="text-[11px] font-bold text-gray-600 uppercase tracking-wide">
+                            {group.label} <span className="text-gray-400 font-normal normal-case">· {group.jobs.length}</span>
+                          </p>
+                        </div>
+                        <div className="divide-y divide-gray-100">
+                          {group.jobs.map(j => {
+                            const isClosed = j.status === 'completed' || j.status === 'cancelled'
+                            return (
+                              <button
+                                key={j.id}
+                                onClick={() => pickJobForSchedule(j)}
+                                title={isClosed ? 'This job is closed — selecting it will prompt you to reopen it.' : undefined}
+                                className={`w-full text-left px-3 py-1.5 text-sm transition-colors truncate flex items-center gap-2 ${
+                                  isClosed
+                                    ? 'text-gray-500 hover:bg-yellow-50 hover:text-yellow-800'
+                                    : 'text-gray-700 hover:bg-green-50 hover:text-green-800'
+                                }`}
+                              >
+                                <span className="flex-1 truncate">{j.name || j.client_name}</span>
+                                {isClosed && (
+                                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200 uppercase tracking-wide flex-shrink-0">
+                                    Closed
+                                  </span>
+                                )}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
