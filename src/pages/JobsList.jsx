@@ -419,9 +419,17 @@ export default function JobsList() {
 
     const sups = (data || []).map(e => ({ ...e, included: true }))
     setSupervisors(sups)
-    // Default: every stage + Unassigned checked. User can untick irrelevant ones
-    // (Design, Permits, etc.) before running the optimizer.
-    setSupStageIds(new Set([...stages.map(s => s.id), '__none__']))
+    // Default: only the production-ready stages — Pre-Install, Job, Yard Check,
+    // Warranty. Earlier stages (Design, Install Sales, Permits, etc.) usually
+    // don't need supervisor assignment yet. User can tick more if needed.
+    const isDefault = (name) => {
+      const n = (name || '').trim().toLowerCase()
+      return n === 'job'
+          || n === 'pre-install' || n === 'pre install'
+          || n.includes('yard check')
+          || n.includes('warrant')
+    }
+    setSupStageIds(new Set(stages.filter(s => isDefault(s.name)).map(s => s.id)))
     setSupLoading(false)
   }
 
