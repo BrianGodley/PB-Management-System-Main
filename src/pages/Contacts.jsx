@@ -439,7 +439,7 @@ function AddCompanyModal({ onSave, onClose }) {
 // ── Main Contacts List ────────────────────────────────────────────────────────
 export default function Contacts() {
   const navigate = useNavigate()
-  const PAGE_SIZE = 50
+  const PAGE_SIZE = 100
 
   const [activeTab,   setActiveTab]   = useState('individuals') // 'individuals' | 'companies' | 'settings'
   const [settingsSubTab, setSettingsSubTab] = useState('import') // 'import' | 'export'
