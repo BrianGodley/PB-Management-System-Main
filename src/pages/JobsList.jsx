@@ -204,6 +204,14 @@ export default function JobsList() {
   const [supResult,        setSupResult]        = useState(null) // { supervisors: [{id, name, jobs:[]}] }
   const [supRunning,       setSupRunning]       = useState(false)
   const [supApplying,      setSupApplying]      = useState(false)
+  // Which stages to include in supervisor optimization. Set of stage ids
+  // (UUIDs from job_stages) plus the literal '__none__' for Unassigned jobs.
+  const [supStageIds,      setSupStageIds]      = useState(() => new Set())
+  // Per-job include/exclude for the optimizer. After stages are picked we
+  // pre-load every eligible job; the user can untick specific ones.
+  const [supEligibleJobs,    setSupEligibleJobs]    = useState([])
+  const [supEligibleLoading, setSupEligibleLoading] = useState(false)
+  const [supExcludedJobIds,  setSupExcludedJobIds]  = useState(() => new Set())
   // Geocoding readiness state for the Schedule Assistance modal
   const [geoStats, setGeoStats] = useState({ ok: 0, pending: 0, not_found: 0, error: 0, total: 0 })
   const [geocoding, setGeocoding] = useState(false)
@@ -389,8 +397,52 @@ export default function JobsList() {
       .order('first_name')
     const sups = (data || []).map(e => ({ ...e, included: true }))
     setSupervisors(sups)
+    // Default: every stage + Unassigned checked. User can untick irrelevant ones
+    // (Design, Permits, etc.) before running the optimizer.
+    setSupStageIds(new Set([...stages.map(s => s.id), '__none__']))
     setSupLoading(false)
   }
+
+  // Fetch every eligible job in the currently-selected stages, so the user
+  // can untick individual jobs before running the optimizer. Open + geocoded.
+  async function loadSupEligibleJobs(stageIdSet) {
+    if (!stageIdSet || stageIdSet.size === 0) {
+      setSupEligibleJobs([])
+      setSupExcludedJobIds(new Set())
+      return
+    }
+    setSupEligibleLoading(true)
+    let q = supabase.from('jobs')
+      .select('id, name, client_name, job_address, job_city, stage_id')
+      .not('lat', 'is', null)
+      .in('status', ['active', 'on_hold'])
+      .order('client_name')
+    const realIds   = [...stageIdSet].filter(s => s !== '__none__')
+    const incNull   = stageIdSet.has('__none__')
+    if (realIds.length > 0 && incNull) {
+      const list = realIds.map(id => `"${id}"`).join(',')
+      q = q.or(`stage_id.in.(${list}),stage_id.is.null`)
+    } else if (realIds.length > 0) {
+      q = q.in('stage_id', realIds)
+    } else if (incNull) {
+      q = q.is('stage_id', null)
+    }
+    const { data } = await q
+    setSupEligibleJobs(data || [])
+    // Re-tick any jobs that were excluded but no longer in the list
+    setSupExcludedJobIds(prev => {
+      const present = new Set((data || []).map(j => j.id))
+      return new Set([...prev].filter(id => present.has(id)))
+    })
+    setSupEligibleLoading(false)
+  }
+
+  // Refresh eligible jobs whenever the stage selection changes (only while
+  // the user is actually on the supervisor-config view).
+  useEffect(() => {
+    if (schedAssistView === 'supervisor-config') loadSupEligibleJobs(supStageIds)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supStageIds, schedAssistView])
 
   // Call the assign-supervisors edge function with the picked supervisors.
   async function runSupervisorOptimization() {
@@ -399,12 +451,24 @@ export default function JobsList() {
       const ids = supervisors.filter(s => s.included).map(s => s.id)
       if (ids.length === 0) { setOptError('Pick at least one supervisor.'); setSupRunning(false); return }
 
+      // Use the per-job include list (eligibles minus user's exclusions) so
+      // the optimizer respects both the stage filter AND any individual jobs
+      // the user unchecked.
+      const includedJobIds = supEligibleJobs.filter(j => !supExcludedJobIds.has(j.id)).map(j => j.id)
+      if (includedJobIds.length === 0) {
+        setOptError('No jobs left after filters — pick at least one stage and one job.')
+        setSupRunning(false)
+        return
+      }
       const { data: { session } } = await supabase.auth.getSession()
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/assign-supervisors`
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ supervisor_employee_ids: ids }),
+        body: JSON.stringify({
+          supervisor_employee_ids: ids,
+          job_ids: includedJobIds,
+        }),
       })
       const data = await res.json()
       if (!res.ok || data.error) { setOptError(data.error || `HTTP ${res.status}`); setSupRunning(false); return }
@@ -1352,7 +1416,101 @@ export default function JobsList() {
             {/* ════ SUPERVISOR CONFIGURE VIEW ════ */}
             {schedAssistView === 'supervisor-config' && (
               <>
-                <div className="space-y-3">
+                <div className="space-y-4">
+
+                  {/* Stage filter — only assign supervisors for jobs that
+                      are actually ready for production (Pre-Install onward,
+                      typically). User picks which stages count. */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-xs font-semibold text-gray-600">
+                        Job stages to include ({supStageIds.size} of {stages.length + 1})
+                      </label>
+                      <div className="flex gap-3">
+                        <button onClick={() => setSupStageIds(new Set([...stages.map(s => s.id), '__none__']))}
+                          className="text-xs text-indigo-700 hover:underline">Select all</button>
+                        <button onClick={() => setSupStageIds(new Set())}
+                          className="text-xs text-gray-400 hover:underline">Clear</button>
+                      </div>
+                    </div>
+                    <div className="border border-gray-200 rounded-lg max-h-44 overflow-y-auto">
+                      {/* Real stages, in their sort order */}
+                      {stages.map((s, idx) => {
+                        const checked = supStageIds.has(s.id)
+                        return (
+                          <label key={s.id} className={`flex items-center gap-2 px-3 py-1.5 text-sm border-b border-gray-100 last:border-b-0 cursor-pointer hover:bg-gray-50 ${!checked ? 'opacity-50' : ''}`}>
+                            <input type="checkbox" checked={checked}
+                              onChange={() => setSupStageIds(prev => {
+                                const next = new Set(prev)
+                                if (next.has(s.id)) next.delete(s.id); else next.add(s.id)
+                                return next
+                              })}
+                              className="accent-indigo-600 flex-shrink-0" />
+                            <span className="text-xs font-bold text-gray-400 w-5">{idx + 1}</span>
+                            <span className="flex-1 text-gray-700">{s.name}</span>
+                          </label>
+                        )
+                      })}
+                      {/* Unassigned bucket — jobs with no stage_id */}
+                      <label className={`flex items-center gap-2 px-3 py-1.5 text-sm border-t border-gray-200 cursor-pointer hover:bg-gray-50 ${!supStageIds.has('__none__') ? 'opacity-50' : ''}`}>
+                        <input type="checkbox" checked={supStageIds.has('__none__')}
+                          onChange={() => setSupStageIds(prev => {
+                            const next = new Set(prev)
+                            if (next.has('__none__')) next.delete('__none__'); else next.add('__none__')
+                            return next
+                          })}
+                          className="accent-indigo-600 flex-shrink-0" />
+                        <span className="text-xs font-bold text-gray-400 w-5">—</span>
+                        <span className="flex-1 text-gray-700 italic">Unassigned</span>
+                      </label>
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      Untick stages where jobs aren't ready for supervisor assignment yet (Design, Permits, etc.).
+                    </p>
+                  </div>
+
+                  {/* Eligible jobs preview — user can untick any individual job */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-xs font-semibold text-gray-600">
+                        Jobs to include ({supEligibleJobs.length - supExcludedJobIds.size} of {supEligibleJobs.length})
+                      </label>
+                      <div className="flex gap-3">
+                        <button onClick={() => setSupExcludedJobIds(new Set())}
+                          className="text-xs text-indigo-700 hover:underline">Select all</button>
+                        <button onClick={() => setSupExcludedJobIds(new Set(supEligibleJobs.map(j => j.id)))}
+                          className="text-xs text-gray-400 hover:underline">Clear</button>
+                      </div>
+                    </div>
+                    {supEligibleLoading ? (
+                      <div className="flex justify-center py-6"><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-700" /></div>
+                    ) : supEligibleJobs.length === 0 ? (
+                      <p className="text-xs text-gray-400 italic text-center py-3 bg-gray-50 rounded-lg">
+                        {supStageIds.size === 0 ? 'Pick at least one stage above.' : 'No open geocoded jobs in those stages.'}
+                      </p>
+                    ) : (
+                      <div className="border border-gray-200 rounded-lg max-h-48 overflow-y-auto">
+                        {supEligibleJobs.map(j => {
+                          const excluded = supExcludedJobIds.has(j.id)
+                          const stageName = stages.find(s => s.id === j.stage_id)?.name || 'Unassigned'
+                          return (
+                            <label key={j.id} className={`flex items-center gap-2 px-3 py-1.5 text-sm border-b border-gray-100 last:border-b-0 cursor-pointer hover:bg-gray-50 ${excluded ? 'opacity-50' : ''}`}>
+                              <input type="checkbox" checked={!excluded}
+                                onChange={() => setSupExcludedJobIds(prev => {
+                                  const next = new Set(prev)
+                                  if (next.has(j.id)) next.delete(j.id); else next.add(j.id)
+                                  return next
+                                })}
+                                className="accent-indigo-600 flex-shrink-0" />
+                              <span className="flex-1 truncate text-gray-700">{j.name || j.client_name}</span>
+                              <span className="text-[10px] text-gray-400 flex-shrink-0">{stageName}</span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+
                   <p className="text-xs text-gray-500">
                     Pick the supervisors to include in the assignment.
                     Default: every active employee whose position contains "supervisor".

@@ -7,6 +7,9 @@
 //   {
 //     supervisor_employee_ids?: string[],   // override; default = all active employees with job_title ILIKE '%supervisor%'
 //     job_ids?: string[],                   // override; default = all open (active/on_hold) geocoded jobs
+//     stage_ids?: string[],                 // when set, only include jobs whose stage_id is in this list.
+//                                           //   Pass the literal string "__none__" inside the list to also include
+//                                           //   jobs with stage_id IS NULL (Unassigned).
 //   }
 //
 // Response:
@@ -181,6 +184,7 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({})) as any
     const explicitSupIds: string[] | undefined = Array.isArray(body?.supervisor_employee_ids) ? body.supervisor_employee_ids : undefined
     const explicitJobIds: string[] | undefined = Array.isArray(body?.job_ids) ? body.job_ids : undefined
+    const stageIds:       string[] | undefined = Array.isArray(body?.stage_ids) ? body.stage_ids : undefined
 
     const admin = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -203,16 +207,30 @@ serve(async (req) => {
       return json(400, { error: 'No active supervisors found. Make sure at least one employee has a job_title containing "supervisor".' })
     }
 
-    // 2. Get jobs. Default: open + geocoded.
+    // 2. Get jobs. Default: open + geocoded. Optionally filter by stage_id.
+    // The pseudo-id "__none__" means "include jobs with stage_id IS NULL (Unassigned)".
     let jobQuery = admin.from('jobs')
-      .select('id, name, client_name, job_address, job_city, job_state, job_zip, lat, lon, project_manager')
+      .select('id, name, client_name, job_address, job_city, job_state, job_zip, lat, lon, project_manager, stage_id')
       .not('lat', 'is', null)
       .in('status', ['active', 'on_hold'])
     if (explicitJobIds) jobQuery = jobQuery.in('id', explicitJobIds)
+    if (stageIds && stageIds.length > 0) {
+      const realIds = stageIds.filter(s => s !== '__none__')
+      const includeNull = stageIds.includes('__none__')
+      if (realIds.length > 0 && includeNull) {
+        // OR clause: stage_id IN (...) OR stage_id IS NULL
+        const list = realIds.map(id => `"${id}"`).join(',')
+        jobQuery = jobQuery.or(`stage_id.in.(${list}),stage_id.is.null`)
+      } else if (realIds.length > 0) {
+        jobQuery = jobQuery.in('stage_id', realIds)
+      } else if (includeNull) {
+        jobQuery = jobQuery.is('stage_id', null)
+      }
+    }
     const { data: jobs, error: jobErr } = await jobQuery
     if (jobErr) return json(500, { error: 'Failed to fetch jobs: ' + jobErr.message })
     if (!jobs || jobs.length === 0) {
-      return json(400, { error: 'No open geocoded jobs found.' })
+      return json(400, { error: 'No open geocoded jobs found in the selected stages.' })
     }
 
     // 3. Run balanced k-means
