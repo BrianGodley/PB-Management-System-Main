@@ -191,20 +191,46 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     )
 
-    // 1. Get supervisors. Default: any active employee whose job_title
-    //    contains "supervisor" (case-insensitive). Caller can override.
-    let supQuery = admin.from('employees')
-      .select('id, first_name, last_name, job_title')
-      .eq('status', 'active')
-    if (explicitSupIds) {
-      supQuery = supQuery.in('id', explicitSupIds)
+    // 1. Get supervisors. Resolution order:
+    //    a) explicit supervisor_employee_ids in the request body (UI default)
+    //    b) the company_settings.supervisor_position_ids list — find each
+    //       position's title, then employees whose job_title matches
+    //    c) substring match on "supervisor" — last-resort fallback
+    let sups: any[] = []
+    if (explicitSupIds && explicitSupIds.length > 0) {
+      const { data, error } = await admin.from('employees')
+        .select('id, first_name, last_name, job_title')
+        .eq('status', 'active').in('id', explicitSupIds)
+      if (error) return json(500, { error: 'Failed to fetch supervisors: ' + error.message })
+      sups = data || []
     } else {
-      supQuery = supQuery.ilike('job_title', '%supervisor%')
+      // Look at the configured supervisor positions
+      const { data: settings } = await admin.from('company_settings')
+        .select('supervisor_position_ids').maybeSingle()
+      const positionIds = Array.isArray(settings?.supervisor_position_ids) ? settings.supervisor_position_ids : []
+
+      if (positionIds.length > 0) {
+        const { data: posRows } = await admin.from('positions').select('title').in('id', positionIds)
+        const titles = (posRows || []).map(p => (p.title || '').trim()).filter(Boolean)
+        if (titles.length === 0) {
+          return json(400, { error: 'Configured supervisor positions have no titles set.' })
+        }
+        const { data, error } = await admin.from('employees')
+          .select('id, first_name, last_name, job_title')
+          .eq('status', 'active').in('job_title', titles)
+        if (error) return json(500, { error: 'Failed to fetch supervisors by position: ' + error.message })
+        sups = data || []
+      } else {
+        // Fallback: substring match
+        const { data, error } = await admin.from('employees')
+          .select('id, first_name, last_name, job_title')
+          .eq('status', 'active').ilike('job_title', '%supervisor%')
+        if (error) return json(500, { error: 'Failed to fetch supervisors: ' + error.message })
+        sups = data || []
+      }
     }
-    const { data: sups, error: supErr } = await supQuery
-    if (supErr) return json(500, { error: 'Failed to fetch supervisors: ' + supErr.message })
     if (!sups || sups.length === 0) {
-      return json(400, { error: 'No active supervisors found. Make sure at least one employee has a job_title containing "supervisor".' })
+      return json(400, { error: 'No active supervisors found. Configure supervisor positions in Jobs → Settings → Scheduling Assistance → Supervisor Assignment, or assign at least one employee to a position with "supervisor" in the title.' })
     }
 
     // 2. Get jobs. Default: open + geocoded. Optionally filter by stage_id.

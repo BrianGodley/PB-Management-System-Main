@@ -12,6 +12,7 @@ import MasterCrews from './MasterCrews'
 import COEstimatePanel  from '../components/COEstimatePanel'
 import JobInfoModal     from '../components/JobInfoModal'
 import StartLocationsCard from '../components/StartLocationsCard'
+import SupervisorPositionsCard from '../components/SupervisorPositionsCard'
 
 function MoveJobModal({ job, stages, onMove, onClose }) {
   const [selected, setSelected] = useState(job.stage_id || '__none__')
@@ -390,11 +391,32 @@ export default function JobsList() {
   // deselect any of them in the configure view before running the optimizer.
   async function loadSupervisors() {
     setSupLoading(true)
-    const { data } = await supabase.from('employees')
+
+    // Resolve supervisor titles using the configured positions in
+    // company_settings.supervisor_position_ids. Falls back to the legacy
+    // substring match on "supervisor" if nothing is configured (so existing
+    // installs keep working).
+    const { data: settings } = await supabase.from('company_settings')
+      .select('supervisor_position_ids').maybeSingle()
+    const positionIds = Array.isArray(settings?.supervisor_position_ids) ? settings.supervisor_position_ids : []
+
+    let titles = []
+    if (positionIds.length > 0) {
+      const { data: posRows } = await supabase.from('positions')
+        .select('title').in('id', positionIds)
+      titles = (posRows || []).map(p => (p.title || '').trim()).filter(Boolean)
+    }
+
+    let q = supabase.from('employees')
       .select('id, first_name, last_name, job_title')
-      .eq('status', 'active')
-      .ilike('job_title', '%supervisor%')
-      .order('first_name')
+      .eq('status', 'active').order('first_name')
+    if (titles.length > 0) {
+      q = q.in('job_title', titles)
+    } else {
+      q = q.ilike('job_title', '%supervisor%')
+    }
+    const { data } = await q
+
     const sups = (data || []).map(e => ({ ...e, included: true }))
     setSupervisors(sups)
     // Default: every stage + Unassigned checked. User can untick irrelevant ones
@@ -1787,6 +1809,36 @@ function getWeekRangeStr(startDay) {
 // Task Descriptions. Each is a simple add / rename / delete CRUD over its own
 // table. Categories drive the first column dropdown; descriptions drive
 // autocomplete suggestions for the second column.
+// ── Scheduling Assistance Settings ───────────────────────────────────────────
+// Parent settings panel with two sub-tabs:
+//   - Start Locations         (saved start addresses for the route optimizer)
+//   - Supervisor Assignment   (which HR positions count as supervisors)
+function SchedulingAssistanceSettings() {
+  const [tab, setTab] = useState('start-locations')
+  return (
+    <div className="max-w-2xl space-y-4">
+      <div className="flex border-b border-gray-200">
+        {[
+          { key: 'start-locations',     label: '📍 Start Locations' },
+          { key: 'supervisor-positions', label: '👥 Supervisor Assignment' },
+        ].map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              tab === t.key ? 'border-green-700 text-green-800' : 'border-transparent text-gray-500 hover:text-gray-800'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {tab === 'start-locations'      && <StartLocationsCard currentUserIsAdmin={true} />}
+      {tab === 'supervisor-positions' && <SupervisorPositionsCard />}
+    </div>
+  )
+}
+
 function TaskListsSettings() {
   const [tab, setTab] = useState('categories') // 'categories' | 'descriptions'
   return (
@@ -1981,12 +2033,12 @@ function JobScheduleSettings({ stages = [], onAddStage, onUpdateStage, onDeleteS
       {/* White sub-tab bar */}
       <div className="flex border-b border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0">
         {[
-          { key: 'general',         label: '⚙️ General'   },
-          { key: 'stages',          label: '🪜 Job Stages' },
-          { key: 'task-lists',      label: '✅ Task Lists' },
-          { key: 'start-locations', label: '📍 Start Locations' },
-          { key: 'templates',       label: '📋 Templates'  },
-          { key: 'crews',           label: '👷 Master Crews' },
+          { key: 'general',                label: '⚙️ General'   },
+          { key: 'stages',                 label: '🪜 Job Stages' },
+          { key: 'task-lists',             label: '✅ Task Lists' },
+          { key: 'scheduling-assistance',  label: '✨ Scheduling Assistance' },
+          { key: 'templates',              label: '📋 Templates'  },
+          { key: 'crews',                  label: '👷 Master Crews' },
         ].map(t => (
           <button key={t.key} onClick={() => setSettingsTab(t.key)}
             className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
@@ -2048,11 +2100,7 @@ function JobScheduleSettings({ stages = [], onAddStage, onUpdateStage, onDeleteS
 
       {settingsTab === 'task-lists' && <TaskListsSettings />}
 
-      {settingsTab === 'start-locations' && (
-        <div className="max-w-2xl">
-          <StartLocationsCard currentUserIsAdmin={true} />
-        </div>
-      )}
+      {settingsTab === 'scheduling-assistance' && <SchedulingAssistanceSettings />}
 
       {settingsTab === 'stages' && <div className="max-w-2xl space-y-6">
       {/* Job Stages */}
