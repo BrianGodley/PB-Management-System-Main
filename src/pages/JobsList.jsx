@@ -11,6 +11,7 @@ import TemplatesManager from '../components/TemplatesManager'
 import MasterCrews from './MasterCrews'
 import COEstimatePanel  from '../components/COEstimatePanel'
 import JobInfoModal     from '../components/JobInfoModal'
+import StartLocationsCard from '../components/StartLocationsCard'
 
 function MoveJobModal({ job, stages, onMove, onClose }) {
   const [selected, setSelected] = useState(job.stage_id || '__none__')
@@ -1151,11 +1152,12 @@ function JobScheduleSettings({ stages = [], onAddStage, onUpdateStage, onDeleteS
       {/* White sub-tab bar */}
       <div className="flex border-b border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0">
         {[
-          { key: 'general',   label: '⚙️ General'   },
-          { key: 'stages',    label: '🪜 Job Stages' },
-          { key: 'task-lists',label: '✅ Task Lists' },
-          { key: 'templates', label: '📋 Templates'  },
-          { key: 'crews',     label: '👷 Master Crews' },
+          { key: 'general',         label: '⚙️ General'   },
+          { key: 'stages',          label: '🪜 Job Stages' },
+          { key: 'task-lists',      label: '✅ Task Lists' },
+          { key: 'start-locations', label: '📍 Start Locations' },
+          { key: 'templates',       label: '📋 Templates'  },
+          { key: 'crews',           label: '👷 Master Crews' },
         ].map(t => (
           <button key={t.key} onClick={() => setSettingsTab(t.key)}
             className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
@@ -1216,6 +1218,12 @@ function JobScheduleSettings({ stages = [], onAddStage, onUpdateStage, onDeleteS
       </div>}
 
       {settingsTab === 'task-lists' && <TaskListsSettings />}
+
+      {settingsTab === 'start-locations' && (
+        <div className="max-w-2xl">
+          <StartLocationsCard currentUserIsAdmin={true} />
+        </div>
+      )}
 
       {settingsTab === 'stages' && <div className="max-w-2xl space-y-6">
       {/* Job Stages */}

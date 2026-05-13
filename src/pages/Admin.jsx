@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { sendWelcomeEmail, sendSMS } from '../lib/notify'
+import StartLocationsCard from '../components/StartLocationsCard'
 
 const FG = '#3A5038'
 
@@ -1328,9 +1329,15 @@ function CompanySettings({ currentUserIsAdmin }) {
         </div>
       </div>
 
+      {/* ── Schedule Assistant: Start Locations ──────────────────────── */}
+      <StartLocationsCard currentUserIsAdmin={currentUserIsAdmin} />
+
     </div>
   )
 }
+
+// (StartLocationsCard moved to src/components/StartLocationsCard.jsx —
+// imported at the top of this file and used by CompanySettings.)
 
 // ── EmailSettings ─────────────────────────────────────────────────────────────
 const EMAIL_PROVIDERS = [
