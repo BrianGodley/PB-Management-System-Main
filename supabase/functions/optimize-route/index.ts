@@ -42,25 +42,57 @@ const json = (status: number, body: unknown) =>
 // keep latency reasonable when chunking large matrices.
 const TILE = 10
 
-// ── Distance Matrix tile fetch ────────────────────────────────────────────
+// ── Routes API tile fetch (Distance Matrix legacy was deprecated) ─────────
+// Uses computeRouteMatrix on the new Routes API. Same pricing as the
+// legacy Distance Matrix (~$5/1k elements).
 type Pt = { lat: number; lon: number }
 type Cell = { minutes: number; meters: number } | null
 
 async function fetchTile(origins: Pt[], destinations: Pt[], key: string): Promise<Cell[][]> {
-  const o = origins.map(p => `${p.lat},${p.lon}`).join('|')
-  const d = destinations.map(p => `${p.lat},${p.lon}`).join('|')
-  const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodeURIComponent(o)}&destinations=${encodeURIComponent(d)}&mode=driving&departure_time=now&key=${key}`
-  const res = await fetch(url)
-  const data = await res.json()
-  if (data.status !== 'OK') throw new Error('Distance Matrix: ' + data.status + (data.error_message ? ' — ' + data.error_message : ''))
-  return data.rows.map((row: any) =>
-    row.elements.map((el: any): Cell => {
-      if (el.status !== 'OK') return null
-      // duration_in_traffic is only set when departure_time is provided.
-      const seconds = el.duration_in_traffic?.value ?? el.duration?.value ?? 0
-      return { minutes: seconds / 60, meters: el.distance?.value ?? 0 }
-    })
-  )
+  const body = {
+    origins: origins.map(p => ({
+      waypoint: { location: { latLng: { latitude: p.lat, longitude: p.lon } } },
+    })),
+    destinations: destinations.map(p => ({
+      waypoint: { location: { latLng: { latitude: p.lat, longitude: p.lon } } },
+    })),
+    travelMode:        'DRIVE',
+    routingPreference: 'TRAFFIC_AWARE',
+  }
+
+  const res = await fetch('https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix', {
+    method: 'POST',
+    headers: {
+      'Content-Type':       'application/json',
+      'X-Goog-Api-Key':     key,
+      // Field mask is REQUIRED for the Routes API. We only need these four
+      // fields per element, which keeps cost in the cheaper SKU tier.
+      'X-Goog-FieldMask':   'originIndex,destinationIndex,duration,distanceMeters,condition',
+    },
+    body: JSON.stringify(body),
+  })
+
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`Routes API HTTP ${res.status}: ${text}`)
+  }
+  // Response is a JSON array of element objects:
+  //   { originIndex, destinationIndex, duration: "1300s", distanceMeters, condition }
+  const elements: any[] = await res.json()
+
+  const matrix: Cell[][] = Array.from({ length: origins.length }, () => Array(destinations.length).fill(null))
+  for (const el of elements) {
+    const oi = el.originIndex ?? 0
+    const di = el.destinationIndex ?? 0
+    if (el.condition !== 'ROUTE_EXISTS') continue
+    // duration is a string like "1300s" — strip the trailing "s" and parse
+    const seconds = parseInt(String(el.duration || '0').replace('s', '')) || 0
+    matrix[oi][di] = {
+      minutes: seconds / 60,
+      meters:  Number(el.distanceMeters) || 0,
+    }
+  }
+  return matrix
 }
 
 // Build the full (N x N) drive-time matrix for the given points by tiling.
