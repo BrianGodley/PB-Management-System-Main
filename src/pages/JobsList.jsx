@@ -178,6 +178,26 @@ export default function JobsList() {
   // Phase 1 just opens the picker; running optimization arrives in Phase 2/3.
   const [schedAssistMode, setSchedAssistMode] = useState(null) // null | 'supervisor' | 'yard' | 'warranty' | 'both'
   const [showSchedAssist, setShowSchedAssist] = useState(false)
+  // Multi-step wizard view inside the Schedule Assistance modal:
+  //   'mode'      → pick which optimization to run (the existing screen)
+  //   'configure' → set start location + dates + which jobs to include
+  //   'result'    → review the optimized route, edit order, apply
+  const [schedAssistView,  setSchedAssistView]  = useState('mode')
+  const [startLocations,   setStartLocations]   = useState([])
+  const [defaultStartId,   setDefaultStartId]   = useState('')
+  const [pickedStartId,    setPickedStartId]    = useState('')
+  const [optStartDate,     setOptStartDate]     = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0,10)
+  })
+  const [optDaysToSpread,  setOptDaysToSpread]  = useState(1)
+  const [eligibleJobs,     setEligibleJobs]     = useState([])
+  const [eligibleLoading,  setEligibleLoading]  = useState(false)
+  const [excludedJobIds,   setExcludedJobIds]   = useState(() => new Set())
+  const [yardCheckTotal,   setYardCheckTotal]   = useState(4)
+  const [optimizing,       setOptimizing]       = useState(false)
+  const [optResult,        setOptResult]        = useState(null) // { ordered_jobs, legs, totals }
+  const [optError,         setOptError]         = useState('')
+  const [applying,         setApplying]         = useState(false)
   // Geocoding readiness state for the Schedule Assistance modal
   const [geoStats, setGeoStats] = useState({ ok: 0, pending: 0, not_found: 0, error: 0, total: 0 })
   const [geocoding, setGeocoding] = useState(false)
@@ -243,11 +263,194 @@ export default function JobsList() {
     setGeocoding(false)
   }
 
-  // Refresh geo stats whenever the modal opens
+  // Refresh geo stats + load start locations + yard check default whenever
+  // the Schedule Assistance modal opens.
   useEffect(() => {
-    if (showSchedAssist) refreshGeoStats()
+    if (!showSchedAssist) return
+    refreshGeoStats()
+    ;(async () => {
+      const { data } = await supabase.from('company_settings')
+        .select('start_locations, default_start_location_id, yard_check_default_total')
+        .maybeSingle()
+      const locs = Array.isArray(data?.start_locations) ? data.start_locations : []
+      setStartLocations(locs)
+      setDefaultStartId(data?.default_start_location_id || '')
+      setPickedStartId(data?.default_start_location_id || locs[0]?.id || '')
+      setYardCheckTotal(data?.yard_check_default_total || 4)
+    })()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showSchedAssist])
+
+  // When the user picks a mode AND there's a start location set, fetch the
+  // eligible jobs for that mode (Yard Check stage, Warranty stage, or both).
+  // For Yard Checks we filter out jobs that already have N yard checks
+  // scheduled (where N = yard_check_default_total).
+  async function loadEligibleJobs(mode) {
+    setEligibleLoading(true)
+    setEligibleJobs([])
+    setExcludedJobIds(new Set())
+    try {
+      // Find the matching stage IDs by name
+      const targetNames = mode === 'yard'      ? ['yard']
+                        : mode === 'warranty'  ? ['warranty']
+                        : mode === 'both'      ? ['yard', 'warranty']
+                        : []
+      const ors = targetNames.map(n => `name.ilike.%${n}%`).join(',')
+      const { data: stageRows } = await supabase.from('job_stages').select('id, name').or(ors)
+      const stageIds = (stageRows || []).map(s => s.id)
+      if (stageIds.length === 0) { setEligibleJobs([]); setEligibleLoading(false); return }
+
+      // Pull jobs in those stages with lat/lon
+      const { data: jobs } = await supabase.from('jobs')
+        .select('id, name, client_name, job_address, job_city, job_state, job_zip, lat, lon, stage_id, geocode_status')
+        .in('stage_id', stageIds)
+        .not('lat', 'is', null)
+        .order('client_name')
+
+      // For yard mode (and the yard portion of 'both'), check how many yard
+      // checks each job already has scheduled and filter out the completed ones.
+      let result = jobs || []
+      if (mode === 'yard' || mode === 'both') {
+        const ids = result.map(j => j.id)
+        const { data: ycRows } = await supabase.from('schedule_items')
+          .select('job_id').in('job_id', ids).eq('scheduling_type', 'yard_check')
+        const countByJob = {}
+        for (const r of ycRows || []) {
+          countByJob[r.job_id] = (countByJob[r.job_id] || 0) + 1
+        }
+        // Tag each job with how many checks it's had + how many are remaining.
+        // For 'both' we only filter out yard-stage jobs that are done; warranty-stage jobs pass through untouched.
+        const yardStageIds = new Set((stageRows || []).filter(s => /yard/i.test(s.name || '')).map(s => s.id))
+        result = result.filter(j => {
+          if (!yardStageIds.has(j.stage_id)) return true
+          const used = countByJob[j.id] || 0
+          j._yard_checks_used      = used
+          j._yard_checks_remaining = Math.max(0, yardCheckTotal - used)
+          return used < yardCheckTotal
+        })
+      }
+
+      setEligibleJobs(result)
+    } catch (e) {
+      console.error(e)
+    }
+    setEligibleLoading(false)
+  }
+
+  // Call the optimize-route edge function with the picked start location +
+  // the selected (not-excluded) eligible jobs.
+  async function runOptimization() {
+    setOptimizing(true); setOptError(''); setOptResult(null)
+    try {
+      const start = startLocations.find(l => l.id === pickedStartId)
+      if (!start) { setOptError('Pick a start location first.'); setOptimizing(false); return }
+      const jobIds = eligibleJobs.filter(j => !excludedJobIds.has(j.id)).map(j => j.id)
+      if (jobIds.length === 0) { setOptError('Pick at least one job to optimize.'); setOptimizing(false); return }
+      if (jobIds.length > 50)  { setOptError(`Too many jobs (${jobIds.length}). The optimizer caps at 50 per run — deselect some and try again.`); setOptimizing(false); return }
+
+      const { data: { session } } = await supabase.auth.getSession()
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/optimize-route`
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          job_ids: jobIds,
+          start:   { lat: Number(start.lat), lon: Number(start.lon), label: start.label },
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) { setOptError(data.error || `HTTP ${res.status}`); setOptimizing(false); return }
+
+      // Reorder eligibleJobs to match the optimizer's order
+      const byId = Object.fromEntries(eligibleJobs.map(j => [j.id, j]))
+      const orderedJobs = data.ordered_job_ids.map(id => byId[id]).filter(Boolean)
+      setOptResult({ ordered_jobs: orderedJobs, legs: data.legs, totals: data.totals, start })
+      setSchedAssistView('result')
+    } catch (e) {
+      setOptError(e instanceof Error ? e.message : String(e))
+    }
+    setOptimizing(false)
+  }
+
+  // Move a job up/down within the ordered route (manual edit of the result).
+  function reorderRouteJob(idx, delta) {
+    setOptResult(prev => {
+      if (!prev) return prev
+      const next = [...prev.ordered_jobs]
+      const j = idx + delta
+      if (j < 0 || j >= next.length) return prev
+      const tmp = next[idx]; next[idx] = next[j]; next[j] = tmp
+      return { ...prev, ordered_jobs: next }
+    })
+  }
+
+  // Create schedule_items in the optimized route order, distributed across
+  // the requested number of days. For yard checks, auto-numbers each visit
+  // (based on existing count per job).
+  async function applyOptimization() {
+    if (!optResult) return
+    setApplying(true)
+    try {
+      const jobs = optResult.ordered_jobs
+      const days = Math.max(1, Math.min(parseInt(optDaysToSpread) || 1, jobs.length))
+      const jobsPerDay = Math.ceil(jobs.length / days)
+      const baseDate = new Date(optStartDate + 'T00:00:00')
+
+      // Re-fetch yard-check counts at apply-time so the numbers reflect any
+      // changes since the modal opened
+      const yardJobIds = jobs.filter(j => j._yard_checks_remaining !== undefined).map(j => j.id)
+      const { data: ycRows } = await supabase.from('schedule_items')
+        .select('job_id').in('job_id', yardJobIds.length ? yardJobIds : ['00000000-0000-0000-0000-000000000000']).eq('scheduling_type', 'yard_check')
+      const countByJob = {}
+      for (const r of ycRows || []) {
+        countByJob[r.job_id] = (countByJob[r.job_id] || 0) + 1
+      }
+
+      const items = jobs.map((job, i) => {
+        const dayIdx = Math.floor(i / jobsPerDay)
+        const d = new Date(baseDate); d.setDate(baseDate.getDate() + dayIdx)
+        const ds = d.toISOString().slice(0, 10)
+        const isYard = job._yard_checks_remaining !== undefined
+        const nextNum = isYard ? ((countByJob[job.id] || 0) + 1) : null
+        return {
+          job_id:           job.id,
+          title:            isYard ? `Yard Check #${nextNum}` : 'Warranty Check',
+          start_date:       ds,
+          end_date:         ds,
+          work_days:        1,
+          scheduling_type:  isYard ? 'yard_check' : 'warranty',
+          notes:            isYard
+            ? `Yard Check ${nextNum} of ${yardCheckTotal} · Route stop ${i+1} of ${jobs.length}`
+            : `Warranty visit · Route stop ${i+1} of ${jobs.length}`,
+          progress:         0,
+          reminder:         'None',
+          display_color:    isYard ? '#3b82f6' : '#a855f7',
+          assignee_color:   null,
+          assignees:        '',
+          crew_id:          null,
+          sub_id:           null,
+          include_saturday: false,
+          include_sunday:   false,
+          needs_crew:       false,
+          work_order_ids:   [],
+        }
+      })
+
+      const { error } = await supabase.from('schedule_items').insert(items)
+      if (error) { alert('Failed to create schedule items: ' + error.message); setApplying(false); return }
+
+      // Done — close the modal and bump the schedule trigger so the calendar
+      // refreshes if the user navigates there.
+      setShowSchedAssist(false)
+      setSchedAssistView('mode')
+      setOptResult(null)
+      setSchedAssistMode(null)
+      setAddScheduleTrigger(v => v + 1)
+    } catch (e) {
+      alert('Error applying optimization: ' + (e instanceof Error ? e.message : String(e)))
+    }
+    setApplying(false)
+  }
   // When a job is moved into the Yard Check stage we bump this so the
   // ScheduleCalendar auto-opens the yard check config modal for that job.
   const [yardCheckTrigger, setYardCheckTrigger] = useState(null) // { jobId, ts } | null
@@ -716,110 +919,285 @@ export default function JobsList() {
       {showSchedAssist && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={e => { if (e.target === e.currentTarget) setShowSchedAssist(false) }}
+          onClick={e => { if (e.target === e.currentTarget) { setShowSchedAssist(false); setSchedAssistView('mode'); setOptResult(null) } }}
         >
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
-            <div className="flex items-start justify-between mb-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex items-start justify-between p-6 pb-3 flex-shrink-0">
               <div>
                 <h2 className="text-lg font-bold text-gray-900">✨ Schedule Assistance</h2>
-                <p className="text-xs text-gray-500 mt-0.5">Geographic + traffic-aware optimization powered by route planning.</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {schedAssistView === 'mode' && 'Pick which optimization to run.'}
+                  {schedAssistView === 'configure' && 'Choose start location, dates, and which jobs to include.'}
+                  {schedAssistView === 'result' && 'Review the route — edit order if needed — then apply.'}
+                </p>
               </div>
-              <button onClick={() => setShowSchedAssist(false)} className="text-gray-300 hover:text-gray-500">
+              <button onClick={() => { setShowSchedAssist(false); setSchedAssistView('mode'); setOptResult(null) }} className="text-gray-300 hover:text-gray-500">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
+            <div className="px-6 pb-6 overflow-y-auto flex-1">
 
-            {/* Geocoding status — optimization can't run without lat/lon */}
-            <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <div>
-                  <p className="text-xs font-semibold text-gray-700">Geocoding status</p>
-                  <p className="text-[11px] text-gray-500 mt-0.5">
-                    {geoStats.total > 0 ? (
-                      <>
-                        <span className="font-semibold text-gray-700">{geoStats.ok}</span> of {geoStats.total} jobs geocoded
-                        {geoStats.pending  > 0 && <> · <span className="text-amber-700">{geoStats.pending} pending</span></>}
-                        {geoStats.not_found > 0 && <> · <span className="text-gray-500">{geoStats.not_found} not found</span></>}
-                        {geoStats.error   > 0 && <> · <span className="text-red-600">{geoStats.error} errors</span></>}
-                      </>
-                    ) : 'Loading…'}
-                  </p>
-                </div>
-                <button
-                  onClick={runGeocoder}
-                  disabled={geocoding || geoStats.pending === 0}
-                  className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-indigo-700 text-white hover:bg-indigo-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex-shrink-0"
-                >
-                  {geocoding ? 'Geocoding…' : geoStats.pending === 0 ? 'All set' : 'Geocode pending jobs'}
-                </button>
-              </div>
-              {/* Progress bar */}
-              {geoStats.total > 0 && (
-                <div className="bg-gray-200 rounded-full h-1.5 overflow-hidden">
-                  <div className="bg-green-600 h-1.5 transition-all"
-                       style={{ width: `${Math.round((geoStats.ok / geoStats.total) * 100)}%` }} />
-                </div>
-              )}
-              {geoMsg && (
-                <p className={`text-[11px] mt-2 ${geoMsg.startsWith('Error') ? 'text-red-600' : 'text-gray-500'}`}>{geoMsg}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              {[
-                { key: 'supervisor', emoji: '👥', title: 'Optimize Job Supervisor Assignment',
-                  desc: 'Cluster open jobs by location and balance them across your Job Supervisors.' },
-                { key: 'yard',       emoji: '🌿', title: 'Optimize Yard Checks',
-                  desc: 'Route a single person efficiently through all jobs currently in the Yard Check stage. Respects yard check #s (#4 is typically the last).' },
-                { key: 'warranty',   emoji: '🛡️', title: 'Optimize Warranties',
-                  desc: 'Same idea, but for jobs in the Warranty stage.' },
-                { key: 'both',       emoji: '🌿🛡️', title: 'Optimize Yard Checks + Warranties',
-                  desc: 'Combined route across both Yard Check and Warranty jobs.' },
-              ].map(opt => (
-                <button
-                  key={opt.key}
-                  onClick={() => setSchedAssistMode(opt.key)}
-                  className={`w-full flex items-start gap-3 p-3.5 rounded-xl border-2 text-left transition-colors ${
-                    schedAssistMode === opt.key
-                      ? 'border-indigo-500 bg-indigo-50'
-                      : 'border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/40'
-                  }`}
-                >
-                  <span className="text-2xl mt-0.5">{opt.emoji}</span>
-                  <div>
-                    <p className={`text-sm font-bold ${schedAssistMode === opt.key ? 'text-indigo-900' : 'text-gray-800'}`}>{opt.title}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{opt.desc}</p>
+            {/* ════ MODE PICKER VIEW ════ */}
+            {schedAssistView === 'mode' && (
+              <>
+                {/* Geocoding status — optimization can't run without lat/lon */}
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <p className="text-xs font-semibold text-gray-700">Geocoding status</p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        {geoStats.total > 0 ? (
+                          <>
+                            <span className="font-semibold text-gray-700">{geoStats.ok}</span> of {geoStats.total} jobs geocoded
+                            {geoStats.pending  > 0 && <> · <span className="text-amber-700">{geoStats.pending} pending</span></>}
+                            {geoStats.not_found > 0 && <> · <span className="text-gray-500">{geoStats.not_found} not found</span></>}
+                            {geoStats.error   > 0 && <> · <span className="text-red-600">{geoStats.error} errors</span></>}
+                          </>
+                        ) : 'Loading…'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={runGeocoder}
+                      disabled={geocoding || geoStats.pending === 0}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-indigo-700 text-white hover:bg-indigo-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+                    >
+                      {geocoding ? 'Geocoding…' : geoStats.pending === 0 ? 'All set' : 'Geocode pending jobs'}
+                    </button>
                   </div>
-                </button>
-              ))}
-            </div>
+                  {geoStats.total > 0 && (
+                    <div className="bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                      <div className="bg-green-600 h-1.5 transition-all"
+                           style={{ width: `${Math.round((geoStats.ok / geoStats.total) * 100)}%` }} />
+                    </div>
+                  )}
+                  {geoMsg && (
+                    <p className={`text-[11px] mt-2 ${geoMsg.startsWith('Error') ? 'text-red-600' : 'text-gray-500'}`}>{geoMsg}</p>
+                  )}
+                </div>
 
-            <div className="mt-5 flex items-center gap-2">
-              <button
-                disabled={!schedAssistMode}
-                onClick={() => {
-                  // Phase 1 stub — the actual optimization runs in Phase 2/3.
-                  alert(
-                    `Schedule Assistance: "${schedAssistMode}" is ready to wire up in Phase 2/3.\n\n` +
-                    `Phase 1 just confirms the entry point + mode picker. To unlock running it:\n` +
-                    `1) Run supabase-schedule-assistant-phase1.sql in Supabase.\n` +
-                    `2) Deploy the geocode-jobs edge function and set the GOOGLE_MAPS_API_KEY secret.\n` +
-                    `3) Bulk-geocode existing jobs (one-time pass).\n` +
-                    `Then we'll build the optimizer.`
-                  )
-                }}
-                className="flex-1 py-2.5 bg-indigo-700 text-white text-sm font-semibold rounded-xl hover:bg-indigo-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Run optimization
-              </button>
-              <button
-                onClick={() => setShowSchedAssist(false)}
-                className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-            </div>
-            <p className="text-[11px] text-gray-400 mt-3 text-center italic">Phase 1 of 3 — entry point and mode picker. Optimization logic ships next.</p>
+                <div className="space-y-2">
+                  {[
+                    { key: 'supervisor', emoji: '👥', title: 'Optimize Job Supervisor Assignment',
+                      desc: 'Cluster open jobs by location and balance them across your Job Supervisors. (Phase 3 — coming soon)' },
+                    { key: 'yard',       emoji: '🌿', title: 'Optimize Yard Checks',
+                      desc: 'Route a single person efficiently through all jobs currently in the Yard Check stage. Respects yard check #s.' },
+                    { key: 'warranty',   emoji: '🛡️', title: 'Optimize Warranties',
+                      desc: 'Same idea, but for jobs in the Warranty stage.' },
+                    { key: 'both',       emoji: '🌿🛡️', title: 'Optimize Yard Checks + Warranties',
+                      desc: 'Combined route across both Yard Check and Warranty jobs.' },
+                  ].map(opt => (
+                    <button
+                      key={opt.key}
+                      onClick={() => setSchedAssistMode(opt.key)}
+                      className={`w-full flex items-start gap-3 p-3.5 rounded-xl border-2 text-left transition-colors ${
+                        schedAssistMode === opt.key
+                          ? 'border-indigo-500 bg-indigo-50'
+                          : 'border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/40'
+                      }`}
+                    >
+                      <span className="text-2xl mt-0.5">{opt.emoji}</span>
+                      <div>
+                        <p className={`text-sm font-bold ${schedAssistMode === opt.key ? 'text-indigo-900' : 'text-gray-800'}`}>{opt.title}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{opt.desc}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-5 flex items-center gap-2">
+                  <button
+                    disabled={!schedAssistMode || schedAssistMode === 'supervisor'}
+                    onClick={() => { loadEligibleJobs(schedAssistMode); setSchedAssistView('configure') }}
+                    className="flex-1 py-2.5 bg-indigo-700 text-white text-sm font-semibold rounded-xl hover:bg-indigo-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {schedAssistMode === 'supervisor' ? 'Supervisor mode — Phase 3' : 'Next →'}
+                  </button>
+                  <button
+                    onClick={() => { setShowSchedAssist(false); setSchedAssistMode(null) }}
+                    className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* ════ CONFIGURE VIEW ════ */}
+            {schedAssistView === 'configure' && (
+              <>
+                <div className="space-y-4">
+                  {/* Start location */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Start location</label>
+                    {startLocations.length === 0 ? (
+                      <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                        No start locations saved. Go to Jobs → Settings → Start Locations to add one first.
+                      </div>
+                    ) : (
+                      <select
+                        value={pickedStartId}
+                        onChange={e => setPickedStartId(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        {startLocations.map(l => (
+                          <option key={l.id} value={l.id}>
+                            {l.label} — {l.address} {l.id === defaultStartId ? '★' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  {/* Dates */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">Start date</label>
+                      <input type="date" value={optStartDate}
+                        onChange={e => setOptStartDate(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">Spread across days</label>
+                      <input type="number" min="1" max="30" value={optDaysToSpread}
+                        onChange={e => setOptDaysToSpread(parseInt(e.target.value) || 1)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                    </div>
+                  </div>
+
+                  {/* Eligible jobs */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-xs font-semibold text-gray-600">
+                        Eligible jobs ({eligibleJobs.length - excludedJobIds.size} selected of {eligibleJobs.length})
+                      </label>
+                      <div className="flex gap-3">
+                        <button onClick={() => setExcludedJobIds(new Set())} className="text-xs text-indigo-700 hover:underline">Select all</button>
+                        <button onClick={() => setExcludedJobIds(new Set(eligibleJobs.map(j => j.id)))} className="text-xs text-gray-400 hover:underline">Clear</button>
+                      </div>
+                    </div>
+                    {eligibleLoading ? (
+                      <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-700" /></div>
+                    ) : eligibleJobs.length === 0 ? (
+                      <p className="text-xs text-gray-400 italic text-center py-4 bg-gray-50 rounded-lg">
+                        No eligible geocoded jobs found for this mode.
+                      </p>
+                    ) : (
+                      <div className="border border-gray-200 rounded-lg max-h-64 overflow-y-auto">
+                        {eligibleJobs.map(j => {
+                          const excluded = excludedJobIds.has(j.id)
+                          return (
+                            <label key={j.id} className={`flex items-center gap-2 px-3 py-1.5 text-sm border-b border-gray-100 last:border-b-0 cursor-pointer hover:bg-gray-50 ${excluded ? 'opacity-50' : ''}`}>
+                              <input type="checkbox" checked={!excluded}
+                                onChange={() => setExcludedJobIds(prev => {
+                                  const next = new Set(prev)
+                                  if (next.has(j.id)) next.delete(j.id); else next.add(j.id)
+                                  return next
+                                })}
+                                className="accent-indigo-600 flex-shrink-0" />
+                              <span className="flex-1 truncate text-gray-700">{j.name || j.client_name}</span>
+                              {j._yard_checks_used !== undefined && (
+                                <span className="text-[10px] font-mono text-gray-400 flex-shrink-0">YC {j._yard_checks_used}/{yardCheckTotal}</span>
+                              )}
+                            </label>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {optError && <p className="text-xs text-red-600">{optError}</p>}
+                </div>
+
+                <div className="mt-5 flex items-center gap-2">
+                  <button
+                    disabled={optimizing || eligibleJobs.length - excludedJobIds.size === 0 || !pickedStartId}
+                    onClick={runOptimization}
+                    className="flex-1 py-2.5 bg-indigo-700 text-white text-sm font-semibold rounded-xl hover:bg-indigo-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {optimizing ? 'Optimizing route…' : 'Run optimization'}
+                  </button>
+                  <button
+                    onClick={() => { setSchedAssistView('mode'); setOptError('') }}
+                    className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm hover:bg-gray-50"
+                  >
+                    ← Back
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* ════ RESULT VIEW ════ */}
+            {schedAssistView === 'result' && optResult && (
+              <>
+                {/* Totals summary */}
+                <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 mb-4 grid grid-cols-3 gap-3 text-center">
+                  <div>
+                    <p className="text-xs text-indigo-700">Stops</p>
+                    <p className="text-xl font-bold text-indigo-900">{optResult.totals.stops}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-indigo-700">Drive time</p>
+                    <p className="text-xl font-bold text-indigo-900">{optResult.totals.drive_minutes} min</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-indigo-700">Distance</p>
+                    <p className="text-xl font-bold text-indigo-900">{optResult.totals.drive_miles} mi</p>
+                  </div>
+                </div>
+
+                {/* Ordered route */}
+                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                  <div className="bg-gray-50 px-3 py-2 text-xs text-gray-500 border-b border-gray-200">
+                    Starting from <span className="font-semibold text-gray-700">{optResult.start.label}</span>
+                  </div>
+                  <div className="divide-y divide-gray-100">
+                    {optResult.ordered_jobs.map((job, idx) => {
+                      const leg = optResult.legs[idx] // drive from prev stop to this one
+                      return (
+                        <div key={job.id} className="flex items-center gap-2 px-3 py-2">
+                          <span className="w-6 text-center text-xs font-bold text-indigo-700 flex-shrink-0">#{idx + 1}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gray-800 truncate">{job.name || job.client_name}</p>
+                            <p className="text-[11px] text-gray-500 truncate">
+                              {leg ? `${Math.round(leg.minutes)} min drive` : ''}
+                              {job._yard_checks_used !== undefined && ` · Next yard check #${(job._yard_checks_used || 0) + 1}`}
+                            </p>
+                          </div>
+                          <div className="flex flex-col flex-shrink-0">
+                            <button onClick={() => reorderRouteJob(idx, -1)} disabled={idx === 0}
+                              className="text-gray-300 hover:text-indigo-600 disabled:opacity-30 text-xs leading-none p-0.5">▲</button>
+                            <button onClick={() => reorderRouteJob(idx, 1)} disabled={idx === optResult.ordered_jobs.length - 1}
+                              className="text-gray-300 hover:text-indigo-600 disabled:opacity-30 text-xs leading-none p-0.5">▼</button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-gray-400 mt-3 italic">
+                  Applying will create {optResult.ordered_jobs.length} schedule item{optResult.ordered_jobs.length === 1 ? '' : 's'} starting {optStartDate}, distributed across {optDaysToSpread} day{optDaysToSpread === 1 ? '' : 's'}.
+                </p>
+
+                <div className="mt-5 flex items-center gap-2">
+                  <button
+                    disabled={applying}
+                    onClick={applyOptimization}
+                    className="flex-1 py-2.5 bg-green-700 text-white text-sm font-semibold rounded-xl hover:bg-green-800 disabled:opacity-40 transition-colors"
+                  >
+                    {applying ? 'Applying…' : '✓ Apply & Schedule'}
+                  </button>
+                  <button
+                    onClick={() => setSchedAssistView('configure')}
+                    className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm hover:bg-gray-50"
+                  >
+                    ← Back
+                  </button>
+                </div>
+              </>
+            )}
+
+            </div>{/* end scroll body */}
           </div>
         </div>
       )}
