@@ -1058,9 +1058,22 @@ export default function JobsList() {
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-600 mb-1">Spread across days</label>
-                      <input type="number" min="1" max="30" value={optDaysToSpread}
-                        onChange={e => setOptDaysToSpread(parseInt(e.target.value) || 1)}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={optDaysToSpread}
+                        onChange={e => {
+                          // Accept only digits; let user clear the field while typing.
+                          const v = e.target.value.replace(/\D/g, '')
+                          setOptDaysToSpread(v === '' ? '' : Math.max(1, Math.min(parseInt(v), 30)))
+                        }}
+                        onBlur={e => {
+                          // Snap back to 1 if the user left the field empty.
+                          if (e.target.value === '' || parseInt(e.target.value) < 1) setOptDaysToSpread(1)
+                        }}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
                     </div>
                   </div>
 
@@ -1145,35 +1158,68 @@ export default function JobsList() {
                   </div>
                 </div>
 
-                {/* Ordered route */}
-                <div className="border border-gray-200 rounded-xl overflow-hidden">
-                  <div className="bg-gray-50 px-3 py-2 text-xs text-gray-500 border-b border-gray-200">
-                    Starting from <span className="font-semibold text-gray-700">{optResult.start.label}</span>
-                  </div>
-                  <div className="divide-y divide-gray-100">
-                    {optResult.ordered_jobs.map((job, idx) => {
-                      const leg = optResult.legs[idx] // drive from prev stop to this one
-                      return (
-                        <div key={job.id} className="flex items-center gap-2 px-3 py-2">
-                          <span className="w-6 text-center text-xs font-bold text-indigo-700 flex-shrink-0">#{idx + 1}</span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-gray-800 truncate">{job.name || job.client_name}</p>
-                            <p className="text-[11px] text-gray-500 truncate">
-                              {leg ? `${Math.round(leg.minutes)} min drive` : ''}
-                              {job._yard_checks_used !== undefined && ` · Next yard check #${(job._yard_checks_used || 0) + 1}`}
-                            </p>
+                {/* Ordered route — grouped by day so user sees the spread */}
+                {(() => {
+                  const days = Math.max(1, Math.min(parseInt(optDaysToSpread) || 1, optResult.ordered_jobs.length))
+                  const jobsPerDay = Math.ceil(optResult.ordered_jobs.length / days)
+                  // Build day buckets
+                  const buckets = []
+                  for (let d = 0; d < days; d++) {
+                    const startIdx = d * jobsPerDay
+                    const endIdx   = Math.min(startIdx + jobsPerDay, optResult.ordered_jobs.length)
+                    if (startIdx >= optResult.ordered_jobs.length) break
+                    const date = new Date(optStartDate + 'T00:00:00')
+                    date.setDate(date.getDate() + d)
+                    buckets.push({
+                      dayNum: d + 1,
+                      date,
+                      dateStr: date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+                      stops: optResult.ordered_jobs.slice(startIdx, endIdx).map((job, i) => ({ job, globalIdx: startIdx + i })),
+                    })
+                  }
+                  return (
+                    <div className="space-y-3">
+                      <p className="text-xs text-gray-500">
+                        Starting from <span className="font-semibold text-gray-700">{optResult.start.label}</span>
+                      </p>
+                      {buckets.map(bucket => (
+                        <div key={bucket.dayNum} className="border border-gray-200 rounded-xl overflow-hidden">
+                          <div className="bg-indigo-50 border-b border-indigo-200 px-3 py-2 flex items-center justify-between">
+                            <span className="text-xs font-bold text-indigo-900 uppercase tracking-wide">
+                              Day {bucket.dayNum} · {bucket.dateStr}
+                            </span>
+                            <span className="text-[11px] text-indigo-700 font-semibold">
+                              {bucket.stops.length} stop{bucket.stops.length === 1 ? '' : 's'}
+                            </span>
                           </div>
-                          <div className="flex flex-col flex-shrink-0">
-                            <button onClick={() => reorderRouteJob(idx, -1)} disabled={idx === 0}
-                              className="text-gray-300 hover:text-indigo-600 disabled:opacity-30 text-xs leading-none p-0.5">▲</button>
-                            <button onClick={() => reorderRouteJob(idx, 1)} disabled={idx === optResult.ordered_jobs.length - 1}
-                              className="text-gray-300 hover:text-indigo-600 disabled:opacity-30 text-xs leading-none p-0.5">▼</button>
+                          <div className="divide-y divide-gray-100">
+                            {bucket.stops.map(({ job, globalIdx }) => {
+                              const leg = optResult.legs[globalIdx]
+                              return (
+                                <div key={job.id} className="flex items-center gap-2 px-3 py-2">
+                                  <span className="w-6 text-center text-xs font-bold text-indigo-700 flex-shrink-0">#{globalIdx + 1}</span>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-semibold text-gray-800 truncate">{job.name || job.client_name}</p>
+                                    <p className="text-[11px] text-gray-500 truncate">
+                                      {leg ? `${Math.round(leg.minutes)} min drive` : ''}
+                                      {job._yard_checks_used !== undefined && ` · Next yard check #${(job._yard_checks_used || 0) + 1}`}
+                                    </p>
+                                  </div>
+                                  <div className="flex flex-col flex-shrink-0">
+                                    <button onClick={() => reorderRouteJob(globalIdx, -1)} disabled={globalIdx === 0}
+                                      className="text-gray-300 hover:text-indigo-600 disabled:opacity-30 text-xs leading-none p-0.5">▲</button>
+                                    <button onClick={() => reorderRouteJob(globalIdx, 1)} disabled={globalIdx === optResult.ordered_jobs.length - 1}
+                                      className="text-gray-300 hover:text-indigo-600 disabled:opacity-30 text-xs leading-none p-0.5">▼</button>
+                                  </div>
+                                </div>
+                              )
+                            })}
                           </div>
                         </div>
-                      )
-                    })}
-                  </div>
-                </div>
+                      ))}
+                    </div>
+                  )
+                })()}
 
                 <p className="text-[11px] text-gray-400 mt-3 italic">
                   Applying will create {optResult.ordered_jobs.length} schedule item{optResult.ordered_jobs.length === 1 ? '' : 's'} starting {optStartDate}, distributed across {optDaysToSpread} day{optDaysToSpread === 1 ? '' : 's'}.
