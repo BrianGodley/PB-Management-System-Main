@@ -133,6 +133,9 @@ export default function JobsList() {
   const [showExceptions,    setShowExceptions]    = useState(false)
   const [exceptionsCount,   setExceptionsCount]   = useState(0)
   const [addScheduleTrigger, setAddScheduleTrigger] = useState(0)
+  // When a job is moved into the Yard Check stage we bump this so the
+  // ScheduleCalendar auto-opens the yard check config modal for that job.
+  const [yardCheckTrigger, setYardCheckTrigger] = useState(null) // { jobId, ts } | null
   const [isAdmin,    setIsAdmin]    = useState(false)
 
   useEffect(() => { fetchJobs(); fetchStages() }, [])
@@ -189,8 +192,20 @@ export default function JobsList() {
   }
 
   async function moveJobToStage(jobId, stageId) {
+    // Detect whether the destination is a Yard Check stage BEFORE we mutate
+    // anything, so we can fire the auto-trigger after the DB write succeeds.
+    const targetStage = stages.find(s => s.id === stageId)
+    const isYardCheck = !!targetStage && /yard\s*check/i.test(targetStage.name || '')
+
     await supabase.from('jobs').update({ stage_id: stageId }).eq('id', jobId)
     setJobs(prev => prev.map(j => j.id === jobId ? { ...j, stage_id: stageId } : j))
+
+    if (isYardCheck) {
+      // Make sure the Schedule tab is visible so the modal can render, then
+      // bump the trigger. The user can close the modal to skip scheduling.
+      setTab('schedule')
+      setYardCheckTrigger({ jobId, ts: Date.now() })
+    }
   }
 
   async function fetchJobs() {
@@ -484,6 +499,7 @@ export default function JobsList() {
               onSetShowExceptions={setShowExceptions}
               onExceptionsLoaded={setExceptionsCount}
               addScheduleTrigger={addScheduleTrigger}
+              yardCheckTrigger={yardCheckTrigger}
             />
           )}
 

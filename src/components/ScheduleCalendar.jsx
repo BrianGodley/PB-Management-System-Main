@@ -775,7 +775,19 @@ function WorkdayExceptionsModal({ exceptions, onAdd, onDelete, onClose, recalcul
   )
 }
 
-export default function ScheduleCalendar({ jobs = [], selectedJob, showExceptionsExternal, onSetShowExceptions, onExceptionsLoaded, addScheduleTrigger = 0 }) {
+export default function ScheduleCalendar({
+  jobs = [],
+  selectedJob,
+  showExceptionsExternal,
+  onSetShowExceptions,
+  onExceptionsLoaded,
+  addScheduleTrigger = 0,
+  // Auto-open the Yard Check schedule modal for a specific job. Used by the
+  // parent (JobsList) when a job is moved to the Yard Check stage. Pass an
+  // object like { jobId, ts } and bump `ts` to re-trigger; the modal opens
+  // for whatever jobId is set. User can close to skip.
+  yardCheckTrigger = null,
+}) {
   const today = new Date()
   const [year,  setYear]  = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
@@ -859,6 +871,44 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
     setScheduledWOIds(alreadyScheduled)
     setWorkOrders(woRes.data || [])
     setWoLoading(false)
+  }
+
+  // Open the Yard Check config modal preloaded with a single job. Used when:
+  //   - User picks a job first via Add Schedule then chooses "Yard Check"
+  //   - A job is moved to the Yard Check stage (auto-triggered from JobsList)
+  // Skips the multi-job selection step entirely — we already know which job
+  // the schedule is for, so just gather it into ycJobs/ycSelected and jump
+  // straight to the configuration phase.
+  async function startYardCheckForJob(jobId) {
+    if (!jobId) return
+    // Reset yard check state to a clean slate
+    setYcOptOrder([])
+    setYcStartDate('')
+    setYcWeeks(4)
+    setYcOptimize(false)
+
+    // Try to find the job in the parent's `jobs` prop first; fall back to a
+    // DB lookup if it isn't there (e.g. when triggered from a stage change
+    // before the parent list has refreshed).
+    let job = jobs.find(j => j.id === jobId)
+    if (!job) {
+      const { data } = await supabase.from('jobs')
+        .select('id, client_name, job_address, job_city, job_state, job_zip')
+        .eq('id', jobId).maybeSingle()
+      if (!data) return
+      job = data
+    }
+    setYcJobs([{
+      id:           job.id,
+      client_name:  job.client_name || job.name || '',
+      job_address:  job.job_address || '',
+      job_city:     job.job_city || '',
+      job_state:    job.job_state || '',
+      job_zip:      job.job_zip || '',
+    }])
+    setYcSelected(new Set([jobId]))
+    setModalJobId(jobId)
+    setPhase('yard-check-config')
   }
 
   async function fetchYardCheckJobs() {
@@ -1116,6 +1166,15 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
   // Respond to external "Add Schedule" button in parent sidebar
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (addScheduleTrigger > 0) handleAddNew() }, [addScheduleTrigger])
+
+  // Auto-open the Yard Check config modal when the parent signals a stage
+  // change to Yard Check. The user can close it to skip scheduling.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (yardCheckTrigger && yardCheckTrigger.jobId) {
+      startYardCheckForJob(yardCheckTrigger.jobId)
+    }
+  }, [yardCheckTrigger?.ts])
 
   function handleItemClick(e, item) {
     if (e) e.stopPropagation()
@@ -1495,13 +1554,13 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
                 </div>
               </button>
               <button
-                onClick={() => { fetchYardCheckJobs(); setPhase('yard-check-select') }}
+                onClick={() => { startYardCheckForJob(modalJobId) }}
                 className="w-full flex items-start gap-3 p-3.5 rounded-xl border-2 border-gray-200 hover:border-teal-500 hover:bg-teal-50 text-left transition-colors group"
               >
                 <span className="text-xl mt-0.5">🌿</span>
                 <div>
                   <p className="text-sm font-bold text-gray-800 group-hover:text-teal-800">Yard Check & Maintenance</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Schedule recurring yard checks for Yard Check stage jobs. Supports route optimization.</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Schedule recurring yard checks for this job. Set start date and how many checks to schedule.</p>
                 </div>
               </button>
               <button
@@ -1997,9 +2056,13 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-base font-bold text-gray-800">Configure Yard Checks</h3>
-                    <p className="text-xs text-teal-700 font-medium mt-0.5">{ycSelected.size} job{ycSelected.size !== 1 ? 's' : ''} selected</p>
+                    <p className="text-xs text-teal-700 font-medium mt-0.5">
+                      {modalJobId && jobMap[modalJobId]
+                        ? jobMap[modalJobId]
+                        : `${ycSelected.size} job${ycSelected.size !== 1 ? 's' : ''} selected`}
+                    </p>
                   </div>
-                  <button onClick={() => setPhase('yard-check-select')} className="text-xs text-gray-400 hover:text-gray-600">← Back</button>
+                  <button onClick={() => setPhase('type-select')} className="text-xs text-gray-400 hover:text-gray-600">← Back</button>
                 </div>
               </div>
 
