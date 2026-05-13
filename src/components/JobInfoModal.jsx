@@ -28,6 +28,14 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
   const [city,           setCity]           = useState(job.job_city || '')
   const [state,          setState]          = useState(job.job_state || '')
   const [zip,            setZip]            = useState(job.job_zip || '')
+  // Contract price prefers the modern total_price column, falls back to the
+  // legacy contract_price for older job rows. Stored as a string while editing
+  // so we don't fight the input over partial values like "12500." or "".
+  const [contractPrice,  setContractPrice]  = useState(() => {
+    const v = job.total_price ?? job.contract_price ?? ''
+    return v === '' || v === null || v === undefined ? '' : String(v)
+  })
+  const [permitNumber,   setPermitNumber]   = useState(job.permit_number || '')
   const [consultant,     setConsultant]     = useState(job.consultant || '')
   const [projectManager, setProjectManager] = useState(job.project_manager || '')
 
@@ -48,6 +56,8 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
     if (!jobTitle.trim()) { setError('Job title cannot be empty.'); return }
     setSaving(true)
     setError('')
+    // Coerce the contract price string back to a number; blank/invalid → null
+    const cpNum = contractPrice === '' ? null : parseFloat(contractPrice)
     const ok = await onSave(job.id, {
       name:            jobTitle.trim(),
       status,
@@ -55,6 +65,8 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
       job_city:        city.trim(),
       job_state:       state.trim(),
       job_zip:         zip.trim(),
+      total_price:     Number.isFinite(cpNum) ? cpNum : null,
+      permit_number:   permitNumber.trim() || null,
       consultant:      consultant || null,
       project_manager: projectManager || null,
     })
@@ -73,7 +85,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
       onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-[480px] overflow-hidden flex flex-col" style={{ maxHeight: '90vh' }}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col" style={{ maxHeight: '90vh' }}>
 
         {/* Header */}
         <div className="px-5 pt-5 pb-3 border-b border-gray-100 flex items-start justify-between flex-shrink-0">
@@ -115,8 +127,9 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
               {/* Main Details */}
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Main Details</p>
-                <div className="space-y-3">
 
+                {/* Row 1: Status + Job Title (Job Title takes 2 cols on wide screens) */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">Status</label>
                     <select
@@ -128,9 +141,8 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
                       <option value="completed">Closed</option>
                     </select>
                   </div>
-
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Job Title</label>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs text-gray-500 mb-1">Job Name</label>
                     <input
                       type="text"
                       value={jobTitle}
@@ -139,61 +151,91 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
                       placeholder="Job name"
                     />
                   </div>
+                </div>
 
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Street Address</label>
+                {/* Row 2: Street Address (full width) */}
+                <div className="mb-3">
+                  <label className="block text-xs text-gray-500 mb-1">Job Street Address</label>
+                  <input
+                    type="text"
+                    value={address}
+                    onChange={e => setAddress(e.target.value)}
+                    className="input text-sm w-full"
+                    placeholder="123 Main St"
+                  />
+                </div>
+
+                {/* Row 3: City, State, Zip */}
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                  <div className="col-span-1">
+                    <label className="block text-xs text-gray-500 mb-1">Job City</label>
                     <input
                       type="text"
-                      value={address}
-                      onChange={e => setAddress(e.target.value)}
+                      value={city}
+                      onChange={e => setCity(e.target.value)}
                       className="input text-sm w-full"
-                      placeholder="123 Main St"
+                      placeholder="City"
                     />
                   </div>
-
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="col-span-1">
-                      <label className="block text-xs text-gray-500 mb-1">City</label>
-                      <input
-                        type="text"
-                        value={city}
-                        onChange={e => setCity(e.target.value)}
-                        className="input text-sm w-full"
-                        placeholder="City"
-                      />
-                    </div>
-                    <div className="col-span-1">
-                      <label className="block text-xs text-gray-500 mb-1">State</label>
-                      <input
-                        type="text"
-                        value={state}
-                        onChange={e => setState(e.target.value)}
-                        className="input text-sm w-full"
-                        placeholder="CA"
-                        maxLength={2}
-                      />
-                    </div>
-                    <div className="col-span-1">
-                      <label className="block text-xs text-gray-500 mb-1">Zip</label>
-                      <input
-                        type="text"
-                        value={zip}
-                        onChange={e => setZip(e.target.value)}
-                        className="input text-sm w-full"
-                        placeholder="90210"
-                        maxLength={10}
-                      />
-                    </div>
+                  <div className="col-span-1">
+                    <label className="block text-xs text-gray-500 mb-1">Job State</label>
+                    <input
+                      type="text"
+                      value={state}
+                      onChange={e => setState(e.target.value)}
+                      className="input text-sm w-full"
+                      placeholder="CA"
+                      maxLength={2}
+                    />
                   </div>
+                  <div className="col-span-1">
+                    <label className="block text-xs text-gray-500 mb-1">Job Zip Code</label>
+                    <input
+                      type="text"
+                      value={zip}
+                      onChange={e => setZip(e.target.value)}
+                      className="input text-sm w-full"
+                      placeholder="90210"
+                      maxLength={10}
+                    />
+                  </div>
+                </div>
 
+                {/* Row 4: Contract Price + Permit # */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Job Total Contract Price</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={contractPrice}
+                        onChange={e => setContractPrice(e.target.value)}
+                        className="input text-sm w-full pl-7"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-1">Pulled from the sold bid; edit if the contract has changed.</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Permit #</label>
+                    <input
+                      type="text"
+                      value={permitNumber}
+                      onChange={e => setPermitNumber(e.target.value)}
+                      className="input text-sm w-full"
+                      placeholder="e.g. BLD-2026-00123"
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* More Details */}
+              {/* Assignments */}
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">More Details</p>
-                <div className="space-y-3">
-
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Assignments</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs text-gray-500 mb-1">Consultant</label>
                     <select
@@ -207,21 +249,19 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
                       ))}
                     </select>
                   </div>
-
                   <div>
-                    <label className="block text-xs text-gray-500 mb-1">Project Manager</label>
+                    <label className="block text-xs text-gray-500 mb-1">Job Supervisor</label>
                     <select
                       value={projectManager}
                       onChange={e => setProjectManager(e.target.value)}
                       className="input text-sm w-full"
                     >
-                      <option value="">— Select project manager —</option>
+                      <option value="">— Select job supervisor —</option>
                       {employeeOptions.map(o => (
                         <option key={o.value} value={o.value}>{o.label}</option>
                       ))}
                     </select>
                   </div>
-
                 </div>
               </div>
 
@@ -261,7 +301,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
                   )}
                   {projectManager && (
                     <div>
-                      <p className="text-xs text-gray-400 mb-0.5">Project Manager</p>
+                      <p className="text-xs text-gray-400 mb-0.5">Job Supervisor</p>
                       <p className="text-sm font-medium text-gray-800">{projectManager}</p>
                     </div>
                   )}
