@@ -58,8 +58,21 @@ function MoveJobModal({ job, stages, onMove, onClose }) {
   )
 }
 
-function JobItem({ job, stages, selectedJob, setSelectedJob, setJobModal, onMove }) {
+function JobItem({ job, stages, selectedJob, setSelectedJob, setJobModal, onMove, clientPhoneMap = { byId: {}, byName: {} } }) {
   const [showMoveModal, setShowMoveModal] = useState(false)
+  // Mouse-tracking tooltip state: { x, y } when active, null when hidden.
+  const [hoverPos, setHoverPos] = useState(null)
+
+  // Resolve the client phone for this job. Prefer client_id; fall back to
+  // a case-insensitive name match for older imports where client_id is null.
+  const clientPhone = (() => {
+    if (job.client_id && clientPhoneMap.byId[job.client_id]) return clientPhoneMap.byId[job.client_id]
+    const key = (job.client_name || '').trim().toLowerCase()
+    return key ? (clientPhoneMap.byName[key] || '') : ''
+  })()
+
+  const addressLine = [job.job_city, job.job_state, job.job_zip].filter(Boolean).join(', ')
+  const hasAnyDetail = job.job_address || addressLine || clientPhone
 
   return (
     <>
@@ -77,11 +90,38 @@ function JobItem({ job, stages, selectedJob, setSelectedJob, setJobModal, onMove
           selectedJob === job.id ? 'bg-green-50 border border-green-200' : 'hover:bg-gray-100 border border-transparent'
         }`}
       >
-        <button className="flex-1 px-2 py-1.5 text-xs min-w-0 text-left">
+        <button
+          className="flex-1 px-2 py-1.5 text-xs min-w-0 text-left"
+          onMouseEnter={e => setHoverPos({ x: e.clientX, y: e.clientY })}
+          onMouseMove={e => setHoverPos({ x: e.clientX, y: e.clientY })}
+          onMouseLeave={() => setHoverPos(null)}
+        >
           <p className={`font-bold truncate ${selectedJob === job.id ? 'text-green-800' : 'text-gray-800'}`}>
             {job.name || job.client_name}
           </p>
         </button>
+
+        {/* Mouse-following info tooltip — fixed so it floats above everything */}
+        {hoverPos && hasAnyDetail && (
+          <div
+            className="fixed z-[100] pointer-events-none bg-white border border-gray-200 shadow-xl rounded-lg px-3 py-2 text-xs max-w-xs"
+            style={{
+              left: Math.min(hoverPos.x + 14, window.innerWidth  - 260),
+              top:  Math.min(hoverPos.y + 14, window.innerHeight - 110),
+            }}
+          >
+            <p className="font-bold text-gray-900 truncate">{job.name || job.client_name}</p>
+            {job.job_address && (
+              <p className="text-gray-700 mt-0.5 truncate">{job.job_address}</p>
+            )}
+            {addressLine && (
+              <p className="text-gray-700 truncate">{addressLine}</p>
+            )}
+            {clientPhone && (
+              <p className="text-gray-600 mt-1">📱 {clientPhone}</p>
+            )}
+          </div>
+        )}
         {/* Move stage button */}
         <button
           onClick={e => { e.stopPropagation(); setShowMoveModal(true) }}
@@ -136,9 +176,32 @@ export default function JobsList() {
   // When a job is moved into the Yard Check stage we bump this so the
   // ScheduleCalendar auto-opens the yard check config modal for that job.
   const [yardCheckTrigger, setYardCheckTrigger] = useState(null) // { jobId, ts } | null
+  // Lookup tables for the hover tooltip on job names. Built once after
+  // fetching clients. byId is keyed by clients.id; byName is keyed by a
+  // normalized client name (lowercased + trimmed) so older BT-imported
+  // jobs without a client_id still resolve.
+  const [clientPhoneMap, setClientPhoneMap] = useState({ byId: {}, byName: {} })
   const [isAdmin,    setIsAdmin]    = useState(false)
 
-  useEffect(() => { fetchJobs(); fetchStages() }, [])
+  useEffect(() => { fetchJobs(); fetchStages(); fetchClientPhones() }, [])
+
+  // Build phone lookup maps for the JobItem hover tooltip. We only need a
+  // few fields so the query stays light even with thousands of clients.
+  async function fetchClientPhones() {
+    const { data } = await supabase.from('clients')
+      .select('id, name, first_name, last_name, phone')
+    if (!data) return
+    const byId   = {}
+    const byName = {}
+    for (const c of data) {
+      const phone = c.phone || ''
+      if (!phone) continue
+      byId[c.id] = phone
+      const full = (c.name || `${c.first_name || ''} ${c.last_name || ''}`).trim().toLowerCase()
+      if (full) byName[full] = phone
+    }
+    setClientPhoneMap({ byId, byName })
+  }
 
   // Gate Settings tab to admin / super_admin only
   useEffect(() => {
@@ -465,6 +528,7 @@ export default function JobsList() {
                             setSelectedJob={setSelectedJob}
                             setJobModal={setJobModal}
                             onMove={moveJobToStage}
+                            clientPhoneMap={clientPhoneMap}
                           />
                         ))}
                         {stageJobs.length === 0 && isOver && (
