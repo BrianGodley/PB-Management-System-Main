@@ -1083,6 +1083,9 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
     if (month === 11) { setMonth(0); setYear(y => y + 1) }
     else setMonth(m => m + 1)
   }
+  function prevYear()  { setYear(y => y - 1) }
+  function nextYear()  { setYear(y => y + 1) }
+  function goToToday() { setMonth(today.getMonth()); setYear(today.getFullYear()) }
 
   function handleDayClick(day) {
     const ds = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
@@ -1291,21 +1294,53 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
   const todayStr = dateStr(today)
 
   // Month navigation header (shared between mobile and desktop)
-  const MonthNav = () => (
-    <div className="flex items-center justify-between mb-3">
-      <button onClick={prevMonth} className="p-2 rounded-lg hover:bg-gray-100 text-gray-600">
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-      </button>
-      <h3 className="text-sm font-bold text-gray-800">{MONTH_NAMES[month]} {year}</h3>
-      <button onClick={nextMonth} className="p-2 rounded-lg hover:bg-gray-100 text-gray-600">
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-      </button>
-    </div>
-  )
+  // Compact group of controls centered together: << < Month Year [Today] > >>
+  const MonthNav = ({ compact = false } = {}) => {
+    const isCurrent = month === today.getMonth() && year === today.getFullYear()
+    const btn = compact
+      ? 'p-1 rounded hover:bg-gray-100 text-gray-600'
+      : 'p-1.5 rounded-lg hover:bg-gray-100 text-gray-600'
+    const dblBtn = btn + ' text-gray-500'
+    return (
+      <div className={`flex items-center justify-center gap-1 ${compact ? 'mb-2' : 'mb-3'}`}>
+        <button onClick={prevYear} className={dblBtn} title="Previous year">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+          </svg>
+        </button>
+        <button onClick={prevMonth} className={btn} title="Previous month">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <h3 className="text-sm font-bold text-gray-800 min-w-[8.5rem] text-center px-1">
+          {MONTH_NAMES[month]} {year}
+        </h3>
+        <button onClick={nextMonth} className={btn} title="Next month">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+        <button onClick={nextYear} className={dblBtn} title="Next year">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+          </svg>
+        </button>
+        <button
+          onClick={goToToday}
+          disabled={isCurrent}
+          className={`ml-2 text-xs font-semibold px-2.5 py-1 rounded-md border transition-colors ${
+            isCurrent
+              ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-default'
+              : 'border-green-700 text-green-700 hover:bg-green-50'
+          }`}
+          title="Jump to current month"
+        >
+          Today
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col select-none">
@@ -1358,19 +1393,7 @@ export default function ScheduleCalendar({ jobs = [], selectedJob, showException
 
         {/* Month navigation + day headers — sticky */}
         <div className="sticky top-0 z-10 bg-white pb-0">
-          <div className="flex items-center justify-between mb-2 gap-2">
-            <button onClick={prevMonth} className="p-1.5 rounded hover:bg-gray-100 text-gray-600 flex-shrink-0">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <h3 className="text-sm font-bold text-gray-800">{MONTH_NAMES[month]} {year}</h3>
-            <button onClick={nextMonth} className="p-1.5 rounded hover:bg-gray-100 text-gray-600 flex-shrink-0">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          </div>
+          <MonthNav compact />
 
           <div className="grid grid-cols-7 border-l border-t border-gray-200">
             {DAY_NAMES.map(d => (

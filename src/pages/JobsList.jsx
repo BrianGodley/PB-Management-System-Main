@@ -458,7 +458,7 @@ export default function JobsList() {
                 return (
                   <>
                     {byStage['__none__'].length > 0 && <StageSection stageId="__none__" label="Unassigned" />}
-                    {stages.map(s => <StageSection key={s.id} stageId={s.id} label={s.name} />)}
+                    {stages.map((s, idx) => <StageSection key={s.id} stageId={s.id} label={`${idx + 1} - ${s.name}`} />)}
                     {sorted.length === 0 && <p className="text-xs text-gray-400 text-center py-6">No jobs found.</p>}
                   </>
                 )
