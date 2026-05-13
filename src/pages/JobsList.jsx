@@ -668,6 +668,153 @@ function getWeekRangeStr(startDay) {
   return `${fmt(start)} – ${fmt(end)}`
 }
 
+// ── Task Lists Settings ───────────────────────────────────────────────────────
+// Manages two predefined lists used by the Tasks panel: Task Categories and
+// Task Descriptions. Each is a simple add / rename / delete CRUD over its own
+// table. Categories drive the first column dropdown; descriptions drive
+// autocomplete suggestions for the second column.
+function TaskListsSettings() {
+  const [tab, setTab] = useState('categories') // 'categories' | 'descriptions'
+  return (
+    <div className="max-w-2xl space-y-4">
+      <div className="flex border-b border-gray-200">
+        {[
+          { key: 'categories',   label: 'Task Categories' },
+          { key: 'descriptions', label: 'Task Descriptions' },
+        ].map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              tab === t.key ? 'border-green-700 text-green-800' : 'border-transparent text-gray-500 hover:text-gray-800'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {tab === 'categories'   && <SimpleListEditor table="task_categories"   title="Task Categories"
+        helper="Categories appear in the first column dropdown when creating tasks." />}
+      {tab === 'descriptions' && <SimpleListEditor table="task_descriptions" title="Task Descriptions"
+        helper="Descriptions appear as autocomplete suggestions in the task description column. Users can also type custom descriptions." />}
+    </div>
+  )
+}
+
+// ── SimpleListEditor ──────────────────────────────────────────────────────────
+// Reusable add / rename / delete editor for a flat name+sort_order table.
+// Used by Task Categories and Task Descriptions in Settings → Task Lists.
+function SimpleListEditor({ table, title, helper }) {
+  const [items, setItems]         = useState([])
+  const [loading, setLoading]     = useState(true)
+  const [newName, setNewName]     = useState('')
+  const [editingId, setEditingId] = useState(null)
+  const [editingName, setEditingName] = useState('')
+
+  useEffect(() => { fetchItems() }, [table])
+
+  async function fetchItems() {
+    setLoading(true)
+    const { data } = await supabase.from(table).select('*').order('sort_order').order('name')
+    setItems(data || [])
+    setLoading(false)
+  }
+
+  async function add() {
+    const name = newName.trim()
+    if (!name) return
+    const maxOrder = items.reduce((m, i) => Math.max(m, i.sort_order || 0), 0)
+    const { data, error } = await supabase.from(table)
+      .insert({ name, sort_order: maxOrder + 1 }).select().single()
+    if (error) { alert(error.message); return }
+    setItems(prev => [...prev, data])
+    setNewName('')
+  }
+
+  async function rename(id, name) {
+    const trimmed = name.trim()
+    if (!trimmed) { setEditingId(null); return }
+    await supabase.from(table).update({ name: trimmed }).eq('id', id)
+    setItems(prev => prev.map(i => i.id === id ? { ...i, name: trimmed } : i))
+    setEditingId(null)
+  }
+
+  async function remove(id) {
+    if (!confirm(`Delete this ${title.toLowerCase().replace(/s$/, '')}?`)) return
+    await supabase.from(table).delete().eq('id', id)
+    setItems(prev => prev.filter(i => i.id !== id))
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <h2 className="text-base font-bold text-gray-800 mb-1">{title}</h2>
+      {helper && <p className="text-sm text-gray-500 mb-4">{helper}</p>}
+
+      {/* Add new */}
+      <div className="flex gap-2 mb-4">
+        <input
+          type="text" value={newName}
+          onChange={e => setNewName(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') add() }}
+          placeholder={`New ${title.toLowerCase().replace(/s$/, '')}…`}
+          className="input text-sm flex-1"
+        />
+        <button onClick={add} className="btn-primary text-sm px-4 py-2">Add</button>
+      </div>
+
+      {/* List */}
+      {loading ? (
+        <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-700" /></div>
+      ) : items.length === 0 ? (
+        <p className="text-sm text-gray-400 italic text-center py-4">None yet — add one above.</p>
+      ) : (
+        <div className="space-y-1.5">
+          {items.map((item, idx) => (
+            <div key={item.id} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors">
+              <span className="text-xs font-bold text-blue-900 w-6 text-center flex-shrink-0 bg-blue-50 border border-blue-200 rounded px-1 py-0.5">
+                {idx + 1}
+              </span>
+              {editingId === item.id ? (
+                <input
+                  autoFocus type="text" value={editingName}
+                  onChange={e => setEditingName(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') rename(item.id, editingName)
+                    if (e.key === 'Escape') setEditingId(null)
+                  }}
+                  onBlur={() => rename(item.id, editingName)}
+                  className="input text-sm flex-1 py-0.5"
+                />
+              ) : (
+                <span className="flex-1 text-sm font-medium text-gray-700">{item.name}</span>
+              )}
+              <button
+                onClick={() => { setEditingId(item.id); setEditingName(item.name) }}
+                className="text-gray-400 hover:text-gray-700 p-1 rounded hover:bg-gray-200"
+                title="Rename"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 0l.172.172a2 2 0 010 2.828L12 16H9v-3z" />
+                </svg>
+              </button>
+              <button
+                onClick={() => remove(item.id)}
+                className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50"
+                title="Delete"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Job Schedule Settings ─────────────────────────────────────────────────────
 function JobScheduleSettings({ stages = [], onAddStage, onUpdateStage, onDeleteStage, onReorderStages }) {
   const [settingsTab,     setSettingsTab]     = useState('general')
@@ -722,6 +869,7 @@ function JobScheduleSettings({ stages = [], onAddStage, onUpdateStage, onDeleteS
         {[
           { key: 'general',   label: '⚙️ General'   },
           { key: 'stages',    label: '🪜 Job Stages' },
+          { key: 'task-lists',label: '✅ Task Lists' },
           { key: 'templates', label: '📋 Templates'  },
           { key: 'crews',     label: '👷 Master Crews' },
         ].map(t => (
@@ -782,6 +930,8 @@ function JobScheduleSettings({ stages = [], onAddStage, onUpdateStage, onDeleteS
       </div>
 
       </div>}
+
+      {settingsTab === 'task-lists' && <TaskListsSettings />}
 
       {settingsTab === 'stages' && <div className="max-w-2xl space-y-6">
       {/* Job Stages */}
@@ -1673,40 +1823,72 @@ function JobChangeOrdersPanel({ job }) {
 }
 
 // ── Job Tasks Panel ───────────────────────────────────────────────────────────
+// Table-based tasks for a single job. Columns: ✓ status, Category, Description,
+// Assignee, Due Date. Each cell is inline-editable; changes autosave on blur.
+// "+ Add Task" inserts an empty editable row.
+//
+// Lookup data:
+//   - Category    → task_categories table
+//   - Description → free-text input with autocomplete suggestions from task_descriptions
+//   - Assignee    → active employees
 function JobTasksPanel({ job }) {
   const [tasks,       setTasks]       = useState([])
+  const [categories,  setCategories]  = useState([])
+  const [descPresets, setDescPresets] = useState([])
+  const [employees,   setEmployees]   = useState([])
   const [loading,     setLoading]     = useState(false)
-  const [addingTask,  setAddingTask]  = useState(false)
-  const [newTaskName, setNewTaskName] = useState('')
-  const [saving,      setSaving]      = useState(false)
   const [showModal,   setShowModal]   = useState(false)
+  const [adding,      setAdding]      = useState(false)
 
   useEffect(() => {
-    if (job?.id) fetchTasks(job.id)
-    else setTasks([])
+    if (job?.id) {
+      fetchTasks(job.id)
+      fetchLookups()
+    } else {
+      setTasks([])
+    }
   }, [job?.id])
+
+  async function fetchLookups() {
+    const [cats, descs, emps] = await Promise.all([
+      supabase.from('task_categories').select('*').order('sort_order').order('name'),
+      supabase.from('task_descriptions').select('*').order('sort_order').order('name'),
+      supabase.from('employees').select('id, first_name, last_name').eq('status', 'active').order('first_name'),
+    ])
+    setCategories(cats.data || [])
+    setDescPresets(descs.data || [])
+    setEmployees(emps.data || [])
+  }
 
   async function fetchTasks(jobId) {
     setLoading(true)
-    const { data } = await supabase.from('job_tasks').select('*').eq('job_id', jobId).order('sort_order')
-    if (data) setTasks(data)
+    const { data } = await supabase.from('job_tasks')
+      .select('*').eq('job_id', jobId).order('sort_order').order('created_at')
+    setTasks(data || [])
     setLoading(false)
   }
 
-  async function handleAddTask() {
-    if (!newTaskName.trim() || !job?.id) return
-    setSaving(true)
+  async function addTask() {
+    if (!job?.id || adding) return
+    setAdding(true)
     const { data } = await supabase.from('job_tasks').insert({
-      job_id: job.id, task_name: newTaskName.trim(), status: 'pending', sort_order: tasks.length,
+      job_id: job.id, task_name: '', status: 'pending', sort_order: tasks.length,
     }).select().single()
     if (data) setTasks(prev => [...prev, data])
-    setNewTaskName(''); setAddingTask(false); setSaving(false)
+    setAdding(false)
   }
 
-  async function toggleTask(task) {
-    const newStatus = task.status === 'completed' ? 'pending' : 'completed'
-    await supabase.from('job_tasks').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', task.id)
-    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t))
+  // Autosave one field on a task row
+  async function patchTask(id, patch) {
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, ...patch } : t))
+    await supabase.from('job_tasks')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', id)
+  }
+
+  async function toggleStatus(task) {
+    const next = task.status === 'completed' ? 'pending' : 'completed'
+    await patchTask(task.id, { status: next })
   }
 
   async function deleteTask(id) {
@@ -1724,9 +1906,13 @@ function JobTasksPanel({ job }) {
   )
 
   const completed = tasks.filter(t => t.status === 'completed').length
+  const empName = e => `${e.first_name} ${e.last_name}`.trim()
+
+  // Stable id for the description datalist (one per panel render)
+  const descListId = 'task-desc-suggestions'
 
   return (
-    <div className="p-4 max-w-2xl">
+    <div className="p-4">
       {showModal && (
         <ApplyTemplateModal
           job={job}
@@ -1741,24 +1927,36 @@ function JobTasksPanel({ job }) {
           <h2 className="text-lg font-bold text-gray-900">Tasks</h2>
           <p className="text-xs text-gray-400">{job.client_name || job.name}</p>
         </div>
-        <button
-          onClick={() => { setAddingTask(a => !a); setNewTaskName('') }}
-          className="text-xs px-3 py-1.5 rounded-lg bg-green-700 text-white font-medium hover:bg-green-800 transition-colors"
-        >{addingTask ? '✕ Cancel' : '+ Add Task'}</button>
+        <div className="flex items-center gap-2">
+          {tasks.length > 0 && (
+            <button onClick={() => setShowModal(true)}
+              className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 font-medium hover:bg-gray-50 hover:text-gray-800 transition-colors">
+              📋 Apply Template
+            </button>
+          )}
+          <button
+            onClick={addTask}
+            disabled={adding}
+            className="text-xs px-3 py-1.5 rounded-lg bg-green-700 text-white font-medium hover:bg-green-800 transition-colors disabled:opacity-50"
+          >
+            {adding ? 'Adding…' : '+ Add Task'}
+          </button>
+        </div>
       </div>
 
-      {/* Add task input */}
-      {addingTask && (
-        <div className="flex gap-2 mb-4">
-          <input autoFocus type="text" value={newTaskName}
-            onChange={e => setNewTaskName(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleAddTask(); if (e.key === 'Escape') { setAddingTask(false); setNewTaskName('') } }}
-            placeholder="Task name…" className="input text-sm flex-1"
-          />
-          <button onClick={handleAddTask} disabled={!newTaskName.trim() || saving}
-            className="px-3 py-1.5 rounded-lg bg-green-700 text-white text-sm font-medium hover:bg-green-800 disabled:opacity-40">
-            {saving ? '…' : 'Add'}
-          </button>
+      {/* Shared datalist for description autocomplete */}
+      <datalist id={descListId}>
+        {descPresets.map(d => <option key={d.id} value={d.name} />)}
+      </datalist>
+
+      {/* Progress bar */}
+      {tasks.length > 0 && (
+        <div className="flex items-center gap-3 mb-3">
+          <div className="flex-1 bg-gray-100 rounded-full h-2">
+            <div className="bg-green-600 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${(completed / tasks.length) * 100}%` }} />
+          </div>
+          <span className="text-xs font-semibold text-gray-500 flex-shrink-0">{completed}/{tasks.length} done</span>
         </div>
       )}
 
@@ -1770,7 +1968,7 @@ function JobTasksPanel({ job }) {
         <div className="flex flex-col items-center py-12 text-gray-400">
           <p className="text-4xl mb-3">✅</p>
           <p className="text-sm font-medium text-gray-500">No tasks yet</p>
-          <p className="text-xs mt-1 mb-5 text-center max-w-xs">Add tasks manually above, or apply a template to create folders and tasks all at once.</p>
+          <p className="text-xs mt-1 mb-5 text-center max-w-xs">Click "+ Add Task" to start, or apply a template to create folders and tasks all at once.</p>
           <button
             onClick={() => setShowModal(true)}
             className="flex items-center gap-2 text-sm px-4 py-2 rounded-lg bg-green-700 text-white font-medium hover:bg-green-800 transition-colors"
@@ -1779,51 +1977,110 @@ function JobTasksPanel({ job }) {
           </button>
         </div>
       ) : (
-        <div>
-          {/* Progress bar */}
-          <div className="flex items-center gap-3 mb-4">
-            <div className="flex-1 bg-gray-100 rounded-full h-2">
-              <div
-                className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${tasks.length > 0 ? (completed / tasks.length) * 100 : 0}%` }}
-              />
-            </div>
-            <span className="text-xs font-semibold text-gray-500 flex-shrink-0">{completed}/{tasks.length} done</span>
-          </div>
+        <div className="overflow-x-auto bg-white border border-gray-200 rounded-xl">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500">
+                <th className="px-3 py-2 w-10 text-center font-semibold">✓</th>
+                <th className="px-3 py-2 w-44 text-left font-semibold">Category</th>
+                <th className="px-3 py-2 text-left font-semibold">Description</th>
+                <th className="px-3 py-2 w-44 text-left font-semibold">Assignee</th>
+                <th className="px-3 py-2 w-36 text-left font-semibold">Due Date</th>
+                <th className="px-3 py-2 w-10"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {tasks.map(task => {
+                const isDone = task.status === 'completed'
+                return (
+                  <tr key={task.id}
+                      className={`border-b border-gray-100 hover:bg-gray-50/70 group transition-colors ${isDone ? 'bg-green-50/30' : ''}`}>
+                    {/* Status checkbox */}
+                    <td className="px-3 py-1.5 text-center">
+                      <button
+                        onClick={() => toggleStatus(task)}
+                        className={`w-5 h-5 rounded-full border-2 inline-flex items-center justify-center transition-colors ${
+                          isDone ? 'bg-green-600 border-green-600 text-white' : 'border-gray-300 hover:border-green-500'
+                        }`}
+                        title={isDone ? 'Mark pending' : 'Mark complete'}
+                      >
+                        {isDone && (
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
+                    </td>
 
-          {/* Task list */}
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-            {tasks.map((task, i) => (
-              <div key={task.id}
-                className={`flex items-center gap-3 px-4 py-3 hover:bg-gray-50 group transition-colors ${i < tasks.length - 1 ? 'border-b border-gray-100' : ''}`}
-              >
-                <button
-                  onClick={() => toggleTask(task)}
-                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                    task.status === 'completed' ? 'bg-green-600 border-green-600 text-white' : 'border-gray-300 hover:border-green-500'
-                  }`}
-                >
-                  {task.status === 'completed' && (
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </button>
-                <span className={`flex-1 text-sm ${task.status === 'completed' ? 'line-through text-gray-400' : 'text-gray-800'}`}>
-                  {task.task_name}
-                </span>
-                <button onClick={() => deleteTask(task.id)}
-                  className="text-red-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity text-xs p-1">✕</button>
-              </div>
-            ))}
-          </div>
+                    {/* Category dropdown */}
+                    <td className="px-2 py-1">
+                      <select
+                        value={task.category_id || ''}
+                        onChange={e => patchTask(task.id, { category_id: e.target.value || null })}
+                        className={`w-full text-xs bg-transparent border border-transparent hover:border-gray-200 focus:border-green-500 focus:outline-none rounded px-1.5 py-1 ${isDone ? 'text-gray-400' : 'text-gray-700'}`}
+                      >
+                        <option value="">— Select —</option>
+                        {categories.map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    </td>
 
-          {/* Apply more from template */}
-          <div className="mt-3 text-center">
-            <button onClick={() => setShowModal(true)} className="text-xs text-gray-400 hover:text-green-700 transition-colors">
-              + Apply template to add more
-            </button>
-          </div>
+                    {/* Description — text with datalist autocomplete */}
+                    <td className="px-2 py-1">
+                      <input
+                        type="text"
+                        list={descListId}
+                        defaultValue={task.task_name || ''}
+                        placeholder="Type or pick…"
+                        onBlur={e => {
+                          const v = e.target.value
+                          if (v !== task.task_name) patchTask(task.id, { task_name: v })
+                        }}
+                        onKeyDown={e => { if (e.key === 'Enter') e.target.blur() }}
+                        className={`w-full text-sm bg-transparent border border-transparent hover:border-gray-200 focus:border-green-500 focus:outline-none rounded px-1.5 py-1 ${isDone ? 'line-through text-gray-400' : 'text-gray-800'}`}
+                      />
+                    </td>
+
+                    {/* Assignee dropdown */}
+                    <td className="px-2 py-1">
+                      <select
+                        value={task.assignee_id || ''}
+                        onChange={e => patchTask(task.id, { assignee_id: e.target.value || null })}
+                        className={`w-full text-xs bg-transparent border border-transparent hover:border-gray-200 focus:border-green-500 focus:outline-none rounded px-1.5 py-1 ${isDone ? 'text-gray-400' : 'text-gray-700'}`}
+                      >
+                        <option value="">— Unassigned —</option>
+                        {employees.map(e => (
+                          <option key={e.id} value={e.id}>{empName(e)}</option>
+                        ))}
+                      </select>
+                    </td>
+
+                    {/* Due date picker */}
+                    <td className="px-2 py-1">
+                      <input
+                        type="date"
+                        value={task.due_date || ''}
+                        onChange={e => patchTask(task.id, { due_date: e.target.value || null })}
+                        className={`w-full text-xs bg-transparent border border-transparent hover:border-gray-200 focus:border-green-500 focus:outline-none rounded px-1.5 py-1 ${isDone ? 'text-gray-400' : 'text-gray-700'}`}
+                      />
+                    </td>
+
+                    {/* Delete */}
+                    <td className="px-2 py-1 text-center">
+                      <button
+                        onClick={() => deleteTask(task.id)}
+                        className="text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity text-xs p-1"
+                        title="Delete task"
+                      >
+                        ✕
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
