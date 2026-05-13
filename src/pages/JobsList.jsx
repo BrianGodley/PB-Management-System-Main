@@ -127,6 +127,7 @@ export default function JobsList() {
   const [tab,        setTab]        = useState(() => searchParams.get('tab') || 'schedule')
   const [jobModal,   setJobModal]   = useState(null)
   const [search,     setSearch]     = useState('')
+  const [statusFilter, setStatusFilter] = useState('open') // 'open' | 'closed' | 'both'
   const [stages,          setStages]          = useState([])
   const [dragOverStage,   setDragOverStage]   = useState(null)
   const [showExceptions,    setShowExceptions]    = useState(false)
@@ -228,6 +229,13 @@ export default function JobsList() {
   const completedTotal    = jobs.filter(j => j.status === 'completed').reduce((s, j) => s + price(j), 0)
 
   const sorted = [...jobs]
+    .filter(j => {
+      const status = j.status || 'active'
+      const isOpen = status === 'active' || status === 'on_hold'
+      if (statusFilter === 'open')   return isOpen
+      if (statusFilter === 'closed') return !isOpen
+      return true // 'both'
+    })
     .filter(j => {
       const q = search.toLowerCase()
       return !q || (j.name || '').toLowerCase().includes(q) || (j.client_name || '').toLowerCase().includes(q)
@@ -344,6 +352,27 @@ export default function JobsList() {
               </span>
             )}
           </button>
+
+          {/* Open / Closed / Both filter */}
+          <div className="flex gap-1 mb-2 flex-shrink-0">
+            {[
+              { key: 'open',   label: 'Open'   },
+              { key: 'closed', label: 'Closed' },
+              { key: 'both',   label: 'Both'   },
+            ].map(opt => (
+              <button
+                key={opt.key}
+                onClick={() => setStatusFilter(opt.key)}
+                className={`flex-1 text-[11px] font-semibold px-2 py-1 rounded-md border transition-colors ${
+                  statusFilter === opt.key
+                    ? 'bg-green-700 text-white border-green-700'
+                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-800'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
 
           <input
             type="text"
