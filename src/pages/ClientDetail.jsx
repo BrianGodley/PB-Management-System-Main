@@ -203,9 +203,14 @@ export default function ClientDetail() {
   )
   if (!client) return <div className="card text-center py-12 text-gray-500">Client not found.</div>
 
-  const totalRevenue = soldJobs.reduce((s, j) => s + parseFloat(j.total_price  || 0), 0)
-  const totalGP      = soldJobs.reduce((s, j) => s + parseFloat(j.gross_profit || 0), 0)
-  const totalCOs     = Object.values(jobCOs).flat().length
+  // Change-order rollups across every CO on every job. COs are additive on
+  // top of the original job revenue / gross profit.
+  const allCOs       = Object.values(jobCOs).flat()
+  const coRevenue    = allCOs.reduce((s, co) => s + parseFloat(co.bid_amount   || 0), 0)
+  const coGP         = allCOs.reduce((s, co) => s + parseFloat(co.gross_profit || 0), 0)
+  const totalRevenue = soldJobs.reduce((s, j) => s + parseFloat(j.total_price  || 0), 0) + coRevenue
+  const totalGP      = soldJobs.reduce((s, j) => s + parseFloat(j.gross_profit || 0), 0) + coGP
+  const totalCOs     = allCOs.length
   const initials     = ((client.first_name || client.last_name || client.name || '?')[0] + (client.last_name?.[0] || '')).toUpperCase()
 
   return (
