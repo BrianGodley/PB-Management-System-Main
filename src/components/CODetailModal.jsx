@@ -415,6 +415,30 @@ export default function CODetailModal({ co, job, onClose, onSaved, onDeleted, on
               )}
             </div>
 
+            {/* BT-imported metadata (only shows when present) */}
+            {(coState?.expires_at || coState?.viewed_by_owner_at || coState?.bt_attachment_count || coState?.bt_created_by_name || coState?.bt_attached_by_names) && (
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs grid grid-cols-2 gap-x-4 gap-y-1.5">
+                {coState.bt_created_by_name && (
+                  <div><span className="text-gray-400">Created by:</span> <span className="text-gray-700 font-medium">{coState.bt_created_by_name}</span></div>
+                )}
+                {coState.expires_at && (
+                  <div><span className="text-gray-400">Expires:</span> <span className="text-gray-700 font-medium">{new Date(coState.expires_at).toLocaleDateString()}</span></div>
+                )}
+                {coState.viewed_by_owner_at && (
+                  <div><span className="text-gray-400">Viewed by owner:</span> <span className="text-gray-700 font-medium">{new Date(coState.viewed_by_owner_at).toLocaleDateString()}</span></div>
+                )}
+                {coState.bt_attachment_count > 0 && (
+                  <div>
+                    <span className="text-gray-400">BT attachments:</span>{' '}
+                    <span className="text-gray-700 font-medium">📎 {coState.bt_attachment_count}</span>
+                    {coState.bt_attached_by_names && (
+                      <span className="text-gray-400"> by {coState.bt_attached_by_names}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Signature info if approved */}
             {isApproved && coState.signature_data_url && (
               <div className="border border-green-200 bg-green-50 rounded-xl p-3">
