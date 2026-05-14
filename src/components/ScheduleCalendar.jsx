@@ -159,7 +159,8 @@ const DOW_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','
 // Bars skip over exception days — rendered as multiple segments
 // so gaps appear on weekends / holidays instead of solid spans.
 function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, onDayClick, onItemClick, exceptions = [] }) {
-  const weekDates = weekDays.map(day => day ? new Date(year, month, day) : null)
+  // weekDays is now an array of 7 Date objects (incl. prev/next-month spillover).
+  const weekDates = weekDays
   const validDates = weekDates.filter(Boolean)
   if (validDates.length === 0) return null
 
@@ -189,11 +190,7 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
     let segStart = -1, lastWorkingCol = -1
 
     weekDates.forEach((date, col) => {
-      if (!date) {
-        if (segStart !== -1) { segments.push({ startCol: segStart, endCol: lastWorkingCol }); segStart = -1 }
-        return
-      }
-      const inRange   = date >= iStart && date <= iEnd
+      const inRange   = date && date >= iStart && date <= iEnd
       const isWorking = inRange && isWorkingDay(date, exceptions, incSat, incSun)
       if (isWorking) {
         if (segStart === -1) segStart = col
@@ -237,15 +234,15 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
 
       {/* ── Layer 1: day cell backgrounds + click targets (absolute, fills full row height) ── */}
       <div className="absolute inset-0 grid grid-cols-7">
-        {weekDays.map((day, col) => {
-          const cellDate = day ? new Date(year, month, day) : null
-          const isExcept = cellDate ? isCellException(cellDate, exceptions) : false
+        {weekDays.map((cellDate, col) => {
+          const inMonth  = cellDate.getMonth() === month
+          const isExcept = isCellException(cellDate, exceptions)
           return (
             <div
               key={col}
-              onClick={() => day && onDayClick(day)}
+              onClick={() => onDayClick(cellDate)}
               className={`border-r border-gray-200
-                ${!day     ? 'bg-white cursor-default'
+                ${!inMonth ? 'bg-gray-50 cursor-pointer hover:bg-green-50'
                 : isExcept ? 'bg-gray-100 cursor-pointer'
                 :             'bg-white hover:bg-green-50 cursor-pointer'}`}
             />
@@ -255,19 +252,18 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
 
       {/* ── Layer 2: day number headers (normal flow — sets the top DAY_H px of the row) ── */}
       <div className="relative grid grid-cols-7 pointer-events-none" style={{ height: DAY_H }}>
-        {weekDays.map((day, col) => {
-          const ds = day
-            ? `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
-            : null
+        {weekDays.map((cellDate, col) => {
+          const ds = `${cellDate.getFullYear()}-${String(cellDate.getMonth()+1).padStart(2,'0')}-${String(cellDate.getDate()).padStart(2,'0')}`
           const isToday = ds === todayStr
+          const inMonth = cellDate.getMonth() === month
           return (
             <div key={col} className="pt-1 px-1">
-              {day && (
-                <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-medium
-                  ${isToday ? 'bg-green-700 text-white' : 'text-gray-500'}`}>
-                  {day}
-                </span>
-              )}
+              <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-medium
+                ${isToday ? 'bg-green-700 text-white'
+                  : !inMonth ? 'text-gray-300'
+                  : 'text-gray-500'}`}>
+                {cellDate.getDate()}
+              </span>
             </div>
           )
         })}
@@ -1183,8 +1179,9 @@ export default function ScheduleCalendar({
   function nextYear()  { setYear(y => y + 1) }
   function goToToday() { setMonth(today.getMonth()); setYear(today.getFullYear()) }
 
-  function handleDayClick(day) {
-    const ds = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
+  function handleDayClick(date) {
+    // `date` is a Date (may be a spillover day from prev/next month).
+    const ds = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`
     setClickedDate(ds)
     setWoStartDate(ds)
     setForm({ ...EMPTY_FORM, display_color: defaultSchedColor, start_date: ds, end_date: ds, work_days: 1 })
@@ -1387,11 +1384,15 @@ export default function ScheduleCalendar({
     fetchItems()
   }
 
-  // Build week rows (desktop only)
+  // Build week rows (desktop only). Cells are full Date objects, including
+  // prev/next-month spillover days so every week is a complete Sun→Sat row
+  // (no truncation at month edges).
   const firstDay = firstDayOfMonth(year, month)
   const numDays  = daysInMonth(year, month)
-  const cells    = Array.from({ length: firstDay + numDays }, (_, i) => i < firstDay ? null : i - firstDay + 1)
-  while (cells.length % 7 !== 0) cells.push(null)
+  const totalCells = Math.ceil((firstDay + numDays) / 7) * 7
+  const cells = Array.from({ length: totalCells }, (_, i) =>
+    new Date(year, month, 1 + (i - firstDay))
+  )
   const weeks = []
   for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7))
 
@@ -1503,12 +1504,15 @@ export default function ScheduleCalendar({
             Toolbar row layout: [Add Schedule][Exceptions]  ‹‹ ‹ Month Year › ›› [Today]  [✨ Schedule Assistance]
             Each side button is ~60% of the old sidebar-button width. */}
         <div className="sticky top-0 z-10 bg-white pb-0">
-          <div className="flex items-center justify-between gap-2 mb-2">
+          {/* Toolbar: items-center → all controls share the same vertical center.
+              h-9 forces a consistent row height so MonthNav (small icon buttons)
+              doesn't ride higher than the chunkier action buttons. */}
+          <div className="flex items-center justify-between gap-2 mb-2 h-9 px-6">
             {/* Left: Add Schedule + Exceptions */}
-            <div className="flex items-center gap-1.5 flex-shrink-0">
+            <div className="flex items-center gap-1.5 flex-shrink-0 h-full">
               <button
                 onClick={handleAddNew}
-                className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-green-700 text-white text-[11px] font-semibold hover:bg-green-800 transition-colors w-[140px]"
+                className="flex items-center justify-center gap-1 h-7 px-2 rounded-lg bg-green-700 text-white text-[11px] font-semibold hover:bg-green-800 transition-colors w-[140px]"
               >
                 <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -1517,7 +1521,7 @@ export default function ScheduleCalendar({
               </button>
               <button
                 onClick={() => onSetShowExceptions && onSetShowExceptions(true)}
-                className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg border border-gray-200 text-[11px] font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors w-[140px]"
+                className="flex items-center justify-center gap-1 h-7 px-2 ml-6 rounded-lg border border-gray-200 text-[11px] font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors w-[140px]"
               >
                 <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -1533,13 +1537,15 @@ export default function ScheduleCalendar({
             </div>
 
             {/* Center: Month nav */}
-            <MonthNav compact inline />
+            <div className="flex items-center h-full">
+              <MonthNav compact inline />
+            </div>
 
             {/* Right: Schedule Assistance */}
             {onOpenScheduleAssist ? (
               <button
                 onClick={onOpenScheduleAssist}
-                className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[11px] font-semibold hover:from-purple-700 hover:to-indigo-700 transition-colors w-[140px] flex-shrink-0"
+                className="flex items-center justify-center gap-1 h-7 px-2 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[11px] font-semibold hover:from-purple-700 hover:to-indigo-700 transition-colors w-[140px] flex-shrink-0"
               >
                 <span>✨</span>
                 <span>Schedule Assistance</span>

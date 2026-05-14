@@ -912,10 +912,10 @@ export default function JobsList() {
             </div>
           ) : (
             <div className="overflow-y-auto flex-1 w-[90%] mx-auto">
-              {/* All Jobs button */}
+              {/* All Jobs button — 30% shorter than the original (h-[25px]) */}
               <button
                 onClick={() => setSelectedJob(ALL_JOBS)}
-                className={`w-full text-center px-3 py-2 rounded-lg text-sm font-medium transition-colors border mb-1 ${
+                className={`w-full text-center px-3 h-[25px] rounded-lg text-xs font-medium transition-colors border mb-1 ${
                   selectedJob === ALL_JOBS ? 'bg-green-50 border-green-200 text-green-800' : 'border-transparent text-gray-500 hover:bg-gray-100 hover:text-gray-700'
                 }`}
               >
