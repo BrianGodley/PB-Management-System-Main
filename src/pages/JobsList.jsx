@@ -1023,8 +1023,22 @@ export default function JobsList() {
 
                 return (
                   <>
-                    {byStage['__none__'].length > 0 && <StageSection stageId="__none__" label="Unassigned" />}
-                    {stages.map((s, idx) => <StageSection key={s.id} stageId={s.id} label={`${idx + 1} - ${s.name}`} />)}
+                    {/* When the user is filtering to Closed only, just show
+                        the Closed stage — every other stage's jobs are
+                        irrelevant in that view, and Unassigned is hidden too. */}
+                    {statusFilter === 'closed' ? (
+                      stages
+                        .map((s, idx) => ({ s, idx }))
+                        .filter(({ s }) => /closed/i.test(s.name || ''))
+                        .map(({ s, idx }) => (
+                          <StageSection key={s.id} stageId={s.id} label={`${idx + 1} - ${s.name}`} />
+                        ))
+                    ) : (
+                      <>
+                        {byStage['__none__'].length > 0 && <StageSection stageId="__none__" label="Unassigned" />}
+                        {stages.map((s, idx) => <StageSection key={s.id} stageId={s.id} label={`${idx + 1} - ${s.name}`} />)}
+                      </>
+                    )}
                     {sorted.length === 0 && <p className="text-xs text-gray-400 text-center py-6">No jobs found.</p>}
                   </>
                 )
