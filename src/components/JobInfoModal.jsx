@@ -36,10 +36,10 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
   const [clientData,  setClientData]  = useState(null)
   const [contactData, setContactData] = useState(null)
   const [loadingClient, setLoadingClient] = useState(false)
-  // Inline client edit state (mirrors the ClientDetail page's edit card).
-  const [editingClient, setEditingClient] = useState(false)
-  const [clientForm,    setClientForm]    = useState({})
-  const [savingClient,  setSavingClient]  = useState(false)
+  // Client form buffer — auto-seeded from clientData by the effect below.
+  // The Client tab renders these inputs always-editable; the global Save
+  // button writes them back via handleSave().
+  const [clientForm, setClientForm] = useState({})
   // Site Access fields (live on jobs). Editable.
   const [gateCode,    setGateCode]    = useState(job.gate_code || '')
   const [hasDog,      setHasDog]      = useState(!!job.has_dog)
@@ -110,6 +110,67 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
     return () => { cancelled = true }
   }, [job.id, job.client_id, job.client_name])
 
+  // Detect unsaved Client-tab edits — used to skip auto-refresh below so
+  // we don't clobber what the user is typing.
+  function isClientFormDirty() {
+    if (!clientData) return false
+    const f = clientForm
+    const scalarKeys = [
+      'first_name','last_name','spouse_first_name','spouse_last_name',
+      'company_name','company_position','email','phone','cell',
+      'street','city','state','zip','other_email','other_address','website','notes',
+    ]
+    if (scalarKeys.some(k => (f[k] || '') !== (clientData[k] || ''))) return true
+    const eRaw = Array.isArray(clientData.additional_emails) ? clientData.additional_emails.join('\n') : ''
+    const pRaw = Array.isArray(clientData.additional_phones) ? clientData.additional_phones.join('\n') : ''
+    return (f._additionalEmailsRaw || '') !== eRaw || (f._additionalPhonesRaw || '') !== pRaw
+  }
+
+  // When the user switches INTO the Client tab, re-fetch the client row so
+  // any external edits (Clients page, ClientDetail, etc.) show up here.
+  // Skip if the form is dirty so we don't lose unsaved edits.
+  useEffect(() => {
+    if (activeTab !== 'client' || !clientData?.id) return
+    if (isClientFormDirty()) return
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase.from('clients')
+        .select('*').eq('id', clientData.id).maybeSingle()
+      if (!cancelled && data) setClientData(data)
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, clientData?.id])
+
+  // Whenever clientData changes (initial load or after a save), reseed the
+  // form buffer so the always-editable inputs in the Client tab stay in sync
+  // with the latest server state. This also handles the reverse-sync case:
+  // if the client was changed elsewhere and we re-fetch, the inputs update.
+  useEffect(() => {
+    if (!clientData) return
+    setClientForm({
+      first_name:        clientData.first_name        || '',
+      last_name:         clientData.last_name         || '',
+      spouse_first_name: clientData.spouse_first_name || '',
+      spouse_last_name:  clientData.spouse_last_name  || '',
+      company_name:      clientData.company_name      || '',
+      company_position:  clientData.company_position  || '',
+      email:             clientData.email             || '',
+      phone:             clientData.phone             || '',
+      cell:              clientData.cell              || '',
+      _additionalEmailsRaw: Array.isArray(clientData.additional_emails) ? clientData.additional_emails.join('\n') : '',
+      _additionalPhonesRaw: Array.isArray(clientData.additional_phones) ? clientData.additional_phones.join('\n') : '',
+      street:            clientData.street            || '',
+      city:              clientData.city              || '',
+      state:             clientData.state             || '',
+      zip:               clientData.zip               || '',
+      other_email:       clientData.other_email       || '',
+      other_address:     clientData.other_address     || '',
+      website:           clientData.website           || '',
+      notes:             clientData.notes             || '',
+    })
+  }, [clientData])
+
   const employeeOptions = employees.map(e => ({
     value: `${e.first_name} ${e.last_name}`.trim(),
     label: `${e.last_name}, ${e.first_name}`.trim(),
@@ -136,71 +197,49 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
       consultant:      consultant || null,
       project_manager: projectManager || null,
     })
-    setSaving(false)
-    if (!ok) setError('Failed to save. Please try again.')
-  }
 
-  // Start editing the client: copy the loaded row into a form buffer.
-  function startEditClient() {
-    if (!clientData) return
-    setClientForm({
-      first_name:        clientData.first_name        || '',
-      last_name:         clientData.last_name         || '',
-      spouse_first_name: clientData.spouse_first_name || '',
-      spouse_last_name:  clientData.spouse_last_name  || '',
-      company_name:      clientData.company_name      || '',
-      company_position:  clientData.company_position  || '',
-      email:             clientData.email             || '',
-      phone:             clientData.phone             || '',
-      cell:              clientData.cell              || '',
-      _additionalEmailsRaw: Array.isArray(clientData.additional_emails) ? clientData.additional_emails.join('\n') : '',
-      _additionalPhonesRaw: Array.isArray(clientData.additional_phones) ? clientData.additional_phones.join('\n') : '',
-      street:            clientData.street            || '',
-      city:              clientData.city              || '',
-      state:             clientData.state             || '',
-      zip:               clientData.zip               || '',
-      notes:             clientData.notes             || '',
-    })
-    setEditingClient(true)
-  }
-
-  // Persist the edited client back to clients. Also rebuilds the composed
-  // `name` field so it stays in sync (same convention ClientDetail follows).
-  async function saveClient() {
-    if (!clientData?.id) return
-    setSavingClient(true)
-    const f = clientForm
-    const fullName = [f.first_name, f.last_name].filter(Boolean).join(' ').trim()
-    const splitMulti = raw => raw
-      ? raw.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
-      : null
-    const addlEmails = splitMulti(f._additionalEmailsRaw)
-    const addlPhones = splitMulti(f._additionalPhonesRaw)
-    const updates = {
-      first_name:        f.first_name?.trim()        || null,
-      last_name:         f.last_name?.trim()         || null,
-      spouse_first_name: f.spouse_first_name?.trim() || null,
-      spouse_last_name:  f.spouse_last_name?.trim()  || null,
-      name:              fullName || clientData.name,
-      company_name:      f.company_name?.trim()      || null,
-      company_position:  f.company_position?.trim()  || null,
-      email:             f.email?.trim()             || null,
-      phone:             f.phone?.trim()             || null,
-      cell:              f.cell?.trim()              || null,
-      additional_emails: addlEmails && addlEmails.length ? addlEmails : null,
-      additional_phones: addlPhones && addlPhones.length ? addlPhones : null,
-      street:            f.street?.trim()            || null,
-      city:              f.city?.trim()              || null,
-      state:             f.state                     || null,
-      zip:               f.zip?.trim()               || null,
-      notes:             f.notes?.trim()             || null,
+    // Save the client row alongside the job. Same payload as saveClient(),
+    // run unconditionally so any edit on the Client tab persists in one click.
+    let clientOk = true
+    if (clientData?.id) {
+      const f = clientForm
+      const fullName = [f.first_name, f.last_name].filter(Boolean).join(' ').trim()
+      const splitMulti = raw => raw
+        ? raw.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
+        : null
+      const addlEmails = splitMulti(f._additionalEmailsRaw)
+      const addlPhones = splitMulti(f._additionalPhonesRaw)
+      const updates = {
+        first_name:        f.first_name?.trim()        || null,
+        last_name:         f.last_name?.trim()         || null,
+        spouse_first_name: f.spouse_first_name?.trim() || null,
+        spouse_last_name:  f.spouse_last_name?.trim()  || null,
+        name:              fullName || clientData.name,
+        company_name:      f.company_name?.trim()      || null,
+        company_position:  f.company_position?.trim()  || null,
+        email:             f.email?.trim()             || null,
+        phone:             f.phone?.trim()             || null,
+        cell:              f.cell?.trim()              || null,
+        additional_emails: addlEmails && addlEmails.length ? addlEmails : null,
+        additional_phones: addlPhones && addlPhones.length ? addlPhones : null,
+        street:            f.street?.trim()            || null,
+        city:              f.city?.trim()              || null,
+        state:             f.state                     || null,
+        zip:               f.zip?.trim()               || null,
+        other_email:       f.other_email?.trim()       || null,
+        other_address:     f.other_address?.trim()     || null,
+        website:           f.website?.trim()           || null,
+        notes:             f.notes?.trim()             || null,
+      }
+      const { data, error: clientErr } = await supabase.from('clients')
+        .update(updates).eq('id', clientData.id).select().single()
+      if (clientErr) { clientOk = false }
+      else if (data)  { setClientData(data) }
     }
-    const { data, error } = await supabase.from('clients')
-      .update(updates).eq('id', clientData.id).select().single()
-    setSavingClient(false)
-    if (error) { alert('Failed to save client: ' + error.message); return }
-    if (data) setClientData(data)
-    setEditingClient(false)
+
+    setSaving(false)
+    if (!ok)         setError('Failed to save the job. Please try again.')
+    else if (!clientOk) setError('Job saved, but the client update failed.')
   }
 
   const TABS = [
@@ -397,7 +436,9 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
             </div>
           )}
 
-          {/* ── Client tab ── */}
+          {/* ── Client tab — Job-Info-style, always-editable form.
+               The global footer Save button writes both the job AND the
+               client in one click via handleSave(). ── */}
           {activeTab === 'client' && (
             <div className="px-5 py-4 space-y-5">
               {loadingClient ? (
@@ -415,155 +456,174 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
                 </div>
               ) : (
                 <>
-                  {/* ── Client card — mirrors ClientDetail's left column.
-                      Toggles between read view and inline edit form. ── */}
-                  <div className="bg-white border border-slate-300 rounded-xl p-4">
-                    {editingClient ? (
-                      <form onSubmit={e => { e.preventDefault(); saveClient() }} className="space-y-2.5">
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Edit Client</p>
-                          <button type="button" onClick={() => setEditingClient(false)}
-                            className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
-                        </div>
-                        {[
-                          { label: 'First Name',             key: 'first_name',       type: 'text'  },
-                          { label: 'Last Name',              key: 'last_name',        type: 'text'  },
-                          { label: 'Spouse / Partner First', key: 'spouse_first_name', type: 'text' },
-                          { label: 'Spouse / Partner Last',  key: 'spouse_last_name',  type: 'text' },
-                          { label: 'Company',        key: 'company_name',     type: 'text'  },
-                          { label: 'Position',       key: 'company_position', type: 'text'  },
-                          { label: 'Email',          key: 'email',            type: 'email' },
-                          { label: 'Phone',          key: 'phone',            type: 'tel'   },
-                          { label: 'Cell',           key: 'cell',             type: 'tel'   },
-                          { label: 'Street',         key: 'street',           type: 'text'  },
-                          { label: 'City',           key: 'city',             type: 'text'  },
-                          { label: 'Zip',            key: 'zip',              type: 'text'  },
-                        ].map(f => (
-                          <div key={f.key}>
-                            <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">{f.label}</label>
-                            <input type={f.type}
-                              value={clientForm[f.key] || ''}
-                              onChange={e => setClientForm(p => ({ ...p, [f.key]: e.target.value }))}
-                              className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600" />
-                          </div>
-                        ))}
-                        <div>
-                          <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Additional Emails <span className="font-normal normal-case text-gray-400">(one per line)</span></label>
-                          <textarea rows={2}
-                            value={clientForm._additionalEmailsRaw || ''}
-                            onChange={e => setClientForm(p => ({ ...p, _additionalEmailsRaw: e.target.value }))}
-                            placeholder="extra@example.com"
-                            className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-600/30" />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Additional Phones <span className="font-normal normal-case text-gray-400">(one per line)</span></label>
-                          <textarea rows={2}
-                            value={clientForm._additionalPhonesRaw || ''}
-                            onChange={e => setClientForm(p => ({ ...p, _additionalPhonesRaw: e.target.value }))}
-                            placeholder="(555) 555-5555"
-                            className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-600/30" />
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">State</label>
-                          <select
-                            value={clientForm.state || ''}
-                            onChange={e => setClientForm(p => ({ ...p, state: e.target.value }))}
-                            className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30">
-                            <option value="">-- State --</option>
-                            {US_STATES.map(s => <option key={s}>{s}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Notes</label>
-                          <textarea rows={2}
-                            value={clientForm.notes || ''}
-                            onChange={e => setClientForm(p => ({ ...p, notes: e.target.value }))}
-                            className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-600/30" />
-                        </div>
-                        <div className="flex gap-2 pt-1">
-                          <button type="submit" disabled={savingClient}
-                            className="flex-1 py-1.5 rounded-lg bg-green-700 text-white text-xs font-semibold hover:bg-green-800 disabled:opacity-50">
-                            {savingClient ? 'Saving…' : 'Save Client'}
-                          </button>
-                          <button type="button" onClick={() => setEditingClient(false)}
-                            className="flex-1 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50">Cancel</button>
-                        </div>
-                      </form>
-                    ) : (
-                      <>
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="min-w-0">
-                            <h3 className="text-base font-bold text-gray-900 leading-tight truncate">
-                              {[clientData.first_name, clientData.last_name].filter(Boolean).join(' ') || clientData.name || '—'}
-                            </h3>
-                            <p className="text-xs text-gray-500 mt-0.5">
-                              {clientData.company_name || <span className="text-gray-300">No company</span>}
-                              {clientData.company_position ? ` · ${clientData.company_position}` : ''}
-                            </p>
-                          </div>
-                          <button onClick={startEditClient}
-                            className="text-gray-400 hover:text-gray-700 p-1 rounded hover:bg-slate-100 transition-colors flex-shrink-0" title="Edit client">
-                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                              <path d="M11.5 1.5a1.414 1.414 0 0 1 2 2L5 12l-3 1 1-3 8.5-8.5z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                          </button>
-                        </div>
-
-                        {/* Every field is always rendered — empty values show "—" */}
-                        <div className="space-y-1.5 pt-2 border-t border-slate-100">
-                          <Field label="First name"  value={clientData.first_name} />
-                          <Field label="Last name"   value={clientData.last_name}  />
-                          <Field label="Company"     value={clientData.company_name} />
-                          <Field label="Position"    value={clientData.company_position} />
-                          <Field label="Email"       value={clientData.email} link={clientData.email ? `mailto:${clientData.email}` : null} />
-                          <Field label="Phone"       value={clientData.phone} link={clientData.phone ? `tel:${clientData.phone}` : null} />
-                          <Field label="Street"      value={clientData.street} />
-                          <Field label="City"        value={clientData.city} />
-                          <Field label="State"       value={clientData.state} />
-                          <Field label="Zip"         value={clientData.zip} />
-                          <div className="pt-2 border-t border-slate-100">
-                            <p className="text-xs text-gray-400 mb-1">Notes</p>
-                            {clientData.notes ? (
-                              <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{clientData.notes}</p>
-                            ) : (
-                              <p className="text-sm text-gray-300">—</p>
-                            )}
-                          </div>
-                        </div>
-                      </>
-                    )}
+                  {/* Identity */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Identity</p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">First Name</label>
+                        <input type="text" value={clientForm.first_name || ''}
+                          onChange={e => setClientForm(p => ({ ...p, first_name: e.target.value }))}
+                          className="input text-sm w-full" placeholder="First name" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Last Name</label>
+                        <input type="text" value={clientForm.last_name || ''}
+                          onChange={e => setClientForm(p => ({ ...p, last_name: e.target.value }))}
+                          className="input text-sm w-full" placeholder="Last name" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Company</label>
+                        <input type="text" value={clientForm.company_name || ''}
+                          onChange={e => setClientForm(p => ({ ...p, company_name: e.target.value }))}
+                          className="input text-sm w-full" placeholder="Company name" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Position</label>
+                        <input type="text" value={clientForm.company_position || ''}
+                          onChange={e => setClientForm(p => ({ ...p, company_position: e.target.value }))}
+                          className="input text-sm w-full" placeholder="Position / title" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Spouse / Partner First</label>
+                        <input type="text" value={clientForm.spouse_first_name || ''}
+                          onChange={e => setClientForm(p => ({ ...p, spouse_first_name: e.target.value }))}
+                          className="input text-sm w-full" placeholder="First" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Spouse / Partner Last</label>
+                        <input type="text" value={clientForm.spouse_last_name || ''}
+                          onChange={e => setClientForm(p => ({ ...p, spouse_last_name: e.target.value }))}
+                          className="input text-sm w-full" placeholder="Last" />
+                      </div>
+                    </div>
                   </div>
 
-                  {/* ── Additional client info — always rendered. Read-only
-                       here; the canonical edit surface lives in the Clients
-                       module (and Contacts for the contact-only fields). ── */}
-                  <Section title="Additional info">
-                    <Field label="Spouse / partner"
-                      value={`${clientData.spouse_first_name || ''} ${clientData.spouse_last_name || ''}`.trim()} />
-                    <Field label="Secondary contact"
-                      value={`${contactData?.secondary_first_name || ''} ${contactData?.secondary_last_name || ''}`.trim()} />
-                    <Field label="Cell"            value={clientData.cell || contactData?.cell || ''} link={(clientData.cell || contactData?.cell) ? `tel:${clientData.cell || contactData?.cell}` : null} />
-                    {Array.isArray(clientData.additional_phones) && clientData.additional_phones.filter(Boolean).map((p, i) => (
-                      <Field key={`addphn-${i}`} label={`Phone ${i + 2}`} value={p} link={`tel:${p}`} />
-                    ))}
-                    {Array.isArray(clientData.additional_emails) && clientData.additional_emails.filter(Boolean).map((e, i) => (
-                      <Field key={`addem-${i}`} label={`Email ${i + 2}`} value={e} link={`mailto:${e}`} />
-                    ))}
-                    <Field label="Other email"     value={clientData.other_email} link={clientData.other_email ? `mailto:${clientData.other_email}` : null} />
-                    <Field label="Website"         value={clientData.website} link={clientData.website ? (clientData.website.startsWith('http') ? clientData.website : `https://${clientData.website}`) : null} />
-                    <Field label="Other address"   value={clientData.other_address} />
-                    <Field label="Source"          value={contactData?.source} />
-                    <Field label="How did you hear?" value={contactData?.how_did_you_hear} />
-                    <Field label="Campaign"        value={contactData?.campaign} />
-                    <div className="pt-2 border-t border-slate-100">
-                      <p className="text-xs text-gray-400 mb-1">Project description</p>
-                      {contactData?.project_description ? (
-                        <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{contactData.project_description}</p>
-                      ) : (
-                        <p className="text-sm text-gray-300">—</p>
-                      )}
+                  {/* Contact info */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Contact info</p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Phone</label>
+                        <input type="tel" value={clientForm.phone || ''}
+                          onChange={e => setClientForm(p => ({ ...p, phone: e.target.value }))}
+                          className="input text-sm w-full" placeholder="(555) 555-5555" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Cell</label>
+                        <input type="tel" value={clientForm.cell || ''}
+                          onChange={e => setClientForm(p => ({ ...p, cell: e.target.value }))}
+                          className="input text-sm w-full" placeholder="(555) 555-5555" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Email</label>
+                        <input type="email" value={clientForm.email || ''}
+                          onChange={e => setClientForm(p => ({ ...p, email: e.target.value }))}
+                          className="input text-sm w-full" placeholder="email@example.com" />
+                      </div>
                     </div>
-                  </Section>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Additional Emails <span className="font-normal text-gray-400">(one per line)</span></label>
+                        <textarea rows={2} value={clientForm._additionalEmailsRaw || ''}
+                          onChange={e => setClientForm(p => ({ ...p, _additionalEmailsRaw: e.target.value }))}
+                          className="input text-sm w-full resize-none" placeholder="extra@example.com" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Additional Phones <span className="font-normal text-gray-400">(one per line)</span></label>
+                        <textarea rows={2} value={clientForm._additionalPhonesRaw || ''}
+                          onChange={e => setClientForm(p => ({ ...p, _additionalPhonesRaw: e.target.value }))}
+                          className="input text-sm w-full resize-none" placeholder="(555) 555-5555" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Address */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Address</p>
+                    <div className="mb-3">
+                      <label className="block text-xs text-gray-500 mb-1">Street</label>
+                      <input type="text" value={clientForm.street || ''}
+                        onChange={e => setClientForm(p => ({ ...p, street: e.target.value }))}
+                        className="input text-sm w-full" placeholder="123 Main St" />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">City</label>
+                        <input type="text" value={clientForm.city || ''}
+                          onChange={e => setClientForm(p => ({ ...p, city: e.target.value }))}
+                          className="input text-sm w-full" placeholder="City" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">State</label>
+                        <select value={clientForm.state || ''}
+                          onChange={e => setClientForm(p => ({ ...p, state: e.target.value }))}
+                          className="input text-sm w-full">
+                          <option value="">—</option>
+                          {US_STATES.map(s => <option key={s}>{s}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Zip</label>
+                        <input type="text" value={clientForm.zip || ''}
+                          onChange={e => setClientForm(p => ({ ...p, zip: e.target.value }))}
+                          className="input text-sm w-full" placeholder="00000" maxLength={10} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Other */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Other</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Other Email</label>
+                        <input type="email" value={clientForm.other_email || ''}
+                          onChange={e => setClientForm(p => ({ ...p, other_email: e.target.value }))}
+                          className="input text-sm w-full" placeholder="other@example.com" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Other Address</label>
+                        <input type="text" value={clientForm.other_address || ''}
+                          onChange={e => setClientForm(p => ({ ...p, other_address: e.target.value }))}
+                          className="input text-sm w-full" placeholder="Mailing / vacation address" />
+                      </div>
+                    </div>
+                    <div className="mb-3">
+                      <label className="block text-xs text-gray-500 mb-1">Website</label>
+                      <input type="text" value={clientForm.website || ''}
+                        onChange={e => setClientForm(p => ({ ...p, website: e.target.value }))}
+                        className="input text-sm w-full" placeholder="https://example.com" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Notes</label>
+                      <textarea rows={3} value={clientForm.notes || ''}
+                        onChange={e => setClientForm(p => ({ ...p, notes: e.target.value }))}
+                        className="input text-sm w-full resize-none" placeholder="Notes about this client…" />
+                    </div>
+                  </div>
+
+                  {/* Read-only contact info — these live on the contacts row,
+                       not the client. Editing happens in the Contacts module. */}
+                  {(contactData?.secondary_first_name || contactData?.source ||
+                    contactData?.how_did_you_hear || contactData?.campaign ||
+                    contactData?.project_description) && (
+                    <Section title="From the contact record">
+                      <Field label="Secondary contact"
+                        value={`${contactData?.secondary_first_name || ''} ${contactData?.secondary_last_name || ''}`.trim()} />
+                      <Field label="Source"           value={contactData?.source} />
+                      <Field label="How did you hear?" value={contactData?.how_did_you_hear} />
+                      <Field label="Campaign"         value={contactData?.campaign} />
+                      {contactData?.project_description && (
+                        <div className="pt-2 border-t border-slate-100">
+                          <p className="text-xs text-gray-400 mb-1">Project description</p>
+                          <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{contactData.project_description}</p>
+                        </div>
+                      )}
+                    </Section>
+                  )}
 
                   {/* COMPANY CONTACTS (only for company clients) */}
                   {(clientData.client_type === 'company' || (clientData.company_contacts || []).length > 0) && (
