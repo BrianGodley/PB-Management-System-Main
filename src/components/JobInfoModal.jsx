@@ -148,6 +148,9 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
       company_position:  clientData.company_position  || '',
       email:             clientData.email             || '',
       phone:             clientData.phone             || '',
+      cell:              clientData.cell              || '',
+      _additionalEmailsRaw: Array.isArray(clientData.additional_emails) ? clientData.additional_emails.join('\n') : '',
+      _additionalPhonesRaw: Array.isArray(clientData.additional_phones) ? clientData.additional_phones.join('\n') : '',
       street:            clientData.street            || '',
       city:              clientData.city              || '',
       state:             clientData.state             || '',
@@ -164,6 +167,11 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
     setSavingClient(true)
     const f = clientForm
     const fullName = [f.first_name, f.last_name].filter(Boolean).join(' ').trim()
+    const splitMulti = raw => raw
+      ? raw.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
+      : null
+    const addlEmails = splitMulti(f._additionalEmailsRaw)
+    const addlPhones = splitMulti(f._additionalPhonesRaw)
     const updates = {
       first_name:        f.first_name?.trim()        || null,
       last_name:         f.last_name?.trim()         || null,
@@ -174,6 +182,9 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
       company_position:  f.company_position?.trim()  || null,
       email:             f.email?.trim()             || null,
       phone:             f.phone?.trim()             || null,
+      cell:              f.cell?.trim()              || null,
+      additional_emails: addlEmails && addlEmails.length ? addlEmails : null,
+      additional_phones: addlPhones && addlPhones.length ? addlPhones : null,
       street:            f.street?.trim()            || null,
       city:              f.city?.trim()              || null,
       state:             f.state                     || null,
@@ -420,6 +431,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
                           { label: 'Position',       key: 'company_position', type: 'text'  },
                           { label: 'Email',          key: 'email',            type: 'email' },
                           { label: 'Phone',          key: 'phone',            type: 'tel'   },
+                          { label: 'Cell',           key: 'cell',             type: 'tel'   },
                           { label: 'Street',         key: 'street',           type: 'text'  },
                           { label: 'City',           key: 'city',             type: 'text'  },
                           { label: 'Zip',            key: 'zip',              type: 'text'  },
@@ -432,6 +444,22 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
                               className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600" />
                           </div>
                         ))}
+                        <div>
+                          <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Additional Emails <span className="font-normal normal-case text-gray-400">(one per line)</span></label>
+                          <textarea rows={2}
+                            value={clientForm._additionalEmailsRaw || ''}
+                            onChange={e => setClientForm(p => ({ ...p, _additionalEmailsRaw: e.target.value }))}
+                            placeholder="extra@example.com"
+                            className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-600/30" />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Additional Phones <span className="font-normal normal-case text-gray-400">(one per line)</span></label>
+                          <textarea rows={2}
+                            value={clientForm._additionalPhonesRaw || ''}
+                            onChange={e => setClientForm(p => ({ ...p, _additionalPhonesRaw: e.target.value }))}
+                            placeholder="(555) 555-5555"
+                            className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-600/30" />
+                        </div>
                         <div>
                           <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">State</label>
                           <select
@@ -511,7 +539,13 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
                       value={`${clientData.spouse_first_name || ''} ${clientData.spouse_last_name || ''}`.trim()} />
                     <Field label="Secondary contact"
                       value={`${contactData?.secondary_first_name || ''} ${contactData?.secondary_last_name || ''}`.trim()} />
-                    <Field label="Cell"            value={contactData?.cell || ''} link={contactData?.cell ? `tel:${contactData.cell}` : null} />
+                    <Field label="Cell"            value={clientData.cell || contactData?.cell || ''} link={(clientData.cell || contactData?.cell) ? `tel:${clientData.cell || contactData?.cell}` : null} />
+                    {Array.isArray(clientData.additional_phones) && clientData.additional_phones.filter(Boolean).map((p, i) => (
+                      <Field key={`addphn-${i}`} label={`Phone ${i + 2}`} value={p} link={`tel:${p}`} />
+                    ))}
+                    {Array.isArray(clientData.additional_emails) && clientData.additional_emails.filter(Boolean).map((e, i) => (
+                      <Field key={`addem-${i}`} label={`Email ${i + 2}`} value={e} link={`mailto:${e}`} />
+                    ))}
                     <Field label="Other email"     value={clientData.other_email} link={clientData.other_email ? `mailto:${clientData.other_email}` : null} />
                     <Field label="Website"         value={clientData.website} link={clientData.website ? (clientData.website.startsWith('http') ? clientData.website : `https://${clientData.website}`) : null} />
                     <Field label="Other address"   value={clientData.other_address} />

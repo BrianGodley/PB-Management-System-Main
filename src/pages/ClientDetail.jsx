@@ -111,6 +111,11 @@ export default function ClientDetail() {
     e.preventDefault()
     setSaving(true)
     const combined = [form.first_name?.trim(), form.last_name?.trim()].filter(Boolean).join(' ')
+    const splitMulti = raw => raw
+      ? raw.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
+      : null
+    const addlEmails = splitMulti(form._additionalEmailsRaw)
+    const addlPhones = splitMulti(form._additionalPhonesRaw)
     const { error } = await supabase.from('clients').update({
       first_name: form.first_name?.trim() || null, last_name: form.last_name?.trim() || null,
       spouse_first_name: form.spouse_first_name?.trim() || null,
@@ -118,12 +123,26 @@ export default function ClientDetail() {
       name: combined || form.name?.trim(),
       company_name: form.company_name?.trim() || null, company_position: form.company_position?.trim() || null,
       email: form.email?.trim() || null, phone: form.phone?.trim() || null,
+      cell:  form.cell?.trim() || null,
+      additional_emails: addlEmails && addlEmails.length ? addlEmails : null,
+      additional_phones: addlPhones && addlPhones.length ? addlPhones : null,
       street: form.street?.trim() || null, city: form.city?.trim() || null,
       state: form.state || null, zip: form.zip?.trim() || null,
       notes: form.notes?.trim() || null,
     }).eq('id', id)
     setSaving(false)
-    if (!error) { setClient({ ...client, ...form, name: combined || form.name?.trim() }); setEditing(false) }
+    if (!error) {
+      setClient({
+        ...client,
+        ...form,
+        name: combined || form.name?.trim(),
+        // Reflect the parsed arrays in local state (form holds raw strings).
+        additional_emails: addlEmails && addlEmails.length ? addlEmails : null,
+        additional_phones: addlPhones && addlPhones.length ? addlPhones : null,
+        cell: form.cell?.trim() || null,
+      })
+      setEditing(false)
+    }
   }
 
   async function handleEstimateNext(data) {
@@ -260,6 +279,7 @@ export default function ClientDetail() {
                         { label: 'Position',   key: 'company_position', type: 'text' },
                         { label: 'Email',      key: 'email', type: 'email' },
                         { label: 'Phone',      key: 'phone', type: 'tel' },
+                        { label: 'Cell',       key: 'cell',  type: 'tel' },
                         { label: 'Street',     key: 'street', type: 'text' },
                         { label: 'City',       key: 'city',   type: 'text' },
                         { label: 'Zip',        key: 'zip',    type: 'text' },
@@ -270,6 +290,20 @@ export default function ClientDetail() {
                             value={form[f.key] || ''} onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))} />
                         </div>
                       ))}
+                      <div>
+                        <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Additional Emails <span className="font-normal normal-case text-gray-400">(one per line)</span></label>
+                        <textarea className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-600/30"
+                          rows={2} value={form._additionalEmailsRaw || ''}
+                          onChange={e => setForm(p => ({ ...p, _additionalEmailsRaw: e.target.value }))}
+                          placeholder="extra@example.com" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Additional Phones <span className="font-normal normal-case text-gray-400">(one per line)</span></label>
+                        <textarea className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-600/30"
+                          rows={2} value={form._additionalPhonesRaw || ''}
+                          onChange={e => setForm(p => ({ ...p, _additionalPhonesRaw: e.target.value }))}
+                          placeholder="(555) 555-5555" />
+                      </div>
                       <div>
                         <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">State</label>
                         <select className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30"
@@ -309,7 +343,15 @@ export default function ClientDetail() {
                             )}
                           </div>
                         </div>
-                        <button onClick={() => setEditing(true)} className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-slate-100 transition-colors" title="Edit">
+                        <button onClick={() => {
+                          // Hydrate textarea-backed fields from the array columns.
+                          setForm(p => ({
+                            ...client,
+                            _additionalEmailsRaw: Array.isArray(client.additional_emails) ? client.additional_emails.join('\n') : '',
+                            _additionalPhonesRaw: Array.isArray(client.additional_phones) ? client.additional_phones.join('\n') : '',
+                          }))
+                          setEditing(true)
+                        }} className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-slate-100 transition-colors" title="Edit">
                           <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M11.5 1.5a1.414 1.414 0 0 1 2 2L5 12l-3 1 1-3 8.5-8.5z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>
                         </button>
                       </div>
@@ -326,12 +368,30 @@ export default function ClientDetail() {
                             <a href={`tel:${client.phone}`} className="font-semibold text-gray-900 hover:text-green-700">{client.phone}</a>
                           </div>
                         )}
+                        {client.cell && (
+                          <div className="flex items-center gap-1.5">
+                            <span>📱</span>
+                            <a href={`tel:${client.cell}`} className="font-semibold text-gray-900 hover:text-green-700">{client.cell}</a>
+                          </div>
+                        )}
+                        {Array.isArray(client.additional_phones) && client.additional_phones.filter(Boolean).map((p, i) => (
+                          <div key={`phn-${i}`} className="flex items-center gap-1.5">
+                            <span>📞</span>
+                            <a href={`tel:${p}`} className="font-semibold text-gray-700 hover:text-green-700">{p}</a>
+                          </div>
+                        ))}
                         {client.email && (
                           <div className="flex items-center gap-1.5 min-w-0">
                             <span className="flex-shrink-0">✉️</span>
                             <a href={`mailto:${client.email}`} className="font-semibold text-gray-900 hover:text-green-700 truncate">{client.email}</a>
                           </div>
                         )}
+                        {Array.isArray(client.additional_emails) && client.additional_emails.filter(Boolean).map((e, i) => (
+                          <div key={`em-${i}`} className="flex items-center gap-1.5 min-w-0">
+                            <span className="flex-shrink-0">✉️</span>
+                            <a href={`mailto:${e}`} className="font-semibold text-gray-700 hover:text-green-700 truncate">{e}</a>
+                          </div>
+                        ))}
                         {client.notes && (
                           <div className="pt-2 border-t border-slate-100">
                             <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">Notes</p>

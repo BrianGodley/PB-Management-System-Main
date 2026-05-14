@@ -113,8 +113,10 @@ function AddIndividualModal({ onSave, onClose, user }) {
     first_name: '', last_name: '',
     spouse_first_name: '', spouse_last_name: '',
     street: '', city: '', state: '', zip: '',
-    email: '', phone: '',
+    email: '', phone: '', cell: '',
     other_email: '', other_address: '',
+    // Raw textareas; split into arrays on save (one per line or comma-separated).
+    _additionalEmailsRaw: '', _additionalPhonesRaw: '',
     notes: '',
   })
   const [mode, setMode]               = useState('scratch')
@@ -133,7 +135,7 @@ function AddIndividualModal({ onSave, onClose, user }) {
     if (mode !== 'contact' || contacts.length > 0) return
     fetchAllPaginated(() =>
       supabase.from('contacts')
-        .select('id, first_name, last_name, email, phone, cell, street_address, city, state, zip, secondary_first_name, secondary_last_name')
+        .select('id, first_name, last_name, email, phone, cell, additional_emails, additional_phones, street_address, city, state, zip, secondary_first_name, secondary_last_name')
         .order('last_name')
     ).then(({ data }) => setContacts(data || []))
   }, [mode])
@@ -158,9 +160,12 @@ function AddIndividualModal({ onSave, onClose, user }) {
       state:             c.state                   || '',
       zip:               c.zip                     || '',
       email:             c.email                   || '',
-      phone:             c.phone || c.cell         || '',
+      phone:             c.phone                   || '',
+      cell:              c.cell                    || '',
       other_email:       '',
       other_address:     '',
+      _additionalEmailsRaw: Array.isArray(c.additional_emails) ? c.additional_emails.join('\n') : '',
+      _additionalPhonesRaw: Array.isArray(c.additional_phones) ? c.additional_phones.join('\n') : '',
       notes:             '',
     })
   }
@@ -173,6 +178,11 @@ function AddIndividualModal({ onSave, onClose, user }) {
     }
     setSaving(true); setSaveError('')
     const name = [form.first_name.trim(), form.last_name.trim()].filter(Boolean).join(' ')
+    const splitMulti = raw => raw
+      ? raw.split(/[\n,]+/).map(s => s.trim()).filter(Boolean)
+      : null
+    const addlEmails = splitMulti(form._additionalEmailsRaw)
+    const addlPhones = splitMulti(form._additionalPhonesRaw)
     const { error } = await supabase.from('clients').insert({
       client_type:       'individual',
       first_name:        form.first_name.trim(),
@@ -182,6 +192,9 @@ function AddIndividualModal({ onSave, onClose, user }) {
       spouse_last_name:  form.spouse_last_name.trim()  || null,
       email:             form.email.trim()             || null,
       phone:             form.phone.trim()             || null,
+      cell:              form.cell.trim()              || null,
+      additional_emails: addlEmails && addlEmails.length ? addlEmails : null,
+      additional_phones: addlPhones && addlPhones.length ? addlPhones : null,
       other_email:       form.other_email.trim()       || null,
       other_address:     form.other_address.trim()     || null,
       street:            form.street.trim()            || null,
@@ -269,9 +282,18 @@ function AddIndividualModal({ onSave, onClose, user }) {
           </div>
 
           {/* Contact info */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
+            <div><label className={lbl}>Phone</label><input className={inp} type="tel" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(555) 555-5555" /></div>
+            <div><label className={lbl}>Cell</label><input className={inp} type="tel" value={form.cell} onChange={e => set('cell', e.target.value)} placeholder="(555) 555-5555" /></div>
             <div><label className={lbl}>Email</label><input className={inp} type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="email@example.com" /></div>
-            <div><label className={lbl}>Cell Phone</label><input className={inp} type="tel" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(555) 555-5555" /></div>
+          </div>
+          <div>
+            <label className={lbl}>Additional Emails <span className="font-normal text-gray-400">(one per line)</span></label>
+            <textarea className={`${inp} resize-none`} rows={2} value={form._additionalEmailsRaw} onChange={e => set('_additionalEmailsRaw', e.target.value)} placeholder="extra@email.com" />
+          </div>
+          <div>
+            <label className={lbl}>Additional Phones <span className="font-normal text-gray-400">(one per line)</span></label>
+            <textarea className={`${inp} resize-none`} rows={2} value={form._additionalPhonesRaw} onChange={e => set('_additionalPhonesRaw', e.target.value)} placeholder="(555) 555-5555" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div><label className={lbl}>Other Email</label><input className={inp} type="email" value={form.other_email} onChange={e => set('other_email', e.target.value)} placeholder="other@example.com" /></div>
