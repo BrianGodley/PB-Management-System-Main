@@ -63,6 +63,59 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
   const [consultant,     setConsultant]     = useState(job.consultant || '')
   const [projectManager, setProjectManager] = useState(job.project_manager || '')
 
+  // Per-tab edit toggles. Both tabs default to read-only; user clicks Edit
+  // to switch into the input form. (Will become permission-driven later.)
+  const [editingDetails, setEditingDetails] = useState(false)
+  const [editingClient,  setEditingClient]  = useState(false)
+
+  // Revert all Job Details state back to whatever's on the job prop. Used by
+  // Cancel in the Details tab.
+  function resetDetailsForm() {
+    setStatus(job.status || 'active')
+    setJobTitle(job.name || job.client_name || '')
+    setAddress(job.job_address || '')
+    setCity(job.job_city || '')
+    setState(job.job_state || '')
+    setZip(job.job_zip || '')
+    const v = job.total_price ?? job.contract_price ?? ''
+    setContractPrice(v === '' || v === null || v === undefined ? '' : String(v))
+    setPermitNumber(job.permit_number || '')
+    setConsultant(job.consultant || '')
+    setProjectManager(job.project_manager || '')
+    setError('')
+  }
+
+  // Revert Client tab + Site Access state back to last-loaded values. Used
+  // by Cancel in the Client tab.
+  function resetClientForm() {
+    if (clientData) {
+      setClientForm({
+        first_name:        clientData.first_name        || '',
+        last_name:         clientData.last_name         || '',
+        spouse_first_name: clientData.spouse_first_name || '',
+        spouse_last_name:  clientData.spouse_last_name  || '',
+        company_name:      clientData.company_name      || '',
+        company_position:  clientData.company_position  || '',
+        email:             clientData.email             || '',
+        phone:             clientData.phone             || '',
+        cell:              clientData.cell              || '',
+        _additionalEmailsRaw: Array.isArray(clientData.additional_emails) ? clientData.additional_emails.join('\n') : '',
+        _additionalPhonesRaw: Array.isArray(clientData.additional_phones) ? clientData.additional_phones.join('\n') : '',
+        street:            clientData.street            || '',
+        city:              clientData.city              || '',
+        state:             clientData.state             || '',
+        zip:               clientData.zip               || '',
+        other_email:       clientData.other_email       || '',
+        other_address:     clientData.other_address     || '',
+        website:           clientData.website           || '',
+        notes:             clientData.notes             || '',
+      })
+    }
+    setGateCode(job.gate_code || '')
+    setHasDog(!!job.has_dog)
+    setAccessNotes(job.access_notes || '')
+  }
+
   useEffect(() => {
     supabase.from('employees')
       .select('id, first_name, last_name')
@@ -176,11 +229,13 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
     label: `${e.last_name}, ${e.first_name}`.trim(),
   }))
 
-  async function handleSave() {
+  // Save just the Job Details fields (status, name, address, contract,
+  // permit, consultant, project manager). Site access lives on the job too
+  // but is edited from the Client tab — see handleSaveClient.
+  async function handleSaveDetails() {
     if (!jobTitle.trim()) { setError('Job title cannot be empty.'); return }
     setSaving(true)
     setError('')
-    // Coerce the contract price string back to a number; blank/invalid → null
     const cpNum = contractPrice === '' ? null : parseFloat(contractPrice)
     const ok = await onSave(job.id, {
       name:            jobTitle.trim(),
@@ -191,15 +246,26 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
       job_zip:         zip.trim(),
       total_price:     Number.isFinite(cpNum) ? cpNum : null,
       permit_number:   permitNumber.trim() || null,
-      gate_code:       gateCode.trim() || null,
-      has_dog:         !!hasDog,
-      access_notes:    accessNotes.trim() || null,
       consultant:      consultant || null,
       project_manager: projectManager || null,
     })
+    setSaving(false)
+    if (!ok) setError('Failed to save the job. Please try again.')
+    else     setEditingDetails(false)
+  }
 
-    // Save the client row alongside the job. Same payload as saveClient(),
-    // run unconditionally so any edit on the Client tab persists in one click.
+  // Save the client row plus the Site Access fields on the job.
+  async function handleSaveClient() {
+    setSaving(true)
+    setError('')
+    // Site access lives on the jobs row; bundle with this Save so the Client
+    // tab is a self-contained editor.
+    const jobOk = await onSave(job.id, {
+      gate_code:    gateCode.trim() || null,
+      has_dog:      !!hasDog,
+      access_notes: accessNotes.trim() || null,
+    })
+
     let clientOk = true
     if (clientData?.id) {
       const f = clientForm
@@ -238,12 +304,13 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
     }
 
     setSaving(false)
-    if (!ok)         setError('Failed to save the job. Please try again.')
-    else if (!clientOk) setError('Job saved, but the client update failed.')
+    if (!jobOk)         setError('Failed to save site access on the job.')
+    else if (!clientOk) setError('Site access saved, but the client update failed.')
+    else                setEditingClient(false)
   }
 
   const TABS = [
-    { key: 'info',      label: 'Job Info' },
+    { key: 'info',      label: 'Job Details' },
     { key: 'client',    label: 'Client' },
     { key: 'employees', label: 'Employees' },
   ]
@@ -287,160 +354,190 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
         {/* Tab content */}
         <div className="overflow-y-auto flex-1">
 
-          {/* ── Job Info tab ── */}
+          {/* ── Job Details tab ── */}
           {activeTab === 'info' && (
             <div className="px-5 py-4 space-y-5">
+
+              {/* Edit / Save / Cancel toolbar */}
+              <div className="flex items-center justify-between flex-shrink-0 -mb-2">
+                <p className="text-xs text-gray-400">
+                  {editingDetails ? 'Editing job details' : 'Read-only — click Edit to make changes'}
+                </p>
+                {editingDetails ? (
+                  <div className="flex gap-2">
+                    <button onClick={() => { resetDetailsForm(); setEditingDetails(false) }}
+                      className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50">
+                      Cancel
+                    </button>
+                    <button onClick={handleSaveDetails} disabled={saving}
+                      className="px-3 py-1.5 rounded-lg bg-green-700 text-white text-xs font-semibold hover:bg-green-800 disabled:opacity-50">
+                      {saving ? 'Saving…' : 'Save'}
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => setEditingDetails(true)}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-green-700 text-xs font-semibold text-green-700 hover:bg-green-50">
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                      <path d="M11.5 1.5a1.414 1.414 0 0 1 2 2L5 12l-3 1 1-3 8.5-8.5z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    Edit
+                  </button>
+                )}
+              </div>
 
               {/* Main Details */}
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Main Details</p>
 
-                {/* Row 1: Status + Job Title (Job Title takes 2 cols on wide screens) */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Status</label>
-                    <select
-                      value={status}
-                      onChange={e => setStatus(e.target.value)}
-                      className="input text-sm w-full"
-                    >
-                      <option value="active">Open</option>
-                      <option value="completed">Closed</option>
-                    </select>
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-xs text-gray-500 mb-1">Job Name</label>
-                    <input
-                      type="text"
-                      value={jobTitle}
-                      onChange={e => { setJobTitle(e.target.value); setError('') }}
-                      className="input text-sm w-full"
-                      placeholder="Job name"
-                    />
-                  </div>
-                </div>
-
-                {/* Row 2: Street Address (full width) */}
-                <div className="mb-3">
-                  <label className="block text-xs text-gray-500 mb-1">Job Street Address</label>
-                  <input
-                    type="text"
-                    value={address}
-                    onChange={e => setAddress(e.target.value)}
-                    className="input text-sm w-full"
-                    placeholder="123 Main St"
-                  />
-                </div>
-
-                {/* Row 3: City, State, Zip */}
-                <div className="grid grid-cols-3 gap-2 mb-3">
-                  <div className="col-span-1">
-                    <label className="block text-xs text-gray-500 mb-1">Job City</label>
-                    <input
-                      type="text"
-                      value={city}
-                      onChange={e => setCity(e.target.value)}
-                      className="input text-sm w-full"
-                      placeholder="City"
-                    />
-                  </div>
-                  <div className="col-span-1">
-                    <label className="block text-xs text-gray-500 mb-1">Job State</label>
-                    <input
-                      type="text"
-                      value={state}
-                      onChange={e => setState(e.target.value)}
-                      className="input text-sm w-full"
-                      placeholder="CA"
-                      maxLength={2}
-                    />
-                  </div>
-                  <div className="col-span-1">
-                    <label className="block text-xs text-gray-500 mb-1">Job Zip Code</label>
-                    <input
-                      type="text"
-                      value={zip}
-                      onChange={e => setZip(e.target.value)}
-                      className="input text-sm w-full"
-                      placeholder="90210"
-                      maxLength={10}
-                    />
-                  </div>
-                </div>
-
-                {/* Row 4: Contract Price + Permit # */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Job Total Contract Price</label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">$</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={contractPrice}
-                        onChange={e => setContractPrice(e.target.value)}
-                        className="input text-sm w-full pl-7"
-                        placeholder="0.00"
-                      />
+                {editingDetails ? (
+                  <>
+                    {/* Row 1: Status + Job Title (Job Title takes 2 cols on wide screens) */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Status</label>
+                        <select value={status} onChange={e => setStatus(e.target.value)} className="input text-sm w-full">
+                          <option value="active">Open</option>
+                          <option value="completed">Closed</option>
+                        </select>
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-xs text-gray-500 mb-1">Job Name</label>
+                        <input type="text" value={jobTitle}
+                          onChange={e => { setJobTitle(e.target.value); setError('') }}
+                          className="input text-sm w-full" placeholder="Job name" />
+                      </div>
                     </div>
-                    <p className="text-[11px] text-gray-400 mt-1">Pulled from the sold bid; edit if the contract has changed.</p>
+
+                    {/* Row 2: Street Address (full width) */}
+                    <div className="mb-3">
+                      <label className="block text-xs text-gray-500 mb-1">Job Street Address</label>
+                      <input type="text" value={address} onChange={e => setAddress(e.target.value)}
+                        className="input text-sm w-full" placeholder="123 Main St" />
+                    </div>
+
+                    {/* Row 3: City, State, Zip */}
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Job City</label>
+                        <input type="text" value={city} onChange={e => setCity(e.target.value)}
+                          className="input text-sm w-full" placeholder="City" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Job State</label>
+                        <input type="text" value={state} onChange={e => setState(e.target.value)}
+                          className="input text-sm w-full" placeholder="CA" maxLength={2} />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Job Zip Code</label>
+                        <input type="text" value={zip} onChange={e => setZip(e.target.value)}
+                          className="input text-sm w-full" placeholder="90210" maxLength={10} />
+                      </div>
+                    </div>
+
+                    {/* Row 4: Contract Price + Permit # */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Job Total Contract Price</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">$</span>
+                          <input type="number" step="0.01" min="0" value={contractPrice}
+                            onChange={e => setContractPrice(e.target.value)}
+                            className="input text-sm w-full pl-7" placeholder="0.00" />
+                        </div>
+                        <p className="text-[11px] text-gray-400 mt-1">Pulled from the sold bid; edit if the contract has changed.</p>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Permit #</label>
+                        <input type="text" value={permitNumber} onChange={e => setPermitNumber(e.target.value)}
+                          className="input text-sm w-full" placeholder="e.g. BLD-2026-00123" />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-1.5">
+                    <Field label="Status"          value={status === 'completed' ? 'Closed' : 'Open'} />
+                    <Field label="Job Name"        value={jobTitle} />
+                    <Field label="Street Address"  value={address} />
+                    <Field label="City"            value={city} />
+                    <Field label="State"           value={state} />
+                    <Field label="Zip Code"        value={zip} />
+                    <Field label="Contract Price"
+                      value={contractPrice ? '$' + Number(contractPrice).toLocaleString() : ''} />
+                    <Field label="Permit #"        value={permitNumber} mono />
                   </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Permit #</label>
-                    <input
-                      type="text"
-                      value={permitNumber}
-                      onChange={e => setPermitNumber(e.target.value)}
-                      className="input text-sm w-full"
-                      placeholder="e.g. BLD-2026-00123"
-                    />
-                  </div>
-                </div>
+                )}
               </div>
 
               {/* Assignments */}
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Assignments</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Consultant</label>
-                    <select
-                      value={consultant}
-                      onChange={e => setConsultant(e.target.value)}
-                      className="input text-sm w-full"
-                    >
-                      <option value="">— Select consultant —</option>
-                      {employeeOptions.map(o => (
-                        <option key={o.value} value={o.value}>{o.label}</option>
-                      ))}
-                    </select>
+                {editingDetails ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Consultant</label>
+                      <select value={consultant} onChange={e => setConsultant(e.target.value)} className="input text-sm w-full">
+                        <option value="">— Select consultant —</option>
+                        {employeeOptions.map(o => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Job Supervisor</label>
+                      <select value={projectManager} onChange={e => setProjectManager(e.target.value)} className="input text-sm w-full">
+                        <option value="">— Select job supervisor —</option>
+                        {employeeOptions.map(o => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Job Supervisor</label>
-                    <select
-                      value={projectManager}
-                      onChange={e => setProjectManager(e.target.value)}
-                      className="input text-sm w-full"
-                    >
-                      <option value="">— Select job supervisor —</option>
-                      {employeeOptions.map(o => (
-                        <option key={o.value} value={o.value}>{o.label}</option>
-                      ))}
-                    </select>
+                ) : (
+                  <div className="space-y-1.5">
+                    <Field label="Consultant"     value={consultant} />
+                    <Field label="Job Supervisor" value={projectManager} />
                   </div>
-                </div>
+                )}
               </div>
 
               {error && <p className="text-xs text-red-500">{error}</p>}
             </div>
           )}
 
-          {/* ── Client tab — Job-Info-style, always-editable form.
-               The global footer Save button writes both the job AND the
-               client in one click via handleSave(). ── */}
+          {/* ── Client tab — read-only by default, click Edit to change.
+               Saving writes both the client row AND the Site Access fields
+               on the job (handleSaveClient). ── */}
           {activeTab === 'client' && (
             <div className="px-5 py-4 space-y-5">
+              {/* Edit / Save / Cancel toolbar */}
+              {clientData && (
+                <div className="flex items-center justify-between flex-shrink-0 -mb-2">
+                  <p className="text-xs text-gray-400">
+                    {editingClient ? 'Editing client + site access' : 'Read-only — click Edit to make changes'}
+                  </p>
+                  {editingClient ? (
+                    <div className="flex gap-2">
+                      <button onClick={() => { resetClientForm(); setEditingClient(false) }}
+                        className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50">
+                        Cancel
+                      </button>
+                      <button onClick={handleSaveClient} disabled={saving}
+                        className="px-3 py-1.5 rounded-lg bg-green-700 text-white text-xs font-semibold hover:bg-green-800 disabled:opacity-50">
+                        {saving ? 'Saving…' : 'Save'}
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setEditingClient(true)}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-green-700 text-xs font-semibold text-green-700 hover:bg-green-50">
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                        <path d="M11.5 1.5a1.414 1.414 0 0 1 2 2L5 12l-3 1 1-3 8.5-8.5z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      Edit
+                    </button>
+                  )}
+                </div>
+              )}
+
               {loadingClient ? (
                 <div className="flex justify-center py-8">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-700" />
@@ -454,6 +551,115 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
                     No matching client record found. This usually means the job was imported from BuilderTrend or the client name on the job doesn't exactly match a record in the Clients module. Open the contact or client manually to fill in details.
                   </p>
                 </div>
+              ) : !editingClient ? (
+                /* ── Read-only display of every editable field ── */
+                <>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Identity</p>
+                    <div className="space-y-1.5">
+                      <Field label="First Name"            value={clientData.first_name} />
+                      <Field label="Last Name"             value={clientData.last_name}  />
+                      <Field label="Company"               value={clientData.company_name} />
+                      <Field label="Position"              value={clientData.company_position} />
+                      <Field label="Spouse / Partner First" value={clientData.spouse_first_name} />
+                      <Field label="Spouse / Partner Last"  value={clientData.spouse_last_name} />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Contact info</p>
+                    <div className="space-y-1.5">
+                      <Field label="Phone" value={clientData.phone} link={clientData.phone ? `tel:${clientData.phone}` : null} />
+                      <Field label="Cell"  value={clientData.cell}  link={clientData.cell  ? `tel:${clientData.cell}`  : null} />
+                      <Field label="Email" value={clientData.email} link={clientData.email ? `mailto:${clientData.email}` : null} />
+                      {Array.isArray(clientData.additional_phones) && clientData.additional_phones.filter(Boolean).map((p, i) => (
+                        <Field key={`ph-${i}`} label={`Phone ${i + 2}`} value={p} link={`tel:${p}`} />
+                      ))}
+                      {Array.isArray(clientData.additional_emails) && clientData.additional_emails.filter(Boolean).map((e, i) => (
+                        <Field key={`em-${i}`} label={`Email ${i + 2}`} value={e} link={`mailto:${e}`} />
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Address</p>
+                    <div className="space-y-1.5">
+                      <Field label="Street" value={clientData.street} />
+                      <Field label="City"   value={clientData.city} />
+                      <Field label="State"  value={clientData.state} />
+                      <Field label="Zip"    value={clientData.zip} />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Other</p>
+                    <div className="space-y-1.5">
+                      <Field label="Other Email"   value={clientData.other_email} link={clientData.other_email ? `mailto:${clientData.other_email}` : null} />
+                      <Field label="Other Address" value={clientData.other_address} />
+                      <Field label="Website"       value={clientData.website} link={clientData.website ? (clientData.website.startsWith('http') ? clientData.website : `https://${clientData.website}`) : null} />
+                      <div className="pt-2 border-t border-slate-100">
+                        <p className="text-xs text-gray-400 mb-1">Notes</p>
+                        {clientData.notes
+                          ? <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{clientData.notes}</p>
+                          : <p className="text-sm text-gray-300">—</p>}
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Site access</p>
+                    <div className="space-y-1.5">
+                      <Field label="Gate code"   value={gateCode} />
+                      <Field label="Dog on site" value={hasDog ? 'Yes' : 'No'} />
+                      <div className="pt-2 border-t border-slate-100">
+                        <p className="text-xs text-gray-400 mb-1">Access notes</p>
+                        {accessNotes
+                          ? <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{accessNotes}</p>
+                          : <p className="text-sm text-gray-300">—</p>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Read-only contact-record info still shown in read mode */}
+                  {(contactData?.secondary_first_name || contactData?.source ||
+                    contactData?.how_did_you_hear || contactData?.campaign ||
+                    contactData?.project_description) && (
+                    <Section title="From the contact record">
+                      <Field label="Secondary contact"
+                        value={`${contactData?.secondary_first_name || ''} ${contactData?.secondary_last_name || ''}`.trim()} />
+                      <Field label="Source"            value={contactData?.source} />
+                      <Field label="How did you hear?" value={contactData?.how_did_you_hear} />
+                      <Field label="Campaign"          value={contactData?.campaign} />
+                      {contactData?.project_description && (
+                        <div className="pt-2 border-t border-slate-100">
+                          <p className="text-xs text-gray-400 mb-1">Project description</p>
+                          <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{contactData.project_description}</p>
+                        </div>
+                      )}
+                    </Section>
+                  )}
+
+                  {(clientData.client_type === 'company' || (clientData.company_contacts || []).length > 0) && (
+                    <Section title="Company contacts">
+                      {(clientData.company_contacts || []).length === 0 ? (
+                        <p className="text-xs text-gray-400 italic">No company contacts listed.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {clientData.company_contacts.map((cc, i) => (
+                            <div key={i} className="border border-gray-200 rounded-lg p-2.5">
+                              <p className="text-sm font-semibold text-gray-800">
+                                {`${cc.first_name || ''} ${cc.last_name || ''}`.trim() || '—'}
+                                {cc.position && <span className="text-xs text-gray-500 font-normal ml-2">· {cc.position}</span>}
+                              </p>
+                              {(cc.phone || cc.email) && (
+                                <p className="text-xs text-gray-600 mt-0.5 flex gap-3">
+                                  {cc.phone && <a href={`tel:${cc.phone}`} className="hover:text-green-700">{cc.phone}</a>}
+                                  {cc.email && <a href={`mailto:${cc.email}`} className="hover:text-green-700">{cc.email}</a>}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </Section>
+                  )}
+                </>
               ) : (
                 <>
                   {/* Identity */}
@@ -653,38 +859,42 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
                 </>
               )}
 
-              {/* SITE ACCESS — always editable, lives on the job row */}
-              <Section title="Site access">
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Gate code</label>
-                    <input
-                      type="text" value={gateCode}
-                      onChange={e => setGateCode(e.target.value)}
-                      className="input text-sm w-full"
-                      placeholder="e.g. 1234#"
-                    />
+              {/* SITE ACCESS — only rendered in edit mode (read-mode shows
+                   the same fields as Field rows above). Lives on the job row. */}
+              {editingClient && clientData && (
+                <Section title="Site access">
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Gate code</label>
+                      <input
+                        type="text" value={gateCode}
+                        onChange={e => setGateCode(e.target.value)}
+                        className="input text-sm w-full"
+                        placeholder="e.g. 1234#"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="has-dog" type="checkbox" checked={hasDog}
+                        onChange={e => setHasDog(e.target.checked)}
+                        className="w-4 h-4 rounded accent-amber-600"
+                      />
+                      <label htmlFor="has-dog" className="text-sm text-gray-700 cursor-pointer">🐕 Dog on premises</label>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Access notes</label>
+                      <textarea
+                        rows={3} value={accessNotes}
+                        onChange={e => setAccessNotes(e.target.value)}
+                        className="input text-sm w-full"
+                        placeholder="e.g. Keys with neighbor at #45 · Park on the street · Side gate sticks"
+                      />
+                    </div>
+                    <p className="text-[11px] text-gray-400 italic">These will move into the Job Details questionnaire when that lands; safe to fill in for now.</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      id="has-dog" type="checkbox" checked={hasDog}
-                      onChange={e => setHasDog(e.target.checked)}
-                      className="w-4 h-4 rounded accent-amber-600"
-                    />
-                    <label htmlFor="has-dog" className="text-sm text-gray-700 cursor-pointer">🐕 Dog on premises</label>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Access notes</label>
-                    <textarea
-                      rows={3} value={accessNotes}
-                      onChange={e => setAccessNotes(e.target.value)}
-                      className="input text-sm w-full"
-                      placeholder="e.g. Keys with neighbor at #45 · Park on the street · Side gate sticks"
-                    />
-                  </div>
-                  <p className="text-[11px] text-gray-400 italic">These will move into the Job Details questionnaire when that lands; safe to fill in for now.</p>
-                </div>
-              </Section>
+                </Section>
+              )}
+              {error && <p className="text-xs text-red-500">{error}</p>}
             </div>
           )}
 
@@ -715,32 +925,29 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
 
         </div>
 
-        {/* Footer */}
-        <div className="px-5 py-4 border-t border-gray-100 flex gap-2 flex-shrink-0">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex-1 btn-primary text-sm py-2 disabled:opacity-50"
-          >
-            {saving ? 'Saving…' : 'Save'}
-          </button>
-          {!inline && (
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
-            >
-              Close
-            </button>
-          )}
-          {onDelete && (
-            <button
-              onClick={() => onDelete(job.id, job.name || job.client_name)}
-              className="px-4 py-2 text-sm rounded-lg border border-red-200 text-red-500 hover:bg-red-50 hover:border-red-300 transition-colors"
-            >
-              Delete
-            </button>
-          )}
-        </div>
+        {/* Footer — Save lives in each tab now (Edit → Save/Cancel pattern).
+             Footer only carries the modal-only Close button and the
+             persistent Delete affordance. */}
+        {(!inline || onDelete) && (
+          <div className="px-5 py-4 border-t border-gray-100 flex gap-2 flex-shrink-0 justify-end">
+            {!inline && (
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
+              >
+                Close
+              </button>
+            )}
+            {onDelete && (
+              <button
+                onClick={() => onDelete(job.id, job.name || job.client_name)}
+                className="px-4 py-2 text-sm rounded-lg border border-red-200 text-red-500 hover:bg-red-50 hover:border-red-300 transition-colors"
+              >
+                Delete
+              </button>
+            )}
+          </div>
+        )}
     </>
   )
 
