@@ -36,22 +36,31 @@ export default function JobDetail() {
 
   async function fetchData() {
     setLoading(true)
+    // Fetch the bare job row first. If we tried to embed projects/modules/
+    // actual_entries/change_orders in a single PostgREST query and ANY one of
+    // those relations errored (e.g. a BT-imported job has no legacy children
+    // and PostgREST trips on the join), the whole call would return null and
+    // the page would render "Job not found." Splitting the call lets the job
+    // still load even when the legacy children are missing or broken.
     const [settingsRes, jobRes] = await Promise.all([
       supabase.from('company_settings').select('*').single(),
-      supabase.from('jobs').select(`
-        *,
-        projects (
-          *,
-          modules (
-            *,
-            actual_entries (*)
-          )
-        ),
-        change_orders (*)
-      `).eq('id', id).single()
+      supabase.from('jobs').select('*').eq('id', id).single(),
     ])
     if (settingsRes.data) setLaborRate(parseFloat(settingsRes.data.labor_rate_per_man_day) || 400)
-    if (jobRes.data) setJob(jobRes.data)
+    if (!jobRes.data) { setLoading(false); return }
+
+    // Pull legacy children in parallel; tolerate failures.
+    const [projectsRes, cosRes] = await Promise.all([
+      supabase.from('projects')
+        .select('*, modules (*, actual_entries (*))')
+        .eq('job_id', jobRes.data.id),
+      supabase.from('change_orders').select('*').eq('job_id', jobRes.data.id),
+    ])
+    setJob({
+      ...jobRes.data,
+      projects:      projectsRes.data || [],
+      change_orders: cosRes.data       || [],
+    })
     setLoading(false)
   }
 

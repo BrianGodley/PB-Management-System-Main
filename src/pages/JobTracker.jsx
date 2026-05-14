@@ -20,22 +20,26 @@ export default function JobTracker() {
 
   async function fetchData() {
     setLoading(true)
+    // Same defensive pattern as JobDetail: fetch the bare job first so a
+    // broken legacy relation can't 404 the whole page.
     const [settingsRes, jobRes] = await Promise.all([
       supabase.from('company_settings').select('*').single(),
-      supabase.from('jobs').select(`
-        *,
-        projects (
-          *,
-          modules (
-            *,
-            actual_entries ( * )
-          )
-        ),
-        change_orders (*)
-      `).eq('id', id).single()
+      supabase.from('jobs').select('*').eq('id', id).single(),
     ])
     if (settingsRes.data) setLaborRate(parseFloat(settingsRes.data.labor_rate_per_man_day) || 400)
-    if (jobRes.data) setJob(jobRes.data)
+    if (!jobRes.data) { setLoading(false); return }
+
+    const [projectsRes, cosRes] = await Promise.all([
+      supabase.from('projects')
+        .select('*, modules ( *, actual_entries ( * ) )')
+        .eq('job_id', jobRes.data.id),
+      supabase.from('change_orders').select('*').eq('job_id', jobRes.data.id),
+    ])
+    setJob({
+      ...jobRes.data,
+      projects:      projectsRes.data || [],
+      change_orders: cosRes.data       || [],
+    })
     setLoading(false)
   }
 
