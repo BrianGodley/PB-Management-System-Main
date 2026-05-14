@@ -2794,6 +2794,14 @@ const CO_STATUS_STYLE = {
   sold:      'border-green-500  text-green-800  bg-green-50',
   lost:      'border-red-400    text-red-800    bg-red-50',
 }
+// CO-context labels — underlying status values stay 'sold'/'lost' but
+// display reads more naturally as "Approved"/"Declined" for change orders.
+const CO_STATUS_LABEL = {
+  pending:   'Pending',
+  presented: 'Sent',
+  sold:      'Approved',
+  lost:      'Declined',
+}
 
 function JobChangeOrdersPanel({ job }) {
   const [cos,         setCos]         = useState([])
@@ -2966,7 +2974,7 @@ function JobChangeOrdersPanel({ job }) {
                     </td>
                     <td className="px-3 py-3 text-center" onClick={e => e.stopPropagation()}>
                       <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border ${CO_STATUS_STYLE[status] || CO_STATUS_STYLE.pending}`}>
-                        {status === 'sold' ? '✓ Approved' : status}
+                        {status === 'sold' && '✓ '}{CO_STATUS_LABEL[status] || status}
                       </span>
                     </td>
                     <td className="px-2 py-3 text-center text-gray-300 text-lg">›</td>

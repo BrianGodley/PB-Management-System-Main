@@ -264,6 +264,7 @@ export default function CODetailModal({ co, job, onClose, onSaved, onDeleted, on
   }
 
   const isApproved = coState?.status === 'sold'
+  const isDeclined = coState?.status === 'lost'
   const formattedAmount = coState ? `$${Number(coState.bid_amount || bidAmount || 0).toLocaleString()}` : `$${Number(bidAmount || 0).toLocaleString()}`
 
   return (
@@ -288,6 +289,16 @@ export default function CODetailModal({ co, job, onClose, onSaved, onDeleted, on
               {isApproved && (
                 <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-green-50 text-green-800 border border-green-300">
                   ✓ Approved
+                </span>
+              )}
+              {isDeclined && (
+                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-300">
+                  ✕ Declined
+                </span>
+              )}
+              {coState?.status === 'pending' && (
+                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-yellow-50 text-yellow-800 border border-yellow-300">
+                  Pending
                 </span>
               )}
               <button onClick={onClose} className="text-gray-300 hover:text-gray-500">
