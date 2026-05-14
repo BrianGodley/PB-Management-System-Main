@@ -10,6 +10,7 @@ import JobComparison from '../components/JobComparison'
 import TemplatesManager from '../components/TemplatesManager'
 import MasterCrews from './MasterCrews'
 import COEstimatePanel  from '../components/COEstimatePanel'
+import CODetailModal    from '../components/CODetailModal'
 import JobInfoModal     from '../components/JobInfoModal'
 import StartLocationsCard from '../components/StartLocationsCard'
 import SupervisorPositionsCard from '../components/SupervisorPositionsCard'
@@ -2784,7 +2785,9 @@ function JobFilesPanel({ job }) {
 }
 
 // ── Job Change Orders Panel ───────────────────────────────────────────────────
-const CO_STATUSES     = ['pending', 'presented', 'sold', 'lost']
+// Layout: ID# | Title | Created | Attachments | GP | Amount | Status | Delete
+// Click a row → CODetailModal. Detailed pricing still uses COEstimatePanel
+// via the "Open detailed estimator" link inside the modal.
 const CO_STATUS_STYLE = {
   pending:   'border-yellow-400 text-yellow-800 bg-yellow-50',
   presented: 'border-blue-400   text-blue-800   bg-blue-50',
@@ -2793,12 +2796,14 @@ const CO_STATUS_STYLE = {
 }
 
 function JobChangeOrdersPanel({ job }) {
-  const [cos,        setCos]        = useState([])
-  const [loading,    setLoading]    = useState(false)
-  const [creatingCO, setCreatingCO] = useState(false)
-  const [updatingId, setUpdatingId] = useState(null)
-
-  // Inline estimator state
+  const [cos,         setCos]         = useState([])
+  const [loading,     setLoading]     = useState(false)
+  const [activeCo,    setActiveCo]    = useState(null)   // { id, ... } when modal is open; { id: null } for new
+  // Counts of attachments per CO id, keyed by bid id
+  const [attCounts,   setAttCounts]   = useState({})
+  // When the user clicks "Open detailed estimator" inside the modal, we
+  // route to the existing COEstimatePanel full-page view. Same state shape
+  // as before so behavior stays identical.
   const [openEstimateId, setOpenEstimateId] = useState(null)
   const [openBidId,      setOpenBidId]      = useState(null)
   const [openCoName,     setOpenCoName]     = useState('')
@@ -2806,14 +2811,31 @@ function JobChangeOrdersPanel({ job }) {
 
   useEffect(() => {
     if (job?.id) fetchCOs(job.id)
-    else { setCos([]); closeEstimator() }
+    else { setCos([]); setActiveCo(null) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job?.id])
 
-  function closeEstimator() {
-    setOpenEstimateId(null)
-    setOpenBidId(null)
-    setOpenCoName('')
-    setOpenCoType('')
+  async function fetchCOs(jobId) {
+    setLoading(true)
+    const { data } = await supabase
+      .from('bids').select('*')
+      .eq('record_type', 'change_order').eq('linked_job_id', jobId)
+      .order('custom_co_id', { ascending: false, nullsFirst: false })
+      .order('date_submitted', { ascending: false })
+    setCos(data || [])
+
+    // Attachment counts in one round-trip (group by bid_id client-side)
+    if (data && data.length > 0) {
+      const ids = data.map(c => c.id)
+      const { data: files } = await supabase.from('job_files')
+        .select('bid_id').in('bid_id', ids)
+      const counts = {}
+      for (const f of files || []) counts[f.bid_id] = (counts[f.bid_id] || 0) + 1
+      setAttCounts(counts)
+    } else {
+      setAttCounts({})
+    }
+    setLoading(false)
   }
 
   function openEstimator(estimateId, bidId, coName, coType) {
@@ -2822,57 +2844,30 @@ function JobChangeOrdersPanel({ job }) {
     setOpenCoName(coName || '')
     setOpenCoType(coType || '')
   }
-
-  async function fetchCOs(jobId) {
-    setLoading(true)
-    const { data } = await supabase
-      .from('bids')
-      .select('*')
-      .eq('record_type', 'change_order')
-      .eq('linked_job_id', jobId)
-      .order('date_submitted', { ascending: false })
-    if (data) setCos(data)
-    setLoading(false)
-  }
-
-  async function handleNewCO() {
-    setCreatingCO(true)
-    const clientName = job.client_name || job.name || ''
-    const { data: est, error } = await supabase
-      .from('estimates')
-      .insert({ estimate_name: '', client_name: clientName, status: 'pending' })
-      .select().single()
-    setCreatingCO(false)
-    if (error) { alert('Error creating estimate: ' + error.message); return }
-    // Open inline estimator with empty description — user fills it in the panel
-    openEstimator(est.id, null, '', '')
+  function closeEstimator() {
+    setOpenEstimateId(null); setOpenBidId(null); setOpenCoName(''); setOpenCoType('')
+    if (job?.id) fetchCOs(job.id)
   }
 
   function handleCoSaved(bid) {
     if (!bid) return
     setCos(prev => {
       const idx = prev.findIndex(c => c.id === bid.id)
-      if (idx >= 0) {
-        const updated = [...prev]
-        updated[idx] = { ...prev[idx], ...bid }
-        return updated
-      }
+      if (idx >= 0) { const updated = [...prev]; updated[idx] = { ...prev[idx], ...bid }; return updated }
       return [bid, ...prev]
     })
   }
 
-  async function handleStatusChange(id, status) {
-    setUpdatingId(id)
-    await supabase.from('bids').update({ status }).eq('id', id)
-    setCos(prev => prev.map(c => c.id === id ? { ...c, status } : c))
-    setUpdatingId(null)
+  function handleCoDeleted(coId) {
+    setCos(prev => prev.filter(c => c.id !== coId))
+    setAttCounts(prev => { const n = { ...prev }; delete n[coId]; return n })
   }
 
-  async function handleDelete(co) {
-    if (!confirm(`Delete change order "${co.co_name}"?`)) return
-    if (co.estimate_id) await supabase.from('estimates').delete().eq('id', co.estimate_id)
-    await supabase.from('bids').delete().eq('id', co.id)
-    setCos(prev => prev.filter(c => c.id !== co.id))
+  // From the detail modal, route to the full estimator
+  function handleOpenEstimator(co) {
+    if (!co?.estimate_id) { alert('This CO has no underlying estimate.'); return }
+    setActiveCo(null)
+    openEstimator(co.estimate_id, co.id, co.co_name, co.co_type)
   }
 
   const fmt = v => '$' + Math.round(parseFloat(v || 0)).toLocaleString()
@@ -2884,25 +2879,20 @@ function JobChangeOrdersPanel({ job }) {
     </div>
   )
 
-  // ── Inline estimator view ────────────────────────────────────────────────
+  // Detailed estimator full-page (route here from the modal's "Open detailed estimator" link)
   if (openEstimateId) {
     return (
       <div className="p-4 flex flex-col h-full">
         <COEstimatePanel
-          estimateId={openEstimateId}
-          bidId={openBidId}
-          coName={openCoName}
-          coType={openCoType}
-          jobId={job.id}
-          clientName={job.client_name || job.name || ''}
-          onClose={closeEstimator}
-          onSaved={handleCoSaved}
+          estimateId={openEstimateId} bidId={openBidId}
+          coName={openCoName} coType={openCoType}
+          jobId={job.id} clientName={job.client_name || job.name || ''}
+          onClose={closeEstimator} onSaved={handleCoSaved}
         />
       </div>
     )
   }
 
-  // ── CO list view ─────────────────────────────────────────────────────────
   return (
     <div className="p-4">
       {/* Header */}
@@ -2911,24 +2901,22 @@ function JobChangeOrdersPanel({ job }) {
           <h2 className="text-lg font-bold text-gray-900">Change Orders</h2>
           <p className="text-xs text-gray-400">{job.client_name || job.name}</p>
         </div>
-        <button onClick={handleNewCO} disabled={creatingCO}
-          className="text-xs px-3 py-1.5 rounded-lg bg-blue-700 text-white font-semibold hover:bg-blue-800 transition-colors disabled:opacity-50">
-          {creatingCO ? 'Creating…' : '+ New Change Order'}
+        <button onClick={() => setActiveCo({})}
+          className="text-xs px-3 py-1.5 rounded-lg bg-blue-700 text-white font-semibold hover:bg-blue-800 transition-colors">
+          + New Change Order
         </button>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-700" />
-        </div>
+        <div className="flex items-center justify-center py-16"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-700" /></div>
       ) : cos.length === 0 ? (
         <div className="flex flex-col items-center py-14 text-gray-400">
           <p className="text-4xl mb-3">📋</p>
           <p className="text-sm font-medium text-gray-500">No change orders yet for this job</p>
-          <p className="text-xs mt-1 mb-5 text-center max-w-xs">Click "+ New Change Order" to build a priced change order using the estimating interface.</p>
-          <button onClick={handleNewCO} disabled={creatingCO}
-            className="text-sm px-4 py-2 rounded-lg bg-blue-700 text-white font-medium hover:bg-blue-800 transition-colors disabled:opacity-50">
-            {creatingCO ? 'Creating…' : '+ New Change Order'}
+          <p className="text-xs mt-1 mb-5 text-center max-w-xs">Click "+ New Change Order" to add one.</p>
+          <button onClick={() => setActiveCo({})}
+            className="text-sm px-4 py-2 rounded-lg bg-blue-700 text-white font-medium hover:bg-blue-800 transition-colors">
+            + New Change Order
           </button>
         </div>
       ) : (
@@ -2936,64 +2924,70 @@ function JobChangeOrdersPanel({ job }) {
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-4 py-3 font-semibold text-gray-700">Change Order</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-700">Type</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-700">Created</th>
-                <th className="text-right px-4 py-3 font-semibold text-gray-700">Gross Profit</th>
-                <th className="text-right px-4 py-3 font-semibold text-gray-700">Amount</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-700">Status</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-700">Delete</th>
+                <th className="text-left px-3 py-3 font-semibold text-gray-700 w-16">CO #</th>
+                <th className="text-left px-3 py-3 font-semibold text-gray-700">Title</th>
+                <th className="text-left px-3 py-3 font-semibold text-gray-700 w-28">Created</th>
+                <th className="text-center px-3 py-3 font-semibold text-gray-700 w-20">Files</th>
+                <th className="text-right px-3 py-3 font-semibold text-gray-700 w-28">Gross Profit</th>
+                <th className="text-right px-3 py-3 font-semibold text-gray-700 w-28">Amount</th>
+                <th className="text-center px-3 py-3 font-semibold text-gray-700 w-28">Status</th>
+                <th className="text-center px-3 py-3 font-semibold text-gray-700 w-12"></th>
               </tr>
             </thead>
             <tbody>
               {cos.map((co, i) => {
                 const status = co.status || 'pending'
+                const ac = attCounts[co.id] || 0
                 return (
-                  <tr key={co.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
-                    <td className="px-4 py-3">
-                      {co.estimate_id ? (
-                        <button
-                          onClick={() => openEstimator(co.estimate_id, co.id, co.co_name, co.co_type)}
-                          className="font-semibold text-blue-700 hover:underline text-left"
-                        >
-                          {co.co_name || '—'}
-                        </button>
-                      ) : (
-                        <span className="font-semibold text-gray-800">{co.co_name || '—'}</span>
-                      )}
+                  <tr key={co.id}
+                      className={`border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}
+                      onClick={() => setActiveCo(co)}>
+                    <td className="px-3 py-3 font-mono text-xs font-bold text-indigo-700">
+                      {co.custom_co_id ? `#${co.custom_co_id}` : <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-4 py-3 text-gray-500 text-xs">{co.co_type || '—'}</td>
-                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                    <td className="px-3 py-3">
+                      <span className="font-semibold text-gray-800">{co.co_name || '(untitled)'}</span>
+                    </td>
+                    <td className="px-3 py-3 text-gray-500 whitespace-nowrap text-xs">
                       {co.date_submitted ? new Date(co.date_submitted).toLocaleDateString() : '—'}
                     </td>
-                    <td className="px-4 py-3 text-right whitespace-nowrap font-semibold text-green-700">
+                    <td className="px-3 py-3 text-center">
+                      {ac > 0 ? (
+                        <span className="inline-flex items-center gap-1 text-xs text-gray-700">📎<span className="font-bold">{ac}</span></span>
+                      ) : (
+                        <span className="text-gray-200">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-right whitespace-nowrap font-semibold text-green-700 text-xs">
                       {co.gross_profit > 0 ? fmt(co.gross_profit) : <span className="text-gray-300 font-normal">—</span>}
                     </td>
-                    <td className="px-4 py-3 text-right font-bold text-gray-900 whitespace-nowrap">
+                    <td className="px-3 py-3 text-right font-bold text-gray-900 whitespace-nowrap">
                       {fmt(co.bid_amount)}
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <select
-                        value={status}
-                        disabled={updatingId === co.id}
-                        onChange={e => handleStatusChange(co.id, e.target.value)}
-                        className={`text-xs font-semibold rounded-full px-3 py-1 border-2 cursor-pointer appearance-none text-center transition-colors focus:outline-none disabled:opacity-40 ${CO_STATUS_STYLE[status] || CO_STATUS_STYLE.pending}`}
-                      >
-                        {CO_STATUSES.map(s => (
-                          <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-                        ))}
-                      </select>
+                    <td className="px-3 py-3 text-center" onClick={e => e.stopPropagation()}>
+                      <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border ${CO_STATUS_STYLE[status] || CO_STATUS_STYLE.pending}`}>
+                        {status === 'sold' ? '✓ Approved' : status}
+                      </span>
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <button onClick={() => handleDelete(co)}
-                        className="text-xs px-2 py-1 rounded border border-red-100 text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors">✕</button>
-                    </td>
+                    <td className="px-2 py-3 text-center text-gray-300 text-lg">›</td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
         </div>
+      )}
+
+      {activeCo && (
+        <CODetailModal
+          co={activeCo.id ? activeCo : null}
+          job={job}
+          onClose={() => setActiveCo(null)}
+          onSaved={(saved) => { handleCoSaved(saved); setActiveCo(saved) }}
+          onDeleted={handleCoDeleted}
+          onOpenEstimator={handleOpenEstimator}
+          onSent={() => {/* hook for analytics later */}}
+        />
       )}
     </div>
   )
