@@ -113,6 +113,8 @@ export default function ClientDetail() {
     const combined = [form.first_name?.trim(), form.last_name?.trim()].filter(Boolean).join(' ')
     const { error } = await supabase.from('clients').update({
       first_name: form.first_name?.trim() || null, last_name: form.last_name?.trim() || null,
+      spouse_first_name: form.spouse_first_name?.trim() || null,
+      spouse_last_name:  form.spouse_last_name?.trim()  || null,
       name: combined || form.name?.trim(),
       company_name: form.company_name?.trim() || null, company_position: form.company_position?.trim() || null,
       email: form.email?.trim() || null, phone: form.phone?.trim() || null,
@@ -250,8 +252,10 @@ export default function ClientDetail() {
                         <button type="button" onClick={() => setEditing(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
                       </div>
                       {[
-                        { label: 'First Name', key: 'first_name', type: 'text' },
-                        { label: 'Last Name',  key: 'last_name',  type: 'text' },
+                        { label: 'First Name',         key: 'first_name', type: 'text' },
+                        { label: 'Last Name',          key: 'last_name',  type: 'text' },
+                        { label: 'Spouse / Partner First', key: 'spouse_first_name', type: 'text' },
+                        { label: 'Spouse / Partner Last',  key: 'spouse_last_name',  type: 'text' },
                         { label: 'Company',    key: 'company_name', type: 'text' },
                         { label: 'Position',   key: 'company_position', type: 'text' },
                         { label: 'Email',      key: 'email', type: 'email' },
@@ -295,6 +299,11 @@ export default function ClientDetail() {
                           </div>
                           <div>
                             <h2 className="text-base font-bold text-gray-900 leading-tight">{displayName(client) || client.name}</h2>
+                            {(client.spouse_first_name || client.spouse_last_name) && (
+                              <p className="text-xs text-gray-700 mt-0.5">
+                                &amp; {[client.spouse_first_name, client.spouse_last_name].filter(Boolean).join(' ')}
+                              </p>
+                            )}
                             {client.company_name && (
                               <p className="text-xs text-gray-500 mt-0.5">{client.company_name}{client.company_position ? ` · ${client.company_position}` : ''}</p>
                             )}

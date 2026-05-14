@@ -140,17 +140,19 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
   function startEditClient() {
     if (!clientData) return
     setClientForm({
-      first_name:       clientData.first_name       || '',
-      last_name:        clientData.last_name        || '',
-      company_name:     clientData.company_name     || '',
-      company_position: clientData.company_position || '',
-      email:            clientData.email            || '',
-      phone:            clientData.phone            || '',
-      street:           clientData.street           || '',
-      city:             clientData.city             || '',
-      state:            clientData.state            || '',
-      zip:              clientData.zip              || '',
-      notes:            clientData.notes            || '',
+      first_name:        clientData.first_name        || '',
+      last_name:         clientData.last_name         || '',
+      spouse_first_name: clientData.spouse_first_name || '',
+      spouse_last_name:  clientData.spouse_last_name  || '',
+      company_name:      clientData.company_name      || '',
+      company_position:  clientData.company_position  || '',
+      email:             clientData.email             || '',
+      phone:             clientData.phone             || '',
+      street:            clientData.street            || '',
+      city:              clientData.city              || '',
+      state:             clientData.state             || '',
+      zip:               clientData.zip               || '',
+      notes:             clientData.notes             || '',
     })
     setEditingClient(true)
   }
@@ -163,18 +165,20 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
     const f = clientForm
     const fullName = [f.first_name, f.last_name].filter(Boolean).join(' ').trim()
     const updates = {
-      first_name:       f.first_name?.trim()       || null,
-      last_name:        f.last_name?.trim()        || null,
-      name:             fullName || clientData.name,
-      company_name:     f.company_name?.trim()     || null,
-      company_position: f.company_position?.trim() || null,
-      email:            f.email?.trim()            || null,
-      phone:            f.phone?.trim()            || null,
-      street:           f.street?.trim()           || null,
-      city:             f.city?.trim()             || null,
-      state:            f.state                    || null,
-      zip:              f.zip?.trim()              || null,
-      notes:            f.notes?.trim()            || null,
+      first_name:        f.first_name?.trim()        || null,
+      last_name:         f.last_name?.trim()         || null,
+      spouse_first_name: f.spouse_first_name?.trim() || null,
+      spouse_last_name:  f.spouse_last_name?.trim()  || null,
+      name:              fullName || clientData.name,
+      company_name:      f.company_name?.trim()      || null,
+      company_position:  f.company_position?.trim()  || null,
+      email:             f.email?.trim()             || null,
+      phone:             f.phone?.trim()             || null,
+      street:            f.street?.trim()            || null,
+      city:              f.city?.trim()              || null,
+      state:             f.state                     || null,
+      zip:               f.zip?.trim()               || null,
+      notes:             f.notes?.trim()             || null,
     }
     const { data, error } = await supabase.from('clients')
       .update(updates).eq('id', clientData.id).select().single()
@@ -408,8 +412,10 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
                             className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
                         </div>
                         {[
-                          { label: 'First Name',     key: 'first_name',       type: 'text'  },
-                          { label: 'Last Name',      key: 'last_name',        type: 'text'  },
+                          { label: 'First Name',             key: 'first_name',       type: 'text'  },
+                          { label: 'Last Name',              key: 'last_name',        type: 'text'  },
+                          { label: 'Spouse / Partner First', key: 'spouse_first_name', type: 'text' },
+                          { label: 'Spouse / Partner Last',  key: 'spouse_last_name',  type: 'text' },
                           { label: 'Company',        key: 'company_name',     type: 'text'  },
                           { label: 'Position',       key: 'company_position', type: 'text'  },
                           { label: 'Email',          key: 'email',            type: 'email' },
