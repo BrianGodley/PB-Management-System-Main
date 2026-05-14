@@ -23,7 +23,11 @@ const US_STATES = [
   'VA','WA','WV','WI','WY',
 ]
 
-export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
+// `inline` (default false): when true, render the same content without the
+// fixed-overlay modal chrome — used by JobsList's Info tab to host the same
+// UI directly inside the right panel. Hides the X / Close buttons since the
+// user navigates away by clicking another tab.
+export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = false }) {
   const [activeTab, setActiveTab] = useState('info')
   const [saving,    setSaving]    = useState(false)
   const [error,     setError]     = useState('')
@@ -205,24 +209,23 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
     { key: 'employees', label: 'Employees' },
   ]
 
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-      onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col" style={{ maxHeight: '90vh' }}>
-
+  // Shared inner content block. Wrapped differently below depending on
+  // whether we're rendering as a modal or as an inline panel.
+  const innerContent = (
+    <>
         {/* Header */}
         <div className="px-5 pt-5 pb-3 border-b border-gray-100 flex items-start justify-between flex-shrink-0">
           <div className="min-w-0 flex-1">
             <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-0.5">Job</p>
             <h2 className="text-lg font-bold text-gray-900 truncate">{job.name || job.client_name}</h2>
           </div>
-          <button onClick={onClose} className="text-gray-300 hover:text-gray-500 ml-3 mt-0.5 flex-shrink-0">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          {!inline && (
+            <button onClick={onClose} className="text-gray-300 hover:text-gray-500 ml-3 mt-0.5 flex-shrink-0">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* Tab bar */}
@@ -661,12 +664,14 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
           >
             {saving ? 'Saving…' : 'Save'}
           </button>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
-          >
-            Close
-          </button>
+          {!inline && (
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
+            >
+              Close
+            </button>
+          )}
           {onDelete && (
             <button
               onClick={() => onDelete(job.id, job.name || job.client_name)}
@@ -676,6 +681,26 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete }) {
             </button>
           )}
         </div>
+    </>
+  )
+
+  // Inline mode: render directly into the parent panel without overlay chrome.
+  if (inline) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col h-full">
+        {innerContent}
+      </div>
+    )
+  }
+
+  // Modal mode (default): fixed overlay with click-outside-to-close.
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+      onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col" style={{ maxHeight: '90vh' }}>
+        {innerContent}
       </div>
     </div>
   )

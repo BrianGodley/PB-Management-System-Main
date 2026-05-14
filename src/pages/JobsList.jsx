@@ -137,17 +137,6 @@ function JobItem({ job, stages, selectedJob, setSelectedJob, setJobModal, onMove
               d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
           </svg>
         </button>
-        {/* Edit button */}
-        <button
-          onClick={e => { e.stopPropagation(); setJobModal(job) }}
-          className="flex-shrink-0 p-1 rounded transition-colors text-amber-500 hover:text-amber-700 hover:bg-amber-100 mr-1"
-          title="Edit job"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 0l.172.172a2 2 0 010 2.828L12 16H9v-3z" />
-          </svg>
-        </button>
       </div>
     </>
   )
@@ -823,6 +812,7 @@ export default function JobsList() {
   const selectedJobObj = selectedJob === ALL_JOBS ? null : jobs.find(j => j.id === selectedJob) || null
 
   const TABS = [
+    { key: 'info',          label: 'ℹ️ Info'          },
     { key: 'schedule',      label: '📅 Schedule'      },
     { key: 'work-orders',   label: '📋 Work Orders'   },
     { key: 'tracking',      label: '📍 Tracking'      },
@@ -1047,6 +1037,24 @@ export default function JobsList() {
         {/* Right panel — only thing that scrolls. overflow-x-hidden traps any
             tiny horizontal overflow from inner cards on mobile. */}
         <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden lg:-mr-6">
+
+          {tab === 'info' && (
+            selectedJobObj ? (
+              <JobInfoModal
+                key={selectedJobObj.id}
+                job={selectedJobObj}
+                inline
+                onSave={updateJob}
+                onDelete={async (id, name) => { await deleteJob(id, name) }}
+                onClose={() => {}}
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-gray-400 py-20">
+                <p className="text-4xl mb-3">ℹ️</p>
+                <p className="text-sm">Select a job to view its info</p>
+              </div>
+            )
+          )}
 
           {tab === 'schedule' && (
             <ScheduleCalendar
