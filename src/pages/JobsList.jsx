@@ -171,7 +171,7 @@ export default function JobsList() {
   const [tab,        setTab]        = useState(() => searchParams.get('tab') || 'schedule')
   const [jobModal,   setJobModal]   = useState(null)
   const [search,     setSearch]     = useState('')
-  const [statusFilter, setStatusFilter] = useState('open') // 'open' | 'closed' | 'both'
+  const [statusFilter, setStatusFilter] = useState('open') // 'open' | 'closed'
   const [stages,          setStages]          = useState([])
   const [dragOverStage,   setDragOverStage]   = useState(null)
   const [showExceptions,    setShowExceptions]    = useState(false)
@@ -788,9 +788,7 @@ export default function JobsList() {
     .filter(j => {
       const status = j.status || 'active'
       const isOpen = status === 'active' || status === 'on_hold'
-      if (statusFilter === 'open')   return isOpen
-      if (statusFilter === 'closed') return !isOpen
-      return true // 'both'
+      return statusFilter === 'closed' ? !isOpen : isOpen
     })
     .filter(j => {
       const q = search.toLowerCase()
@@ -920,12 +918,11 @@ export default function JobsList() {
             )}
           </button>
 
-          {/* Open / Closed / Both filter */}
+          {/* Open / Closed filter */}
           <div className="flex gap-1 mb-2 flex-shrink-0">
             {[
               { key: 'open',   label: 'Open'   },
               { key: 'closed', label: 'Closed' },
-              { key: 'both',   label: 'Both'   },
             ].map(opt => (
               <button
                 key={opt.key}
@@ -1027,22 +1024,8 @@ export default function JobsList() {
 
                 return (
                   <>
-                    {/* When the user is filtering to Closed only, just show
-                        the Closed stage — every other stage's jobs are
-                        irrelevant in that view, and Unassigned is hidden too. */}
-                    {statusFilter === 'closed' ? (
-                      stages
-                        .map((s, idx) => ({ s, idx }))
-                        .filter(({ s }) => /closed/i.test(s.name || ''))
-                        .map(({ s, idx }) => (
-                          <StageSection key={s.id} stageId={s.id} label={`${idx + 1} - ${s.name}`} />
-                        ))
-                    ) : (
-                      <>
-                        {byStage['__none__'].length > 0 && <StageSection stageId="__none__" label="Unassigned" />}
-                        {stages.map((s, idx) => <StageSection key={s.id} stageId={s.id} label={`${idx + 1} - ${s.name}`} />)}
-                      </>
-                    )}
+                    {byStage['__none__'].length > 0 && <StageSection stageId="__none__" label="Unassigned" />}
+                    {stages.map((s, idx) => <StageSection key={s.id} stageId={s.id} label={`${idx + 1} - ${s.name}`} />)}
                     {sorted.length === 0 && <p className="text-xs text-gray-400 text-center py-6">No jobs found.</p>}
                   </>
                 )
