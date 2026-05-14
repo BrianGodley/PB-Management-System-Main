@@ -598,7 +598,7 @@ export default function ClientDetail() {
                               <>
                                 <tr key={job.id} className="hover:bg-gray-50 transition-colors">
                                   <td className="px-4 py-2 font-semibold">
-                                    <Link to={`/jobs/${job.id}`} className="text-green-700 hover:underline">{job.name}</Link>
+                                    <Link to={`/jobs?tab=info&job=${job.id}`} className="text-green-700 hover:underline">{job.name}</Link>
                                   </td>
                                   <td className="px-3 py-2 text-right text-gray-500 whitespace-nowrap">
                                     {job.sold_date ? new Date(job.sold_date).toLocaleDateString() : '—'}
