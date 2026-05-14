@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { fetchAllPaginated } from '../lib/fetchAll'
 import { useLang } from '../contexts/LanguageContext'
 import TimeClock from '../components/TimeClock'
 
@@ -10,9 +11,10 @@ export default function TimeClockPage() {
   const [loading,     setLoading]     = useState(true)
 
   useEffect(() => {
-    // bypass PostgREST 1k default — jobs table has 2k+ rows
-    supabase.from('jobs').select('*').order('sold_date', { ascending: false }).range(0, 49999)
-      .then(({ data }) => { if (data) setJobs(data); setLoading(false) })
+    // Server max-rows is 1k; paginate to get all 2k+ jobs.
+    fetchAllPaginated(() =>
+      supabase.from('jobs').select('*').order('sold_date', { ascending: false })
+    ).then(({ data }) => { if (data) setJobs(data); setLoading(false) })
   }, [])
 
   return (

@@ -14,6 +14,7 @@ import CODetailModal    from '../components/CODetailModal'
 import JobInfoModal     from '../components/JobInfoModal'
 import StartLocationsCard from '../components/StartLocationsCard'
 import SupervisorPositionsCard from '../components/SupervisorPositionsCard'
+import { fetchAllPaginated } from '../lib/fetchAll'
 
 function MoveJobModal({ job, stages, onMove, onClose }) {
   const [selected, setSelected] = useState(job.stage_id || '__none__')
@@ -657,11 +658,10 @@ export default function JobsList() {
   // Build phone lookup maps for the JobItem hover tooltip. We only need a
   // few fields so the query stays light even with thousands of clients.
   async function fetchClientPhones() {
-    // bypass PostgREST 1k default — clients table has 1.6k+ rows;
-    // missing rows would silently break the hover-tooltip phone lookup
-    const { data } = await supabase.from('clients')
-      .select('id, name, first_name, last_name, phone')
-      .range(0, 49999)
+    // Project's max-rows is 1k server-side; paginate to get all 1.6k+ clients.
+    const { data } = await fetchAllPaginated(() =>
+      supabase.from('clients').select('id, name, first_name, last_name, phone')
+    )
     if (!data) return
     const byId   = {}
     const byName = {}
@@ -745,15 +745,11 @@ export default function JobsList() {
 
   async function fetchJobs() {
     setLoading(true)
-    // Supabase defaults to 1,000 rows per query. After the BT v2 import the
-    // jobs table has 2,000+ rows, so we explicitly raise the cap. Using
-    // range() rather than limit() is the documented way to bypass the
-    // implicit 1k cap on PostgREST queries.
-    const { data, error } = await supabase
-      .from('jobs')
-      .select('*')
-      .order('sold_date', { ascending: false })
-      .range(0, 49999)
+    // Supabase project has max-rows hard-capped at 1k server-side, so .range()
+    // alone isn't enough. fetchAllPaginated loops until all rows are fetched.
+    const { data, error } = await fetchAllPaginated(() =>
+      supabase.from('jobs').select('*').order('sold_date', { ascending: false })
+    )
     if (error) console.error('JobsList fetch error:', error)
     if (data) setJobs(data)
     setLoading(false)

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { fetchAllPaginated } from '../lib/fetchAll'
 
 const STATUS_LABELS = {
   active: { label: 'Active', cls: 'badge-active' },
@@ -59,7 +60,8 @@ export default function Dashboard() {
     setLoading(true)
     const [settingsRes, jobsRes] = await Promise.all([
       supabase.from('company_settings').select('*').single(),
-      supabase.from('jobs').select(`
+      // Server max-rows is 1k; paginate to get all 2k+ jobs.
+      fetchAllPaginated(() => supabase.from('jobs').select(`
         *,
         projects (
           *,
@@ -69,7 +71,7 @@ export default function Dashboard() {
           )
         ),
         change_orders (*)
-      `).order('created_at', { ascending: false }).range(0, 49999)
+      `).order('created_at', { ascending: false }))
     ])
 
     if (settingsRes.data) setLaborRate(parseFloat(settingsRes.data.labor_rate_per_man_day) || 400)

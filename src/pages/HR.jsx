@@ -408,7 +408,7 @@ export default function HR() {
     ] = await Promise.all([
       supabase.from('employees').select('*').order('last_name'),
       supabase.from('applicants').select('*').order('applied_at', { ascending: false }),
-      supabase.from('hr_review_forms').select('*').order('created_at', { ascending: false }).range(0, 49999),
+      supabase.from('hr_review_forms').select('*').order('created_at', { ascending: false }),
       supabase.from('profiles').select('id, email, role'),
       supabase.from('employee_groups').select('*').order('name'),
       supabase.from('employee_group_members').select('group_id, employee_id'),

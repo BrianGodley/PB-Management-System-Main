@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { fetchAllPaginated } from '../lib/fetchAll'
 import { useAuth } from '../contexts/AuthContext'
 import MasterRates from './MasterRates'
 
@@ -130,11 +131,11 @@ function AddIndividualModal({ onSave, onClose, user }) {
   // Load contacts once when "From a contact" is chosen
   useEffect(() => {
     if (mode !== 'contact' || contacts.length > 0) return
-    supabase.from('contacts')
-      .select('id, first_name, last_name, email, phone, cell, street_address, city, state, zip, secondary_first_name, secondary_last_name')
-      .order('last_name')
-      .range(0, 49999)  // bypass PostgREST 1k default
-      .then(({ data }) => setContacts(data || []))
+    fetchAllPaginated(() =>
+      supabase.from('contacts')
+        .select('id, first_name, last_name, email, phone, cell, street_address, city, state, zip, secondary_first_name, secondary_last_name')
+        .order('last_name')
+    ).then(({ data }) => setContacts(data || []))
   }, [mode])
 
   // Close dropdown on outside click
@@ -543,8 +544,10 @@ export default function Clients() {
 
   async function fetchClients() {
     setLoading(true)
-    // bypass PostgREST's default 1k cap — clients table has 1.6k+ rows
-    const { data, error } = await supabase.from('clients').select('*').range(0, 49999)
+    // Project's max-rows is 1k server-side; paginate to get all 1.6k+ clients.
+    const { data, error } = await fetchAllPaginated(() =>
+      supabase.from('clients').select('*')
+    )
     if (error) console.error('fetchClients error:', error.message)
     setClients(data || [])
     setLoading(false)

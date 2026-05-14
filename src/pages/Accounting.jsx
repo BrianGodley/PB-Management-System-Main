@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { fetchAllPaginated } from '../lib/fetchAll'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const fmt  = n => Number(n || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
@@ -1325,9 +1326,9 @@ export default function Accounting() {
       supabase.from('acct_bills').select('*').order('date', { ascending: false }),
       supabase.from('acct_accounts').select('*').eq('is_active', true).order('sort_order'),
       supabase.from('acct_bank_accounts').select('*').eq('is_active', true).order('name'),
-      // .range bypasses PostgREST's default 1k cap; clients=1.6k, jobs=2k+
-      supabase.from('clients').select('id, name, client_name').order('name').range(0, 49999),
-      supabase.from('jobs').select('id, name, client_name').order('created_at', { ascending: false }).range(0, 49999),
+      // Server max-rows is 1k; paginate to get all 1.6k+ clients and 2k+ jobs.
+      fetchAllPaginated(() => supabase.from('clients').select('id, name, client_name').order('name')),
+      fetchAllPaginated(() => supabase.from('jobs').select('id, name, client_name').order('created_at', { ascending: false })),
       supabase.from('subs_vendors').select('id, company_name').eq('type', 'sub').order('company_name'),
     ])
     if (invRes.data)    setInvoices(invRes.data)

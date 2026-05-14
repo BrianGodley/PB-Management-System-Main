@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { fetchAllPaginated } from '../lib/fetchAll'
 import { useAuth } from '../contexts/AuthContext'
 import { generateBidDoc, downloadBidDoc } from '../lib/generateBidDoc'
 import BidDocViewerModal from '../components/BidDocViewerModal'
@@ -65,13 +66,13 @@ export default function Bids() {
 
   async function fetchBids() {
     setLoading(true)
-    // Bypass Supabase's default 1,000-row cap — bids has 6,700+ rows post-BT-import
-    const { data } = await supabase
-      .from('bids')
-      .select('*, estimates(estimate_name, created_by)')
-      .in('record_type', ['bid'])
-      .order('date_submitted', { ascending: false })
-      .range(0, 49999)
+    // Project's max-rows hard-caps at 1k server-side; paginate.
+    const { data } = await fetchAllPaginated(() =>
+      supabase.from('bids')
+        .select('*, estimates(estimate_name, created_by)')
+        .in('record_type', ['bid'])
+        .order('date_submitted', { ascending: false })
+    )
     if (data) setBids(data)
     setLoading(false)
   }
