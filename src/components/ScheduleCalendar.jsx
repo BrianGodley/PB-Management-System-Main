@@ -798,6 +798,12 @@ export default function ScheduleCalendar({
   // Called after a closed job is reopened from the picker so the parent
   // can patch its local jobs array. Signature: (jobId) => void
   onReopenJob,
+  // Total workday-exception rows for the badge on the Exceptions button
+  // (rendered in the desktop month-nav toolbar row).
+  exceptionsCount = 0,
+  // Opens the Schedule Assistance modal in the parent. Rendered as a
+  // button on the far right of the desktop month-nav toolbar.
+  onOpenScheduleAssist,
 }) {
   const today = new Date()
   const [year,  setYear]  = useState(today.getFullYear())
@@ -1394,14 +1400,17 @@ export default function ScheduleCalendar({
 
   // Month navigation header (shared between mobile and desktop)
   // Compact group of controls centered together: << < Month Year [Today] > >>
-  const MonthNav = ({ compact = false } = {}) => {
+  const MonthNav = ({ compact = false, inline = false } = {}) => {
     const isCurrent = month === today.getMonth() && year === today.getFullYear()
     const btn = compact
       ? 'p-1 rounded hover:bg-gray-100 text-gray-600'
       : 'p-1.5 rounded-lg hover:bg-gray-100 text-gray-600'
     const dblBtn = btn + ' text-gray-500'
+    const wrapCls = inline
+      ? 'flex items-center justify-center gap-1'
+      : `flex items-center justify-center gap-1 ${compact ? 'mb-2' : 'mb-3'}`
     return (
-      <div className={`flex items-center justify-center gap-1 ${compact ? 'mb-2' : 'mb-3'}`}>
+      <div className={wrapCls}>
         <button onClick={prevYear} className={dblBtn} title="Previous year">
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
@@ -1490,9 +1499,55 @@ export default function ScheduleCalendar({
       ══════════════════════════════════════════════════════ */}
       <div className="hidden lg:flex lg:flex-col">
 
-        {/* Month navigation + day headers — sticky */}
+        {/* Month navigation + day headers — sticky.
+            Toolbar row layout: [Add Schedule][Exceptions]  ‹‹ ‹ Month Year › ›› [Today]  [✨ Schedule Assistance]
+            Each side button is ~60% of the old sidebar-button width. */}
         <div className="sticky top-0 z-10 bg-white pb-0">
-          <MonthNav compact />
+          <div className="flex items-center justify-between gap-2 mb-2">
+            {/* Left: Add Schedule + Exceptions */}
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <button
+                onClick={handleAddNew}
+                className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-green-700 text-white text-[11px] font-semibold hover:bg-green-800 transition-colors w-[140px]"
+              >
+                <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                <span>Add Schedule</span>
+              </button>
+              <button
+                onClick={() => onSetShowExceptions && onSetShowExceptions(true)}
+                className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg border border-gray-200 text-[11px] font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors w-[140px]"
+              >
+                <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                </svg>
+                <span>Exceptions</span>
+                {exceptionsCount > 0 && (
+                  <span className="bg-gray-200 text-gray-700 rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none">
+                    {exceptionsCount}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Center: Month nav */}
+            <MonthNav compact inline />
+
+            {/* Right: Schedule Assistance */}
+            {onOpenScheduleAssist ? (
+              <button
+                onClick={onOpenScheduleAssist}
+                className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[11px] font-semibold hover:from-purple-700 hover:to-indigo-700 transition-colors w-[140px] flex-shrink-0"
+              >
+                <span>✨</span>
+                <span>Schedule Assistance</span>
+              </button>
+            ) : (
+              <div className="w-[140px] flex-shrink-0" />
+            )}
+          </div>
 
           <div className="grid grid-cols-7 border-l border-t border-gray-200">
             {DAY_NAMES.map(d => (

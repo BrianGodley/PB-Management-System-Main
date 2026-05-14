@@ -877,47 +877,6 @@ export default function JobsList() {
         <div className="hidden lg:flex w-64 flex-shrink-0 flex-col min-h-0 bg-white border-r border-gray-200">
           {/* Inner column: 90% wide, centered */}
           <div className="flex flex-col w-[90%] mx-auto mt-2 flex-shrink-0">
-          {/* Add Schedule button — only visible on Schedule tab */}
-          {tab === 'schedule' && (
-            <button
-              onClick={() => setAddScheduleTrigger(v => v + 1)}
-              className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 mb-2 rounded-lg bg-green-700 text-white text-xs font-semibold hover:bg-green-800 transition-colors flex-shrink-0"
-            >
-              <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              <span>Add Schedule</span>
-            </button>
-          )}
-
-          {/* Schedule Assistance — geographic + traffic-aware optimization */}
-          {tab === 'schedule' && (
-            <button
-              onClick={() => { setSchedAssistMode(null); setShowSchedAssist(true) }}
-              className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 mb-2 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-semibold hover:from-purple-700 hover:to-indigo-700 transition-colors flex-shrink-0"
-            >
-              <span>✨</span>
-              <span>Schedule Assistance</span>
-            </button>
-          )}
-
-          {/* Workday Exceptions button */}
-          <button
-            onClick={() => setShowExceptions(true)}
-            className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 mb-2 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors flex-shrink-0"
-          >
-            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-            </svg>
-            <span>Workday Exceptions</span>
-            {exceptionsCount > 0 && (
-              <span className="bg-gray-200 text-gray-700 rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none">
-                {exceptionsCount}
-              </span>
-            )}
-          </button>
-
           {/* Open / Closed filter */}
           <div className="flex gap-1 mb-2 flex-shrink-0">
             {[
@@ -1022,6 +981,37 @@ export default function JobsList() {
                   )
                 }
 
+                // In Closed view, show every closed job under one fixed
+                // "Closed" header — no per-stage grouping and no drop targets.
+                if (statusFilter === 'closed') {
+                  return (
+                    <>
+                      <div className="mb-1 rounded-lg">
+                        <div className="flex items-center gap-1.5 px-2 pt-1.5 pb-1">
+                          <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide truncate flex-1 bg-gray-100 border border-gray-300 rounded px-2 py-0.5">
+                            Closed <span className="text-gray-400 font-normal normal-case">· {sorted.length}</span>
+                          </span>
+                        </div>
+                        <div className="space-y-0.5 px-0.5">
+                          {sorted.map(job => (
+                            <JobItem
+                              key={job.id}
+                              job={job}
+                              stages={stages}
+                              selectedJob={selectedJob}
+                              setSelectedJob={setSelectedJob}
+                              setJobModal={setJobModal}
+                              onMove={moveJobToStage}
+                              clientPhoneMap={clientPhoneMap}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      {sorted.length === 0 && <p className="text-xs text-gray-400 text-center py-6">No closed jobs.</p>}
+                    </>
+                  )
+                }
+
                 return (
                   <>
                     {byStage['__none__'].length > 0 && <StageSection stageId="__none__" label="Unassigned" />}
@@ -1045,10 +1035,12 @@ export default function JobsList() {
               showExceptionsExternal={showExceptions}
               onSetShowExceptions={setShowExceptions}
               onExceptionsLoaded={setExceptionsCount}
+              exceptionsCount={exceptionsCount}
               addScheduleTrigger={addScheduleTrigger}
               yardCheckTrigger={yardCheckTrigger}
               statusFilter={statusFilter}
               stages={stages}
+              onOpenScheduleAssist={() => { setSchedAssistMode(null); setShowSchedAssist(true) }}
               onReopenJob={(jobId) =>
                 setJobs(prev => prev.map(j => j.id === jobId ? { ...j, status: 'active' } : j))
               }
