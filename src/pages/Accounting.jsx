@@ -1325,8 +1325,9 @@ export default function Accounting() {
       supabase.from('acct_bills').select('*').order('date', { ascending: false }),
       supabase.from('acct_accounts').select('*').eq('is_active', true).order('sort_order'),
       supabase.from('acct_bank_accounts').select('*').eq('is_active', true).order('name'),
-      supabase.from('clients').select('id, name, client_name').order('name'),
-      supabase.from('jobs').select('id, name, client_name').order('created_at', { ascending: false }),
+      // .range bypasses PostgREST's default 1k cap; clients=1.6k, jobs=2k+
+      supabase.from('clients').select('id, name, client_name').order('name').range(0, 49999),
+      supabase.from('jobs').select('id, name, client_name').order('created_at', { ascending: false }).range(0, 49999),
       supabase.from('subs_vendors').select('id, company_name').eq('type', 'sub').order('company_name'),
     ])
     if (invRes.data)    setInvoices(invRes.data)

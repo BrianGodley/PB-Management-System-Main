@@ -1097,7 +1097,9 @@ export default function ScheduleCalendar({
 
   async function recalculateScheduleItems(updatedExceptions) {
     setRecalculating(true)
-    const { data: allItems } = await supabase.from('schedule_items').select('*')
+    // bypass PostgREST 1k default — schedule_items table has 16k+ rows after BT import.
+    // Without this the recalc silently misses 90%+ of items.
+    const { data: allItems } = await supabase.from('schedule_items').select('*').range(0, 99999)
     if (!allItems) { setRecalculating(false); return }
 
     const updates = allItems

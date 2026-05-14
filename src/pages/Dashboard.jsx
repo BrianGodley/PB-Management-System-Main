@@ -69,7 +69,7 @@ export default function Dashboard() {
           )
         ),
         change_orders (*)
-      `).order('created_at', { ascending: false })
+      `).order('created_at', { ascending: false }).range(0, 49999)
     ])
 
     if (settingsRes.data) setLaborRate(parseFloat(settingsRes.data.labor_rate_per_man_day) || 400)

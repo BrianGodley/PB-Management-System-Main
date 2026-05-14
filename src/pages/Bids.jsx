@@ -65,11 +65,13 @@ export default function Bids() {
 
   async function fetchBids() {
     setLoading(true)
+    // Bypass Supabase's default 1,000-row cap — bids has 6,700+ rows post-BT-import
     const { data } = await supabase
       .from('bids')
       .select('*, estimates(estimate_name, created_by)')
       .in('record_type', ['bid'])
       .order('date_submitted', { ascending: false })
+      .range(0, 49999)
     if (data) setBids(data)
     setLoading(false)
   }

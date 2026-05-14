@@ -133,6 +133,7 @@ function AddIndividualModal({ onSave, onClose, user }) {
     supabase.from('contacts')
       .select('id, first_name, last_name, email, phone, cell, street_address, city, state, zip, secondary_first_name, secondary_last_name')
       .order('last_name')
+      .range(0, 49999)  // bypass PostgREST 1k default
       .then(({ data }) => setContacts(data || []))
   }, [mode])
 
@@ -542,7 +543,8 @@ export default function Clients() {
 
   async function fetchClients() {
     setLoading(true)
-    const { data, error } = await supabase.from('clients').select('*')
+    // bypass PostgREST's default 1k cap — clients table has 1.6k+ rows
+    const { data, error } = await supabase.from('clients').select('*').range(0, 49999)
     if (error) console.error('fetchClients error:', error.message)
     setClients(data || [])
     setLoading(false)

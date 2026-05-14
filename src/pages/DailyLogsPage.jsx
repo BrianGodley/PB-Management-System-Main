@@ -10,7 +10,8 @@ export default function DailyLogsPage() {
   const [loading,     setLoading]     = useState(true)
 
   useEffect(() => {
-    supabase.from('jobs').select('*').order('sold_date', { ascending: false })
+    // bypass PostgREST 1k default — jobs table has 2k+ rows
+    supabase.from('jobs').select('*').order('sold_date', { ascending: false }).range(0, 49999)
       .then(({ data }) => { if (data) setJobs(data); setLoading(false) })
   }, [])
 
