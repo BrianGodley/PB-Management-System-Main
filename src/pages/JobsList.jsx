@@ -3160,11 +3160,13 @@ function JobTasksPanel({ job }) {
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500">
-                <th className="px-3 py-2 w-10 text-center font-semibold">✓</th>
-                <th className="px-3 py-2 w-44 text-left font-semibold">Category</th>
-                <th className="px-3 py-2 text-left font-semibold">Description</th>
-                <th className="px-3 py-2 w-44 text-left font-semibold">Assignee</th>
-                <th className="px-3 py-2 w-36 text-left font-semibold">Due Date</th>
+                <th className="px-3 py-2 w-10  text-center font-semibold">✓</th>
+                <th className="px-3 py-2 w-40  text-left   font-semibold">Category</th>
+                <th className="px-3 py-2       text-left   font-semibold">Description</th>
+                <th className="px-3 py-2 w-44  text-left   font-semibold">Notes</th>
+                <th className="px-3 py-2 w-24  text-left   font-semibold">Priority</th>
+                <th className="px-3 py-2 w-44  text-left   font-semibold">Assignee</th>
+                <th className="px-3 py-2 w-36  text-left   font-semibold">Due Date</th>
                 <th className="px-3 py-2 w-10"></th>
               </tr>
             </thead>
@@ -3221,14 +3223,51 @@ function JobTasksPanel({ job }) {
                       />
                     </td>
 
-                    {/* Assignee dropdown */}
+                    {/* Notes — short text input, hover for full content */}
+                    <td className="px-2 py-1">
+                      <input
+                        type="text"
+                        defaultValue={task.notes || ''}
+                        placeholder="—"
+                        title={task.notes || ''}
+                        onBlur={e => {
+                          const v = e.target.value
+                          if (v !== (task.notes || '')) patchTask(task.id, { notes: v || null })
+                        }}
+                        onKeyDown={e => { if (e.key === 'Enter') e.target.blur() }}
+                        className={`w-full text-xs bg-transparent border border-transparent hover:border-gray-200 focus:border-green-500 focus:outline-none rounded px-1.5 py-1 ${isDone ? 'text-gray-400' : 'text-gray-700'}`}
+                      />
+                    </td>
+
+                    {/* Priority — small chip for high/highest, plain text for low/none */}
+                    <td className="px-2 py-1">
+                      <select
+                        value={task.priority || ''}
+                        onChange={e => patchTask(task.id, { priority: e.target.value || null })}
+                        className={`w-full text-[11px] font-semibold uppercase border border-transparent hover:border-gray-200 focus:border-green-500 focus:outline-none rounded px-1.5 py-1 ${
+                          task.priority === 'highest' ? 'bg-red-100 text-red-700' :
+                          task.priority === 'high'    ? 'bg-orange-100 text-orange-700' :
+                          task.priority === 'low'     ? 'text-gray-400' :
+                          'bg-transparent text-gray-400'
+                        } ${isDone ? 'opacity-60' : ''}`}
+                      >
+                        <option value="">—</option>
+                        <option value="highest">Highest</option>
+                        <option value="high">High</option>
+                        <option value="low">Low</option>
+                      </select>
+                    </td>
+
+                    {/* Assignee — dropdown of active employees, with fallback
+                        to BT-imported name when there's no FK match */}
                     <td className="px-2 py-1">
                       <select
                         value={task.assignee_id || ''}
                         onChange={e => patchTask(task.id, { assignee_id: e.target.value || null })}
                         className={`w-full text-xs bg-transparent border border-transparent hover:border-gray-200 focus:border-green-500 focus:outline-none rounded px-1.5 py-1 ${isDone ? 'text-gray-400' : 'text-gray-700'}`}
+                        title={!task.assignee_id && task.assignee_name ? `BT name: ${task.assignee_name}` : undefined}
                       >
-                        <option value="">— Unassigned —</option>
+                        <option value="">{task.assignee_name ? `(BT) ${task.assignee_name}` : '— Unassigned —'}</option>
                         {employees.map(e => (
                           <option key={e.id} value={e.id}>{empName(e)}</option>
                         ))}
