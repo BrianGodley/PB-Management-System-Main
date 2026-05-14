@@ -172,6 +172,11 @@ export default function JobsList() {
   const [jobModal,   setJobModal]   = useState(null)
   const [search,     setSearch]     = useState('')
   const [statusFilter, setStatusFilter] = useState('open') // 'open' | 'closed'
+  // Auto-open trigger for the CO modal when the user deep-links from
+  // ClientDetail like ?tab=change-orders&job=<jobId>&co=<coId>.
+  // Bumped each time the URL param changes so JobChangeOrdersPanel knows
+  // to re-open even if the same coId arrives twice in a row.
+  const [coDeepLink, setCoDeepLink] = useState(null) // { coId, ts } | null
   const [stages,          setStages]          = useState([])
   const [dragOverStage,   setDragOverStage]   = useState(null)
   const [showExceptions,    setShowExceptions]    = useState(false)
@@ -684,11 +689,26 @@ export default function JobsList() {
       })
   }, [user?.id])
 
-  // Sync tab when dock link changes the ?tab= URL param
+  // Sync tab when dock link changes the ?tab= URL param.
+  // Also handle ?job=<id>&co=<id> deep links from ClientDetail's CO rows
+  // — select the job, flip the Open/Closed filter to match its status,
+  // and arm the CO modal trigger.
   useEffect(() => {
-    const t = searchParams.get('tab')
+    const t        = searchParams.get('tab')
+    const jobParam = searchParams.get('job')
+    const coParam  = searchParams.get('co')
     if (t) setTab(t)
-  }, [searchParams])
+    if (jobParam) {
+      setSelectedJob(jobParam)
+      // Match the sidebar filter to wherever the job lives so it's visible.
+      const jobObj = jobs.find(j => j.id === jobParam)
+      if (jobObj) {
+        const isOpen = jobObj.status === 'active' || jobObj.status === 'on_hold' || !jobObj.status
+        setStatusFilter(isOpen ? 'open' : 'closed')
+      }
+    }
+    if (coParam) setCoDeepLink({ coId: coParam, ts: Date.now() })
+  }, [searchParams, jobs])
 
   async function fetchStages() {
     const { data } = await supabase.from('job_stages').select('*').order('sort_order')
@@ -1079,7 +1099,7 @@ export default function JobsList() {
             />
           )}
           {tab === 'tasks'          && <JobTasksPanel job={selectedJobObj} />}
-          {tab === 'change-orders'  && <JobChangeOrdersPanel job={selectedJobObj} />}
+          {tab === 'change-orders'  && <JobChangeOrdersPanel job={selectedJobObj} coDeepLink={coDeepLink} />}
           {tab === 'finance'        && <ComingSoon label="Finance" />}
           {tab === 'files'          && <JobFilesPanel job={selectedJobObj} />}
         </div>
@@ -2798,12 +2818,15 @@ const CO_STATUS_LABEL = {
   lost:      'Declined',
 }
 
-function JobChangeOrdersPanel({ job }) {
+function JobChangeOrdersPanel({ job, coDeepLink = null }) {
   const [cos,         setCos]         = useState([])
   const [loading,     setLoading]     = useState(false)
   const [activeCo,    setActiveCo]    = useState(null)   // { id, ... } when modal is open; { id: null } for new
   // Counts of attachments per CO id, keyed by bid id
   const [attCounts,   setAttCounts]   = useState({})
+  // Track which deep-link timestamps we've already auto-opened so opening a
+  // CO once and closing it doesn't immediately re-open on next render.
+  const lastOpenedDeepLinkTs = useRef(null)
   // When the user clicks "Open detailed estimator" inside the modal, we
   // route to the existing COEstimatePanel full-page view. Same state shape
   // as before so behavior stays identical.
@@ -2817,6 +2840,19 @@ function JobChangeOrdersPanel({ job }) {
     else { setCos([]); setActiveCo(null) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job?.id])
+
+  // When a deep-link arrives (clicked a CO from ClientDetail) and the matching
+  // CO is loaded into `cos`, open the detail modal automatically. Tracked by
+  // timestamp so opening + closing doesn't get re-triggered on re-render.
+  useEffect(() => {
+    if (!coDeepLink?.coId) return
+    if (lastOpenedDeepLinkTs.current === coDeepLink.ts) return
+    const target = cos.find(c => c.id === coDeepLink.coId)
+    if (target) {
+      setActiveCo(target)
+      lastOpenedDeepLinkTs.current = coDeepLink.ts
+    }
+  }, [coDeepLink, cos])
 
   async function fetchCOs(jobId) {
     setLoading(true)

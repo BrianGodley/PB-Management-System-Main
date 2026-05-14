@@ -623,8 +623,8 @@ export default function ClientDetail() {
                                     <td className="pl-8 pr-3 py-1.5">
                                       <div className="flex items-center gap-1.5">
                                         <span className="text-blue-300 text-xs">↳</span>
-                                        {co.estimate_id ? (
-                                          <Link to={`/estimates/${co.estimate_id}?co=1&job_id=${co.linked_job_id || ''}&co_name=${encodeURIComponent(co.co_name || '')}&co_type=${encodeURIComponent(co.co_type || '')}`}
+                                        {co.linked_job_id ? (
+                                          <Link to={`/jobs?tab=change-orders&job=${co.linked_job_id}&co=${co.id}`}
                                             className="text-[10px] font-semibold text-blue-700 hover:underline">{co.co_name || '—'}</Link>
                                         ) : (
                                           <span className="text-[10px] font-semibold text-blue-700">{co.co_name || '—'}</span>
