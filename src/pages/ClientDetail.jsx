@@ -505,24 +505,29 @@ export default function ClientDetail() {
                             }
                             const renderRow = (est, isVersion = false) => {
                               const t = estimateTotals(est)
-                              const versionLabel = isVersion
-                                ? `Estimate ${est.version || 2}`
-                                : `Estimate ${est.version || 1}`
+                              const versionN = est.version || (isVersion ? 2 : 1)
+                              // Originals: green badge. Versions: blue badge, indented row,
+                               // light-blue background, with a chunky ↳ glyph to mirror the
+                               // Jobs/Change Orders pattern but at a larger font (text-sm
+                               // vs the CO row's text-[10px]).
                               const linkCls = isVersion
-                                ? 'font-semibold text-blue-700 hover:underline'
-                                : 'font-semibold text-green-700 hover:underline'
+                                ? 'text-sm font-semibold text-blue-700 hover:underline'
+                                : 'text-sm font-semibold text-green-700 hover:underline'
                               const rowCls = isVersion
-                                ? 'bg-blue-50/40 hover:bg-blue-50 transition-colors'
+                                ? 'bg-blue-50/60 hover:bg-blue-100/60 border-b border-blue-100/60 transition-colors'
                                 : 'hover:bg-gray-50 transition-colors'
+                              const badgeCls = isVersion
+                                ? 'inline-block ml-2 text-[11px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 bg-blue-100 text-blue-700 border border-blue-200'
+                                : 'inline-block ml-2 text-[11px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 bg-green-100 text-green-700 border border-green-200'
                               return (
                                 <tr key={est.id} className={rowCls}>
-                                  <td className={isVersion ? 'pl-8 pr-3 py-2' : 'px-4 py-2'}>
-                                    <div className="flex items-center gap-1.5">
-                                      {isVersion && <span className="text-blue-300">↳</span>}
+                                  <td className={isVersion ? 'pl-10 pr-3 py-2' : 'px-4 py-2'}>
+                                    <div className="flex items-center gap-2">
+                                      {isVersion && <span className="text-blue-400 text-base font-bold">↳</span>}
                                       <Link to={`/estimates/${est.id}`} className={linkCls}>
                                         {est.estimate_name}
-                                        <span className="ml-2 text-[11px] text-gray-400 font-normal">· {versionLabel}</span>
                                       </Link>
+                                      <span className={badgeCls}>Estimate {versionN}</span>
                                     </div>
                                     {est.type && <p className="text-[10px] text-gray-400 mt-0.5">{est.type}</p>}
                                   </td>
