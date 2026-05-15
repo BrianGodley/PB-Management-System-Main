@@ -5,6 +5,7 @@ import { fetchAllPaginated } from '../lib/fetchAll'
 import { useAuth } from '../contexts/AuthContext'
 import { generateBidDoc, downloadBidDoc } from '../lib/generateBidDoc'
 import BidDocViewerModal from '../components/BidDocViewerModal'
+import { JOB_ROLES, nameInitials } from '../components/JobInfoModal'
 
 const BID_STATUSES = ['pending', 'presented', 'sold', 'lost']
 
@@ -50,13 +51,17 @@ export default function Bids() {
   const [downloadingId, setDownloadingId] = useState(null)
 
   // Sold modal state
-  const [soldModal,    setSoldModal]    = useState(null) // { bidId, bid, jobName, templateId }
+  const [soldModal,    setSoldModal]    = useState(null) // { bidId, bid, jobName, templateId, roles }
   const [savingJob,    setSavingJob]    = useState(false)
   const [templates,    setTemplates]    = useState([])
+  const [employees,    setEmployees]    = useState([])
 
   useEffect(() => {
     supabase.from('job_templates').select('id, name, auto_trigger, template_folders(*), template_tasks(*)').order('name')
       .then(({ data }) => { if (data) setTemplates(data) })
+    supabase.from('employees').select('id, first_name, last_name')
+      .eq('status', 'active').order('last_name')
+      .then(({ data }) => { if (data) setEmployees(data) })
   }, [])
 
   // Cascade warning modal state
@@ -111,7 +116,12 @@ export default function Bids() {
       // Intercept — show Sold modal to create job
       const bid = bids.find(b => b.id === id)
       const autoTemplate = templates.find(t => t.auto_trigger === 'sold_bid')
-      setSoldModal({ bidId: id, bid, jobName: formatJobName(bid?.client_name || ''), templateId: autoTemplate?.id || '' })
+      setSoldModal({
+        bidId: id, bid,
+        jobName: formatJobName(bid?.client_name || ''),
+        templateId: autoTemplate?.id || '',
+        roles: {},  // { [role.key]: employeeFullName }
+      })
       return
     }
 
@@ -179,6 +189,20 @@ export default function Bids() {
 
       if (jobErr) throw new Error(jobErr.message)
       const job = { id: jobId }
+
+      // Persist any role assignments the user picked in the sold modal.
+      // Mirrors the legacy consultant / project_manager columns so older
+      // readers stay in sync.
+      const r = soldModal.roles || {}
+      const roleUpdates = {}
+      for (const role of JOB_ROLES) {
+        if (r[role.key]) roleUpdates[role.key] = r[role.key]
+      }
+      if (r.design_consultant) roleUpdates.consultant      = r.design_consultant
+      if (r.job_supervisor)    roleUpdates.project_manager = r.job_supervisor
+      if (Object.keys(roleUpdates).length) {
+        await supabase.from('jobs').update(roleUpdates).eq('id', jobId)
+      }
 
       // Apply template folders + tasks if a template was selected
       if (soldModal.templateId) {
@@ -448,6 +472,39 @@ export default function Bids() {
                 <p className="text-xs text-gray-400 mt-1">Folders from this template will be created on the new job.</p>
               </div>
             )}
+
+            {/* Initial role assignments. Each is optional — the user can fill
+                 the rest in later from Jobs > Info > Employees. */}
+            <div className="mb-5">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Assign Employees (optional)</label>
+              <div className="grid grid-cols-1 gap-2 max-h-72 overflow-y-auto pr-1">
+                {JOB_ROLES.map(role => {
+                  const value = soldModal.roles?.[role.key] || ''
+                  return (
+                    <div key={role.key} className="flex items-center gap-2">
+                      <label className="text-xs text-gray-500 w-44 flex-shrink-0">{role.label}</label>
+                      <select
+                        value={value}
+                        onChange={e => setSoldModal(prev => ({ ...prev, roles: { ...(prev.roles || {}), [role.key]: e.target.value } }))}
+                        className="input text-sm flex-1"
+                      >
+                        <option value="">— Unassigned —</option>
+                        {employees.map(emp => {
+                          const full = `${emp.first_name || ''} ${emp.last_name || ''}`.trim()
+                          const lbl  = `${emp.last_name || ''}, ${emp.first_name || ''}`.trim()
+                          return <option key={emp.id} value={full}>{lbl}</option>
+                        })}
+                      </select>
+                      {value && (
+                        <span className={`text-[11px] font-bold rounded-full px-2 py-0.5 flex-shrink-0 ${role.pillCls}`} title={value}>
+                          ({nameInitials(value)})
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
 
             <div className="flex gap-3">
               <button

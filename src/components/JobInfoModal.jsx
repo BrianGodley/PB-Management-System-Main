@@ -23,6 +23,31 @@ const US_STATES = [
   'VA','WA','WV','WI','WY',
 ]
 
+// Per-job role assignments rendered on the Employees tab.
+//   key       — column on the jobs table
+//   label     — human label
+//   pillCls   — Tailwind classes for the (initials) pill next to the name
+//   stateKey  — local-state key in JobInfoModal (matches setter name pair)
+export const JOB_ROLES = [
+  { key: 'design_consultant',              label: 'Design Consultant',              pillCls: 'bg-blue-100 text-blue-700 border border-blue-200' },
+  { key: 'installation_consultant',        label: 'Installation Consultant',        pillCls: 'bg-indigo-100 text-indigo-700 border border-indigo-200' },
+  { key: 'design_review',                  label: 'Design Review',                  pillCls: 'bg-purple-100 text-purple-700 border border-purple-200' },
+  { key: 'permit_engineering_coordinator', label: 'Permit & Engineering Coordinator', pillCls: 'bg-orange-100 text-orange-700 border border-orange-200' },
+  { key: 'final_review',                   label: 'Final Review',                   pillCls: 'bg-pink-100 text-pink-700 border border-pink-200' },
+  { key: 'job_supervisor',                 label: 'Job Supervisor',                 pillCls: 'bg-green-100 text-green-700 border border-green-200' },
+  { key: 'quality_control_supervisor',     label: 'Quality Control Supervisor',     pillCls: 'bg-teal-100 text-teal-700 border border-teal-200' },
+  { key: 'finance_manager',                label: 'Finance Manager',                pillCls: 'bg-amber-100 text-amber-700 border border-amber-200' },
+  { key: 'success_supervisor',             label: 'Success Supervisor',             pillCls: 'bg-red-100 text-red-700 border border-red-200' },
+]
+
+// "John Smith" → "JS" · single-word names → first 2 chars uppercased.
+export function nameInitials(full) {
+  if (!full) return ''
+  const parts = String(full).trim().split(/\s+/)
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
 // `inline` (default false): when true, render the same content without the
 // fixed-overlay modal chrome — used by JobsList's Info tab to host the same
 // UI directly inside the right panel. Hides the X / Close buttons since the
@@ -63,10 +88,24 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
   const [consultant,     setConsultant]     = useState(job.consultant || '')
   const [projectManager, setProjectManager] = useState(job.project_manager || '')
 
+  // Employees tab — 9 role assignments, each storing the employee's full
+  // name. Falls back to the legacy fields so jobs imported before the
+  // schema migration still light up.
+  const [designConsultant,        setDesignConsultant]        = useState(job.design_consultant              || job.consultant      || '')
+  const [installationConsultant,  setInstallationConsultant]  = useState(job.installation_consultant        || '')
+  const [designReview,            setDesignReview]            = useState(job.design_review                  || '')
+  const [permitCoordinator,       setPermitCoordinator]       = useState(job.permit_engineering_coordinator || '')
+  const [finalReview,             setFinalReview]             = useState(job.final_review                   || '')
+  const [jobSupervisor,           setJobSupervisor]           = useState(job.job_supervisor                 || job.project_manager || '')
+  const [qcSupervisor,            setQcSupervisor]            = useState(job.quality_control_supervisor     || '')
+  const [financeManager,          setFinanceManager]          = useState(job.finance_manager                || '')
+  const [successSupervisor,       setSuccessSupervisor]       = useState(job.success_supervisor             || '')
+
   // Per-tab edit toggles. Both tabs default to read-only; user clicks Edit
   // to switch into the input form. (Will become permission-driven later.)
-  const [editingDetails, setEditingDetails] = useState(false)
-  const [editingClient,  setEditingClient]  = useState(false)
+  const [editingDetails,   setEditingDetails]   = useState(false)
+  const [editingClient,    setEditingClient]    = useState(false)
+  const [editingEmployees, setEditingEmployees] = useState(false)
 
   // Revert all Job Details state back to whatever's on the job prop. Used by
   // Cancel in the Details tab.
@@ -114,6 +153,44 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
     setGateCode(job.gate_code || '')
     setHasDog(!!job.has_dog)
     setAccessNotes(job.access_notes || '')
+  }
+
+  // Revert all 9 Employees-tab role assignments to whatever's on the job.
+  function resetEmployeesForm() {
+    setDesignConsultant      (job.design_consultant              || job.consultant      || '')
+    setInstallationConsultant(job.installation_consultant        || '')
+    setDesignReview          (job.design_review                  || '')
+    setPermitCoordinator     (job.permit_engineering_coordinator || '')
+    setFinalReview           (job.final_review                   || '')
+    setJobSupervisor         (job.job_supervisor                 || job.project_manager || '')
+    setQcSupervisor          (job.quality_control_supervisor     || '')
+    setFinanceManager        (job.finance_manager                || '')
+    setSuccessSupervisor     (job.success_supervisor             || '')
+  }
+
+  // Save the 9 role columns. Also keeps the legacy consultant /
+  // project_manager columns in sync so older code that reads them keeps
+  // working.
+  async function handleSaveEmployees() {
+    setSaving(true)
+    setError('')
+    const ok = await onSave(job.id, {
+      design_consultant:              designConsultant       || null,
+      installation_consultant:        installationConsultant || null,
+      design_review:                  designReview           || null,
+      permit_engineering_coordinator: permitCoordinator      || null,
+      final_review:                   finalReview            || null,
+      job_supervisor:                 jobSupervisor          || null,
+      quality_control_supervisor:     qcSupervisor           || null,
+      finance_manager:                financeManager         || null,
+      success_supervisor:             successSupervisor      || null,
+      // Legacy mirror — keep filled so any old reader still sees a value.
+      consultant:                     designConsultant       || null,
+      project_manager:                jobSupervisor          || null,
+    })
+    setSaving(false)
+    if (!ok) setError('Failed to save employee assignments.')
+    else     setEditingEmployees(false)
   }
 
   useEffect(() => {
@@ -828,30 +905,95 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
             </div>
           )}
 
-          {/* ── Employees tab ── */}
-          {activeTab === 'employees' && (
-            <div className="px-5 py-4">
-              {(consultant || projectManager) ? (
-                <div className="space-y-3">
-                  {consultant && (
-                    <div>
-                      <p className="text-xs text-gray-400 mb-0.5">Consultant</p>
-                      <p className="text-sm font-medium text-gray-800">{consultant}</p>
+          {/* ── Employees tab — 9 role assignments, edit-on-toggle. ── */}
+          {activeTab === 'employees' && (() => {
+            // Map state values to each role so we can drive everything
+            // from JOB_ROLES without repeating boilerplate.
+            const roleValueMap = {
+              design_consultant:              designConsultant,
+              installation_consultant:        installationConsultant,
+              design_review:                  designReview,
+              permit_engineering_coordinator: permitCoordinator,
+              final_review:                   finalReview,
+              job_supervisor:                 jobSupervisor,
+              quality_control_supervisor:     qcSupervisor,
+              finance_manager:                financeManager,
+              success_supervisor:             successSupervisor,
+            }
+            const roleSetterMap = {
+              design_consultant:              setDesignConsultant,
+              installation_consultant:        setInstallationConsultant,
+              design_review:                  setDesignReview,
+              permit_engineering_coordinator: setPermitCoordinator,
+              final_review:                   setFinalReview,
+              job_supervisor:                 setJobSupervisor,
+              quality_control_supervisor:     setQcSupervisor,
+              finance_manager:                setFinanceManager,
+              success_supervisor:             setSuccessSupervisor,
+            }
+            return (
+              <div className="px-5 py-4 space-y-5">
+                {/* Edit / Save / Cancel toolbar */}
+                <div className="flex items-center justify-between flex-shrink-0 -mb-2">
+                  <p className="text-xs text-gray-400">
+                    {editingEmployees ? 'Editing employee assignments' : 'Read-only — click Edit to make changes'}
+                  </p>
+                  {editingEmployees ? (
+                    <div className="flex gap-2">
+                      <button onClick={() => { resetEmployeesForm(); setEditingEmployees(false) }}
+                        className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50">
+                        Cancel
+                      </button>
+                      <button onClick={handleSaveEmployees} disabled={saving}
+                        className="px-3 py-1.5 rounded-lg bg-green-700 text-white text-xs font-semibold hover:bg-green-800 disabled:opacity-50">
+                        {saving ? 'Saving…' : 'Save'}
+                      </button>
                     </div>
-                  )}
-                  {projectManager && (
-                    <div>
-                      <p className="text-xs text-gray-400 mb-0.5">Job Supervisor</p>
-                      <p className="text-sm font-medium text-gray-800">{projectManager}</p>
-                    </div>
+                  ) : (
+                    <button onClick={() => setEditingEmployees(true)}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-green-700 text-xs font-semibold text-green-700 hover:bg-green-50">
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                        <path d="M11.5 1.5a1.414 1.414 0 0 1 2 2L5 12l-3 1 1-3 8.5-8.5z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      Edit
+                    </button>
                   )}
                 </div>
-              ) : (
-                <p className="text-sm text-gray-400 italic">No employees assigned yet. Set them in the Job Info tab.</p>
-              )}
-              <p className="text-xs text-gray-400 italic pt-4">Full employee assignment coming soon.</p>
-            </div>
-          )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {JOB_ROLES.map(role => {
+                    const value = roleValueMap[role.key]
+                    const setter = roleSetterMap[role.key]
+                    const initials = nameInitials(value)
+                    return (
+                      <div key={role.key}>
+                        <label className="block text-xs text-gray-500 mb-1">{role.label}</label>
+                        <div className="flex items-center gap-2">
+                          <select value={value || ''}
+                            onChange={e => setter(e.target.value)}
+                            disabled={!editingEmployees}
+                            className="input text-sm flex-1 disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default">
+                            <option value="">— Unassigned —</option>
+                            {employeeOptions.map(o => (
+                              <option key={o.value} value={o.value}>{o.label}</option>
+                            ))}
+                          </select>
+                          {value && (
+                            <span className={`text-[11px] font-bold rounded-full px-2 py-0.5 flex-shrink-0 ${role.pillCls}`}
+                              title={value}>
+                              ({initials})
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {error && <p className="text-xs text-red-500">{error}</p>}
+              </div>
+            )
+          })()}
 
         </div>
 
