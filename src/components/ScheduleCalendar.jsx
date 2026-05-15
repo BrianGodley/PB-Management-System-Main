@@ -1656,6 +1656,20 @@ export default function ScheduleCalendar({
                   <h3 className="text-sm font-bold text-gray-800">Select a Job</h3>
                   <p className="text-[11px] text-gray-400">{clickedDate}</p>
                 </div>
+
+                {/* Administrative shortcut — for non-job-related schedule
+                     items like crew time off and supervisor scheduling. */}
+                <button
+                  onClick={() => setPhase('admin-select')}
+                  className="w-full flex items-center justify-between gap-3 px-3 py-2 mb-3 rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 hover:border-purple-300 transition-colors text-left"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-purple-800">📋 Administrative</p>
+                    <p className="text-[11px] text-purple-600 mt-0.5">For crew time off and supervisor scheduling</p>
+                  </div>
+                  <span className="text-purple-400 text-lg flex-shrink-0">›</span>
+                </button>
+
                 <input
                   autoFocus
                   type="text"
@@ -1726,6 +1740,61 @@ export default function ScheduleCalendar({
           </ModalOverlay>
         )
       })()}
+
+      {/* ── Administrative scheduling picker ────────────────────
+           Stub for now — wires Crew Time Off and Supervisor Scheduling
+           options. Each option is a placeholder until those flows are
+           built. */}
+      {phase === 'admin-select' && (
+        <ModalOverlay onClose={closeModal}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-5">
+            <div className="flex items-baseline justify-between mb-1">
+              <h3 className="text-sm font-bold text-gray-800">Administrative</h3>
+              <p className="text-[11px] text-gray-400">{clickedDate}</p>
+            </div>
+            <p className="text-xs text-gray-500 mb-4">Pick what you want to schedule.</p>
+
+            <div className="space-y-2">
+              <button
+                onClick={() => alert('Crew time off scheduling — coming soon.')}
+                className="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-colors text-left"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-800">🌴 Crew Time Off</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">Block out days a crew is unavailable</p>
+                </div>
+                <span className="text-gray-400 text-lg flex-shrink-0">›</span>
+              </button>
+
+              <button
+                onClick={() => alert('Supervisor scheduling — coming soon.')}
+                className="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-colors text-left"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-800">👤 Supervisor Scheduling</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">Schedule a supervisor across jobs</p>
+                </div>
+                <span className="text-gray-400 text-lg flex-shrink-0">›</span>
+              </button>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between">
+              <button
+                onClick={() => setPhase('job-select')}
+                className="text-xs text-gray-400 hover:text-gray-600"
+              >
+                ← Back to job picker
+              </button>
+              <button
+                onClick={closeModal}
+                className="text-xs text-gray-400 hover:text-gray-600"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </ModalOverlay>
+      )}
 
       {/* ── Scheduling Type Selector ──────────────────────────── */}
       {phase === 'type-select' && (
