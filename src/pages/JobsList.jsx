@@ -166,6 +166,40 @@ export default function JobsList() {
   // Bumped each time the URL param changes so JobChangeOrdersPanel knows
   // to re-open even if the same coId arrives twice in a row.
   const [coDeepLink, setCoDeepLink] = useState(null) // { coId, ts } | null
+
+  // Per-user collapsed-state for the sidebar stage groups. Persisted in
+  // localStorage keyed by the signed-in user so each user keeps their own
+  // view across reloads. Set of stageId strings (or '__none__' for the
+  // Unassigned bucket).
+  const collapsedKey = user?.id ? `pbs:jobsList:collapsedStages:${user.id}` : null
+  const [collapsedStages, setCollapsedStages] = useState(() => {
+    if (typeof window === 'undefined' || !collapsedKey) return new Set()
+    try {
+      const raw = window.localStorage.getItem(collapsedKey)
+      return raw ? new Set(JSON.parse(raw)) : new Set()
+    } catch { return new Set() }
+  })
+  // If the user changes (login/logout) re-hydrate from their key.
+  useEffect(() => {
+    if (!collapsedKey) { setCollapsedStages(new Set()); return }
+    try {
+      const raw = window.localStorage.getItem(collapsedKey)
+      setCollapsedStages(raw ? new Set(JSON.parse(raw)) : new Set())
+    } catch { setCollapsedStages(new Set()) }
+  }, [collapsedKey])
+  // Persist every change.
+  useEffect(() => {
+    if (!collapsedKey) return
+    try { window.localStorage.setItem(collapsedKey, JSON.stringify([...collapsedStages])) } catch {}
+  }, [collapsedKey, collapsedStages])
+  function toggleStageCollapsed(stageId) {
+    setCollapsedStages(prev => {
+      const next = new Set(prev)
+      if (next.has(stageId)) next.delete(stageId)
+      else next.add(stageId)
+      return next
+    })
+  }
   const [stages,          setStages]          = useState([])
   const [dragOverStage,   setDragOverStage]   = useState(null)
   const [showExceptions,    setShowExceptions]    = useState(false)
@@ -954,6 +988,7 @@ export default function JobsList() {
                 const StageSection = ({ stageId, label }) => {
                   const stageJobs = byStage[stageId] || []
                   const isOver = dragOverStage === stageId && dragJobId
+                  const collapsed = collapsedStages.has(stageId)
                   return (
                     <div
                       onDragOver={e => { e.preventDefault(); setDragOverStage(stageId) }}
@@ -965,28 +1000,41 @@ export default function JobsList() {
                       }}
                       className={`mb-1 rounded-lg transition-colors ${isOver ? 'bg-green-50 ring-1 ring-green-300' : ''}`}
                     >
-                      <div className="flex items-center gap-1.5 px-2 pt-1.5 pb-1">
-                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide truncate flex-1 bg-gray-100 border border-gray-300 rounded px-2 py-0.5">
+                      <button
+                        type="button"
+                        onClick={() => toggleStageCollapsed(stageId)}
+                        title={collapsed ? 'Expand' : 'Collapse'}
+                        className="w-full flex items-center gap-1.5 px-2 pt-1.5 pb-1 text-[11px] font-bold text-gray-500 uppercase tracking-wide truncate bg-gray-100 border border-gray-300 rounded px-2 py-0.5 hover:bg-gray-200 transition-colors text-left"
+                      >
+                        <svg
+                          className={`w-3 h-3 flex-shrink-0 text-gray-400 transition-transform ${collapsed ? '' : 'rotate-90'}`}
+                          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                        </svg>
+                        <span className="truncate flex-1">
                           {label} <span className="text-gray-400 font-normal normal-case">· {stageJobs.length}</span>
                         </span>
-                      </div>
-                      <div className="space-y-0.5 px-0.5 min-h-[4px]">
-                        {stageJobs.map(job => (
-                          <JobItem
-                            key={job.id}
-                            job={job}
-                            stages={stages}
-                            selectedJob={selectedJob}
-                            setSelectedJob={setSelectedJob}
-                            setJobModal={setJobModal}
-                            onMove={moveJobToStage}
-                            clientPhoneMap={clientPhoneMap}
-                          />
-                        ))}
-                        {stageJobs.length === 0 && isOver && (
-                          <div className="h-6 rounded border-2 border-dashed border-green-300 mx-1" />
-                        )}
-                      </div>
+                      </button>
+                      {!collapsed && (
+                        <div className="space-y-0.5 px-0.5 min-h-[4px]">
+                          {stageJobs.map(job => (
+                            <JobItem
+                              key={job.id}
+                              job={job}
+                              stages={stages}
+                              selectedJob={selectedJob}
+                              setSelectedJob={setSelectedJob}
+                              setJobModal={setJobModal}
+                              onMove={moveJobToStage}
+                              clientPhoneMap={clientPhoneMap}
+                            />
+                          ))}
+                          {stageJobs.length === 0 && isOver && (
+                            <div className="h-6 rounded border-2 border-dashed border-green-300 mx-1" />
+                          )}
+                        </div>
+                      )}
                     </div>
                   )
                 }
