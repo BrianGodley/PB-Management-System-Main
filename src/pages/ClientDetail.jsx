@@ -62,7 +62,7 @@ export default function ClientDetail() {
 
       const { data: estData } = await supabase
         .from('estimates')
-        .select(`id, estimate_name, type, status, created_at,
+        .select(`id, estimate_name, type, status, created_at, version, parent_estimate_id,
           estimate_projects(estimate_modules(man_days,material_cost,labor_cost,labor_burden,gross_profit,sub_cost,total_price))`)
         .eq('client_name', clientData.name)
         .order('created_at', { ascending: false })
