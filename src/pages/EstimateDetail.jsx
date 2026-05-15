@@ -142,10 +142,97 @@ export default function EstimateDetail() {
   const [estDeleteModal, setEstDeleteModal] = useState(null)
   // { bidId, bidCount, woCount, jobIds, onConfirm, onKeepBid }
 
-  // What-If modal toggle. Modal is a pure scratchpad — it doesn't persist,
-  // it just shows the user what the estimate would look like under
-  // different GPMD / price / per-project-and-module overrides.
+  // What-If modal toggle. The user can either preview only (no save) or
+  // click "Save as New Estimate" inside the modal — that snapshots the
+  // current estimate as a new version with the GPMD overrides baked in.
   const [whatIfOpen, setWhatIfOpen] = useState(false)
+
+  // Snapshot the current estimate as a brand-new version. The original
+  // estimate is left untouched. New row gets parent_estimate_id pointing
+  // at the original (or the original's own id if `estimate` is itself a
+  // version), and a fresh version number = max(existing children) + 1.
+  // moduleOverrides: { [moduleId]: newGpmd }
+  async function applyAsNewVersion(moduleOverrides) {
+    if (!estimate) return false
+    // The root original everything chains to. If we ourselves are a
+    // version, point new versions at the same parent.
+    const rootId = estimate.parent_estimate_id || estimate.id
+
+    // Find the next version number under this root.
+    const { data: existing } = await supabase
+      .from('estimates')
+      .select('version')
+      .or(`id.eq.${rootId},parent_estimate_id.eq.${rootId}`)
+    const maxVer = (existing || []).reduce((m, e) => Math.max(m, e.version || 1), 1)
+    const nextVer = maxVer + 1
+
+    // Make sure the original itself has version=1 set so the tree displays
+    // correctly. If it was created before the versioning column existed
+    // it may be NULL.
+    if (rootId === estimate.id && (estimate.version == null || estimate.version === 0)) {
+      await supabase.from('estimates').update({ version: 1 }).eq('id', rootId)
+    }
+
+    // 1) Insert the new estimate row (copy of the current one's shell).
+    const { data: newEst, error: estErr } = await supabase
+      .from('estimates')
+      .insert({
+        estimate_name:       estimate.estimate_name,
+        type:                estimate.type,
+        status:              'pending',
+        client_id:           estimate.client_id,
+        client_name:         estimate.client_name,
+        created_by:          user?.id || null,
+        version:             nextVer,
+        parent_estimate_id:  rootId,
+      })
+      .select().single()
+    if (estErr || !newEst) { alert('Save failed: ' + (estErr?.message || 'unknown error')); return false }
+
+    // 2) Duplicate every project under the new estimate, then duplicate
+    // every module under each project — applying the GPMD override if any.
+    for (const proj of projects) {
+      const { id: oldProjId, estimate_modules: _mods, estimate_id: _eid, created_at: _ca, ...projShell } = proj
+      const { data: newProj, error: projErr } = await supabase
+        .from('estimate_projects')
+        .insert({ ...projShell, estimate_id: newEst.id })
+        .select().single()
+      if (projErr || !newProj) { alert('Project copy failed: ' + (projErr?.message || 'unknown')); return false }
+
+      const newRows = (proj.estimate_modules || []).map(m => {
+        const { id: _modId, project_id: _pid, created_at: _mca, ...modShell } = m
+        const ov = moduleOverrides[m.id]
+        if (Number.isFinite(ov) && ov >= 0) {
+          // Recompute GP and total_price using the new GPMD. Other costs
+          // (labor, burden, materials, sub) are unchanged.
+          const md       = parseFloat(m.man_days || 0)
+          const newGp    = md * ov
+          const labor    = parseFloat(m.labor_cost   || m.data?.calc?.laborCost || 0)
+          const burden   = parseFloat(m.labor_burden || m.data?.calc?.burden    || 0)
+          const mat      = parseFloat(m.material_cost || 0)
+          const sub      = parseFloat(m.sub_cost      || m.data?.calc?.subCost  || 0)
+          const comm     = newGp * 0.12   // commission scales with GP
+          const newPrice = labor + burden + mat + sub + newGp + comm
+          const newData  = {
+            ...(m.data || {}),
+            gpmd: ov,
+            calc: { ...(m.data?.calc || {}), gp: newGp, price: newPrice },
+          }
+          return { ...modShell, project_id: newProj.id, gross_profit: newGp, total_price: newPrice, data: newData }
+        }
+        // No override → straight copy.
+        return { ...modShell, project_id: newProj.id }
+      })
+      if (newRows.length > 0) {
+        const { error: modErr } = await supabase.from('estimate_modules').insert(newRows)
+        if (modErr) { alert('Module copy failed: ' + modErr.message); return false }
+      }
+    }
+
+    // Navigate to the new version so the user sees it.
+    navigate(`/estimates/${newEst.id}`)
+    return true
+  }
 
   // Add / Edit module modals
   const [showModulePicker, setShowModulePicker] = useState(false)
@@ -719,6 +806,7 @@ export default function EstimateDetail() {
           adjustedEstimateGP={adjustedEstimateGP}
           derivedEstSubRate={derivedEstSubRate}
           onClose={() => setWhatIfOpen(false)}
+          onApplyAsNewVersion={applyAsNewVersion}
         />
       )}
 
@@ -778,7 +866,7 @@ export default function EstimateDetail() {
 
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 mb-4 text-sm">
-        <Link to="/clients" className="text-gray-400 hover:text-gray-600">← Clients</Link>
+        <Link to="/clients" className="text-gray-400 hover:text-gray-600">← Opportunities</Link>
         {estimate.client_name && (
           <>
             <span className="text-gray-300">/</span>
@@ -792,6 +880,11 @@ export default function EstimateDetail() {
         )}
         <span className="text-gray-300">/</span>
         <span className="text-gray-700 font-medium">{editingName ? nameInput || estimate.estimate_name : estimate.estimate_name}</span>
+        {(estimate.version > 1 || estimate.parent_estimate_id) && (
+          <span className="ml-2 text-[11px] bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-2 py-0.5 font-medium">
+            Estimate {estimate.version || 2}
+          </span>
+        )}
       </div>
 
       {/* Change Order mode banner */}

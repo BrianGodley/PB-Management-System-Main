@@ -18,7 +18,32 @@ export default function EstimateWhatIfModal({
   derivedEstSubRate,   // blended sub markup
   adjustedEstimateGP,  // current effective GP across all projects (post-overrides)
   onClose,
+  // (moduleGpmds: { [moduleId]: number }) => Promise<boolean>
+  // Snapshots the current estimate as a new version with the given module
+  // GPMD overrides baked in. Returns true on success.
+  onApplyAsNewVersion,
 }) {
+  const [savingApply, setSavingApply] = useState(false)
+  // Per-module natural GPMD lookup so we can compute scaled overrides.
+  const allModulesFlat = useMemo(() => projects.flatMap(p =>
+    (p.estimate_modules || []).map(m => {
+      const md = parseFloat(m.man_days || 0)
+      const gp = parseFloat(m.gross_profit || m.data?.calc?.gp || 0)
+      return { id: m.id, manDays: md, gp, gpmd: md > 0 ? gp / md : 0 }
+    })
+  ), [projects])
+
+  async function applySection(buildOverrides, label) {
+    const overrides = buildOverrides()
+    if (!overrides) return
+    const ok = window.confirm(`Save this what-if as a new estimate version?\n\nUsing: ${label}`)
+    if (!ok) return
+    setSavingApply(true)
+    const success = await onApplyAsNewVersion(overrides)
+    setSavingApply(false)
+    if (success) onClose()
+  }
+
   const baseCost   = et.materialCost + et.laborCost + et.burden + et.subCost
   const subGp      = et.subCost * (derivedEstSubRate || 0)
   // The "natural" estimate GPMD derived from the post-override GP
@@ -156,7 +181,7 @@ export default function EstimateWhatIfModal({
                 <label className="block text-[10px] text-gray-500 mb-1">New GPMD</label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">$</span>
-                  <input type="number" min="0" step="1" value={s1Draft}
+                  <input type="text" inputMode="decimal" min="0" step="1" value={s1Draft}
                     onChange={e => setS1Draft(e.target.value)}
                     className="input text-sm pl-7 w-32" />
                 </div>
@@ -170,6 +195,20 @@ export default function EstimateWhatIfModal({
               </p>
             </div>
             <GpmdBar {...sharedBarProps} directGp={s1Gp} price={baseCost + (s1Gp + subGp) * 1.12} />
+            {onApplyAsNewVersion && s1Has && (
+              <div className="mt-2 flex justify-end">
+                <button
+                  disabled={savingApply}
+                  onClick={() => applySection(
+                    () => Object.fromEntries(allModulesFlat.map(m => [m.id, s1Num])),
+                    `Uniform GPMD of $${s1Num.toLocaleString()} on every module`
+                  )}
+                  className="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700 disabled:opacity-50"
+                >
+                  {savingApply ? 'Saving…' : 'Save as New Estimate'}
+                </button>
+              </div>
+            )}
           </section>
 
           {/* ── SECTION 2: Try a different overall price ── */}
@@ -183,7 +222,7 @@ export default function EstimateWhatIfModal({
                 <label className="block text-[10px] text-gray-500 mb-1">New total price</label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">$</span>
-                  <input type="number" min="0" step="0.01" value={s2Draft}
+                  <input type="text" inputMode="decimal" min="0" step="0.01" value={s2Draft}
                     onChange={e => setS2Draft(e.target.value)}
                     className="input text-sm pl-7 w-44" />
                 </div>
@@ -199,6 +238,24 @@ export default function EstimateWhatIfModal({
               </p>
             </div>
             <GpmdBar {...sharedBarProps} directGp={s2Gp} price={s2Has ? s2Num : et.price} />
+            {onApplyAsNewVersion && s2Has && adjustedEstimateGP > 0 && (
+              <div className="mt-2 flex justify-end">
+                <button
+                  disabled={savingApply}
+                  onClick={() => applySection(() => {
+                    // Scale every module's GPMD by the same ratio so the
+                    // new estimate-wide GP totals to s2Gp.
+                    const ratio = s2Gp / adjustedEstimateGP
+                    const ovs = {}
+                    for (const m of allModulesFlat) ovs[m.id] = m.gpmd * ratio
+                    return ovs
+                  }, `Scale all module GPMDs proportionally to hit $${Math.round(s2Num).toLocaleString()} total`)}
+                  className="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700 disabled:opacity-50"
+                >
+                  {savingApply ? 'Saving…' : 'Save as New Estimate'}
+                </button>
+              </div>
+            )}
           </section>
 
           {/* ── SECTION 3: per-project / per-module overrides ── */}
@@ -243,6 +300,40 @@ export default function EstimateWhatIfModal({
                 </tbody>
               </table>
             </div>
+            {onApplyAsNewVersion && (
+              <div className="mt-2 flex justify-end">
+                <button
+                  disabled={savingApply}
+                  onClick={() => applySection(() => {
+                    // Build per-module overrides from the section 3 inputs.
+                    // Project-level override wins over its module overrides.
+                    const ovs = {}
+                    for (const row of s3Rows) {
+                      for (const m of row.modUsed) {
+                        // Either the module had its own override applied,
+                        // or it inherits from a project-level override.
+                        const projOv = parseFloat(projDrafts[row.id])
+                        const projOvOk = Number.isFinite(projOv) && projOv >= 0
+                        if (projOvOk) {
+                          ovs[m.id] = projOv
+                        } else {
+                          const modOv = parseFloat(modDrafts[m.id])
+                          if (Number.isFinite(modOv) && modOv >= 0) ovs[m.id] = modOv
+                        }
+                      }
+                    }
+                    if (Object.keys(ovs).length === 0) {
+                      alert('Set at least one project or module GPMD override before saving.')
+                      return null
+                    }
+                    return ovs
+                  }, 'Per-project / per-module GPMD overrides from the table above')}
+                  className="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700 disabled:opacity-50"
+                >
+                  {savingApply ? 'Saving…' : 'Save as New Estimate'}
+                </button>
+              </div>
+            )}
           </section>
 
         </div>
@@ -273,11 +364,11 @@ function FragmentRows({ row, projDraft, onProjChange, modDrafts, onModChange }) 
         <td className="px-3 py-2 text-right">
           <div className="relative inline-block">
             <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none">$</span>
-            <input type="number" min="0" step="1"
+            <input type="text" inputMode="decimal"
               value={projDraft}
               onChange={e => onProjChange(e.target.value)}
               placeholder={String(row.natGpmd)}
-              className="input text-xs pl-5 py-1 w-24 text-right" />
+              className="input text-xs pl-5 py-1 w-24 text-right text-gray-900 font-semibold" />
           </div>
         </td>
         <td className="px-3 py-2 text-right font-semibold text-gray-800">${Math.round(row.projGp).toLocaleString()}</td>
@@ -294,12 +385,12 @@ function FragmentRows({ row, projDraft, onProjChange, modDrafts, onModChange }) 
             <td className="px-3 py-1.5 text-right">
               <div className="relative inline-block">
                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none">$</span>
-                <input type="number" min="0" step="1"
+                <input type="text" inputMode="decimal"
                   value={draft}
                   disabled={projOverrides}
                   onChange={e => onModChange(m.id, e.target.value)}
                   placeholder={String(m.natGpmd)}
-                  className="input text-xs pl-5 py-1 w-20 text-right disabled:bg-gray-50 disabled:text-gray-400" />
+                  className="input text-xs pl-5 py-1 w-20 text-right text-gray-900 font-semibold disabled:bg-gray-50 disabled:text-gray-400 disabled:font-normal" />
               </div>
             </td>
             <td className="px-3 py-1.5 text-right text-gray-700">${Math.round(m.eff).toLocaleString()}</td>

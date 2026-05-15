@@ -481,26 +481,66 @@ export default function ClientDetail() {
                             <th className="px-3 py-2 text-right font-semibold">Sub Cost</th>
                             <th className="px-3 py-2 text-right font-semibold">Gross Profit</th>
                             <th className="px-3 py-2 text-right font-semibold">GPMD</th>
+                            <th className="px-3 py-2 text-right font-semibold">Total Price</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                          {estimates.map(est => {
-                            const t = estimateTotals(est)
-                            return (
-                              <tr key={est.id} className="hover:bg-gray-50 transition-colors">
-                                <td className="px-4 py-2">
-                                  <Link to={`/estimates/${est.id}`} className="font-semibold text-green-700 hover:underline">{est.estimate_name}</Link>
-                                  {est.type && <p className="text-[10px] text-gray-400 mt-0.5">{est.type}</p>}
-                                </td>
-                                <td className="px-3 py-2 text-right text-gray-700">{t.man_days.toFixed(1)}</td>
-                                <td className="px-3 py-2 text-right text-gray-600">{fmt(t.labor_burden)}</td>
-                                <td className="px-3 py-2 text-right text-gray-700">{fmt(t.material_cost)}</td>
-                                <td className="px-3 py-2 text-right text-gray-600">{t.sub_cost > 0 ? fmt(t.sub_cost) : '—'}</td>
-                                <td className="px-3 py-2 text-right font-semibold text-green-700">{t.gross_profit > 0 ? fmt(t.gross_profit) : '—'}</td>
-                                <td className="px-3 py-2 text-right text-gray-600">{t.gpmd > 0 ? `$${Math.round(t.gpmd).toLocaleString()}` : '—'}</td>
-                              </tr>
-                            )
-                          })}
+                          {(() => {
+                            // Build version tree: originals + their child versions.
+                            // An estimate is "original" if it has no parent_estimate_id.
+                            // Versions hang off via parent_estimate_id.
+                            const byParent = {}
+                            const originals = []
+                            for (const est of estimates) {
+                              if (est.parent_estimate_id) {
+                                if (!byParent[est.parent_estimate_id]) byParent[est.parent_estimate_id] = []
+                                byParent[est.parent_estimate_id].push(est)
+                              } else {
+                                originals.push(est)
+                              }
+                            }
+                            // Sort children by version asc
+                            for (const k of Object.keys(byParent)) {
+                              byParent[k].sort((a, b) => (a.version || 1) - (b.version || 1))
+                            }
+                            const renderRow = (est, isVersion = false) => {
+                              const t = estimateTotals(est)
+                              const versionLabel = isVersion
+                                ? `Estimate ${est.version || 2}`
+                                : `Estimate ${est.version || 1}`
+                              const linkCls = isVersion
+                                ? 'font-semibold text-blue-700 hover:underline'
+                                : 'font-semibold text-green-700 hover:underline'
+                              const rowCls = isVersion
+                                ? 'bg-blue-50/40 hover:bg-blue-50 transition-colors'
+                                : 'hover:bg-gray-50 transition-colors'
+                              return (
+                                <tr key={est.id} className={rowCls}>
+                                  <td className={isVersion ? 'pl-8 pr-3 py-2' : 'px-4 py-2'}>
+                                    <div className="flex items-center gap-1.5">
+                                      {isVersion && <span className="text-blue-300">↳</span>}
+                                      <Link to={`/estimates/${est.id}`} className={linkCls}>
+                                        {est.estimate_name}
+                                        <span className="ml-2 text-[11px] text-gray-400 font-normal">· {versionLabel}</span>
+                                      </Link>
+                                    </div>
+                                    {est.type && <p className="text-[10px] text-gray-400 mt-0.5">{est.type}</p>}
+                                  </td>
+                                  <td className="px-3 py-2 text-right text-gray-700">{t.man_days.toFixed(1)}</td>
+                                  <td className="px-3 py-2 text-right text-gray-600">{fmt(t.labor_burden)}</td>
+                                  <td className="px-3 py-2 text-right text-gray-700">{fmt(t.material_cost)}</td>
+                                  <td className="px-3 py-2 text-right text-gray-600">{t.sub_cost > 0 ? fmt(t.sub_cost) : '—'}</td>
+                                  <td className="px-3 py-2 text-right font-semibold text-green-700">{t.gross_profit > 0 ? fmt(t.gross_profit) : '—'}</td>
+                                  <td className="px-3 py-2 text-right text-gray-600">{t.gpmd > 0 ? `$${Math.round(t.gpmd).toLocaleString()}` : '—'}</td>
+                                  <td className="px-3 py-2 text-right font-bold text-gray-900">{t.total_price > 0 ? fmt(t.total_price) : '—'}</td>
+                                </tr>
+                              )
+                            }
+                            return originals.flatMap(est => [
+                              renderRow(est, false),
+                              ...(byParent[est.id] || []).map(v => renderRow(v, true)),
+                            ])
+                          })()}
                         </tbody>
                       </table>
                     </div>
