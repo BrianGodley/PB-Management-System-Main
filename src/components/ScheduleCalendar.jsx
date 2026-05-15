@@ -126,6 +126,23 @@ function countWorkDays(start, end, exceptions = [], includeSat = false, includeS
   return count
 }
 
+// Returns the label of the matching exception for this date, or null.
+// Specific-date matches win over day-of-week matches because they tend to
+// carry the more meaningful copy (e.g. "Christmas" vs "Sunday").
+function cellExceptionLabel(date, exceptions) {
+  if (!date) return null
+  const ds = dateStr(date)
+  const specific = exceptions.find(ex => {
+    if (ex.type !== 'specific_date') return false
+    const end = ex.exception_date_end || ex.exception_date
+    return ds >= ex.exception_date && ds <= end
+  })
+  if (specific?.label) return specific.label
+  const dow = date.getDay()
+  const recurring = exceptions.find(ex => ex.type === 'day_of_week' && ex.day_of_week === dow)
+  return recurring?.label || null
+}
+
 // Returns true if a calendar cell should be shaded as a non-work day (for display)
 function isCellException(date, exceptions) {
   if (!date) return false
@@ -256,14 +273,20 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
           const ds = `${cellDate.getFullYear()}-${String(cellDate.getMonth()+1).padStart(2,'0')}-${String(cellDate.getDate()).padStart(2,'0')}`
           const isToday = ds === todayStr
           const inMonth = cellDate.getMonth() === month
+          const exLabel = cellExceptionLabel(cellDate, exceptions)
           return (
-            <div key={col} className="pt-1 px-1">
-              <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-medium
+            <div key={col} className="pt-1 px-1 flex items-center gap-1 min-w-0 overflow-hidden">
+              <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-medium flex-shrink-0
                 ${isToday ? 'bg-green-700 text-white'
                   : !inMonth ? 'text-gray-300'
                   : 'text-gray-500'}`}>
                 {cellDate.getDate()}
               </span>
+              {exLabel && (
+                <span className="text-[10px] font-medium text-gray-500 truncate" title={exLabel}>
+                  {exLabel}
+                </span>
+              )}
             </div>
           )
         })}
