@@ -42,6 +42,7 @@ import FinishesSummary          from '../components/modules/FinishesSummary'
 import StepsModule              from '../components/modules/StepsModule'
 import StepsSummary             from '../components/modules/StepsSummary'
 import GpmdBar                  from '../components/modules/GpmdBar'
+import EstimateWhatIfModal      from '../components/EstimateWhatIfModal'
 
 const MODULE_TYPES = [
   'Skid Steer Demo',
@@ -141,10 +142,10 @@ export default function EstimateDetail() {
   const [estDeleteModal, setEstDeleteModal] = useState(null)
   // { bidId, bidCount, woCount, jobIds, onConfirm, onKeepBid }
 
-  // Adjusted-price what-if input. Keep state here at the top with the other
-  // hooks (Rules of Hooks: cannot live after the early return below).
-  const [adjPriceDraft,  setAdjPriceDraft]  = useState('')
-  const [savingAdjPrice, setSavingAdjPrice] = useState(false)
+  // What-If modal toggle. Modal is a pure scratchpad — it doesn't persist,
+  // it just shows the user what the estimate would look like under
+  // different GPMD / price / per-project-and-module overrides.
+  const [whatIfOpen, setWhatIfOpen] = useState(false)
 
   // Add / Edit module modals
   const [showModulePicker, setShowModulePicker] = useState(false)
@@ -154,13 +155,6 @@ export default function EstimateDetail() {
   const [editingModule,    setEditingModule]    = useState(null)  // set when editing existing module
 
   useEffect(() => { fetchData() }, [id])
-
-  // Prefill the adjusted-price input from whatever's saved on the estimate
-  // so the user can tweak it. Re-runs when a different estimate loads.
-  useEffect(() => {
-    const v = parseFloat(estimate?.adjusted_price)
-    setAdjPriceDraft(Number.isFinite(v) && v > 0 ? String(v) : '')
-  }, [estimate?.id, estimate?.adjusted_price])
 
   async function fetchData() {
     setLoading(true)
@@ -543,18 +537,12 @@ export default function EstimateDetail() {
       }
 
       // Compute grand total, GP, and GPMD
-      const allMods       = projects.flatMap(p => p.estimate_modules || [])
-      const naturalTotal  = allMods.reduce((s, m) => s + parseFloat(m.total_price || m.data?.calc?.price || 0), 0)
-      const naturalGp     = allMods.reduce((s, m) => s + parseFloat(m.gross_profit || m.data?.calc?.gp || 0), 0)
-      const totalMD       = allMods.reduce((s, m) => s + parseFloat(m.man_days     || m.data?.calc?.manDays || 0), 0)
-      // If the estimate has an adjusted price, the bid uses that and rolls
-      // every dollar of the difference into gross profit.
-      const adjPrice      = parseFloat(estimate?.adjusted_price)
-      const useAdjusted   = Number.isFinite(adjPrice) && adjPrice > 0
-      const grandTotal    = useAdjusted ? adjPrice : naturalTotal
-      const totalGp       = useAdjusted ? naturalGp + (adjPrice - naturalTotal) : naturalGp
-      const bidGpmd       = totalMD > 0 ? Math.round(totalGp / totalMD) : 0
-      const projNames     = projects.map(p => p.project_name)
+      const allMods    = projects.flatMap(p => p.estimate_modules || [])
+      const grandTotal = allMods.reduce((s, m) => s + parseFloat(m.total_price || m.data?.calc?.price || 0), 0)
+      const totalGp    = allMods.reduce((s, m) => s + parseFloat(m.gross_profit || m.data?.calc?.gp || 0), 0)
+      const totalMD    = allMods.reduce((s, m) => s + parseFloat(m.man_days     || m.data?.calc?.manDays || 0), 0)
+      const bidGpmd    = totalMD > 0 ? Math.round(totalGp / totalMD) : 0
+      const projNames  = projects.map(p => p.project_name)
 
       // Save bid / change order record to Supabase
       const { data: bid, error: bidErr } = await supabase
@@ -704,49 +692,6 @@ export default function EstimateDetail() {
   // Derived blended rate for display in the Estimate Totals bar (read-only)
   const derivedEstSubRate = et.subCost > 0 ? estimateTotalSubGp / et.subCost : 0.20
 
-  // ── Adjusted-price overlay ─────────────────────────────────────────────────
-  // The user can type a what-if total price for the entire estimate. The
-  // delta against the natural total flows entirely into gross profit (every
-  // dollar of price increase is profit since costs don't change).
-  // When estimate.adjusted_price is set, we render a second GPMD bar
-  // alongside the natural one and the bid creation flow uses adjusted_price.
-  const savedAdjPriceNum  = parseFloat(estimate?.adjusted_price)
-  const hasSavedAdjPrice  = Number.isFinite(savedAdjPriceNum) && savedAdjPriceNum > 0
-  const adjDraftNum   = parseFloat(adjPriceDraft)
-  const hasDraftAdj   = Number.isFinite(adjDraftNum) && adjDraftNum > 0
-  // Preview GP/GPMD for whatever's currently typed in the input (or the saved value)
-  const previewPrice  = hasDraftAdj ? adjDraftNum : (hasSavedAdjPrice ? savedAdjPriceNum : et.price)
-  const previewGp     = adjustedEstimateGP + (previewPrice - et.price)
-  const previewGpmd   = et.manDays > 0 ? Math.round(previewGp / et.manDays) : 0
-  const previewProfit = previewGp + estimateTotalSubGp
-  const naturalGpmd   = et.manDays > 0 ? Math.round(adjustedEstimateGP / et.manDays) : 0
-
-  async function saveAdjustedPrice() {
-    if (!hasDraftAdj) return
-    setSavingAdjPrice(true)
-    const { data, error } = await supabase
-      .from('estimates')
-      .update({ adjusted_price: adjDraftNum })
-      .eq('id', id)
-      .select().single()
-    setSavingAdjPrice(false)
-    if (error) { alert('Save failed: ' + error.message); return }
-    if (data) setEstimate(data)
-  }
-  async function clearAdjustedPrice() {
-    if (!confirm('Remove the adjusted total? The bid will revert to the natural total.')) return
-    setSavingAdjPrice(true)
-    const { data, error } = await supabase
-      .from('estimates')
-      .update({ adjusted_price: null })
-      .eq('id', id)
-      .select().single()
-    setSavingAdjPrice(false)
-    if (error) { alert('Clear failed: ' + error.message); return }
-    if (data) setEstimate(data)
-    setAdjPriceDraft('')
-  }
-
   // ── Per-project totals for selected project ────────────────────────────────
   const projModules = selectedProject?.estimate_modules || []
   const projectTotals = projModules.reduce((acc, mod) => {
@@ -765,6 +710,17 @@ export default function EstimateDetail() {
 
   return (
     <div className="flex flex-col h-full">
+
+      {/* ── What If? scratchpad modal ── */}
+      {whatIfOpen && (
+        <EstimateWhatIfModal
+          projects={projects}
+          et={et}
+          adjustedEstimateGP={adjustedEstimateGP}
+          derivedEstSubRate={derivedEstSubRate}
+          onClose={() => setWhatIfOpen(false)}
+        />
+      )}
 
       {/* ── Estimate Delete Cascade Modal ── */}
       {estDeleteModal && (
@@ -921,7 +877,18 @@ export default function EstimateDetail() {
       {/* ── Estimate-wide summary bar ── */}
       <div className="mb-4">
         <div className="flex items-center justify-between mb-2 px-1">
-          <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Estimate Totals</p>
+          <div className="flex items-center gap-3">
+            <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Estimate Totals</p>
+            {allModules.length > 0 && (
+              <button
+                onClick={() => setWhatIfOpen(true)}
+                className="px-3 py-1 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 text-[11px] font-semibold hover:bg-amber-100 hover:border-amber-400 transition-colors"
+                title="Run a what-if analysis: tweak GPMD, overall price, or per-project / per-module overrides"
+              >
+                💡 What If?
+              </button>
+            )}
+          </div>
           <p className="text-xs text-gray-400">
             {allModules.length} module{allModules.length !== 1 ? 's' : ''}
             {' across '}
@@ -933,104 +900,18 @@ export default function EstimateDetail() {
             <p className="text-xs text-gray-500 text-center py-1">Add projects and modules to see totals here.</p>
           </div>
         ) : (
-          <>
-            <GpmdBar
-              totalMat={et.materialCost}
-              totalHrs={et.manDays * 8}
-              manDays={et.manDays}
-              laborCost={et.laborCost}
-              laborRatePerHour={et.manDays > 0 && et.laborCost > 0 ? et.laborCost / (et.manDays * 8) : 35}
-              burden={et.burden}
-              subCost={et.subCost}
-              directGp={adjustedEstimateGP}
-              price={et.price}
-              subMarkupRate={derivedEstSubRate}
-            />
-
-            {/* ── Adjusted-price what-if panel ───────────────────────
-                 User types a target overall price; we show the resulting
-                 GP/GPMD live. Apply saves it to estimates.adjusted_price
-                 and the bid created from this estimate uses that number. */}
-            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/40 px-4 py-3">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-bold uppercase tracking-wider text-amber-700">
-                  Adjusted Total Price
-                </p>
-                {hasSavedAdjPrice && (
-                  <span className="text-[10px] bg-amber-100 text-amber-700 border border-amber-300 rounded-full px-2 py-0.5 font-medium">
-                    ⚠ Adjusted total will be used for the bid
-                  </span>
-                )}
-              </div>
-
-              <div className="flex flex-wrap items-end gap-3">
-                <div>
-                  <label className="block text-[10px] text-gray-500 mb-1">Target overall price</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">$</span>
-                    <input
-                      type="number" min="0" step="0.01"
-                      value={adjPriceDraft}
-                      onChange={e => setAdjPriceDraft(e.target.value)}
-                      placeholder={Math.round(et.price).toLocaleString()}
-                      className="input text-sm pl-7 w-44"
-                    />
-                  </div>
-                </div>
-                <div className="text-xs text-gray-600">
-                  <p>Natural total: <span className="font-semibold text-gray-800">${Math.round(et.price).toLocaleString()}</span></p>
-                  {hasDraftAdj && (
-                    <>
-                      <p>Δ profit: <span className={`font-semibold ${previewGp - adjustedEstimateGP >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                        {previewGp - adjustedEstimateGP >= 0 ? '+' : ''}${Math.round(previewGp - adjustedEstimateGP).toLocaleString()}
-                      </span></p>
-                      <p>New GP: <span className="font-semibold text-gray-800">${Math.round(previewGp).toLocaleString()}</span> · New GPMD: <span className="font-semibold text-gray-800">${previewGpmd.toLocaleString()}</span></p>
-                    </>
-                  )}
-                </div>
-                <div className="ml-auto flex gap-2">
-                  <button
-                    onClick={saveAdjustedPrice}
-                    disabled={savingAdjPrice || !hasDraftAdj || adjDraftNum === savedAdjPriceNum}
-                    className="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700 disabled:opacity-50"
-                  >
-                    {savingAdjPrice ? 'Saving…' : hasSavedAdjPrice ? 'Update' : 'Apply'}
-                  </button>
-                  {hasSavedAdjPrice && (
-                    <button
-                      onClick={clearAdjustedPrice}
-                      disabled={savingAdjPrice}
-                      className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Adjusted GPMD bar — only when an adjusted price is saved.
-                 Same costs as the natural bar; price + GP shifted to match. */}
-            {hasSavedAdjPrice && (
-              <div className="mt-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-700 mb-1.5 px-1">
-                  Adjusted (used for bid)
-                </p>
-                <GpmdBar
-                  totalMat={et.materialCost}
-                  totalHrs={et.manDays * 8}
-                  manDays={et.manDays}
-                  laborCost={et.laborCost}
-                  laborRatePerHour={et.manDays > 0 && et.laborCost > 0 ? et.laborCost / (et.manDays * 8) : 35}
-                  burden={et.burden}
-                  subCost={et.subCost}
-                  directGp={adjustedEstimateGP + (savedAdjPriceNum - et.price)}
-                  price={savedAdjPriceNum}
-                  subMarkupRate={derivedEstSubRate}
-                />
-              </div>
-            )}
-          </>
+          <GpmdBar
+            totalMat={et.materialCost}
+            totalHrs={et.manDays * 8}
+            manDays={et.manDays}
+            laborCost={et.laborCost}
+            laborRatePerHour={et.manDays > 0 && et.laborCost > 0 ? et.laborCost / (et.manDays * 8) : 35}
+            burden={et.burden}
+            subCost={et.subCost}
+            directGp={adjustedEstimateGP}
+            price={et.price}
+            subMarkupRate={derivedEstSubRate}
+          />
         )}
       </div>
 
