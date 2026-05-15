@@ -51,7 +51,7 @@ const EMPTY_COMPANY_FORM = {
 }
 
 // ── Add Individual Contact Modal ──────────────────────────────────────────────
-function AddContactModal({ onSave, onClose }) {
+function AddContactModal({ onSave, onClose, assignees = [] }) {
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
@@ -260,7 +260,7 @@ function CompanyContactRow({ contact, onChange, onRemove, inp, lbl }) {
   )
 }
 
-function AddCompanyModal({ onSave, onClose }) {
+function AddCompanyModal({ onSave, onClose, assignees = [] }) {
   const [form, setForm] = useState(EMPTY_COMPANY_FORM)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
@@ -876,6 +876,7 @@ export default function Contacts() {
 
       {showAdd && isIndividuals && (
         <AddContactModal
+          assignees={assignees}
           onSave={c => { setContacts(p => [c, ...p]); setShowAdd(false) }}
           onClose={() => setShowAdd(false)}
         />
@@ -883,6 +884,7 @@ export default function Contacts() {
 
       {showAdd && !isIndividuals && (
         <AddCompanyModal
+          assignees={assignees}
           onSave={c => { setCompanies(p => [c, ...p]); setShowAdd(false) }}
           onClose={() => setShowAdd(false)}
         />
