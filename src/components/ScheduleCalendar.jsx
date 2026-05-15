@@ -814,6 +814,15 @@ export default function ScheduleCalendar({
   const [modalJobId,  setModalJobId]  = useState(null)
   const [jobPickerSearch, setJobPickerSearch] = useState('')
   const [saving,      setSaving]      = useState(false)
+  // Administrative scheduling form (crew time off / supervisor scheduling).
+  // job_id stays null on these rows; title is prefixed "X - " and uses X's color.
+  const [adminForm, setAdminForm] = useState({
+    supervisorId: '', consultantId: '',
+    crewChiefId:  '', crewMemberId: '',
+    description:  '',  // 'job_walk' | 'time_off' | 'custom'
+    customDesc:   '',
+    startDate:    '', endDate: '', workDays: 1,
+  })
   const [entryMode,          setEntryMode]          = useState('crew')
   const [crews,              setCrews]              = useState([])
   const [employees,          setEmployees]          = useState([])
@@ -1247,6 +1256,13 @@ export default function ScheduleCalendar({
 
   function closeModal() {
     setPhase(null); setEditItem(null); setForm(EMPTY_FORM); setModalJobId(null); setEntryMode('crew')
+    setAdminForm({
+      supervisorId: '', consultantId: '',
+      crewChiefId:  '', crewMemberId: '',
+      description:  '',
+      customDesc:   '',
+      startDate:    '', endDate: '', workDays: 1,
+    })
     setSchedType(null); setWorkOrders([]); setSelectedWOs(new Set()); setWoSequence([])
     setWoAssignments({}); setWoStartDate('')
   }
@@ -1268,6 +1284,68 @@ export default function ScheduleCalendar({
       }
       return next
     })
+  }
+
+  // Insert an Administrative schedule item (crew time off / supervisor
+  // scheduling). job_id stays null. Title is prefixed "X - " and both colors
+  // come from the X crew row so it slots in alongside other X items.
+  async function saveAdminItem(mode) {
+    const empById = new Map(employees.map(e => [e.id, e]))
+    const fullName = id => {
+      const e = empById.get(id)
+      return e ? `${e.first_name || ''} ${e.last_name || ''}`.trim() : ''
+    }
+
+    const sup    = adminForm.supervisorId ? fullName(adminForm.supervisorId) : ''
+    const cons   = adminForm.consultantId ? fullName(adminForm.consultantId) : ''
+    const chief  = adminForm.crewChiefId  ? fullName(adminForm.crewChiefId)  : ''
+    const member = adminForm.crewMemberId ? fullName(adminForm.crewMemberId) : ''
+
+    const assigneeNames = mode === 'supervisor'
+      ? [sup, cons].filter(Boolean)
+      : [chief, member].filter(Boolean)
+    if (assigneeNames.length === 0) {
+      alert(mode === 'supervisor'
+        ? 'Pick at least one — Supervisor or Consultant.'
+        : 'Pick at least one — Crew Chief or Crew Member.')
+      return
+    }
+
+    const descLabel = adminForm.description === 'job_walk' ? 'Job Walk'
+                    : adminForm.description === 'time_off' ? 'Time Off'
+                    : adminForm.description === 'custom'   ? adminForm.customDesc.trim()
+                    : ''
+    if (!descLabel) { alert('Pick a description.'); return }
+    if (!adminForm.startDate) { alert('Pick a start date.'); return }
+
+    const xCrew  = crews.find(c => (c.label || '').toUpperCase() === 'X')
+    const xColor = xCrew?.color || '#b91c1c'
+    const assignees = assigneeNames.join(', ')
+    const title     = `X - ${descLabel}: ${assignees}`
+
+    setSaving(true)
+    const payload = {
+      job_id:         null,
+      title,
+      display_color:  xColor,
+      assignee_color: xColor,
+      assignees,
+      start_date:     adminForm.startDate,
+      end_date:       adminForm.endDate || adminForm.startDate,
+      work_days:      +adminForm.workDays || 1,
+      progress:       0,
+      reminder:       'None',
+      notes:          '',
+      crew_id:        null,
+      sub_id:         null,
+      include_saturday: false,
+      include_sunday:   false,
+      needs_crew:     false,
+    }
+    const { error } = await supabase.from('schedule_items').insert(payload)
+    setSaving(false)
+    if (error) { alert('Failed to save: ' + error.message); return }
+    closeModal(); fetchItems()
   }
 
   async function saveItem() {
@@ -1742,9 +1820,10 @@ export default function ScheduleCalendar({
       })()}
 
       {/* ── Administrative scheduling picker ────────────────────
-           Stub for now — wires Crew Time Off and Supervisor Scheduling
-           options. Each option is a placeholder until those flows are
-           built. */}
+           Two paths: 1) Supervisor + Consultant scheduling
+                      2) Crew (chief / member) scheduling
+           Both insert schedule_items with title prefixed "X - "
+           and the X crew's color. */}
       {phase === 'admin-select' && (
         <ModalOverlay onClose={closeModal}>
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-5">
@@ -1756,23 +1835,29 @@ export default function ScheduleCalendar({
 
             <div className="space-y-2">
               <button
-                onClick={() => alert('Crew time off scheduling — coming soon.')}
+                onClick={() => {
+                  setAdminForm(p => ({ ...p, startDate: clickedDate || '', endDate: clickedDate || '', workDays: 1 }))
+                  setPhase('admin-supervisor')
+                }}
                 className="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-colors text-left"
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-gray-800">🌴 Crew Time Off</p>
-                  <p className="text-[11px] text-gray-500 mt-0.5">Block out days a crew is unavailable</p>
+                  <p className="text-sm font-semibold text-gray-800">👤 Supervisor / Consultant</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">Job walk, time off, or a custom item</p>
                 </div>
                 <span className="text-gray-400 text-lg flex-shrink-0">›</span>
               </button>
 
               <button
-                onClick={() => alert('Supervisor scheduling — coming soon.')}
+                onClick={() => {
+                  setAdminForm(p => ({ ...p, startDate: clickedDate || '', endDate: clickedDate || '', workDays: 1 }))
+                  setPhase('admin-crew')
+                }}
                 className="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-colors text-left"
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-gray-800">👤 Supervisor Scheduling</p>
-                  <p className="text-[11px] text-gray-500 mt-0.5">Schedule a supervisor across jobs</p>
+                  <p className="text-sm font-semibold text-gray-800">🛠️ Crew Member</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">Time off or a custom item for a chief or crew member</p>
                 </div>
                 <span className="text-gray-400 text-lg flex-shrink-0">›</span>
               </button>
@@ -1795,6 +1880,210 @@ export default function ScheduleCalendar({
           </div>
         </ModalOverlay>
       )}
+
+      {/* ── Administrative: Supervisor / Consultant ──────────── */}
+      {phase === 'admin-supervisor' && (() => {
+        const supervisorOpts = employees.map(e => ({ id: e.id, label: `${e.last_name || ''}, ${e.first_name || ''}`.trim() }))
+        return (
+          <ModalOverlay onClose={closeModal}>
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-5 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-baseline justify-between mb-1">
+                <h3 className="text-sm font-bold text-gray-800">Supervisor / Consultant</h3>
+                <p className="text-[11px] text-gray-400">{adminForm.startDate || clickedDate}</p>
+              </div>
+              <p className="text-xs text-gray-500 mb-4">Pick a supervisor, a consultant, or both.</p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Job Supervisor</label>
+                  <select className="input text-sm w-full"
+                    value={adminForm.supervisorId}
+                    onChange={e => setAdminForm(p => ({ ...p, supervisorId: e.target.value }))}>
+                    <option value="">— None —</option>
+                    {supervisorOpts.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Consultant</label>
+                  <select className="input text-sm w-full"
+                    value={adminForm.consultantId}
+                    onChange={e => setAdminForm(p => ({ ...p, consultantId: e.target.value }))}>
+                    <option value="">— None —</option>
+                    {supervisorOpts.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Description</p>
+              <div className="space-y-1.5 mb-4">
+                {[
+                  { key: 'job_walk', label: 'Job Walk' },
+                  { key: 'time_off', label: 'Time Off' },
+                  { key: 'custom',   label: 'Custom…'  },
+                ].map(opt => (
+                  <label key={opt.key} className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+                    adminForm.description === opt.key ? 'border-purple-300 bg-purple-50' : 'border-gray-200 hover:bg-gray-50'
+                  }`}>
+                    <input type="radio" name="admin-desc-sup"
+                      checked={adminForm.description === opt.key}
+                      onChange={() => setAdminForm(p => ({ ...p, description: opt.key }))}
+                      className="accent-purple-600" />
+                    <span className="text-sm text-gray-800">{opt.label}</span>
+                  </label>
+                ))}
+                {adminForm.description === 'custom' && (
+                  <input type="text" autoFocus
+                    value={adminForm.customDesc}
+                    onChange={e => setAdminForm(p => ({ ...p, customDesc: e.target.value }))}
+                    placeholder="Describe the schedule item…"
+                    className="input text-sm w-full mt-1" />
+                )}
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Start</label>
+                  <input type="date" value={adminForm.startDate}
+                    onChange={e => setAdminForm(p => ({ ...p, startDate: e.target.value }))}
+                    className="input text-sm w-full" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">End</label>
+                  <input type="date" value={adminForm.endDate}
+                    onChange={e => setAdminForm(p => ({ ...p, endDate: e.target.value }))}
+                    className="input text-sm w-full" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Work days</label>
+                  <input type="number" min="1" value={adminForm.workDays}
+                    onChange={e => setAdminForm(p => ({ ...p, workDays: e.target.value }))}
+                    className="input text-sm w-full" />
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <button onClick={() => setPhase('admin-select')}
+                  className="text-xs text-gray-400 hover:text-gray-600">← Back</button>
+                <div className="flex gap-2">
+                  <button onClick={closeModal}
+                    className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50">Cancel</button>
+                  <button onClick={() => saveAdminItem('supervisor')}
+                    disabled={saving}
+                    className="px-3 py-1.5 rounded-lg bg-green-700 text-white text-xs font-semibold hover:bg-green-800 disabled:opacity-50">
+                    {saving ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </ModalOverlay>
+        )
+      })()}
+
+      {/* ── Administrative: Crew Chief / Member ──────────────── */}
+      {phase === 'admin-crew' && (() => {
+        const empById = new Map(employees.map(e => [e.id, e]))
+        const chiefIds = [...new Set(crews.map(c => c.crew_chief_id).filter(Boolean))]
+        const memberIds = [...new Set(crews.flatMap(c => [c.journeyman_id, c.laborer_1_id, c.laborer_2_id, c.laborer_3_id]).filter(Boolean))]
+        const toOpts = ids => ids
+          .map(id => empById.get(id))
+          .filter(Boolean)
+          .map(e => ({ id: e.id, label: `${e.last_name || ''}, ${e.first_name || ''}`.trim() }))
+          .sort((a, b) => a.label.localeCompare(b.label))
+        const chiefOpts  = toOpts(chiefIds)
+        const memberOpts = toOpts(memberIds)
+        return (
+          <ModalOverlay onClose={closeModal}>
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-5 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-baseline justify-between mb-1">
+                <h3 className="text-sm font-bold text-gray-800">Crew Member Scheduling</h3>
+                <p className="text-[11px] text-gray-400">{adminForm.startDate || clickedDate}</p>
+              </div>
+              <p className="text-xs text-gray-500 mb-4">Pick a crew chief, a crew member, or both.</p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Crew Chief</label>
+                  <select className="input text-sm w-full"
+                    value={adminForm.crewChiefId}
+                    onChange={e => setAdminForm(p => ({ ...p, crewChiefId: e.target.value }))}>
+                    <option value="">— None —</option>
+                    {chiefOpts.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Crew Member</label>
+                  <select className="input text-sm w-full"
+                    value={adminForm.crewMemberId}
+                    onChange={e => setAdminForm(p => ({ ...p, crewMemberId: e.target.value }))}>
+                    <option value="">— None —</option>
+                    {memberOpts.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Description</p>
+              <div className="space-y-1.5 mb-4">
+                {[
+                  { key: 'time_off', label: 'Time Off' },
+                  { key: 'custom',   label: 'Custom…'  },
+                ].map(opt => (
+                  <label key={opt.key} className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+                    adminForm.description === opt.key ? 'border-purple-300 bg-purple-50' : 'border-gray-200 hover:bg-gray-50'
+                  }`}>
+                    <input type="radio" name="admin-desc-crew"
+                      checked={adminForm.description === opt.key}
+                      onChange={() => setAdminForm(p => ({ ...p, description: opt.key }))}
+                      className="accent-purple-600" />
+                    <span className="text-sm text-gray-800">{opt.label}</span>
+                  </label>
+                ))}
+                {adminForm.description === 'custom' && (
+                  <input type="text" autoFocus
+                    value={adminForm.customDesc}
+                    onChange={e => setAdminForm(p => ({ ...p, customDesc: e.target.value }))}
+                    placeholder="Describe the schedule item…"
+                    className="input text-sm w-full mt-1" />
+                )}
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Start</label>
+                  <input type="date" value={adminForm.startDate}
+                    onChange={e => setAdminForm(p => ({ ...p, startDate: e.target.value }))}
+                    className="input text-sm w-full" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">End</label>
+                  <input type="date" value={adminForm.endDate}
+                    onChange={e => setAdminForm(p => ({ ...p, endDate: e.target.value }))}
+                    className="input text-sm w-full" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Work days</label>
+                  <input type="number" min="1" value={adminForm.workDays}
+                    onChange={e => setAdminForm(p => ({ ...p, workDays: e.target.value }))}
+                    className="input text-sm w-full" />
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <button onClick={() => setPhase('admin-select')}
+                  className="text-xs text-gray-400 hover:text-gray-600">← Back</button>
+                <div className="flex gap-2">
+                  <button onClick={closeModal}
+                    className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50">Cancel</button>
+                  <button onClick={() => saveAdminItem('crew')}
+                    disabled={saving}
+                    className="px-3 py-1.5 rounded-lg bg-green-700 text-white text-xs font-semibold hover:bg-green-800 disabled:opacity-50">
+                    {saving ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </ModalOverlay>
+        )
+      })()}
 
       {/* ── Scheduling Type Selector ──────────────────────────── */}
       {phase === 'type-select' && (
