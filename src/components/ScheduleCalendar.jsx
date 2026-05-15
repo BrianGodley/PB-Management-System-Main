@@ -1158,8 +1158,20 @@ export default function ScheduleCalendar({
 
   async function fetchItems() {
     setLoading(true)
-    const startOf = `${year}-${String(month+1).padStart(2,'0')}-01`
-    const endOf   = `${year}-${String(month+1).padStart(2,'0')}-${String(daysInMonth(year, month)).padStart(2,'0')}`
+    // Visible date range = the actual 6-row Sun→Sat grid the user sees,
+    // which can spill into the previous and next month. The calendar now
+    // renders those spillover days in full, so we have to fetch any item
+    // that overlaps that wider range — not just items inside the current
+    // month — otherwise the leading/trailing weeks render empty when the
+    // user pages between months.
+    const firstDow   = firstDayOfMonth(year, month)
+    const numDays    = daysInMonth(year, month)
+    const totalCells = Math.ceil((firstDow + numDays) / 7) * 7
+    const visStart   = new Date(year, month, 1 - firstDow)
+    const visEnd     = new Date(year, month, 1 - firstDow + (totalCells - 1))
+    const fmt        = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+    const startOf    = fmt(visStart)
+    const endOf      = fmt(visEnd)
 
     let q = supabase
       .from('schedule_items')
