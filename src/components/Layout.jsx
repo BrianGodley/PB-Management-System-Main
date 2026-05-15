@@ -7,7 +7,7 @@ import SamChat from './SamChat'
 
 const navItems = [
   { path: '/contacts',            label: 'Contacts',          icon: '🗂️' },
-  { path: '/clients',             label: 'Clients',           icon: '👥' },
+  { path: '/clients',             label: 'Opportunities',     icon: '👥' },
   { path: '/design',              label: 'Design',            icon: '📐' },
   { path: '/bids',                label: 'Bids',              icon: '📋' },
   { path: '/jobs',                label: 'Jobs',              icon: '🔨' },

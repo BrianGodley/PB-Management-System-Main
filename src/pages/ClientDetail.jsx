@@ -201,7 +201,7 @@ export default function ClientDetail() {
       <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-700" />
     </div>
   )
-  if (!client) return <div className="card text-center py-12 text-gray-500">Client not found.</div>
+  if (!client) return <div className="card text-center py-12 text-gray-500">Opportunity not found.</div>
 
   // Change-order rollups across every CO on every job. COs are additive on
   // top of the original job revenue / gross profit.
@@ -223,7 +223,7 @@ export default function ClientDetail() {
             <div className="flex items-center gap-3 mb-4">
               <span className="text-2xl">⚠️</span>
               <div>
-                <h2 className="text-lg font-bold text-gray-900">Delete Client?</h2>
+                <h2 className="text-lg font-bold text-gray-900">Delete Opportunity?</h2>
                 <p className="text-sm text-gray-500">This cannot be undone.</p>
               </div>
             </div>
@@ -251,7 +251,7 @@ export default function ClientDetail() {
 
       {/* ── Top nav bar ── */}
       <div className="flex items-center gap-2 px-6 py-3 bg-white border-b border-gray-200 flex-shrink-0">
-        <button onClick={() => navigate('/clients')} className="text-gray-900 hover:text-gray-600 text-sm font-medium">Clients</button>
+        <button onClick={() => navigate('/clients')} className="text-gray-900 hover:text-gray-600 text-sm font-medium">Opportunities</button>
         <span className="text-gray-300">/</span>
         <span className="text-sm font-semibold text-gray-900 bg-gray-100 px-2 py-0.5 rounded-md">
           {[client.first_name, client.last_name].filter(Boolean).join(' ') || client.name || 'Unnamed'}
@@ -272,7 +272,7 @@ export default function ClientDetail() {
                   {editing ? (
                     <form onSubmit={handleSave} className="space-y-2.5">
                       <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Edit Client</p>
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Edit Opportunity</p>
                         <button type="button" onClick={() => setEditing(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
                       </div>
                       {[
@@ -445,7 +445,7 @@ export default function ClientDetail() {
                   </button>
                   <button onClick={handleDelete}
                     className="w-full py-2 rounded-lg border border-red-200 text-red-500 text-xs font-semibold hover:bg-red-50 hover:border-red-300 transition-colors">
-                    Delete Client
+                    Delete Opportunity
                   </button>
                 </div>
 

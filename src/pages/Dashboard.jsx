@@ -137,7 +137,7 @@ export default function Dashboard() {
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <input
           type="text"
-          placeholder="Search by client or address..."
+          placeholder="Search by opportunity or address..."
           value={search}
           onChange={e => setSearch(e.target.value)}
           className="input sm:max-w-xs"

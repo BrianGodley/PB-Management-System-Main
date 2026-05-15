@@ -1753,7 +1753,7 @@ export default function ScheduleCalendar({
                   type="text"
                   value={jobPickerSearch}
                   onChange={e => setJobPickerSearch(e.target.value)}
-                  placeholder="Search jobs by name, client, or address…"
+                  placeholder="Search jobs by name, opportunity, or address…"
                   className="input text-sm w-full py-1.5"
                 />
                 <p className="text-[11px] text-gray-400 mt-1.5">

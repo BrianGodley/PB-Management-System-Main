@@ -155,7 +155,7 @@ export default function NewJob() {
           <h2 className="font-semibold text-gray-900 mb-4 text-lg">Job Information</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
-              <label className="label">Client Name *</label>
+              <label className="label">Opportunity Name *</label>
               <input className="input" value={form.client_name} onChange={e => updateForm('client_name', e.target.value)} placeholder="John Smith" required />
             </div>
             <div className="sm:col-span-2">

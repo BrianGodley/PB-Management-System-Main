@@ -193,7 +193,7 @@ export default function Design() {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr className="text-xs uppercase tracking-wide text-gray-500">
                 <th className="text-left px-6 py-3 font-semibold">Project</th>
-                <th className="text-left px-4 py-3 font-semibold">Client</th>
+                <th className="text-left px-4 py-3 font-semibold">Opportunity</th>
                 <th className="text-left px-4 py-3 font-semibold">Created</th>
                 <th className="text-left px-4 py-3 font-semibold">Notes</th>
                 <th className="px-4 py-3 w-20"></th>
@@ -263,7 +263,7 @@ export default function Design() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Client (optional)</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Opportunity (optional)</label>
                 <select
                   value={newClient}
                   onChange={e => setNewClient(e.target.value)}

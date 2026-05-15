@@ -10,7 +10,7 @@ export const translations = {
     // Main menu sheet
     mainMenu:       'Main Menu',
     dashboard:      'Dashboard',
-    clients:        'Clients',
+    clients:        'Opportunities',
     bids:           'Bids',
     jobs:           'Jobs',
     statistics:     'Statistics',
@@ -50,7 +50,7 @@ export const translations = {
     // Main menu sheet
     mainMenu:       'Menú Principal',
     dashboard:      'Panel',
-    clients:        'Clientes',
+    clients:        'Oportunidades',
     bids:           'Cotizaciones',
     jobs:           'Trabajos',
     statistics:     'Estadísticas',

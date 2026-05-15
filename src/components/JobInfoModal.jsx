@@ -311,7 +311,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
 
   const TABS = [
     { key: 'info',      label: 'Job Details' },
-    { key: 'client',    label: 'Client' },
+    { key: 'client',    label: 'Opportunity' },
     { key: 'employees', label: 'Employees' },
   ]
 
@@ -546,7 +546,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
                     <span className="font-semibold text-gray-800">{job.client_name || 'Unknown client'}</span>
                   </p>
                   <p className="text-xs text-gray-400 italic">
-                    No matching client record found. This usually means the job was imported from BuilderTrend or the client name on the job doesn't exactly match a record in the Clients module. Open the contact or client manually to fill in details.
+                    No matching opportunity record found. This usually means the job was imported from BuilderTrend or the customer name on the job doesn't exactly match a record in the Opportunities module. Open the contact or opportunity manually to fill in details.
                   </p>
                 </div>
               ) : (
@@ -734,7 +734,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
                         onChange={e => setClientForm(p => ({ ...p, notes: e.target.value }))}
                         disabled={!editingClient}
                         className="input text-sm w-full resize-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
-                        placeholder="Notes about this client…" />
+                        placeholder="Notes about this opportunity…" />
                     </div>
                   </div>
 

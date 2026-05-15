@@ -350,7 +350,7 @@ export default function Info() {
               <div className="px-5 py-4 space-y-3">
                 {selectedJob.client_name && (
                   <div>
-                    <p className="text-xs text-gray-400 mb-0.5">Client</p>
+                    <p className="text-xs text-gray-400 mb-0.5">Opportunity</p>
                     <p className="text-sm font-medium text-gray-800">{selectedJob.client_name}</p>
                   </div>
                 )}

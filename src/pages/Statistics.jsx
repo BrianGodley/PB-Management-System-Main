@@ -3321,10 +3321,10 @@ const AUTO_SOURCES = [
     sources: [
       {
         key: 'clients_count',
-        label: 'New Clients — Count',
+        label: 'New Opportunities — Count',
         table: 'clients', date_column: 'created_at', metric: 'count',
         stat_type: 'numeric',
-        desc: 'Number of client records created in the period.',
+        desc: 'Number of opportunity records created in the period.',
       },
     ],
   },

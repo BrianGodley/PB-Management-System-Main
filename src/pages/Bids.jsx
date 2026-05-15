@@ -410,7 +410,7 @@ export default function Bids() {
             </div>
 
             <div className="bg-gray-50 rounded-xl p-4 mb-4 text-sm text-gray-600 space-y-1">
-              <p><span className="text-gray-400">Client:</span> {soldModal.bid?.client_name}</p>
+              <p><span className="text-gray-400">Opportunity:</span> {soldModal.bid?.client_name}</p>
               <p><span className="text-gray-400">Contract:</span> ${parseFloat(soldModal.bid?.bid_amount || 0).toLocaleString()}</p>
               {soldModal.bid?.projects?.length > 0 && (
                 <p><span className="text-gray-400">Projects:</span> {soldModal.bid.projects.join(', ')}</p>

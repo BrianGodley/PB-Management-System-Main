@@ -418,9 +418,9 @@ function InvoiceModal({ invoice, clients, jobs, accounts, onSave, onClose }) {
       <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Client Name</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Opportunity Name</label>
             <input className="input text-sm w-full" value={form.client_name}
-              onChange={e => setForm(p => ({ ...p, client_name: e.target.value }))} placeholder="Client name" />
+              onChange={e => setForm(p => ({ ...p, client_name: e.target.value }))} placeholder="Opportunity name" />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Job (optional)</label>

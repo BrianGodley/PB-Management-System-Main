@@ -678,13 +678,13 @@ export default function ContactDetail() {
               )}
             </div>
 
-            {/* Card 4: Notes + Linked Client + Meta */}
+            {/* Card 4: Notes + Linked Opportunity + Meta */}
             <div className="bg-white border border-slate-300 rounded-xl p-4 shadow-sm space-y-3">
               <div>
-                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Linked Client</p>
+                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Linked Opportunity</p>
                 {client
                   ? <Link to={`/clients/${client.id}`} className="flex items-center gap-2 text-sm text-green-700 hover:text-green-900 font-medium hover:underline"><span>👥</span> {client.name}</Link>
-                  : <p className="text-xs text-gray-400 italic">No client linked yet</p>}
+                  : <p className="text-xs text-gray-400 italic">No opportunity linked yet</p>}
               </div>
               {contact.call_center_notes && (
                 <div className="pt-2 border-t border-slate-100">
@@ -870,13 +870,13 @@ export default function ContactDetail() {
               </div>
             </div>
 
-            {/* Add as Client card */}
+            {/* Add as Opportunity card */}
             <div className="bg-white border border-slate-300 rounded-xl p-3 shadow-sm">
-              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Clients</p>
+              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Opportunities</p>
               {clientAdded ? (
                 <div className="flex items-center gap-2 py-1">
                   <span className="text-green-600 text-sm">✓</span>
-                  <p className="text-xs text-green-700 font-semibold">Added as client!</p>
+                  <p className="text-xs text-green-700 font-semibold">Added as opportunity!</p>
                 </div>
               ) : (
                 <button
@@ -884,7 +884,7 @@ export default function ContactDetail() {
                   disabled={addingAsClient}
                   className="w-full py-2 rounded-lg bg-green-700 text-white text-xs font-semibold hover:bg-green-800 disabled:opacity-50 transition-colors"
                 >
-                  {addingAsClient ? 'Adding…' : '+ Add as Client'}
+                  {addingAsClient ? 'Adding…' : '+ Add as Opportunity'}
                 </button>
               )}
             </div>

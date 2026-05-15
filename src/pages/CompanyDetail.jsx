@@ -722,13 +722,13 @@ export default function CompanyDetail() {
               </div>
             </div>
 
-            {/* Add as Client card */}
+            {/* Add as Opportunity card */}
             <div className="bg-white border border-slate-300 rounded-xl p-3 shadow-sm">
-              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Clients</p>
+              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Opportunities</p>
               {clientAdded ? (
                 <div className="flex items-center gap-2 py-1">
                   <span className="text-green-600 text-sm">✓</span>
-                  <p className="text-xs text-green-700 font-semibold">Added as client!</p>
+                  <p className="text-xs text-green-700 font-semibold">Added as opportunity!</p>
                 </div>
               ) : (
                 <button
@@ -736,7 +736,7 @@ export default function CompanyDetail() {
                   disabled={addingAsClient}
                   className="w-full py-2 rounded-lg bg-green-700 text-white text-xs font-semibold hover:bg-green-800 disabled:opacity-50 transition-colors"
                 >
-                  {addingAsClient ? 'Adding…' : '+ Add as Client'}
+                  {addingAsClient ? 'Adding…' : '+ Add as Opportunity'}
                 </button>
               )}
             </div>

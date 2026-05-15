@@ -1131,7 +1131,7 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
         <thead className="sticky top-0 z-10">
           {/* Day header row */}
           <tr className="bg-gray-50 border-b border-gray-200">
-            <th rowSpan={2} className="px-3 py-2 text-center font-semibold text-gray-700 border-r border-gray-300">Client</th>
+            <th rowSpan={2} className="px-3 py-2 text-center font-semibold text-gray-700 border-r border-gray-300">Opportunity</th>
             <th rowSpan={2} className="px-2 py-2 text-center font-semibold text-gray-600 text-[11px] border-r border-gray-300">{section.balLabel}</th>
             {DAYS.map(d => (
               <th key={d} colSpan={2} className="px-2 py-1.5 text-center font-extrabold text-gray-700 border-l border-r border-gray-400 text-[11px] bg-gray-200">
@@ -1214,7 +1214,7 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
                 return (
                   <tr key={row.id} className="hover:bg-gray-50 group">
                     <td className="px-2 py-1 border-r border-gray-300 bg-gray-100">
-                      <TextCell value={row.client_name} onSave={v => onUpdate(row.id,'client_name',v)} placeholder="Client" bold onDelete={() => onDelete(row.id)} />
+                      <TextCell value={row.client_name} onSave={v => onUpdate(row.id,'client_name',v)} placeholder="Opportunity" bold onDelete={() => onDelete(row.id)} />
                     </td>
                     <td className="px-1 py-1 border-r border-gray-300">
                       <CellInput value={row.starting_balance||''} onSave={v => onUpdate(row.id,'starting_balance',v)} />

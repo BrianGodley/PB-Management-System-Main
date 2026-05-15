@@ -217,7 +217,7 @@ function AddIndividualModal({ onSave, onClose, user }) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
-            <h2 className="text-base font-bold text-gray-900">Add Individual Client</h2>
+            <h2 className="text-base font-bold text-gray-900">Add Individual Opportunity</h2>
             <p className="text-xs text-gray-400 mt-0.5">Person or household</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none p-1">×</button>
@@ -303,7 +303,7 @@ function AddIndividualModal({ onSave, onClose, user }) {
           {/* Notes */}
           <div>
             <label className={lbl}>Notes</label>
-            <textarea className={`${inp} resize-none`} rows={2} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any notes about this client…" />
+            <textarea className={`${inp} resize-none`} rows={2} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any notes about this opportunity…" />
           </div>
 
           {saveError && (
@@ -318,7 +318,7 @@ function AddIndividualModal({ onSave, onClose, user }) {
             onClick={handleSave}
             disabled={saving}
             className="flex-1 py-2 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800 disabled:opacity-50 transition-colors"
-          >{saving ? 'Saving…' : 'Save Individual Client'}</button>
+          >{saving ? 'Saving…' : 'Save Individual Opportunity'}</button>
         </div>
       </div>
     </div>
@@ -421,7 +421,7 @@ function AddCompanyModal({ onSave, onClose, user }) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
-            <h2 className="text-base font-bold text-gray-900">Add Company Client</h2>
+            <h2 className="text-base font-bold text-gray-900">Add Company Opportunity</h2>
             <p className="text-xs text-gray-400 mt-0.5">Business or organization</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none p-1">×</button>
@@ -514,7 +514,7 @@ function AddCompanyModal({ onSave, onClose, user }) {
           {/* Notes */}
           <div>
             <label className={lbl}>Notes</label>
-            <textarea className={`${inp} resize-none`} rows={2} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any notes about this client…" />
+            <textarea className={`${inp} resize-none`} rows={2} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Any notes about this opportunity…" />
           </div>
 
           {saveError && (
@@ -529,7 +529,7 @@ function AddCompanyModal({ onSave, onClose, user }) {
             onClick={handleSave}
             disabled={saving}
             className="flex-1 py-2 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800 disabled:opacity-50 transition-colors"
-          >{saving ? 'Saving…' : 'Save Company Client'}</button>
+          >{saving ? 'Saving…' : 'Save Company Opportunity'}</button>
         </div>
       </div>
     </div>
@@ -689,14 +689,14 @@ export default function Clients() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* ── Client Delete Cascade Modal ── */}
+      {/* ── Opportunity Delete Cascade Modal ── */}
       {deleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
             <div className="flex items-center gap-3 mb-4">
               <span className="text-2xl">⚠️</span>
               <div>
-                <h2 className="text-lg font-bold text-gray-900">Delete Client?</h2>
+                <h2 className="text-lg font-bold text-gray-900">Delete Opportunity?</h2>
                 <p className="text-sm text-gray-500">This cannot be undone.</p>
               </div>
             </div>
@@ -712,7 +712,7 @@ export default function Clients() {
                   <li className="text-gray-500">No associated estimates, bids, or work orders.</li>
                 )}
               </ul>
-              <p className="text-xs text-red-600 font-semibold mt-2">There is no option to keep any of this data if the client is deleted.</p>
+              <p className="text-xs text-red-600 font-semibold mt-2">There is no option to keep any of this data if the opportunity is deleted.</p>
             </div>
             <div className="flex gap-3">
               <button onClick={() => setDeleteModal(null)} className="flex-1 px-4 py-2 rounded-lg border border-gray-300 text-gray-600 font-semibold hover:bg-gray-50 transition-colors">Cancel</button>
@@ -722,7 +722,7 @@ export default function Clients() {
         </div>
       )}
 
-      {/* ── Add Client Modals ── */}
+      {/* ── Add Opportunity Modals ── */}
       {clientModal === 'individual' && (
         <AddIndividualModal
           user={user}
@@ -740,7 +740,7 @@ export default function Clients() {
 
       {/* Page header */}
       <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
-        <h1 className="text-xl font-bold text-gray-900">Clients</h1>
+        <h1 className="text-xl font-bold text-gray-900">Opportunities</h1>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setClientModal('individual')}
@@ -801,7 +801,7 @@ export default function Clients() {
               <div className="flex items-center justify-center py-20 text-center">
                 <div>
                   <p className="text-4xl mb-3">⚙️</p>
-                  <h2 className="text-base font-semibold text-gray-800 mb-1">Clients Settings</h2>
+                  <h2 className="text-base font-semibold text-gray-800 mb-1">Opportunities Settings</h2>
                   <p className="text-sm text-gray-500">Configuration options will be available here.</p>
                 </div>
               </div>
@@ -880,13 +880,13 @@ export default function Clients() {
             {search
               ? 'No results match your search.'
               : tab === 'inactive'
-              ? 'No past clients.'
-              : clients.length === 0 ? 'No clients yet.' : 'No current clients.'}
+              ? 'No past opportunities.'
+              : clients.length === 0 ? 'No opportunities yet.' : 'No current opportunities.'}
           </p>
           {tab === 'active' && clients.length === 0 && (
             <div className="flex items-center justify-center gap-2">
-              <button onClick={() => setClientModal('individual')} className="btn-secondary">Add Individual Client</button>
-              <button onClick={() => setClientModal('company')} className="btn-primary">Add Company Client</button>
+              <button onClick={() => setClientModal('individual')} className="btn-secondary">Add Individual Opportunity</button>
+              <button onClick={() => setClientModal('company')} className="btn-primary">Add Company Opportunity</button>
             </div>
           )}
         </div>
