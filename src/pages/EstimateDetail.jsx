@@ -638,10 +638,20 @@ export default function EstimateDetail() {
       const projsForBid = freshProjs || projects
 
       // Compute grand total, GP, and GPMD from the freshly fetched data.
+      // The module-level total_price doesn't carry per-project Sub GP
+      // markup (that's a project-level field), so we add it back here so
+      // the bid total matches the Estimate Totals bar exactly.
       const allMods    = projsForBid.flatMap(p => p.estimate_modules || [])
-      const grandTotal = allMods.reduce((s, m) => s + parseFloat(m.total_price || m.data?.calc?.price || 0), 0)
-      const totalGp    = allMods.reduce((s, m) => s + parseFloat(m.gross_profit || m.data?.calc?.gp || 0), 0)
+      const moduleSum  = allMods.reduce((s, m) => s + parseFloat(m.total_price || m.data?.calc?.price || 0), 0)
+      const moduleGp   = allMods.reduce((s, m) => s + parseFloat(m.gross_profit || m.data?.calc?.gp || 0), 0)
       const totalMD    = allMods.reduce((s, m) => s + parseFloat(m.man_days     || m.data?.calc?.manDays || 0), 0)
+      const subGp      = projsForBid.reduce((s, p) => {
+        const projSub = (p.estimate_modules || []).reduce((ms, m) => ms + parseFloat(m.sub_cost || m.data?.calc?.subCost || 0), 0)
+        const rate    = p.sub_gp_markup_rate ?? 0.20
+        return s + projSub * rate
+      }, 0)
+      const grandTotal = moduleSum + subGp + subGp * 0.12
+      const totalGp    = moduleGp + subGp
       const bidGpmd    = totalMD > 0 ? Math.round(totalGp / totalMD) : 0
       const projNames  = projsForBid.map(p => p.project_name)
 

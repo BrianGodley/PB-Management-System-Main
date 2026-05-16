@@ -279,7 +279,14 @@ function buildProjectSection(project) {
   // (Was a two-column layout where column 1 was an empty spacer; that
   // empty cell now disappears entirely and the same visual position is
   // achieved via the table's `alignment: RIGHT`.)
-  const projTotal = modules.reduce((s, m) => s + parseFloat(m.total_price || m.data?.calc?.price || 0), 0)
+  // Per-project total = sum of module total_price + that project's
+  // Sub GP markup × 1.12 (the markup commission). Same formula the
+  // EstimateDetail bar uses, so the project lines on the bid doc add
+  // up to the bid_amount written on the bid row.
+  const projModSum = modules.reduce((s, m) => s + parseFloat(m.total_price || m.data?.calc?.price || 0), 0)
+  const projSubCost = modules.reduce((s, m) => s + parseFloat(m.sub_cost || m.data?.calc?.subCost || 0), 0)
+  const projSubGp   = projSubCost * (project.sub_gp_markup_rate ?? 0.20)
+  const projTotal   = projModSum + projSubGp + projSubGp * 0.12
   if (projTotal > 0) {
     const totalTable = new Table({
       alignment: AlignmentType.RIGHT,
@@ -450,11 +457,16 @@ function buildTerms() {
 export async function generateBidDoc(estimate, projects, clientAddress = '') {
   const bidDate = new Date()
 
-  // Compute grand total from all modules across all projects
+  // Compute grand total from all modules across all projects, plus each
+  // project's Sub GP markup × 1.12. Matches the per-project totals
+  // rendered above so the doc footer ties to the project lines and to
+  // the bid_amount written on the bid row.
   const grandTotal = projects.reduce((sum, proj) => {
-    return sum + (proj.estimate_modules || []).reduce((s, m) => {
-      return s + parseFloat(m.total_price || m.data?.calc?.price || 0)
-    }, 0)
+    const mods       = proj.estimate_modules || []
+    const projModSum = mods.reduce((s, m) => s + parseFloat(m.total_price || m.data?.calc?.price || 0), 0)
+    const projSub    = mods.reduce((s, m) => s + parseFloat(m.sub_cost   || m.data?.calc?.subCost  || 0), 0)
+    const projSubGp  = projSub * (proj.sub_gp_markup_rate ?? 0.20)
+    return sum + projModSum + projSubGp + projSubGp * 0.12
   }, 0)
 
   // Build document body
