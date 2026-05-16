@@ -175,8 +175,17 @@ export default function EstimateDetail() {
   // estimate is left untouched. New row gets parent_estimate_id pointing
   // at the original (or the original's own id if `estimate` is itself a
   // version), and a fresh version number = max(existing children) + 1.
+  //
   // moduleOverrides: { [moduleId]: newGpmd }
-  async function applyAsNewVersion(moduleOverrides) {
+  // projectGpmdOverrides:
+  //   null/undefined  → carry over each project's existing gpmd_override
+  //   { [projId]: v } → for each project in the map: v=number sets the
+  //                     override, v=null clears it. Projects not in the
+  //                     map carry over.
+  // What If Sections 1 & 2 pass a "clear-all" map so the per-module new
+  // GPs win on the bar — otherwise stale project-level overrides from
+  // earlier versions would mask the uniform GPMD the user just chose.
+  async function applyAsNewVersion(moduleOverrides, projectGpmdOverrides = null) {
     if (!estimate) return false
     // The root original everything chains to. If we ourselves are a
     // version, point new versions at the same parent.
@@ -217,9 +226,16 @@ export default function EstimateDetail() {
     // every module under each project — applying the GPMD override if any.
     for (const proj of projects) {
       const { id: oldProjId, estimate_modules: _mods, estimate_id: _eid, created_at: _ca, ...projShell } = proj
+      // Decide what gpmd_override the new project row should have:
+      //   - If the caller supplied projectGpmdOverrides AND included this
+      //     project's id, use that value (number or null).
+      //   - Otherwise carry over the source project's existing override.
+      const newOverride = projectGpmdOverrides && Object.prototype.hasOwnProperty.call(projectGpmdOverrides, oldProjId)
+        ? projectGpmdOverrides[oldProjId]
+        : projShell.gpmd_override
       const { data: newProj, error: projErr } = await supabase
         .from('estimate_projects')
-        .insert({ ...projShell, estimate_id: newEst.id })
+        .insert({ ...projShell, gpmd_override: newOverride, estimate_id: newEst.id })
         .select().single()
       if (projErr || !newProj) { alert('Project copy failed: ' + (projErr?.message || 'unknown')); return false }
 

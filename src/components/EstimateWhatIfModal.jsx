@@ -33,16 +33,30 @@ export default function EstimateWhatIfModal({
     })
   ), [projects])
 
+  // buildOverrides should return either:
+  //   { moduleOverrides, projectGpmdOverrides? }
+  //   — or, for backward compat, just a moduleOverrides map (treated as
+  //     having no project-level overrides).
   async function applySection(buildOverrides, label) {
-    const overrides = buildOverrides()
-    if (!overrides) return
+    const built = buildOverrides()
+    if (!built) return
+    const moduleOverrides       = built.moduleOverrides       || built
+    const projectGpmdOverrides  = built.projectGpmdOverrides  || null
     const ok = window.confirm(`Save this what-if as a new estimate version?\n\nUsing: ${label}`)
     if (!ok) return
     setSavingApply(true)
-    const success = await onApplyAsNewVersion(overrides)
+    const success = await onApplyAsNewVersion(moduleOverrides, projectGpmdOverrides)
     setSavingApply(false)
     if (success) onClose()
   }
+
+  // Map of every project id with value=null. Sections 1 & 2 use this to
+  // wipe any stale per-project gpmd_override on the new version copy so
+  // their per-module GPMD changes are what the bar reads.
+  const clearAllProjectOverrides = useMemo(
+    () => Object.fromEntries(projects.map(p => [p.id, null])),
+    [projects]
+  )
 
   const baseCost   = et.materialCost + et.laborCost + et.burden + et.subCost
   const subGp      = et.subCost * (derivedEstSubRate || 0)
@@ -199,10 +213,10 @@ export default function EstimateWhatIfModal({
               <div className="mt-2 flex justify-end">
                 <button
                   disabled={savingApply}
-                  onClick={() => applySection(
-                    () => Object.fromEntries(allModulesFlat.map(m => [m.id, s1Num])),
-                    `Uniform GPMD of $${s1Num.toLocaleString()} on every module`
-                  )}
+                  onClick={() => applySection(() => ({
+                    moduleOverrides:      Object.fromEntries(allModulesFlat.map(m => [m.id, s1Num])),
+                    projectGpmdOverrides: clearAllProjectOverrides,
+                  }), `Uniform GPMD of $${s1Num.toLocaleString()} on every module`)}
                   className="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700 disabled:opacity-50"
                 >
                   {savingApply ? 'Saving…' : 'Save as New Estimate'}
@@ -248,7 +262,10 @@ export default function EstimateWhatIfModal({
                     const ratio = s2Gp / adjustedEstimateGP
                     const ovs = {}
                     for (const m of allModulesFlat) ovs[m.id] = m.gpmd * ratio
-                    return ovs
+                    return {
+                      moduleOverrides:      ovs,
+                      projectGpmdOverrides: clearAllProjectOverrides,
+                    }
                   }, `Scale all module GPMDs proportionally to hit $${Math.round(s2Num).toLocaleString()} total`)}
                   className="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700 disabled:opacity-50"
                 >
@@ -305,28 +322,36 @@ export default function EstimateWhatIfModal({
                 <button
                   disabled={savingApply}
                   onClick={() => applySection(() => {
-                    // Build per-module overrides from the section 3 inputs.
-                    // Project-level override wins over its module overrides.
-                    const ovs = {}
+                    // Build per-module + per-project overrides from the
+                    // section 3 inputs. A project-level override sets the
+                    // new project's gpmd_override; modules inside that
+                    // project get the project's value too. Modules in a
+                    // project WITHOUT a project-level override take the
+                    // user's per-module value, and that project's
+                    // gpmd_override is cleared so module GPs drive.
+                    const moduleOvs  = {}
+                    const projectOvs = {}
                     for (const row of s3Rows) {
-                      for (const m of row.modUsed) {
-                        // Either the module had its own override applied,
-                        // or it inherits from a project-level override.
-                        const projOv = parseFloat(projDrafts[row.id])
-                        const projOvOk = Number.isFinite(projOv) && projOv >= 0
-                        if (projOvOk) {
-                          ovs[m.id] = projOv
-                        } else {
+                      const projOv = parseFloat(projDrafts[row.id])
+                      const projOvOk = Number.isFinite(projOv) && projOv >= 0
+                      if (projOvOk) {
+                        projectOvs[row.id] = projOv
+                        for (const m of row.modUsed) moduleOvs[m.id] = projOv
+                      } else {
+                        // No project-level override — clear any stale one
+                        // on the new copy and respect each module's value.
+                        projectOvs[row.id] = null
+                        for (const m of row.modUsed) {
                           const modOv = parseFloat(modDrafts[m.id])
-                          if (Number.isFinite(modOv) && modOv >= 0) ovs[m.id] = modOv
+                          if (Number.isFinite(modOv) && modOv >= 0) moduleOvs[m.id] = modOv
                         }
                       }
                     }
-                    if (Object.keys(ovs).length === 0) {
+                    if (Object.keys(moduleOvs).length === 0) {
                       alert('Set at least one project or module GPMD override before saving.')
                       return null
                     }
-                    return ovs
+                    return { moduleOverrides: moduleOvs, projectGpmdOverrides: projectOvs }
                   }, 'Per-project / per-module GPMD overrides from the table above')}
                   className="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700 disabled:opacity-50"
                 >
