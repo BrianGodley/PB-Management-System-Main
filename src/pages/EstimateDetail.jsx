@@ -147,6 +147,30 @@ export default function EstimateDetail() {
   // current estimate as a new version with the GPMD overrides baked in.
   const [whatIfOpen, setWhatIfOpen] = useState(false)
 
+  // Draft-mode flag. After load every edit (module add/edit/delete,
+  // project GPMD override, etc.) updates only local state and flips this
+  // to true. Clicking "Save Changes" snapshots the local state as a new
+  // version (Estimate N+1). Reset to false on load and after save.
+  const [dirty, setDirty] = useState(false)
+  const [savingDraft, setSavingDraft] = useState(false)
+  // Mark dirty whenever an edit handler updates local state.
+  const markDirty = () => setDirty(true)
+
+  // Browser-level guard so accidental nav / refresh / tab-close doesn't
+  // silently lose draft changes. The string is shown in some browsers and
+  // ignored in modern Chrome/Firefox (they use a generic message), but the
+  // dialog still appears as long as we set returnValue.
+  useEffect(() => {
+    if (!dirty) return
+    function handler(e) {
+      e.preventDefault()
+      e.returnValue = 'You have unsaved estimate changes. Leave anyway?'
+      return e.returnValue
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [dirty])
+
   // Snapshot the current estimate as a brand-new version. The original
   // estimate is left untouched. New row gets parent_estimate_id pointing
   // at the original (or the original's own id if `estimate` is itself a
@@ -286,122 +310,88 @@ export default function EstimateDetail() {
   }
 
   // ── Projects ──────────────────────────────────────
-  async function addProject() {
+  // ── DRAFT-MODE handlers ──────────────────────────────────────────────────
+  // Every project/module edit only updates local state and marks the
+  // estimate dirty. Clicking "Save Changes" snapshots local state as a
+  // new version (Estimate N+1) via saveDraftAsNewVersion(). The current
+  // estimate row in Postgres stays untouched until then.
+  function addProject() {
     if (!newProjectName.trim()) return
-    setSavingProject(true)
-    const { data: proj } = await supabase
-      .from('estimate_projects')
-      .insert({ estimate_id: id, project_name: newProjectName.trim() })
-      .select()
-      .single()
-    if (proj) {
-      const newProj = { ...proj, estimate_modules: [] }
-      setProjects(p => [...p, newProj])
-      setNewProjectName('')
-      setShowAddProject(false)
-      setSelectedProject(newProj)
-      setSelectedModule(null)
+    const newProj = {
+      id: crypto.randomUUID(),
+      estimate_id:      id,
+      project_name:     newProjectName.trim(),
+      gpmd_override:    null,
+      sub_gp_markup_rate: 0.20,
+      estimate_modules: [],
     }
-    setSavingProject(false)
+    setProjects(p => [...p, newProj])
+    setNewProjectName('')
+    setShowAddProject(false)
+    setSelectedProject(newProj)
+    setSelectedModule(null)
+    markDirty()
   }
 
-  async function updateProject() {
+  function updateProject() {
     if (!editProjectName.trim() || !editingProject) return
-    setSavingProject(true)
-    const { data: updated } = await supabase
-      .from('estimate_projects')
-      .update({ project_name: editProjectName.trim() })
-      .eq('id', editingProject.id)
-      .select()
-      .single()
-    if (updated) {
-      const refreshed = { ...editingProject, project_name: updated.project_name }
-      setProjects(p => p.map(pr => pr.id === refreshed.id ? { ...pr, project_name: refreshed.project_name } : pr))
-      if (selectedProject?.id === refreshed.id) setSelectedProject(p => ({ ...p, project_name: refreshed.project_name }))
-    }
+    const newName = editProjectName.trim()
+    setProjects(p => p.map(pr => pr.id === editingProject.id ? { ...pr, project_name: newName } : pr))
+    if (selectedProject?.id === editingProject.id) setSelectedProject(p => ({ ...p, project_name: newName }))
     setEditingProject(null)
-    setSavingProject(false)
+    markDirty()
   }
 
-  async function deleteProject(proj) {
-    if (!confirm(`Delete project "${proj.project_name}" and all its modules?`)) return
-    await supabase.from('estimate_projects').delete().eq('id', proj.id)
+  function deleteProject(proj) {
+    if (!confirm(`Remove project "${proj.project_name}" from this draft?\n\nIt will only disappear once you save the new version. The current saved estimate is untouched.`)) return
     setProjects(p => p.filter(p2 => p2.id !== proj.id))
     if (selectedProject?.id === proj.id) {
       setSelectedProject(null)
       setSelectedModule(null)
     }
+    markDirty()
   }
 
-  // ── Per-project GPMD override ─────────────────────
-  async function saveProjectGpmd(projectId, newVal) {
-    // Update local GPMD state immediately
+  // ── Per-project GPMD override (draft) ─────────────────────
+  function saveProjectGpmd(projectId, newVal) {
     setProjectGpmds(prev => ({ ...prev, [projectId]: newVal }))
-
-    // Persist project override
-    await supabase.from('estimate_projects').update({ gpmd_override: newVal }).eq('id', projectId)
-
-    // Cascade to every module in the project
     const proj = projects.find(p => p.id === projectId)
     if (!proj) return
     const mods = proj.estimate_modules || []
-
-    const updatedMods = await Promise.all(mods.map(async mod => {
+    const updatedMods = mods.map(mod => {
       const manDays    = parseFloat(mod.man_days || 0)
       const laborCost  = parseFloat(mod.labor_cost   || mod.data?.calc?.laborCost || 0)
       const burden     = parseFloat(mod.labor_burden || mod.data?.calc?.burden    || 0)
       const mat        = parseFloat(mod.material_cost || 0)
       const subCost    = parseFloat(mod.sub_cost      || mod.data?.calc?.subCost  || 0)
-
-      // Preserve any sub-haul / markup GP contribution that isn't manDays×gpmd
-      const oldGpmd        = parseFloat(mod.data?.gpmd ?? 425)
-      const oldTotalGP     = parseFloat(mod.gross_profit || mod.data?.calc?.gp || 0)
-      const subContrib     = oldTotalGP - (manDays * oldGpmd)   // non-zero for demo modules
-      const newGP          = (manDays * newVal) + subContrib
-      const newCommission  = newGP * 0.12
-      const newPrice       = laborCost + burden + mat + subCost + newGP + newCommission
-
+      const oldGpmd       = parseFloat(mod.data?.gpmd ?? 425)
+      const oldTotalGP    = parseFloat(mod.gross_profit || mod.data?.calc?.gp || 0)
+      const subContrib    = oldTotalGP - (manDays * oldGpmd)
+      const newGP         = (manDays * newVal) + subContrib
+      const newCommission = newGP * 0.12
+      const newPrice      = laborCost + burden + mat + subCost + newGP + newCommission
       const updatedData = {
         ...(mod.data || {}),
         gpmd: newVal,
-        calc: {
-          ...(mod.data?.calc || {}),
-          gp:         newGP,
-          commission: newCommission,
-          price:      newPrice,
-        },
+        calc: { ...(mod.data?.calc || {}), gp: newGP, commission: newCommission, price: newPrice },
       }
-
-      await supabase.from('estimate_modules').update({
-        gross_profit: parseFloat(newGP.toFixed(2)),
-        total_price:  parseFloat(newPrice.toFixed(2)),
-        data:         updatedData,
-      }).eq('id', mod.id)
-
       return { ...mod, gross_profit: newGP, total_price: newPrice, data: updatedData }
-    }))
-
-    // Update local state so bars re-render immediately
-    const updatedProj = { ...proj, estimate_modules: updatedMods }
+    })
+    const updatedProj = { ...proj, gpmd_override: newVal, estimate_modules: updatedMods }
     setProjects(prev => prev.map(p => p.id === projectId ? updatedProj : p))
     if (selectedProject?.id === projectId) setSelectedProject(updatedProj)
-
-    // Also refresh selectedModule so "Edit Module" gets the new gpmd in initialData
     if (selectedModule) {
       const refreshed = updatedMods.find(m => m.id === selectedModule.id)
       if (refreshed) setSelectedModule(refreshed)
     }
+    markDirty()
   }
 
-  // ── Per-project sub GP markup rate ────────────────────────────
-  async function saveProjectSubRate(projectId, newVal) {
-    // Update directly on the project objects so selectedProject stays in sync
+  // ── Per-project sub GP markup rate (draft) ────────────────────────────
+  function saveProjectSubRate(projectId, newVal) {
     setProjects(prev => prev.map(p => p.id === projectId ? { ...p, sub_gp_markup_rate: newVal } : p))
     if (selectedProject?.id === projectId) setSelectedProject(p => ({ ...p, sub_gp_markup_rate: newVal }))
-    await supabase
-      .from('estimate_projects')
-      .update({ sub_gp_markup_rate: newVal })
-      .eq('id', projectId)
+    markDirty()
   }
 
   // ── Modules ──────────────────────────────────────
@@ -440,72 +430,56 @@ export default function EstimateDetail() {
     }
   }
 
-  async function saveModule(formData) {
+  function saveModule(formData) {
     if (!selectedType || !selectedProject) return
-    setSavingModule(true)
-    // formData may come from a specific module component (e.g. DrainageModule)
-    // or from the generic form. Normalise to a common shape.
     const payload = formData || moduleForm
     const fin = extractFinancials(payload)
-    const { data: mod } = await supabase
-      .from('estimate_modules')
-      .insert({
-        project_id:    selectedProject.id,
-        module_type:   selectedType,
-        man_days:      parseFloat(payload.man_days) || 0,
-        material_cost: parseFloat(payload.material_cost) || 0,
-        data:          payload.data || null,
-        notes:         payload.notes || '',
-        ...fin,
-      })
-      .select()
-      .single()
-    if (mod) {
-      const updatedProject = {
-        ...selectedProject,
-        estimate_modules: [...(selectedProject.estimate_modules || []), mod],
-      }
-      setProjects(p => p.map(proj => proj.id === selectedProject.id ? updatedProject : proj))
-      setSelectedProject(updatedProject)
-      setSelectedModule(mod)
-      closeModuleFlow()
+    const mod = {
+      id:            crypto.randomUUID(),  // temp local id; stripped on save
+      project_id:    selectedProject.id,
+      module_type:   selectedType,
+      man_days:      parseFloat(payload.man_days) || 0,
+      material_cost: parseFloat(payload.material_cost) || 0,
+      data:          payload.data || null,
+      notes:         payload.notes || '',
+      ...fin,
     }
-    setSavingModule(false)
+    const updatedProject = {
+      ...selectedProject,
+      estimate_modules: [...(selectedProject.estimate_modules || []), mod],
+    }
+    setProjects(p => p.map(proj => proj.id === selectedProject.id ? updatedProject : proj))
+    setSelectedProject(updatedProject)
+    setSelectedModule(mod)
+    closeModuleFlow()
+    markDirty()
   }
 
-  async function updateModule(formData) {
+  function updateModule(formData) {
     if (!editingModule) return
-    setSavingModule(true)
     const payload = formData || moduleForm
     const fin = extractFinancials(payload)
-    const { data: mod } = await supabase
-      .from('estimate_modules')
-      .update({
-        man_days:      parseFloat(payload.man_days) || 0,
-        material_cost: parseFloat(payload.material_cost) || 0,
-        data:          payload.data || editingModule.data || null,
-        notes:         payload.notes || '',
-        ...fin,
-      })
-      .eq('id', editingModule.id)
-      .select()
-      .single()
-    if (mod) {
-      const updatedProject = {
-        ...selectedProject,
-        estimate_modules: selectedProject.estimate_modules.map(m => m.id === mod.id ? mod : m),
-      }
-      setProjects(p => p.map(proj => proj.id === selectedProject.id ? updatedProject : proj))
-      setSelectedProject(updatedProject)
-      setSelectedModule(mod)
-      closeModuleFlow()
+    const updatedMod = {
+      ...editingModule,
+      man_days:      parseFloat(payload.man_days) || 0,
+      material_cost: parseFloat(payload.material_cost) || 0,
+      data:          payload.data || editingModule.data || null,
+      notes:         payload.notes || '',
+      ...fin,
     }
-    setSavingModule(false)
+    const updatedProject = {
+      ...selectedProject,
+      estimate_modules: selectedProject.estimate_modules.map(m => m.id === updatedMod.id ? updatedMod : m),
+    }
+    setProjects(p => p.map(proj => proj.id === selectedProject.id ? updatedProject : proj))
+    setSelectedProject(updatedProject)
+    setSelectedModule(updatedMod)
+    closeModuleFlow()
+    markDirty()
   }
 
-  async function deleteModule(mod) {
-    if (!confirm(`Remove module "${mod.module_type}"?`)) return
-    await supabase.from('estimate_modules').delete().eq('id', mod.id)
+  function deleteModule(mod) {
+    if (!confirm(`Remove module "${mod.module_type}" from this draft?\n\nIt will only disappear once you save the new version. The current saved estimate is untouched.`)) return
     const updatedProject = {
       ...selectedProject,
       estimate_modules: selectedProject.estimate_modules.filter(m => m.id !== mod.id),
@@ -513,6 +487,7 @@ export default function EstimateDetail() {
     setProjects(p => p.map(proj => proj.id === selectedProject.id ? updatedProject : proj))
     setSelectedProject(updatedProject)
     if (selectedModule?.id === mod.id) setSelectedModule(null)
+    markDirty()
   }
 
   // ── Status management ────────────────────────────
@@ -937,10 +912,34 @@ export default function EstimateDetail() {
           <span className={`text-xs font-semibold px-3 py-1 rounded-full ${STATUS_BADGE[estimate.status] || STATUS_BADGE.pending}`}>
             {estimate.status?.charAt(0).toUpperCase() + estimate.status?.slice(1) || 'Pending'}
           </span>
+          {dirty && (
+            <span className="text-[11px] font-bold uppercase tracking-wide bg-amber-100 text-amber-800 border border-amber-300 rounded-full px-2 py-0.5">
+              Unsaved draft
+            </span>
+          )}
         </div>
 
         {/* Status action buttons */}
         <div className="flex gap-2 flex-shrink-0 flex-wrap">
+          {/* Save Changes — only visible when there are draft edits.
+               Snapshots local state into a brand-new estimate version
+               (Estimate N+1, where N = max version across the whole tree
+               regardless of which version the user is currently on). */}
+          {dirty && (
+            <button
+              onClick={async () => {
+                setSavingDraft(true)
+                const ok = await applyAsNewVersion({})
+                setSavingDraft(false)
+                if (ok) setDirty(false)
+              }}
+              disabled={savingDraft}
+              className="px-4 py-1.5 rounded-lg bg-amber-600 text-white text-sm font-semibold hover:bg-amber-700 disabled:opacity-50"
+              title="Snapshot every change as the next estimate version"
+            >
+              {savingDraft ? 'Saving…' : '💾 Save Changes as New Version'}
+            </button>
+          )}
           {/* Create Bid / Change Order */}
           <button
             onClick={createBid}
