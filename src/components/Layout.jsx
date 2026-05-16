@@ -49,6 +49,14 @@ export default function Layout() {
   useEffect(() => {
     try { localStorage.setItem('navCollapsed', navCollapsed ? '1' : '0') } catch {}
   }, [navCollapsed])
+  // Jobs page (which lives at /jobs and renders the Schedule calendar by
+  // default) wants every horizontal pixel for the calendar grid, so auto-
+  // collapse the left nav whenever the user lands on it. They can still
+  // click the expand button to reopen it; the effect won't re-collapse
+  // until they leave and come back.
+  useEffect(() => {
+    if (location.pathname === '/jobs') setNavCollapsed(true)
+  }, [location.pathname])
 
   // Translated dock + main-menu items (re-computed whenever t() changes)
   const DOCK_ITEMS = [
@@ -264,8 +272,7 @@ export default function Layout() {
               <Link
                 key={item.path}
                 to={item.path}
-                title={navCollapsed ? item.label : undefined}
-                className={`flex items-center ${navCollapsed ? 'justify-center' : 'gap-2'} px-2 py-2 rounded-lg text-xs font-medium transition-colors ${
+                className={`group relative flex items-center ${navCollapsed ? 'justify-center' : 'gap-2'} px-2 py-2 rounded-lg text-xs font-medium transition-colors ${
                   isActive(item.path)
                     ? 'bg-gray-100 text-gray-900'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -273,17 +280,28 @@ export default function Layout() {
               >
                 <span className="text-sm">{item.icon}</span>
                 {!navCollapsed && item.label}
+                {/* Instant tooltip — only when the nav is collapsed.
+                     Floats to the right of the icon, no hover delay. */}
+                {navCollapsed && (
+                  <span className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 rounded-md bg-gray-900 text-white text-[11px] font-semibold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-100 z-50 shadow-lg">
+                    {item.label}
+                  </span>
+                )}
               </Link>
             ))}
           </nav>
           <div className="px-1.5 py-3 border-t border-gray-100">
             <button
               onClick={handleSignOut}
-              title={navCollapsed ? 'Sign Out' : undefined}
-              className={`w-full flex items-center ${navCollapsed ? 'justify-center' : 'gap-2'} px-2 py-2 rounded-lg text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-colors`}
+              className={`group relative w-full flex items-center ${navCollapsed ? 'justify-center' : 'gap-2'} px-2 py-2 rounded-lg text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-colors`}
             >
               <span>🚪</span>
               {!navCollapsed && <span>Sign Out</span>}
+              {navCollapsed && (
+                <span className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 rounded-md bg-gray-900 text-white text-[11px] font-semibold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-100 z-50 shadow-lg">
+                  Sign Out
+                </span>
+              )}
             </button>
           </div>
         </aside>
