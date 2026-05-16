@@ -681,12 +681,9 @@ export default function EstimateDetail() {
 
       if (bidErr) throw new Error(bidErr.message)
 
-      // Generate and download the Word doc — use the freshly fetched
-      // projects so the printed doc matches the bid totals exactly.
-      const blob     = await generateBidDoc(estimate, projsForBid, clientAddress)
-      const safeName = (estimate.estimate_name || (isCOMode ? 'ChangeOrder' : 'Bid')).replace(/[^a-z0-9]/gi, '_')
-      const suffix   = isCOMode ? 'CO' : 'Bid'
-      downloadBidDoc(blob, `${safeName}_${suffix}_${new Date().toISOString().split('T')[0]}.docx`)
+      // No auto-download — the user typically needs to edit the bid in
+      // the Bids module before sending. The Word doc can be generated
+      // from there once the bid is finalised.
 
       // Navigate back if a return path was provided (e.g., back to Jobs > Change Orders)
       if (isCOMode && returnTo) {
