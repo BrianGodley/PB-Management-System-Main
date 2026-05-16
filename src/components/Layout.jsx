@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LanguageContext'
@@ -49,14 +50,39 @@ export default function Layout() {
   useEffect(() => {
     try { localStorage.setItem('navCollapsed', navCollapsed ? '1' : '0') } catch {}
   }, [navCollapsed])
-  // Jobs page (which lives at /jobs and renders the Schedule calendar by
-  // default) wants every horizontal pixel for the calendar grid, so auto-
-  // collapse the left nav whenever the user lands on it. They can still
-  // click the expand button to reopen it; the effect won't re-collapse
-  // until they leave and come back.
+
+  // /jobs (Schedule view) auto-collapses the nav on entry to free up
+  // horizontal space, then restores the user's pre-/jobs state on exit.
+  // If the user was already collapsed before /jobs, we DO NOT auto-expand
+  // when they leave — they get to keep their preference.
+  const prevPathRef          = useRef(location.pathname)
+  const preJobsCollapsedRef  = useRef(null)
   useEffect(() => {
-    if (location.pathname === '/jobs') setNavCollapsed(true)
+    const prev = prevPathRef.current
+    const curr = location.pathname
+    if (curr === '/jobs' && prev !== '/jobs') {
+      // Entering /jobs — capture current state and force collapsed.
+      preJobsCollapsedRef.current = navCollapsed
+      setNavCollapsed(true)
+    } else if (curr !== '/jobs' && prev === '/jobs') {
+      // Leaving /jobs — restore captured state (whether expanded or
+      // collapsed). If user was collapsed before, this is a no-op.
+      if (preJobsCollapsedRef.current !== null) {
+        setNavCollapsed(preJobsCollapsedRef.current)
+        preJobsCollapsedRef.current = null
+      }
+    }
+    prevPathRef.current = curr
+    // navCollapsed intentionally not in deps — we only react to route
+    // changes, not toggle clicks. The closure captures latest navCollapsed
+    // at render time, which is what we want.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname])
+
+  // Tooltip for the collapsed nav. Lives at the document.body level via
+  // a React portal so it can poke out past the sidebar's overflow-y-auto
+  // (which would otherwise clip any absolutely-positioned child).
+  const [navTip, setNavTip] = useState(null) // { label, top } | null
 
   // Translated dock + main-menu items (re-computed whenever t() changes)
   const DOCK_ITEMS = [
@@ -169,6 +195,25 @@ export default function Layout() {
   return (
     <div className="h-screen flex flex-col bg-gray-100">
 
+      {/* Floating tooltip portal — attached to <body> so the sidebar's
+          overflow-y-auto can't clip it. Driven by hover on each collapsed
+          nav item. left: 56 = w-12 sidebar (48px) + 8px margin. */}
+      {navTip && navCollapsed && createPortal(
+        <div
+          style={{
+            position:  'fixed',
+            left:       56,
+            top:        navTip.top,
+            transform: 'translateY(-50%)',
+            zIndex:     9999,
+          }}
+          className="px-2 py-1 rounded-md bg-gray-900 text-white text-[11px] font-semibold whitespace-nowrap shadow-lg pointer-events-none"
+        >
+          {navTip.label}
+        </div>,
+        document.body
+      )}
+
       {/* ── TOP BAR ── */}
       <header
         style={{ backgroundColor: forestGreen }}
@@ -272,7 +317,13 @@ export default function Layout() {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`group relative flex items-center ${navCollapsed ? 'justify-center' : 'gap-2'} px-2 py-2 rounded-lg text-xs font-medium transition-colors ${
+                onMouseEnter={e => {
+                  if (!navCollapsed) return
+                  const r = e.currentTarget.getBoundingClientRect()
+                  setNavTip({ label: item.label, top: r.top + r.height / 2 })
+                }}
+                onMouseLeave={() => setNavTip(null)}
+                className={`flex items-center ${navCollapsed ? 'justify-center' : 'gap-2'} px-2 py-2 rounded-lg text-xs font-medium transition-colors ${
                   isActive(item.path)
                     ? 'bg-gray-100 text-gray-900'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -280,28 +331,22 @@ export default function Layout() {
               >
                 <span className="text-sm">{item.icon}</span>
                 {!navCollapsed && item.label}
-                {/* Instant tooltip — only when the nav is collapsed.
-                     Floats to the right of the icon, no hover delay. */}
-                {navCollapsed && (
-                  <span className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 rounded-md bg-gray-900 text-white text-[11px] font-semibold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-100 z-50 shadow-lg">
-                    {item.label}
-                  </span>
-                )}
               </Link>
             ))}
           </nav>
           <div className="px-1.5 py-3 border-t border-gray-100">
             <button
               onClick={handleSignOut}
-              className={`group relative w-full flex items-center ${navCollapsed ? 'justify-center' : 'gap-2'} px-2 py-2 rounded-lg text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-colors`}
+              onMouseEnter={e => {
+                if (!navCollapsed) return
+                const r = e.currentTarget.getBoundingClientRect()
+                setNavTip({ label: 'Sign Out', top: r.top + r.height / 2 })
+              }}
+              onMouseLeave={() => setNavTip(null)}
+              className={`w-full flex items-center ${navCollapsed ? 'justify-center' : 'gap-2'} px-2 py-2 rounded-lg text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-colors`}
             >
               <span>🚪</span>
               {!navCollapsed && <span>Sign Out</span>}
-              {navCollapsed && (
-                <span className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 rounded-md bg-gray-900 text-white text-[11px] font-semibold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-100 z-50 shadow-lg">
-                  Sign Out
-                </span>
-              )}
             </button>
           </div>
         </aside>
