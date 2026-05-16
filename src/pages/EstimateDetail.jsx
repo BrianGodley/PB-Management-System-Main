@@ -228,16 +228,22 @@ export default function EstimateDetail() {
         const ov = moduleOverrides[m.id]
         if (Number.isFinite(ov) && ov >= 0) {
           // Recompute GP and total_price using the new GPMD. Other costs
-          // (labor, burden, materials, sub) are unchanged.
-          const md       = parseFloat(m.man_days || 0)
-          const newGp    = md * ov
-          const labor    = parseFloat(m.labor_cost   || m.data?.calc?.laborCost || 0)
-          const burden   = parseFloat(m.labor_burden || m.data?.calc?.burden    || 0)
-          const mat      = parseFloat(m.material_cost || 0)
-          const sub      = parseFloat(m.sub_cost      || m.data?.calc?.subCost  || 0)
-          const comm     = newGp * 0.12   // commission scales with GP
-          const newPrice = labor + burden + mat + sub + newGp + comm
-          const newData  = {
+          // (labor, burden, materials, sub) are unchanged. Preserve any
+          // non-labor GP contribution (sub-haul markup, etc.) so a module
+          // with sub_cost doesn't lose that piece of profit on the version
+          // copy — same trick the live saveProjectGpmd uses.
+          const md          = parseFloat(m.man_days || 0)
+          const labor       = parseFloat(m.labor_cost   || m.data?.calc?.laborCost || 0)
+          const burden      = parseFloat(m.labor_burden || m.data?.calc?.burden    || 0)
+          const mat         = parseFloat(m.material_cost || 0)
+          const sub         = parseFloat(m.sub_cost      || m.data?.calc?.subCost  || 0)
+          const oldGpmd     = parseFloat(m.data?.gpmd ?? 425)
+          const oldTotalGp  = parseFloat(m.gross_profit || m.data?.calc?.gp || 0)
+          const subContrib  = oldTotalGp - (md * oldGpmd)   // 0 for non-sub modules
+          const newGp       = (md * ov) + subContrib
+          const comm        = newGp * 0.12
+          const newPrice    = labor + burden + mat + sub + newGp + comm
+          const newData = {
             ...(m.data || {}),
             gpmd: ov,
             calc: { ...(m.data?.calc || {}), gp: newGp, price: newPrice },
@@ -579,6 +585,13 @@ export default function EstimateDetail() {
       alert('Add at least one project before creating a bid.')
       return
     }
+    // Draft mode safety: never create a bid that points at an estimate row
+    // whose totals haven't been persisted yet. Block until the user either
+    // saves the draft as a new version or discards it.
+    if (dirty) {
+      alert('You have unsaved changes on this estimate. Click "Save Changes as New Version" first — the bid will then use that new version\'s numbers.')
+      return
+    }
     setCreatingBid(true)
     try {
       // Fetch client address from the clients table
@@ -598,13 +611,23 @@ export default function EstimateDetail() {
         }
       }
 
-      // Compute grand total, GP, and GPMD
-      const allMods    = projects.flatMap(p => p.estimate_modules || [])
+      // Re-pull projects + modules straight from the DB for the CURRENT
+      // estimate id. Guarantees bid totals match exactly what's saved on
+      // this version, regardless of whatever's in local state.
+      const { data: freshProjs } = await supabase
+        .from('estimate_projects')
+        .select('*, estimate_modules(*)')
+        .eq('estimate_id', id)
+        .order('created_at')
+      const projsForBid = freshProjs || projects
+
+      // Compute grand total, GP, and GPMD from the freshly fetched data.
+      const allMods    = projsForBid.flatMap(p => p.estimate_modules || [])
       const grandTotal = allMods.reduce((s, m) => s + parseFloat(m.total_price || m.data?.calc?.price || 0), 0)
       const totalGp    = allMods.reduce((s, m) => s + parseFloat(m.gross_profit || m.data?.calc?.gp || 0), 0)
       const totalMD    = allMods.reduce((s, m) => s + parseFloat(m.man_days     || m.data?.calc?.manDays || 0), 0)
       const bidGpmd    = totalMD > 0 ? Math.round(totalGp / totalMD) : 0
-      const projNames  = projects.map(p => p.project_name)
+      const projNames  = projsForBid.map(p => p.project_name)
 
       // Save bid / change order record to Supabase
       const { data: bid, error: bidErr } = await supabase
@@ -632,8 +655,9 @@ export default function EstimateDetail() {
 
       if (bidErr) throw new Error(bidErr.message)
 
-      // Generate and download the Word doc
-      const blob     = await generateBidDoc(estimate, projects, clientAddress)
+      // Generate and download the Word doc — use the freshly fetched
+      // projects so the printed doc matches the bid totals exactly.
+      const blob     = await generateBidDoc(estimate, projsForBid, clientAddress)
       const safeName = (estimate.estimate_name || (isCOMode ? 'ChangeOrder' : 'Bid')).replace(/[^a-z0-9]/gi, '_')
       const suffix   = isCOMode ? 'CO' : 'Bid'
       downloadBidDoc(blob, `${safeName}_${suffix}_${new Date().toISOString().split('T')[0]}.docx`)
