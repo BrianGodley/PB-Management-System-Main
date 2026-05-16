@@ -63,7 +63,7 @@ export default function ClientDetail() {
       const { data: estData } = await supabase
         .from('estimates')
         .select(`id, estimate_name, type, status, created_at, version, parent_estimate_id,
-          estimate_projects(estimate_modules(man_days,material_cost,labor_cost,labor_burden,gross_profit,sub_cost,total_price))`)
+          estimate_projects(sub_gp_markup_rate, estimate_modules(man_days,material_cost,labor_cost,labor_burden,gross_profit,sub_cost,total_price))`)
         .eq('client_name', clientData.name)
         .order('created_at', { ascending: false })
 
@@ -188,9 +188,23 @@ export default function ClientDetail() {
     const labor_burden  = sumModules(est, 'labor_burden')
     const material_cost = sumModules(est, 'material_cost')
     const sub_cost      = sumModules(est, 'sub_cost')
-    const gross_profit  = sumModules(est, 'gross_profit')
-    const total_price   = sumModules(est, 'total_price')
-    const gpmd          = man_days > 0 ? gross_profit / man_days : 0
+    const moduleGp      = sumModules(est, 'gross_profit')
+    const moduleTotal   = sumModules(est, 'total_price')
+
+    // Per-project sub-GP markup (default 20%). The module-level total_price
+    // doesn't carry this — it's added at the project level — so we add it
+    // back here so the row matches the Estimate Totals bar in EstimateDetail.
+    const subGp = (est.estimate_projects || []).reduce((s, proj) => {
+      const projSub = (proj.estimate_modules || [])
+        .reduce((ms, mod) => ms + parseFloat(mod.sub_cost || 0), 0)
+      const rate = proj.sub_gp_markup_rate ?? 0.20
+      return s + projSub * rate
+    }, 0)
+    const subGpCommission = subGp * 0.12
+
+    const gross_profit = moduleGp + subGp
+    const total_price  = moduleTotal + subGp + subGpCommission
+    const gpmd         = man_days > 0 ? gross_profit / man_days : 0
     return { man_days, labor_burden, material_cost, sub_cost, gross_profit, total_price, gpmd }
   }
 
