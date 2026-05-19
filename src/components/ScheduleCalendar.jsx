@@ -1584,7 +1584,7 @@ export default function ScheduleCalendar({
           New Schedule Item
         </button>
 
-        {loading ? (
+        {loading && items.length === 0 ? (
           <div className="flex justify-center py-10">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-700" />
           </div>
@@ -1677,8 +1677,10 @@ export default function ScheduleCalendar({
           </div>
         </div>
 
-        {/* Week rows */}
-        {loading ? (
+        {/* Week rows — keep the existing grid mounted during refetches so
+            scroll position is preserved after a save. The spinner only
+            shows on the very first load (when items is still empty). */}
+        {loading && items.length === 0 ? (
           <div className="flex justify-center py-10">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-700" />
           </div>
