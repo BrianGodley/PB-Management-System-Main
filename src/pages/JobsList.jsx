@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -166,6 +166,23 @@ export default function JobsList() {
   // Bumped each time the URL param changes so JobChangeOrdersPanel knows
   // to re-open even if the same coId arrives twice in a row.
   const [coDeepLink, setCoDeepLink] = useState(null) // { coId, ts } | null
+
+  // ── Sidebar scroll preservation ─────────────────────────────────────────────
+  // The jobs sidebar list (left column) is its own scroll container, but
+  // certain re-renders (job-click, tab-switch, child remounts) were resetting
+  // its scrollTop to 0. We capture the latest position in a ref on every scroll
+  // and re-apply it via useLayoutEffect after each render so the user stays
+  // pinned to wherever they last were in the list — even when navigating
+  // between jobs or job-detail tabs.
+  const jobsListRef    = useRef(null)
+  const jobsScrollTop  = useRef(0)
+  const onJobsListScroll = (e) => { jobsScrollTop.current = e.currentTarget.scrollTop }
+  useLayoutEffect(() => {
+    const el = jobsListRef.current
+    if (el && el.scrollTop !== jobsScrollTop.current) {
+      el.scrollTop = jobsScrollTop.current
+    }
+  })
 
   // Per-user collapsed-state for the sidebar stage groups. Persisted in
   // localStorage keyed by the signed-in user so each user keeps their own
@@ -955,7 +972,11 @@ export default function JobsList() {
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-700" />
             </div>
           ) : (
-            <div className="overflow-y-auto flex-1 w-[90%] mx-auto">
+            <div
+              ref={jobsListRef}
+              onScroll={onJobsListScroll}
+              className="overflow-y-auto flex-1 w-[90%] mx-auto"
+            >
               {/* All Jobs button — 30% shorter than the original (h-[25px]) */}
               <button
                 onClick={() => setSelectedJob(ALL_JOBS)}
