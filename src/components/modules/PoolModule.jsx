@@ -457,7 +457,9 @@ function StructDims({ label, data, onChange, alwaysEnabled }) {
           ['Perimeter', 'perimLF', 'LF'],
           ['Max Depth', 'maxDepth', 'ft'],
           ['Steps / Bench', 'stepBenchLF', 'LF'],
-          ['Dam Wall', 'damWallLF', 'LF'],
+          // Dam Wall is spa-only (separates the spa from pool water surface).
+          // Pool, Infinity Basin and Cover Vault don't use it.
+          ...(label === 'Spa' ? [['Dam Wall', 'damWallLF', 'LF']] : []),
         ].map(([lbl, key, unit]) => (
           <div key={key}>
             <Label text={lbl} sub={unit} />
