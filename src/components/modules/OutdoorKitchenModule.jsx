@@ -456,6 +456,31 @@ export default function OutdoorKitchenModule({ projectName, onSave, onBack, savi
       {/* ── Countertop ── */}
       <div>
         <SectionHeader title="Concrete Countertop" />
+        <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-2 text-[11px] text-gray-500">
+          <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">Countertop Rates (click any to edit)</p>
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
+            <span className="inline-flex items-center gap-1">Concrete ${p(OK_RATES.bbqConcrete.dbName, 149.50).toFixed(2)}/CY
+              <RateEditPopover table="material_rates" name={OK_RATES.bbqConcrete.dbName} category="Outdoor Kitchen"
+                unitLabel="CY" currentValue={p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.fallback)} onSaved={refreshAllRates} />
+            </span>
+            <span className="inline-flex items-center gap-1">Form {p(OK_RATES.counterFormLab.dbName, 20)} LF/hr
+              <RateEditPopover table="labor_rates" name={OK_RATES.counterFormLab.dbName} category="Outdoor Kitchen"
+                mode="coefficient" unitLabel="LF/hr" currentValue={p(OK_RATES.counterFormLab.dbName, OK_RATES.counterFormLab.fallback)} onSaved={refreshAllRates} />
+            </span>
+            <span className="inline-flex items-center gap-1">Pour {p(OK_RATES.counterPourLab.dbName, 50)} SF/day
+              <RateEditPopover table="labor_rates" name={OK_RATES.counterPourLab.dbName} category="Outdoor Kitchen"
+                mode="coefficient" unitLabel="SF/day" currentValue={p(OK_RATES.counterPourLab.dbName, OK_RATES.counterPourLab.fallback)} onSaved={refreshAllRates} />
+            </span>
+            <span className="inline-flex items-center gap-1">Broom {p(OK_RATES.counterBroomLab.dbName, 60)} SF/day
+              <RateEditPopover table="labor_rates" name={OK_RATES.counterBroomLab.dbName} category="Outdoor Kitchen"
+                mode="coefficient" unitLabel="SF/day" currentValue={p(OK_RATES.counterBroomLab.dbName, OK_RATES.counterBroomLab.fallback)} onSaved={refreshAllRates} />
+            </span>
+            <span className="inline-flex items-center gap-1">Polish {p(OK_RATES.counterPolishLab.dbName, 18)} SF/day
+              <RateEditPopover table="labor_rates" name={OK_RATES.counterPolishLab.dbName} category="Outdoor Kitchen"
+                mode="coefficient" unitLabel="SF/day" currentValue={p(OK_RATES.counterPolishLab.dbName, OK_RATES.counterPolishLab.fallback)} onSaved={refreshAllRates} />
+            </span>
+          </div>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs text-gray-500 mb-1">Area (SF)</label>
