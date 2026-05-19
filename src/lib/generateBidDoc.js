@@ -2,15 +2,57 @@
 // Generates a Word (.docx) bid proposal from estimate data.
 // Requires: npm install docx
 // Usage: import { generateBidDoc } from './generateBidDoc'
+//
+// ── Styling target ───────────────────────────────────────────────────────────
+// This output is intentionally modeled on the historical Picture Build "Sauer"
+// estimate template Brian provided. Specifically:
+//   • Header (logo + address block) repeats on every page in Times New Roman.
+//   • Body font is Calibri (Word's default) at 11pt.
+//   • The body opens with a single bold "Estimate For <name> - M/D/YYYY"
+//     line, followed by plain address lines. No "PREPARED FOR" label, no
+//     proposal title banner, no separate Date/Proposal rows.
+//   • Each module renders as a Sauer-style section:
+//       Heading 2 (bold, 16pt, Title-Case)         ← module title
+//       italic indented scope lines (NO numbering) ← MODULE_VERBIAGE.scope[]
+//       italic indented asterisk notes             ← MODULE_VERBIAGE.notes[]
+//       bold "COST $X,XXX" (left-aligned, 12pt)    ← per-module subtotal
+//   • Document ends with two bold ~13pt lines:
+//       "Job Total $X,XXX - Cash/Check Price"
+//       "Job Total $X,XXX - Finance OAC Price"  (cash × FINANCE_OAC_RATE)
+//   • No Terms & Conditions, no Authorization to Proceed / signature block.
+//     (Those used to live here; intentionally removed to match Sauer.)
+//
+// HeadingLevel.HEADING_2 is used for module titles so mammoth maps them to
+// <h2> in the BidDocViewerModal preview, where CSS picks up the 16pt size.
+// ─────────────────────────────────────────────────────────────────────────────
 
 import {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   Header, Footer, ImageRun, AlignmentType, BorderStyle, WidthType,
-  ShadingType, VerticalAlign, PageNumber, LevelFormat,
-  TabStopType, TabStopPosition,
+  VerticalAlign, PageNumber, HeadingLevel,
 } from 'docx'
 import { LOGO_B64 } from './logoBase64'
 import { MODULE_VERBIAGE } from './bidVerbiage'
+
+// ── Constants ────────────────────────────────────────────────────────────────
+
+const HEADER_FONT = 'Times New Roman'   // matches Sauer header
+const BODY_FONT   = 'Calibri'           // matches Sauer body
+
+// Finance OAC markup. Sauer template: $33,915 cash → $37,307 finance = +10.0%.
+// Centralized so it's easy to tweak / pull from settings later.
+const FINANCE_OAC_RATE = 0.10
+
+// Half-point sizes used throughout (docx sizes are in half-points).
+const SZ_BODY      = 22   // 11pt
+const SZ_BODY_SM   = 18   //  9pt (header lines)
+const SZ_TITLE     = 24   // 12pt — "Estimate For …" + COST lines
+const SZ_SECTION   = 32   // 16pt — module heading
+const SZ_TOTAL     = 26   // 13pt — final Job Total lines
+
+// Borders for header/footer tables (all invisible).
+const NO_BORDER  = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
+const NO_BORDERS = { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -25,98 +67,38 @@ function usd(n) {
   return '$' + Math.round(n || 0).toLocaleString()
 }
 
+// Sauer-style short date: M/D/YYYY (e.g. "2/11/2026").
 function fmtDate(d = new Date()) {
-  return new Date(d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+  const dt = new Date(d)
+  return `${dt.getMonth() + 1}/${dt.getDate()}/${dt.getFullYear()}`
 }
 
-// Thin gray border for tables
-const THIN = { style: BorderStyle.SINGLE, size: 4, color: 'D0D0D0' }
-const BORDERS = { top: THIN, bottom: THIN, left: THIN, right: THIN }
-const NO_BORDER = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
-const NO_BORDERS = { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER }
-
-const FONT    = 'Times New Roman'
-const FG_HEX  = '2D6A2D'   // dark green to match app (approximate)
-
-// ── Logo image bytes ─────────────────────────────────────────────────────────
 let _logoBytes = null
 function logoBytes() {
   if (!_logoBytes) _logoBytes = b64ToUint8(LOGO_B64)
   return _logoBytes
 }
 
-// ── Reusable paragraph builders ──────────────────────────────────────────────
-
-function p(children, opts = {}) {
-  return new Paragraph({
-    spacing: { after: opts.after ?? 120, before: opts.before ?? 0, line: opts.line ?? 276 },
-    alignment: opts.align ?? AlignmentType.LEFT,
-    ...opts,
-    children: Array.isArray(children) ? children : [children],
+// Body run — Calibri at the requested half-point size with optional bold/italic.
+function bRun(text, opts = {}) {
+  return new TextRun({
+    text,
+    font: BODY_FONT,
+    size: opts.size ?? SZ_BODY,
+    bold: !!opts.bold,
+    italics: !!opts.italics,
+    color: opts.color,
   })
 }
 
-function run(text, opts = {}) {
-  return new TextRun({ text, font: FONT, size: opts.size ?? 20, ...opts })
-}
-
-function boldRun(text, opts = {}) {
-  return run(text, { bold: true, ...opts })
-}
-
-function sectionTitle(text) {
+function emptyLine(after = 120) {
   return new Paragraph({
-    spacing: { before: 240, after: 80, line: 276 },
-    children: [
-      new TextRun({
-        text,
-        font: FONT,
-        size: 22,
-        bold: true,
-        allCaps: true,
-        color: '000000',
-      }),
-    ],
-    border: {
-      bottom: { style: BorderStyle.SINGLE, size: 6, color: 'D0D0D0', space: 4 },
-    },
+    spacing: { after, line: 276 },
+    children: [new TextRun({ text: '', font: BODY_FONT })],
   })
 }
 
-function moduleTitlePara(text) {
-  return new Paragraph({
-    spacing: { before: 200, after: 60 },
-    children: [
-      new TextRun({ text, font: FONT, size: 20, bold: true, underline: {} }),
-    ],
-  })
-}
-
-function bulletPara(text, num) {
-  return new Paragraph({
-    spacing: { before: 0, after: 40, line: 276 },
-    indent: { left: 360, hanging: 360 },
-    children: [
-      new TextRun({ text: `${num}.  ${text}`, font: FONT, size: 20 }),
-    ],
-  })
-}
-
-function notePara(text) {
-  return new Paragraph({
-    spacing: { before: 0, after: 40, line: 276 },
-    indent: { left: 360 },
-    children: [
-      new TextRun({ text: `* ${text}`, font: FONT, size: 18, italics: true, color: '555555' }),
-    ],
-  })
-}
-
-function emptyLine(after = 80) {
-  return new Paragraph({ spacing: { after }, children: [new TextRun('')] })
-}
-
-// ── Header: Logo (left) + company info (right) ───────────────────────────────
+// ── Header: Logo (left) + company info (right), Times New Roman ──────────────
 function buildHeader() {
   const logo = new ImageRun({
     type: 'png',
@@ -125,7 +107,6 @@ function buildHeader() {
     altText: { title: 'Picture Build Logo', description: 'Company logo', name: 'logo' },
   })
 
-  // Two-cell table: logo left | company info right
   const headerTable = new Table({
     width: { size: 9360, type: WidthType.DXA },
     columnWidths: [3000, 6360],
@@ -133,27 +114,34 @@ function buildHeader() {
     rows: [
       new TableRow({
         children: [
-          // Logo cell
           new TableCell({
             borders: NO_BORDERS,
             width: { size: 3000, type: WidthType.DXA },
             verticalAlign: VerticalAlign.CENTER,
             children: [
-              new Paragraph({
-                spacing: { after: 0 },
-                children: [logo],
-              }),
+              new Paragraph({ spacing: { after: 0 }, children: [logo] }),
             ],
           }),
-          // Company info cell
           new TableCell({
             borders: NO_BORDERS,
             width: { size: 6360, type: WidthType.DXA },
             verticalAlign: VerticalAlign.CENTER,
             children: [
-              p(run('12410 Foothill Blvd Unit U  Sylmar, CA 91342', { size: 18 }), { align: AlignmentType.RIGHT, after: 20 }),
-              p(run('(818) 751-2690    www.picturebuild.com', { size: 18 }), { align: AlignmentType.RIGHT, after: 20 }),
-              p(run('CA Contractor\'s License    B, C-27,8,53: 990772', { size: 18 }), { align: AlignmentType.RIGHT, after: 0 }),
+              new Paragraph({
+                alignment: AlignmentType.RIGHT,
+                spacing: { after: 20 },
+                children: [new TextRun({ text: '12410 Foothill Blvd Unit U  Sylmar, CA 91342', font: HEADER_FONT, size: SZ_BODY_SM })],
+              }),
+              new Paragraph({
+                alignment: AlignmentType.RIGHT,
+                spacing: { after: 20 },
+                children: [new TextRun({ text: '(818) 751-2690    www.picturebuild.com', font: HEADER_FONT, size: SZ_BODY_SM })],
+              }),
+              new Paragraph({
+                alignment: AlignmentType.RIGHT,
+                spacing: { after: 0 },
+                children: [new TextRun({ text: "CA Contractor's License    B, C-27,8,53: 990772", font: HEADER_FONT, size: SZ_BODY_SM })],
+              }),
             ],
           }),
         ],
@@ -161,15 +149,10 @@ function buildHeader() {
     ],
   })
 
-  return new Header({
-    children: [
-      headerTable,
-      emptyLine(0),
-    ],
-  })
+  return new Header({ children: [headerTable, emptyLine(0)] })
 }
 
-// ── Footer: page numbers ──────────────────────────────────────────────────────
+// ── Footer: page numbers with thin top border ────────────────────────────────
 function buildFooter() {
   return new Footer({
     children: [
@@ -177,345 +160,166 @@ function buildFooter() {
         border: { top: { style: BorderStyle.SINGLE, size: 4, color: 'D9D9D9', space: 1 } },
         spacing: { after: 0 },
         children: [
-          new TextRun({ text: 'Page ', font: FONT, size: 18, bold: true }),
-          new TextRun({ children: [PageNumber.CURRENT], font: FONT, size: 18, bold: true }),
-          new TextRun({ text: ' of ', font: FONT, size: 18, bold: true }),
-          new TextRun({ children: [PageNumber.TOTAL_PAGES], font: FONT, size: 18, bold: true }),
+          new TextRun({ text: 'Page ', font: BODY_FONT, size: SZ_BODY_SM, bold: true }),
+          new TextRun({ children: [PageNumber.CURRENT], font: BODY_FONT, size: SZ_BODY_SM, bold: true }),
+          new TextRun({ text: ' of ', font: BODY_FONT, size: SZ_BODY_SM, bold: true }),
+          new TextRun({ children: [PageNumber.TOTAL_PAGES], font: BODY_FONT, size: SZ_BODY_SM, bold: true }),
         ],
       }),
     ],
   })
 }
 
-// ── Client info block ─────────────────────────────────────────────────────────
-function buildClientBlock(estimate, bidDate, clientAddress) {
-  const rows = []
-  const addressLines = (clientAddress || '').split('\n').filter(Boolean)
+// ── Title + address block (Sauer-style opening) ──────────────────────────────
+function buildOpening(estimate, bidDate, clientAddress) {
+  const out = []
+  const name = (estimate.client_name || '').trim() || 'Client'
 
-  // Two-column info row: "PREPARED FOR" left, date/proposal right
-  const infoTable = new Table({
-    width: { size: 9360, type: WidthType.DXA },
-    columnWidths: [4680, 4680],
-    borders: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER, insideH: NO_BORDER, insideV: NO_BORDER },
-    rows: [
-      new TableRow({
-        children: [
-          new TableCell({
-            borders: NO_BORDERS,
-            width: { size: 4680, type: WidthType.DXA },
-            children: [
-              p(boldRun('PREPARED FOR:', { size: 20, allCaps: true }), { after: 40 }),
-              p(boldRun(estimate.client_name || '', { size: 22 }), { after: 40 }),
-              ...addressLines.map(line => p(run(line, { size: 20 }), { after: 20 })),
-              ...(addressLines.length === 0 ? [emptyLine(0)] : []),
-            ],
-          }),
-          new TableCell({
-            borders: NO_BORDERS,
-            width: { size: 4680, type: WidthType.DXA },
-            children: [
-              p(run('Date:  ' + fmtDate(bidDate), { size: 20 }), { align: AlignmentType.RIGHT, after: 40 }),
-              p(run('Proposal:  ' + (estimate.estimate_name || ''), { size: 20 }), { align: AlignmentType.RIGHT, after: 0 }),
-            ],
-          }),
-        ],
-      }),
-    ],
+  // Single bold line: "Estimate For <Name> - M/D/YYYY"
+  out.push(new Paragraph({
+    spacing: { before: 0, after: 120, line: 276 },
+    children: [bRun(`Estimate For ${name} - ${fmtDate(bidDate)}`, { bold: true, size: SZ_TITLE })],
+  }))
+
+  // Plain address lines — no spacing between them, mirrors Sauer.
+  const addressLines = (clientAddress || '').split('\n').map(s => s.trim()).filter(Boolean)
+  addressLines.forEach(line => {
+    out.push(new Paragraph({
+      spacing: { after: 0, line: 276 },
+      children: [bRun(line)],
+    }))
   })
 
-  rows.push(infoTable)
-  rows.push(emptyLine(120))
-  return rows
+  out.push(emptyLine(120))
+  return out
 }
 
-// ── Project section ───────────────────────────────────────────────────────────
-function buildProjectSection(project) {
-  const paras = []
-  const modules = project.estimate_modules || []
+// ── Module section (Sauer-style: heading → italic items → COST) ──────────────
+// Returns the paragraphs PLUS the dollar amount used for the cost line, so
+// the caller can roll a grand total. The cost mirrors EstimateDetail's
+// per-module pricing (total_price falls back to data.calc.price).
+function buildModuleSection(mod, project) {
+  const out = []
+  const v = MODULE_VERBIAGE[mod.module_type]
+  const title = v?.title || mod.module_type || 'Scope of Work'
 
-  // Project header
-  paras.push(
+  // Heading 2 → mammoth renders <h2>; print CSS sizes it to 16pt.
+  out.push(new Paragraph({
+    heading: HeadingLevel.HEADING_2,
+    spacing: { before: 200, after: 80 },
+    children: [bRun(title, { bold: true, size: SZ_SECTION })],
+  }))
+
+  // Scope lines — italic, indented (~0.5in = 720 twips), NO numbering.
+  if (v?.scope?.length) {
+    v.scope.forEach(line => {
+      out.push(new Paragraph({
+        spacing: { after: 40, line: 276 },
+        indent: { left: 720 },
+        children: [bRun(line, { italics: true })],
+      }))
+    })
+  }
+
+  // Custom user note (if present) + standard disclaimer notes — italic, indented.
+  if (mod.notes && mod.notes.trim()) {
+    out.push(new Paragraph({
+      spacing: { before: 80, after: 40, line: 276 },
+      indent: { left: 720 },
+      children: [bRun(`*${mod.notes.trim()}`, { italics: true })],
+    }))
+  }
+  if (v?.notes?.length) {
+    v.notes.forEach((note, i) => {
+      out.push(new Paragraph({
+        spacing: { before: i === 0 ? 80 : 0, after: 40, line: 276 },
+        indent: { left: 720 },
+        children: [bRun(`*${note}`, { italics: true })],
+      }))
+    })
+  }
+
+  // Per-module cost. Use the same fallback chain EstimateDetail uses.
+  const modPrice = parseFloat(mod.total_price || mod.data?.calc?.price || 0)
+  // Per-module sub markup share = sub_cost × project's sub_gp_markup_rate × 1.12.
+  // This keeps the per-module COSTs adding up to the same grand total the
+  // current code produces (which rolls Sub GP × 1.12 into each project total).
+  const modSubCost = parseFloat(mod.sub_cost || mod.data?.calc?.subCost || 0)
+  const modSubGp   = modSubCost * (project?.sub_gp_markup_rate ?? 0.20)
+  const modTotal   = modPrice + modSubGp + modSubGp * 0.12
+
+  if (modTotal > 0) {
+    out.push(new Paragraph({
+      spacing: { before: 120, after: 0, line: 276 },
+      children: [bRun(`COST ${usd(modTotal)}`, { bold: true, size: SZ_TITLE })],
+    }))
+  }
+  out.push(emptyLine(160))
+
+  return { paragraphs: out, amount: modTotal }
+}
+
+// ── Final Job Total lines (Cash / Finance OAC) ───────────────────────────────
+function buildJobTotals(grandTotal) {
+  const cash    = grandTotal
+  const finance = grandTotal * (1 + FINANCE_OAC_RATE)
+  return [
+    emptyLine(120),
     new Paragraph({
-      spacing: { before: 280, after: 100 },
-      children: [
-        new TextRun({
-          text: project.project_name || 'Project',
-          font: FONT, size: 24, bold: true, color: FG_HEX,
-        }),
-      ],
-    })
-  )
-
-  // Each module's scope
-  for (const mod of modules) {
-    const v = MODULE_VERBIAGE[mod.module_type]
-    if (!v) {
-      // Fallback: just show the module type name and notes
-      paras.push(moduleTitlePara(mod.module_type || 'Scope of Work'))
-      if (mod.notes) {
-        paras.push(notePara(mod.notes))
-      }
-      continue
-    }
-
-    paras.push(moduleTitlePara(v.title))
-
-    v.scope.forEach((line, i) => {
-      paras.push(bulletPara(line, i + 1))
-    })
-
-    // If the module has custom notes saved, include them first
-    if (mod.notes && mod.notes.trim()) {
-      paras.push(notePara(mod.notes.trim()))
-    }
-
-    // Standard disclaimer notes
-    v.notes.forEach(note => paras.push(notePara(note)))
-
-    paras.push(emptyLine(60))
-  }
-
-  // Project total price row — single-column, right-aligned table.
-  // (Was a two-column layout where column 1 was an empty spacer; that
-  // empty cell now disappears entirely and the same visual position is
-  // achieved via the table's `alignment: RIGHT`.)
-  // Per-project total = sum of module total_price + that project's
-  // Sub GP markup × 1.12 (the markup commission). Same formula the
-  // EstimateDetail bar uses, so the project lines on the bid doc add
-  // up to the bid_amount written on the bid row.
-  const projModSum = modules.reduce((s, m) => s + parseFloat(m.total_price || m.data?.calc?.price || 0), 0)
-  const projSubCost = modules.reduce((s, m) => s + parseFloat(m.sub_cost || m.data?.calc?.subCost || 0), 0)
-  const projSubGp   = projSubCost * (project.sub_gp_markup_rate ?? 0.20)
-  const projTotal   = projModSum + projSubGp + projSubGp * 0.12
-  if (projTotal > 0) {
-    const totalTable = new Table({
-      alignment: AlignmentType.RIGHT,
-      width: { size: 3000, type: WidthType.DXA },
-      columnWidths: [3000],
-      borders: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER, insideH: NO_BORDER, insideV: NO_BORDER },
-      rows: [
-        new TableRow({
-          children: [
-            new TableCell({
-              borders: {
-                top: THIN, bottom: { style: BorderStyle.DOUBLE, size: 6, color: '333333' },
-                left: NO_BORDER, right: NO_BORDER,
-              },
-              shading: { fill: 'F5F5F5', type: ShadingType.CLEAR },
-              width: { size: 3000, type: WidthType.DXA },
-              margins: { top: 60, bottom: 60, left: 120, right: 120 },
-              children: [
-                new Paragraph({
-                  alignment: AlignmentType.RIGHT,
-                  spacing: { after: 0 },
-                  children: [
-                    new TextRun({ text: project.project_name + ' Total:  ', font: FONT, size: 20 }),
-                    new TextRun({ text: usd(projTotal), font: FONT, size: 20, bold: true }),
-                  ],
-                }),
-              ],
-            }),
-          ],
-        }),
-      ],
-    })
-    paras.push(totalTable)
-  }
-
-  // Larger gap between the subtotal box and the next project's heading
-  paras.push(emptyLine(240))
-  return paras
-}
-
-// ── Grand total block ─────────────────────────────────────────────────────────
-function buildGrandTotal(totalPrice) {
-  const totalTable = new Table({
-    width: { size: 9360, type: WidthType.DXA },
-    columnWidths: [5360, 4000],
-    borders: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER, insideH: NO_BORDER, insideV: NO_BORDER },
-    rows: [
-      new TableRow({
-        children: [
-          new TableCell({
-            borders: NO_BORDERS,
-            width: { size: 5360, type: WidthType.DXA },
-            children: [emptyLine(0)],
-          }),
-          new TableCell({
-            borders: {
-              top: { style: BorderStyle.DOUBLE, size: 6, color: '333333' },
-              bottom: { style: BorderStyle.DOUBLE, size: 6, color: '333333' },
-              left: NO_BORDER, right: NO_BORDER,
-            },
-            shading: { fill: 'EAFAEA', type: ShadingType.CLEAR },
-            width: { size: 4000, type: WidthType.DXA },
-            margins: { top: 100, bottom: 100, left: 180, right: 180 },
-            children: [
-              new Paragraph({
-                alignment: AlignmentType.RIGHT,
-                spacing: { after: 0 },
-                children: [
-                  new TextRun({ text: 'TOTAL BID AMOUNT:  ', font: FONT, size: 24, bold: true }),
-                  new TextRun({ text: usd(totalPrice), font: FONT, size: 28, bold: true, color: FG_HEX }),
-                ],
-              }),
-            ],
-          }),
-        ],
-      }),
-    ],
-  })
-  return [totalTable, emptyLine(240)]
-}
-
-// ── Terms & signature ─────────────────────────────────────────────────────────
-function buildTerms() {
-  const paras = []
-
-  paras.push(sectionTitle('Terms and Conditions'))
-  paras.push(emptyLine(60))
-
-  const terms = [
-    'This proposal is valid for 30 days from the date shown above.',
-    'A deposit of 10% of the total bid amount is required to schedule the project. The remaining balance is due upon completion of each phase of work.',
-    'Any changes to the scope of work must be agreed upon in writing and may result in a change order and additional costs.',
-    'Picture Build is not responsible for underground utilities, pipes, or other obstructions not disclosed prior to the start of work.',
-    'All work will be performed in accordance with applicable local building codes and regulations.',
-    'Picture Build carries general liability insurance and workers\' compensation insurance.',
-    'Permits, when required, are not included in this proposal unless specifically stated.',
-    'This proposal does not include the cost of any HOA approvals, surveys, or engineering unless specifically stated.',
+      spacing: { after: 80, line: 276 },
+      children: [bRun(`Job Total ${usd(cash)} - Cash/Check Price`, { bold: true, size: SZ_TOTAL })],
+    }),
+    new Paragraph({
+      spacing: { after: 0, line: 276 },
+      children: [bRun(`Job Total ${usd(finance)} - Finance OAC Price`, { bold: true, size: SZ_TOTAL })],
+    }),
   ]
-
-  terms.forEach((t, i) => paras.push(bulletPara(t, i + 1)))
-
-  paras.push(emptyLine(240))
-
-  // Signature block
-  paras.push(sectionTitle('Authorization to Proceed'))
-  paras.push(emptyLine(60))
-  paras.push(
-    p(run('By signing below, Client accepts the terms of this proposal and authorizes Picture Build to proceed with the work described herein.'), { after: 200 })
-  )
-
-  const sigTable = new Table({
-    width: { size: 9360, type: WidthType.DXA },
-    columnWidths: [4280, 500, 4580],
-    borders: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER, insideH: NO_BORDER, insideV: NO_BORDER },
-    rows: [
-      new TableRow({
-        children: [
-          // Client sig
-          new TableCell({
-            borders: NO_BORDERS,
-            width: { size: 4280, type: WidthType.DXA },
-            children: [
-              new Paragraph({
-                border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '333333', space: 2 } },
-                spacing: { after: 60 },
-                children: [new TextRun('')],
-              }),
-              p(run('Client Signature / Date', { size: 18 }), { after: 200 }),
-            ],
-          }),
-          // Spacer
-          new TableCell({
-            borders: NO_BORDERS,
-            width: { size: 500, type: WidthType.DXA },
-            children: [emptyLine(0)],
-          }),
-          // PB sig
-          new TableCell({
-            borders: NO_BORDERS,
-            width: { size: 4580, type: WidthType.DXA },
-            children: [
-              new Paragraph({
-                border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '333333', space: 2 } },
-                spacing: { after: 60 },
-                children: [new TextRun('')],
-              }),
-              p(run('Picture Build Representative / Date', { size: 18 }), { after: 0 }),
-            ],
-          }),
-        ],
-      }),
-    ],
-  })
-
-  paras.push(sigTable)
-  return paras
 }
 
-// ── Main export ───────────────────────────────────────────────────────────────
+// ── Main export ──────────────────────────────────────────────────────────────
 
 /**
- * generateBidDoc(estimate, projects)
+ * generateBidDoc(estimate, projects, clientAddress)
  * Returns a Blob containing the .docx file.
  *
- * @param {object} estimate  - estimate row from Supabase
- * @param {array}  projects  - estimate_projects with nested estimate_modules[]
+ * @param {object} estimate       - estimate row from Supabase
+ * @param {array}  projects       - estimate_projects with nested estimate_modules[]
+ * @param {string} clientAddress  - multi-line address string for the client
  */
 export async function generateBidDoc(estimate, projects, clientAddress = '') {
   const bidDate = new Date()
 
-  // Compute grand total from all modules across all projects, plus each
-  // project's Sub GP markup × 1.12. Matches the per-project totals
-  // rendered above so the doc footer ties to the project lines and to
-  // the bid_amount written on the bid row.
-  const grandTotal = projects.reduce((sum, proj) => {
-    const mods       = proj.estimate_modules || []
-    const projModSum = mods.reduce((s, m) => s + parseFloat(m.total_price || m.data?.calc?.price || 0), 0)
-    const projSub    = mods.reduce((s, m) => s + parseFloat(m.sub_cost   || m.data?.calc?.subCost  || 0), 0)
-    const projSubGp  = projSub * (proj.sub_gp_markup_rate ?? 0.20)
-    return sum + projModSum + projSubGp + projSubGp * 0.12
-  }, 0)
-
-  // Build document body
   const body = []
 
-  // ── Proposal title
-  body.push(
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 120, after: 80 },
-      children: [
-        new TextRun({ text: 'LANDSCAPE PROPOSAL', font: FONT, size: 36, bold: true, color: FG_HEX }),
-      ],
-    })
-  )
-  body.push(
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 200 },
-      border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: FG_HEX, space: 4 } },
-      children: [new TextRun({ text: '', font: FONT, size: 4 })],
-    })
-  )
+  // Opening: "Estimate For …" + address lines
+  body.push(...buildOpening(estimate, bidDate, clientAddress))
 
-  // ── Client info
-  body.push(...buildClientBlock(estimate, bidDate, clientAddress))
-
-  // ── Scope of work header
-  body.push(sectionTitle('Scope of Work'))
-  body.push(emptyLine(80))
-
-  // ── Projects
-  for (const proj of projects) {
-    body.push(...buildProjectSection(proj))
+  // Flatten projects → modules; render each module as a Sauer-style section.
+  // Sauer doesn't show a project-level grouping label, so we don't either —
+  // the cost lives on each module's COST line.
+  let grandTotal = 0
+  for (const project of projects || []) {
+    const modules = project.estimate_modules || []
+    for (const mod of modules) {
+      const { paragraphs, amount } = buildModuleSection(mod, project)
+      body.push(...paragraphs)
+      grandTotal += amount
+    }
   }
 
-  // ── Grand total
-  body.push(...buildGrandTotal(grandTotal))
+  // Final Job Total block (Cash + Finance OAC)
+  if (grandTotal > 0) {
+    body.push(...buildJobTotals(grandTotal))
+  }
 
-  // ── Terms & signature
-  body.push(...buildTerms())
-
-  // ── Assemble document
   const doc = new Document({
-    numbering: { config: [] },
     styles: {
       default: {
-        document: {
-          run: { font: FONT, size: 20 },
+        document: { run: { font: BODY_FONT, size: SZ_BODY } },
+        // Make sure the Heading 2 style itself doesn't override our colors/fonts.
+        heading2: {
+          run: { font: BODY_FONT, size: SZ_SECTION, bold: true, color: '000000' },
+          paragraph: { spacing: { before: 200, after: 80 } },
         },
       },
     },

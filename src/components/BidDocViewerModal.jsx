@@ -213,22 +213,27 @@ export default function BidDocViewerModal({ bid, onClose }) {
     // rules the PDF collapses to browser defaults and elements stack on top
     // of each other (especially around the project subtotal boxes).
     const container = document.createElement('div')
+    // Matches the Sauer estimate template:
+    //   • Calibri body, 11pt
+    //   • h2 = 16pt bold (module section heading)
+    //   • Tight paragraph spacing, no borders on body tables
+    //   • Indented italic scope lines are produced by the .docx itself; we
+    //     don't restyle <em>/<p> beyond what mammoth emits.
     const pdfStyles =
       '<style>' +
-      'p { margin: 0.5em 0; line-height: 1.4; }' +
-      'table { border-collapse: collapse; width: 100%; margin: 0.75em 0; }' +
-      'td { vertical-align: top; padding: 4px 6px; }' +
-      'th { background: #f2f2f2; font-weight: 600; padding: 4px 6px; }' +
-      'h1, h2, h3 { color: #1f2937; margin: 1em 0 0.5em 0; page-break-after: avoid; }' +
-      'h1 { font-size: 18pt; } h2 { font-size: 14pt; } h3 { font-size: 12pt; }' +
-      'hr { border: none; border-top: 1px solid #d0d0d0; margin: 0.75em 0; }' +
+      'p { margin: 0.35em 0; line-height: 1.35; }' +
+      'table { border-collapse: collapse; width: 100%; margin: 0.5em 0; }' +
+      'td { vertical-align: top; padding: 2px 4px; }' +
+      'h1, h2, h3 { color: #111; margin: 0.9em 0 0.35em 0; page-break-after: avoid; font-weight: 700; }' +
+      'h1 { font-size: 18pt; } h2 { font-size: 16pt; } h3 { font-size: 13pt; }' +
+      'hr { border: none; border-top: 1px solid #d0d0d0; margin: 0.5em 0; }' +
       'img { max-width: 100%; height: auto; }' +
       '* { print-color-adjust: exact; -webkit-print-color-adjust: exact; }' +
       '</style>'
     container.innerHTML = pdfStyles + ensureLetterhead(editorRef.current.innerHTML)
     container.style.cssText =
       'position:fixed;left:-10000px;top:0;width:720px;' +
-      'font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#333;' +
+      'font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#222;' +
       'padding:0;background:#fff;'
     document.body.appendChild(container)
 
@@ -303,14 +308,15 @@ export default function BidDocViewerModal({ bid, onClose }) {
       '<meta charset="utf-8">' +
       `<title>${title}</title>` +
       '<style>' +
+      // Matches the Sauer estimate template (Calibri body 11pt, bold 16pt
+      // section headings, no borders on body tables, tight line spacing).
       '@page { size: letter; margin: 0.5in; }' +
-      'body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; color: #333; margin: 0; padding: 0; }' +
+      'body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; color: #222; margin: 0; padding: 0; }' +
       'table { border-collapse: collapse; width: 100%; }' +
-      'th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; vertical-align: top; }' +
-      'th { background: #f2f2f2; font-weight: 600; }' +
-      'h1, h2, h3 { color: #1f2937; margin-top: 1em; margin-bottom: 0.5em; }' +
-      'h1 { font-size: 18pt; } h2 { font-size: 14pt; } h3 { font-size: 12pt; }' +
-      'p { margin: 0.5em 0; line-height: 1.4; }' +
+      'td { padding: 2px 4px; vertical-align: top; border: none; }' +
+      'h1, h2, h3 { color: #111; margin: 0.9em 0 0.35em 0; page-break-after: avoid; font-weight: 700; }' +
+      'h1 { font-size: 18pt; } h2 { font-size: 16pt; } h3 { font-size: 13pt; }' +
+      'p { margin: 0.35em 0; line-height: 1.35; }' +
       'img { max-width: 100%; height: auto; }' +
       '* { print-color-adjust: exact; -webkit-print-color-adjust: exact; }' +
       '</style></head>' +
@@ -455,48 +461,49 @@ export default function BidDocViewerModal({ bid, onClose }) {
         )}
       </div>
 
-      {/* Scoped styles for the document body */}
+      {/* Scoped styles for the document body — mirror the Sauer estimate
+          template so the in-app preview matches the printed/PDF output. */}
       <style>{`
+        .bid-doc-preview {
+          font-family: Calibri, 'Segoe UI', Arial, sans-serif;
+          color: #222;
+        }
         .bid-doc-preview h1, .bid-doc-preview h2, .bid-doc-preview h3 {
-          color: #1f2937;
+          color: #111;
           font-weight: 700;
-          margin-top: 1.25em;
-          margin-bottom: 0.5em;
+          margin-top: 1em;
+          margin-bottom: 0.35em;
         }
         .bid-doc-preview h1 { font-size: 1.5rem; }
-        .bid-doc-preview h2 { font-size: 1.25rem; }
-        .bid-doc-preview h3 { font-size: 1.1rem; }
+        .bid-doc-preview h2 { font-size: 1.3rem; }
+        .bid-doc-preview h3 { font-size: 1.05rem; }
         .bid-doc-preview p {
-          color: #374151;
-          line-height: 1.6;
-          margin: 0.5em 0;
+          color: #222;
+          line-height: 1.45;
+          margin: 0.35em 0;
         }
+        .bid-doc-preview em, .bid-doc-preview i {
+          color: #222;
+        }
+        /* Body tables (project sections etc.) shouldn't show borders — only
+           the letterhead table at the top stays visually clean. */
         .bid-doc-preview table {
           width: 100%;
           border-collapse: collapse;
-          margin: 1em 0;
-          font-size: 0.875rem;
+          margin: 0.5em 0;
+          font-size: inherit;
         }
-        .bid-doc-preview th, .bid-doc-preview td {
-          border: 1px solid #e5e7eb;
-          padding: 0.5em 0.75em;
+        .bid-doc-preview td {
+          border: none;
+          padding: 2px 4px;
           text-align: left;
           vertical-align: top;
-        }
-        .bid-doc-preview th {
-          background: #f9fafb;
-          font-weight: 600;
-          color: #374151;
-        }
-        .bid-doc-preview ul, .bid-doc-preview ol {
-          margin: 0.5em 0 0.5em 1.5em;
-          color: #374151;
         }
         .bid-doc-preview img {
           max-width: 100%;
           height: auto;
         }
-        .bid-doc-preview strong { color: #111827; }
+        .bid-doc-preview strong { color: #111; }
         .bid-doc-preview[contenteditable="true"]:focus { outline: none; }
       `}</style>
     </div>
