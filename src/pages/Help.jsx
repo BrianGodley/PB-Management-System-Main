@@ -68,6 +68,40 @@ const TABS = [
   { key: 'videos',  label: 'Videos',          icon: '🎬' },
 ]
 
+// ── Note parsing/serializing ────────────────────────────────────────────────
+// `feature_requests.admin_notes` is stored as a single text blob. We treat it
+// as a numbered list, where each note starts with "N. " at the beginning of
+// a line. The number on disk is just a label — when we serialize we always
+// renumber sequentially from 1, so reordering / deletion can never produce
+// duplicate numbers.
+//
+// Legacy notes (no numeric prefix) are treated as a single note #1, so older
+// rows show up correctly without any data migration.
+function parseNotes(text) {
+  const raw = (text || '').trim()
+  if (!raw) return []
+  // Match: line-start, digits + dot + whitespace, then capture everything
+  // up to the next "N. " at line-start (or end of string).
+  const re = /^(\d+)\.\s+([\s\S]*?)(?=\n\d+\.\s+|$)/gm
+  const out = []
+  let m
+  while ((m = re.exec(raw))) {
+    const t = m[2].trim()
+    if (t) out.push(t)
+  }
+  // Fallback for unnumbered legacy notes — treat whole blob as one note.
+  if (out.length === 0) out.push(raw)
+  return out
+}
+
+function serializeNotes(notes) {
+  return notes
+    .map(t => (t || '').trim())
+    .filter(Boolean)
+    .map((t, i) => `${i + 1}. ${t}`)
+    .join('\n')
+}
+
 export default function Help() {
   const [tab, setTab] = useState('tickets')
 
@@ -124,6 +158,11 @@ function SupportTickets() {
   const [isAdmin,  setIsAdmin]  = useState(false)
   const [showNew,  setShowNew]  = useState(false)
 
+  // Status-change/note modal. When set, opens StatusChangeModal.
+  //   { ticket, targetBucket }    → admin clicked Move-to-X (status will change)
+  //   { ticket, targetBucket: null } → admin clicked "Add Note" (no status change)
+  const [pendingChange, setPendingChange] = useState(null)
+
   // Detect admin role so we know whether to show the All/Mine toggle, the
   // Reporter column, and the status-change buttons in the expanded row.
   useEffect(() => {
@@ -173,48 +212,67 @@ function SupportTickets() {
   }
 
   // ── Status workflow (admin) ────────────────────────────────────────────────
-  // Updates DB, then optimistically updates local state. If the new bucket is
-  // pending or completed AND the previous bucket was different, fire the
-  // notification email so the reporter knows. Mirrors Admin > Feedback Inbox.
-  async function moveToBucket(row, targetBucket) {
-    const newDbStatus = BUCKET_TO_DB[targetBucket]
-    if (!newDbStatus) return
-    const prevBucket = bucketOf(row.status)
-    if (prevBucket === targetBucket && row.status === newDbStatus) return
+  // Status changes always go through StatusChangeModal so the admin can add
+  // numbered notes before committing. Direct flips (without the modal) would
+  // be too easy to do by accident and would skip the email-with-notes flow.
+  function requestMove(row, targetBucket) {
+    // No-op if they clicked the bucket they're already in.
+    if (bucketOf(row.status) === targetBucket) return
+    setPendingChange({ ticket: row, targetBucket })
+  }
+
+  function requestAddNote(row) {
+    setPendingChange({ ticket: row, targetBucket: null })
+  }
+
+  // Commits both the appended notes AND (optionally) the new status. Called
+  // from StatusChangeModal.onSaved with the already-serialized admin_notes
+  // text plus optional targetBucket. Sends the notification email only when
+  // status actually changed to pending or completed.
+  async function commitChange({ admin_notes, targetBucket }) {
+    if (!pendingChange) return
+    const row = pendingChange.ticket
+    const updates = { admin_notes }
+    const newDbStatus = targetBucket ? BUCKET_TO_DB[targetBucket] : null
+    if (newDbStatus) updates.status = newDbStatus
 
     // Optimistic UI
-    setTickets(prev => prev.map(r => r.id === row.id ? { ...r, status: newDbStatus } : r))
+    setTickets(prev => prev.map(r => r.id === row.id ? { ...r, ...updates } : r))
+
     try {
-      await supabase.from('feature_requests')
-        .update({ status: newDbStatus }).eq('id', row.id)
+      await supabase.from('feature_requests').update(updates).eq('id', row.id)
     } catch (err) {
-      console.warn('[Help] status update failed', err)
-      // Roll back optimistic update so the UI matches DB.
-      setTickets(prev => prev.map(r => r.id === row.id ? { ...r, status: row.status } : r))
+      console.warn('[Help] ticket update failed', err)
+      // Roll back optimistic update so UI matches DB.
+      setTickets(prev => prev.map(r => r.id === row.id ? row : r))
       return
     }
 
-    // Notify reporter on transition to pending or completed
-    if (prevBucket === targetBucket) return  // bucket unchanged → no email
-    if (!['pending', 'completed'].includes(targetBucket)) return
-    try {
-      let toEmail = userMap[row.user_id]?.email
-      if (!toEmail && row.user_id) {
-        const { data: prof } = await supabase
-          .from('profiles').select('email').eq('id', row.user_id).maybeSingle()
-        toEmail = prof?.email
+    // Email only on a real bucket transition to pending or completed.
+    if (newDbStatus && ['pending','completed'].includes(targetBucket)
+        && bucketOf(row.status) !== targetBucket) {
+      try {
+        let toEmail = userMap[row.user_id]?.email
+        if (!toEmail && row.user_id) {
+          const { data: prof } = await supabase
+            .from('profiles').select('email').eq('id', row.user_id).maybeSingle()
+          toEmail = prof?.email
+        }
+        if (toEmail) {
+          await sendFeedbackStatusEmail({
+            to:      toEmail,
+            title:   row.title || 'your request',
+            status:  newDbStatus,
+            notes:   admin_notes || '',
+            helpUrl: `${window.location.origin}/help`,
+          })
+        }
+      } catch (err) {
+        console.warn('[Help] status email failed', err)
       }
-      if (!toEmail) return
-      await sendFeedbackStatusEmail({
-        to:      toEmail,
-        title:   row.title || 'your request',
-        status:  newDbStatus,
-        notes:   row.admin_notes || '',
-        helpUrl: `${window.location.origin}/help`,
-      })
-    } catch (err) {
-      console.warn('[Help] status email failed', err)
     }
+
+    setPendingChange(null)
   }
 
   async function handleCreated() {
@@ -329,7 +387,8 @@ function SupportTickets() {
                     reporterEmail={reporter?.email}
                     isOpen={isOpen}
                     onToggle={() => setExpanded(isOpen ? null : r.id)}
-                    onMove={moveToBucket}
+                    onRequestMove={requestMove}
+                    onRequestAddNote={requestAddNote}
                   />
                 )
               })}
@@ -349,6 +408,15 @@ function SupportTickets() {
           userId={user?.id}
         />
       )}
+
+      {pendingChange && (
+        <StatusChangeModal
+          ticket={pendingChange.ticket}
+          targetBucket={pendingChange.targetBucket}
+          onClose={() => setPendingChange(null)}
+          onSaved={commitChange}
+        />
+      )}
     </div>
   )
 }
@@ -356,7 +424,7 @@ function SupportTickets() {
 // ── Single ticket row + expandable detail ────────────────────────────────────
 function SupportRow({
   row, dateStr, isAdmin, showReporter, reporterName, reporterEmail,
-  isOpen, onToggle, onMove,
+  isOpen, onToggle, onRequestMove, onRequestAddNote,
 }) {
   const r = row
   const bucket = bucketOf(r.status)
@@ -406,15 +474,26 @@ function SupportRow({
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-4 mb-1">
                   Notes from the team
                 </p>
-                {r.admin_notes ? (
-                  <p className="text-sm text-gray-800 whitespace-pre-wrap bg-white border border-gray-200 rounded-lg p-3">
-                    {r.admin_notes}
-                  </p>
-                ) : (
-                  <p className="text-sm text-gray-400 italic bg-white border border-dashed border-gray-200 rounded-lg p-3">
-                    No notes yet. The team will add notes here when they update the status.
-                  </p>
-                )}
+                {(() => {
+                  const list = parseNotes(r.admin_notes)
+                  if (list.length === 0) {
+                    return (
+                      <p className="text-sm text-gray-400 italic bg-white border border-dashed border-gray-200 rounded-lg p-3">
+                        No notes yet. The team will add notes here when they update the status.
+                      </p>
+                    )
+                  }
+                  return (
+                    <div className="bg-white border border-gray-200 rounded-lg p-3 space-y-2">
+                      {list.map((n, i) => (
+                        <div key={i} className="text-sm text-gray-800 flex gap-2">
+                          <span className="font-semibold text-gray-500 flex-shrink-0">{i + 1}.</span>
+                          <span className="whitespace-pre-wrap">{n}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })()}
               </div>
 
               <div className="space-y-3">
@@ -427,7 +506,9 @@ function SupportRow({
                   <DetailLine label="Last update" value={new Date(r.updated_at).toLocaleString()} />
                 )}
 
-                {/* Admin status workflow buttons */}
+                {/* Admin status workflow buttons. Clicking opens
+                    StatusChangeModal where the admin can add numbered notes
+                    before committing. Save → status + notes + email. */}
                 {isAdmin && (
                   <div className="pt-3 mt-2 border-t border-gray-200">
                     <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
@@ -440,7 +521,7 @@ function SupportRow({
                           <button
                             key={b}
                             disabled={active}
-                            onClick={() => onMove(r, b)}
+                            onClick={() => onRequestMove(r, b)}
                             className={`text-xs font-semibold px-2.5 py-1 rounded-md border transition-colors ${
                               active
                                 ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-default'
@@ -452,11 +533,18 @@ function SupportRow({
                         )
                       })}
                     </div>
-                    {bucket !== 'completed' && (
-                      <p className="text-[10px] text-gray-400 mt-2 leading-snug">
-                        Moving to Pending or Completed emails the reporter.
-                      </p>
-                    )}
+                    {/* Always-available note button for the current status. */}
+                    <div className="mt-2" onClick={e => e.stopPropagation()}>
+                      <button
+                        onClick={() => onRequestAddNote(r)}
+                        className="text-xs font-semibold text-green-800 hover:text-green-900 hover:underline"
+                      >
+                        + Add note (no status change)
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-2 leading-snug">
+                      Moving to Pending or Completed emails the reporter with the latest notes.
+                    </p>
                   </div>
                 )}
               </div>
@@ -622,6 +710,193 @@ function NewTicketModal({ onClose, onCreated, userId }) {
             style={{ backgroundColor: FG }}
             className="text-xs font-semibold text-white px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50">
             {saving ? 'Submitting…' : 'Submit Ticket'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── StatusChangeModal ────────────────────────────────────────────────────────
+// Opened when the admin clicks a "Move to X" button OR the "Add Note" link
+// on an expanded ticket row. Shows the existing numbered notes (read-only),
+// lets the admin queue any number of new notes, and on Save commits the
+// merged note list along with the (optional) status change. The Email is
+// sent by the parent's commitChange handler — not from inside the modal.
+//
+// Props:
+//   ticket        — the row being edited
+//   targetBucket  — 'new' | 'pending' | 'completed' | null  (null = note-only)
+//   onClose       — close the modal without saving
+//   onSaved       — called with { admin_notes, targetBucket } on Save
+function StatusChangeModal({ ticket, targetBucket, onClose, onSaved }) {
+  // Snapshot existing notes once — they don't change while the modal is open.
+  const existing = parseNotes(ticket?.admin_notes || '')
+
+  // Queue of new notes being added in this session. Each entry is plain text.
+  const [queued, setQueued] = useState([])
+  const [draft,  setDraft]  = useState('')
+  const [saving, setSaving] = useState(false)
+  const [err,    setErr]    = useState('')
+
+  // "Add to list" — pushes the current draft onto queued and clears the
+  // textarea so the admin can type the next note. If the draft is empty,
+  // does nothing (no empty notes).
+  function pushDraft() {
+    const t = draft.trim()
+    if (!t) return
+    setQueued(prev => [...prev, t])
+    setDraft('')
+    if (err) setErr('')
+  }
+
+  function removeQueued(i) {
+    setQueued(prev => prev.filter((_, idx) => idx !== i))
+  }
+
+  async function save() {
+    setErr('')
+    // Auto-flush a non-empty draft so the admin doesn't have to remember to
+    // hit the + button before Save.
+    const finalQueued = [...queued]
+    const trimDraft = draft.trim()
+    if (trimDraft) finalQueued.push(trimDraft)
+
+    // When moving status, allow saving with zero new notes (status change
+    // alone is valid). When in note-only mode, require at least one new note
+    // — otherwise the modal is a no-op.
+    if (!targetBucket && finalQueued.length === 0) {
+      setErr('Add at least one note before saving.')
+      return
+    }
+
+    const merged = [...existing, ...finalQueued]
+    const admin_notes = serializeNotes(merged)
+
+    setSaving(true)
+    try {
+      await onSaved({ admin_notes, targetBucket })
+    } catch (e) {
+      setErr(e?.message || 'Save failed.')
+      setSaving(false)
+    }
+  }
+
+  const headerLabel = targetBucket
+    ? `Move to ${BUCKET_LABEL[targetBucket]}`
+    : 'Add Note'
+  const saveLabel = saving
+    ? 'Saving…'
+    : targetBucket && ['pending','completed'].includes(targetBucket)
+      ? 'Save & Email Reporter'
+      : 'Save'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+         onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl border border-gray-200 overflow-hidden"
+           onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-gray-100">
+          <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+            <span>📝</span> {headerLabel}
+          </h3>
+          <p className="text-xs text-gray-500 mt-1 truncate">{ticket.title}</p>
+        </div>
+
+        <div className="px-5 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+          {/* Existing notes (read-only) */}
+          {existing.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                Existing notes
+              </p>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-1.5">
+                {existing.map((t, i) => (
+                  <div key={i} className="text-sm text-gray-700 flex gap-2">
+                    <span className="font-semibold text-gray-500 flex-shrink-0">{i + 1}.</span>
+                    <span className="whitespace-pre-wrap">{t}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Queued new notes (with remove buttons) */}
+          {queued.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-2">
+                New notes (queued — will save)
+              </p>
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 space-y-1.5">
+                {queued.map((t, i) => (
+                  <div key={i} className="text-sm text-gray-800 flex items-start gap-2">
+                    <span className="font-semibold text-green-700 flex-shrink-0">
+                      {existing.length + i + 1}.
+                    </span>
+                    <span className="whitespace-pre-wrap flex-1">{t}</span>
+                    <button onClick={() => removeQueued(i)}
+                      className="text-xs text-gray-400 hover:text-red-600 flex-shrink-0"
+                      title="Remove this note">
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Draft input */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">
+              {targetBucket ? 'Add a note (optional)' : 'Add a note'}
+              <span className="text-gray-400 normal-case font-normal ml-1">
+                — will be #{existing.length + queued.length + 1}
+              </span>
+            </label>
+            <textarea
+              value={draft}
+              onChange={e => { setDraft(e.target.value); if (err) setErr('') }}
+              rows={3}
+              autoFocus
+              placeholder={targetBucket
+                ? "Optional note for the reporter (will be included in the email)…"
+                : "What's the update?"}
+              className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+            <div className="mt-1 flex justify-end">
+              <button
+                onClick={pushDraft}
+                disabled={!draft.trim()}
+                className="text-xs font-semibold text-green-800 hover:text-green-900 disabled:text-gray-300 disabled:cursor-not-allowed"
+              >
+                + Add another note
+              </button>
+            </div>
+          </div>
+
+          {targetBucket && ['pending','completed'].includes(targetBucket) && (
+            <div className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-snug">
+              When you save, the ticket status changes to <strong>{BUCKET_LABEL[targetBucket]}</strong> and the reporter is emailed with the full notes list.
+            </div>
+          )}
+
+          {err && (
+            <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {err}
+            </div>
+          )}
+        </div>
+
+        <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-end gap-2 bg-gray-50">
+          <button onClick={onClose}
+            className="text-xs font-semibold text-gray-600 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-white">
+            Cancel
+          </button>
+          <button onClick={save} disabled={saving}
+            style={{ backgroundColor: FG }}
+            className="text-xs font-semibold text-white px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50">
+            {saveLabel}
           </button>
         </div>
       </div>
