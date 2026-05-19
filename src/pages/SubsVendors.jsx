@@ -161,7 +161,12 @@ export default function SubsVendors() {
     const { error } = editSub
       ? await supabase.from('subs_vendors').update(payload).eq('id', editSub.id)
       : await supabase.from('subs_vendors').insert(payload)
-    if (error) { console.error(error); setError('Failed to save. Try again.'); setSaving(false); return }
+    if (error) {
+      console.error('subs_vendors save failed:', error)
+      setError(`Save failed: ${error.message}${error.details ? ' — ' + error.details : ''}`)
+      setSaving(false)
+      return
+    }
     setSaving(false)
     closeModal()
     fetchSubs()
