@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
+import RateEditPopover from '../RateEditPopover'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Walls Module — CMU Block | Poured In Place | Timber/Lumber
@@ -372,23 +373,27 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
   const [pricesLoading, setPricesLoading]   = useState(!initialData?.materialPrices)
 
+  // Re-fetch the merged labor+material rate map. Called once on mount and
+  // again after any RateEditPopover save so the calc reflects edits.
+  const refreshAllRates = useCallback(async () => {
+    const [matRes, labRes] = await Promise.all([
+      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Walls'),
+      supabase.from('labor_rates').select('name, rate').eq('category', 'Walls'),
+    ])
+    const p = {}
+    ;(matRes.data || []).forEach(row => { p[row.name] = parseFloat(row.unit_cost) || 0 })
+    ;(labRes.data  || []).forEach(row => { p[row.name] = parseFloat(row.rate)     || 0 })
+    setMaterialPrices(p)
+  }, [])
+
   useEffect(() => {
     if (!initialData?.laborRatePerHour) {
       supabase.from('company_settings').select('value').eq('key', 'labor_rate_per_hour').single()
         .then(({ data }) => { if (data) setLaborRatePerHour(parseFloat(data.value) || DEFAULTS.laborRatePerHour) })
     }
     if (initialData?.materialPrices) { setPricesLoading(false); return }
-    Promise.all([
-      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Walls'),
-      supabase.from('labor_rates').select('name, rate').eq('category', 'Walls'),
-    ]).then(([matRes, labRes]) => {
-      const p = {}
-      ;(matRes.data || []).forEach(row => { p[row.name] = parseFloat(row.unit_cost) || 0 })
-      ;(labRes.data  || []).forEach(row => { p[row.name] = parseFloat(row.rate)     || 0 })
-      setMaterialPrices(p)
-      setPricesLoading(false)
-    })
-  }, [])
+    refreshAllRates().then(() => setPricesLoading(false))
+  }, [refreshAllRates])
 
   const gpmd            = initialData?.gpmd            ?? DEFAULTS.gpmd
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
@@ -557,6 +562,54 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
         <div>
           <SectionHeader title="CMU Block Walls" />
 
+          {/* Inline CMU rate reference — labor + material — all editable */}
+          <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-2 text-[11px] text-gray-500">
+            <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">CMU Rates (click any to edit)</p>
+            <div className="flex flex-wrap gap-x-3 gap-y-1">
+              <span className="inline-flex items-center gap-1">Grey block ${r('greyBlock')}/ea
+                <RateEditPopover table="material_rates" name={WALL_RATES.greyBlock.db} category="Walls" unitLabel="ea" currentValue={r('greyBlock')} onSaved={refreshAllRates} />
+              </span>
+              <span className="inline-flex items-center gap-1">Bondbeam ${r('bondbeamBlock')}/ea
+                <RateEditPopover table="material_rates" name={WALL_RATES.bondbeamBlock.db} category="Walls" unitLabel="ea" currentValue={r('bondbeamBlock')} onSaved={refreshAllRates} />
+              </span>
+              <span className="inline-flex items-center gap-1">Rebar ${r('rebar')}/LF
+                <RateEditPopover table="material_rates" name={WALL_RATES.rebar.db} category="Walls" unitLabel="LF" currentValue={r('rebar')} onSaved={refreshAllRates} />
+              </span>
+              <span className="inline-flex items-center gap-1">Conc hand ${r('concreteHand')}/CY
+                <RateEditPopover table="material_rates" name={WALL_RATES.concreteHand.db} category="Walls" unitLabel="CY" currentValue={r('concreteHand')} onSaved={refreshAllRates} />
+              </span>
+              <span className="inline-flex items-center gap-1">Conc truck ${r('concreteTruck')}/CY
+                <RateEditPopover table="material_rates" name={WALL_RATES.concreteTruck.db} category="Walls" unitLabel="CY" currentValue={r('concreteTruck')} onSaved={refreshAllRates} />
+              </span>
+              <span className="inline-flex items-center gap-1">Grout pump setup ${r('groutPumpSetup')}
+                <RateEditPopover table="material_rates" name={WALL_RATES.groutPumpSetup.db} category="Walls" unitLabel="flat" currentValue={r('groutPumpSetup')} onSaved={refreshAllRates} />
+              </span>
+              <span className="inline-flex items-center gap-1">Grout pump ${r('groutPumpPerYd')}/CY
+                <RateEditPopover table="material_rates" name={WALL_RATES.groutPumpPerYd.db} category="Walls" unitLabel="CY" currentValue={r('groutPumpPerYd')} onSaved={refreshAllRates} />
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+              <span className="inline-flex items-center gap-1">Dig {r('digLab')} CF/hr
+                <RateEditPopover table="labor_rates" name={WALL_RATES.digLab.db} category="Walls" mode="coefficient" unitLabel="CF/hr" currentValue={r('digLab')} onSaved={refreshAllRates} />
+              </span>
+              <span className="inline-flex items-center gap-1">Rebar {r('rebarLab')} LF/hr
+                <RateEditPopover table="labor_rates" name={WALL_RATES.rebarLab.db} category="Walls" mode="coefficient" unitLabel="LF/hr" currentValue={r('rebarLab')} onSaved={refreshAllRates} />
+              </span>
+              <span className="inline-flex items-center gap-1">Block {r('blockLab')} blk/hr
+                <RateEditPopover table="labor_rates" name={WALL_RATES.blockLab.db} category="Walls" mode="coefficient" unitLabel="blk/hr" currentValue={r('blockLab')} onSaved={refreshAllRates} />
+              </span>
+              <span className="inline-flex items-center gap-1">Hand grout {r('handGroutLab')} CF/hr
+                <RateEditPopover table="labor_rates" name={WALL_RATES.handGroutLab.db} category="Walls" mode="coefficient" unitLabel="CF/hr" currentValue={r('handGroutLab')} onSaved={refreshAllRates} />
+              </span>
+              <span className="inline-flex items-center gap-1">Pump grout {r('pumpGroutLab')} CF/hr
+                <RateEditPopover table="labor_rates" name={WALL_RATES.pumpGroutLab.db} category="Walls" mode="coefficient" unitLabel="CF/hr" currentValue={r('pumpGroutLab')} onSaved={refreshAllRates} />
+              </span>
+              <span className="inline-flex items-center gap-1">Setup/clean {r('setupCleanLab')} LF/hr
+                <RateEditPopover table="labor_rates" name={WALL_RATES.setupCleanLab.db} category="Walls" mode="coefficient" unitLabel="LF/hr" currentValue={r('setupCleanLab')} onSaved={refreshAllRates} />
+              </span>
+            </div>
+          </div>
+
           {cmuWalls.map((wall, idx) => (
             <CmuWallEntry
               key={idx}
@@ -592,7 +645,7 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
           {/* Waterproofing */}
           <div>
             <label className="block text-xs text-gray-500 mb-1 font-medium">Waterproofing</label>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <select className="input text-sm py-1.5 flex-1" value={wpType} onChange={e => setWpType(e.target.value)}>
                 <option>None</option>
                 <option>Primer &amp; Membrane</option>
@@ -602,6 +655,16 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
               </select>
               {wpType !== 'None' && <NumInput value={wpSF} onChange={setWpSF} placeholder="0" className="w-28" />}
               {wpType !== 'None' && <span className="text-xs text-gray-400 shrink-0">SF</span>}
+              {wpType !== 'None' && (() => {
+                const wpKey = { 'Primer & Membrane':'wpPrimerMembrane','3 Coats Roll On':'wp3CoatRollOn','Thoroseal & Roll On':'wpThoroseal','Dimple Membrane':'wpDimpleMembrane' }[wpType]
+                return wpKey ? (
+                  <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+                    ${r(wpKey).toFixed(2)}/SF
+                    <RateEditPopover table="material_rates" name={WALL_RATES[wpKey].db} category="Walls"
+                      unitLabel="SF" currentValue={r(wpKey)} onSaved={refreshAllRates} />
+                  </span>
+                ) : null
+              })()}
             </div>
           </div>
         </div>
@@ -611,6 +674,14 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
       {wallType === 'PIP' && (
         <div>
           <SectionHeader title="Poured In Place Walls" />
+
+          <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-2 text-[11px] text-gray-500">
+            <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">PIP Rate (click to edit)</p>
+            <span className="inline-flex items-center gap-1">Concrete truck ${r('concreteTruck')}/CY
+              <RateEditPopover table="material_rates" name={WALL_RATES.concreteTruck.db} category="Walls"
+                unitLabel="CY" currentValue={r('concreteTruck')} onSaved={refreshAllRates} />
+            </span>
+          </div>
 
           {pipWalls.map((wall, idx) => (
             <PipWallEntry
@@ -678,41 +749,69 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
           </thead>
           <tbody>
             {[
-              { label: 'Sand Stucco',        sf: sandStuccoSF,   setSf: setSandStuccoSF,   mat: calc.sandStuccoMat,   rate: `$${r('sandStucco').toFixed(2)}/SF` },
-              { label: 'Smooth Stucco',      sf: smoothStuccoSF, setSf: setSmoothStuccoSF, mat: calc.smoothStuccoMat, rate: `$${r('smoothStucco').toFixed(2)}/SF` },
-              { label: 'Ledgerstone Veneer', sf: ledgerstoneSF,  setSf: setLedgerstoneSF,  mat: calc.ledgerstoneMat,  rate: `$${r('ledgerstone').toFixed(2)}/SF` },
-              { label: 'Stacked Stone',      sf: stackedStoneSF, setSf: setStackedStoneSF, mat: calc.stackedStoneMat, rate: `$${r('stackedStone').toFixed(2)}/SF` },
-              { label: 'Tile',               sf: tileSF,         setSf: setTileSF,         mat: calc.tileMat,         rate: `$${r('tile').toFixed(2)}/SF` },
-            ].map(({ label, sf, setSf, mat, rate }) => (
+              { label: 'Sand Stucco',        sf: sandStuccoSF,   setSf: setSandStuccoSF,   mat: calc.sandStuccoMat,   matKey: 'sandStucco',   labKey: 'sandStuccoLab' },
+              { label: 'Smooth Stucco',      sf: smoothStuccoSF, setSf: setSmoothStuccoSF, mat: calc.smoothStuccoMat, matKey: 'smoothStucco', labKey: 'smoothStuccoLab' },
+              { label: 'Ledgerstone Veneer', sf: ledgerstoneSF,  setSf: setLedgerstoneSF,  mat: calc.ledgerstoneMat,  matKey: 'ledgerstone',  labKey: 'ledgerstoneLab' },
+              { label: 'Stacked Stone',      sf: stackedStoneSF, setSf: setStackedStoneSF, mat: calc.stackedStoneMat, matKey: 'stackedStone', labKey: 'stackedStoneLab' },
+              { label: 'Tile',               sf: tileSF,         setSf: setTileSF,         mat: calc.tileMat,         matKey: 'tile',         labKey: 'tileLab' },
+            ].map(({ label, sf, setSf, mat, matKey, labKey }) => (
               <tr key={label} className="border-b border-gray-100">
                 <td className="py-1 pr-2 text-xs text-gray-700">{label}</td>
                 <td className="py-1 pr-2"><NumInput value={sf} onChange={setSf} /></td>
-                <td className="py-1 pr-2 text-xs text-gray-400">{rate}</td>
+                <td className="py-1 pr-2 text-xs text-gray-400">
+                  <span className="inline-flex items-center gap-1 flex-wrap">
+                    ${r(matKey).toFixed(2)}/SF
+                    <RateEditPopover table="material_rates" name={WALL_RATES[matKey].db} category="Walls"
+                      unitLabel="SF" currentValue={r(matKey)} onSaved={refreshAllRates} />
+                    <RateEditPopover table="labor_rates" name={WALL_RATES[labKey].db} category="Walls"
+                      mode="coefficient" unitLabel="rate" currentValue={r(labKey)} onSaved={refreshAllRates} />
+                  </span>
+                </td>
                 <td className="py-1 text-right text-xs text-gray-600">{n(sf) > 0 ? `$${mat.toFixed(2)}` : '—'}</td>
               </tr>
             ))}
             <tr className="border-b border-gray-100">
-              <td className="py-1 pr-2 text-xs text-gray-700">Real Flagstone</td>
+              <td className="py-1 pr-2 text-xs text-gray-700">
+                <span className="inline-flex items-center gap-1">
+                  Real Flagstone
+                  <RateEditPopover table="labor_rates" name={WALL_RATES.flagstoneLab.db} category="Walls"
+                    mode="coefficient" unitLabel="rate" currentValue={r('flagstoneLab')} onSaved={refreshAllRates} />
+                </span>
+              </td>
               <td className="py-1 pr-2"><NumInput value={flagstoneSF} onChange={setFlagstoneSF} /></td>
               <td className="py-1 pr-2">
-                <div className="relative w-24">
-                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-                  <input type="number" step="any" min="0" className="input text-sm py-1.5 pl-5 w-full"
-                    placeholder={r('flagstone').toString()} value={flagstoneRateIn}
-                    onChange={e => setFlagstoneRateIn(e.target.value)} />
+                <div className="flex items-center gap-1">
+                  <div className="relative w-24">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                    <input type="number" step="any" min="0" className="input text-sm py-1.5 pl-5 w-full"
+                      placeholder={r('flagstone').toString()} value={flagstoneRateIn}
+                      onChange={e => setFlagstoneRateIn(e.target.value)} />
+                  </div>
+                  <RateEditPopover table="material_rates" name={WALL_RATES.flagstone.db} category="Walls"
+                    unitLabel="ton" currentValue={r('flagstone')} onSaved={refreshAllRates} />
                 </div>
               </td>
               <td className="py-1 text-right text-xs text-gray-600">{n(flagstoneSF) > 0 ? `$${calc.flagstoneMat.toFixed(2)}` : '—'}</td>
             </tr>
             <tr className="border-b border-gray-100">
-              <td className="py-1 pr-2 text-xs text-gray-700">Real Stone</td>
+              <td className="py-1 pr-2 text-xs text-gray-700">
+                <span className="inline-flex items-center gap-1">
+                  Real Stone
+                  <RateEditPopover table="labor_rates" name={WALL_RATES.realStoneLab.db} category="Walls"
+                    mode="coefficient" unitLabel="rate" currentValue={r('realStoneLab')} onSaved={refreshAllRates} />
+                </span>
+              </td>
               <td className="py-1 pr-2"><NumInput value={realStoneSF} onChange={setRealStoneSF} /></td>
               <td className="py-1 pr-2">
-                <div className="relative w-24">
-                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-                  <input type="number" step="any" min="0" className="input text-sm py-1.5 pl-5 w-full"
-                    placeholder={r('realStone').toString()} value={realStoneRateIn}
-                    onChange={e => setRealStoneRateIn(e.target.value)} />
+                <div className="flex items-center gap-1">
+                  <div className="relative w-24">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                    <input type="number" step="any" min="0" className="input text-sm py-1.5 pl-5 w-full"
+                      placeholder={r('realStone').toString()} value={realStoneRateIn}
+                      onChange={e => setRealStoneRateIn(e.target.value)} />
+                  </div>
+                  <RateEditPopover table="material_rates" name={WALL_RATES.realStone.db} category="Walls"
+                    unitLabel="ton" currentValue={r('realStone')} onSaved={refreshAllRates} />
                 </div>
               </td>
               <td className="py-1 text-right text-xs text-gray-600">{n(realStoneSF) > 0 ? `$${calc.realStoneMat.toFixed(2)}` : '—'}</td>
@@ -724,6 +823,20 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
       {/* ── Wall Caps ── */}
       <div>
         <SectionHeader title="Wall Caps" />
+        <p className="text-xs text-gray-400 mb-1 inline-flex items-center flex-wrap gap-x-2">
+          <span className="inline-flex items-center gap-1">Flagstone ${r('capFlagstone')}/ton
+            <RateEditPopover table="material_rates" name={WALL_RATES.capFlagstone.db} category="Walls"
+              unitLabel="ton" currentValue={r('capFlagstone')} onSaved={refreshAllRates} />
+          </span>·
+          <span className="inline-flex items-center gap-1">Precast ${r('capPrecast')}/ea
+            <RateEditPopover table="material_rates" name={WALL_RATES.capPrecast.db} category="Walls"
+              unitLabel="ea" currentValue={r('capPrecast')} onSaved={refreshAllRates} />
+          </span>·
+          <span className="inline-flex items-center gap-1">Bullnose ${r('capBullnose')}/LF
+            <RateEditPopover table="material_rates" name={WALL_RATES.capBullnose.db} category="Walls"
+              unitLabel="LF" currentValue={r('capBullnose')} onSaved={refreshAllRates} />
+          </span>
+        </p>
         <table className="w-full text-sm">
           <thead>
             <tr className="text-xs text-gray-500 border-b border-gray-200">

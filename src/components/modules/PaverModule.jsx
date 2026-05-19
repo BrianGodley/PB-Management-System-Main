@@ -35,11 +35,21 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
+import RateEditPopover from '../RateEditPopover'
 
 const n = v => parseFloat(v) || 0
 const sfToTons = (sf, depthIn) => (n(sf) / 200) * n(depthIn)
 
 const BASE_METHODS = ['Skid Good', 'Skid OK', 'Mini Skid', 'Hand']
+
+// Each base-install method maps to a labor_rates row so the inline calculator
+// icon next to the method dropdown edits the correct t/hr rate.
+const BASE_METHOD_LABOR_NAME = {
+  'Skid Good': 'Paver - Base Skid Steer Good',
+  'Skid OK':   'Paver - Base Skid Steer OK',
+  'Mini Skid': 'Paver - Base Mini Skid Steer',
+  'Hand':      'Paver - Base Hand',
+}
 
 // ── Fallback constants (matched to seed SQL) ──────────────────────────────────
 const LABOR_DEFAULTS = {
@@ -398,6 +408,17 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
   const [paverPrices,      setPaverPrices]      = useState(initialData?.paverPrices    || [])
   const [loading,          setLoading]          = useState(true)
 
+  // Re-fetch all Paver rate maps. Called once on mount and again whenever the
+  // user saves an edit from a RateEditPopover so the calc picks up the change.
+  const refreshAllRates = useCallback(async () => {
+    const [lrRes, mrRes] = await Promise.all([
+      supabase.from('labor_rates').select('name,rate').eq('category', 'Paver'),
+      supabase.from('material_rates').select('name,unit_cost').eq('category', 'Paver'),
+    ])
+    if (lrRes.data) { const m = {}; lrRes.data.forEach(r => { m[r.name] = parseFloat(r.rate) }); setLaborRates(m) }
+    if (mrRes.data) { const m = {}; mrRes.data.forEach(r => { m[r.name] = parseFloat(r.unit_cost) }); setMaterialRates(m) }
+  }, [])
+
   useEffect(() => {
     let gone = false
     ;(async () => {
@@ -409,20 +430,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
               if (!gone && data?.labor_rate_per_hour != null)
                 setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || 35)
             }),
-        // Paver labor rates — always fresh
-        supabase.from('labor_rates').select('name,rate').eq('category', 'Paver')
-          .then(({ data }) => {
-            if (!gone && data) {
-              const m = {}; data.forEach(r => { m[r.name] = parseFloat(r.rate) }); setLaborRates(m)
-            }
-          }),
-        // Paver material rates — always fresh
-        supabase.from('material_rates').select('name,unit_cost').eq('category', 'Paver')
-          .then(({ data }) => {
-            if (!gone && data) {
-              const m = {}; data.forEach(r => { m[r.name] = parseFloat(r.unit_cost) }); setMaterialRates(m)
-            }
-          }),
+        refreshAllRates(),
         // Paver prices catalog — always fresh
         supabase.from('paver_prices').select('brand,name,price_per_sf,sf_per_pallet,price_per_lf_vert')
           .order('brand').order('name')
@@ -433,7 +441,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       if (!gone) setLoading(false)
     })()
     return () => { gone = true }
-  }, [])
+  }, [refreshAllRates])
 
   const set    = useCallback((f, v) => setState(p => ({ ...p, [f]: v })), [])
   const setRow = useCallback((sec, i, f, v) => setState(p => {
@@ -535,14 +543,28 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
 
       {/* ── Paver Material ──────────────────────────────────────────────────────── */}
       <div>
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2">
-          Paver Material
+        <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2">
+          <span>Paver Material</span>
           {calc.totalInstallSF > 0 && (
-            <span className="ml-2 font-normal normal-case text-gray-400">
+            <span className="font-normal normal-case text-gray-400">
               {calc.totalInstallSF.toLocaleString()} SF total · {calc.totalBaseTons.toFixed(1)} tons base
             </span>
           )}
-        </p>
+          <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
+            · Base rock ${calc.baseRockPerTon}/ton
+            <RateEditPopover table="material_rates" name="Paver - Base Rock" category="Paver"
+              unitLabel="ton" currentValue={calc.baseRockPerTon} onSaved={refreshAllRates} />
+            · Bedding sand ${calc.beddingSandPerTon}/ton
+            <RateEditPopover table="material_rates" name="Paver - Bedding Sand" category="Paver"
+              unitLabel="ton" currentValue={calc.beddingSandPerTon} onSaved={refreshAllRates} />
+            · Joint sand ${calc.jointSandPerSF}/SF
+            <RateEditPopover table="material_rates" name="Paver - Joint Sand" category="Paver"
+              unitLabel="SF" currentValue={calc.jointSandPerSF} onSaved={refreshAllRates} />
+            · Pallet ${calc.palletCharge}
+            <RateEditPopover table="material_rates" name="Paver - Pallet Charge" category="Paver"
+              unitLabel="pallet" currentValue={calc.palletCharge} onSaved={refreshAllRates} />
+          </span>
+        </div>
         <table className="w-full text-xs">
           <TH cols={[
             { label: 'Area',         w: 'w-20' },
@@ -559,6 +581,12 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           <tbody className="divide-y divide-gray-50">
             {state.areaRows.map((row, i) => {
               const a = calc.areas[i] || {}
+              const baseRate = (
+                row.method === 'Skid Good' ? calc.baseBobcatGood :
+                row.method === 'Skid OK'   ? calc.baseBobcatOK   :
+                row.method === 'Mini Skid' ? calc.baseMiniBobcat :
+                                             calc.baseHand
+              )
               return (
                 <tr key={i}>
                   <td className={td}>
@@ -569,7 +597,13 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                     <Inp value={row.sf} onChange={e => setRow('areaRows', i, 'sf', e.target.value)} />
                   </td>
                   <td className={td}>
-                    <Sel value={row.method} onChange={e => setRow('areaRows', i, 'method', e.target.value)} options={BASE_METHODS} />
+                    <div className="flex items-center gap-1">
+                      <div className="flex-1 min-w-0">
+                        <Sel value={row.method} onChange={e => setRow('areaRows', i, 'method', e.target.value)} options={BASE_METHODS} />
+                      </div>
+                      <RateEditPopover table="labor_rates" name={BASE_METHOD_LABOR_NAME[row.method]} category="Paver"
+                        mode="coefficient" unitLabel="t/hr" currentValue={baseRate} onSaved={refreshAllRates} />
+                    </div>
                   </td>
                   <td className={td}>
                     <Inp value={row.depth} onChange={e => setRow('areaRows', i, 'depth', e.target.value)} placeholder="6" />
@@ -604,7 +638,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         </p>
         <table className="w-full text-xs">
           <TH cols={[
-            { label: 'Operation', w: 'w-56' },
+            { label: 'Operation', w: 'w-72' },
             { label: 'Qty / LF / SF', w: 'w-32' },
             { label: 'Labor Hrs', w: 'w-24' },
             { label: 'Notes' },
@@ -612,7 +646,11 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           <tbody className="divide-y divide-gray-50">
             <tr>
               <td className={`${td} font-medium text-gray-700`}>
-                Install <span className="text-gray-400 font-normal">({calc.installRate} SF/hr)</span>
+                <span className="inline-flex items-center gap-1">
+                  Install <span className="text-gray-400 font-normal">({calc.installRate} SF/hr)</span>
+                  <RateEditPopover table="labor_rates" name="Paver - Install" category="Paver"
+                    mode="coefficient" unitLabel="SF/hr" currentValue={calc.installRate} onSaved={refreshAllRates} />
+                </span>
               </td>
               <td className={`${num} text-gray-500`}>{calc.totalInstallSF > 0 ? calc.totalInstallSF.toLocaleString() : '—'} SF</td>
               <td className={num}>{fh(calc.installHrs)}</td>
@@ -621,7 +659,11 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             {state.is80mm && (
               <tr>
                 <td className={`${td} font-medium text-gray-700`}>
-                  80mm Add <span className="text-gray-400 font-normal">({(calc.add80mmMult * 100 || LABOR_DEFAULTS.add80mm * 100).toFixed(0)}% penalty)</span>
+                  <span className="inline-flex items-center gap-1">
+                    80mm Add <span className="text-gray-400 font-normal">(+15% penalty)</span>
+                    <RateEditPopover table="labor_rates" name="Paver - 80mm Add" category="Paver"
+                      mode="coefficient" unitLabel="× SF/install" currentValue={laborRates['Paver - 80mm Add'] ?? LABOR_DEFAULTS.add80mm} onSaved={refreshAllRates} />
+                  </span>
                 </td>
                 <td className={`${num} text-gray-500`}>{calc.totalInstallSF > 0 ? calc.totalInstallSF.toLocaleString() : '—'} SF</td>
                 <td className={num}>{fh(calc.add80mmHrs)}</td>
@@ -629,14 +671,25 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
               </tr>
             )}
             {[
-              { label: 'Straight Cut', rate: calc.straightCutRate, key: 'straightCutLF', hrs: calc.straightCutHrs, unit: 'LF' },
-              { label: 'Curved Cut',   rate: calc.curvedCutRate,   key: 'curvedCutLF',   hrs: calc.curvedCutHrs,   unit: 'LF' },
-              { label: 'Restraints',   rate: calc.restraintRate,   key: 'restraintsLF',  hrs: calc.restraintsHrs,  unit: 'LF' },
-              { label: 'Sleeves',      rate: calc.sleevesRate,     key: 'sleevesLF',     hrs: calc.sleevesHrs,     unit: 'LF' },
-            ].map(({ label, rate, key, hrs, unit }) => (
+              { label: 'Straight Cut', rate: calc.straightCutRate, key: 'straightCutLF', hrs: calc.straightCutHrs, unit: 'LF', rateName: 'Paver - Straight Cut' },
+              { label: 'Curved Cut',   rate: calc.curvedCutRate,   key: 'curvedCutLF',   hrs: calc.curvedCutHrs,   unit: 'LF', rateName: 'Paver - Curved Cut' },
+              { label: 'Restraints',   rate: calc.restraintRate,   key: 'restraintsLF',  hrs: calc.restraintsHrs,  unit: 'LF', rateName: 'Paver - Restraints', matName: 'Paver - Restraint Concrete', matRate: calc.restraintConcrLF, matUnit: 'LF' },
+              { label: 'Sleeves',      rate: calc.sleevesRate,     key: 'sleevesLF',     hrs: calc.sleevesHrs,     unit: 'LF', rateName: 'Paver - Sleeves',    matName: 'Paver - Sleeves',           matRate: calc.sleevesMatLF,    matUnit: 'LF' },
+            ].map(({ label, rate, key, hrs, unit, rateName, matName, matRate, matUnit }) => (
               <tr key={key}>
                 <td className={`${td} font-medium text-gray-700`}>
-                  {label} <span className="text-gray-400 font-normal">({rate} {unit}/hr)</span>
+                  <span className="inline-flex items-center gap-1 flex-wrap">
+                    {label} <span className="text-gray-400 font-normal">({rate} {unit}/hr)</span>
+                    <RateEditPopover table="labor_rates" name={rateName} category="Paver"
+                      mode="coefficient" unitLabel={`${unit}/hr`} currentValue={rate} onSaved={refreshAllRates} />
+                    {matName && (
+                      <>
+                        <span className="text-gray-400 font-normal">· ${matRate}/{matUnit} mat</span>
+                        <RateEditPopover table="material_rates" name={matName} category="Paver"
+                          unitLabel={matUnit} currentValue={matRate} onSaved={refreshAllRates} />
+                      </>
+                    )}
+                  </span>
                 </td>
                 <td className={td}>
                   <Inp value={state[key]} onChange={e => set(key, e.target.value)} placeholder="0" />
@@ -647,7 +700,11 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             ))}
             <tr>
               <td className={`${td} font-medium text-gray-700`}>
-                Stones <span className="text-gray-400 font-normal">({calc.addStonePer ?? LABOR_DEFAULTS.addStone} hrs/ea)</span>
+                <span className="inline-flex items-center gap-1">
+                  Stones <span className="text-gray-400 font-normal">({laborRates['Paver - Stone Add'] ?? LABOR_DEFAULTS.addStone} hrs/ea)</span>
+                  <RateEditPopover table="labor_rates" name="Paver - Stone Add" category="Paver"
+                    mode="coefficient" unitLabel="hrs/ea" currentValue={laborRates['Paver - Stone Add'] ?? LABOR_DEFAULTS.addStone} onSaved={refreshAllRates} />
+                </span>
               </td>
               <td className={td}>
                 <Inp value={state.numStones} onChange={e => set('numStones', e.target.value)} placeholder="0" />
@@ -657,7 +714,11 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             </tr>
             <tr>
               <td className={`${td} font-medium text-gray-700`}>
-                Colors <span className="text-gray-400 font-normal">({calc.addColorPer ?? LABOR_DEFAULTS.addColor} hrs/ea)</span>
+                <span className="inline-flex items-center gap-1">
+                  Colors <span className="text-gray-400 font-normal">({laborRates['Paver - Color Add'] ?? LABOR_DEFAULTS.addColor} hrs/ea)</span>
+                  <RateEditPopover table="labor_rates" name="Paver - Color Add" category="Paver"
+                    mode="coefficient" unitLabel="hrs/ea" currentValue={laborRates['Paver - Color Add'] ?? LABOR_DEFAULTS.addColor} onSaved={refreshAllRates} />
+                </span>
               </td>
               <td className={td}>
                 <Inp value={state.numColors} onChange={e => set('numColors', e.target.value)} placeholder="0" />
@@ -668,7 +729,14 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             {state.polySand && (
               <tr>
                 <td className={`${td} font-medium text-gray-700`}>
-                  Poly Sand Spread <span className="text-gray-400 font-normal">(0.004 hrs/SF)</span>
+                  <span className="inline-flex items-center gap-1 flex-wrap">
+                    Poly Sand Spread <span className="text-gray-400 font-normal">({laborRates['Paver - Poly Sand Spread'] ?? LABOR_DEFAULTS.polySandSpread} hrs/SF)</span>
+                    <RateEditPopover table="labor_rates" name="Paver - Poly Sand Spread" category="Paver"
+                      mode="coefficient" unitLabel="hrs/SF" currentValue={laborRates['Paver - Poly Sand Spread'] ?? LABOR_DEFAULTS.polySandSpread} onSaved={refreshAllRates} />
+                    <span className="text-gray-400 font-normal">· ${calc.polySandPerSF}/SF mat</span>
+                    <RateEditPopover table="material_rates" name="Paver - Poly Sand" category="Paver"
+                      unitLabel="SF" currentValue={calc.polySandPerSF} onSaved={refreshAllRates} />
+                  </span>
                 </td>
                 <td className={`${num} text-gray-500`}>{calc.totalInstallSF > 0 ? calc.totalInstallSF.toLocaleString() : '—'} SF</td>
                 <td className={num}>{fh(calc.polySandHrs)}</td>
@@ -677,7 +745,14 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             )}
             <tr>
               <td className={`${td} font-medium text-gray-700`}>
-                Sealer <span className="text-gray-400 font-normal">({calc.sealerRate} SF/hr)</span>
+                <span className="inline-flex items-center gap-1 flex-wrap">
+                  Sealer <span className="text-gray-400 font-normal">({calc.sealerRate} SF/hr)</span>
+                  <RateEditPopover table="labor_rates" name="Paver - Sealer" category="Paver"
+                    mode="coefficient" unitLabel="SF/hr" currentValue={calc.sealerRate} onSaved={refreshAllRates} />
+                  <span className="text-gray-400 font-normal">· ${calc.sealerMatPerSF}/SF mat</span>
+                  <RateEditPopover table="material_rates" name="Paver - Sealer" category="Paver"
+                    unitLabel="SF" currentValue={calc.sealerMatPerSF} onSaved={refreshAllRates} />
+                </span>
               </td>
               <td className={td}>
                 <Inp value={state.sealerSF} onChange={e => set('sealerSF', e.target.value)} placeholder="0 SF" />
@@ -691,10 +766,15 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
 
       {/* ── Vertical Soldier Course ───────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <SecHdr
-          title="Vertical Soldier Course"
-          sub={`${calc.vertSoldierRate} LF/hr — paver priced $/LF (price_per_lf_vert)`}
-        />
+        <div className="col-span-full flex items-center flex-wrap gap-x-2 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-1">
+          <span>Vertical Soldier Course</span>
+          <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
+            {calc.vertSoldierRate} LF/hr
+            <RateEditPopover table="labor_rates" name="Paver - Vertical Soldier" category="Paver"
+              mode="coefficient" unitLabel="LF/hr" currentValue={calc.vertSoldierRate} onSaved={refreshAllRates} />
+            — paver priced $/LF (price_per_lf_vert)
+          </span>
+        </div>
         <div>
           <p className="text-xs text-gray-500 mb-0.5">Vertical Soldier LF</p>
           <Inp value={state.vertSoldierLF} onChange={e => set('vertSoldierLF', e.target.value)} />
@@ -732,11 +812,15 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           <Inp value={state.shippingCharge} onChange={e => set('shippingCharge', e.target.value)} step="1" />
         </div>
         <div className="flex flex-col gap-2 justify-center pt-4">
-          <Toggle
-            checked={state.includeDelivery}
-            onChange={v => set('includeDelivery', v)}
-            label={`Delivery (${fmt2(calc.deliveryFlat)} flat)`}
-          />
+          <div className="flex items-center gap-1">
+            <Toggle
+              checked={state.includeDelivery}
+              onChange={v => set('includeDelivery', v)}
+              label={`Delivery (${fmt2(calc.deliveryFlat)} flat)`}
+            />
+            <RateEditPopover table="material_rates" name="Paver - Delivery" category="Paver"
+              unitLabel="flat" currentValue={calc.deliveryFlat} onSaved={refreshAllRates} />
+          </div>
         </div>
       </div>
 

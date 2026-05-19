@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
+import RateEditPopover from '../RateEditPopover'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Steps Module
@@ -178,6 +179,17 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
   const [paverPrices,   setPaverPrices]   = useState(initialData?.paverPrices   || [])
   const [loading,       setLoading]       = useState(true)
 
+  // Re-fetch Steps rate maps. Called once on mount and again after any
+  // RateEditPopover save so the calc picks up the change immediately.
+  const refreshAllRates = useCallback(async () => {
+    const [lrRes, mrRes] = await Promise.all([
+      supabase.from('labor_rates').select('name, rate').eq('category', 'Steps'),
+      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Steps'),
+    ])
+    if (lrRes.data) { const m = {}; lrRes.data.forEach(r => { m[r.name] = parseFloat(r.rate) }); setLaborRates(m) }
+    if (mrRes.data) { const m = {}; mrRes.data.forEach(r => { m[r.name] = parseFloat(r.unit_cost) }); setMaterialRates(m) }
+  }, [])
+
   useEffect(() => {
     let gone = false
     Promise.all([
@@ -187,28 +199,13 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
             if (!gone && data?.labor_rate_per_hour != null)
               setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
           }),
-      supabase.from('labor_rates').select('name, rate').eq('category', 'Steps')
-        .then(({ data }) => {
-          if (!gone && data) {
-            const m = {}
-            data.forEach(r => { m[r.name] = parseFloat(r.rate) })
-            setLaborRates(m)
-          }
-        }),
-      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Steps')
-        .then(({ data }) => {
-          if (!gone && data) {
-            const m = {}
-            data.forEach(r => { m[r.name] = parseFloat(r.unit_cost) })
-            setMaterialRates(m)
-          }
-        }),
+      refreshAllRates(),
       supabase.from('paver_prices').select('brand, name, price_per_sf, sf_per_pallet')
         .order('brand').order('name')
         .then(({ data }) => { if (!gone && data) setPaverPrices(data) }),
     ]).then(() => { if (!gone) setLoading(false) })
     return () => { gone = true }
-  }, [])
+  }, [refreshAllRates])
 
   const gpmd            = initialData?.gpmd            ?? DEFAULTS.gpmd
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
@@ -317,7 +314,11 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {/* Straight Steps */}
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Straight Steps (LF)</label>
+            <label className="block text-xs text-gray-500 mb-1 inline-flex items-center gap-1">
+              Straight Steps (LF) — {calc.straightRate} LF/hr
+              <RateEditPopover table="labor_rates" name="Steps - Straight" category="Steps"
+                mode="coefficient" unitLabel="LF/hr" currentValue={calc.straightRate} onSaved={refreshAllRates} />
+            </label>
             <NumInput value={straightLF} onChange={setStraightLF} placeholder="0" />
             {calc.straightHrs > 0 && (
               <p className="text-xs text-gray-400 mt-0.5">{calc.straightHrs.toFixed(2)} hrs</p>
@@ -326,7 +327,11 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
 
           {/* Curved Steps */}
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Curved Steps (LF)</label>
+            <label className="block text-xs text-gray-500 mb-1 inline-flex items-center gap-1">
+              Curved Steps (LF) — {calc.curvedRate} LF/hr
+              <RateEditPopover table="labor_rates" name="Steps - Curved" category="Steps"
+                mode="coefficient" unitLabel="LF/hr" currentValue={calc.curvedRate} onSaved={refreshAllRates} />
+            </label>
             <NumInput value={curvedLF} onChange={setCurvedLF} placeholder="0" />
             {calc.curvedHrs > 0 && (
               <p className="text-xs text-gray-400 mt-0.5">{calc.curvedHrs.toFixed(2)} hrs</p>
@@ -379,16 +384,31 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
           title="Concrete Steps"
           sub={`straight ${calc.concStraightRate} LF/hr · curved ${calc.concCurvedRate} LF/hr · $${calc.concMatPerLF}/LF mat`}
         />
+        <div className="flex items-center gap-2 mb-2 -mt-1 flex-wrap text-xs text-gray-400">
+          <span className="inline-flex items-center gap-1">
+            Material ${calc.concMatPerLF}/LF
+            <RateEditPopover table="material_rates" name="Steps - Concrete" category="Steps"
+              unitLabel="LF" currentValue={calc.concMatPerLF} onSaved={refreshAllRates} />
+          </span>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Straight Steps (LF)</label>
+            <label className="block text-xs text-gray-500 mb-1 inline-flex items-center gap-1">
+              Straight Steps (LF) — {calc.concStraightRate} LF/hr
+              <RateEditPopover table="labor_rates" name="Steps - Concrete Straight" category="Steps"
+                mode="coefficient" unitLabel="LF/hr" currentValue={calc.concStraightRate} onSaved={refreshAllRates} />
+            </label>
             <NumInput value={concStraightLF} onChange={setConcStraightLF} placeholder="0" />
             {calc.concStraightHrs > 0 && (
               <p className="text-xs text-gray-400 mt-0.5">{calc.concStraightHrs.toFixed(2)} hrs</p>
             )}
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Curved Steps (LF)</label>
+            <label className="block text-xs text-gray-500 mb-1 inline-flex items-center gap-1">
+              Curved Steps (LF) — {calc.concCurvedRate} LF/hr
+              <RateEditPopover table="labor_rates" name="Steps - Concrete Curved" category="Steps"
+                mode="coefficient" unitLabel="LF/hr" currentValue={calc.concCurvedRate} onSaved={refreshAllRates} />
+            </label>
             <NumInput value={concCurvedLF} onChange={setConcCurvedLF} placeholder="0" />
             {calc.concCurvedHrs > 0 && (
               <p className="text-xs text-gray-400 mt-0.5">{calc.concCurvedHrs.toFixed(2)} hrs</p>
