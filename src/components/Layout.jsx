@@ -249,6 +249,16 @@ export default function Layout() {
               🛡️ <span className="hidden sm:inline">Admin</span>
             </Link>
 
+            {/* Help / Support — opens the user's tickets, docs, and videos. */}
+            <Link
+              to="/help"
+              style={isActive('/help') ? { backgroundColor: forestGreenDark } : {}}
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-white/80 hover:text-white hover:bg-black/20 transition-colors"
+              title="Help & Support"
+            >
+              🛟 <span className="hidden sm:inline">Help</span>
+            </Link>
+
             {/* User avatar dropdown — desktop only */}
             <div ref={userMenuRef} className="relative hidden md:block pl-3 ml-1 border-l border-white/20">
               <button

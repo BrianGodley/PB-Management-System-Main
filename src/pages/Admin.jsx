@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { sendWelcomeEmail, sendSMS } from '../lib/notify'
+import { sendWelcomeEmail, sendSMS, sendFeedbackStatusEmail } from '../lib/notify'
 import StartLocationsCard from '../components/StartLocationsCard'
 
 const FG = '#3A5038'
@@ -2757,8 +2757,48 @@ function FeedbackInbox() {
   }
 
   async function patch(id, fields) {
+    // Capture previous row BEFORE we mutate local state so we can detect a
+    // real status transition and grab the latest admin_notes for the email.
+    const prevRow = requests.find(r => r.id === id)
     setRequests(prev => prev.map(r => r.id === id ? { ...r, ...fields } : r))
     await supabase.from('feature_requests').update(fields).eq('id', id)
+
+    // ── Notify user when status flips to in_progress or done ────────────────
+    // Only fires on actual status transitions (not when admin_notes/priority
+    // are edited without changing status). Failures are swallowed so the
+    // admin UI never gets blocked by an email outage.
+    try {
+      const newStatus = fields.status
+      if (!newStatus) return
+      if (!['in_progress', 'done'].includes(newStatus)) return
+      if (prevRow && prevRow.status === newStatus) return  // no real change
+
+      // Resolve reporter email. userMap may already have it; otherwise fetch.
+      const reporterId = prevRow?.user_id
+      if (!reporterId) return
+      let toEmail = userMap[reporterId]?.email
+      if (!toEmail) {
+        const { data: prof } = await supabase
+          .from('profiles').select('email').eq('id', reporterId).maybeSingle()
+        toEmail = prof?.email
+      }
+      if (!toEmail) return
+
+      // Use the latest admin_notes — if the admin is editing notes and status
+      // together, prefer the incoming value; otherwise fall back to existing.
+      const notes = ('admin_notes' in fields ? fields.admin_notes : prevRow?.admin_notes) || ''
+      const helpUrl = `${window.location.origin}/help`
+
+      await sendFeedbackStatusEmail({
+        to:      toEmail,
+        title:   prevRow?.title || 'your request',
+        status:  newStatus,
+        notes,
+        helpUrl,
+      })
+    } catch (err) {
+      console.warn('[FeedbackInbox] status email failed', err)
+    }
   }
 
   async function remove(id) {

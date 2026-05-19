@@ -240,3 +240,44 @@ export async function sendJobSMS({ to, jobName, message }) {
     message: `[Job Tracker] ${jobName}: ${message}`,
   })
 }
+
+/**
+ * Feature/bug request status-change email.
+ * Sent when an admin moves a ticket to "in_progress" or "done".
+ * `notes` is the admin's triage note (rendered if present).
+ */
+export async function sendFeedbackStatusEmail({ to, title, status, notes, helpUrl }) {
+  const niceStatus = status === 'in_progress' ? 'In Progress' : status === 'done' ? 'Done' : status
+  const badgeColor = status === 'done'
+    ? { bg: '#f0fdf4', border: '#bbf7d0', text: '#166534' }
+    : { bg: '#faf5ff', border: '#e9d5ff', text: '#6b21a8' }
+  const subject = `Your request "${title}" is now ${niceStatus}`
+  const body = `
+    <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 12px;">
+      An update on the request you submitted:
+    </p>
+    <p style="color:#111827;font-size:16px;font-weight:600;margin:0 0 16px;">
+      ${title}
+    </p>
+    <div style="display:inline-block;background:${badgeColor.bg};border:1px solid ${badgeColor.border};
+                color:${badgeColor.text};padding:8px 20px;border-radius:8px;font-weight:700;font-size:15px;margin-bottom:16px;">
+      ${niceStatus}
+    </div>
+    ${notes ? `
+      <p style="color:#6b7280;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;margin:20px 0 6px;">
+        Notes from the team
+      </p>
+      <p style="color:#374151;font-size:14px;line-height:1.6;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px;white-space:pre-wrap;margin:0;">
+        ${notes.replace(/</g, '&lt;')}
+      </p>` : ''}
+    <p style="color:#6b7280;font-size:13px;margin:20px 0 0;">
+      You can see all your open and resolved requests in the Help section of PBS.
+    </p>`
+  const html = baseTemplate({
+    title: 'Request Update',
+    body,
+    buttonText: 'Open Help & Support',
+    buttonUrl: helpUrl || '#',
+  })
+  return sendEmail({ to, subject, html })
+}

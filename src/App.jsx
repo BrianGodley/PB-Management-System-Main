@@ -39,6 +39,7 @@ import DailyLogsPage from './pages/DailyLogsPage'
 import MasterEquipment from './pages/MasterEquipment'
 import EquipmentTracking from './pages/EquipmentTracking'
 import OrgChart from './pages/OrgChart'
+import Help from './pages/Help'
 
 function PortalPlaceholder({ label, icon }) {
   return (
@@ -112,6 +113,7 @@ function AppRoutes() {
         <Route path="master-equipment" element={<MasterEquipment />} />
         <Route path="equipment-tracking" element={<EquipmentTracking />} />
         <Route path="org-chart" element={<OrgChart />} />
+        <Route path="help" element={<Help />} />
       </Route>
     </Routes>
   )
