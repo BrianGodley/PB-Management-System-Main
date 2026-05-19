@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { generateBidDoc, downloadBidDoc } from '../lib/generateBidDoc'
+import { fetchGlobalGpmd, DEFAULT_ESTIMATE_GPMD } from '../lib/companyDefaults'
 import DrainageModule      from '../components/modules/DrainageModule'
 import DrainageSummary     from '../components/modules/DrainageSummary'
 import LightingModule      from '../components/modules/LightingModule'
@@ -134,6 +135,17 @@ export default function EstimateDetail() {
 
   // Per-project GPMD overrides  { [projectId]: number }
   const [projectGpmds, setProjectGpmds] = useState({})
+
+  // Global estimate GPMD baseline from company_settings. Used as the
+  // fallback when a module has no stored GPMD and the project has no
+  // override. Loaded once on mount; defaults to DEFAULT_ESTIMATE_GPMD until
+  // the fetch completes so first paint has a sane number.
+  const [globalGpmd, setGlobalGpmd] = useState(DEFAULT_ESTIMATE_GPMD)
+  useEffect(() => {
+    let alive = true
+    fetchGlobalGpmd().then(n => { if (alive) setGlobalGpmd(n) })
+    return () => { alive = false }
+  }, [])
 
   // Per-project sub GP markup rates  { [projectId]: number }
   const [projectSubRates, setProjectSubRates] = useState({})
@@ -756,7 +768,9 @@ export default function EstimateDetail() {
   // module or editing an existing one, regardless of what is stored in module.data.
   const moduleInitialData = {
     ...(editingModule?.data || {}),
-    gpmd: projectGpmds[selectedProject?.id] ?? (editingModule?.data?.gpmd ?? 425),
+    // Priority: per-project override → stored module GPMD → global default
+    // from company_settings.estimate_gpmd_default → hardcoded baseline.
+    gpmd: projectGpmds[selectedProject?.id] ?? (editingModule?.data?.gpmd ?? globalGpmd),
     // Sub GP rate always comes from the project — never from stored module data
     subGpMarkupRate: selectedProject?.sub_gp_markup_rate ?? 0.20,
   }
