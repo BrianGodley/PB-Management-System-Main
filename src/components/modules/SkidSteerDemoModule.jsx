@@ -600,7 +600,11 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel }) {
 
       {/* Misc Flat */}
       <div>
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2">Misc Flat Demo</p>
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2 inline-flex items-center gap-2">
+          <span>Misc Flat Demo — {calc.rateConc} t/hr</span>
+          <RateEditPopover table="labor_rates" name="Demo - Skid Steer Concrete/Dirt" category="Demo"
+            mode="coefficient" unitLabel="t/hr" currentValue={calc.rateConc} onSaved={refreshAllRates} />
+        </p>
         <table className="w-full text-xs">
           <TH cols={[{label:'Description'},{label:'SF',w:'w-24'},{label:'Depth (in)',w:'w-20'},{label:'Tons',w:'w-16'},{label:'Labor Hrs',w:'w-20'}]} />
           <tbody className="divide-y divide-gray-50">
@@ -620,7 +624,11 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel }) {
 
       {/* Misc Vertical */}
       <div>
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2">Misc Vertical / Structural Demo — LF × Height × Width</p>
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2 inline-flex items-center gap-2">
+          <span>Misc Vertical / Structural Demo — LF × Height × Width · {calc.rateConc} t/hr</span>
+          <RateEditPopover table="labor_rates" name="Demo - Skid Steer Concrete/Dirt" category="Demo"
+            mode="coefficient" unitLabel="t/hr" currentValue={calc.rateConc} onSaved={refreshAllRates} />
+        </p>
         <table className="w-full text-xs">
           <TH cols={[{label:'Description'},{label:'LF',w:'w-20'},{label:'H (in)',w:'w-18'},{label:'W (in)',w:'w-18'},{label:'Tons',w:'w-16'},{label:'Labor Hrs',w:'w-20'}]} />
           <tbody className="divide-y divide-gray-50">
@@ -641,7 +649,11 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel }) {
 
       {/* Footing */}
       <div>
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2">Footing Demo — SF × Depth</p>
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2 inline-flex items-center gap-2">
+          <span>Footing Demo — SF × Depth · {calc.rateConc} t/hr</span>
+          <RateEditPopover table="labor_rates" name="Demo - Skid Steer Concrete/Dirt" category="Demo"
+            mode="coefficient" unitLabel="t/hr" currentValue={calc.rateConc} onSaved={refreshAllRates} />
+        </p>
         <table className="w-full text-xs">
           <TH cols={[{label:'Description'},{label:'SF',w:'w-24'},{label:'Depth (in)',w:'w-20'},{label:'Tons',w:'w-16'},{label:'Labor Hrs',w:'w-20'}]} />
           <tbody className="divide-y divide-gray-50">
