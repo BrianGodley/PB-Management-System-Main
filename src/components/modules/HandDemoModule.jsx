@@ -13,6 +13,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
+import RateEditPopover from '../RateEditPopover'
 
 // ── Fallback constants ────────────────────────────────────────────────────────
 
@@ -330,6 +331,19 @@ export default function HandDemoModule({ initialData, onSave, onCancel }) {
   const [subRates,         setSubRates]         = useState(initialData?.subRates        || {})
   const [pricesLoading,    setPricesLoading]    = useState(!initialData?.materialPrices)
 
+  // Re-fetch all master-rate maps. Called once on mount and again whenever the
+  // user saves an edit from a RateEditPopover so the calc picks up the change.
+  const refreshAllRates = useCallback(async () => {
+    const [matRes, lrRes, srRes] = await Promise.all([
+      supabase.from('material_rates').select('name,unit_cost').eq('category','Demo'),
+      supabase.from('labor_rates').select('name,rate,rate_per_day'),
+      supabase.from('subcontractor_rates').select('company_name,rate').eq('category','Sub Haul'),
+    ])
+    if (matRes.data) { const m={}; matRes.data.forEach(r=>{m[r.name]=parseFloat(r.unit_cost)}); setMaterialPrices(m) }
+    if (lrRes.data)  { const m={}; lrRes.data.forEach(r=>{m[r.name]=parseFloat(r.rate??r.rate_per_day)}); setLaborRates(m) }
+    if (srRes.data)  { const m={}; srRes.data.forEach(r=>{m[r.company_name]=parseFloat(r.rate)}); setSubRates(m) }
+  }, [])
+
   useEffect(() => {
     let gone = false
     ;(async () => {
@@ -343,21 +357,12 @@ export default function HandDemoModule({ initialData, onSave, onCancel }) {
                 if (data.sub_markup_rate    != null) setSubMarkupRate(parseFloat(data.sub_markup_rate)||0.35)
               }
             }),
-        // Material rates — always fetch fresh so Master Rates changes are reflected
-        supabase.from('material_rates').select('name,unit_cost').eq('category','Demo')
-          .then(({data}) => { if (!gone && data) { const m={}; data.forEach(r=>{m[r.name]=parseFloat(r.unit_cost)}); setMaterialPrices(m) } }),
-        // Labor rates — skip if already loaded via initialData
-        !initialData?.laborRates &&
-          supabase.from('labor_rates').select('name,rate,rate_per_day')
-            .then(({data}) => { if (!gone && data) { const m={}; data.forEach(r=>{m[r.name]=parseFloat(r.rate??r.rate_per_day)}); setLaborRates(m) } }),
-        // Sub haul rates — always fetch fresh so Master Rates changes are reflected
-        supabase.from('subcontractor_rates').select('company_name,rate').eq('category','Sub Haul')
-          .then(({data}) => { if (!gone && data) { const m={}; data.forEach(r=>{m[r.company_name]=parseFloat(r.rate)}); setSubRates(m) } }),
+        refreshAllRates(),
       ])
       if (!gone) setPricesLoading(false)
     })()
     return () => { gone = true }
-  }, [])
+  }, [refreshAllRates])
 
   const set    = useCallback((f,v) => setState(p => ({...p,[f]:v})), [])
   const setRow = useCallback((sec,i,f,v) => setState(p => {
@@ -442,7 +447,25 @@ export default function HandDemoModule({ initialData, onSave, onCancel }) {
         <div>
           <p className="text-xs text-gray-500 mb-0.5">Dump Type</p>
           <Sel value={state.dumpType} onChange={e=>set('dumpType',e.target.value)} options={DUMP_TYPES} />
-          {!isSelf && <p className="text-xs text-amber-600 mt-0.5">Sub haul charges apply</p>}
+          {!isSelf && (
+            <p className="text-xs text-amber-600 mt-0.5 inline-flex items-center flex-wrap gap-x-1 gap-y-0.5">
+              Sub haul:
+              <span className="inline-flex items-center gap-0.5">${calc.shConc}/1.5T conc
+                <RateEditPopover table="subcontractor_rates" name="Sub Haul - Concrete"
+                  unitLabel="/1.5T" currentValue={calc.shConc} onSaved={refreshAllRates} />
+              </span>
+              ·
+              <span className="inline-flex items-center gap-0.5">${calc.shDirt}/1.5T dirt
+                <RateEditPopover table="subcontractor_rates" name="Sub Haul - Dirt"
+                  unitLabel="/1.5T" currentValue={calc.shDirt} onSaved={refreshAllRates} />
+              </span>
+              ·
+              <span className="inline-flex items-center gap-0.5">${calc.shGrass}/1.5T grass
+                <RateEditPopover table="subcontractor_rates" name="Sub Haul - Grass"
+                  unitLabel="/1.5T" currentValue={calc.shGrass} onSaved={refreshAllRates} />
+              </span>
+            </p>
+          )}
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
@@ -456,20 +479,47 @@ export default function HandDemoModule({ initialData, onSave, onCancel }) {
 
       {/* Demolition */}
       <div>
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2">
-          Demolition — {calc.rateConc} t/hr hand{isSelf ? ` · Conc $${dumpConc}/ton · Dirt $${dumpDirt}/ton` : ' · Sub Handles Removal'}
-        </p>
+        <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2">
+          <span>Demolition — {calc.rateConc} t/hr hand</span>
+          <RateEditPopover table="labor_rates" name="Demo - Hand Concrete/Dirt" category="Demo"
+            mode="coefficient" unitLabel="t/hr" currentValue={calc.rateConc} onSaved={refreshAllRates} />
+          {isSelf ? (
+            <>
+              <span className="text-gray-400 font-normal">·</span>
+              <span className="font-normal normal-case">Conc ${dumpConc}/ton</span>
+              <RateEditPopover table="material_rates" name="Dump Fee - Concrete" category="Demo"
+                unitLabel="ton" currentValue={dumpConc} onSaved={refreshAllRates} />
+              <span className="text-gray-400 font-normal">·</span>
+              <span className="font-normal normal-case">Dirt ${dumpDirt}/ton</span>
+              <RateEditPopover table="material_rates" name="Dump Fee - Dirt" category="Demo"
+                unitLabel="ton" currentValue={dumpDirt} onSaved={refreshAllRates} />
+            </>
+          ) : (
+            <span className="font-normal normal-case">· Sub Handles Removal</span>
+          )}
+        </div>
         <table className="w-full text-xs">
           <TH cols={[{label:'Material',w:'w-32'},{label:'SF',w:'w-24'},{label:'Depth (in)',w:'w-20'},{label:'Tons',w:'w-16'},...(isSelf?[{label:'Dump Fee',w:'w-24'}]:[]),{label:'Labor Hrs',w:'w-20'}]} />
           <tbody className="divide-y divide-gray-50">
             {[
-              {label:'Concrete',   sfK:'concSF',  dK:'concDepth',  dep:4, row:calc.conc,  fee:dumpConc},
-              {label:'Dirt/Rock',  sfK:'dirtSF',  dK:'dirtDepth',  dep:6, row:calc.dirt,  fee:dumpDirt},
-              {label:'Import Base',sfK:'baseSF',  dK:'baseDepth',  dep:4, row:calc.base,  fee:0},
-              {label:'Grass/Sod',  sfK:'grassSF', dK:'grassDepth', dep:2, row:calc.grass, fee:dumpGreen},
-            ].map(({label,sfK,dK,dep,row,fee})=>(
+              {label:'Concrete',   sfK:'concSF',  dK:'concDepth',  dep:4, row:calc.conc,  fee:dumpConc, rate: calc.rateConc,  rateName: 'Demo - Hand Concrete/Dirt', rateNote: `${calc.rateConc} t/hr`},
+              {label:'Dirt/Rock',  sfK:'dirtSF',  dK:'dirtDepth',  dep:6, row:calc.dirt,  fee:dumpDirt, rate: calc.rateConc,  rateName: 'Demo - Hand Concrete/Dirt', rateNote: `${calc.rateConc} t/hr`},
+              {label:'Import Base',sfK:'baseSF',  dK:'baseDepth',  dep:4, row:calc.base,  fee:0,         rate: calc.rateBase,  rateName: 'Demo - Hand Import Base',    rateNote: `${calc.rateBase} t/hr`},
+              {label:'Grass/Sod',  sfK:'grassSF', dK:'grassDepth', dep:2, row:calc.grass, fee:dumpGreen, rate: calc.rateGrass, rateName: 'Demo - Hand Grass',         rateNote: `${calc.rateGrass} t/hr · $${dumpGreen}/ton green waste`, extraIcon: (
+                <RateEditPopover table="material_rates" name="Dump Fee - Green Waste" category="Demo"
+                  unitLabel="ton" currentValue={dumpGreen} onSaved={refreshAllRates} />
+              )},
+            ].map(({label,sfK,dK,dep,row,fee,rate,rateName,rateNote,extraIcon})=>(
               <tr key={label}>
-                <td className={`${td} font-medium text-gray-700`}>{label}</td>
+                <td className={`${td} font-medium text-gray-700`}>
+                  <span className="inline-flex items-center gap-1">
+                    {label}
+                    <span className="text-gray-400 font-normal text-[10px]">({rateNote})</span>
+                    <RateEditPopover table="labor_rates" name={rateName} category="Demo"
+                      mode="coefficient" unitLabel="t/hr" currentValue={rate} onSaved={refreshAllRates} />
+                    {extraIcon}
+                  </span>
+                </td>
                 <td className={td}><Inp value={state[sfK]} onChange={e=>set(sfK,e.target.value)} /></td>
                 <td className={td}><Inp value={state[dK]}  onChange={e=>set(dK, e.target.value)} placeholder={String(dep)} /></td>
                 <td className={num}>{row.tons>0?row.tons.toFixed(1):'—'}</td>
@@ -483,8 +533,11 @@ export default function HandDemoModule({ initialData, onSave, onCancel }) {
         {/* Rebar add-on */}
         <div className="mt-3 flex items-center gap-3">
           <div className="flex-1 max-w-xs">
-            <p className="text-xs text-gray-500 mb-0.5">
-              Rebar SF <span className="text-gray-400 font-normal">({calc.rebarMinPerSF} min/SF = {(calc.rebarMinPerSF/60).toFixed(5)} hrs/SF)</span>
+            <p className="text-xs text-gray-500 mb-0.5 inline-flex items-center gap-1">
+              Rebar SF
+              <span className="text-gray-400 font-normal">({calc.rebarMinPerSF} min/SF = {(calc.rebarMinPerSF/60).toFixed(5)} hrs/SF)</span>
+              <RateEditPopover table="labor_rates" name="Demo - Hand Rebar" category="Demo"
+                mode="coefficient" unitLabel="min/SF" currentValue={calc.rebarMinPerSF} onSaved={refreshAllRates} />
             </p>
             <Inp value={state.rebarSF} onChange={e=>set('rebarSF',e.target.value)} placeholder="0" />
           </div>
@@ -557,8 +610,10 @@ export default function HandDemoModule({ initialData, onSave, onCancel }) {
 
       {/* Hand Bucket Areas */}
       <div>
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2">
-          Hand Bucket Areas — tight/confined access · {calc.rateBucket} t/hr
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2 inline-flex items-center gap-2">
+          <span>Hand Bucket Areas — tight/confined access · {calc.rateBucket} t/hr</span>
+          <RateEditPopover table="labor_rates" name="Demo - Hand Bucket" category="Demo"
+            mode="coefficient" unitLabel="t/hr" currentValue={calc.rateBucket} onSaved={refreshAllRates} />
         </p>
         <table className="w-full text-xs">
           <TH cols={[{label:'Description'},{label:'SF',w:'w-24'},{label:'Depth (in)',w:'w-20'},{label:'Tons',w:'w-16'},...(isSelf?[{label:'Dump Fee',w:'w-24'}]:[]),{label:'Labor Hrs',w:'w-20'}]} />
@@ -585,14 +640,18 @@ export default function HandDemoModule({ initialData, onSave, onCancel }) {
           <TH cols={[{label:'Operation',w:'w-40'},{label:'SF',w:'w-24'},{label:'Depth (in)',w:'w-20'},{label:'Tons',w:'w-16'},{label:'Labor Hrs',w:'w-20'}]} />
           <tbody className="divide-y divide-gray-50">
             {[
-              {label:'Grade Cut',   sfK:'gradeCutSF',  dK:'gradeCutDepth',  dep:3, tons:calc.gradeCut.tons,  hrs:calc.gradeCut.hours,  note:`${calc.rateConc} t/hr`},
-              {label:'Grade Fill',  sfK:'gradeFillSF', dK:'gradeFillDepth', dep:3, tons:calc.gradeFill.tons, hrs:calc.gradeFill.hours, note:`${calc.rateBase} t/hr`},
-              {label:'Jumping Jack',sfK:'jjSF',        dK:'jjDepth',        dep:3, tons:calc.jjTons,         hrs:calc.jjHrs,           note:`${calc.rateJJ} t/hr`},
-            ].map(({label,sfK,dK,dep,tons,hrs,note})=>(
+              {label:'Grade Cut',   sfK:'gradeCutSF',  dK:'gradeCutDepth',  dep:3, tons:calc.gradeCut.tons,  hrs:calc.gradeCut.hours,  note:`${calc.rateConc} t/hr`, rate: calc.rateConc, rateName: 'Demo - Hand Concrete/Dirt'},
+              {label:'Grade Fill',  sfK:'gradeFillSF', dK:'gradeFillDepth', dep:3, tons:calc.gradeFill.tons, hrs:calc.gradeFill.hours, note:`${calc.rateBase} t/hr`, rate: calc.rateBase, rateName: 'Demo - Hand Import Base'},
+              {label:'Jumping Jack',sfK:'jjSF',        dK:'jjDepth',        dep:3, tons:calc.jjTons,         hrs:calc.jjHrs,           note:`${calc.rateJJ} t/hr`,   rate: calc.rateJJ,   rateName: 'Demo - JJ Compaction'},
+            ].map(({label,sfK,dK,dep,tons,hrs,note,rate,rateName})=>(
               <tr key={label}>
                 <td className={`${td} font-medium text-gray-700`}>
-                  {label}
-                  <span className="ml-1 text-gray-400 font-normal">({note})</span>
+                  <span className="inline-flex items-center gap-1">
+                    {label}
+                    <span className="text-gray-400 font-normal">({note})</span>
+                    <RateEditPopover table="labor_rates" name={rateName} category="Demo"
+                      mode="coefficient" unitLabel="t/hr" currentValue={rate} onSaved={refreshAllRates} />
+                  </span>
                 </td>
                 <td className={td}><Inp value={state[sfK]} onChange={e=>set(sfK,e.target.value)} /></td>
                 <td className={td}><Inp value={state[dK]}  onChange={e=>set(dK, e.target.value)} placeholder={String(dep)} /></td>
@@ -608,12 +667,16 @@ export default function HandDemoModule({ initialData, onSave, onCancel }) {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <SecHdr title="Shrub & Stump Demo" />
         {[
-          {label:'Shrubs (qty)',       key:'shrubQty',      hrs:calc.shrubHrs,    sub:`${ACCESS_LEVELS[state.access]}× × ${calc.shrubRate} hrs/ea`},
-          {label:'Stump Grind 1st',    key:'stumpFirstQty', hrs:calc.stumpFstHrs, sub:`${ACCESS_LEVELS[state.access]}× × ${calc.stumpFstRate} hrs`},
-          {label:"Stump Grind Add'l",  key:'stumpAddQty',   hrs:calc.stumpAddHrs, sub:`${ACCESS_LEVELS[state.access]}× × ${calc.stumpAddRate} hrs`},
-        ].map(({label,key,hrs,sub})=>(
+          {label:'Shrubs (qty)',       key:'shrubQty',      hrs:calc.shrubHrs,    sub:`${ACCESS_LEVELS[state.access]}× × ${calc.shrubRate} hrs/ea`, rate: calc.shrubRate, rateName: 'Demo - Shrub'},
+          {label:'Stump Grind 1st',    key:'stumpFirstQty', hrs:calc.stumpFstHrs, sub:`${ACCESS_LEVELS[state.access]}× × ${calc.stumpFstRate} hrs`, rate: calc.stumpFstRate, rateName: 'Demo - Stump 1st'},
+          {label:"Stump Grind Add'l",  key:'stumpAddQty',   hrs:calc.stumpAddHrs, sub:`${ACCESS_LEVELS[state.access]}× × ${calc.stumpAddRate} hrs`, rate: calc.stumpAddRate, rateName: 'Demo - Stump Additional'},
+        ].map(({label,key,hrs,sub,rate,rateName})=>(
           <div key={key}>
-            <p className="text-xs text-gray-500 mb-0.5">{label}</p>
+            <p className="text-xs text-gray-500 mb-0.5 inline-flex items-center gap-1">
+              {label}
+              <RateEditPopover table="labor_rates" name={rateName} category="Demo"
+                mode="coefficient" unitLabel="hrs/ea" currentValue={rate} onSaved={refreshAllRates} />
+            </p>
             <Inp value={state[key]} onChange={e=>set(key,e.target.value)} />
             <p className="text-xs text-gray-400 mt-0.5">{hrs>0?`${hrs.toFixed(2)} hrs — ${sub}`:sub}</p>
           </div>
@@ -622,12 +685,28 @@ export default function HandDemoModule({ initialData, onSave, onCancel }) {
 
       {/* Trees */}
       <div>
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2">
-          Tree Demo — qty × height × {ACCESS_LEVELS[state.access]}× access × size multiplier
-          <span className="ml-2 font-normal normal-case text-gray-400">
-            (S:{calc.treeSmall} · M:{calc.treeMed} · L:{calc.treeLarge} hrs/ft)
+        <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2">
+          <span>Tree Demo — qty × height × {ACCESS_LEVELS[state.access]}× access × size multiplier</span>
+          <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
+            (S:{calc.treeSmall}
+            <RateEditPopover table="labor_rates" name="Demo - Tree Small" category="Demo"
+              mode="coefficient" unitLabel="hrs/ft" currentValue={calc.treeSmall} onSaved={refreshAllRates} />
+            · M:{calc.treeMed}
+            <RateEditPopover table="labor_rates" name="Demo - Tree Medium" category="Demo"
+              mode="coefficient" unitLabel="hrs/ft" currentValue={calc.treeMed} onSaved={refreshAllRates} />
+            · L:{calc.treeLarge}
+            <RateEditPopover table="labor_rates" name="Demo - Tree Large" category="Demo"
+              mode="coefficient" unitLabel="hrs/ft" currentValue={calc.treeLarge} onSaved={refreshAllRates} />
+            hrs/ft)
           </span>
-        </p>
+          {isSelf && (
+            <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
+              · Tree dump
+              <RateEditPopover table="material_rates" name="Dump Fee - Tree/Stump" category="Demo"
+                unitLabel="ton" currentValue={materialPrices['Dump Fee - Tree/Stump'] ?? DUMP_FEE_DEFAULTS['Dump Fee - Tree/Stump']} onSaved={refreshAllRates} />
+            </span>
+          )}
+        </div>
         <table className="w-full text-xs">
           <TH cols={[{label:'Qty',w:'w-16'},{label:'Height (ft)',w:'w-24'},{label:'Size',w:'w-28'},{label:'Labor Hrs',w:'w-20'},...(isSelf?[{label:'Tree Dump',w:'w-24'}]:[])]} />
           <tbody className="divide-y divide-gray-50">
