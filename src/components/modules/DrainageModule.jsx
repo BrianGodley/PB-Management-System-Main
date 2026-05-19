@@ -36,6 +36,37 @@ const FIXTURE_TYPES = {
 // minutes per cubic foot by equipment type
 const TRENCH_MINS_PER_CF = { Trench: 10, Hand: 12.5 }
 
+// ── Labor-coefficient lookup maps ─────────────────────────────────────────
+// Each entry points the inline calculator icon at a row in `labor_rates`
+// (seeded by supabase-drainage-labor-coefficients.sql). Click the icon →
+// popover fetches that coefficient, user adjusts it. The seed names match
+// these exactly.
+const TRENCH_LABOR_RATE_NAME = {
+  Trench: 'Drainage Trench Excavation',
+  Hand:   'Drainage Hand Excavation',
+}
+const PIPE_LABOR_RATE_NAME = {
+  '4" SDR 35':      'Drainage 4" SDR 35 Pipe Labor',
+  '3" SDR 35':      'Drainage 3" SDR 35 Pipe Labor',
+  '6" SDR 35':      'Drainage 6" SDR 35 Pipe Labor',
+  '4" Triple Wall': 'Drainage 4" Triple Wall Pipe Labor',
+  '3" Triple Wall': 'Drainage 3" Triple Wall Pipe Labor',
+  '4" Perforated':  'Drainage 4" Perforated Pipe Labor',
+  '3" Perforated':  'Drainage 3" Perforated Pipe Labor',
+}
+const FIXTURE_LABOR_RATE_NAME = {
+  '3" Area Drain':         'Drainage 3" Area Drain Labor',
+  '4" Area Drain':         'Drainage 4" Area Drain Labor',
+  '3" Atrium Drain':       'Drainage 3" Atrium Drain Labor',
+  '4" Atrium Drain':       'Drainage 4" Atrium Drain Labor',
+  '4" Brass Area Drain':   'Drainage 4" Brass Area Drain Labor',
+  '3" Brass Area Drain':   'Drainage 3" Brass Area Drain Labor',
+  'Downspout Connector':   'Drainage Downspout Connector Labor',
+  '4" Paver Top Inlet':    'Drainage 4" Paver Top Inlet Labor',
+  '9" x 9" Catch Basin':   'Drainage 9" x 9" Catch Basin Labor',
+  '12" x 12" Catch Basin': 'Drainage 12" x 12" Catch Basin Labor',
+}
+
 // Additional item rates — qty drives both labor hours AND material cost
 const ADD_ITEM_RATES = {
   pumpVault: { laborHrs: 5, matCost: 275,  label: 'Pump Vault',                 dbName: 'Pump Vault'               },
@@ -341,13 +372,26 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
                 const lf = n(row.lf), w = n(row.width), d = n(row.depth)
                 const cf  = lf > 0 && w > 0 && d > 0 ? lf * (w / 12) * (d / 12) : 0
                 const hrs = cf > 0 ? (cf * (TRENCH_MINS_PER_CF[row.equipment] || 10)) / 60 : 0
+                const laborName = TRENCH_LABOR_RATE_NAME[row.equipment]
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-2">
-                      <select className="input text-sm py-1" value={row.equipment} onChange={e => updateTrench(i, 'equipment', e.target.value)}>
-                        <option>Trench</option>
-                        <option>Hand</option>
-                      </select>
+                      <div className="flex items-center gap-1">
+                        <select className="input text-sm py-1 flex-1 min-w-0" value={row.equipment} onChange={e => updateTrench(i, 'equipment', e.target.value)}>
+                          <option>Trench</option>
+                          <option>Hand</option>
+                        </select>
+                        {laborName && (
+                          <RateEditPopover
+                            table="labor_rates"
+                            name={laborName}
+                            category="Drainage"
+                            mode="coefficient"
+                            unitLabel="min/cf"
+                            currentValue={TRENCH_MINS_PER_CF[row.equipment]}
+                          />
+                        )}
+                      </div>
                     </td>
                     <td className="py-1 pr-2"><NumInput value={row.lf}    onChange={v => updateTrench(i, 'lf', v)} /></td>
                     <td className="py-1 pr-2"><NumInput value={row.width} onChange={v => updateTrench(i, 'width', v)} /></td>
@@ -382,9 +426,21 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-2">
-                      <select className="input text-sm py-1" value={row.type} onChange={e => updatePipe(i, 'type', e.target.value)}>
-                        {Object.keys(PIPE_TYPES).map(t => <option key={t}>{t}</option>)}
-                      </select>
+                      <div className="flex items-center gap-1">
+                        <select className="input text-sm py-1 flex-1 min-w-0" value={row.type} onChange={e => updatePipe(i, 'type', e.target.value)}>
+                          {Object.keys(PIPE_TYPES).map(t => <option key={t}>{t}</option>)}
+                        </select>
+                        {PIPE_LABOR_RATE_NAME[row.type] && (
+                          <RateEditPopover
+                            table="labor_rates"
+                            name={PIPE_LABOR_RATE_NAME[row.type]}
+                            category="Drainage"
+                            mode="coefficient"
+                            unitLabel="hr/LF"
+                            currentValue={rate?.laborPerLF}
+                          />
+                        )}
+                      </div>
                     </td>
                     <td className="py-1 pr-2"><NumInput value={row.lf} onChange={v => updatePipe(i, 'lf', v)} /></td>
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
@@ -430,10 +486,22 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-2">
-                      <select className="input text-sm py-1" value={row.type} onChange={e => updateFixture(i, 'type', e.target.value)}>
-                        <option value="">-- Select --</option>
-                        {Object.keys(FIXTURE_TYPES).map(t => <option key={t}>{t}</option>)}
-                      </select>
+                      <div className="flex items-center gap-1">
+                        <select className="input text-sm py-1 flex-1 min-w-0" value={row.type} onChange={e => updateFixture(i, 'type', e.target.value)}>
+                          <option value="">-- Select --</option>
+                          {Object.keys(FIXTURE_TYPES).map(t => <option key={t}>{t}</option>)}
+                        </select>
+                        {FIXTURE_LABOR_RATE_NAME[row.type] && (
+                          <RateEditPopover
+                            table="labor_rates"
+                            name={FIXTURE_LABOR_RATE_NAME[row.type]}
+                            category="Drainage"
+                            mode="coefficient"
+                            unitLabel="hr/ea"
+                            currentValue={rate?.laborHrs}
+                          />
+                        )}
+                      </div>
                     </td>
                     <td className="py-1 pr-2"><NumInput value={row.qty} onChange={v => updateFixture(i, 'qty', v)} /></td>
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">

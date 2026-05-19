@@ -51,6 +51,11 @@ export default function RateEditPopover({
   unitLabel,
   currentValue,        // optional fallback if DB has no row yet
   onSaved,
+  // 'currency' (default) → shows '$' prefix on the input.
+  // 'coefficient'        → no prefix, shows unitLabel as a suffix inside
+  //                        the input. Use for labor coefficients like
+  //                        'min/cf' or 'hr/LF' where the value isn't dollars.
+  mode = 'currency',
 }) {
   const field    = valueField || DEFAULT_VALUE_FIELD[table] || 'unit_cost'
   const nameCol  = NAME_COLUMN[table] || 'name'
@@ -150,20 +155,27 @@ export default function RateEditPopover({
           <p className="text-sm font-semibold text-gray-800 truncate" title={name}>{name}</p>
           {category && <p className="text-[11px] text-gray-500 mb-2">Category: {category}</p>}
           <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            Rate{unitLabel ? ` ($/${unitLabel})` : ''}
+            {mode === 'coefficient'
+              ? `Coefficient${unitLabel ? ` (${unitLabel})` : ''}`
+              : `Rate${unitLabel ? ` ($/${unitLabel})` : ''}`}
           </label>
           {!loaded ? (
-            <p className="text-xs text-gray-400 py-2">Loading current rate…</p>
+            <p className="text-xs text-gray-400 py-2">Loading current value…</p>
           ) : (
             <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">$</span>
+              {mode === 'currency' && (
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">$</span>
+              )}
               <input
-                type="number" step="0.01" min="0" autoFocus
+                type="number" step="0.001" min="0" autoFocus
                 value={draft}
                 onChange={e => setDraft(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') save() }}
-                className="input text-sm w-full pl-6"
+                className={`input text-sm w-full ${mode === 'currency' ? 'pl-6' : 'pl-2.5'} ${mode === 'coefficient' && unitLabel ? 'pr-14' : ''}`}
               />
+              {mode === 'coefficient' && unitLabel && (
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none">{unitLabel}</span>
+              )}
             </div>
           )}
           {error && <p className="text-[11px] text-red-600 mt-1.5">{error}</p>}
