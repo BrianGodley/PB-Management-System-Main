@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
+import RateEditPopover from '../RateEditPopover'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drainage Module — fields and calculations from Excel estimator
@@ -193,6 +194,21 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
   )
   const [pricesLoading, setPricesLoading] = useState(!initialData?.materialPrices)
 
+  // Pulled out so RateEditPopover can call it after the user saves a new
+  // master-rate value — picks up the change without a page refresh.
+  async function refreshMaterialPrices() {
+    const { data } = await supabase
+      .from('material_rates')
+      .select('name, unit_cost')
+      .eq('category', 'Drainage')
+    if (data) {
+      const prices = {}
+      data.forEach(r => { prices[r.name] = parseFloat(r.unit_cost) || 0 })
+      setMaterialPrices(prices)
+    }
+    setPricesLoading(false)
+  }
+
   useEffect(() => {
     // Fetch labor rate unless we already have it from initialData
     if (!initialData?.laborRatePerHour) {
@@ -208,18 +224,8 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
 
     // Fetch material prices unless we have a saved snapshot from initialData
     if (initialData?.materialPrices) return
-    supabase
-      .from('material_rates')
-      .select('name, unit_cost')
-      .eq('category', 'Drainage')
-      .then(({ data }) => {
-        if (data) {
-          const prices = {}
-          data.forEach(r => { prices[r.name] = parseFloat(r.unit_cost) || 0 })
-          setMaterialPrices(prices)
-        }
-        setPricesLoading(false)
-      })
+    refreshMaterialPrices()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const gpmd = initialData?.gpmd ?? DEFAULTS.gpmd
@@ -381,7 +387,19 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
                       </select>
                     </td>
                     <td className="py-1 pr-2"><NumInput value={row.lf} onChange={v => updatePipe(i, 'lf', v)} /></td>
-                    <td className="py-1 text-right text-gray-400 text-xs pr-2">${costPerLF.toFixed(2)}</td>
+                    <td className="py-1 text-right text-gray-400 text-xs pr-2">
+                      <span className="inline-flex items-center justify-end">
+                        ${costPerLF.toFixed(2)}
+                        <RateEditPopover
+                          table="material_rates"
+                          name={rate?.dbName || row.type}
+                          category="Drainage"
+                          unitLabel="LF"
+                          currentValue={costPerLF}
+                          onSaved={refreshMaterialPrices}
+                        />
+                      </span>
+                    </td>
                     <td className="py-1 text-right text-gray-600 text-xs">{mat > 0 ? `$${mat.toFixed(2)}` : '—'}</td>
                   </tr>
                 )
@@ -418,7 +436,19 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
                       </select>
                     </td>
                     <td className="py-1 pr-2"><NumInput value={row.qty} onChange={v => updateFixture(i, 'qty', v)} /></td>
-                    <td className="py-1 text-right text-gray-400 text-xs pr-2">{rate ? `$${cost.toFixed(2)}` : '—'}</td>
+                    <td className="py-1 text-right text-gray-400 text-xs pr-2">
+                      <span className="inline-flex items-center justify-end">
+                        {rate ? `$${cost.toFixed(2)}` : '—'}
+                        <RateEditPopover
+                          table="material_rates"
+                          name={rate?.dbName || row.type}
+                          category="Drainage"
+                          unitLabel="ea"
+                          currentValue={cost}
+                          onSaved={refreshMaterialPrices}
+                        />
+                      </span>
+                    </td>
                     <td className="py-1 text-right text-gray-600 text-xs">{mat > 0 ? `$${mat.toFixed(2)}` : '—'}</td>
                   </tr>
                 )

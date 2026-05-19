@@ -49,19 +49,38 @@ export default function RateEditPopover({
   category,
   valueField,
   unitLabel,
-  currentValue,
+  currentValue,        // optional fallback if DB has no row yet
   onSaved,
 }) {
   const field    = valueField || DEFAULT_VALUE_FIELD[table] || 'unit_cost'
   const nameCol  = NAME_COLUMN[table] || 'name'
   const [open,    setOpen]    = useState(false)
-  const [draft,   setDraft]   = useState(String(currentValue ?? ''))
+  const [draft,   setDraft]   = useState('')
+  const [loaded,  setLoaded]  = useState(false)
   const [saving,  setSaving]  = useState(false)
   const [error,   setError]   = useState('')
   const wrapRef   = useRef(null)
 
-  // Keep the input in sync whenever the cell value changes upstream.
-  useEffect(() => { setDraft(String(currentValue ?? '')) }, [currentValue])
+  // Whenever the popover opens, fetch the current rate from the DB so the
+  // input reflects whatever is saved RIGHT NOW (not whatever stale value
+  // the caller passed in). Falls back to currentValue if no row exists.
+  useEffect(() => {
+    if (!open) return
+    setLoaded(false)
+    setError('')
+    let q = supabase.from(table).select(`${field}, id`).eq(nameCol, name)
+    if (table === 'material_rates' && category) q = q.eq('category', category)
+    q.limit(1).then(({ data, error: fetchErr }) => {
+      if (fetchErr) { setError(fetchErr.message); setLoaded(true); return }
+      if (data && data.length > 0) {
+        setDraft(String(data[0][field] ?? ''))
+      } else {
+        setDraft(String(currentValue ?? ''))
+      }
+      setLoaded(true)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   // Close on outside click + Escape.
   useEffect(() => {
@@ -133,16 +152,20 @@ export default function RateEditPopover({
           <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">
             Rate{unitLabel ? ` ($/${unitLabel})` : ''}
           </label>
-          <div className="relative">
-            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">$</span>
-            <input
-              type="number" step="0.01" min="0" autoFocus
-              value={draft}
-              onChange={e => setDraft(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') save() }}
-              className="input text-sm w-full pl-6"
-            />
-          </div>
+          {!loaded ? (
+            <p className="text-xs text-gray-400 py-2">Loading current rate…</p>
+          ) : (
+            <div className="relative">
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">$</span>
+              <input
+                type="number" step="0.01" min="0" autoFocus
+                value={draft}
+                onChange={e => setDraft(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') save() }}
+                className="input text-sm w-full pl-6"
+              />
+            </div>
+          )}
           {error && <p className="text-[11px] text-red-600 mt-1.5">{error}</p>}
           <div className="flex gap-2 mt-3">
             <button
