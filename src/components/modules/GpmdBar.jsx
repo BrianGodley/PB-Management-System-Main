@@ -38,6 +38,12 @@ export default function GpmdBar({
   subMarkupRate    = 0.20,  // Sub GP = subCost × subMarkupRate
   onSubMarkupSave  = null,  // if provided → Sub % cell is editable
   sticky           = false, // when true: renders with sticky positioning (handled by parent wrapper)
+  showEditRatesButton = false, // when true AND user has permission: render an
+                               // "Edit Rates" toggle ABOVE the dark bar.
+                               // Only set on module-detail GpmdBars — the
+                               // estimate-totals and project-totals bars on
+                               // EstimateDetail / COEstimatePanel should NOT
+                               // pass this prop.
 }) {
   const [editingGpmd,    setEditingGpmd]    = useState(false)
   const [draftGpmd,      setDraftGpmd]      = useState('')
@@ -204,44 +210,49 @@ export default function GpmdBar({
     ? 'bg-gray-900 text-white py-2 px-2'
     : 'bg-gray-900 text-white rounded-xl p-3 mt-2'
 
+  // "Edit Rates" toggle — only rendered for users with the
+  // `clients_access_edit_rates` permission AND when the caller has explicitly
+  // opted-in via showEditRatesButton (module-detail views only). Sits
+  // ABOVE the dark GPMD container, not inside it, so the bar itself stays
+  // clean for the estimate/project totals views.
+  const editRatesToggle = (showEditRatesButton && canAccessRates) ? (
+    <div className={`flex justify-end ${sticky ? 'pb-1' : 'mb-1.5 mt-2'}`}>
+      <button
+        type="button"
+        onClick={toggleRateIcons}
+        title={showRateIcons
+          ? 'Hide the inline rate-edit calculator icons'
+          : 'Show calculator icons next to every rate so you can adjust master rates inline'}
+        className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded border transition-colors ${
+          showRateIcons
+            ? 'bg-green-600 border-green-500 text-white hover:bg-green-700'
+            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
+        }`}
+      >
+        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <rect x="4" y="3" width="16" height="18" rx="2" />
+          <line x1="8" y1="7"  x2="16" y2="7" />
+          <line x1="8" y1="11" x2="10" y2="11" />
+          <line x1="13" y1="11" x2="16" y2="11" />
+          <line x1="8" y1="15" x2="10" y2="15" />
+          <line x1="13" y1="15" x2="16" y2="15" />
+          <line x1="8" y1="19" x2="10" y2="19" />
+          <line x1="13" y1="19" x2="16" y2="19" />
+        </svg>
+        Edit Rates
+        <span className={`text-[10px] uppercase tracking-wide ml-0.5 ${
+          showRateIcons ? 'text-green-100' : 'text-gray-500'
+        }`}>
+          {showRateIcons ? 'on' : 'off'}
+        </span>
+      </button>
+    </div>
+  ) : null
+
   return (
-    <div className={containerCls}>
-      {/* Top row: Access/Edit Rates toggle — reveals the inline calculator
-          icons on every rate value when on. Persisted to localStorage. Only
-          rendered for users with the `clients_access_edit_rates` permission. */}
-      {canAccessRates && (
-        <div className="flex justify-end mb-1.5">
-          <button
-            type="button"
-            onClick={toggleRateIcons}
-            title={showRateIcons
-              ? 'Hide the inline rate-edit calculator icons'
-              : 'Show calculator icons next to every rate so you can adjust master rates inline'}
-            className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded border transition-colors ${
-              showRateIcons
-                ? 'bg-green-600 border-green-500 text-white hover:bg-green-700'
-                : 'bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700 hover:border-gray-500'
-            }`}
-          >
-            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <rect x="4" y="3" width="16" height="18" rx="2" />
-              <line x1="8" y1="7"  x2="16" y2="7" />
-              <line x1="8" y1="11" x2="10" y2="11" />
-              <line x1="13" y1="11" x2="16" y2="11" />
-              <line x1="8" y1="15" x2="10" y2="15" />
-              <line x1="13" y1="15" x2="16" y2="15" />
-              <line x1="8" y1="19" x2="10" y2="19" />
-              <line x1="13" y1="19" x2="16" y2="19" />
-            </svg>
-            Access/Edit Rates
-            <span className={`text-[10px] uppercase tracking-wide ml-0.5 ${
-              showRateIcons ? 'text-green-100' : 'text-gray-500'
-            }`}>
-              {showRateIcons ? 'on' : 'off'}
-            </span>
-          </button>
-        </div>
-      )}
+    <>
+      {editRatesToggle}
+      <div className={containerCls}>
 
       <div className="flex gap-0 divide-x divide-white/10 flex-wrap">
 
@@ -276,5 +287,6 @@ export default function GpmdBar({
 
       </div>
     </div>
+    </>
   )
 }

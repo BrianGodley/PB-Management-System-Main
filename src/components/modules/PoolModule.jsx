@@ -615,6 +615,7 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
       {/* ── Sticky GPMD bar ── */}
       <div className="sticky top-0 z-20 -mx-6 px-6 pt-2 pb-2 bg-gray-900 shadow-lg">
         <GpmdBar
+          showEditRatesButton
           sticky
           totalMat={calc.totalMat}
           totalHrs={calc.totalHrs}
