@@ -19,6 +19,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from './AuthContext'
 
 const STORAGE_KEY = 'pbs.showRateIcons'
 
@@ -30,6 +31,11 @@ const RateIconsContext = createContext({
 })
 
 export function RateIconsProvider({ children }) {
+  // Piggyback on the AuthContext (already does the supabase session work)
+  // instead of opening our own auth subscription — avoids duplicate listeners
+  // and any chance of competing initialization.
+  const { user, loading: authLoading } = useAuth()
+
   // Lazy-init from localStorage. Falls back to false (icons hidden) if absent
   // or if running where window is not defined (SSR safety, harmless in CSR).
   const [showRateIcons, setShowRateIcons] = useState(() => {
@@ -41,8 +47,9 @@ export function RateIconsProvider({ children }) {
     }
   })
 
-  // Permission flag — fetched once after auth, then cached for the session.
-  // Defaults to false so unauthorized users never see the toggle.
+  // Permission flag — defaults to false so unauthorized users never see the
+  // toggle. Fail-closed if anything in the fetch errors (e.g. the
+  // `clients_access_edit_rates` column hasn't been added to the DB yet).
   const [canAccessRates, setCanAccessRates] = useState(false)
 
   // Persist visibility choice on every change so a refresh keeps it.
@@ -50,32 +57,39 @@ export function RateIconsProvider({ children }) {
     try { window.localStorage.setItem(STORAGE_KEY, String(showRateIcons)) } catch { /* ignore quota errors */ }
   }, [showRateIcons])
 
-  // Fetch the current user's permission row on mount + whenever auth changes.
-  // Admins/super_admins always get access regardless of the explicit flag.
+  // Load the permission flag whenever the auth user changes. Wrapped in a
+  // top-level try/catch so a bad query (missing column / RLS denial / network
+  // hiccup) can NEVER lock up the UI — worst case the toggle stays hidden.
   useEffect(() => {
+    if (authLoading) return
+    if (!user) { setCanAccessRates(false); return }
+
     let alive = true
-    async function loadPerm() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!alive || !user) { setCanAccessRates(false); return }
-
-      // Role check first — admins always have access
-      const { data: profile } = await supabase
-        .from('profiles').select('role').eq('id', user.id).single()
-      if (!alive) return
-      if (profile && (profile.role === 'admin' || profile.role === 'super_admin')) {
-        setCanAccessRates(true)
-        return
+    ;(async () => {
+      try {
+        // Admins always have access
+        const { data: profile } = await supabase
+          .from('profiles').select('role').eq('id', user.id).maybeSingle()
+        if (!alive) return
+        if (profile?.role === 'admin' || profile?.role === 'super_admin') {
+          setCanAccessRates(true)
+          return
+        }
+        // Otherwise check the explicit permission. If the column doesn't
+        // exist yet (SQL hasn't been run) Supabase returns an error and
+        // perms will be null — we fall through to false.
+        const { data: perms } = await supabase
+          .from('user_permissions').select('clients_access_edit_rates')
+          .eq('user_id', user.id).maybeSingle()
+        if (alive) setCanAccessRates(perms?.clients_access_edit_rates === true)
+      } catch (err) {
+        // Any unexpected failure → no access (fail-closed). Logged for debug.
+        console.warn('[RateIconsContext] permission load failed', err)
+        if (alive) setCanAccessRates(false)
       }
-
-      // Otherwise check the explicit permission flag
-      const { data: perms } = await supabase
-        .from('user_permissions').select('clients_access_edit_rates').eq('user_id', user.id).single()
-      if (alive) setCanAccessRates(perms?.clients_access_edit_rates === true)
-    }
-    loadPerm()
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => loadPerm())
-    return () => { alive = false; subscription.unsubscribe() }
-  }, [])
+    })()
+    return () => { alive = false }
+  }, [user, authLoading])
 
   // If the user loses permission mid-session, force the icons off so nothing
   // they shouldn't see lingers on screen.
