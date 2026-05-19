@@ -98,27 +98,58 @@ export default function Help() {
 // ── Support Tickets tab ──────────────────────────────────────────────────────
 function SupportTickets() {
   const { user } = useAuth()
-  const [tickets, setTickets] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [filter,  setFilter]  = useState('open')  // 'open' | 'all' | 'done'
+  const [tickets,  setTickets]  = useState([])
+  const [userMap,  setUserMap]  = useState({})   // user_id → { full_name, email }
+  const [loading,  setLoading]  = useState(true)
+  const [filter,   setFilter]   = useState('open')   // 'open' | 'all' | 'done'
+  const [scope,    setScope]    = useState('all')    // 'mine' | 'all'  (admins only)
   const [expanded, setExpanded] = useState(null)
+  const [isAdmin,  setIsAdmin]  = useState(false)
+
+  // Detect admin role so we know whether to show the All / Mine toggle and
+  // the Reporter column.
+  useEffect(() => {
+    if (!user?.id) return
+    let alive = true
+    ;(async () => {
+      try {
+        const { data } = await supabase.from('profiles')
+          .select('role').eq('id', user.id).maybeSingle()
+        const role = data?.role || ''
+        if (alive) setIsAdmin(role === 'admin' || role === 'super_admin')
+      } catch { /* fail-closed → non-admin view */ }
+    })()
+    return () => { alive = false }
+  }, [user?.id])
 
   useEffect(() => {
     if (!user?.id) return
     fetchTickets()
-  }, [user?.id])
+  }, [user?.id, isAdmin, scope])
 
   async function fetchTickets() {
     setLoading(true)
     try {
-      // RLS already constrains to own rows, but we filter explicitly so this
-      // is correct even if RLS is ever loosened.
-      const { data } = await supabase.from('feature_requests')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(500)
-      setTickets(data || [])
+      // Admins viewing "all" get every row (RLS allows it). Non-admins, and
+      // admins who chose "mine", get just their own.
+      let q = supabase.from('feature_requests').select('*')
+        .order('created_at', { ascending: false }).limit(500)
+      if (!isAdmin || scope === 'mine') {
+        q = q.eq('user_id', user.id)
+      }
+      const { data } = await q
+      const rows = data || []
+      setTickets(rows)
+
+      // Hydrate reporter names for the table (only matters when viewing all).
+      const ids = [...new Set(rows.map(r => r.user_id).filter(Boolean))]
+      if (ids.length) {
+        const { data: profs } = await supabase.from('profiles')
+          .select('id, full_name, email').in('id', ids)
+        setUserMap(Object.fromEntries((profs || []).map(p => [p.id, p])))
+      } else {
+        setUserMap({})
+      }
     } catch (err) {
       console.warn('[Help] fetchTickets failed', err)
       setTickets([])
@@ -141,7 +172,7 @@ function SupportTickets() {
   return (
     <div>
       {/* Filter chips */}
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
         {[
           { key: 'open', label: `Open (${counts.open})` },
           { key: 'all',  label: `All (${counts.all})` },
@@ -156,6 +187,27 @@ function SupportTickets() {
             {f.label}
           </button>
         ))}
+
+        {/* Admin-only scope toggle: see everyone's tickets or just yours. */}
+        {isAdmin && (
+          <div className="flex items-center gap-1 ml-2 pl-3 border-l border-gray-200">
+            <span className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mr-1">View</span>
+            {[
+              { key: 'all',  label: 'All users' },
+              { key: 'mine', label: 'Mine only' },
+            ].map(s => (
+              <button key={s.key} onClick={() => setScope(s.key)}
+                className={`text-xs font-semibold px-2.5 py-1 rounded-md border transition-colors ${
+                  scope === s.key
+                    ? 'bg-gray-800 text-white border-gray-800'
+                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                }`}>
+                {s.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="flex-1" />
         <button onClick={fetchTickets} className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1">↻ Refresh</button>
       </div>
@@ -172,6 +224,9 @@ function SupportTickets() {
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500">
                 <th className="px-3 py-2 text-left font-semibold w-28">Submitted</th>
+                {isAdmin && scope === 'all' && (
+                  <th className="px-3 py-2 text-left font-semibold w-40">Reporter</th>
+                )}
                 <th className="px-3 py-2 text-left font-semibold w-28">Category</th>
                 <th className="px-3 py-2 text-left font-semibold">Title</th>
                 <th className="px-3 py-2 text-left font-semibold w-24">Priority</th>
@@ -185,11 +240,17 @@ function SupportTickets() {
                   month: 'short', day: 'numeric', year: '2-digit',
                 })
                 const isOpen = expanded === r.id
+                const reporter = userMap[r.user_id]
+                const reporterName = reporter?.full_name || reporter?.email
+                  || (r.user_id ? r.user_id.slice(0, 8) : '—')
                 return (
                   <SupportRow
                     key={r.id}
                     row={r}
                     dateStr={dateStr}
+                    showReporter={isAdmin && scope === 'all'}
+                    reporterName={reporterName}
+                    reporterEmail={reporter?.email}
                     isOpen={isOpen}
                     onToggle={() => setExpanded(isOpen ? null : r.id)}
                   />
@@ -207,8 +268,10 @@ function SupportTickets() {
   )
 }
 
-function SupportRow({ row, dateStr, isOpen, onToggle }) {
+function SupportRow({ row, dateStr, showReporter, reporterName, reporterEmail, isOpen, onToggle }) {
   const r = row
+  // 6 base columns + 1 if Reporter is visible.
+  const colSpan = showReporter ? 7 : 6
   return (
     <>
       <tr
@@ -216,6 +279,11 @@ function SupportRow({ row, dateStr, isOpen, onToggle }) {
         onClick={onToggle}
       >
         <td className="px-3 py-2 text-xs text-gray-500">{dateStr}</td>
+        {showReporter && (
+          <td className="px-3 py-2 text-xs text-gray-700 truncate" title={reporterEmail || ''}>
+            {reporterName}
+          </td>
+        )}
         <td className="px-3 py-2">
           <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold uppercase ${CATEGORY_STYLE[r.category] || CATEGORY_STYLE.other}`}>
             {r.category}
@@ -236,7 +304,7 @@ function SupportRow({ row, dateStr, isOpen, onToggle }) {
       </tr>
       {isOpen && (
         <tr className="bg-gray-50 border-b border-gray-200">
-          <td colSpan={6} className="px-6 py-4">
+          <td colSpan={colSpan} className="px-6 py-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="md:col-span-2">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
