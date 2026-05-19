@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
+import RateEditPopover from '../RateEditPopover'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Columns Module — fields and calculations from Excel estimator (Columns Module tab)
@@ -179,23 +180,26 @@ export default function ColumnsModule({ projectName, onSave, onBack, saving, ini
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
   const [pricesLoading, setPricesLoading]   = useState(!initialData?.materialPrices)
 
+  // Re-fetch Columns merged labor+material map. Used on mount and after edits.
+  const refreshAllRates = useCallback(async () => {
+    const [matRes, labRes] = await Promise.all([
+      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Columns'),
+      supabase.from('labor_rates').select('name, rate').eq('category', 'Columns'),
+    ])
+    const prices = {}
+    ;(matRes.data || []).forEach(r => { prices[r.name] = parseFloat(r.unit_cost) || 0 })
+    ;(labRes.data  || []).forEach(r => { prices[r.name] = parseFloat(r.rate)     || 0 })
+    setMaterialPrices(prices)
+  }, [])
+
   useEffect(() => {
     if (!initialData?.laborRatePerHour) {
       supabase.from('company_settings').select('value').eq('key', 'labor_rate_per_hour').single()
         .then(({ data }) => { if (data) setLaborRatePerHour(parseFloat(data.value) || DEFAULTS.laborRatePerHour) })
     }
     if (initialData?.materialPrices) return
-    Promise.all([
-      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Columns'),
-      supabase.from('labor_rates').select('name, rate').eq('category', 'Columns'),
-    ]).then(([matRes, labRes]) => {
-      const prices = {}
-      ;(matRes.data || []).forEach(r => { prices[r.name] = parseFloat(r.unit_cost) || 0 })
-      ;(labRes.data  || []).forEach(r => { prices[r.name] = parseFloat(r.rate)     || 0 })
-      setMaterialPrices(prices)
-      setPricesLoading(false)
-    })
-  }, [])
+    refreshAllRates().then(() => setPricesLoading(false))
+  }, [refreshAllRates])
 
   const gpmd          = initialData?.gpmd ?? DEFAULTS.gpmd
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
@@ -291,6 +295,41 @@ export default function ColumnsModule({ projectName, onSave, onBack, saving, ini
       {/* ── Column Install ── */}
       <div>
         <SectionHeader title="Column Install" />
+        <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3 text-[11px] text-gray-500">
+          <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">Column Install Rates (click any to edit)</p>
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
+            <span className="inline-flex items-center gap-1">Block ${(materialPrices[BLOCK_RATES.blockMatCost.dbName] ?? BLOCK_RATES.blockMatCost.fallback).toFixed(2)}/ea
+              <RateEditPopover table="material_rates" name={BLOCK_RATES.blockMatCost.dbName} category="Columns" unitLabel="ea"
+                currentValue={materialPrices[BLOCK_RATES.blockMatCost.dbName] ?? BLOCK_RATES.blockMatCost.fallback} onSaved={refreshAllRates} />
+            </span>
+            <span className="inline-flex items-center gap-1">Rebar ${(materialPrices[BLOCK_RATES.rebarMatCost.dbName] ?? BLOCK_RATES.rebarMatCost.fallback).toFixed(2)}/LF
+              <RateEditPopover table="material_rates" name={BLOCK_RATES.rebarMatCost.dbName} category="Columns" unitLabel="LF"
+                currentValue={materialPrices[BLOCK_RATES.rebarMatCost.dbName] ?? BLOCK_RATES.rebarMatCost.fallback} onSaved={refreshAllRates} />
+            </span>
+            <span className="inline-flex items-center gap-1">Fill ${(materialPrices[BLOCK_RATES.fillMatCost.dbName] ?? BLOCK_RATES.fillMatCost.fallback).toFixed(2)}/block
+              <RateEditPopover table="material_rates" name={BLOCK_RATES.fillMatCost.dbName} category="Columns" unitLabel="block"
+                currentValue={materialPrices[BLOCK_RATES.fillMatCost.dbName] ?? BLOCK_RATES.fillMatCost.fallback} onSaved={refreshAllRates} />
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+            <span className="inline-flex items-center gap-1">Install {(materialPrices[BLOCK_RATES.installLaborHrs.dbName] ?? BLOCK_RATES.installLaborHrs.fallback)} hrs/blk
+              <RateEditPopover table="labor_rates" name={BLOCK_RATES.installLaborHrs.dbName} category="Columns" mode="coefficient" unitLabel="hrs/blk"
+                currentValue={materialPrices[BLOCK_RATES.installLaborHrs.dbName] ?? BLOCK_RATES.installLaborHrs.fallback} onSaved={refreshAllRates} />
+            </span>
+            <span className="inline-flex items-center gap-1">Excavate {(materialPrices[BLOCK_RATES.excavateLaborHrs.dbName] ?? BLOCK_RATES.excavateLaborHrs.fallback)} hrs/col
+              <RateEditPopover table="labor_rates" name={BLOCK_RATES.excavateLaborHrs.dbName} category="Columns" mode="coefficient" unitLabel="hrs/col"
+                currentValue={materialPrices[BLOCK_RATES.excavateLaborHrs.dbName] ?? BLOCK_RATES.excavateLaborHrs.fallback} onSaved={refreshAllRates} />
+            </span>
+            <span className="inline-flex items-center gap-1">Pour {(materialPrices[BLOCK_RATES.pourLaborHrs.dbName] ?? BLOCK_RATES.pourLaborHrs.fallback)} hrs/col
+              <RateEditPopover table="labor_rates" name={BLOCK_RATES.pourLaborHrs.dbName} category="Columns" mode="coefficient" unitLabel="hrs/col"
+                currentValue={materialPrices[BLOCK_RATES.pourLaborHrs.dbName] ?? BLOCK_RATES.pourLaborHrs.fallback} onSaved={refreshAllRates} />
+            </span>
+            <span className="inline-flex items-center gap-1">Fill {(materialPrices[BLOCK_RATES.fillLaborHrs.dbName] ?? BLOCK_RATES.fillLaborHrs.fallback)} hrs/blk
+              <RateEditPopover table="labor_rates" name={BLOCK_RATES.fillLaborHrs.dbName} category="Columns" mode="coefficient" unitLabel="hrs/blk"
+                currentValue={materialPrices[BLOCK_RATES.fillLaborHrs.dbName] ?? BLOCK_RATES.fillLaborHrs.fallback} onSaved={refreshAllRates} />
+            </span>
+          </div>
+        </div>
         <div className="grid grid-cols-3 gap-3 mb-3">
           <div>
             <label className="block text-xs text-gray-500 mb-1">Quantity of Columns</label>
@@ -339,20 +378,36 @@ export default function ColumnsModule({ projectName, onSave, onBack, saving, ini
                 const isTon   = rate?.unit === 'ton'
                 const defCost = isTon ? rate?.costPerTon : rate?.costPerSF
                 const cost    = materialPrices[rate?.dbName] ?? defCost ?? 0
+                const defLab  = isTon ? rate?.laborHrsPer : rate?.laborHrsPerSF
+                const labRate = materialPrices[rate?.laborDbName] ?? defLab ?? 0
                 const mat     = n(row.qty) * cost
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-2">
-                      <select className="input text-sm py-1" value={row.type}
-                              onChange={e => updateFinish(i, 'type', e.target.value)}>
-                        {Object.keys(FINISH_TYPES).map(t => <option key={t}>{t}</option>)}
-                      </select>
+                      <div className="flex items-center gap-1">
+                        <select className="input text-sm py-1 flex-1 min-w-0" value={row.type}
+                                onChange={e => updateFinish(i, 'type', e.target.value)}>
+                          {Object.keys(FINISH_TYPES).map(t => <option key={t}>{t}</option>)}
+                        </select>
+                        {rate && (
+                          <RateEditPopover table="labor_rates" name={rate.laborDbName} category="Columns"
+                            mode="coefficient" unitLabel={`hrs/${rate.unit}`} currentValue={labRate} onSaved={refreshAllRates} />
+                        )}
+                      </div>
                     </td>
                     <td className="py-1 pr-2">
                       <NumInput value={row.qty} onChange={v => updateFinish(i, 'qty', v)} />
                     </td>
                     <td className="py-1 pr-2 text-xs text-gray-400">{rate?.unit ?? 'SF'}</td>
-                    <td className="py-1 text-right text-gray-400 text-xs pr-2">${cost.toFixed(2)}</td>
+                    <td className="py-1 text-right text-gray-400 text-xs pr-2">
+                      <span className="inline-flex items-center justify-end gap-1">
+                        ${cost.toFixed(2)}
+                        {rate && (
+                          <RateEditPopover table="material_rates" name={rate.dbName} category="Columns"
+                            unitLabel={rate.unit} currentValue={cost} onSaved={refreshAllRates} />
+                        )}
+                      </span>
+                    </td>
                     <td className="py-1 text-right text-gray-600 text-xs">{mat > 0 ? `$${mat.toFixed(2)}` : '—'}</td>
                   </tr>
                 )
@@ -376,7 +431,11 @@ export default function ColumnsModule({ projectName, onSave, onBack, saving, ini
             const matCost = materialPrices[rate.dbName] ?? rate.matCost
             return (
               <div key={key} className="flex items-center gap-3 py-1.5 border-b border-gray-100">
-                <span className="text-xs text-gray-700 flex-1">{rate.label}</span>
+                <span className="text-xs text-gray-700 flex-1 inline-flex items-center gap-1">
+                  {rate.label}
+                  <RateEditPopover table="material_rates" name={rate.dbName} category="Columns"
+                    unitLabel="ea" currentValue={matCost} onSaved={refreshAllRates} />
+                </span>
                 <input
                   type="number" step="1" min="0"
                   className="input text-sm py-1 w-24"

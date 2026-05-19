@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
+import RateEditPopover from '../RateEditPopover'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pool Module
@@ -467,26 +468,27 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
   const [subRates, setSubRates]             = useState({})
   const [loadingRates, setLoadingRates]     = useState(true)
 
-  useEffect(() => {
-    async function fetchRates() {
-      const [matRes, labRes, subRes] = await Promise.all([
-        supabase.from('material_rates').select('name,unit_cost').eq('category', 'Pool'),
-        supabase.from('labor_rates').select('name,rate').eq('category', 'Pool'),
-        supabase.from('subcontractor_rates').select('trade,rate').eq('category', 'Pool'),
-      ])
-      const mp = {}
-      ;(matRes.data || []).forEach(r => { mp[r.name] = parseFloat(r.unit_cost) })
-      const lr = {}
-      ;(labRes.data || []).forEach(r => { lr[r.name] = parseFloat(r.rate) })
-      const sr = {}
-      ;(subRes.data || []).forEach(r => { sr[r.trade] = parseFloat(r.rate) })
-      setMaterialPrices(mp)
-      setLaborRates(lr)
-      setSubRates(sr)
-      setLoadingRates(false)
-    }
-    fetchRates()
+  // Re-fetch all three Pool rate tables. Called on mount and after edits.
+  const refreshAllRates = useCallback(async () => {
+    const [matRes, labRes, subRes] = await Promise.all([
+      supabase.from('material_rates').select('name,unit_cost').eq('category', 'Pool'),
+      supabase.from('labor_rates').select('name,rate').eq('category', 'Pool'),
+      supabase.from('subcontractor_rates').select('trade,rate').eq('category', 'Pool'),
+    ])
+    const mp = {}
+    ;(matRes.data || []).forEach(r => { mp[r.name] = parseFloat(r.unit_cost) })
+    const lr = {}
+    ;(labRes.data || []).forEach(r => { lr[r.name] = parseFloat(r.rate) })
+    const sr = {}
+    ;(subRes.data || []).forEach(r => { sr[r.trade] = parseFloat(r.rate) })
+    setMaterialPrices(mp)
+    setLaborRates(lr)
+    setSubRates(sr)
   }, [])
+
+  useEffect(() => {
+    refreshAllRates().finally(() => setLoadingRates(false))
+  }, [refreshAllRates])
 
   const upd = (key, val) => setState(p => ({ ...p, [key]: val }))
   const updStruct = (key, val) => setState(p => ({ ...p, [key]: val }))
@@ -680,11 +682,16 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
             </div>
           </div>
           <div className="flex items-end pb-1">
-            <p className="text-xs text-gray-400">
-              {calc.totalShotCY.toFixed(1)} CY
-              × ${(subRates['Shotcrete Material'] ?? SHOTCRETE_MAT_PER_CY)}/CY mat
-              + max(${(subRates['Shotcrete Minimum Labor'] ?? SHOTCRETE_LABOR_MIN).toLocaleString()},
-              CY × ${(subRates['Shotcrete Labor'] ?? SHOTCRETE_LABOR_PER_CY)}/CY lab)
+            <p className="text-xs text-gray-400 inline-flex items-center flex-wrap gap-x-1">
+              {calc.totalShotCY.toFixed(1)} CY × ${(subRates['Shotcrete Material'] ?? SHOTCRETE_MAT_PER_CY)}/CY mat
+              <RateEditPopover table="subcontractor_rates" name="Shotcrete Material" category="Pool"
+                unitLabel="CY" currentValue={subRates['Shotcrete Material'] ?? SHOTCRETE_MAT_PER_CY} onSaved={refreshAllRates} />
+              + max(${(subRates['Shotcrete Minimum Labor'] ?? SHOTCRETE_LABOR_MIN).toLocaleString()}
+              <RateEditPopover table="subcontractor_rates" name="Shotcrete Minimum Labor" category="Pool"
+                unitLabel="flat" currentValue={subRates['Shotcrete Minimum Labor'] ?? SHOTCRETE_LABOR_MIN} onSaved={refreshAllRates} />
+              , CY × ${(subRates['Shotcrete Labor'] ?? SHOTCRETE_LABOR_PER_CY)}/CY lab)
+              <RateEditPopover table="subcontractor_rates" name="Shotcrete Labor" category="Pool"
+                unitLabel="CY" currentValue={subRates['Shotcrete Labor'] ?? SHOTCRETE_LABOR_PER_CY} onSaved={refreshAllRates} />
             </p>
           </div>
         </div>
@@ -743,13 +750,19 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
                   </div>
                   <div>
                     <Label text="Install Type" />
-                    <select
-                      className="input text-sm py-1.5"
-                      value={t.installType}
-                      onChange={e => upd('tile', { ...state.tile, [k]: { ...t, installType: e.target.value } })}
-                    >
-                      {TILE_INSTALL_TYPES.map(tp => <option key={tp}>{tp}</option>)}
-                    </select>
+                    <div className="flex items-center gap-1">
+                      <select
+                        className="input text-sm py-1.5 flex-1 min-w-0"
+                        value={t.installType}
+                        onChange={e => upd('tile', { ...state.tile, [k]: { ...t, installType: e.target.value } })}
+                      >
+                        {TILE_INSTALL_TYPES.map(tp => <option key={tp}>{tp}</option>)}
+                      </select>
+                      <RateEditPopover table="labor_rates" name={`Tile - ${t.installType}`} category="Pool"
+                        mode="coefficient" unitLabel="hrs/LF"
+                        currentValue={laborRates[`Tile - ${t.installType}`] ?? TILE_INSTALL_DEFAULTS[t.installType]}
+                        onSaved={refreshAllRates} />
+                    </div>
                   </div>
                   <div>
                     <Label text="Material" sub="$/SF" />
@@ -800,10 +813,19 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
               </div>
               <div>
                 <Label text="Type" />
-                <select className="input text-sm py-1.5" value={sw.type}
-                  onChange={e => updSpillway(i, 'type', e.target.value)}>
-                  {SPILLWAY_TYPES.map(t => <option key={t}>{t}</option>)}
-                </select>
+                <div className="flex items-center gap-1">
+                  <select className="input text-sm py-1.5 flex-1 min-w-0" value={sw.type}
+                    onChange={e => updSpillway(i, 'type', e.target.value)}>
+                    {SPILLWAY_TYPES.map(t => <option key={t}>{t}</option>)}
+                  </select>
+                  <RateEditPopover table="material_rates" name={`Spillway ${sw.type}`} category="Pool"
+                    unitLabel="LF" currentValue={materialPrices[`Spillway ${sw.type}`] ?? SPILLWAY_DEFAULTS[sw.type]?.mat}
+                    onSaved={refreshAllRates} />
+                  <RateEditPopover table="labor_rates" name={`Spillway - ${sw.type}`} category="Pool"
+                    mode="coefficient" unitLabel="hrs/LF"
+                    currentValue={laborRates[`Spillway - ${sw.type}`] ?? SPILLWAY_DEFAULTS[sw.type]?.hrs}
+                    onSaved={refreshAllRates} />
+                </div>
               </div>
               <div>
                 <Label text="Qty" />
@@ -837,10 +859,19 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
               </div>
               <div className="col-span-2">
                 <Label text="Coping Type" />
-                <select className="input text-sm py-1.5" value={cr.type}
-                  onChange={e => updCoping(i, 'type', e.target.value)}>
-                  {COPING_TYPES.map(t => <option key={t}>{t}</option>)}
-                </select>
+                <div className="flex items-center gap-1">
+                  <select className="input text-sm py-1.5 flex-1 min-w-0" value={cr.type}
+                    onChange={e => updCoping(i, 'type', e.target.value)}>
+                    {COPING_TYPES.map(t => <option key={t}>{t}</option>)}
+                  </select>
+                  <RateEditPopover table="material_rates" name={`Coping - ${cr.type}`} category="Pool"
+                    unitLabel="LF" currentValue={materialPrices[`Coping - ${cr.type}`] ?? COPING_DEFAULTS[cr.type]?.mat}
+                    onSaved={refreshAllRates} />
+                  <RateEditPopover table="labor_rates" name={`Coping - ${cr.type}`} category="Pool"
+                    mode="coefficient" unitLabel="hrs/LF"
+                    currentValue={laborRates[`Coping - ${cr.type}`] ?? COPING_DEFAULTS[cr.type]?.hrs}
+                    onSaved={refreshAllRates} />
+                </div>
               </div>
               <div>
                 <Label text="LF" />
@@ -871,10 +902,19 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
             <div key={i} className="grid grid-cols-5 gap-2 items-end">
               <div className="col-span-2">
                 <Label text="Surface Type" />
-                <select className="input text-sm py-1.5" value={rs.matType}
-                  onChange={e => updRaised(i, 'matType', e.target.value)}>
-                  {RAISED_SURFACE_TYPES.map(t => <option key={t}>{t}</option>)}
-                </select>
+                <div className="flex items-center gap-1">
+                  <select className="input text-sm py-1.5 flex-1 min-w-0" value={rs.matType}
+                    onChange={e => updRaised(i, 'matType', e.target.value)}>
+                    {RAISED_SURFACE_TYPES.map(t => <option key={t}>{t}</option>)}
+                  </select>
+                  <RateEditPopover table="material_rates" name={`Raised - ${rs.matType}`} category="Pool"
+                    unitLabel="SF" currentValue={materialPrices[`Raised - ${rs.matType}`] ?? RAISED_SURFACE_DEFAULTS[rs.matType]?.mat}
+                    onSaved={refreshAllRates} />
+                  <RateEditPopover table="labor_rates" name={`Raised - ${rs.matType}`} category="Pool"
+                    mode="coefficient" unitLabel="hrs/SF"
+                    currentValue={laborRates[`Raised - ${rs.matType}`] ?? RAISED_SURFACE_DEFAULTS[rs.matType]?.hrs}
+                    onSaved={refreshAllRates} />
+                </div>
               </div>
               <div>
                 <Label text="Sqft" />
@@ -914,10 +954,14 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <Label text="Finish Type" />
-                    <select className="input text-sm py-1.5" value={fin.type}
-                      onChange={e => upd('interiorFinish', { ...state.interiorFinish, [k]: { ...fin, type: e.target.value } })}>
-                      {INTERIOR_TYPES.map(t => <option key={t}>{t}</option>)}
-                    </select>
+                    <div className="flex items-center gap-1">
+                      <select className="input text-sm py-1.5 flex-1 min-w-0" value={fin.type}
+                        onChange={e => upd('interiorFinish', { ...state.interiorFinish, [k]: { ...fin, type: e.target.value } })}>
+                        {INTERIOR_TYPES.map(t => <option key={t}>{t}</option>)}
+                      </select>
+                      <RateEditPopover table="subcontractor_rates" name={`Interior Finish - ${fin.type}`} category="Pool"
+                        unitLabel="SF" currentValue={priceSF} onSaved={refreshAllRates} />
+                    </div>
                   </div>
                   <div>
                     <Label text="Auto Sub" sub={`$${priceSF}/SF`} />
@@ -1039,9 +1083,11 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
             </div>
           </div>
           <div className="flex items-end pb-1">
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-gray-400 inline-flex items-center flex-wrap gap-1">
               Auto: {fmt2(calc.plumbSub)}
               <br />Base: ${(subRates[`Plumbing ${state.plumbing.baseType}`] ?? PLUMBING_BASES[state.plumbing.baseType] ?? 4500).toLocaleString()}
+              <RateEditPopover table="subcontractor_rates" name={`Plumbing ${state.plumbing.baseType}`} category="Pool"
+                unitLabel="flat" currentValue={subRates[`Plumbing ${state.plumbing.baseType}`] ?? PLUMBING_BASES[state.plumbing.baseType]} onSaved={refreshAllRates} />
             </p>
           </div>
         </div>
@@ -1071,8 +1117,17 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
             </div>
           </div>
           <div className="flex items-end pb-1">
-            <p className="text-xs text-gray-400">
-              Auto: pool perimeter × ${subRates['Steel Per LF'] ?? 8}/LF{state.spa.enabled ? ` + $${subRates['Steel Spa Bonus'] ?? 200} spa` : ''}
+            <p className="text-xs text-gray-400 inline-flex items-center flex-wrap gap-1">
+              Auto: pool perimeter × ${subRates['Steel Per LF'] ?? 8}/LF
+              <RateEditPopover table="subcontractor_rates" name="Steel Per LF" category="Pool"
+                unitLabel="LF" currentValue={subRates['Steel Per LF'] ?? 8} onSaved={refreshAllRates} />
+              {state.spa.enabled && (
+                <>
+                  + ${subRates['Steel Spa Bonus'] ?? 200} spa
+                  <RateEditPopover table="subcontractor_rates" name="Steel Spa Bonus" category="Pool"
+                    unitLabel="flat" currentValue={subRates['Steel Spa Bonus'] ?? 200} onSaved={refreshAllRates} />
+                </>
+              )}
             </p>
           </div>
         </div>
