@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
+import RateEditPopover from '../RateEditPopover'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Fire Pit Module — based on Fire Pit Module tab in Excel estimator
@@ -229,23 +230,26 @@ export default function FirePitModule({ projectName, onSave, onBack, saving, ini
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
   const [pricesLoading, setPricesLoading]   = useState(!initialData?.materialPrices)
 
+  // Re-fetch Fire Pit merged labor+material map. Used on mount and after edit.
+  const refreshAllRates = useCallback(async () => {
+    const [matRes, labRes] = await Promise.all([
+      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Fire Pit'),
+      supabase.from('labor_rates').select('name, rate').eq('category', 'Fire Pit'),
+    ])
+    const prices = {}
+    ;(matRes.data || []).forEach(r => { prices[r.name] = parseFloat(r.unit_cost) || 0 })
+    ;(labRes.data  || []).forEach(r => { prices[r.name] = parseFloat(r.rate)     || 0 })
+    setMaterialPrices(prices)
+  }, [])
+
   useEffect(() => {
     if (!initialData?.laborRatePerHour) {
       supabase.from('company_settings').select('value').eq('key', 'labor_rate_per_hour').single()
         .then(({ data }) => { if (data) setLaborRatePerHour(parseFloat(data.value) || DEFAULTS.laborRatePerHour) })
     }
     if (initialData?.materialPrices) return
-    Promise.all([
-      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Fire Pit'),
-      supabase.from('labor_rates').select('name, rate').eq('category', 'Fire Pit'),
-    ]).then(([matRes, labRes]) => {
-      const prices = {}
-      ;(matRes.data || []).forEach(r => { prices[r.name] = parseFloat(r.unit_cost) || 0 })
-      ;(labRes.data  || []).forEach(r => { prices[r.name] = parseFloat(r.rate)     || 0 })
-      setMaterialPrices(prices)
-      setPricesLoading(false)
-    })
-  }, [])
+    refreshAllRates().then(() => setPricesLoading(false))
+  }, [refreshAllRates])
 
   const gpmd            = initialData?.gpmd            ?? DEFAULTS.gpmd
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
@@ -368,6 +372,40 @@ export default function FirePitModule({ projectName, onSave, onBack, saving, ini
       {/* ── Fire Pit Structure ── */}
       <div>
         <SectionHeader title="Fire Pit Structure (CMU Block)" />
+        <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3 text-[11px] text-gray-500">
+          <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">FP Structural Rates (click any to edit)</p>
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
+            <span className="inline-flex items-center gap-1">Block ${p(FP_RATES.fpBlock.dbName, 2.50).toFixed(2)}/ea
+              <RateEditPopover table="material_rates" name={FP_RATES.fpBlock.dbName} category="Fire Pit" unitLabel="ea" currentValue={p(FP_RATES.fpBlock.dbName, FP_RATES.fpBlock.fallback)} onSaved={refreshAllRates} />
+            </span>
+            <span className="inline-flex items-center gap-1">Rebar ${p(FP_RATES.fpRebar.dbName, 0.50).toFixed(2)}/LF
+              <RateEditPopover table="material_rates" name={FP_RATES.fpRebar.dbName} category="Fire Pit" unitLabel="LF" currentValue={p(FP_RATES.fpRebar.dbName, FP_RATES.fpRebar.fallback)} onSaved={refreshAllRates} />
+            </span>
+            <span className="inline-flex items-center gap-1">Concrete ${p(FP_RATES.fpConcrete.dbName, 149.50).toFixed(2)}/CY
+              <RateEditPopover table="material_rates" name={FP_RATES.fpConcrete.dbName} category="Fire Pit" unitLabel="CY" currentValue={p(FP_RATES.fpConcrete.dbName, FP_RATES.fpConcrete.fallback)} onSaved={refreshAllRates} />
+            </span>
+            <span className="inline-flex items-center gap-1">Grout pump ${p(FP_RATES.fpGroutPump.dbName, 150).toFixed(2)}
+              <RateEditPopover table="material_rates" name={FP_RATES.fpGroutPump.dbName} category="Fire Pit" unitLabel="flat" currentValue={p(FP_RATES.fpGroutPump.dbName, FP_RATES.fpGroutPump.fallback)} onSaved={refreshAllRates} />
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+            <span className="inline-flex items-center gap-1">Dig {p(FP_RATES.digLab.dbName, 4)} CF/hr
+              <RateEditPopover table="labor_rates" name={FP_RATES.digLab.dbName} category="Fire Pit" mode="coefficient" unitLabel="CF/hr" currentValue={p(FP_RATES.digLab.dbName, FP_RATES.digLab.fallback)} onSaved={refreshAllRates} />
+            </span>
+            <span className="inline-flex items-center gap-1">Rebar {p(FP_RATES.rebarLab.dbName, 35)} LF/hr
+              <RateEditPopover table="labor_rates" name={FP_RATES.rebarLab.dbName} category="Fire Pit" mode="coefficient" unitLabel="LF/hr" currentValue={p(FP_RATES.rebarLab.dbName, FP_RATES.rebarLab.fallback)} onSaved={refreshAllRates} />
+            </span>
+            <span className="inline-flex items-center gap-1">Block {p(FP_RATES.blockLab.dbName, 10.4)} blk/hr
+              <RateEditPopover table="labor_rates" name={FP_RATES.blockLab.dbName} category="Fire Pit" mode="coefficient" unitLabel="blk/hr" currentValue={p(FP_RATES.blockLab.dbName, FP_RATES.blockLab.fallback)} onSaved={refreshAllRates} />
+            </span>
+            <span className="inline-flex items-center gap-1">Hand grout {p(FP_RATES.handGroutLab.dbName, 5.5)} CF/hr
+              <RateEditPopover table="labor_rates" name={FP_RATES.handGroutLab.dbName} category="Fire Pit" mode="coefficient" unitLabel="CF/hr" currentValue={p(FP_RATES.handGroutLab.dbName, FP_RATES.handGroutLab.fallback)} onSaved={refreshAllRates} />
+            </span>
+            <span className="inline-flex items-center gap-1">Pump grout {p(FP_RATES.pumpGroutLab.dbName, 81)} CF/hr
+              <RateEditPopover table="labor_rates" name={FP_RATES.pumpGroutLab.dbName} category="Fire Pit" mode="coefficient" unitLabel="CF/hr" currentValue={p(FP_RATES.pumpGroutLab.dbName, FP_RATES.pumpGroutLab.fallback)} onSaved={refreshAllRates} />
+            </span>
+          </div>
+        </div>
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div>
             <label className="block text-xs text-gray-500 mb-1">Wall Perimeter (LF)</label>
@@ -431,17 +469,34 @@ export default function FirePitModule({ projectName, onSave, onBack, saving, ini
       <div>
         <SectionHeader title="Gas Fixtures & Trench" />
         <div className="space-y-0">
-          <LabeledRow label="Layout Time (Hours)">
+          <div className="flex items-center gap-3 py-1.5 border-b border-gray-100">
+            <span className="text-xs text-gray-700 w-44 shrink-0">Layout Time (Hours)</span>
             <NumInput value={layoutHrs} onChange={setLayoutHrs} placeholder="0" className="w-28" />
-          </LabeledRow>
-          <LabeledRow label="Gas Ring / Burner Openings"
-            note={n(gasRingCount) > 0 ? `$${(n(gasRingCount) * p(FP_RATES.fpGasRing.dbName, 25)).toFixed(2)} mat` : null}>
+          </div>
+          <div className="flex items-center gap-3 py-1.5 border-b border-gray-100">
+            <span className="text-xs text-gray-700 w-44 shrink-0 inline-flex items-center gap-1">
+              Gas Ring / Burner Openings
+              <RateEditPopover table="material_rates" name={FP_RATES.fpGasRing.dbName} category="Fire Pit"
+                unitLabel="ea" currentValue={p(FP_RATES.fpGasRing.dbName, FP_RATES.fpGasRing.fallback)} onSaved={refreshAllRates} />
+            </span>
             <NumInput value={gasRingCount} onChange={setGasRingCount} placeholder="0" className="w-28" />
-          </LabeledRow>
-          <LabeledRow label="Gas Trench / Run (LF)"
-            note={n(gasTrenchLF) > 0 ? `$${(n(gasTrenchLF) * p(FP_RATES.fpGasPipe.dbName, 3)).toFixed(2)} mat` : null}>
+            {n(gasRingCount) > 0 && (
+              <span className="text-xs text-gray-400 shrink-0">${(n(gasRingCount) * p(FP_RATES.fpGasRing.dbName, 25)).toFixed(2)} mat</span>
+            )}
+          </div>
+          <div className="flex items-center gap-3 py-1.5 border-b border-gray-100">
+            <span className="text-xs text-gray-700 w-44 shrink-0 inline-flex items-center gap-1">
+              Gas Trench / Run (LF)
+              <RateEditPopover table="labor_rates" name={FP_RATES.gasTrenchLab.dbName} category="Fire Pit"
+                mode="coefficient" unitLabel="LF/day" currentValue={p(FP_RATES.gasTrenchLab.dbName, FP_RATES.gasTrenchLab.fallback)} onSaved={refreshAllRates} />
+              <RateEditPopover table="material_rates" name={FP_RATES.fpGasPipe.dbName} category="Fire Pit"
+                unitLabel="LF" currentValue={p(FP_RATES.fpGasPipe.dbName, FP_RATES.fpGasPipe.fallback)} onSaved={refreshAllRates} />
+            </span>
             <NumInput value={gasTrenchLF} onChange={setGasTrenchLF} placeholder="0" className="w-28" />
-          </LabeledRow>
+            {n(gasTrenchLF) > 0 && (
+              <span className="text-xs text-gray-400 shrink-0">${(n(gasTrenchLF) * p(FP_RATES.fpGasPipe.dbName, 3)).toFixed(2)} mat</span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -460,16 +515,24 @@ export default function FirePitModule({ projectName, onSave, onBack, saving, ini
             </thead>
             <tbody>
               {[
-                { label: 'Sand Stucco',       sf: sandStuccoSF,   setSf: setSandStuccoSF,   mat: calc.sandStuccoMat,   rate: p(FP_RATES.sandStucco.dbName,   0).toFixed(2),   unit: '/SF' },
-                { label: 'Smooth Stucco',     sf: smoothStuccoSF, setSf: setSmoothStuccoSF, mat: calc.smoothStuccoMat, rate: p(FP_RATES.smoothStucco.dbName, 0).toFixed(2),   unit: '/SF' },
-                { label: 'Ledgerstone Veneer',sf: ledgerstoneSF,  setSf: setLedgerstoneSF,  mat: calc.ledgerstoneMat,  rate: p(FP_RATES.ledgerstone.dbName,  10).toFixed(2),  unit: '/SF' },
-                { label: 'Stacked Stone',     sf: stackedStoneSF, setSf: setStackedStoneSF, mat: calc.stackedStoneMat, rate: p(FP_RATES.stackedStone.dbName, 10).toFixed(2),  unit: '/SF' },
-                { label: 'Tile',              sf: tileSF,         setSf: setTileSF,         mat: calc.tileMat,         rate: p(FP_RATES.tile.dbName,         6.5).toFixed(2), unit: '/SF' },
-              ].map(({ label, sf, setSf, mat, rate, unit }) => (
+                { label: 'Sand Stucco',       sf: sandStuccoSF,   setSf: setSandStuccoSF,   mat: calc.sandStuccoMat,   matKey: 'sandStucco',   labKey: 'sandStuccoLab',   fallback: 0 },
+                { label: 'Smooth Stucco',     sf: smoothStuccoSF, setSf: setSmoothStuccoSF, mat: calc.smoothStuccoMat, matKey: 'smoothStucco', labKey: 'smoothStuccoLab', fallback: 0 },
+                { label: 'Ledgerstone Veneer',sf: ledgerstoneSF,  setSf: setLedgerstoneSF,  mat: calc.ledgerstoneMat,  matKey: 'ledgerstone',  labKey: 'ledgerstoneLab',  fallback: 10 },
+                { label: 'Stacked Stone',     sf: stackedStoneSF, setSf: setStackedStoneSF, mat: calc.stackedStoneMat, matKey: 'stackedStone', labKey: 'stackedStoneLab', fallback: 10 },
+                { label: 'Tile',              sf: tileSF,         setSf: setTileSF,         mat: calc.tileMat,         matKey: 'tile',         labKey: 'tileLab',         fallback: 6.5 },
+              ].map(({ label, sf, setSf, mat, matKey, labKey, fallback }) => (
                 <tr key={label} className="border-b border-gray-100">
                   <td className="py-1 pr-2 text-xs text-gray-700">{label}</td>
                   <td className="py-1 pr-2"><NumInput value={sf} onChange={setSf} /></td>
-                  <td className="py-1 pr-2 text-xs text-gray-400">${rate}{unit}</td>
+                  <td className="py-1 pr-2 text-xs text-gray-400">
+                    <span className="inline-flex items-center gap-1 flex-wrap">
+                      ${p(FP_RATES[matKey].dbName, fallback).toFixed(2)}/SF
+                      <RateEditPopover table="material_rates" name={FP_RATES[matKey].dbName} category="Fire Pit"
+                        unitLabel="SF" currentValue={p(FP_RATES[matKey].dbName, FP_RATES[matKey].fallback)} onSaved={refreshAllRates} />
+                      <RateEditPopover table="labor_rates" name={FP_RATES[labKey].dbName} category="Fire Pit"
+                        mode="coefficient" unitLabel="rate" currentValue={p(FP_RATES[labKey].dbName, FP_RATES[labKey].fallback)} onSaved={refreshAllRates} />
+                    </span>
+                  </td>
                   <td className="py-1 text-right text-xs text-gray-600">
                     {n(sf) > 0 ? `$${mat.toFixed(2)}` : '—'}
                   </td>
@@ -478,17 +541,27 @@ export default function FirePitModule({ projectName, onSave, onBack, saving, ini
 
               {/* Real Flagstone — editable $/ton */}
               <tr className="border-b border-gray-100">
-                <td className="py-1 pr-2 text-xs text-gray-700">Real Flagstone</td>
+                <td className="py-1 pr-2 text-xs text-gray-700">
+                  <span className="inline-flex items-center gap-1">
+                    Real Flagstone
+                    <RateEditPopover table="labor_rates" name={FP_RATES.flagstoneLab.dbName} category="Fire Pit"
+                      mode="coefficient" unitLabel="hrs/SF" currentValue={p(FP_RATES.flagstoneLab.dbName, FP_RATES.flagstoneLab.fallback)} onSaved={refreshAllRates} />
+                  </span>
+                </td>
                 <td className="py-1 pr-2"><NumInput value={flagstoneSF} onChange={setFlagstoneSF} /></td>
                 <td className="py-1 pr-2">
-                  <div className="relative w-24">
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-                    <input type="number" step="any" min="0"
-                      className="input text-sm py-1.5 pl-5 w-full"
-                      placeholder={p(FP_RATES.realFlagstone.dbName, 400).toString()}
-                      value={flagstoneRateInput}
-                      onChange={e => setFlagstoneRateInput(e.target.value)}
-                    />
+                  <div className="flex items-center gap-1">
+                    <div className="relative w-24">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                      <input type="number" step="any" min="0"
+                        className="input text-sm py-1.5 pl-5 w-full"
+                        placeholder={p(FP_RATES.realFlagstone.dbName, 400).toString()}
+                        value={flagstoneRateInput}
+                        onChange={e => setFlagstoneRateInput(e.target.value)}
+                      />
+                    </div>
+                    <RateEditPopover table="material_rates" name={FP_RATES.realFlagstone.dbName} category="Fire Pit"
+                      unitLabel="ton" currentValue={p(FP_RATES.realFlagstone.dbName, FP_RATES.realFlagstone.fallback)} onSaved={refreshAllRates} />
                   </div>
                 </td>
                 <td className="py-1 text-right text-xs text-gray-600">
@@ -503,17 +576,27 @@ export default function FirePitModule({ projectName, onSave, onBack, saving, ini
 
               {/* Real Stone — editable $/ton */}
               <tr className="border-b border-gray-100">
-                <td className="py-1 pr-2 text-xs text-gray-700">Real Stone</td>
+                <td className="py-1 pr-2 text-xs text-gray-700">
+                  <span className="inline-flex items-center gap-1">
+                    Real Stone
+                    <RateEditPopover table="labor_rates" name={FP_RATES.realStoneLab.dbName} category="Fire Pit"
+                      mode="coefficient" unitLabel="hrs/SF" currentValue={p(FP_RATES.realStoneLab.dbName, FP_RATES.realStoneLab.fallback)} onSaved={refreshAllRates} />
+                  </span>
+                </td>
                 <td className="py-1 pr-2"><NumInput value={realStoneSF} onChange={setRealStoneSF} /></td>
                 <td className="py-1 pr-2">
-                  <div className="relative w-24">
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-                    <input type="number" step="any" min="0"
-                      className="input text-sm py-1.5 pl-5 w-full"
-                      placeholder={p(FP_RATES.realStone.dbName, 400).toString()}
-                      value={realStoneRateInput}
-                      onChange={e => setRealStoneRateInput(e.target.value)}
-                    />
+                  <div className="flex items-center gap-1">
+                    <div className="relative w-24">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                      <input type="number" step="any" min="0"
+                        className="input text-sm py-1.5 pl-5 w-full"
+                        placeholder={p(FP_RATES.realStone.dbName, 400).toString()}
+                        value={realStoneRateInput}
+                        onChange={e => setRealStoneRateInput(e.target.value)}
+                      />
+                    </div>
+                    <RateEditPopover table="material_rates" name={FP_RATES.realStone.dbName} category="Fire Pit"
+                      unitLabel="ton" currentValue={p(FP_RATES.realStone.dbName, FP_RATES.realStone.fallback)} onSaved={refreshAllRates} />
                   </div>
                 </td>
                 <td className="py-1 text-right text-xs text-gray-600">

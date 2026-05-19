@@ -10,6 +10,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
+import RateEditPopover from '../RateEditPopover'
 
 // ── Demo method rates (tons/hr) — DemoRatesTurf lookup table ────────────────
 const DEMO_METHODS = [
@@ -305,6 +306,16 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
   const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? 35)
   const [pricesLoading,    setPricesLoading]    = useState(!initialData?.materialPrices)
 
+  // Re-fetch Turf rate maps. Used on mount and after any RateEditPopover save.
+  const refreshAllRates = useCallback(async () => {
+    const [matRes, labRes] = await Promise.all([
+      supabase.from('material_rates').select('name, unit_cost').in('category', ['Artificial Turf', 'Demo']),
+      supabase.from('labor_rates').select('name, rate').eq('category', 'Artificial Turf'),
+    ])
+    if (matRes.data) { const m = {}; matRes.data.forEach(r => { m[r.name] = parseFloat(r.unit_cost) }); setMaterialPrices(m) }
+    if (labRes.data) { const m = {}; labRes.data.forEach(r => { m[r.name] = parseFloat(r.rate) });      setLaborRates(m) }
+  }, [])
+
   useEffect(() => {
     if (initialData?.materialPrices && initialData?.laborRatePerHour) return
     let gone = false
@@ -313,17 +324,12 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         !initialData?.laborRatePerHour &&
           supabase.from('company_settings').select('labor_rate_per_hour').single()
             .then(({ data }) => { if (!gone && data?.labor_rate_per_hour) setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || 35) }),
-        !initialData?.materialPrices &&
-          supabase.from('material_rates').select('name, unit_cost').in('category', ['Artificial Turf', 'Demo'])
-            .then(({ data }) => { if (!gone && data) { const m = {}; data.forEach(r => { m[r.name] = parseFloat(r.unit_cost) }); setMaterialPrices(m) } }),
-        !initialData?.laborRates &&
-          supabase.from('labor_rates').select('name, rate').eq('category', 'Artificial Turf')
-            .then(({ data }) => { if (!gone && data) { const m = {}; data.forEach(r => { m[r.name] = parseFloat(r.rate) }); setLaborRates(m) } }),
+        refreshAllRates(),
       ])
       if (!gone) setPricesLoading(false)
     })()
     return () => { gone = true }
-  }, [])
+  }, [refreshAllRates])
 
   const set    = useCallback((f, v) => setState(p => ({ ...p, [f]: v })), [])
   const setDemo  = useCallback((type, field, val) =>
@@ -444,13 +450,28 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           <tbody className="divide-y divide-gray-50">
             {DEMO_ROWS.map((row, i) => {
               const cr = calc.demoCalc[i]
+              const methodMeta = DEMO_METHODS.find(x => x.key === state.demo[row.key].method)
               return (
                 <tr key={row.key}>
-                  <td className={`${td} font-medium text-gray-700`}>{row.label}</td>
+                  <td className={`${td} font-medium text-gray-700`}>
+                    <span className="inline-flex items-center gap-1">
+                      {row.label}
+                      <RateEditPopover table="material_rates" name={row.dumpKey} category="Demo"
+                        unitLabel="ton" currentValue={cr.dumpRate} onSaved={refreshAllRates} />
+                    </span>
+                  </td>
                   <td className={td}>
-                    <Sel value={state.demo[row.key].method}
-                      onChange={e => setDemo(row.key, 'method', e.target.value)}
-                      options={demoMethodKeys} optionLabels={demoMethodLabels} />
+                    <div className="flex items-center gap-1">
+                      <div className="flex-1 min-w-0">
+                        <Sel value={state.demo[row.key].method}
+                          onChange={e => setDemo(row.key, 'method', e.target.value)}
+                          options={demoMethodKeys} optionLabels={demoMethodLabels} />
+                      </div>
+                      {methodMeta && (
+                        <RateEditPopover table="labor_rates" name={methodMeta.matKey} category="Artificial Turf"
+                          mode="coefficient" unitLabel="t/hr" currentValue={cr.rate} onSaved={refreshAllRates} />
+                      )}
+                    </div>
                   </td>
                   <td className={td}>
                     <Inp value={state.demo[row.key].sf}
@@ -494,8 +515,12 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                   className="w-4 h-4 accent-blue-600" />
               </td>
               <td className={`${td} font-medium text-gray-700`}>
-                2" Gravel Base
-                <span className="text-gray-400 font-normal ml-1">${n(materialPrices['Turf - Gravel Base'] || RATE_DEFAULTS.gravelBase).toFixed(2)}/ton</span>
+                <span className="inline-flex items-center gap-1">
+                  2" Gravel Base
+                  <span className="text-gray-400 font-normal">${n(materialPrices['Turf - Gravel Base'] || RATE_DEFAULTS.gravelBase).toFixed(2)}/ton</span>
+                  <RateEditPopover table="material_rates" name="Turf - Gravel Base" category="Artificial Turf"
+                    unitLabel="ton" currentValue={n(materialPrices['Turf - Gravel Base'] || RATE_DEFAULTS.gravelBase)} onSaved={refreshAllRates} />
+                </span>
               </td>
               <td className={td}><Inp value={state.base.gravelSF} onChange={e => setBase('gravelSF', e.target.value)} placeholder={calc.turfAreaSF || '0'} /></td>
               <td className={num}>{state.base.useGravel && calc.gravelTons > 0 ? `${calc.gravelTons.toFixed(2)} t` : '—'}</td>
@@ -510,8 +535,12 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                   className="w-4 h-4 accent-blue-600" />
               </td>
               <td className={`${td} font-medium text-gray-700`}>
-                1" DG Base
-                <span className="text-gray-400 font-normal ml-1">${n(materialPrices['Turf - DG Base'] || RATE_DEFAULTS.dgBase).toFixed(2)}/ton</span>
+                <span className="inline-flex items-center gap-1">
+                  1" DG Base
+                  <span className="text-gray-400 font-normal">${n(materialPrices['Turf - DG Base'] || RATE_DEFAULTS.dgBase).toFixed(2)}/ton</span>
+                  <RateEditPopover table="material_rates" name="Turf - DG Base" category="Artificial Turf"
+                    unitLabel="ton" currentValue={n(materialPrices['Turf - DG Base'] || RATE_DEFAULTS.dgBase)} onSaved={refreshAllRates} />
+                </span>
               </td>
               <td className={td}><Inp value={state.base.dgSF} onChange={e => setBase('dgSF', e.target.value)} placeholder={calc.turfAreaSF || '0'} /></td>
               <td className={num}>{state.base.useDG && calc.dgTrips > 0 ? `${calc.dgTrips} trips` : '—'}</td>
@@ -526,8 +555,12 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
                   className="w-4 h-4 accent-blue-600" />
               </td>
               <td className={`${td} font-medium text-gray-700`}>
-                Weed Barrier Fabric
-                <span className="text-gray-400 font-normal ml-1">${n(materialPrices['Turf - Weed Barrier Fabric'] || RATE_DEFAULTS.weedFabric).toFixed(2)}/roll (1,800 SF)</span>
+                <span className="inline-flex items-center gap-1">
+                  Weed Barrier Fabric
+                  <span className="text-gray-400 font-normal">${n(materialPrices['Turf - Weed Barrier Fabric'] || RATE_DEFAULTS.weedFabric).toFixed(2)}/roll (1,800 SF)</span>
+                  <RateEditPopover table="material_rates" name="Turf - Weed Barrier Fabric" category="Artificial Turf"
+                    unitLabel="roll" currentValue={n(materialPrices['Turf - Weed Barrier Fabric'] || RATE_DEFAULTS.weedFabric)} onSaved={refreshAllRates} />
+                </span>
               </td>
               <td className={td}><Inp value={state.base.weedSF} onChange={e => setBase('weedSF', e.target.value)} placeholder={calc.turfAreaSF || '0'} /></td>
               <td className={num}>{state.base.useWeedFabric && calc.weedRolls > 0 ? `${calc.weedRolls} rolls` : '—'}</td>
@@ -544,11 +577,20 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
             onChange={v => set('useZeoFill', v)}
             label="ZeoFill Pet Odor Infill (upgrade)"
           />
-          <span className="text-xs text-amber-700 ml-auto">
-            {state.useZeoFill
-              ? `${Math.ceil(calc.infillAreaSF / 30)} bags @ $${n(materialPrices['Turf - Infill ZeoFill'] || RATE_DEFAULTS.infillZeoFill).toFixed(2)}/bag`
-              : `Durafill @ $${n(materialPrices['Turf - Infill Durafill'] || RATE_DEFAULTS.infillDurafill).toFixed(2)}/SF`
-            }
+          <span className="text-xs text-amber-700 ml-auto inline-flex items-center gap-1">
+            {state.useZeoFill ? (
+              <>
+                {Math.ceil(calc.infillAreaSF / 30)} bags @ ${n(materialPrices['Turf - Infill ZeoFill'] || RATE_DEFAULTS.infillZeoFill).toFixed(2)}/bag
+                <RateEditPopover table="material_rates" name="Turf - Infill ZeoFill" category="Artificial Turf"
+                  unitLabel="bag" currentValue={n(materialPrices['Turf - Infill ZeoFill'] || RATE_DEFAULTS.infillZeoFill)} onSaved={refreshAllRates} />
+              </>
+            ) : (
+              <>
+                Durafill @ ${n(materialPrices['Turf - Infill Durafill'] || RATE_DEFAULTS.infillDurafill).toFixed(2)}/SF
+                <RateEditPopover table="material_rates" name="Turf - Infill Durafill" category="Artificial Turf"
+                  unitLabel="SF" currentValue={n(materialPrices['Turf - Infill Durafill'] || RATE_DEFAULTS.infillDurafill)} onSaved={refreshAllRates} />
+              </>
+            )}
           </span>
         </div>
       </div>
@@ -567,12 +609,19 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           <tbody className="divide-y divide-gray-50">
             {state.rolls.map((roll, i) => {
               const cr = calc.rollCalc[i]
+              const brand = TURF_BRANDS.find(b => b.key === roll.brand) || TURF_BRANDS[0]
               return (
                 <tr key={i}>
                   <td className={td}>
-                    <Sel value={roll.brand}
-                      onChange={e => setRoll(i, 'brand', e.target.value)}
-                      options={brandKeys} optionLabels={brandLabels} />
+                    <div className="flex items-center gap-1">
+                      <div className="flex-1 min-w-0">
+                        <Sel value={roll.brand}
+                          onChange={e => setRoll(i, 'brand', e.target.value)}
+                          options={brandKeys} optionLabels={brandLabels} />
+                      </div>
+                      <RateEditPopover table="material_rates" name={brand.matKey} category="Artificial Turf"
+                        unitLabel="SF" currentValue={cr.pricePerSF} onSaved={refreshAllRates} />
+                    </div>
                   </td>
                   <td className={td}>
                     <Inp value={roll.edgeLF}
@@ -590,8 +639,11 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
         {/* Cut, Staple & Seam — auto-calculated */}
         {calc.totalEdgeLF > 0 && (
           <div className="mt-2 bg-gray-50 rounded-lg px-3 py-2 text-xs flex justify-between">
-            <span className="text-gray-600 font-medium">Cut, Staple &amp; Seam
-              <span className="text-gray-400 font-normal ml-2">({calc.totalEdgeLF} LF total)</span>
+            <span className="text-gray-600 font-medium inline-flex items-center gap-1">
+              Cut, Staple &amp; Seam
+              <span className="text-gray-400 font-normal ml-1">({calc.totalEdgeLF} LF total)</span>
+              <RateEditPopover table="material_rates" name="Turf - Install Materials" category="Artificial Turf"
+                unitLabel="LF" currentValue={n(materialPrices['Turf - Install Materials'] || RATE_DEFAULTS.installMaterials)} onSaved={refreshAllRates} />
             </span>
             <div className="flex gap-4">
               <span className="text-gray-700">{fh(calc.cutHrs)} hrs</span>
@@ -630,9 +682,20 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           <tbody>
             <tr>
               <td className={td}>
-                <Sel value={state.strips?.brand || brandKeys[0]}
-                  onChange={e => setStrips('brand', e.target.value)}
-                  options={brandKeys} optionLabels={brandLabels} />
+                <div className="flex items-center gap-1">
+                  <div className="flex-1 min-w-0">
+                    <Sel value={state.strips?.brand || brandKeys[0]}
+                      onChange={e => setStrips('brand', e.target.value)}
+                      options={brandKeys} optionLabels={brandLabels} />
+                  </div>
+                  {(() => {
+                    const stripBrand = TURF_BRANDS.find(b => b.key === state.strips?.brand) || TURF_BRANDS[0]
+                    return (
+                      <RateEditPopover table="material_rates" name={stripBrand.matKey} category="Artificial Turf"
+                        unitLabel="SF" currentValue={calc.stripsPrice} onSaved={refreshAllRates} />
+                    )
+                  })()}
+                </div>
               </td>
               <td className={td}>
                 <Inp value={state.strips?.lf || ''}

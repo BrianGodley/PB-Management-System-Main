@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
+import RateEditPopover from '../RateEditPopover'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Outdoor Kitchen (BBQ) Module — based on BBQ Module tab in Excel estimator
@@ -236,23 +237,26 @@ export default function OutdoorKitchenModule({ projectName, onSave, onBack, savi
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
   const [pricesLoading, setPricesLoading]   = useState(!initialData?.materialPrices)
 
+  // Re-fetch Outdoor Kitchen merged labor+material map. Used on mount and after save.
+  const refreshAllRates = useCallback(async () => {
+    const [matRes, labRes] = await Promise.all([
+      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Outdoor Kitchen'),
+      supabase.from('labor_rates').select('name, rate').eq('category', 'Outdoor Kitchen'),
+    ])
+    const prices = {}
+    ;(matRes.data || []).forEach(r => { prices[r.name] = parseFloat(r.unit_cost) || 0 })
+    ;(labRes.data  || []).forEach(r => { prices[r.name] = parseFloat(r.rate)     || 0 })
+    setMaterialPrices(prices)
+  }, [])
+
   useEffect(() => {
     if (!initialData?.laborRatePerHour) {
       supabase.from('company_settings').select('value').eq('key', 'labor_rate_per_hour').single()
         .then(({ data }) => { if (data) setLaborRatePerHour(parseFloat(data.value) || DEFAULTS.laborRatePerHour) })
     }
     if (initialData?.materialPrices) return
-    Promise.all([
-      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Outdoor Kitchen'),
-      supabase.from('labor_rates').select('name, rate').eq('category', 'Outdoor Kitchen'),
-    ]).then(([matRes, labRes]) => {
-      const prices = {}
-      ;(matRes.data || []).forEach(r => { prices[r.name] = parseFloat(r.unit_cost) || 0 })
-      ;(labRes.data  || []).forEach(r => { prices[r.name] = parseFloat(r.rate)     || 0 })
-      setMaterialPrices(prices)
-      setPricesLoading(false)
-    })
-  }, [])
+    refreshAllRates().then(() => setPricesLoading(false))
+  }, [refreshAllRates])
 
   const gpmd           = initialData?.gpmd          ?? DEFAULTS.gpmd
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
@@ -379,6 +383,40 @@ export default function OutdoorKitchenModule({ projectName, onSave, onBack, savi
       {/* ── BBQ Structure ── */}
       <div>
         <SectionHeader title="BBQ Structure" />
+        <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3 text-[11px] text-gray-500">
+          <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">BBQ Structural Rates (click any to edit)</p>
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
+            <span className="inline-flex items-center gap-1">Block ${p(OK_RATES.bbqBlock.dbName, 2.50).toFixed(2)}/ea
+              <RateEditPopover table="material_rates" name={OK_RATES.bbqBlock.dbName} category="Outdoor Kitchen" unitLabel="ea" currentValue={p(OK_RATES.bbqBlock.dbName, OK_RATES.bbqBlock.fallback)} onSaved={refreshAllRates} />
+            </span>
+            <span className="inline-flex items-center gap-1">Rebar ${p(OK_RATES.bbqRebar.dbName, 0.40).toFixed(2)}/LF
+              <RateEditPopover table="material_rates" name={OK_RATES.bbqRebar.dbName} category="Outdoor Kitchen" unitLabel="LF" currentValue={p(OK_RATES.bbqRebar.dbName, OK_RATES.bbqRebar.fallback)} onSaved={refreshAllRates} />
+            </span>
+            <span className="inline-flex items-center gap-1">Concrete ${p(OK_RATES.bbqConcrete.dbName, 149.50).toFixed(2)}/CY
+              <RateEditPopover table="material_rates" name={OK_RATES.bbqConcrete.dbName} category="Outdoor Kitchen" unitLabel="CY" currentValue={p(OK_RATES.bbqConcrete.dbName, OK_RATES.bbqConcrete.fallback)} onSaved={refreshAllRates} />
+            </span>
+            <span className="inline-flex items-center gap-1">Fill ${p(OK_RATES.bbqFillMat.dbName, 60).toFixed(2)}/CY
+              <RateEditPopover table="material_rates" name={OK_RATES.bbqFillMat.dbName} category="Outdoor Kitchen" unitLabel="CY" currentValue={p(OK_RATES.bbqFillMat.dbName, OK_RATES.bbqFillMat.fallback)} onSaved={refreshAllRates} />
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+            <span className="inline-flex items-center gap-1">Excavate {p(OK_RATES.excavateLab.dbName, 5)} CF/hr
+              <RateEditPopover table="labor_rates" name={OK_RATES.excavateLab.dbName} category="Outdoor Kitchen" mode="coefficient" unitLabel="CF/hr" currentValue={p(OK_RATES.excavateLab.dbName, OK_RATES.excavateLab.fallback)} onSaved={refreshAllRates} />
+            </span>
+            <span className="inline-flex items-center gap-1">Rebar {p(OK_RATES.rebarLab.dbName, 146)} LF/day
+              <RateEditPopover table="labor_rates" name={OK_RATES.rebarLab.dbName} category="Outdoor Kitchen" mode="coefficient" unitLabel="LF/day" currentValue={p(OK_RATES.rebarLab.dbName, OK_RATES.rebarLab.fallback)} onSaved={refreshAllRates} />
+            </span>
+            <span className="inline-flex items-center gap-1">Pour {p(OK_RATES.pourFootingLab.dbName, 4)} hrs/CY
+              <RateEditPopover table="labor_rates" name={OK_RATES.pourFootingLab.dbName} category="Outdoor Kitchen" mode="coefficient" unitLabel="hrs/CY" currentValue={p(OK_RATES.pourFootingLab.dbName, OK_RATES.pourFootingLab.fallback)} onSaved={refreshAllRates} />
+            </span>
+            <span className="inline-flex items-center gap-1">Block {p(OK_RATES.installBlockLab.dbName, 60)} blk/day
+              <RateEditPopover table="labor_rates" name={OK_RATES.installBlockLab.dbName} category="Outdoor Kitchen" mode="coefficient" unitLabel="blk/day" currentValue={p(OK_RATES.installBlockLab.dbName, OK_RATES.installBlockLab.fallback)} onSaved={refreshAllRates} />
+            </span>
+            <span className="inline-flex items-center gap-1">Fill {p(OK_RATES.fillBlockLab.dbName, 146)} blk/day
+              <RateEditPopover table="labor_rates" name={OK_RATES.fillBlockLab.dbName} category="Outdoor Kitchen" mode="coefficient" unitLabel="blk/day" currentValue={p(OK_RATES.fillBlockLab.dbName, OK_RATES.fillBlockLab.fallback)} onSaved={refreshAllRates} />
+            </span>
+          </div>
+        </div>
         <div className="grid grid-cols-2 gap-3 mb-3">
           <div>
             <label className="block text-xs text-gray-500 mb-1">BBQ Wall Length (LF)</label>
@@ -442,27 +480,58 @@ export default function OutdoorKitchenModule({ projectName, onSave, onBack, savi
       <div>
         <SectionHeader title="Appliances & Services" />
         <div className="space-y-0">
-          <LabeledRow label="Layout Time (Hours)">
+          <div className="flex items-center gap-3 py-1.5 border-b border-gray-100">
+            <span className="text-xs text-gray-700 w-44 shrink-0">Layout Time (Hours)</span>
             <NumInput value={layoutHrs} onChange={setLayoutHrs} placeholder="0" className="w-28" />
-          </LabeledRow>
-          <LabeledRow label="Appliances / Openings"
-            note={n(applianceCount) > 0 ? `${(n(applianceCount)/2.75).toFixed(2)} days` : null}>
+          </div>
+          <div className="flex items-center gap-3 py-1.5 border-b border-gray-100">
+            <span className="text-xs text-gray-700 w-44 shrink-0 inline-flex items-center gap-1">
+              Appliances / Openings
+              <RateEditPopover table="labor_rates" name={OK_RATES.applianceLab.dbName} category="Outdoor Kitchen"
+                mode="coefficient" unitLabel="per day" currentValue={p(OK_RATES.applianceLab.dbName, OK_RATES.applianceLab.fallback)} onSaved={refreshAllRates} />
+              <RateEditPopover table="material_rates" name={OK_RATES.applianceHardware.dbName} category="Outdoor Kitchen"
+                unitLabel="ea" currentValue={p(OK_RATES.applianceHardware.dbName, OK_RATES.applianceHardware.fallback)} onSaved={refreshAllRates} />
+            </span>
             <NumInput value={applianceCount} onChange={setApplianceCount} placeholder="0" className="w-28" />
-          </LabeledRow>
-          <LabeledRow label="GFIC Outlets"
-            note={n(gficCount) > 0 ? `${(n(gficCount)*2).toFixed(0)} hrs · $${(n(gficCount)*p(OK_RATES.gficOutlet.dbName,80)).toFixed(2)} mat` : null}>
+            {n(applianceCount) > 0 && <span className="text-xs text-gray-400 shrink-0">{(n(applianceCount)/2.75).toFixed(2)} days</span>}
+          </div>
+          <div className="flex items-center gap-3 py-1.5 border-b border-gray-100">
+            <span className="text-xs text-gray-700 w-44 shrink-0 inline-flex items-center gap-1">
+              GFIC Outlets
+              <RateEditPopover table="labor_rates" name={OK_RATES.gficLab.dbName} category="Outdoor Kitchen"
+                mode="coefficient" unitLabel="hrs/ea" currentValue={p(OK_RATES.gficLab.dbName, OK_RATES.gficLab.fallback)} onSaved={refreshAllRates} />
+              <RateEditPopover table="material_rates" name={OK_RATES.gficOutlet.dbName} category="Outdoor Kitchen"
+                unitLabel="ea" currentValue={p(OK_RATES.gficOutlet.dbName, OK_RATES.gficOutlet.fallback)} onSaved={refreshAllRates} />
+            </span>
             <NumInput value={gficCount} onChange={setGficCount} placeholder="0" className="w-28" />
-          </LabeledRow>
-          <LabeledRow label="Add Sink Plumbing">
+            {n(gficCount) > 0 && (
+              <span className="text-xs text-gray-400 shrink-0">{(n(gficCount)*2).toFixed(0)} hrs · ${(n(gficCount)*p(OK_RATES.gficOutlet.dbName,80)).toFixed(2)} mat</span>
+            )}
+          </div>
+          <div className="flex items-center gap-3 py-1.5 border-b border-gray-100">
+            <span className="text-xs text-gray-700 w-44 shrink-0 inline-flex items-center gap-1">
+              Add Sink Plumbing
+              <RateEditPopover table="labor_rates" name={OK_RATES.sinkLab.dbName} category="Outdoor Kitchen"
+                mode="coefficient" unitLabel="hrs" currentValue={p(OK_RATES.sinkLab.dbName, OK_RATES.sinkLab.fallback)} onSaved={refreshAllRates} />
+              <RateEditPopover table="material_rates" name={OK_RATES.sinkPlumbing.dbName} category="Outdoor Kitchen"
+                unitLabel="flat" currentValue={p(OK_RATES.sinkPlumbing.dbName, OK_RATES.sinkPlumbing.fallback)} onSaved={refreshAllRates} />
+            </span>
             <select className="input text-sm py-1.5 w-28" value={sinkYN} onChange={e => setSinkYN(e.target.value)}>
               <option>No</option>
               <option>Yes</option>
             </select>
-          </LabeledRow>
-          <LabeledRow label="Gas Trench/Run (LF)"
-            note={n(gasTrenchLF) > 0 ? `$${(n(gasTrenchLF)*p(OK_RATES.gasPipe.dbName,3)).toFixed(2)} mat` : null}>
+          </div>
+          <div className="flex items-center gap-3 py-1.5 border-b border-gray-100">
+            <span className="text-xs text-gray-700 w-44 shrink-0 inline-flex items-center gap-1">
+              Gas Trench/Run (LF)
+              <RateEditPopover table="labor_rates" name={OK_RATES.gasTrenchLab.dbName} category="Outdoor Kitchen"
+                mode="coefficient" unitLabel="LF/day" currentValue={p(OK_RATES.gasTrenchLab.dbName, OK_RATES.gasTrenchLab.fallback)} onSaved={refreshAllRates} />
+              <RateEditPopover table="material_rates" name={OK_RATES.gasPipe.dbName} category="Outdoor Kitchen"
+                unitLabel="LF" currentValue={p(OK_RATES.gasPipe.dbName, OK_RATES.gasPipe.fallback)} onSaved={refreshAllRates} />
+            </span>
             <NumInput value={gasTrenchLF} onChange={setGasTrenchLF} placeholder="0" className="w-28" />
-          </LabeledRow>
+            {n(gasTrenchLF) > 0 && <span className="text-xs text-gray-400 shrink-0">${(n(gasTrenchLF)*p(OK_RATES.gasPipe.dbName,3)).toFixed(2)} mat</span>}
+          </div>
         </div>
       </div>
 
@@ -480,59 +549,53 @@ export default function OutdoorKitchenModule({ projectName, onSave, onBack, savi
               </tr>
             </thead>
             <tbody>
-              <tr className="border-b border-gray-100">
-                <td className="py-1 pr-2 text-xs text-gray-700">Sand Stucco</td>
-                <td className="py-1 pr-2"><NumInput value={sandStuccoSF} onChange={setSandStuccoSF} /></td>
-                <td className="py-1 pr-2 text-xs text-gray-400">${p(OK_RATES.sandStucco.dbName,0).toFixed(2)}/SF</td>
-                <td className="py-1 text-right text-xs text-gray-600">
-                  {n(sandStuccoSF) > 0 ? `$${calc.sandStuccoMat.toFixed(2)}` : '—'}
-                </td>
-              </tr>
-              <tr className="border-b border-gray-100">
-                <td className="py-1 pr-2 text-xs text-gray-700">Smooth Stucco</td>
-                <td className="py-1 pr-2"><NumInput value={smoothStuccoSF} onChange={setSmoothStuccoSF} /></td>
-                <td className="py-1 pr-2 text-xs text-gray-400">${p(OK_RATES.smoothStucco.dbName,0).toFixed(2)}/SF</td>
-                <td className="py-1 text-right text-xs text-gray-600">
-                  {n(smoothStuccoSF) > 0 ? `$${calc.smoothStuccoMat.toFixed(2)}` : '—'}
-                </td>
-              </tr>
-              <tr className="border-b border-gray-100">
-                <td className="py-1 pr-2 text-xs text-gray-700">Ledgerstone Veneer</td>
-                <td className="py-1 pr-2"><NumInput value={ledgerstoneSF} onChange={setLedgerstoneSF} /></td>
-                <td className="py-1 pr-2 text-xs text-gray-400">${p(OK_RATES.ledgerstone.dbName,10).toFixed(2)}/SF</td>
-                <td className="py-1 text-right text-xs text-gray-600">
-                  {n(ledgerstoneSF) > 0 ? `$${calc.ledgerstoneMat.toFixed(2)}` : '—'}
-                </td>
-              </tr>
-              <tr className="border-b border-gray-100">
-                <td className="py-1 pr-2 text-xs text-gray-700">Stacked Stone Veneer</td>
-                <td className="py-1 pr-2"><NumInput value={stackedStoneSF} onChange={setStackedStoneSF} /></td>
-                <td className="py-1 pr-2 text-xs text-gray-400">${p(OK_RATES.stackedStone.dbName,10).toFixed(2)}/SF</td>
-                <td className="py-1 text-right text-xs text-gray-600">
-                  {n(stackedStoneSF) > 0 ? `$${calc.stackedStoneMat.toFixed(2)}` : '—'}
-                </td>
-              </tr>
-              <tr className="border-b border-gray-100">
-                <td className="py-1 pr-2 text-xs text-gray-700">Tile</td>
-                <td className="py-1 pr-2"><NumInput value={tileSF} onChange={setTileSF} /></td>
-                <td className="py-1 pr-2 text-xs text-gray-400">${p(OK_RATES.tile.dbName,6.50).toFixed(2)}/SF</td>
-                <td className="py-1 text-right text-xs text-gray-600">
-                  {n(tileSF) > 0 ? `$${calc.tileMat.toFixed(2)}` : '—'}
-                </td>
-              </tr>
+              {[
+                { label: 'Sand Stucco',         sf: sandStuccoSF,   setSf: setSandStuccoSF,   matKey: 'sandStucco',   labKey: 'sandStuccoLab',   matCalc: calc.sandStuccoMat,   fallback: 0 },
+                { label: 'Smooth Stucco',       sf: smoothStuccoSF, setSf: setSmoothStuccoSF, matKey: 'smoothStucco', labKey: 'smoothStuccoLab', matCalc: calc.smoothStuccoMat, fallback: 0 },
+                { label: 'Ledgerstone Veneer',  sf: ledgerstoneSF,  setSf: setLedgerstoneSF,  matKey: 'ledgerstone',  labKey: 'ledgerstoneLab',  matCalc: calc.ledgerstoneMat,  fallback: 10 },
+                { label: 'Stacked Stone Veneer',sf: stackedStoneSF, setSf: setStackedStoneSF, matKey: 'stackedStone', labKey: 'stackedStoneLab', matCalc: calc.stackedStoneMat, fallback: 10 },
+                { label: 'Tile',                sf: tileSF,         setSf: setTileSF,         matKey: 'tile',         labKey: 'tileLab',         matCalc: calc.tileMat,         fallback: 6.50 },
+              ].map(({ label, sf, setSf, matKey, labKey, matCalc, fallback }) => (
+                <tr key={label} className="border-b border-gray-100">
+                  <td className="py-1 pr-2 text-xs text-gray-700">{label}</td>
+                  <td className="py-1 pr-2"><NumInput value={sf} onChange={setSf} /></td>
+                  <td className="py-1 pr-2 text-xs text-gray-400">
+                    <span className="inline-flex items-center gap-1 flex-wrap">
+                      ${p(OK_RATES[matKey].dbName, fallback).toFixed(2)}/SF
+                      <RateEditPopover table="material_rates" name={OK_RATES[matKey].dbName} category="Outdoor Kitchen"
+                        unitLabel="SF" currentValue={p(OK_RATES[matKey].dbName, OK_RATES[matKey].fallback)} onSaved={refreshAllRates} />
+                      <RateEditPopover table="labor_rates" name={OK_RATES[labKey].dbName} category="Outdoor Kitchen"
+                        mode="coefficient" unitLabel="rate" currentValue={p(OK_RATES[labKey].dbName, OK_RATES[labKey].fallback)} onSaved={refreshAllRates} />
+                    </span>
+                  </td>
+                  <td className="py-1 text-right text-xs text-gray-600">
+                    {n(sf) > 0 ? `$${matCalc.toFixed(2)}` : '—'}
+                  </td>
+                </tr>
+              ))}
               {/* Real Flagstone — editable $/ton */}
               <tr className="border-b border-gray-100">
-                <td className="py-1 pr-2 text-xs text-gray-700">Real Flagstone (Flat)</td>
+                <td className="py-1 pr-2 text-xs text-gray-700">
+                  <span className="inline-flex items-center gap-1">
+                    Real Flagstone (Flat)
+                    <RateEditPopover table="labor_rates" name={OK_RATES.flagstoneLab.dbName} category="Outdoor Kitchen"
+                      mode="coefficient" unitLabel="hrs/SF" currentValue={p(OK_RATES.flagstoneLab.dbName, OK_RATES.flagstoneLab.fallback)} onSaved={refreshAllRates} />
+                  </span>
+                </td>
                 <td className="py-1 pr-2"><NumInput value={flagstoneSF} onChange={setFlagstoneSF} /></td>
                 <td className="py-1 pr-2">
-                  <div className="relative w-24">
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-                    <input type="number" step="any" min="0"
-                      className="input text-sm py-1.5 pl-5 w-full"
-                      placeholder={p(OK_RATES.realFlagstone.dbName,400).toString()}
-                      value={flagstoneRateInput}
-                      onChange={e => setFlagstoneRateInput(e.target.value)}
-                    />
+                  <div className="flex items-center gap-1">
+                    <div className="relative w-24">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                      <input type="number" step="any" min="0"
+                        className="input text-sm py-1.5 pl-5 w-full"
+                        placeholder={p(OK_RATES.realFlagstone.dbName,400).toString()}
+                        value={flagstoneRateInput}
+                        onChange={e => setFlagstoneRateInput(e.target.value)}
+                      />
+                    </div>
+                    <RateEditPopover table="material_rates" name={OK_RATES.realFlagstone.dbName} category="Outdoor Kitchen"
+                      unitLabel="ton" currentValue={p(OK_RATES.realFlagstone.dbName, OK_RATES.realFlagstone.fallback)} onSaved={refreshAllRates} />
                   </div>
                 </td>
                 <td className="py-1 text-right text-xs text-gray-600">
@@ -546,17 +609,27 @@ export default function OutdoorKitchenModule({ projectName, onSave, onBack, savi
               </tr>
               {/* Real Stone — editable $/ton */}
               <tr className="border-b border-gray-100">
-                <td className="py-1 pr-2 text-xs text-gray-700">Real Stone</td>
+                <td className="py-1 pr-2 text-xs text-gray-700">
+                  <span className="inline-flex items-center gap-1">
+                    Real Stone
+                    <RateEditPopover table="labor_rates" name={OK_RATES.realStoneLab.dbName} category="Outdoor Kitchen"
+                      mode="coefficient" unitLabel="hrs/SF" currentValue={p(OK_RATES.realStoneLab.dbName, OK_RATES.realStoneLab.fallback)} onSaved={refreshAllRates} />
+                  </span>
+                </td>
                 <td className="py-1 pr-2"><NumInput value={realStoneSF} onChange={setRealStoneSF} /></td>
                 <td className="py-1 pr-2">
-                  <div className="relative w-24">
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-                    <input type="number" step="any" min="0"
-                      className="input text-sm py-1.5 pl-5 w-full"
-                      placeholder={p(OK_RATES.realStone.dbName,400).toString()}
-                      value={realStoneRateInput}
-                      onChange={e => setRealStoneRateInput(e.target.value)}
-                    />
+                  <div className="flex items-center gap-1">
+                    <div className="relative w-24">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                      <input type="number" step="any" min="0"
+                        className="input text-sm py-1.5 pl-5 w-full"
+                        placeholder={p(OK_RATES.realStone.dbName,400).toString()}
+                        value={realStoneRateInput}
+                        onChange={e => setRealStoneRateInput(e.target.value)}
+                      />
+                    </div>
+                    <RateEditPopover table="material_rates" name={OK_RATES.realStone.dbName} category="Outdoor Kitchen"
+                      unitLabel="ton" currentValue={p(OK_RATES.realStone.dbName, OK_RATES.realStone.fallback)} onSaved={refreshAllRates} />
                   </div>
                 </td>
                 <td className="py-1 text-right text-xs text-gray-600">

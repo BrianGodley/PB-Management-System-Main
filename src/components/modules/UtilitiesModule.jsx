@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
+import RateEditPopover from '../RateEditPopover'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Utilities Module — fields and calculations from Excel estimator (Utilities Module tab)
@@ -38,6 +39,13 @@ const FIXTURE_TYPES = {
 // Minutes per cubic foot by equipment type (same as Drainage)
 const TRENCH_MINS_PER_CF = { Trench: 10, Hand: 12.5 }
 
+// Each trench equipment maps to a labor_rates row so the inline calculator
+// icon next to the dropdown can edit the t/hr → min/cf rate.
+const TRENCH_LABOR_RATE_NAME = {
+  Trench: 'Utilities Trench Excavation',
+  Hand:   'Utilities Hand Excavation',
+}
+
 const ADD_ITEM_RATES = {
   curbCore: {
     matCost: 250, dbName: 'Curb Core',                label: 'Curb Core *',
@@ -72,7 +80,11 @@ function calcUtilities(state, laborRatePerHour = DEFAULTS.laborRatePerHour, mate
     const lf = n(r.lf), w = n(r.width), d = n(r.depth)
     if (lf > 0 && w > 0 && d > 0) {
       const cf = lf * (w / 12) * (d / 12)
-      trenchHrs += (cf * (TRENCH_MINS_PER_CF[r.equipment] || 10)) / 60
+      // DB value via labor_rates['Utilities Trench/Hand Excavation'] takes precedence
+      const minsPerCF = materialPrices[TRENCH_LABOR_RATE_NAME[r.equipment]]
+        ?? TRENCH_MINS_PER_CF[r.equipment]
+        ?? 10
+      trenchHrs += (cf * minsPerCF) / 60
     }
   })
 
@@ -189,6 +201,19 @@ export default function UtilitiesModule({ projectName, onSave, onBack, saving, i
   )
   const [pricesLoading, setPricesLoading] = useState(!initialData?.materialPrices)
 
+  // Re-fetch Utilities labor+material rate map (merged into one for lookup).
+  // Called once on mount and again after any RateEditPopover save.
+  const refreshAllRates = useCallback(async () => {
+    const [matRes, labRes] = await Promise.all([
+      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Utilities'),
+      supabase.from('labor_rates').select('name, rate').eq('category', 'Utilities'),
+    ])
+    const prices = {}
+    ;(matRes.data || []).forEach(r => { prices[r.name] = parseFloat(r.unit_cost) || 0 })
+    ;(labRes.data  || []).forEach(r => { prices[r.name] = parseFloat(r.rate)     || 0 })
+    setMaterialPrices(prices)
+  }, [])
+
   useEffect(() => {
     if (!initialData?.laborRatePerHour) {
       supabase
@@ -202,17 +227,8 @@ export default function UtilitiesModule({ projectName, onSave, onBack, saving, i
     }
 
     if (initialData?.materialPrices) return
-    Promise.all([
-      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Utilities'),
-      supabase.from('labor_rates').select('name, rate').eq('category', 'Utilities'),
-    ]).then(([matRes, labRes]) => {
-      const prices = {}
-      ;(matRes.data || []).forEach(r => { prices[r.name] = parseFloat(r.unit_cost) || 0 })
-      ;(labRes.data  || []).forEach(r => { prices[r.name] = parseFloat(r.rate)     || 0 })
-      setMaterialPrices(prices)
-      setPricesLoading(false)
-    })
-  }, [])
+    refreshAllRates().then(() => setPricesLoading(false))
+  }, [refreshAllRates])
 
   const gpmd          = initialData?.gpmd ?? DEFAULTS.gpmd
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
@@ -325,16 +341,25 @@ export default function UtilitiesModule({ projectName, onSave, onBack, saving, i
             <tbody>
               {trenchRows.map((row, i) => {
                 const lf = n(row.lf), w = n(row.width), d = n(row.depth)
+                const minsPerCF = materialPrices[TRENCH_LABOR_RATE_NAME[row.equipment]]
+                  ?? TRENCH_MINS_PER_CF[row.equipment] ?? 10
                 const cf  = lf > 0 && w > 0 && d > 0 ? lf * (w / 12) * (d / 12) : 0
-                const hrs = cf > 0 ? (cf * (TRENCH_MINS_PER_CF[row.equipment] || 10)) / 60 : 0
+                const hrs = cf > 0 ? (cf * minsPerCF) / 60 : 0
+                const laborName = TRENCH_LABOR_RATE_NAME[row.equipment]
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-2">
-                      <select className="input text-sm py-1" value={row.equipment}
-                              onChange={e => updateTrench(i, 'equipment', e.target.value)}>
-                        <option>Trench</option>
-                        <option>Hand</option>
-                      </select>
+                      <div className="flex items-center gap-1">
+                        <select className="input text-sm py-1 flex-1 min-w-0" value={row.equipment}
+                                onChange={e => updateTrench(i, 'equipment', e.target.value)}>
+                          <option>Trench</option>
+                          <option>Hand</option>
+                        </select>
+                        {laborName && (
+                          <RateEditPopover table="labor_rates" name={laborName} category="Utilities"
+                            mode="coefficient" unitLabel="min/cf" currentValue={minsPerCF} onSaved={refreshAllRates} />
+                        )}
+                      </div>
                     </td>
                     <td className="py-1 pr-2"><NumInput value={row.lf}    onChange={v => updateTrench(i, 'lf', v)} /></td>
                     <td className="py-1 pr-2"><NumInput value={row.width} onChange={v => updateTrench(i, 'width', v)} /></td>
@@ -370,17 +395,32 @@ export default function UtilitiesModule({ projectName, onSave, onBack, saving, i
               {lineRows.map((row, i) => {
                 const rate      = UTILITY_LINE_TYPES[row.type]
                 const costPerLF = materialPrices[rate?.dbName] ?? rate?.costPerLF ?? 0
+                const laborPerLF = materialPrices[rate?.laborDbName] ?? rate?.laborPerLF ?? 0
                 const mat       = n(row.lf) * costPerLF
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-2">
-                      <select className="input text-sm py-1" value={row.type}
-                              onChange={e => updateLine(i, 'type', e.target.value)}>
-                        {Object.keys(UTILITY_LINE_TYPES).map(t => <option key={t}>{t}</option>)}
-                      </select>
+                      <div className="flex items-center gap-1">
+                        <select className="input text-sm py-1 flex-1 min-w-0" value={row.type}
+                                onChange={e => updateLine(i, 'type', e.target.value)}>
+                          {Object.keys(UTILITY_LINE_TYPES).map(t => <option key={t}>{t}</option>)}
+                        </select>
+                        {rate && (
+                          <RateEditPopover table="labor_rates" name={rate.laborDbName} category="Utilities"
+                            mode="coefficient" unitLabel="hrs/LF" currentValue={laborPerLF} onSaved={refreshAllRates} />
+                        )}
+                      </div>
                     </td>
                     <td className="py-1 pr-2"><NumInput value={row.lf} onChange={v => updateLine(i, 'lf', v)} /></td>
-                    <td className="py-1 text-right text-gray-400 text-xs pr-2">${costPerLF.toFixed(2)}</td>
+                    <td className="py-1 text-right text-gray-400 text-xs pr-2">
+                      <span className="inline-flex items-center justify-end gap-1">
+                        ${costPerLF.toFixed(2)}
+                        {rate && (
+                          <RateEditPopover table="material_rates" name={rate.dbName} category="Utilities"
+                            unitLabel="LF" currentValue={costPerLF} onSaved={refreshAllRates} />
+                        )}
+                      </span>
+                    </td>
                     <td className="py-1 text-right text-gray-600 text-xs">{mat > 0 ? `$${mat.toFixed(2)}` : '—'}</td>
                   </tr>
                 )
@@ -412,17 +452,32 @@ export default function UtilitiesModule({ projectName, onSave, onBack, saving, i
               {fixtureRows.map((row, i) => {
                 const rate = FIXTURE_TYPES[row.type]
                 const cost = materialPrices[rate?.dbName] ?? rate?.cost ?? 0
+                const laborHrs = materialPrices[rate?.laborDbName] ?? rate?.laborHrs ?? 0
                 const mat  = n(row.qty) * cost
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-2">
-                      <select className="input text-sm py-1" value={row.type}
-                              onChange={e => updateFixture(i, 'type', e.target.value)}>
-                        {Object.keys(FIXTURE_TYPES).map(t => <option key={t}>{t}</option>)}
-                      </select>
+                      <div className="flex items-center gap-1">
+                        <select className="input text-sm py-1 flex-1 min-w-0" value={row.type}
+                                onChange={e => updateFixture(i, 'type', e.target.value)}>
+                          {Object.keys(FIXTURE_TYPES).map(t => <option key={t}>{t}</option>)}
+                        </select>
+                        {rate && (
+                          <RateEditPopover table="labor_rates" name={rate.laborDbName} category="Utilities"
+                            mode="coefficient" unitLabel="hrs/ea" currentValue={laborHrs} onSaved={refreshAllRates} />
+                        )}
+                      </div>
                     </td>
                     <td className="py-1 pr-2"><NumInput value={row.qty} onChange={v => updateFixture(i, 'qty', v)} /></td>
-                    <td className="py-1 text-right text-gray-400 text-xs pr-2">${cost.toFixed(2)}</td>
+                    <td className="py-1 text-right text-gray-400 text-xs pr-2">
+                      <span className="inline-flex items-center justify-end gap-1">
+                        ${cost.toFixed(2)}
+                        {rate && (
+                          <RateEditPopover table="material_rates" name={rate.dbName} category="Utilities"
+                            unitLabel="ea" currentValue={cost} onSaved={refreshAllRates} />
+                        )}
+                      </span>
+                    </td>
                     <td className="py-1 text-right text-gray-600 text-xs">{mat > 0 ? `$${mat.toFixed(2)}` : '—'}</td>
                   </tr>
                 )
@@ -460,11 +515,18 @@ export default function UtilitiesModule({ projectName, onSave, onBack, saving, i
 
           {/* Curb Core & Hydrocut — qty based */}
           {Object.entries(ADD_ITEM_RATES).map(([key, rate]) => {
-            const qty     = n(additionalItems[`${key}Qty`])
-            const matCost = materialPrices[rate.dbName] ?? rate.matCost
+            const qty       = n(additionalItems[`${key}Qty`])
+            const matCost   = materialPrices[rate.dbName]      ?? rate.matCost
+            const laborHrs  = materialPrices[rate.laborDbName] ?? rate.laborHrs
             return (
               <div key={key} className="flex items-center gap-3 py-1.5 border-b border-gray-100">
-                <span className="text-xs text-gray-700 flex-1">{rate.label}</span>
+                <span className="text-xs text-gray-700 flex-1 inline-flex items-center gap-1">
+                  {rate.label}
+                  <RateEditPopover table="labor_rates" name={rate.laborDbName} category="Utilities"
+                    mode="coefficient" unitLabel="hr/ea" currentValue={laborHrs} onSaved={refreshAllRates} />
+                  <RateEditPopover table="material_rates" name={rate.dbName} category="Utilities"
+                    unitLabel="ea" currentValue={matCost} onSaved={refreshAllRates} />
+                </span>
                 <input
                   type="number" step="1" min="0"
                   className="input text-sm py-1 w-20"
