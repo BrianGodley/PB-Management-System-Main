@@ -335,12 +335,16 @@ function calcPool(state, materialPrices, laborRates, subRates = {}) {
   })
 
   // ─ Pool Equipment ─
-  let equipmentSub = 0
+  // Each equipment row has a material rate (unit cost — sub charges) and an
+  // optional labor rate (in-house install hours per unit, defaults to 0).
+  let equipmentSub = 0, equipmentHrs = 0
   equipment.forEach(eq => {
     const qty = n(eq.qty)
     if (!qty) return
-    const unitCost = n(eq.unitCost) || (materialPrices[eq.model] ?? 0)
+    const unitCost  = n(eq.unitCost) || (materialPrices[eq.model] ?? 0)
+    const labHrsEa  = laborRates[`Equip Labor - ${eq.model}`] ?? 0
     equipmentSub += qty * unitCost
+    equipmentHrs += qty * labHrsEa
   })
 
   // ─ Plumbing (rates from subcontractor_rates, category='Pool') ─
@@ -375,7 +379,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}) {
     manSub += n(r.subCost)
   })
 
-  const totalHrs   = excavHrs + tileHrs + spillwayHrs + copingHrs + raisedHrs + manHrs
+  const totalHrs   = excavHrs + tileHrs + spillwayHrs + copingHrs + raisedHrs + equipmentHrs + manHrs
   const manDays    = totalHrs / 8
   const totalMat   = tileMat + spillwayMat + copingMat + raisedMat + manMat
   const subCost    = excavSub + shotcreteSub + interiorSub + equipmentSub + plumbSub + steelSub + manSub
@@ -1027,6 +1031,9 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
         <div className="space-y-2">
           {state.equipment.map((eq, i) => {
             const models = EQUIPMENT_CATALOG[eq.category] || []
+            const catalogPrice = models.find(m => m.model === eq.model)?.price ?? 0
+            const matRate = materialPrices[eq.model] ?? catalogPrice
+            const labRate = laborRates[`Equip Labor - ${eq.model}`] ?? 0
             return (
               <div key={i} className="grid grid-cols-6 gap-2 items-end">
                 <div className="col-span-2">
@@ -1038,10 +1045,18 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
                 </div>
                 <div className="col-span-2">
                   <Label text="Model" />
-                  <select className="input text-sm py-1.5" value={eq.model}
-                    onChange={e => updEquip(i, 'model', e.target.value)}>
-                    {models.map(m => <option key={m.model} value={m.model}>{m.model}</option>)}
-                  </select>
+                  <div className="flex items-center gap-1">
+                    <select className="input text-sm py-1.5 flex-1 min-w-0" value={eq.model}
+                      onChange={e => updEquip(i, 'model', e.target.value)}>
+                      {models.map(m => <option key={m.model} value={m.model}>{m.model}</option>)}
+                    </select>
+                    <span className="text-[10px] text-gray-400 ml-1">mat</span>
+                    <RateEditPopover table="material_rates" name={eq.model} category="Pool"
+                      unitLabel="ea" currentValue={matRate} onSaved={refreshAllRates} />
+                    <span className="text-[10px] text-gray-400">lab</span>
+                    <RateEditPopover table="labor_rates" name={`Equip Labor - ${eq.model}`} category="Pool"
+                      mode="coefficient" unitLabel="hrs/ea" currentValue={labRate} onSaved={refreshAllRates} />
+                  </div>
                 </div>
                 <div>
                   <Label text="Qty" />
