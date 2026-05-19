@@ -17,6 +17,7 @@
 //   effectiveComm = (effectiveGp + subGp) × 12%  ← includes sub GP in base
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState } from 'react'
+import { useRateIcons } from '../../contexts/RateIconsContext'
 
 const fmt  = v => `$${Math.round(v || 0).toLocaleString()}`
 const fmt2 = v => `$${(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -42,6 +43,11 @@ export default function GpmdBar({
   const [draftGpmd,      setDraftGpmd]      = useState('')
   const [editingSubPct,  setEditingSubPct]  = useState(false)
   const [draftSubPct,    setDraftSubPct]    = useState('')
+
+  // Global rate-icon toggle — controls visibility of every <RateEditPopover/>
+  // across all estimate modules. Off by default for a clean UI; user clicks
+  // the button to reveal the icons when they need to adjust master rates.
+  const { showRateIcons, toggleRateIcons } = useRateIcons()
 
   if (price <= 0) return null
 
@@ -200,6 +206,40 @@ export default function GpmdBar({
 
   return (
     <div className={containerCls}>
+      {/* Top row: Access/Edit Rates toggle — reveals the inline calculator
+          icons on every rate value when on. Persisted to localStorage. */}
+      <div className="flex justify-end mb-1.5">
+        <button
+          type="button"
+          onClick={toggleRateIcons}
+          title={showRateIcons
+            ? 'Hide the inline rate-edit calculator icons'
+            : 'Show calculator icons next to every rate so you can adjust master rates inline'}
+          className={`inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded border transition-colors ${
+            showRateIcons
+              ? 'bg-green-600 border-green-500 text-white hover:bg-green-700'
+              : 'bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700 hover:border-gray-500'
+          }`}
+        >
+          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <rect x="4" y="3" width="16" height="18" rx="2" />
+            <line x1="8" y1="7"  x2="16" y2="7" />
+            <line x1="8" y1="11" x2="10" y2="11" />
+            <line x1="13" y1="11" x2="16" y2="11" />
+            <line x1="8" y1="15" x2="10" y2="15" />
+            <line x1="13" y1="15" x2="16" y2="15" />
+            <line x1="8" y1="19" x2="10" y2="19" />
+            <line x1="13" y1="19" x2="16" y2="19" />
+          </svg>
+          Access/Edit Rates
+          <span className={`text-[10px] uppercase tracking-wide ml-0.5 ${
+            showRateIcons ? 'text-green-100' : 'text-gray-500'
+          }`}>
+            {showRateIcons ? 'on' : 'off'}
+          </span>
+        </button>
+      </div>
+
       <div className="flex gap-0 divide-x divide-white/10 flex-wrap">
 
         {/* Left: GPMD editable cell */}

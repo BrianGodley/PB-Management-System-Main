@@ -25,6 +25,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
+import { useRateIcons } from '../contexts/RateIconsContext'
 
 const DEFAULT_VALUE_FIELD = {
   material_rates:      'unit_cost',
@@ -60,6 +61,7 @@ export default function RateEditPopover({
 }) {
   const field    = valueField || DEFAULT_VALUE_FIELD[table] || 'unit_cost'
   const nameCol  = NAME_COLUMN[table] || 'name'
+  const { showRateIcons } = useRateIcons()
   const [open,    setOpen]    = useState(false)
   const [draft,   setDraft]   = useState('')
   const [loaded,  setLoaded]  = useState(false)
@@ -125,6 +127,10 @@ export default function RateEditPopover({
     setOpen(false)
     if (onSaved) await onSaved()
   }
+
+  // Global toggle — when "Access/Edit Rates" is OFF, render nothing.
+  // The user flips it via the button in the GpmdBar at the top of each module.
+  if (!showRateIcons) return null
 
   return (
     <span ref={wrapRef} className="relative inline-flex items-center">
