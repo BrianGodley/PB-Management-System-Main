@@ -75,6 +75,15 @@ const ADD_ITEM_RATES = {
   hydrocut:  { laborHrs: 2, matCost: 50,   label: 'Hydrocut Under Hardscape *', dbName: 'Hydrocut Under Hardscape' },
 }
 
+// Labor-coefficient lookup for Additional Items — matches names seeded in
+// supabase-drainage-labor-coefficients.sql so the popover edits the right row.
+const ADD_ITEM_LABOR_RATE_NAME = {
+  pumpVault: 'Drainage Pump Vault Labor',
+  sumpPump:  'Drainage Sump Pump Labor',
+  curbCore:  'Drainage Curb Core Labor',
+  hydrocut:  'Drainage Hydrocut Under Hardscape Labor',
+}
+
 // Default fitting fee per drain unit — overridden by 'Drain Fitting Fee' in material_rates
 const DRAIN_FITTING_FEE = 10
 
@@ -541,8 +550,9 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
             </thead>
             <tbody>
               {Object.entries(ADD_ITEM_RATES).map(([key, rate]) => {
-                const qty     = n(additionalItems[`${key}Qty`])
-                const matCost = materialPrices[rate.dbName] ?? rate.matCost
+                const qty       = n(additionalItems[`${key}Qty`])
+                const matCost   = materialPrices[rate.dbName] ?? rate.matCost
+                const laborName = ADD_ITEM_LABOR_RATE_NAME[key]
                 return (
                   <tr key={key} className="border-b border-gray-100">
                     <td className="py-1.5 pr-2 text-xs text-gray-700">{rate.label}</td>
@@ -556,10 +566,32 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
                       />
                     </td>
                     <td className="py-1.5 text-right text-gray-400 text-xs pr-2">
-                      {qty > 0 ? (qty * rate.laborHrs).toFixed(1) : '—'}
+                      <span className="inline-flex items-center justify-end">
+                        {qty > 0 ? (qty * rate.laborHrs).toFixed(1) : `${rate.laborHrs} / ea`}
+                        {laborName && (
+                          <RateEditPopover
+                            table="labor_rates"
+                            name={laborName}
+                            category="Drainage"
+                            mode="coefficient"
+                            unitLabel="hr/ea"
+                            currentValue={rate.laborHrs}
+                          />
+                        )}
+                      </span>
                     </td>
                     <td className="py-1.5 text-right text-gray-600 text-xs">
-                      {qty > 0 ? `$${(qty * matCost).toLocaleString()}` : '—'}
+                      <span className="inline-flex items-center justify-end">
+                        {qty > 0 ? `$${(qty * matCost).toLocaleString()}` : `$${matCost} / ea`}
+                        <RateEditPopover
+                          table="material_rates"
+                          name={rate.dbName}
+                          category="Drainage"
+                          unitLabel="ea"
+                          currentValue={matCost}
+                          onSaved={refreshMaterialPrices}
+                        />
+                      </span>
                     </td>
                   </tr>
                 )
