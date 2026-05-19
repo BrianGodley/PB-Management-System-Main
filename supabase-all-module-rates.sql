@@ -625,6 +625,14 @@ ON CONFLICT DO NOTHING;
 
 -- ── Labor rates (labor_rates, category=Pool) ──────────────────────────
 INSERT INTO public.labor_rates (name, rate, unit, category, notes) VALUES
+  -- Excavation equipment rates (CY/hr)
+  ('Excavation - IH Bobcat 72',     7.33,  'CY/hr',  'Pool', 'IH Bobcat 72" excavation rate'),
+  ('Excavation - IH Bobcat 64',     7.14,  'CY/hr',  'Pool', 'IH Bobcat 64" excavation rate'),
+  ('Excavation - Rental 48',        7.33,  'CY/hr',  'Pool', 'Rental 48" excavation rate'),
+  ('Excavation - Rental 42',        7.33,  'CY/hr',  'Pool', 'Rental 42" excavation rate'),
+  ('Excavation - Medium Excavator', 29.75, 'CY/hr',  'Pool', 'Medium excavator rate'),
+  ('Excavation - Large Excavator',  25.50, 'CY/hr',  'Pool', 'Large excavator rate'),
+  ('Excavation - Hand Dig',         0.50,  'CY/hr',  'Pool', 'Hand-dig rate'),
   -- Waterline tile install rates (hours per LF)
   ('Tile - 6" Squares',             0.356, 'hrs/LF', 'Pool', 'Waterline tile install — 6" squares'),
   ('Tile - 3" Squares',             0.400, 'hrs/LF', 'Pool', 'Waterline tile install — 3" squares'),

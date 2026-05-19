@@ -72,6 +72,8 @@ const RAISED_SURFACE_DEFAULTS = {
 const RAISED_SURFACE_TYPES = Object.keys(RAISED_SURFACE_DEFAULTS)
 
 // ── Excavation equipment rates (CY/hr net) ───────────────────────────────────
+// Each entry maps to a labor_rates row so the inline calculator icon next to
+// the equipment dropdown can edit the CY/hr rate. Names match seed SQL.
 const EXCAVATION_RATES = {
   'IH - Bobcat 72"':       7.33,
   'IH - Bobcat 64"':       7.14,
@@ -81,6 +83,16 @@ const EXCAVATION_RATES = {
   'Large Excavator':       25.50,
   'Hand Dig':              0.50,
   'Sub Bobcat / Mini Bob': 0,
+}
+const EXCAVATION_LABOR_NAME = {
+  'IH - Bobcat 72"':       'Excavation - IH Bobcat 72',
+  'IH - Bobcat 64"':       'Excavation - IH Bobcat 64',
+  'Rental 48"':            'Excavation - Rental 48',
+  'Rental 42"':            'Excavation - Rental 42',
+  'Medium Excavator':      'Excavation - Medium Excavator',
+  'Large Excavator':       'Excavation - Large Excavator',
+  'Hand Dig':              'Excavation - Hand Dig',
+  'Sub Bobcat / Mini Bob': null,  // sub cost, not a labor rate
 }
 const EXCAVATION_TYPES = Object.keys(EXCAVATION_RATES)
 
@@ -241,7 +253,9 @@ function calcPool(state, materialPrices, laborRates, subRates = {}) {
 
   // ─ Excavation ─
   const isSubExcav = excavation.equipment === 'Sub Bobcat / Mini Bob'
-  const equipRate  = EXCAVATION_RATES[excavation.equipment] ?? 7.33
+  // DB value via labor_rates['Excavation - ...'] takes precedence over hardcoded fallback
+  const excavLaborName = EXCAVATION_LABOR_NAME[excavation.equipment]
+  const equipRate  = (excavLaborName && laborRates[excavLaborName]) ?? EXCAVATION_RATES[excavation.equipment] ?? 7.33
   const excavHrs   = !isSubExcav && equipRate > 0 ? totalExcavCY / equipRate : 0
   const excavSub   = isSubExcav ? n(excavation.subCost) : 0
 
@@ -376,6 +390,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}) {
     totalExcavCY, totalShotCY,
     excavHrs, tileHrs, spillwayHrs, copingHrs, raisedHrs,
     excavSub, shotcreteSub, interiorSub, equipmentSub, plumbSub, steelSub,
+    equipRate,  // resolved excavation CY/hr so the icon can show + edit it
   }
 }
 
@@ -591,9 +606,43 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
 
   return (
     <div className="space-y-6 pb-6">
+      {/* ── Sticky GPMD bar ── */}
+      <div className="sticky top-0 z-20 -mx-6 px-6 pt-2 pb-2 bg-gray-900 shadow-lg">
+        <GpmdBar
+          sticky
+          totalMat={calc.totalMat}
+          totalHrs={calc.totalHrs}
+          manDays={calc.manDays}
+          laborCost={calc.laborCost}
+          lrph={n(state.laborRatePerHour)}
+          burden={calc.burden}
+          subCost={calc.subCost}
+          gp={calc.gp}
+          commission={calc.commission}
+          price={calc.price}
+          gpmd={n(state.gpmd)}
+          subMarkupRate={subGpMarkupRate}
+        />
+      </div>
+
+      {/* Crew Type */}
+      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
+        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
+        <select value={state.crewType} onChange={e => upd('crewType', e.target.value)} className="input text-sm py-1 w-36">
+          <option value="Demo">Demo</option>
+          <option value="Landscape">Landscape</option>
+          <option value="Masonry">Masonry</option>
+          <option value="Paver">Paver</option>
+          <option value="Specialty">Specialty</option>
+        </select>
+      </div>
+
       {/* ─── 1. Structure Dimensions ─── */}
       <div>
         <SectionHeader title="Structure Dimensions" />
+        <p className="text-xs text-gray-400 italic mb-2">
+          Dimensions are project measurements — no rate to adjust here. The rates that consume these dimensions (excavation, shotcrete, tile, coping, etc.) have their own calculator icons in the sections below.
+        </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <StructDims label="Pool"           data={state.pool}  onChange={v => updStruct('pool',  v)} alwaysEnabled />
           <StructDims label="Spa"            data={state.spa}   onChange={v => updStruct('spa',   v)} />
@@ -614,13 +663,19 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="sm:col-span-2">
             <Label text="Equipment" />
-            <select
-              className="input text-sm py-1.5"
-              value={state.excavation.equipment}
-              onChange={e => upd('excavation', { ...state.excavation, equipment: e.target.value })}
-            >
-              {EXCAVATION_TYPES.map(t => <option key={t}>{t}</option>)}
-            </select>
+            <div className="flex items-center gap-1">
+              <select
+                className="input text-sm py-1.5 flex-1 min-w-0"
+                value={state.excavation.equipment}
+                onChange={e => upd('excavation', { ...state.excavation, equipment: e.target.value })}
+              >
+                {EXCAVATION_TYPES.map(t => <option key={t}>{t}</option>)}
+              </select>
+              {EXCAVATION_LABOR_NAME[state.excavation.equipment] && (
+                <RateEditPopover table="labor_rates" name={EXCAVATION_LABOR_NAME[state.excavation.equipment]} category="Pool"
+                  mode="coefficient" unitLabel="CY/hr" currentValue={calc.equipRate} onSaved={refreshAllRates} />
+              )}
+            </div>
           </div>
           <div>
             <Label text="From Trucks" sub="LF" />
@@ -661,6 +716,9 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
       {/* ─── 3. Shotcrete ─── */}
       <div>
         <SectionHeader title="Shotcrete (Sub)" />
+        <p className="text-xs text-gray-400 italic mb-2">
+          Auto sub total is calculated from the three sub rates below — edit those rates via the calculator icons in the formula note.
+        </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <div>
             <Label text="Auto Sub Total" />
@@ -701,37 +759,6 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
       <div>
         <SectionHeader title="Waterline Tile" />
         <div className="space-y-3">
-      {/* ── Sticky GPMD bar ── */}
-      <div className="sticky top-0 z-20 -mx-6 px-6 pt-2 pb-2 bg-gray-900 shadow-lg">
-      <GpmdBar
-          sticky
-        totalMat={calc.totalMat}
-        totalHrs={calc.totalHrs}
-        manDays={calc.manDays}
-        laborCost={calc.laborCost}
-        lrph={n(state.laborRatePerHour)}
-        burden={calc.burden}
-        subCost={calc.subCost}
-        gp={calc.gp}
-        commission={calc.commission}
-        price={calc.price}
-        gpmd={n(state.gpmd)}
-        subMarkupRate={subGpMarkupRate}
-      />
-      </div>
-
-      {/* Crew Type */}
-      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
-        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
-        <select value={state.crewType} onChange={e => upd('crewType', e.target.value)} className="input text-sm py-1 w-36">
-          <option value="Demo">Demo</option>
-          <option value="Landscape">Landscape</option>
-          <option value="Masonry">Masonry</option>
-          <option value="Paver">Paver</option>
-          <option value="Specialty">Specialty</option>
-        </select>
-      </div>
-
           {[
             ['Pool', state.pool], ['Spa', state.spa],
             ['Infinity Basin', state.basin], ['Cover Vault', state.vault],
@@ -818,9 +845,11 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
                     onChange={e => updSpillway(i, 'type', e.target.value)}>
                     {SPILLWAY_TYPES.map(t => <option key={t}>{t}</option>)}
                   </select>
+                  <span className="text-[10px] text-gray-400 ml-1">mat</span>
                   <RateEditPopover table="material_rates" name={`Spillway ${sw.type}`} category="Pool"
                     unitLabel="LF" currentValue={materialPrices[`Spillway ${sw.type}`] ?? SPILLWAY_DEFAULTS[sw.type]?.mat}
                     onSaved={refreshAllRates} />
+                  <span className="text-[10px] text-gray-400">lab</span>
                   <RateEditPopover table="labor_rates" name={`Spillway - ${sw.type}`} category="Pool"
                     mode="coefficient" unitLabel="hrs/LF"
                     currentValue={laborRates[`Spillway - ${sw.type}`] ?? SPILLWAY_DEFAULTS[sw.type]?.hrs}
@@ -864,9 +893,11 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
                     onChange={e => updCoping(i, 'type', e.target.value)}>
                     {COPING_TYPES.map(t => <option key={t}>{t}</option>)}
                   </select>
+                  <span className="text-[10px] text-gray-400 ml-1">mat</span>
                   <RateEditPopover table="material_rates" name={`Coping - ${cr.type}`} category="Pool"
                     unitLabel="LF" currentValue={materialPrices[`Coping - ${cr.type}`] ?? COPING_DEFAULTS[cr.type]?.mat}
                     onSaved={refreshAllRates} />
+                  <span className="text-[10px] text-gray-400">lab</span>
                   <RateEditPopover table="labor_rates" name={`Coping - ${cr.type}`} category="Pool"
                     mode="coefficient" unitLabel="hrs/LF"
                     currentValue={laborRates[`Coping - ${cr.type}`] ?? COPING_DEFAULTS[cr.type]?.hrs}
@@ -907,9 +938,11 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
                     onChange={e => updRaised(i, 'matType', e.target.value)}>
                     {RAISED_SURFACE_TYPES.map(t => <option key={t}>{t}</option>)}
                   </select>
+                  <span className="text-[10px] text-gray-400 ml-1">mat</span>
                   <RateEditPopover table="material_rates" name={`Raised - ${rs.matType}`} category="Pool"
                     unitLabel="SF" currentValue={materialPrices[`Raised - ${rs.matType}`] ?? RAISED_SURFACE_DEFAULTS[rs.matType]?.mat}
                     onSaved={refreshAllRates} />
+                  <span className="text-[10px] text-gray-400">lab</span>
                   <RateEditPopover table="labor_rates" name={`Raised - ${rs.matType}`} category="Pool"
                     mode="coefficient" unitLabel="hrs/SF"
                     currentValue={laborRates[`Raised - ${rs.matType}`] ?? RAISED_SURFACE_DEFAULTS[rs.matType]?.hrs}
@@ -1037,37 +1070,54 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div>
             <Label text="Base Configuration" />
-            <select className="input text-sm py-1.5" value={state.plumbing.baseType}
-              onChange={e => upd('plumbing', { ...state.plumbing, baseType: e.target.value })}>
-              {Object.keys(PLUMBING_BASES).map(k => <option key={k}>{k}</option>)}
-            </select>
+            <div className="flex items-center gap-1">
+              <select className="input text-sm py-1.5 flex-1 min-w-0" value={state.plumbing.baseType}
+                onChange={e => upd('plumbing', { ...state.plumbing, baseType: e.target.value })}>
+                {Object.keys(PLUMBING_BASES).map(k => <option key={k}>{k}</option>)}
+              </select>
+              <RateEditPopover table="subcontractor_rates" name={`Plumbing ${state.plumbing.baseType}`} category="Pool"
+                unitLabel="flat" currentValue={subRates[`Plumbing ${state.plumbing.baseType}`] ?? PLUMBING_BASES[state.plumbing.baseType]}
+                onSaved={refreshAllRates} />
+            </div>
           </div>
           <div>
             <Label text="Extra Lights" sub="qty" />
-            <NumInput
-              value={state.plumbing.extraLights}
-              onChange={v => upd('plumbing', { ...state.plumbing, extraLights: v })}
-            />
+            <div className="flex items-center gap-1">
+              <NumInput
+                value={state.plumbing.extraLights}
+                onChange={v => upd('plumbing', { ...state.plumbing, extraLights: v })}
+              />
+              <RateEditPopover table="subcontractor_rates" name="Plumbing Extra Light" category="Pool"
+                unitLabel="ea" currentValue={subRates['Plumbing Extra Light'] ?? 150} onSaved={refreshAllRates} />
+            </div>
           </div>
           <div>
             <Label text="Sheer Descents" sub="qty" />
-            <NumInput
-              value={state.plumbing.sheerDescents}
-              onChange={v => upd('plumbing', { ...state.plumbing, sheerDescents: v })}
-            />
+            <div className="flex items-center gap-1">
+              <NumInput
+                value={state.plumbing.sheerDescents}
+                onChange={v => upd('plumbing', { ...state.plumbing, sheerDescents: v })}
+              />
+              <RateEditPopover table="subcontractor_rates" name="Plumbing Sheer Descent" category="Pool"
+                unitLabel="ea" currentValue={subRates['Plumbing Sheer Descent'] ?? 450} onSaved={refreshAllRates} />
+            </div>
           </div>
           <div className="flex flex-col gap-2 pt-1">
             <label className="flex items-center gap-1.5 cursor-pointer">
               <input type="checkbox" checked={state.plumbing.over20ft}
                 onChange={e => upd('plumbing', { ...state.plumbing, over20ft: e.target.checked })}
                 className="rounded" />
-              <span className="text-xs text-gray-600">&gt;20ft from equipment (+$300)</span>
+              <span className="text-xs text-gray-600">&gt;20ft from equipment (+${subRates['Plumbing Over 20ft Add'] ?? 300})</span>
+              <RateEditPopover table="subcontractor_rates" name="Plumbing Over 20ft Add" category="Pool"
+                unitLabel="flat" currentValue={subRates['Plumbing Over 20ft Add'] ?? 300} onSaved={refreshAllRates} />
             </label>
             <label className="flex items-center gap-1.5 cursor-pointer">
               <input type="checkbox" checked={state.plumbing.remodel}
                 onChange={e => upd('plumbing', { ...state.plumbing, remodel: e.target.checked })}
                 className="rounded" />
-              <span className="text-xs text-gray-600">Remodel (+$200)</span>
+              <span className="text-xs text-gray-600">Remodel (+${subRates['Plumbing Remodel Add'] ?? 200})</span>
+              <RateEditPopover table="subcontractor_rates" name="Plumbing Remodel Add" category="Pool"
+                unitLabel="flat" currentValue={subRates['Plumbing Remodel Add'] ?? 200} onSaved={refreshAllRates} />
             </label>
           </div>
           <div>
