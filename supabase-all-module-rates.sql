@@ -696,24 +696,25 @@ INSERT INTO public.material_rates (name, unit_cost, unit, category, notes) VALUE
 ON CONFLICT DO NOTHING;
 
 -- ── Subcontractor rates (subcontractor_rates, category=Pool) ──────────
--- NOTE: uses 'trade' column (PoolModule pulls by trade); other tables use 'company_name'
-INSERT INTO public.subcontractor_rates (trade, rate, category, notes) VALUES
+-- PoolModule looks up by `trade`; the table also requires non-null `company_name`,
+-- so we populate both columns with the same value.
+INSERT INTO public.subcontractor_rates (company_name, trade, rate, category, notes) VALUES
   -- Shotcrete
-  ('Shotcrete Material',          200,  'Pool', 'Shotcrete material per CY'),
-  ('Shotcrete Labor',             85,   'Pool', 'Shotcrete labor per CY'),
-  ('Shotcrete Minimum Labor',     3500, 'Pool', 'Shotcrete minimum labor floor'),
+  ('Shotcrete Material',          'Shotcrete Material',          200,  'Pool', 'Shotcrete material per CY'),
+  ('Shotcrete Labor',             'Shotcrete Labor',             85,   'Pool', 'Shotcrete labor per CY'),
+  ('Shotcrete Minimum Labor',     'Shotcrete Minimum Labor',     3500, 'Pool', 'Shotcrete minimum labor floor'),
   -- Interior finish ($/SF)
-  ('Interior Finish - White Plaster', 45, 'Pool', 'White plaster per SF'),
-  ('Interior Finish - Quartzscapes',  87, 'Pool', 'Quartzscapes per SF'),
-  ('Interior Finish - Stonescapes',   83, 'Pool', 'Stonescapes per SF'),
+  ('Interior Finish - White Plaster', 'Interior Finish - White Plaster', 45, 'Pool', 'White plaster per SF'),
+  ('Interior Finish - Quartzscapes',  'Interior Finish - Quartzscapes',  87, 'Pool', 'Quartzscapes per SF'),
+  ('Interior Finish - Stonescapes',   'Interior Finish - Stonescapes',   83, 'Pool', 'Stonescapes per SF'),
   -- Plumbing
-  ('Plumbing Pool Only',          4500, 'Pool', 'Plumbing base — pool only'),
-  ('Plumbing Pool + Spa',         6000, 'Pool', 'Plumbing base — pool + spa'),
-  ('Plumbing Over 20ft Add',      300,  'Pool', '>20ft from equipment add'),
-  ('Plumbing Remodel Add',        200,  'Pool', 'Remodel add'),
-  ('Plumbing Extra Light',        150,  'Pool', 'Extra light add (each)'),
-  ('Plumbing Sheer Descent',      450,  'Pool', 'Sheer descent plumbing add (each)'),
+  ('Plumbing Pool Only',          'Plumbing Pool Only',          4500, 'Pool', 'Plumbing base — pool only'),
+  ('Plumbing Pool + Spa',         'Plumbing Pool + Spa',         6000, 'Pool', 'Plumbing base — pool + spa'),
+  ('Plumbing Over 20ft Add',      'Plumbing Over 20ft Add',      300,  'Pool', '>20ft from equipment add'),
+  ('Plumbing Remodel Add',        'Plumbing Remodel Add',        200,  'Pool', 'Remodel add'),
+  ('Plumbing Extra Light',        'Plumbing Extra Light',        150,  'Pool', 'Extra light add (each)'),
+  ('Plumbing Sheer Descent',      'Plumbing Sheer Descent',      450,  'Pool', 'Sheer descent plumbing add (each)'),
   -- Steel
-  ('Steel Per LF',                8,    'Pool', 'Steel per LF of pool perimeter'),
-  ('Steel Spa Bonus',             200,  'Pool', 'Spa steel flat add-on')
+  ('Steel Per LF',                'Steel Per LF',                8,    'Pool', 'Steel per LF of pool perimeter'),
+  ('Steel Spa Bonus',             'Steel Spa Bonus',             200,  'Pool', 'Spa steel flat add-on')
 ON CONFLICT DO NOTHING;
