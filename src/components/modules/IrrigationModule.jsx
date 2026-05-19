@@ -17,6 +17,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
+import RateEditPopover from '../RateEditPopover'
 
 // ── Zone definitions ──────────────────────────────────────────────────────────
 // defaultMode: 'Hand' | 'Trench'  — matches Excel defaults; user can override
@@ -179,6 +180,16 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
   const gpmd = initialData?.gpmd ?? 425
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
 
+  // Re-fetch Irrigation master-rate maps. Used on mount and after edit-saves.
+  const refreshAllRates = useCallback(async () => {
+    const [mrRes, lrRes] = await Promise.all([
+      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Irrigation'),
+      supabase.from('labor_rates').select('name, rate').eq('category', 'Irrigation'),
+    ])
+    if (mrRes.data) { const m = {}; mrRes.data.forEach(r => { m[r.name] = parseFloat(r.unit_cost) }); setMaterialPrices(m) }
+    if (lrRes.data) { const m = {}; lrRes.data.forEach(r => { m[r.name] = parseFloat(r.rate) }); setLaborRates(m) }
+  }, [])
+
   useEffect(() => {
     if (initialData?.materialPrices && initialData?.laborRatePerHour) return
     let gone = false
@@ -194,17 +205,12 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
                   setSalesTax(parseFloat(data.sales_tax_rate) || RATE_DEFAULTS.salesTax)
               }
             }),
-        !initialData?.materialPrices &&
-          supabase.from('material_rates').select('name, unit_cost').eq('category', 'Irrigation')
-            .then(({ data }) => { if (!gone && data) { const m = {}; data.forEach(r => { m[r.name] = parseFloat(r.unit_cost) }); setMaterialPrices(m) } }),
-        !initialData?.laborRates &&
-          supabase.from('labor_rates').select('name, rate').eq('category', 'Irrigation')
-            .then(({ data }) => { if (!gone && data) { const m = {}; data.forEach(r => { m[r.name] = parseFloat(r.rate) }); setLaborRates(m) } }),
+        refreshAllRates(),
       ])
       if (!gone) setPricesLoading(false)
     })()
     return () => { gone = true }
-  }, [])
+  }, [refreshAllRates])
 
   const set    = useCallback((f, v) => setState(p => ({ ...p, [f]: v })), [])
   const setNested = useCallback((group, key, val) => setState(p => ({ ...p, [group]: { ...p[group], [key]: val } })), [])
@@ -296,7 +302,17 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
 
       {/* Zones */}
       <div>
-        <SecHdr title={`Irrigation Zones — Hand: ${calc.handRate} hrs/zone · Trench: ${calc.trenchRate} hrs/zone`} />
+        <div className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-5 mb-2 inline-flex items-center flex-wrap gap-x-2 gap-y-1">
+          <span>Irrigation Zones —</span>
+          <span className="inline-flex items-center gap-1">Hand: {calc.handRate} hrs/zone
+            <RateEditPopover table="labor_rates" name="Irrigation - Hand Zone" category="Irrigation"
+              mode="coefficient" unitLabel="hrs/zone" currentValue={calc.handRate} onSaved={refreshAllRates} />
+          </span>·
+          <span className="inline-flex items-center gap-1">Trench: {calc.trenchRate} hrs/zone
+            <RateEditPopover table="labor_rates" name="Irrigation - Trench Zone" category="Irrigation"
+              mode="coefficient" unitLabel="hrs/zone" currentValue={calc.trenchRate} onSaved={refreshAllRates} />
+          </span>
+        </div>
         <table className="w-full text-xs">
           <TH cols={[
             { label: 'Zone Type' },
@@ -308,11 +324,16 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
           <tbody className="divide-y divide-gray-50">
             {ZONE_TYPES.map((z, i) => {
               const cr = calc.zoneCalc[i]
+              const matRate = materialPrices[z.matKey] ?? z.matFallback
               return (
                 <tr key={z.key}>
                   <td className={`${td} font-medium text-gray-700`}>
-                    {z.label}
-                    <span className="ml-1 text-gray-400 font-normal text-xs">(default: {z.defaultMode})</span>
+                    <span className="inline-flex items-center gap-1">
+                      {z.label}
+                      <span className="text-gray-400 font-normal text-xs">(default: {z.defaultMode})</span>
+                      <RateEditPopover table="material_rates" name={z.matKey} category="Irrigation"
+                        unitLabel="zone" currentValue={matRate} onSaved={refreshAllRates} />
+                    </span>
                   </td>
                   <td className={td}>
                     <Inp value={state.zoneQtys[z.key]}
@@ -334,7 +355,11 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
 
       {/* Timers */}
       <div>
-        <SecHdr title={`Controllers / Timers — ${calc.timerHrs} hrs install each`} />
+        <div className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-5 mb-2 inline-flex items-center gap-2">
+          <span>Controllers / Timers — {calc.timerHrs} hrs install each</span>
+          <RateEditPopover table="labor_rates" name="Irrigation - Timer Install" category="Irrigation"
+            mode="coefficient" unitLabel="hrs/ea" currentValue={calc.timerHrs} onSaved={refreshAllRates} />
+        </div>
         <table className="w-full text-xs">
           <TH cols={[
             { label: 'Timer Type' },
@@ -345,9 +370,16 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
           <tbody className="divide-y divide-gray-50">
             {TIMER_TYPES.map((t, i) => {
               const cr = calc.timerCalc[i]
+              const matRate = materialPrices[t.matKey] ?? t.matFallback
               return (
                 <tr key={t.key}>
-                  <td className={`${td} font-medium text-gray-700`}>{t.label}</td>
+                  <td className={`${td} font-medium text-gray-700`}>
+                    <span className="inline-flex items-center gap-1">
+                      {t.label}
+                      <RateEditPopover table="material_rates" name={t.matKey} category="Irrigation"
+                        unitLabel="ea" currentValue={matRate} onSaved={refreshAllRates} />
+                    </span>
+                  </td>
                   <td className={td}>
                     <Inp value={state.timerQtys[t.key]}
                       onChange={e => setNested('timerQtys', t.key, e.target.value)} />

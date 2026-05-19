@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
+import RateEditPopover from '../RateEditPopover'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Planting Module
@@ -267,6 +268,25 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
   const [laborRates,     setLaborRates]     = useState(initialData?.laborRates     ?? {})
   const [pricesLoading,  setPricesLoading]  = useState(!initialData?.materialPrices)
 
+  // Re-fetch Planting master-rate maps. Called once on mount and again after
+  // any RateEditPopover save so the calc reflects edits immediately.
+  const refreshAllRates = useCallback(async () => {
+    const [matRes, labRes] = await Promise.all([
+      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Planting'),
+      supabase.from('labor_rates').select('name, rate').eq('category', 'Planting'),
+    ])
+    if (matRes.data) {
+      const mp = {}
+      matRes.data.forEach(r => { mp[r.name] = parseFloat(r.unit_cost) || 0 })
+      setMaterialPrices(mp)
+    }
+    if (labRes.data) {
+      const lr = {}
+      labRes.data.forEach(r => { lr[r.name] = parseFloat(r.rate) || 0 })
+      setLaborRates(lr)
+    }
+  }, [])
+
   useEffect(() => {
     if (!initialData?.laborRatePerHour) {
       supabase
@@ -282,32 +302,8 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
     // If editing an existing module, use the saved snapshots
     if (initialData?.materialPrices) return
 
-    Promise.all([
-      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Planting'),
-      supabase.from('labor_rates').select('name, rate').eq('category', 'Planting'),
-    ]).then(([matRes, labRes]) => {
-      if (matRes.data) {
-        const mp = {}
-        matRes.data.forEach(r => { mp[r.name] = parseFloat(r.unit_cost) || 0 })
-        setMaterialPrices(mp)
-        // Patch default plant row prices to use live DB prices
-        setSmallPlantRows(rows => rows.map(r => ({
-          ...r,
-          price: mp[r.type] ?? SMALL_PLANT_DEFAULTS[r.type]?.price ?? 0,
-        })))
-        setLargePlantRows(rows => rows.map(r => ({
-          ...r,
-          price: mp[r.type] ?? LARGE_PLANT_DEFAULTS[r.type]?.price ?? 0,
-        })))
-      }
-      if (labRes.data) {
-        const lr = {}
-        labRes.data.forEach(r => { lr[r.name] = parseFloat(r.rate) || 0 })
-        setLaborRates(lr)
-      }
-      setPricesLoading(false)
-    })
-  }, [])
+    refreshAllRates().then(() => setPricesLoading(false))
+  }, [refreshAllRates])
 
   const gpmd = initialData?.gpmd ?? WORKER_DEFAULTS.gpmd
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
@@ -410,7 +406,20 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
       {/* Till & Amend + Difficulty */}
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Till &amp; Amend Soil (sqft)</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1 inline-flex items-center flex-wrap gap-1">
+            Till &amp; Amend Soil (sqft)
+            <span className="text-xs font-normal text-gray-400 inline-flex items-center gap-1">
+              ({lr(laborRates,'Till - Soil Move Rate')} CY/d
+              <RateEditPopover table="labor_rates" name="Till - Soil Move Rate" category="Planting"
+                mode="coefficient" unitLabel="CY/day" currentValue={lr(laborRates,'Till - Soil Move Rate')} onSaved={refreshAllRates} />
+              · {lr(laborRates,'Till - Tilling Rate')} SF/d
+              <RateEditPopover table="labor_rates" name="Till - Tilling Rate" category="Planting"
+                mode="coefficient" unitLabel="SF/day" currentValue={lr(laborRates,'Till - Tilling Rate')} onSaved={refreshAllRates} />
+              · {lr(laborRates,'Till - Amend Rate')} SF/d
+              <RateEditPopover table="labor_rates" name="Till - Amend Rate" category="Planting"
+                mode="coefficient" unitLabel="SF/day" currentValue={lr(laborRates,'Till - Amend Rate')} onSaved={refreshAllRates} />)
+            </span>
+          </label>
           <NumInput value={tillSqft} onChange={setTillSqft} placeholder="0" />
           {n(tillSqft) > 0 && (
             <p className="text-xs text-gray-400 mt-1">{calc.tillHrs.toFixed(2)} hrs estimated</p>
@@ -444,6 +453,7 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
                 const qty    = n(row.qty)
                 const perDay = smallPerDay(row.type)
                 const hrs    = qty > 0 && perDay > 0 ? (qty / perDay) * 8 : 0
+                const masterPrice = materialPrices[row.type] ?? SMALL_PLANT_DEFAULTS[row.type]?.price ?? 0
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-2">
@@ -459,18 +469,26 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
                       <NumInput value={row.qty} onChange={v => updateSmall(i, 'qty', v)} />
                     </td>
                     <td className="py-1 pr-2">
-                      <div className="relative">
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-                        <input
-                          type="number" step="any" min="0"
-                          className="input text-sm py-1.5 pl-5"
-                          value={row.price}
-                          onChange={e => updateSmall(i, 'price', e.target.value)}
-                        />
+                      <div className="flex items-center gap-1">
+                        <div className="relative flex-1">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                          <input
+                            type="number" step="any" min="0"
+                            className="input text-sm py-1.5 pl-5 w-full"
+                            value={row.price}
+                            onChange={e => updateSmall(i, 'price', e.target.value)}
+                          />
+                        </div>
+                        <RateEditPopover table="material_rates" name={row.type} category="Planting"
+                          unitLabel="ea" currentValue={masterPrice} onSaved={refreshAllRates} />
                       </div>
                     </td>
                     <td className="py-1 text-right text-gray-400 text-xs">
-                      {perDay.toLocaleString()}
+                      <span className="inline-flex items-center justify-end gap-1">
+                        {perDay.toLocaleString()}
+                        <RateEditPopover table="labor_rates" name={row.type} category="Planting"
+                          mode="coefficient" unitLabel="per day" currentValue={perDay} onSaved={refreshAllRates} />
+                      </span>
                     </td>
                     <td className="py-1 text-right text-gray-600 text-xs pl-2">
                       {hrs > 0 ? hrs.toFixed(2) : '—'}
@@ -509,6 +527,7 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
                 const qty    = n(row.qty)
                 const perDay = largePerDay(row.type)
                 const hrs    = qty > 0 && perDay > 0 ? (qty / perDay) * 8 : 0
+                const masterPrice = materialPrices[row.type] ?? LARGE_PLANT_DEFAULTS[row.type]?.price ?? 0
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-2">
@@ -524,18 +543,26 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
                       <NumInput value={row.qty} onChange={v => updateLarge(i, 'qty', v)} />
                     </td>
                     <td className="py-1 pr-2">
-                      <div className="relative">
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-                        <input
-                          type="number" step="any" min="0"
-                          className="input text-sm py-1.5 pl-5"
-                          value={row.price}
-                          onChange={e => updateLarge(i, 'price', e.target.value)}
-                        />
+                      <div className="flex items-center gap-1">
+                        <div className="relative flex-1">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                          <input
+                            type="number" step="any" min="0"
+                            className="input text-sm py-1.5 pl-5 w-full"
+                            value={row.price}
+                            onChange={e => updateLarge(i, 'price', e.target.value)}
+                          />
+                        </div>
+                        <RateEditPopover table="material_rates" name={row.type} category="Planting"
+                          unitLabel="ea" currentValue={masterPrice} onSaved={refreshAllRates} />
                       </div>
                     </td>
                     <td className="py-1 text-right text-gray-400 text-xs">
-                      {perDay < 1 ? perDay.toFixed(2) : perDay.toLocaleString()}
+                      <span className="inline-flex items-center justify-end gap-1">
+                        {perDay < 1 ? perDay.toFixed(2) : perDay.toLocaleString()}
+                        <RateEditPopover table="labor_rates" name={row.type} category="Planting"
+                          mode="coefficient" unitLabel="per day" currentValue={perDay} onSaved={refreshAllRates} />
+                      </span>
                     </td>
                     <td className="py-1 text-right text-gray-600 text-xs pl-2">
                       {hrs > 0 ? hrs.toFixed(2) : '—'}
@@ -569,8 +596,14 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
             <span className="text-xs text-gray-400">Sub cost</span>
           </div>
 
-          <div className="flex items-center gap-3">
-            <label className="text-sm text-gray-700 w-52 shrink-0">Tree Stakes (qty)</label>
+          <div className="flex items-center gap-3 flex-wrap">
+            <label className="text-sm text-gray-700 w-52 shrink-0 inline-flex items-center gap-1">
+              Tree Stakes (qty)
+              <RateEditPopover table="labor_rates" name="Tree Stakes - Install Rate" category="Planting"
+                mode="coefficient" unitLabel="stakes/day" currentValue={lr(laborRates,'Tree Stakes - Install Rate')} onSaved={refreshAllRates} />
+              <RateEditPopover table="material_rates" name="Tree Stake" category="Planting"
+                unitLabel="ea" currentValue={mp(materialPrices,'Tree Stake')} onSaved={refreshAllRates} />
+            </label>
             <NumInput value={addons.treeStakes} onChange={v => setAddons(p => ({ ...p, treeStakes: v }))} className="w-36" />
             {n(addons.treeStakes) > 0 && (
               <span className="text-xs text-gray-400">
@@ -580,8 +613,14 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
             )}
           </div>
 
-          <div className="flex items-center gap-3">
-            <label className="text-sm text-gray-700 w-52 shrink-0">Root Barrier 12" (LF)</label>
+          <div className="flex items-center gap-3 flex-wrap">
+            <label className="text-sm text-gray-700 w-52 shrink-0 inline-flex items-center gap-1">
+              Root Barrier 12" (LF)
+              <RateEditPopover table="labor_rates" name="Root Barrier - Install Rate" category="Planting"
+                mode="coefficient" unitLabel="min/LF" currentValue={lr(laborRates,'Root Barrier - Install Rate')} onSaved={refreshAllRates} />
+              <RateEditPopover table="material_rates" name="Root Barrier 12in" category="Planting"
+                unitLabel="LF" currentValue={mp(materialPrices,'Root Barrier 12in')} onSaved={refreshAllRates} />
+            </label>
             <NumInput value={addons.rootBarrier12} onChange={v => setAddons(p => ({ ...p, rootBarrier12: v }))} className="w-36" />
             {n(addons.rootBarrier12) > 0 && (
               <span className="text-xs text-gray-400">
@@ -591,8 +630,12 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
             )}
           </div>
 
-          <div className="flex items-center gap-3">
-            <label className="text-sm text-gray-700 w-52 shrink-0">Root Barrier 24" (LF)</label>
+          <div className="flex items-center gap-3 flex-wrap">
+            <label className="text-sm text-gray-700 w-52 shrink-0 inline-flex items-center gap-1">
+              Root Barrier 24" (LF)
+              <RateEditPopover table="material_rates" name="Root Barrier 24in" category="Planting"
+                unitLabel="LF" currentValue={mp(materialPrices,'Root Barrier 24in')} onSaved={refreshAllRates} />
+            </label>
             <NumInput value={addons.rootBarrier24} onChange={v => setAddons(p => ({ ...p, rootBarrier24: v }))} className="w-36" />
             {n(addons.rootBarrier24) > 0 && (
               <span className="text-xs text-gray-400">
@@ -602,32 +645,52 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
             )}
           </div>
 
-          <div className="flex items-center gap-3">
-            <label className="text-sm text-gray-700 w-52 shrink-0">Gopher Baskets — 1 gal (qty)</label>
+          <div className="flex items-center gap-3 flex-wrap">
+            <label className="text-sm text-gray-700 w-52 shrink-0 inline-flex items-center gap-1">
+              Gopher Baskets — 1 gal (qty)
+              <RateEditPopover table="labor_rates" name="Gopher Basket - Install Rate" category="Planting"
+                mode="coefficient" unitLabel="min/ea" currentValue={lr(laborRates,'Gopher Basket - Install Rate')} onSaved={refreshAllRates} />
+              <RateEditPopover table="material_rates" name="Gopher Basket 1 Gal" category="Planting"
+                unitLabel="ea" currentValue={mp(materialPrices,'Gopher Basket 1 Gal')} onSaved={refreshAllRates} />
+            </label>
             <NumInput value={addons.gopherBaskets1} onChange={v => setAddons(p => ({ ...p, gopherBaskets1: v }))} className="w-36" />
             {n(addons.gopherBaskets1) > 0 && (
               <span className="text-xs text-gray-400">${(n(addons.gopherBaskets1) * mp(materialPrices,'Gopher Basket 1 Gal')).toFixed(2)} mat</span>
             )}
           </div>
 
-          <div className="flex items-center gap-3">
-            <label className="text-sm text-gray-700 w-52 shrink-0">Gopher Baskets — 5 gal (qty)</label>
+          <div className="flex items-center gap-3 flex-wrap">
+            <label className="text-sm text-gray-700 w-52 shrink-0 inline-flex items-center gap-1">
+              Gopher Baskets — 5 gal (qty)
+              <RateEditPopover table="material_rates" name="Gopher Basket 5 Gal" category="Planting"
+                unitLabel="ea" currentValue={mp(materialPrices,'Gopher Basket 5 Gal')} onSaved={refreshAllRates} />
+            </label>
             <NumInput value={addons.gopherBaskets5} onChange={v => setAddons(p => ({ ...p, gopherBaskets5: v }))} className="w-36" />
             {n(addons.gopherBaskets5) > 0 && (
               <span className="text-xs text-gray-400">${(n(addons.gopherBaskets5) * mp(materialPrices,'Gopher Basket 5 Gal')).toFixed(2)} mat</span>
             )}
           </div>
 
-          <div className="flex items-center gap-3">
-            <label className="text-sm text-gray-700 w-52 shrink-0">Gopher Baskets — 15 gal (qty)</label>
+          <div className="flex items-center gap-3 flex-wrap">
+            <label className="text-sm text-gray-700 w-52 shrink-0 inline-flex items-center gap-1">
+              Gopher Baskets — 15 gal (qty)
+              <RateEditPopover table="material_rates" name="Gopher Basket 15 Gal" category="Planting"
+                unitLabel="ea" currentValue={mp(materialPrices,'Gopher Basket 15 Gal')} onSaved={refreshAllRates} />
+            </label>
             <NumInput value={addons.gopherBaskets15} onChange={v => setAddons(p => ({ ...p, gopherBaskets15: v }))} className="w-36" />
             {n(addons.gopherBaskets15) > 0 && (
               <span className="text-xs text-gray-400">${(n(addons.gopherBaskets15) * mp(materialPrices,'Gopher Basket 15 Gal')).toFixed(2)} mat</span>
             )}
           </div>
 
-          <div className="flex items-center gap-3">
-            <label className="text-sm text-gray-700 w-52 shrink-0">Mesh Flat (sqft)</label>
+          <div className="flex items-center gap-3 flex-wrap">
+            <label className="text-sm text-gray-700 w-52 shrink-0 inline-flex items-center gap-1">
+              Mesh Flat (sqft)
+              <RateEditPopover table="labor_rates" name="Mesh Flat - Install Rate" category="Planting"
+                mode="coefficient" unitLabel="min/SF" currentValue={lr(laborRates,'Mesh Flat - Install Rate')} onSaved={refreshAllRates} />
+              <RateEditPopover table="material_rates" name="Mesh Flat" category="Planting"
+                unitLabel="SF" currentValue={mp(materialPrices,'Mesh Flat')} onSaved={refreshAllRates} />
+            </label>
             <NumInput value={addons.meshFlat} onChange={v => setAddons(p => ({ ...p, meshFlat: v }))} className="w-36" />
             {n(addons.meshFlat) > 0 && (
               <span className="text-xs text-gray-400">
@@ -637,8 +700,14 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
             )}
           </div>
 
-          <div className="flex items-center gap-3">
-            <label className="text-sm text-gray-700 w-52 shrink-0">Jute Fabric (sqft)</label>
+          <div className="flex items-center gap-3 flex-wrap">
+            <label className="text-sm text-gray-700 w-52 shrink-0 inline-flex items-center gap-1">
+              Jute Fabric (sqft)
+              <RateEditPopover table="labor_rates" name="Jute Fabric - Install Rate" category="Planting"
+                mode="coefficient" unitLabel="min/SF" currentValue={lr(laborRates,'Jute Fabric - Install Rate')} onSaved={refreshAllRates} />
+              <RateEditPopover table="material_rates" name="Jute Fabric" category="Planting"
+                unitLabel="SF" currentValue={mp(materialPrices,'Jute Fabric')} onSaved={refreshAllRates} />
+            </label>
             <NumInput value={addons.juteFabric} onChange={v => setAddons(p => ({ ...p, juteFabric: v }))} className="w-36" />
             {n(addons.juteFabric) > 0 && (
               <span className="text-xs text-gray-400">

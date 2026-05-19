@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
+import RateEditPopover from '../RateEditPopover'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Ground Treatments Module — based on Softscape Module tab in Excel estimator
@@ -230,23 +231,27 @@ export default function GroundTreatmentsModule({ projectName, onSave, onBack, sa
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
   const [pricesLoading, setPricesLoading]   = useState(!initialData?.materialPrices)
 
+  // Re-fetch the merged labor+material rate map. Called on mount and after any
+  // RateEditPopover save so the calc reflects edits.
+  const refreshAllRates = useCallback(async () => {
+    const [matRes, labRes] = await Promise.all([
+      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Ground Treatments'),
+      supabase.from('labor_rates').select('name, rate').eq('category', 'Ground Treatments'),
+    ])
+    const prices = {}
+    ;(matRes.data || []).forEach(r => { prices[r.name] = parseFloat(r.unit_cost) || 0 })
+    ;(labRes.data  || []).forEach(r => { prices[r.name] = parseFloat(r.rate)     || 0 })
+    setMaterialPrices(prices)
+  }, [])
+
   useEffect(() => {
     if (!initialData?.laborRatePerHour) {
       supabase.from('company_settings').select('value').eq('key', 'labor_rate_per_hour').single()
         .then(({ data }) => { if (data) setLaborRatePerHour(parseFloat(data.value) || DEFAULTS.laborRatePerHour) })
     }
     if (initialData?.materialPrices) return
-    Promise.all([
-      supabase.from('material_rates').select('name, unit_cost').eq('category', 'Ground Treatments'),
-      supabase.from('labor_rates').select('name, rate').eq('category', 'Ground Treatments'),
-    ]).then(([matRes, labRes]) => {
-      const prices = {}
-      ;(matRes.data || []).forEach(r => { prices[r.name] = parseFloat(r.unit_cost) || 0 })
-      ;(labRes.data  || []).forEach(r => { prices[r.name] = parseFloat(r.rate)     || 0 })
-      setMaterialPrices(prices)
-      setPricesLoading(false)
-    })
-  }, [])
+    refreshAllRates().then(() => setPricesLoading(false))
+  }, [refreshAllRates])
 
   const gpmd          = initialData?.gpmd          ?? DEFAULTS.gpmd
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
@@ -371,7 +376,13 @@ export default function GroundTreatmentsModule({ projectName, onSave, onBack, sa
           <LabeledRow label="Soil Prep"
             note={n(soilPrepSF) > 0 ? `$${(n(soilPrepSF)*p(GT_RATES.soilPrepMat.dbName,0.1558)).toFixed(2)} mat` : null}>
             <NumInput value={soilPrepSF} onChange={setSoilPrepSF} placeholder="SF" className="w-28" />
-            <span className="text-xs text-gray-400">${p(GT_RATES.soilPrepMat.dbName,0.1558).toFixed(2)}/SF</span>
+            <span className="text-xs text-gray-400 inline-flex items-center gap-1">
+              ${p(GT_RATES.soilPrepMat.dbName,0.1558).toFixed(2)}/SF
+              <RateEditPopover table="material_rates" name={GT_RATES.soilPrepMat.dbName} category="Ground Treatments"
+                unitLabel="SF" currentValue={p(GT_RATES.soilPrepMat.dbName, GT_RATES.soilPrepMat.fallback)} onSaved={refreshAllRates} />
+              <RateEditPopover table="labor_rates" name={GT_RATES.soilPrepLab.dbName} category="Ground Treatments"
+                mode="coefficient" unitLabel="hrs/SF" currentValue={p(GT_RATES.soilPrepLab.dbName, GT_RATES.soilPrepLab.fallback)} onSaved={refreshAllRates} />
+            </span>
           </LabeledRow>
         </div>
       </div>
@@ -385,6 +396,21 @@ export default function GroundTreatmentsModule({ projectName, onSave, onBack, sa
             <select className="input text-sm py-1.5 flex-1" value={sodType} onChange={e => setSodType(e.target.value)}>
               {SOD_TYPES.map(t => <option key={t}>{t}</option>)}
             </select>
+            <span className="text-xs text-gray-400 inline-flex items-center gap-1">
+              {sodType === 'St. Augustine' ? (
+                <>${p(GT_RATES.sodStAugMat.dbName, 1.97).toFixed(2)}/SF
+                  <RateEditPopover table="material_rates" name={GT_RATES.sodStAugMat.dbName} category="Ground Treatments"
+                    unitLabel="SF" currentValue={p(GT_RATES.sodStAugMat.dbName, GT_RATES.sodStAugMat.fallback)} onSaved={refreshAllRates} />
+                </>
+              ) : (
+                <>${p(GT_RATES.sodMarathonMat.dbName, 1.20).toFixed(2)}/SF
+                  <RateEditPopover table="material_rates" name={GT_RATES.sodMarathonMat.dbName} category="Ground Treatments"
+                    unitLabel="SF" currentValue={p(GT_RATES.sodMarathonMat.dbName, GT_RATES.sodMarathonMat.fallback)} onSaved={refreshAllRates} />
+                </>
+              )}
+              <RateEditPopover table="labor_rates" name={GT_RATES.sodLab.dbName} category="Ground Treatments"
+                mode="coefficient" unitLabel="hrs/SF" currentValue={p(GT_RATES.sodLab.dbName, GT_RATES.sodLab.fallback)} onSaved={refreshAllRates} />
+            </span>
             {n(sodSF) > 0 && (
               <span className="text-xs text-gray-400">
                 ${(n(sodSF) * (sodType === 'St. Augustine'
@@ -409,6 +435,14 @@ export default function GroundTreatmentsModule({ projectName, onSave, onBack, sa
             >
               {['1','2','3','4'].map(d => <option key={d} value={d}>{d}" deep</option>)}
             </select>
+            <span className="text-xs text-gray-400 inline-flex items-center gap-1">
+              ${p(GT_RATES.mulchPerCY.dbName, 25).toFixed(2)}/CY
+              <RateEditPopover table="material_rates" name={GT_RATES.mulchPerCY.dbName} category="Ground Treatments"
+                unitLabel="CY" currentValue={p(GT_RATES.mulchPerCY.dbName, GT_RATES.mulchPerCY.fallback)} onSaved={refreshAllRates} />
+              · ${p(GT_RATES.mulchDelivery.dbName, 75).toFixed(2)} delivery
+              <RateEditPopover table="material_rates" name={GT_RATES.mulchDelivery.dbName} category="Ground Treatments"
+                unitLabel="flat" currentValue={p(GT_RATES.mulchDelivery.dbName, GT_RATES.mulchDelivery.fallback)} onSaved={refreshAllRates} />
+            </span>
             {n(mulchSF) > 0 && (
               <span className="text-xs text-gray-400">
                 {((n(mulchSF)*(n(mulchDepth)/12)/27)).toFixed(2)} CY
@@ -421,6 +455,16 @@ export default function GroundTreatmentsModule({ projectName, onSave, onBack, sa
       {/* ── Decomposed Granite ── */}
       <div>
         <SectionHeader title="Decomposed Granite (D.G.)" />
+        <p className="text-xs text-gray-400 mb-2 inline-flex items-center flex-wrap gap-x-2">
+          <span className="inline-flex items-center gap-1">DG ${p(GT_RATES.dgPerTon.dbName, 50).toFixed(2)}/ton
+            <RateEditPopover table="material_rates" name={GT_RATES.dgPerTon.dbName} category="Ground Treatments"
+              unitLabel="ton" currentValue={p(GT_RATES.dgPerTon.dbName, GT_RATES.dgPerTon.fallback)} onSaved={refreshAllRates} />
+          </span>·
+          <span className="inline-flex items-center gap-1">Cement add ${p(GT_RATES.dgCementPerTon.dbName, 20).toFixed(2)}/ton
+            <RateEditPopover table="material_rates" name={GT_RATES.dgCementPerTon.dbName} category="Ground Treatments"
+              unitLabel="ton" currentValue={p(GT_RATES.dgCementPerTon.dbName, GT_RATES.dgCementPerTon.fallback)} onSaved={refreshAllRates} />
+          </span>
+        </p>
         <div className="grid grid-cols-2 gap-3 mb-2">
           <div>
             <label className="block text-xs text-gray-500 mb-1">Area (SF)</label>
@@ -456,6 +500,15 @@ export default function GroundTreatmentsModule({ projectName, onSave, onBack, sa
       {/* ── Gravel ── */}
       <div>
         <SectionHeader title="Gravel" />
+        <p className="text-xs text-gray-400 mb-2 inline-flex items-center flex-wrap gap-x-2">
+          <span className="inline-flex items-center gap-1">Fabric ${p(GT_RATES.gravelFabricMat.dbName, 0.10).toFixed(2)}/SF mat
+            <RateEditPopover table="material_rates" name={GT_RATES.gravelFabricMat.dbName} category="Ground Treatments"
+              unitLabel="SF" currentValue={p(GT_RATES.gravelFabricMat.dbName, GT_RATES.gravelFabricMat.fallback)} onSaved={refreshAllRates} />
+            · {p(GT_RATES.gravelFabricLab.dbName, 0.024)} hrs/SF labor
+            <RateEditPopover table="labor_rates" name={GT_RATES.gravelFabricLab.dbName} category="Ground Treatments"
+              mode="coefficient" unitLabel="hrs/SF" currentValue={p(GT_RATES.gravelFabricLab.dbName, GT_RATES.gravelFabricLab.fallback)} onSaved={refreshAllRates} />
+          </span>
+        </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -522,14 +575,26 @@ export default function GroundTreatmentsModule({ projectName, onSave, onBack, sa
           <LabeledRow label="Plastic Edging"
             note={n(plasticEdgingLF) > 0 ? `$${(n(plasticEdgingLF)*p(GT_RATES.plasticEdgingMat.dbName,1.20)).toFixed(2)} mat` : null}>
             <NumInput value={plasticEdgingLF} onChange={setPlasticEdgingLF} placeholder="LF" className="w-28" />
-            <span className="text-xs text-gray-400">${p(GT_RATES.plasticEdgingMat.dbName,1.20).toFixed(2)}/LF</span>
+            <span className="text-xs text-gray-400 inline-flex items-center gap-1">
+              ${p(GT_RATES.plasticEdgingMat.dbName,1.20).toFixed(2)}/LF
+              <RateEditPopover table="material_rates" name={GT_RATES.plasticEdgingMat.dbName} category="Ground Treatments"
+                unitLabel="LF" currentValue={p(GT_RATES.plasticEdgingMat.dbName, GT_RATES.plasticEdgingMat.fallback)} onSaved={refreshAllRates} />
+              <RateEditPopover table="labor_rates" name={GT_RATES.plasticEdgingLab.dbName} category="Ground Treatments"
+                mode="coefficient" unitLabel="hrs/LF" currentValue={p(GT_RATES.plasticEdgingLab.dbName, GT_RATES.plasticEdgingLab.fallback)} onSaved={refreshAllRates} />
+            </span>
           </LabeledRow>
 
           {/* Metal Edging */}
           <LabeledRow label="Metal Edging"
             note={n(metalEdgingLF) > 0 ? `$${(n(metalEdgingLF)*p(GT_RATES.metalEdgingMat.dbName,4.00)).toFixed(2)} mat` : null}>
             <NumInput value={metalEdgingLF} onChange={setMetalEdgingLF} placeholder="LF" className="w-28" />
-            <span className="text-xs text-gray-400">${p(GT_RATES.metalEdgingMat.dbName,4.00).toFixed(2)}/LF</span>
+            <span className="text-xs text-gray-400 inline-flex items-center gap-1">
+              ${p(GT_RATES.metalEdgingMat.dbName,4.00).toFixed(2)}/LF
+              <RateEditPopover table="material_rates" name={GT_RATES.metalEdgingMat.dbName} category="Ground Treatments"
+                unitLabel="LF" currentValue={p(GT_RATES.metalEdgingMat.dbName, GT_RATES.metalEdgingMat.fallback)} onSaved={refreshAllRates} />
+              <RateEditPopover table="labor_rates" name={GT_RATES.metalEdgingLab.dbName} category="Ground Treatments"
+                mode="coefficient" unitLabel="hrs/LF" currentValue={p(GT_RATES.metalEdgingLab.dbName, GT_RATES.metalEdgingLab.fallback)} onSaved={refreshAllRates} />
+            </span>
           </LabeledRow>
         </div>
       </div>
@@ -537,6 +602,16 @@ export default function GroundTreatmentsModule({ projectName, onSave, onBack, sa
       {/* ── Steppers ── */}
       <div>
         <SectionHeader title="Steppers" />
+        <p className="text-xs text-gray-400 mb-2 inline-flex items-center flex-wrap gap-x-2">
+          <span className="inline-flex items-center gap-1">Flagstone {p(GT_RATES.flagstoneLab.dbName, 35)} SF/day labor
+            <RateEditPopover table="labor_rates" name={GT_RATES.flagstoneLab.dbName} category="Ground Treatments"
+              mode="coefficient" unitLabel="SF/day" currentValue={p(GT_RATES.flagstoneLab.dbName, GT_RATES.flagstoneLab.fallback)} onSaved={refreshAllRates} />
+          </span>·
+          <span className="inline-flex items-center gap-1">Precast {p(GT_RATES.precastLab.dbName, 50)} SF/day labor
+            <RateEditPopover table="labor_rates" name={GT_RATES.precastLab.dbName} category="Ground Treatments"
+              mode="coefficient" unitLabel="SF/day" currentValue={p(GT_RATES.precastLab.dbName, GT_RATES.precastLab.fallback)} onSaved={refreshAllRates} />
+          </span>
+        </p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -554,15 +629,19 @@ export default function GroundTreatmentsModule({ projectName, onSave, onBack, sa
                 <td className="py-1 pr-2 text-xs text-gray-700">Flagstone Steppers</td>
                 <td className="py-1 pr-2"><NumInput value={flagstoneSF} onChange={setFlagstoneSF} /></td>
                 <td className="py-1 pr-2">
-                  <div className="relative">
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-                    <input
-                      type="number" step="any" min="0"
-                      className="input text-sm py-1.5 pl-5 w-24"
-                      placeholder={p(GT_RATES.flagstonePerTon.dbName, 500).toString()}
-                      value={flagstoneRate}
-                      onChange={e => setFlagstoneRate(e.target.value)}
-                    />
+                  <div className="flex items-center gap-1">
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                      <input
+                        type="number" step="any" min="0"
+                        className="input text-sm py-1.5 pl-5 w-24"
+                        placeholder={p(GT_RATES.flagstonePerTon.dbName, 500).toString()}
+                        value={flagstoneRate}
+                        onChange={e => setFlagstoneRate(e.target.value)}
+                      />
+                    </div>
+                    <RateEditPopover table="material_rates" name={GT_RATES.flagstonePerTon.dbName} category="Ground Treatments"
+                      unitLabel="ton" currentValue={p(GT_RATES.flagstonePerTon.dbName, GT_RATES.flagstonePerTon.fallback)} onSaved={refreshAllRates} />
                   </div>
                 </td>
                 <td className="py-1 text-right text-xs text-gray-400 pr-2">
@@ -577,15 +656,19 @@ export default function GroundTreatmentsModule({ projectName, onSave, onBack, sa
                 <td className="py-1 pr-2 text-xs text-gray-700">Precast Steppers</td>
                 <td className="py-1 pr-2"><NumInput value={precastSF} onChange={setPrecastSF} /></td>
                 <td className="py-1 pr-2">
-                  <div className="relative">
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-                    <input
-                      type="number" step="any" min="0"
-                      className="input text-sm py-1.5 pl-5 w-24"
-                      placeholder={p(GT_RATES.precastPerTon.dbName, 200).toString()}
-                      value={precastRate}
-                      onChange={e => setPrecastRate(e.target.value)}
-                    />
+                  <div className="flex items-center gap-1">
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                      <input
+                        type="number" step="any" min="0"
+                        className="input text-sm py-1.5 pl-5 w-24"
+                        placeholder={p(GT_RATES.precastPerTon.dbName, 200).toString()}
+                        value={precastRate}
+                        onChange={e => setPrecastRate(e.target.value)}
+                      />
+                    </div>
+                    <RateEditPopover table="material_rates" name={GT_RATES.precastPerTon.dbName} category="Ground Treatments"
+                      unitLabel="ton" currentValue={p(GT_RATES.precastPerTon.dbName, GT_RATES.precastPerTon.fallback)} onSaved={refreshAllRates} />
                   </div>
                 </td>
                 <td className="py-1 text-right text-xs text-gray-400 pr-2">
