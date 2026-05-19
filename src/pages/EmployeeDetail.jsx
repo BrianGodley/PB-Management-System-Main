@@ -35,14 +35,17 @@ const MODULES = [
     ],
   },
   {
-    key: 'clients', label: 'Clients', icon: '🤝',
+    // Internal key + accessKey stay as 'clients' / 'access_clients' for backward
+    // compat with the existing user_permissions DB columns; only labels change.
+    key: 'clients', label: 'Opportunities', icon: '🤝',
     accessKey: 'access_clients',
     perms: [
-      { key: 'clients_add',                  label: 'Add new clients' },
-      { key: 'clients_edit',                 label: 'Edit existing clients' },
+      { key: 'clients_add',                  label: 'Add new opportunities' },
+      { key: 'clients_edit',                 label: 'Edit existing opportunities' },
       { key: 'clients_add_estimate',         label: 'Add new estimates' },
       { key: 'clients_edit_other_estimates', label: "Edit other users' estimates" },
       { key: 'clients_create_bids',          label: 'Create bids' },
+      { key: 'clients_access_edit_rates',    label: 'Access/Edit Rates (show inline rate-edit toggle in estimate modules)' },
     ],
   },
   {
@@ -163,9 +166,10 @@ const DEFAULT_PERMS = {
   access_hr: true, access_accounting: true,
   // Contacts
   contacts_add: true, contacts_edit: true,
-  // Clients
+  // Opportunities (internally still keyed as 'clients' in user_permissions)
   clients_add: true, clients_edit: true, clients_add_estimate: true,
   clients_edit_other_estimates: false, clients_create_bids: true,
+  clients_access_edit_rates: false,  // off by default — only admins/estimators get the rate-edit toggle
   // Design
   design_add_project: true, design_edit_other: false,
   // Bids
@@ -827,71 +831,89 @@ export default function EmployeeDetail() {
                 <div>
                   <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Employment</p>
                   <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-                    {editing ? (
-                      <div>
-                        <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Position</label>
-                        <select value={draft.job_title || ''} onChange={e => set('job_title', e.target.value)}
-                          className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500">
-                          <option value="">Select position…</option>
-                          {positions.map(p => <option key={p.id} value={p.title}>{p.title}</option>)}
-                        </select>
-                      </div>
-                    ) : (
-                      <Field label="Position" value={draft.job_title} editing={false} onChange={() => {}} />
-                    )}
-                    {editing ? (
-                      <div>
-                        <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Department</label>
-                        <select value={draft.department || ''} onChange={e => set('department', e.target.value)}
-                          className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500">
-                          <option value="">Select…</option>
-                          {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
-                        </select>
-                      </div>
-                    ) : (
-                      <Field label="Department" value={draft.department} editing={false} onChange={() => {}} />
-                    )}
+                    {/* Position — same select in both modes, disabled when read */}
+                    <div>
+                      <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Position</label>
+                      <select
+                        value={draft.job_title || ''}
+                        onChange={e => set('job_title', e.target.value)}
+                        disabled={!editing}
+                        className={`w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500 ${
+                          !editing ? 'bg-gray-50 text-gray-700 cursor-default appearance-none' : ''
+                        }`}
+                      >
+                        <option value="">Select position…</option>
+                        {positions.map(p => <option key={p.id} value={p.title}>{p.title}</option>)}
+                      </select>
+                    </div>
+                    {/* Department */}
+                    <div>
+                      <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Department</label>
+                      <select
+                        value={draft.department || ''}
+                        onChange={e => set('department', e.target.value)}
+                        disabled={!editing}
+                        className={`w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500 ${
+                          !editing ? 'bg-gray-50 text-gray-700 cursor-default appearance-none' : ''
+                        }`}
+                      >
+                        <option value="">Select…</option>
+                        {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                    </div>
                     {/* Preferred Language */}
-                    {editing ? (
-                      <div>
-                        <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Preferred Language</label>
-                        <select value={draft.preferred_language || 'en'} onChange={e => set('preferred_language', e.target.value)}
-                          className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500">
-                          {LANGUAGES.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
-                        </select>
-                      </div>
-                    ) : (
-                      <Field
-                        label="Preferred Language"
-                        value={LANGUAGES.find(l => l.value === (draft.preferred_language || 'en'))?.label}
-                        editing={false}
-                        onChange={() => {}}
-                      />
-                    )}
+                    <div>
+                      <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Preferred Language</label>
+                      <select
+                        value={draft.preferred_language || 'en'}
+                        onChange={e => set('preferred_language', e.target.value)}
+                        disabled={!editing}
+                        className={`w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500 ${
+                          !editing ? 'bg-gray-50 text-gray-700 cursor-default appearance-none' : ''
+                        }`}
+                      >
+                        {LANGUAGES.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+                      </select>
+                    </div>
+                    {/* Start Date */}
                     <div>
                       <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Start Date</label>
-                      {editing
-                        ? <input type="date" value={draft.start_date || ''} onChange={e => set('start_date', e.target.value)} className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500" />
-                        : <p className="text-sm text-gray-800 py-0.5">{formatDate(draft.start_date)}</p>
-                      }
+                      <input
+                        type="date"
+                        value={draft.start_date || ''}
+                        onChange={e => set('start_date', e.target.value)}
+                        disabled={!editing}
+                        className={`w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500 ${
+                          !editing ? 'bg-gray-50 text-gray-700 cursor-default' : ''
+                        }`}
+                      />
                     </div>
+                    {/* Pay Rate */}
                     <div>
                       <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Pay Rate</label>
-                      {editing ? (
-                        <div className="flex gap-2">
-                          <input type="number" value={draft.pay_rate || ''} onChange={e => set('pay_rate', e.target.value)} placeholder="0.00"
-                            className="flex-1 border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500" />
-                          <select value={draft.pay_type || 'hourly'} onChange={e => set('pay_type', e.target.value)}
-                            className="border border-gray-200 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:border-green-500">
-                            <option value="hourly">hr</option>
-                            <option value="salary">yr</option>
-                          </select>
-                        </div>
-                      ) : (
-                        <p className="text-sm text-gray-800 py-0.5">
-                          {draft.pay_rate ? `$${Number(draft.pay_rate).toLocaleString()}/${draft.pay_type === 'salary' ? 'yr' : 'hr'}` : '—'}
-                        </p>
-                      )}
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          value={draft.pay_rate || ''}
+                          onChange={e => set('pay_rate', e.target.value)}
+                          placeholder="0.00"
+                          disabled={!editing}
+                          className={`flex-1 border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500 ${
+                            !editing ? 'bg-gray-50 text-gray-700 cursor-default' : ''
+                          }`}
+                        />
+                        <select
+                          value={draft.pay_type || 'hourly'}
+                          onChange={e => set('pay_type', e.target.value)}
+                          disabled={!editing}
+                          className={`border border-gray-200 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:border-green-500 ${
+                            !editing ? 'bg-gray-50 text-gray-700 cursor-default appearance-none' : ''
+                          }`}
+                        >
+                          <option value="hourly">hr</option>
+                          <option value="salary">yr</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -901,16 +923,16 @@ export default function EmployeeDetail() {
                   <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mb-3">
                     <div className="col-span-2">
                       <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Sam Greeting Tagline (e.g. "Go Steelers!" — appears after the chat-panel hello)</label>
-                      {editing
-                        ? <input
-                            type="text"
-                            value={greetingTagline}
-                            onChange={e => setGreetingTagline(e.target.value)}
-                            placeholder="(none)"
-                            className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500"
-                          />
-                        : <p className="text-sm text-gray-800 py-0.5">{greetingTagline || <span className="text-gray-400 italic">—</span>}</p>
-                      }
+                      <input
+                        type="text"
+                        value={greetingTagline}
+                        onChange={e => setGreetingTagline(e.target.value)}
+                        placeholder={editing ? '(none)' : '—'}
+                        disabled={!editing}
+                        className={`w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500 ${
+                          !editing ? 'bg-gray-50 text-gray-700 cursor-default' : ''
+                        }`}
+                      />
                     </div>
                   </div>
                 )}
@@ -930,11 +952,16 @@ export default function EmployeeDetail() {
                 {/* Notes */}
                 <div>
                   <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Notes</p>
-                  {editing
-                    ? <textarea value={draft.notes || ''} onChange={e => set('notes', e.target.value)} rows={2} placeholder="Internal notes…"
-                        className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500 resize-none" />
-                    : <p className="text-sm text-gray-600 whitespace-pre-wrap">{draft.notes || <span className="text-gray-400 italic">No notes</span>}</p>
-                  }
+                  <textarea
+                    value={draft.notes || ''}
+                    onChange={e => set('notes', e.target.value)}
+                    rows={2}
+                    placeholder={editing ? 'Internal notes…' : 'No notes'}
+                    disabled={!editing}
+                    className={`w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500 resize-none ${
+                      !editing ? 'bg-gray-50 text-gray-700 cursor-default' : ''
+                    }`}
+                  />
                 </div>
               </div>
             </div>
@@ -1594,14 +1621,20 @@ export default function EmployeeDetail() {
 
 // ── Field helper ──────────────────────────────────────────────────────────────
 function Field({ label, value, editing, onChange }) {
+  // Same input layout in both modes — disabled in read mode so the user always
+  // sees the field structure (matches the Job Details / Client tab convention).
   return (
     <div>
       <label className="block text-[11px] font-medium text-gray-600 mb-0.5">{label}</label>
-      {editing
-        ? <input value={value || ''} onChange={e => onChange(e.target.value)}
-            className="w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500" />
-        : <p className="text-sm text-gray-800 py-0.5">{value || <span className="text-gray-400 italic">—</span>}</p>
-      }
+      <input
+        value={value || ''}
+        onChange={e => onChange(e.target.value)}
+        disabled={!editing}
+        placeholder={editing ? '' : '—'}
+        className={`w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500 ${
+          !editing ? 'bg-gray-50 text-gray-700 cursor-default' : ''
+        }`}
+      />
     </div>
   )
 }
