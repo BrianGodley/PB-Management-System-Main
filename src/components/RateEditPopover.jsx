@@ -23,6 +23,7 @@
 //     closes on outside click or Escape.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 
 const DEFAULT_VALUE_FIELD = {
@@ -146,58 +147,76 @@ export default function RateEditPopover({
         </svg>
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
-          className="absolute z-50 right-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-xl p-3"
-          onClick={e => e.stopPropagation()}
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
+          onMouseDown={e => { if (e.target === e.currentTarget) setOpen(false) }}
         >
-          <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">{SOURCE_LABEL[table] || 'Master Rates'}</p>
-          <p className="text-sm font-semibold text-gray-800 truncate" title={name}>{name}</p>
-          {category && <p className="text-[11px] text-gray-500 mb-2">Category: {category}</p>}
-          <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            {mode === 'coefficient'
-              ? `Coefficient${unitLabel ? ` (${unitLabel})` : ''}`
-              : `Rate${unitLabel ? ` ($/${unitLabel})` : ''}`}
-          </label>
-          {!loaded ? (
-            <p className="text-xs text-gray-400 py-2">Loading current value…</p>
-          ) : (
-            <div className="relative">
-              {mode === 'currency' && (
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">$</span>
-              )}
-              <input
-                type="number" step="0.001" min="0" autoFocus
-                value={draft}
-                onChange={e => setDraft(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') save() }}
-                className={`input text-sm w-full ${mode === 'currency' ? 'pl-6' : 'pl-2.5'} ${mode === 'coefficient' && unitLabel ? 'pr-14' : ''}`}
-              />
-              {mode === 'coefficient' && unitLabel && (
-                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs pointer-events-none">{unitLabel}</span>
-              )}
+          <div
+            className="bg-white border border-gray-200 rounded-xl shadow-2xl w-full max-w-sm p-5"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between mb-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">{SOURCE_LABEL[table] || 'Master Rates'}</p>
+                <p className="text-base font-semibold text-gray-900 leading-tight" title={name}>{name}</p>
+                {category && <p className="text-xs text-gray-500 mt-0.5">Category: {category}</p>}
+              </div>
+              <button
+                onClick={() => setOpen(false)}
+                className="text-gray-300 hover:text-gray-600 text-xl leading-none p-1 -mt-1 flex-shrink-0"
+                title="Close"
+              >×</button>
             </div>
-          )}
-          {error && <p className="text-[11px] text-red-600 mt-1.5">{error}</p>}
-          <div className="flex gap-2 mt-3">
-            <button
-              onClick={() => { setDraft(String(currentValue ?? '')); setOpen(false) }}
-              className="flex-1 px-2 py-1 rounded-md border border-gray-200 text-xs text-gray-600 hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={save}
-              disabled={saving}
-              className="flex-1 px-2 py-1 rounded-md bg-green-700 text-white text-xs font-semibold hover:bg-green-800 disabled:opacity-50"
-            >
-              {saving ? 'Saving…' : 'Save Rate'}
-            </button>
+
+            <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+              {mode === 'coefficient'
+                ? `Coefficient${unitLabel ? ` (${unitLabel})` : ''}`
+                : `Rate${unitLabel ? ` ($/${unitLabel})` : ''}`}
+            </label>
+            {!loaded ? (
+              <p className="text-sm text-gray-400 py-3">Loading current value…</p>
+            ) : (
+              <div className="relative">
+                {mode === 'currency' && (
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">$</span>
+                )}
+                <input
+                  type="number" step="0.001" min="0" autoFocus
+                  value={draft}
+                  onChange={e => setDraft(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') save() }}
+                  className={`input text-base w-full ${mode === 'currency' ? 'pl-7' : 'pl-3'} ${mode === 'coefficient' && unitLabel ? 'pr-16' : ''}`}
+                />
+                {mode === 'coefficient' && unitLabel && (
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">{unitLabel}</span>
+                )}
+              </div>
+            )}
+            {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+
+            <div className="flex gap-2 mt-5">
+              <button
+                onClick={() => setOpen(false)}
+                className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={save}
+                disabled={saving || !loaded}
+                className="flex-1 py-2 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800 disabled:opacity-50"
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+
+            <p className="text-[11px] text-gray-400 mt-3 italic text-center">
+              Updates the master rate everywhere it's used.
+            </p>
           </div>
-          <p className="text-[10px] text-gray-400 mt-2 italic">
-            Updates the master rate everywhere it's used.
-          </p>
-        </div>
+        </div>,
+        document.body
       )}
     </span>
   )
