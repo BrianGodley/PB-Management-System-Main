@@ -88,7 +88,8 @@ function calcDemo(state, laborRatePerHour, materialPrices, laborRates, subMarkup
   //   BobcatLevels — bobcat-assisted ops (grass, grading, footing, vegetation)
   const accessNonBob = NON_BOB_LEVELS[state.access] ?? 0.667
   const accessBobcat = BOB_LEVELS[state.access]     ?? 0.75
-  const isSub   = state.dumpType === 'Subcontractor'
+  const isSub      = state.dumpType === 'Subcontractor'
+  const isDumpSub  = !isSub && state.dispType === 'Subcontractor'
   const lrph    = n(laborRatePerHour) || 35
   const diff    = 1 + n(state.difficulty) / 100
   const hrsAdj  = n(state.hoursAdj)
@@ -124,7 +125,7 @@ function calcDemo(state, laborRatePerHour, materialPrices, laborRates, subMarkup
     return {
       tons,
       hours:   tons / (baseRate * accessLevel),
-      dumpFee: isSub ? 0 : tons * dumpFeePerTon,
+      dumpFee: (isSub || isDumpSub) ? 0 : tons * dumpFeePerTon,
     }
   }
 
@@ -135,7 +136,7 @@ function calcDemo(state, laborRatePerHour, materialPrices, laborRates, subMarkup
     return {
       tons, cf,
       hours:   tons / (baseRate * accessLevel),
-      dumpFee: isSub ? 0 : tons * dumpFeePerTon,
+      dumpFee: (isSub || isDumpSub) ? 0 : tons * dumpFeePerTon,
     }
   }
 
@@ -199,7 +200,7 @@ function calcDemo(state, laborRatePerHour, materialPrices, laborRates, subMarkup
 
   const tonsPerCharge = 1.5   // billing increment
 
-  const subHaulCost = isSub ? (
+  const subHaulCost = (isSub || isDumpSub) ? (
     (conc.tons  / tonsPerCharge) * shConc  +
     (dirt.tons  / tonsPerCharge) * shDirt  +
     (grass.tons / tonsPerCharge) * shGrass +
@@ -290,6 +291,7 @@ const DEFAULT_STATE = {
   difficulty: 0,
   crewType: 'Demo',
   hoursAdj:  0,
+  dispType: 'In-House',
   distanceLF: '',  // Avg truck → work area (LF) for walk-access penalty
   concSF: '', concDepth: 4,
   dirtSF: '', dirtDepth: 6,
@@ -580,7 +582,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
           <p className="text-xs text-gray-400 mt-0.5">Demo: {calc.accessNonBob}× · Bobcat: {calc.accessBobcat}×</p>
         </div>
         <div>
-          <p className="text-xs text-gray-500 mb-0.5">Dump Type</p>
+          <p className="text-xs text-gray-500 mb-0.5">Demo Type</p>
           <Sel value={state.dumpType} onChange={e=>set('dumpType',e.target.value)} options={DUMP_TYPES} />
           {!isSelf && (
             <p className="text-xs text-amber-600 mt-0.5 inline-flex items-center flex-wrap gap-x-1 gap-y-0.5">
@@ -599,6 +601,15 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
               </span>
             </p>
           )}
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 mb-0.5">Dump Type</p>
+          <Sel value={state.dispType ?? 'In-House'}
+            onChange={e=>set('dispType',e.target.value)}
+            options={['In-House','Subcontractor']}
+            disabled={isSub} />
+          {isDumpSub && <p className="text-xs text-amber-600 mt-0.5">Sub haul charges apply</p>}
+          {isSub && <p className="text-xs text-gray-400 mt-0.5">N/A — sub demos</p>}
         </div>
       </div>
       {/* Demolition */}
