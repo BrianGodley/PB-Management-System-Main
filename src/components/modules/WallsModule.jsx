@@ -8,8 +8,41 @@ import RateEditPopover from '../RateEditPopover'
 // CMU and PIP support multiple wall entries that sum into module totals.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const BLOCK_L = 16, BLOCK_H = 8, BLOCK_W = 8
-const GROUT_CY_PER_BLOCK = ((BLOCK_L - 2) * BLOCK_H * (BLOCK_W - 2)) / 1728 / 27
+// ── CMU Block Type catalog ──────────────────────────────────────────────────
+// Mirrors the "CmuBlockPrices" table on the Master Rates & Calcs sheet of the
+// legacy Estimator Master workbook. The Excel wall sheet uses a single
+// dropdown (cell E8) keyed by NAME, then VLOOKUPs the W/H/L (in inches),
+// SPEC (blocks per spec-mix bag — not used by the PBS calc yet, kept for
+// future parity) and unit price. We keep the same column shape here so any
+// future migration to a DB-backed master rate table is mechanical.
+//
+// Grout cubic-yards per block is derived per block type from W/H/L exactly
+// like the Excel formula: cells (L-2) × H × (W-2) inches³ → cubic yards.
+const CMU_BLOCK_TYPES = [
+  { name: '8x8x16 (GREY)',         w: 8,  h: 8, l: 16, spec: 24, price: 2.59 },
+  { name: '8x8x16 SPLITFACE',      w: 8,  h: 8, l: 16, spec: 24, price: 5.19 },
+  { name: '8x8x16 (COLOR)',        w: 8,  h: 8, l: 16, spec: 24, price: 6.19 },
+  { name: '8x6x16 SLUMP (GREY)',   w: 8,  h: 6, l: 16, spec: 20, price: 4.09 },
+  { name: '8x6x16 SLUMP (COLOR)',  w: 8,  h: 6, l: 16, spec: 20, price: 4.59 },
+  { name: '12x8x16 (GREY)',        w: 12, h: 8, l: 16, spec: 16, price: 5.39 },
+  { name: '12x8x16 SPLITFACE',     w: 12, h: 8, l: 16, spec: 16, price: 7.59 },
+  { name: '12x8x16 (COLOR)',       w: 12, h: 8, l: 16, spec: 16, price: 6.39 },
+  { name: '12x6x16 SLUMP (COLOR)', w: 12, h: 6, l: 16, spec: 14, price: 8.60 },
+  { name: '12x6x16 SLUMP (GREY)',  w: 12, h: 6, l: 16, spec: 14, price: 7.89 },
+  { name: '6x8x16 (GREY)',         w: 6,  h: 8, l: 16, spec: 28, price: 2.13 },
+  { name: '6x8x16 SPLITFACE',      w: 6,  h: 8, l: 16, spec: 28, price: 4.59 },
+  { name: '6x8x16 (COLOR)',        w: 6,  h: 8, l: 16, spec: 28, price: 2.59 },
+  { name: '6x6x16 SLUMP (COLOR)',  w: 6,  h: 6, l: 16, spec: 26, price: 3.00 },
+  { name: '6x6x16 SLUMP (GREY)',   w: 6,  h: 6, l: 16, spec: 26, price: 3.01 },
+]
+const DEFAULT_BLOCK_NAME = '8x8x16 (GREY)'
+function blockByName(name) {
+  return CMU_BLOCK_TYPES.find(b => b.name === name) || CMU_BLOCK_TYPES[0]
+}
+function groutCyPerBlock(b) {
+  // Same formula as the Excel ((L-2) × H × (W-2)) in³ → yd³
+  return ((b.l - 2) * b.h * (b.w - 2)) / 1728 / 27
+}
 
 const WALL_RATES = {
   greyBlock:       { db: 'Wall Grey Block',                 fb: 2.59   },
@@ -53,6 +86,7 @@ const n = (v) => parseFloat(v) || 0
 
 // Default entries
 const DEFAULT_CMU = () => ({
+  blockType: DEFAULT_BLOCK_NAME,
   lf: '', heightIn: '', footingWIn: '12', footingDIn: '12',
   rebarSpIn: '16', horizBars: '2', bondBeams: '1',
   pctGrouted: '100', pctCurved: '0',
@@ -61,11 +95,15 @@ const DEFAULT_PIP = () => ({ lf: '', heightIn: '' })
 
 // ── Per-wall calculators ──────────────────────────────────────────────────────
 function calcOneCMU(wall, footingPump, groutPump, r) {
-  const { lf, heightIn, footingWIn, footingDIn, rebarSpIn, horizBars, bondBeams, pctGrouted, pctCurved } = wall
+  const { blockType, lf, heightIn, footingWIn, footingDIn, rebarSpIn, horizBars, bondBeams, pctGrouted, pctCurved } = wall
   if (!n(lf) || !n(heightIn)) return { hrs: 0, mat: 0, detail: null }
 
-  const blocksPerCourse = Math.ceil((n(lf) * 12) / BLOCK_L)
-  const totalCourses    = Math.ceil(n(heightIn) / BLOCK_H)
+  // Selected block type drives both DIMENSIONS (how many blocks per course /
+  // per wall height) and PRICE (grey block unit cost). Falls back to the
+  // default 8x8x16 grey if blockType is missing (legacy walls).
+  const b = blockByName(blockType)
+  const blocksPerCourse = Math.ceil((n(lf) * 12) / b.l)
+  const totalCourses    = Math.ceil(n(heightIn) / b.h)
   const bbCourses       = Math.min(n(bondBeams), totalCourses)
   const regCourses      = Math.max(0, totalCourses - bbCourses)
   const rawBlocks       = blocksPerCourse * totalCourses
@@ -74,7 +112,7 @@ function calcOneCMU(wall, footingPump, groutPump, r) {
 
   const footingCF  = (n(footingWIn) / 12) * (n(footingDIn) / 12) * n(lf)
   const footingCY  = footingCF / 27
-  const groutCY    = rawBlocks * GROUT_CY_PER_BLOCK * (n(pctGrouted) / 100)
+  const groutCY    = rawBlocks * groutCyPerBlock(b) * (n(pctGrouted) / 100)
   const groutCF    = groutCY * 27
 
   const vertRebars   = n(rebarSpIn) > 0 ? Math.ceil((n(lf) * 12) / n(rebarSpIn)) : 0
@@ -94,7 +132,10 @@ function calcOneCMU(wall, footingPump, groutPump, r) {
 
   const footConcrPrc     = footingPump === 'Yes' ? r('concreteTruck') : r('concreteHand')
   const groutConcrPrc    = groutPump   === 'Yes' ? r('concreteTruck') : r('concreteHand')
-  const mat = orderGreyBlock * r('greyBlock')
+  // Grey block price comes from the selected block type's catalog entry
+  // (mirroring the Excel VLOOKUP into the CmuBlockPrices table). Bond-beam
+  // block stays on the flat master rate — there's only one BB SKU.
+  const mat = orderGreyBlock * b.price
             + orderBBBlock   * r('bondbeamBlock')
             + totalRebarLF   * r('rebar')
             + footingCY      * footConcrPrc
@@ -177,7 +218,13 @@ function calcWalls(state, lrph = DEFAULTS.laborRatePerHour, mp = {}, gpmd = DEFA
   ;(state.capRows || []).forEach(cap => {
     const lf = n(cap.lf), qty = n(cap.qty)
     if (cap.type === 'Flagstone')    { capMat += (n(cap.widthIn)/12)*lf*0.0833*100/2000*r('capFlagstone'); capHrs += lf*0.25 }
-    else if (cap.type === 'Precast') { capMat += qty*r('capPrecast'); capHrs += qty*0.20 }
+    else if (cap.type === 'Precast') {
+      // Width scales the unit price — base $/ea is keyed to an 8" cap;
+      // empty/0 width falls back to 8" so old entries price identically.
+      const widthFactor = (n(cap.widthIn) || 8) / 8
+      capMat += qty * r('capPrecast') * widthFactor
+      capHrs += qty * 0.20
+    }
     else if (cap.type === 'PIP Concrete') { capMat += lf*(n(cap.widthIn)/12)*0.333/27*r('concreteTruck'); capHrs += lf*0.15 }
     else if (cap.type === 'Bullnose Brick') { capMat += lf*r('capBullnose'); capHrs += lf*0.08 }
   })
@@ -271,6 +318,22 @@ function CmuWallEntry({ wall, idx, total, onChange, onRemove, detail }) {
         )}
       </div>
       <div className="grid grid-cols-2 gap-2">
+        {/* Block Type — drives dimensions (W/H/L) AND the per-block price.
+            Mirrors cell E8 of the legacy Estimator Master's Walls sheet. */}
+        <div className="col-span-2">
+          <label className="block text-xs text-gray-500 mb-1">Block Type</label>
+          <select
+            className="input text-sm py-1.5 w-full"
+            value={wall.blockType || ''}
+            onChange={e => set('blockType')(e.target.value)}
+          >
+            {CMU_BLOCK_TYPES.map(b => (
+              <option key={b.name} value={b.name}>
+                {b.name} — {b.w}×{b.h}×{b.l}, ${b.price.toFixed(2)}/ea
+              </option>
+            ))}
+          </select>
+        </div>
         <div>
           <label className="block text-xs text-gray-500 mb-1">Linear Feet</label>
           <NumInput value={wall.lf} onChange={set('lf')} placeholder="0" />
@@ -407,8 +470,12 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
   // ── CMU walls array ───────────────────────────────────────────────────────
   // Backward-compat: if old single-entry format, wrap it
   const initCmuWalls = () => {
-    if (initialData?.cmuWalls) return initialData.cmuWalls
+    if (initialData?.cmuWalls) {
+      // Backfill blockType on legacy entries saved before block-type support.
+      return initialData.cmuWalls.map(w => ({ blockType: DEFAULT_BLOCK_NAME, ...w }))
+    }
     if (initialData?.cmuLF !== undefined) return [{
+      blockType: DEFAULT_BLOCK_NAME,
       lf: initialData.cmuLF, heightIn: initialData.cmuHeightIn,
       footingWIn: initialData.cmuFootingWIn ?? '12', footingDIn: initialData.cmuFootingDIn ?? '12',
       rebarSpIn: initialData.cmuRebarSpIn ?? '16', horizBars: initialData.cmuHorizBars ?? '2',
@@ -857,7 +924,7 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
                     </select>
                   </td>
                   <td className="py-1 pr-2">
-                    {isActive && cap.type !== 'Precast' && (
+                    {isActive && (
                       <NumInput value={cap.widthIn} onChange={v => updateCap(i, 'widthIn', v)} className="w-20" placeholder="4" />
                     )}
                   </td>
