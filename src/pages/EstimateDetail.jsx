@@ -1419,7 +1419,7 @@ export default function EstimateDetail() {
           {(selectedType === 'Drainage' || selectedType === 'Lighting' || selectedType === 'Skid Steer Demo' || selectedType === 'Mini Skid Steer Demo' || selectedType === 'Concrete' || selectedType === 'Hand Demo' || selectedType === 'Irrigation' || selectedType === 'Artificial Turf' || selectedType === 'Pavers' || selectedType === 'Planting' || selectedType === 'Pool' || selectedType === 'Utilities' || selectedType === 'Columns' || selectedType === 'Ground Treatments' || selectedType === 'Outdoor Kitchen' || selectedType === 'Fire Pit' || selectedType === 'Walls' || selectedType === 'Finishes' || selectedType === 'Steps') ? (
             <div className={`relative bg-white rounded-2xl shadow-xl w-full mx-4 flex flex-col ${selectedType === 'Pavers' || selectedType === 'Pool' ? 'max-w-6xl' : 'max-w-5xl'}`}
                  style={{ maxHeight: '90vh' }}>
-              <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-gray-200">
+              <div className="flex items-start justify-between px-6 pt-5 pb-3 border-b border-gray-200">
                 <div className="flex-1">
                   <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-0.5">
                     {editingModule ? 'Edit Module' : 'Add Module'}
@@ -1464,7 +1464,7 @@ export default function EstimateDetail() {
                     )}
                   </div>
                 </div>
-                <button onClick={closeModuleFlow} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+                <button onClick={closeModuleFlow} className="text-gray-400 hover:text-gray-600 text-base leading-none mt-0.5" aria-label="Close">✕</button>
               </div>
               <div className="overflow-y-auto px-6 pb-6 flex-1">
                 {selectedType === 'Drainage' && (
