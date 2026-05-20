@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
+import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Utilities Module — fields and calculations from Excel estimator (Utilities Module tab)
@@ -243,11 +244,37 @@ export default function UtilitiesModule({ projectName, onSave, onBack, saving, i
   const [electricSubpanelSubCost,setElectricSubpanelSubCost] = useState(initialData?.electricSubpanelSubCost ?? '')
   const [manualRows,             setManualRows]            = useState(initialData?.manualRows             ?? DEFAULT_MANUAL_ROWS)
 
-  const calc = calcUtilities(
+  // ── Sales tax — applied to totalMat across every module so the bid
+  //    reflects supplier-invoiced material cost. Sourced from
+  //    company_settings.sales_tax_rate via fetchSalesTaxRate(). Default
+  //    0 (no tax) until the admin sets it in Opportunities → Settings.
+  const [salesTaxRate, setSalesTaxRate] = useState(0)
+  useEffect(() => {
+    let alive = true
+    fetchSalesTaxRate().then(r => { if (alive) setSalesTaxRate(r) })
+    return () => { alive = false }
+  }, [])
+
+
+  const calcRaw = calcUtilities(
     { difficulty, hoursAdj, trenchRows, lineRows, fixtureRows, additionalItems,
       electricSubpanelSubCost, manualRows },
     laborRatePerHour, materialPrices, gpmd,
   )
+  // Apply company sales tax to the module's total material cost so the
+  // estimate price matches what suppliers actually invoice. Stored
+  // material_cost (saved with the module) ends up tax-inclusive too,
+  // so bid totals add up to GpmdBar's displayed price.
+  const _salesTaxAmt = (calcRaw.totalMat || 0) * (salesTaxRate || 0)
+  const calc = _salesTaxAmt > 0
+    ? {
+        ...calcRaw,
+        totalMat: (calcRaw.totalMat || 0) + _salesTaxAmt,
+        price:    (calcRaw.price    || 0) + _salesTaxAmt,
+        salesTax: _salesTaxAmt,
+      }
+    : calcRaw
+
 
   function updateTrench(i, field, val) {
     setTrenchRows(rows => rows.map((r, idx) => idx === i ? { ...r, [field]: val } : r))

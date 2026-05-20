@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
+import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pool Module
@@ -489,6 +490,18 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
   const [subRates, setSubRates]             = useState({})
   const [loadingRates, setLoadingRates]     = useState(true)
 
+  // ── Sales tax — applied to totalMat across every module so the bid
+  //    reflects supplier-invoiced material cost. Sourced from
+  //    company_settings.sales_tax_rate via fetchSalesTaxRate(). Default
+  //    0 (no tax) until the admin sets it in Opportunities → Settings.
+  const [salesTaxRate, setSalesTaxRate] = useState(0)
+  useEffect(() => {
+    let alive = true
+    fetchSalesTaxRate().then(r => { if (alive) setSalesTaxRate(r) })
+    return () => { alive = false }
+  }, [])
+
+
   // Re-fetch all three Pool rate tables. Called on mount and after edits.
   const refreshAllRates = useCallback(async () => {
     const [matRes, labRes, subRes] = await Promise.all([
@@ -515,7 +528,21 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
   const updStruct = (key, val) => setState(p => ({ ...p, [key]: val }))
 
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
-  const calc = calcPool(state, materialPrices, laborRates, subRates)
+  const calcRaw = calcPool(state, materialPrices, laborRates, subRates)
+  // Apply company sales tax to the module's total material cost so the
+  // estimate price matches what suppliers actually invoice. Stored
+  // material_cost (saved with the module) ends up tax-inclusive too,
+  // so bid totals add up to GpmdBar's displayed price.
+  const _salesTaxAmt = (calcRaw.totalMat || 0) * (salesTaxRate || 0)
+  const calc = _salesTaxAmt > 0
+    ? {
+        ...calcRaw,
+        totalMat: (calcRaw.totalMat || 0) + _salesTaxAmt,
+        price:    (calcRaw.price    || 0) + _salesTaxAmt,
+        salesTax: _salesTaxAmt,
+      }
+    : calcRaw
+
   const fmt2 = v => `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   function handleSave() {

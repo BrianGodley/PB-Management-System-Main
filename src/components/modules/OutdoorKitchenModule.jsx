@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
+import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Outdoor Kitchen (BBQ) Module — based on BBQ Module tab in Excel estimator
@@ -293,6 +294,18 @@ export default function OutdoorKitchenModule({ projectName, onSave, onBack, savi
   const [realStoneRateInput, setRealStoneRateInput] = useState(initialData?.realStoneRateInput ?? '')
   const [manualRows,         setManualRows]         = useState(initialData?.manualRows         ?? DEFAULT_MANUAL_ROWS)
 
+  // ── Sales tax — applied to totalMat across every module so the bid
+  //    reflects supplier-invoiced material cost. Sourced from
+  //    company_settings.sales_tax_rate via fetchSalesTaxRate(). Default
+  //    0 (no tax) until the admin sets it in Opportunities → Settings.
+  const [salesTaxRate, setSalesTaxRate] = useState(0)
+  useEffect(() => {
+    let alive = true
+    fetchSalesTaxRate().then(r => { if (alive) setSalesTaxRate(r) })
+    return () => { alive = false }
+  }, [])
+
+
   // Default stone rates once prices load
   useEffect(() => {
     if (Object.keys(materialPrices).length === 0) return
@@ -315,7 +328,21 @@ export default function OutdoorKitchenModule({ projectName, onSave, onBack, savi
     tileSF, flagstoneSF, flagstoneRateInput, realStoneSF, realStoneRateInput,
     manualRows,
   }
-  const calc = calcOutdoorKitchen(state, laborRatePerHour, materialPrices, gpmd)
+  const calcRaw = calcOutdoorKitchen(state, laborRatePerHour, materialPrices, gpmd)
+  // Apply company sales tax to the module's total material cost so the
+  // estimate price matches what suppliers actually invoice. Stored
+  // material_cost (saved with the module) ends up tax-inclusive too,
+  // so bid totals add up to GpmdBar's displayed price.
+  const _salesTaxAmt = (calcRaw.totalMat || 0) * (salesTaxRate || 0)
+  const calc = _salesTaxAmt > 0
+    ? {
+        ...calcRaw,
+        totalMat: (calcRaw.totalMat || 0) + _salesTaxAmt,
+        price:    (calcRaw.price    || 0) + _salesTaxAmt,
+        salesTax: _salesTaxAmt,
+      }
+    : calcRaw
+
 
   const p = (dbName, fallback) => materialPrices[dbName] ?? fallback
 

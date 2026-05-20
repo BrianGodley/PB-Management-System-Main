@@ -36,6 +36,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
+import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 
 const n = v => parseFloat(v) || 0
 const sfToTons = (sf, depthIn) => (n(sf) / 200) * n(depthIn)
@@ -406,6 +407,18 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
   const [materialRates,    setMaterialRates]    = useState(initialData?.materialRates  || {})
   const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? 35)
   const [paverPrices,      setPaverPrices]      = useState(initialData?.paverPrices    || [])
+
+  // ── Sales tax — applied to totalMat across every module so the bid
+  //    reflects supplier-invoiced material cost. Sourced from
+  //    company_settings.sales_tax_rate via fetchSalesTaxRate(). Default
+  //    0 (no tax) until the admin sets it in Opportunities → Settings.
+  const [salesTaxRate, setSalesTaxRate] = useState(0)
+  useEffect(() => {
+    let alive = true
+    fetchSalesTaxRate().then(r => { if (alive) setSalesTaxRate(r) })
+    return () => { alive = false }
+  }, [])
+
   const [loading,          setLoading]          = useState(true)
 
   // Re-fetch all Paver rate maps. Called once on mount and again whenever the
@@ -450,7 +463,21 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
 
   const gpmd = initialData?.gpmd ?? 425
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
-  const calc = calcPaver(state, laborRatePerHour, laborRates, materialRates, paverPrices, gpmd)
+  const calcRaw = calcPaver(state, laborRatePerHour, laborRates, materialRates, paverPrices, gpmd)
+  // Apply company sales tax to the module's total material cost so the
+  // estimate price matches what suppliers actually invoice. Stored
+  // material_cost (saved with the module) ends up tax-inclusive too,
+  // so bid totals add up to GpmdBar's displayed price.
+  const _salesTaxAmt = (calcRaw.totalMat || 0) * (salesTaxRate || 0)
+  const calc = _salesTaxAmt > 0
+    ? {
+        ...calcRaw,
+        totalMat: (calcRaw.totalMat || 0) + _salesTaxAmt,
+        price:    (calcRaw.price    || 0) + _salesTaxAmt,
+        salesTax: _salesTaxAmt,
+      }
+    : calcRaw
+
 
   const fmt2 = v => `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   const fmt  = v => `$${Math.round(v).toLocaleString()}`
