@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
+import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Steps Module
@@ -22,7 +23,8 @@ const DEFAULTS = { laborRatePerHour: 35, laborBurdenPct: 0.29, gpmd: 425, commis
 const n = v => parseFloat(v) || 0
 
 // ── Calculation engine ────────────────────────────────────────────────────────
-function calcSteps(state, lrph, laborRates, materialRates, paverPrices, gpmd = DEFAULTS.gpmd) {
+function calcSteps(state, lrph, laborRates, materialRates, paverPrices, gpmd = DEFAULTS.gpmd, walkAccess = null) {
+  const _pace = (parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN)
   const lr = laborRates   || {}
   const mr = materialRates || {}
   const pp = paverPrices   || []
@@ -62,7 +64,9 @@ function calcSteps(state, lrph, laborRates, materialRates, paverPrices, gpmd = D
 
   const baseHrs   = straightHrs + curvedHrs + concStraightHrs + concCurvedHrs + manHrs
   const diffMod   = 1 + n(state.difficulty) / 100
-  const totalHrs  = baseHrs * diffMod + n(state.hoursAdj)
+  const _preWalkHrs = baseHrs * diffMod + n(state.hoursAdj)
+  const walkHrs     = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
+  const totalHrs    = _preWalkHrs + walkHrs
   const manDays   = totalHrs / 8
   const totalMat  = paverCost + concMat + manMat
 
@@ -74,6 +78,7 @@ function calcSteps(state, lrph, laborRates, materialRates, paverPrices, gpmd = D
   const price      = totalMat + laborCost + burden + gp + commission + subCost
 
   return {
+    walkHrs,
     totalHrs, manDays, totalMat, laborCost, burden, gp, commission, subCost, price,
     straightHrs, curvedHrs, paverCost, pallets, pricePerSF,
     straightRate, curvedRate,
@@ -175,6 +180,9 @@ const DEFAULT_MANUAL_ROWS = [
 // ── Main component ────────────────────────────────────────────────────────────
 export default function StepsModule({ projectName, onSave, onBack, saving, initialData }) {
   const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? DEFAULTS.laborRatePerHour)
+  const [walkAccess, setWalkAccess] = useState(initialData?.walkAccess ?? {
+    paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+  })
   const [laborRates,    setLaborRates]    = useState(initialData?.laborRates    || {})
   const [materialRates, setMaterialRates] = useState(initialData?.materialRates || {})
   const [paverPrices,   setPaverPrices]   = useState(initialData?.paverPrices   || [])
@@ -195,7 +203,7 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
     let gone = false
     Promise.all([
       !initialData?.laborRatePerHour &&
-        supabase.from('company_settings').select('labor_rate_per_hour').single()
+        supabase.from('company_settings').select('labor_rate_per_hour, walk_access_pace_lf_per_min').single()
           .then(({ data }) => {
             if (!gone && data?.labor_rate_per_hour != null)
               setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
@@ -252,7 +260,7 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
     manualRows,
   }
 
-  const calcRaw = calcSteps(state, laborRatePerHour, laborRates, materialRates, paverPrices, gpmd)
+  const calcRaw = calcSteps(state, laborRatePerHour, laborRates, materialRates, paverPrices, gpmd, walkAccess)
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
   // material_cost (saved with the module) ends up tax-inclusive too,
@@ -276,7 +284,7 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
     onSave({
       man_days:      parseFloat(calc.manDays.toFixed(2)),
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
-      data: { ...state, laborRatePerHour, gpmd, laborRates, materialRates, paverPrices, calc },
+      data: { ...state, walkAccess, laborRatePerHour, gpmd, laborRates, materialRates, paverPrices, calc },
     })
   }
 

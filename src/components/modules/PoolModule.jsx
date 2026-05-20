@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
+import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pool Module
@@ -183,6 +184,7 @@ const newManualRow = () => ({ label: '', hours: '', materials: '', subCost: '' }
 
 function makeInitial(data = {}) {
   return {
+    walkHrs,
     pool:   data.pool   ?? defaultStruct(true),
     spa:    data.spa    ?? defaultStruct(),
     basin:  data.basin  ?? defaultStruct(),
@@ -216,7 +218,8 @@ function makeInitial(data = {}) {
 }
 
 // ── Main Calculation ──────────────────────────────────────────────────────────
-function calcPool(state, materialPrices, laborRates, subRates = {}) {
+function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess = null) {
+  const _pace = (parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN)
   const {
     pool, spa, basin, vault,
     excavation, shotcrete, tile, spillways, copingRows,
@@ -380,7 +383,9 @@ function calcPool(state, materialPrices, laborRates, subRates = {}) {
     manSub += n(r.subCost)
   })
 
-  const totalHrs   = excavHrs + tileHrs + spillwayHrs + copingHrs + raisedHrs + equipmentHrs + manHrs
+  const _preWalkHrs = excavHrs + tileHrs + spillwayHrs + copingHrs + raisedHrs + equipmentHrs + manHrs
+  const walkHrs     = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
+  const totalHrs    = _preWalkHrs + walkHrs
   const manDays    = totalHrs / 8
   const totalMat   = tileMat + spillwayMat + copingMat + raisedMat + manMat
   const subCost    = excavSub + shotcreteSub + interiorSub + equipmentSub + plumbSub + steelSub + manSub
@@ -528,7 +533,7 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
   const updStruct = (key, val) => setState(p => ({ ...p, [key]: val }))
 
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
-  const calcRaw = calcPool(state, materialPrices, laborRates, subRates)
+  const calcRaw = calcPool(state, materialPrices, laborRates, subRates, state.walkAccess)
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
   // material_cost (saved with the module) ends up tax-inclusive too,

@@ -12,6 +12,7 @@ import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
+import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 
 // ── Demo method rates (tons/hr) — DemoRatesTurf lookup table ────────────────
 const DEMO_METHODS = [
@@ -53,7 +54,6 @@ const RATE_DEFAULTS = {
   turfCutSFHr:       100,    // LF/hr for cut/staple/seam (TurfCutSfHr)
   turfCutRate:       1.0,    // PH for cut/staple/seam (TurfCutRate)
   weedFabricHrPer1kSF: 8,   // hrs per 1000 SF for weed fabric — (SF/1000)*8
-  wheelbarrowFtHr:   30,     // ft/hr travel rate for wheelbarrow (WheelbarrowTravelRate)
   // Material rates
   gravelBase:        6.90,   // $/ton (Gravel Base — $6.90/ton)
   dgBase:            57.50,  // $/ton (DG Base)
@@ -69,7 +69,8 @@ const RATE_DEFAULTS = {
 // ── Calculation engine ────────────────────────────────────────────────────────
 const n = v => parseFloat(v) || 0
 
-function calcTurf(state, laborRatePerHour, materialPrices, laborRates, gpmd = 425) {
+function calcTurf(state, laborRatePerHour, materialPrices, laborRates, gpmd = 425, walkAccess = null) {
+  const _pace = (parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN)
   const mp   = materialPrices || {}
   const lr   = laborRates    || {}
   const lrph = n(laborRatePerHour) || 35
@@ -117,8 +118,8 @@ function calcTurf(state, laborRatePerHour, materialPrices, laborRates, gpmd = 42
   const dgSF    = n(state.base.dgSF) || turfAreaSF
   const dgTons  = dgSF > 0 ? (dgSF * (1 / 12)) / 27 : 0
   const dgTrips = dgSF > 0 ? Math.ceil(dgSF / 400) : 0
-  const wheelFtHr = RATE_DEFAULTS.wheelbarrowFtHr
-  const dgHrs   = (dgTrips > 0 && distanceLF > 0) ? (dgTrips * distanceLF * 2) / wheelFtHr / 60 : 0
+  // Old per-module dgHrs (wheelbarrow trip × distance) retired — now handled by unified walk-access penalty below.
+  const dgHrs   = 0
   const dgMat   = dgTons * (n(mp['Turf - DG Base']) || RATE_DEFAULTS.dgBase)
   if (state.base.useDG) { baseHrs += dgHrs; baseMat += dgMat }
 
@@ -193,9 +194,11 @@ function calcTurf(state, laborRatePerHour, materialPrices, laborRates, gpmd = 42
   const manualSub = manualFiltered.reduce((s, r) => s + n(r.subCost), 0)
 
   // ── Totals ────────────────────────────────────────────────────────────────
-  const rawHrs   = demoHrs + baseHrs + turfHrs + stripsHrs + cutHrs + manualHrs
-  const diffHrs  = rawHrs * n(state.difficulty) / 100
-  const totalHrs = rawHrs + diffHrs + hrsAdj
+  const rawHrs      = demoHrs + baseHrs + turfHrs + stripsHrs + cutHrs + manualHrs
+  const diffHrs     = rawHrs * n(state.difficulty) / 100
+  const _preWalkHrs = rawHrs + diffHrs + hrsAdj
+  const walkHrs     = calcWalkAccessLabor(_preWalkHrs, distanceLF, { paceLfPerMin: _pace })
+  const totalHrs    = _preWalkHrs + walkHrs
   const totalMat = demoMat + baseMat + turfMat + stripsMat + cutMat + infillMat + manualMat
   const subCost  = manualSub
 
@@ -207,6 +210,7 @@ function calcTurf(state, laborRatePerHour, materialPrices, laborRates, gpmd = 42
   const price      = laborCost + burden + totalMat + gp + commission + subCost
 
   return {
+    walkHrs,
     totalHrs, manDays, laborCost, burden, totalMat, subCost, gp, commission, price,
     infillAreaSF,
     demoCalc, turfAreaSF,
@@ -305,6 +309,9 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
   const [materialPrices,   setMaterialPrices]   = useState(initialData?.materialPrices || {})
   const [laborRates,       setLaborRates]       = useState(initialData?.laborRates     || {})
   const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? 35)
+  const [walkAccess, setWalkAccess] = useState(initialData?.walkAccess ?? {
+    paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+  })
 
   // ── Sales tax — applied to totalMat across every module so the bid
   //    reflects supplier-invoiced material cost. Sourced from
@@ -335,7 +342,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
     ;(async () => {
       await Promise.all([
         !initialData?.laborRatePerHour &&
-          supabase.from('company_settings').select('labor_rate_per_hour').single()
+          supabase.from('company_settings').select('labor_rate_per_hour, walk_access_pace_lf_per_min').single()
             .then(({ data }) => { if (!gone && data?.labor_rate_per_hour) setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || 35) }),
         refreshAllRates(),
       ])
@@ -358,7 +365,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
 
   const gpmd  = initialData?.gpmd ?? 425
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
-  const calcRaw  = calcTurf(state, laborRatePerHour, materialPrices, laborRates, gpmd)
+  const calcRaw  = calcTurf(state, laborRatePerHour, materialPrices, laborRates, gpmd, walkAccess)
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
   // material_cost (saved with the module) ends up tax-inclusive too,
@@ -393,7 +400,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
       sub_cost:      parseFloat(calc.subCost.toFixed(2)),
       total_price:   parseFloat(calc.price.toFixed(2)),
       data: {
-        ...state, laborRatePerHour, gpmd, materialPrices, laborRates,
+        ...state, walkAccess, laborRatePerHour, gpmd, materialPrices, laborRates,
         calc: {
           totalHrs: calc.totalHrs, manDays: calc.manDays,
           laborCost: calc.laborCost, burden: calc.burden,
@@ -455,7 +462,7 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
             <Inp value={state.hoursAdj} onChange={e => set('hoursAdj', e.target.value)} step="0.5" />
           </div>
           <div>
-            <p className="text-xs text-gray-500 mb-0.5">Truck Distance (LF)</p>
+            <p className="text-xs text-gray-500 mb-0.5" title="Average Distance from Truck to Work Area">Truck → Work Area (Average LF)</p>
             <Inp value={state.distanceLF} onChange={e => set('distanceLF', e.target.value)} step="1" />
           </div>
         </div>

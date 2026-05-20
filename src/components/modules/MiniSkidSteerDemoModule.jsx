@@ -21,6 +21,15 @@ import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
+import {
+  calcWalkAccessTrips,
+  DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+  DEFAULT_BOBCAT_BASELINE_LF,
+} from '../../lib/walkAccess'
+
+// Bobcat bucket capacity (lbs) — drives `trips = totalTons × 2000 / bucket`
+// for the walk-access shuttle penalty. Matches Excel master rates.
+const BOBCAT_BUCKET_LBS = 400
 
 // ── Fallback constants ────────────────────────────────────────────────────────
 
@@ -69,7 +78,8 @@ const DUMP_FEE_DEFAULTS = {
 const n = v => parseFloat(v) || 0
 const sfToTons = (sf, depthIn) => (n(sf) / 200) * n(depthIn)
 
-function calcDemo(state, laborRatePerHour, materialPrices, laborRates, subMarkupRate = 0.35, subRates = {}, gpmd = 425) {
+function calcDemo(state, laborRatePerHour, materialPrices, laborRates, subMarkupRate = 0.35, subRates = {}, gpmd = 425, walkAccess = null) {
+  const _pace = (parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN)
   const mp  = materialPrices || {}
   const lr  = laborRates    || {}
   const sr  = subRates      || {}
@@ -211,8 +221,24 @@ function calcDemo(state, laborRatePerHour, materialPrices, laborRates, subMarkup
   const vegHrs     = shrubHrs + stumpFstHrs + stumpAddHrs +
     treeCalc.reduce((s,r) => s + r.hrs, 0)
 
+  // ── Walk-access (Truck → Work Area) — trip-based for mini-skid demo ───
+  // Excel: S4 = (F6 - BobcatTravel) × N4 × 2 × (1/60/60)
+  // where N4 = total tons × 2000 / NonBobBucketSize
+  const totalDemoTons = (
+    conc.tons + dirt.tons + base.tons + grass.tons +
+    miscFlatCalc.reduce((s, r) => s + r.tons, 0) +
+    miscVertCalc.reduce((s, r) => s + r.tons, 0) +
+    footingCalc.reduce((s, r)  => s + r.tons, 0) +
+    gradeCut.tons +
+    treeCalc.reduce((s, r) => s + r.tons, 0)
+  )
+  const miniTrips = totalDemoTons > 0 ? (totalDemoTons * 2000) / BOBCAT_BUCKET_LBS : 0
+  const walkHrs   = calcWalkAccessTrips(miniTrips, state.distanceLF, {
+    paceLfPerMin: _pace, baselineLF: DEFAULT_BOBCAT_BASELINE_LF,
+  })
+
   const rawHrs   = crewDemoHrs + gradingHrs + vegHrs + rebarHrs + manualHrs
-  const totalHrs = rawHrs * diff + hrsAdj
+  const totalHrs = (rawHrs * diff + hrsAdj) + walkHrs
 
   // ── Materials ─────────────────────────────────────────────────────────────
   const dumpMatCost = isSub ? 0 : (
@@ -236,6 +262,7 @@ function calcDemo(state, laborRatePerHour, materialPrices, laborRates, subMarkup
   const price      = laborCost + burden + totalMat + gp + commission + subCost
 
   return {
+    walkHrs, miniTrips, totalDemoTons,
     totalHrs, manDays, laborCost, burden, totalMat, subCost, gp, commission, price,
     conc, dirt, base, grass,
     miscFlatCalc, miscVertCalc, footingCalc,
@@ -263,6 +290,7 @@ const DEFAULT_STATE = {
   difficulty: 0,
   crewType: 'Demo',
   hoursAdj:  0,
+  distanceLF: '',  // Avg truck → work area (LF) for walk-access penalty
   concSF: '', concDepth: 4,
   dirtSF: '', dirtDepth: 6,
   baseSF: '', baseDepth: 4,
@@ -334,6 +362,9 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
   const [materialPrices,   setMaterialPrices]   = useState(initialData?.materialPrices || {})
   const [laborRates,       setLaborRates]       = useState(initialData?.laborRates     || {})
   const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? 35)
+  const [walkAccess, setWalkAccess] = useState(initialData?.walkAccess ?? {
+    paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+  })
   const [subMarkupRate,    setSubMarkupRate]    = useState(initialData?.subMarkupRate   ?? 0.35)
   const [subRates,         setSubRates]         = useState(initialData?.subRates        || {})
 
@@ -377,11 +408,15 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       await Promise.all([
         // Company settings — skip if already loaded via initialData
         !initialData?.laborRatePerHour &&
-          supabase.from('company_settings').select('labor_rate_per_hour, sub_markup_rate').single()
+          supabase.from('company_settings').select('labor_rate_per_hour, sub_markup_rate, walk_access_pace_lf_per_min').maybeSingle().single()
             .then(({data}) => {
               if (!gone && data) {
                 if (data.labor_rate_per_hour != null) setLaborRatePerHour(parseFloat(data.labor_rate_per_hour)||35)
                 if (data.sub_markup_rate    != null) setSubMarkupRate(parseFloat(data.sub_markup_rate)||0.35)
+                if (data.walk_access_pace_lf_per_min != null) {
+                  const _wpace = parseFloat(data.walk_access_pace_lf_per_min)
+                  setWalkAccess({ paceLfPerMin: Number.isFinite(_wpace) && _wpace > 0 ? _wpace : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN })
+                }
               }
             }),
         refreshAllRates(),
@@ -398,7 +433,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
 
   const gpmd = initialData?.gpmd ?? 425
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
-  const calcRaw = calcDemo(state, laborRatePerHour, materialPrices, laborRates, subMarkupRate, subRates, gpmd)
+  const calcRaw = calcDemo(state, laborRatePerHour, materialPrices, laborRates, subMarkupRate, subRates, gpmd, walkAccess)
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
   // material_cost (saved with the module) ends up tax-inclusive too,
@@ -433,7 +468,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
       gross_profit: parseFloat(calc.gp.toFixed(2)),
       sub_cost:     parseFloat(calc.subCost.toFixed(2)),
       total_price:  parseFloat(calc.price.toFixed(2)),
-      data: { ...state, laborRatePerHour, gpmd, materialPrices, laborRates,
+      data: { ...state, laborRatePerHour, gpmd, materialPrices, laborRates, walkAccess,
         calc: { totalHrs:calc.totalHrs, manDays:calc.manDays, laborCost:calc.laborCost,
                 burden:calc.burden, totalMat:calc.totalMat, subCost:calc.subCost,
                 gp:calc.gp, price:calc.price } },

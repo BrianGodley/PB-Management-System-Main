@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
+import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Planting Module
@@ -103,7 +104,8 @@ function getLargePerDay(laborRates, type) {
 }
 
 // ── Calc ──────────────────────────────────────────────────────────────────────
-function calcPlanting(state, laborRatePerHour, gpmd, materialPrices, laborRates) {
+function calcPlanting(state, laborRatePerHour, gpmd, materialPrices, laborRates, walkAccess = null) {
+  const _pace = (parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN)
   const { tillSqft, difficulty, smallPlantRows, largePlantRows, addons, manualRows } = state
 
   // Till and Amend
@@ -187,7 +189,9 @@ function calcPlanting(state, laborRatePerHour, gpmd, materialPrices, laborRates)
     manSub += n(r.subCost)
   })
 
-  const totalHrs  = plantHrs + addonHrs + diffHrs + manHrs
+  const _preWalkHrs = plantHrs + addonHrs + diffHrs + manHrs
+  const walkHrs     = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
+  const totalHrs    = _preWalkHrs + walkHrs
   const manDays   = totalHrs / 8
   const totalMat  = smallMat + largeMat + addonMat + manMat
   const laborCost = totalHrs * laborRatePerHour
@@ -263,6 +267,9 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
   const [laborRatePerHour, setLaborRatePerHour] = useState(
     initialData?.laborRatePerHour ?? WORKER_DEFAULTS.laborRatePerHour
   )
+  const [walkAccess, setWalkAccess] = useState(initialData?.walkAccess ?? {
+    paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+  })
   // materialPrices: { 'Plant Name': unit_cost, ... }
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
   // laborRates: { 'Plant Name or Rate Key': rate_value, ... }
@@ -292,10 +299,10 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
     if (!initialData?.laborRatePerHour) {
       supabase
         .from('company_settings')
-        .select('labor_rate_per_hour')
+        .select('labor_rate_per_hour, walk_access_pace_lf_per_min')
         .single()
         .then(({ data }) => {
-          if (data) setLaborRatePerHour(parseFloat(data.value) || WORKER_DEFAULTS.laborRatePerHour)
+          if (data) setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || WORKER_DEFAULTS.laborRatePerHour)
         })
     }
 

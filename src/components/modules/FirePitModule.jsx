@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
+import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Fire Pit Module — based on Fire Pit Module tab in Excel estimator
@@ -61,7 +62,8 @@ const BLOCK_WIDTH_IN  = 8
 const GROUT_CF_PER_BLOCK = ((BLOCK_LENGTH_IN - 2) * BLOCK_HEIGHT_IN * (BLOCK_WIDTH_IN - 2)) / 1728
 
 // ── Calculation engine ────────────────────────────────────────────────────────
-function calcFirePit(state, lrph = DEFAULTS.laborRatePerHour, mp = {}, gpmd = DEFAULTS.gpmd) {
+function calcFirePit(state, lrph = DEFAULTS.laborRatePerHour, mp = {}, gpmd = DEFAULTS.gpmd, walkAccess = null) {
+  const _pace = (parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN)
   const {
     difficulty, hoursAdj, layoutHrs,
     wallLF, wallHeightIn, footingWidthIn, footingDepthIn,
@@ -159,7 +161,9 @@ function calcFirePit(state, lrph = DEFAULTS.laborRatePerHour, mp = {}, gpmd = DE
                 + tileHrs + flagstoneHrs + realStoneHrs + manHrs
 
   const diffMod  = 1 + n(difficulty) / 100
-  const totalHrs = baseHrs * diffMod + n(hoursAdj)
+  const _preWalkHrs = baseHrs * diffMod + n(hoursAdj)
+  const walkHrs     = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
+  const totalHrs    = _preWalkHrs + walkHrs
   const manDays  = totalHrs / 8
 
   const totalMat = blockMat + rebarMat + footingMat + groutMat + pumpSetupMat
@@ -175,6 +179,7 @@ function calcFirePit(state, lrph = DEFAULTS.laborRatePerHour, mp = {}, gpmd = DE
   const price      = totalMat + laborCost + burden + gp + commission + subCost
 
   return {
+    walkHrs,
     totalHrs, manDays, totalMat, laborCost, burden, gp, commission, subCost, price,
     blocksPerCourse, coursesCount, rawBlocks, totalBlocks,
     footingCF, footingCY, groutCF, groutCY, totalRebarLF, curveAddHrs,
@@ -228,6 +233,9 @@ export default function FirePitModule({ projectName, onSave, onBack, saving, ini
   const [laborRatePerHour, setLaborRatePerHour] = useState(
     initialData?.laborRatePerHour ?? DEFAULTS.laborRatePerHour
   )
+  const [walkAccess, setWalkAccess] = useState(initialData?.walkAccess ?? {
+    paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+  })
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
   const [pricesLoading, setPricesLoading]   = useState(!initialData?.materialPrices)
 
@@ -245,8 +253,15 @@ export default function FirePitModule({ projectName, onSave, onBack, saving, ini
 
   useEffect(() => {
     if (!initialData?.laborRatePerHour) {
-      supabase.from('company_settings').select('labor_rate_per_hour').single()
-        .then(({ data }) => { if (data) setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour) })
+      supabase.from('company_settings').select('labor_rate_per_hour, walk_access_pace_lf_per_min').single()
+        .then(({ data }) => {
+          if (!data) return
+          if (data.labor_rate_per_hour != null) setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
+          if (data.walk_access_pace_lf_per_min != null) {
+            const _wpace = parseFloat(data.walk_access_pace_lf_per_min)
+            setWalkAccess({ paceLfPerMin: Number.isFinite(_wpace) && _wpace > 0 ? _wpace : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN })
+          }
+        })
     }
     if (initialData?.materialPrices) return
     refreshAllRates().then(() => setPricesLoading(false))
@@ -318,7 +333,7 @@ export default function FirePitModule({ projectName, onSave, onBack, saving, ini
     tileSF, flagstoneSF, flagstoneRateInput, realStoneSF, realStoneRateInput,
     manualRows,
   }
-  const calcRaw = calcFirePit(state, laborRatePerHour, materialPrices, gpmd)
+  const calcRaw = calcFirePit(state, laborRatePerHour, materialPrices, gpmd, walkAccess)
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
   // material_cost (saved with the module) ends up tax-inclusive too,
@@ -343,7 +358,7 @@ export default function FirePitModule({ projectName, onSave, onBack, saving, ini
     onSave({
       man_days:      parseFloat(calc.manDays.toFixed(2)),
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
-      data: { ...state, laborRatePerHour, gpmd, materialPrices, calc },
+      data: { ...state, walkAccess, laborRatePerHour, gpmd, materialPrices, calc },
     })
   }
 

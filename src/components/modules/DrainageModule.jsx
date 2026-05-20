@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
+import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Drainage Module — fields and calculations from Excel estimator
@@ -99,7 +100,8 @@ const DEFAULTS = {
 const n = (v) => parseFloat(v) || 0
 
 // materialPrices — { 'dbName': unit_cost, ... } fetched from material_rates
-function calcDrainage(state, laborRatePerHour = DEFAULTS.laborRatePerHour, materialPrices = {}, gpmd = DEFAULTS.gpmd) {
+function calcDrainage(state, laborRatePerHour = DEFAULTS.laborRatePerHour, materialPrices = {}, gpmd = DEFAULTS.gpmd, walkAccess = null) {
+  const _pace = (parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN)
   const { difficulty, trenchRows, pipeRows, fixtureRows, additionalItems, manualRows } = state
 
   let trenchHrs = 0, pipeHrs = 0, pipeMat = 0
@@ -155,7 +157,9 @@ function calcDrainage(state, laborRatePerHour = DEFAULTS.laborRatePerHour, mater
 
   const baseHrs  = trenchHrs + pipeHrs + fixHrs + addHrs + manHrs
   const diffMod  = 1 + (n(difficulty) / 100)
-  const totalHrs = baseHrs * diffMod
+  const _preWalkHrs = baseHrs * diffMod
+  const walkHrs     = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
+  const totalHrs    = _preWalkHrs + walkHrs
   const manDays  = totalHrs / 8
   const totalMat = pipeMat + fixMat + drainFittingFee + addMat + manMat
   const laborCost = totalHrs * laborRatePerHour
@@ -228,6 +232,9 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
   const [laborRatePerHour, setLaborRatePerHour] = useState(
     initialData?.laborRatePerHour ?? DEFAULTS.laborRatePerHour
   )
+  const [walkAccess, setWalkAccess] = useState(initialData?.walkAccess ?? {
+    paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+  })
   // Live material prices from material_rates table (category='Drainage')
   // When editing, use the snapshot saved at the time the module was created
   const [materialPrices, setMaterialPrices] = useState(
@@ -255,10 +262,15 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
     if (!initialData?.laborRatePerHour) {
       supabase
         .from('company_settings')
-        .select('labor_rate_per_hour')
+        .select('labor_rate_per_hour, walk_access_pace_lf_per_min')
         .single()
         .then(({ data }) => {
-          if (data) setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
+          if (!data) return
+          if (data.labor_rate_per_hour != null) setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
+          if (data.walk_access_pace_lf_per_min != null) {
+            const _wpace = parseFloat(data.walk_access_pace_lf_per_min)
+            setWalkAccess({ paceLfPerMin: Number.isFinite(_wpace) && _wpace > 0 ? _wpace : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN })
+          }
         })
     }
 

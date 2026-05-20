@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
+import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Columns Module — fields and calculations from Excel estimator (Columns Module tab)
@@ -123,7 +124,9 @@ function calcColumns(state, laborRatePerHour = DEFAULTS.laborRatePerHour, materi
 
   const baseHrs  = installHrs + finishHrs + miscHrs + manHrs
   const diffMod  = 1 + (n(difficulty) / 100)
-  const totalHrs = (baseHrs * diffMod) + n(hoursAdj)
+  const _preWalkHrs = (baseHrs * diffMod) + n(hoursAdj)
+  const walkHrs     = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
+  const totalHrs    = _preWalkHrs + walkHrs
   const manDays  = totalHrs / 8
   const totalMat = installMat + finishMat + miscMat + manMat
   const laborCost   = totalHrs * laborRatePerHour
@@ -178,6 +181,9 @@ export default function ColumnsModule({ projectName, onSave, onBack, saving, ini
   const [laborRatePerHour, setLaborRatePerHour] = useState(
     initialData?.laborRatePerHour ?? DEFAULTS.laborRatePerHour
   )
+  const [walkAccess, setWalkAccess] = useState(initialData?.walkAccess ?? {
+    paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+  })
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
   const [pricesLoading, setPricesLoading]   = useState(!initialData?.materialPrices)
 
@@ -195,8 +201,15 @@ export default function ColumnsModule({ projectName, onSave, onBack, saving, ini
 
   useEffect(() => {
     if (!initialData?.laborRatePerHour) {
-      supabase.from('company_settings').select('labor_rate_per_hour').single()
-        .then(({ data }) => { if (data) setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour) })
+      supabase.from('company_settings').select('labor_rate_per_hour, walk_access_pace_lf_per_min').single()
+        .then(({ data }) => {
+          if (!data) return
+          if (data.labor_rate_per_hour != null) setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
+          if (data.walk_access_pace_lf_per_min != null) {
+            const _wpace = parseFloat(data.walk_access_pace_lf_per_min)
+            setWalkAccess({ paceLfPerMin: Number.isFinite(_wpace) && _wpace > 0 ? _wpace : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN })
+          }
+        })
     }
     if (initialData?.materialPrices) return
     refreshAllRates().then(() => setPricesLoading(false))

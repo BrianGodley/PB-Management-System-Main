@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
+import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Walls Module — CMU Block | Poured In Place | Timber/Lumber
@@ -183,8 +184,9 @@ function calcOnePIP(wall, r) {
 }
 
 // ── Main calc ─────────────────────────────────────────────────────────────────
-function calcWalls(state, lrph = DEFAULTS.laborRatePerHour, mp = {}, gpmd = DEFAULTS.gpmd) {
+function calcWalls(state, lrph = DEFAULTS.laborRatePerHour, mp = {}, gpmd = DEFAULTS.gpmd, walkAccess = null) {
   const r = (key) => mp[WALL_RATES[key].db] ?? WALL_RATES[key].fb
+  const _pace = n(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
 
   let structuralHrs = 0, structuralMat = 0
   let cmuDetails = [], pipDetails = []
@@ -293,9 +295,11 @@ function calcWalls(state, lrph = DEFAULTS.laborRatePerHour, mp = {}, gpmd = DEFA
   let manHrs = 0, manMat = 0, manSub = 0
   ;(state.manualRows || []).forEach(row => { manHrs += n(row.hours); manMat += n(row.materials); manSub += n(row.subCost) })
 
-  const baseHrs   = structuralHrs + finishHrs + capHrs + wpHrs + manHrs
-  const diffMod   = 1 + n(state.difficulty) / 100
-  const totalHrs  = baseHrs * diffMod + n(state.hoursAdj)
+  const baseHrs    = structuralHrs + finishHrs + capHrs + wpHrs + manHrs
+  const diffMod    = 1 + n(state.difficulty) / 100
+  const _adjHrs    = baseHrs * diffMod + n(state.hoursAdj)
+  const walkHrs    = calcWalkAccessLabor(_adjHrs, state.distanceLF, { paceLfPerMin: _pace })
+  const totalHrs   = _adjHrs + walkHrs
   const manDays   = totalHrs / 8
   const totalMat  = structuralMat + finishMat + capMat + wpMat + manMat
 
@@ -307,6 +311,7 @@ function calcWalls(state, lrph = DEFAULTS.laborRatePerHour, mp = {}, gpmd = DEFA
 
   return {
     totalHrs, manDays, totalMat, laborCost, burden, gp, commission, subCost: manSub, price,
+    walkHrs,
     structuralHrs, finishHrs, capHrs, wpHrs,
     structuralMat, finishMat, capMat, wpMat,
     cmuDetails, pipDetails,
@@ -523,6 +528,9 @@ function PipWallEntry({ wall, idx, total, onChange, onRemove, detail }) {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function WallsModule({ projectName, onSave, onBack, saving, initialData }) {
   const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? DEFAULTS.laborRatePerHour)
+  const [walkAccess, setWalkAccess] = useState(initialData?.walkAccess ?? {
+    paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+  })
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
   const [pricesLoading, setPricesLoading]   = useState(!initialData?.materialPrices)
 
@@ -541,8 +549,15 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
 
   useEffect(() => {
     if (!initialData?.laborRatePerHour) {
-      supabase.from('company_settings').select('labor_rate_per_hour').single()
-        .then(({ data }) => { if (data) setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour) })
+      supabase.from('company_settings').select('labor_rate_per_hour, walk_access_pace_lf_per_min').maybeSingle()
+        .then(({ data }) => {
+          if (!data) return
+          if (data.labor_rate_per_hour != null) setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
+          if (data.walk_access_pace_lf_per_min != null) {
+            const _wpace = parseFloat(data.walk_access_pace_lf_per_min)
+            setWalkAccess({ paceLfPerMin: Number.isFinite(_wpace) && _wpace > 0 ? _wpace : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN })
+          }
+        })
     }
     if (initialData?.materialPrices) { setPricesLoading(false); return }
     refreshAllRates().then(() => setPricesLoading(false))
@@ -556,6 +571,7 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Masonry')
   const [hoursAdj,   setHoursAdj]   = useState(initialData?.hoursAdj   ?? '')
   const [wallType,   setWallType]   = useState(initialData?.wallType   ?? 'CMU')
+  const [distanceLF, setDistanceLF] = useState(initialData?.distanceLF ?? '')
 
   // ── CMU walls array ───────────────────────────────────────────────────────
   // Backward-compat: if old single-entry format, wrap it
@@ -670,7 +686,7 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
 
   const state = {
     crewType,
-    difficulty, hoursAdj, wallType,
+    difficulty, hoursAdj, wallType, distanceLF,
     cmuWalls, cmuFootingPump, cmuGroutPump,
     pipWalls,
     timberLF, timberHeightIn, timberType, timberPosts,
@@ -683,7 +699,7 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
     realStoneSF,    realStoneRateIn,
     capRows, wpRows, manualRows,
   }
-  const calcRaw = calcWalls(state, laborRatePerHour, materialPrices, gpmd)
+  const calcRaw = calcWalls(state, laborRatePerHour, materialPrices, gpmd, walkAccess)
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
   // material_cost (saved with the module) ends up tax-inclusive too,
@@ -703,7 +719,7 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
     onSave({
       man_days:      parseFloat(calc.manDays.toFixed(2)),
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
-      data: { ...state, laborRatePerHour, gpmd, materialPrices, calc },
+      data: { ...state, laborRatePerHour, gpmd, materialPrices, walkAccess, calc },
     })
   }
 
@@ -738,12 +754,24 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
         </div>
       )}
 
-      {/* Difficulty */}
-      <div className="flex items-center gap-3">
-        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Difficulty Add</label>
-        <div className="relative w-32">
-          <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+      {/* Difficulty + Truck → Work Area */}
+      <div className="flex items-center gap-6 flex-wrap">
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Difficulty Add</label>
+          <div className="relative w-32">
+            <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-medium text-gray-700 whitespace-nowrap" title="Average Distance from Truck to Work Area">Truck → Work Area</label>
+          <div className="relative w-32">
+            <NumInput value={distanceLF} onChange={setDistanceLF} placeholder="0" />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">Avg LF</span>
+          </div>
+          {calc.walkHrs > 0 && (
+            <span className="text-xs text-gray-500">+{calc.walkHrs.toFixed(2)} hrs walk-access</span>
+          )}
         </div>
       </div>
 

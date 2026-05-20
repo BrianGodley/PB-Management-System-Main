@@ -15,6 +15,7 @@ import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
+import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 
 // ── Fallback constants ────────────────────────────────────────────────────────
 
@@ -57,7 +58,8 @@ const DUMP_FEE_DEFAULTS = {
 const n = v => parseFloat(v) || 0
 const sfToTons = (sf, depthIn) => (n(sf) / 200) * n(depthIn)
 
-function calcDemo(state, laborRatePerHour, materialPrices, laborRates, subMarkupRate = 0.35, subRates = {}, gpmd = 425) {
+function calcDemo(state, laborRatePerHour, materialPrices, laborRates, subMarkupRate = 0.35, subRates = {}, gpmd = 425, walkAccess = null) {
+  const _pace = (parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN)
   const mp      = materialPrices || {}
   const lr      = laborRates    || {}
   const sr      = subRates      || {}
@@ -194,8 +196,10 @@ function calcDemo(state, laborRatePerHour, materialPrices, laborRates, subMarkup
   const vegHrs     = shrubHrs + stumpFstHrs + stumpAddHrs +
     treeCalc.reduce((s,r) => s + r.hrs, 0)
 
-  const rawHrs   = crewDemoHrs + gradingHrs + vegHrs + rebarHrs + manualHrs
-  const totalHrs = rawHrs * diff + hrsAdj
+  const rawHrs      = crewDemoHrs + gradingHrs + vegHrs + rebarHrs + manualHrs
+  const _preWalkHrs = rawHrs * diff + hrsAdj
+  const walkHrs     = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
+  const totalHrs    = _preWalkHrs + walkHrs
 
   // ── Materials ─────────────────────────────────────────────────────────────
   const dumpMatCost = isSub ? 0 : (
@@ -220,6 +224,7 @@ function calcDemo(state, laborRatePerHour, materialPrices, laborRates, subMarkup
   const price      = laborCost + burden + totalMat + gp + commission + subCost
 
   return {
+    walkHrs,
     totalHrs, manDays, laborCost, burden, totalMat, subCost, gp, commission, price,
     conc, dirt, base, grass,
     miscFlatCalc, miscVertCalc, footingCalc, bucketCalc,
@@ -328,6 +333,9 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
   const [materialPrices,   setMaterialPrices]   = useState(initialData?.materialPrices || {})
   const [laborRates,       setLaborRates]       = useState(initialData?.laborRates     || {})
   const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? 35)
+  const [walkAccess, setWalkAccess] = useState(initialData?.walkAccess ?? {
+    paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+  })
   const [subMarkupRate,    setSubMarkupRate]    = useState(initialData?.subMarkupRate   ?? 0.35)
   const [subRates,         setSubRates]         = useState(initialData?.subRates        || {})
 
@@ -371,7 +379,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       await Promise.all([
         // Company settings — skip if already loaded via initialData
         !initialData?.laborRatePerHour &&
-          supabase.from('company_settings').select('labor_rate_per_hour, sub_markup_rate').single()
+          supabase.from('company_settings').select('labor_rate_per_hour, sub_markup_rate, walk_access_pace_lf_per_min').single()
             .then(({data}) => {
               if (!gone && data) {
                 if (data.labor_rate_per_hour != null) setLaborRatePerHour(parseFloat(data.labor_rate_per_hour)||35)
@@ -392,7 +400,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
 
   const gpmd = initialData?.gpmd ?? 425
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
-  const calcRaw = calcDemo(state, laborRatePerHour, materialPrices, laborRates, subMarkupRate, subRates, gpmd)
+  const calcRaw = calcDemo(state, laborRatePerHour, materialPrices, laborRates, subMarkupRate, subRates, gpmd, walkAccess)
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
   // material_cost (saved with the module) ends up tax-inclusive too,
@@ -429,7 +437,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
       gross_profit: parseFloat(calc.gp.toFixed(2)),
       sub_cost:     parseFloat(calc.subCost.toFixed(2)),
       total_price:  parseFloat(calc.price.toFixed(2)),
-      data: { ...state, laborRatePerHour, gpmd, materialPrices, laborRates,
+      data: { ...state, walkAccess, laborRatePerHour, gpmd, materialPrices, laborRates,
         calc: { totalHrs:calc.totalHrs, manDays:calc.manDays, laborCost:calc.laborCost,
                 burden:calc.burden, totalMat:calc.totalMat, subCost:calc.subCost,
                 gp:calc.gp, price:calc.price } },

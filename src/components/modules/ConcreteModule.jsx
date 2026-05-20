@@ -13,6 +13,7 @@ import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
+import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 
 // ── Rate tables (method-indexed — not in DB) ──────────────────────────────────
 
@@ -77,7 +78,8 @@ const R = {
 
 const n = v => parseFloat(v) || 0
 
-function calcConcrete(state, laborRatePerHour = 35, lr = {}, mr = {}, sr = {}, gpmd = R.gpmd) {
+function calcConcrete(state, laborRatePerHour = 35, lr = {}, mr = {}, sr = {}, gpmd = R.gpmd, walkAccess = null) {
+  const _pace = (parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN)
   const lrph = n(laborRatePerHour) || 35
 
   // ── Labor production rates (labor_rates) ─────────────────────────────────
@@ -159,9 +161,8 @@ function calcConcrete(state, laborRatePerHour = 35, lr = {}, mr = {}, sr = {}, g
   const sleeveMat   = sleeveUnits * sleevePer10LF
 
   // ── Travel + backyard ────────────────────────────────────────────────────
-  const travelHrs   = installSF > 0 && distanceLF > 0
-    ? (installSF / R.crewDaySF) * (distanceLF / 60) * 2
-    : 0
+  // Old per-module travelHrs retired — now handled by unified walk-access penalty below.
+  const travelHrs   = 0
   const backyardHrs = pctBackyard > 0 ? 0.2 * pctBackyard * installHrs : 0
 
   // ── Forming complexity ───────────────────────────────────────────────────
@@ -212,9 +213,11 @@ function calcConcrete(state, laborRatePerHour = 35, lr = {}, mr = {}, sr = {}, g
   })
 
   // ── Totals ───────────────────────────────────────────────────────────────
-  const preAdjHrs = preComplexHrs + complexityHrs + finishHrs + vaporHrs + sealerHrs + manHrs
-  const diffHrs   = preAdjHrs * diffPct
-  const totalHrs  = preAdjHrs + diffHrs + hoursAdj
+  const preAdjHrs   = preComplexHrs + complexityHrs + finishHrs + vaporHrs + sealerHrs + manHrs
+  const diffHrs     = preAdjHrs * diffPct
+  const _preWalkHrs = preAdjHrs + diffHrs + hoursAdj
+  const walkHrs     = calcWalkAccessLabor(_preWalkHrs, distanceLF, { paceLfPerMin: _pace })
+  const totalHrs    = _preWalkHrs + walkHrs
   const manDays   = totalHrs / 8
 
   const totalMat  = baseMatTot + concreteMat + rebarMat + formMat + sleeveMat +
@@ -227,6 +230,7 @@ function calcConcrete(state, laborRatePerHour = 35, lr = {}, mr = {}, sr = {}, g
   const price      = totalMat + laborCost + burden + gp + commission + subCost
 
   return {
+    walkHrs,
     totalHrs, manDays, totalMat, laborCost, burden, gp, commission, subCost, price,
     concreteCY, baseCalc,
     layoutHrs, travelHrs, backyardHrs, complexityHrs,
@@ -285,6 +289,9 @@ export default function ConcreteModule({ projectName, onSave, onBack, saving, in
   const [laborRatePerHour, setLaborRatePerHour] = useState(
     initialData?.laborRatePerHour ?? 35
   )
+  const [walkAccess, setWalkAccess] = useState(initialData?.walkAccess ?? {
+    paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+  })
   // Rate snapshots keyed by name → rate value (restored from saved data if re-editing)
   const [laborRates,    setLaborRates]    = useState(initialData?.laborRates    ?? {})
   const [materialRates, setMaterialRates] = useState(initialData?.materialRates ?? {})
@@ -293,7 +300,7 @@ export default function ConcreteModule({ projectName, onSave, onBack, saving, in
   // Fetch company labor rate per hour
   useEffect(() => {
     if (initialData?.laborRatePerHour) return
-    supabase.from('company_settings').select('labor_rate_per_hour').single()
+    supabase.from('company_settings').select('labor_rate_per_hour, walk_access_pace_lf_per_min').single()
       .then(({ data }) => { if (data) setLaborRatePerHour(parseFloat(data.value) || 35) })
   }, [])
 
@@ -370,7 +377,7 @@ export default function ConcreteModule({ projectName, onSave, onBack, saving, in
   }
   const gpmd = initialData?.gpmd ?? R.gpmd
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
-  const calcRaw = calcConcrete(state, laborRatePerHour, laborRates, materialRates, subRates, gpmd)
+  const calcRaw = calcConcrete(state, laborRatePerHour, laborRates, materialRates, subRates, gpmd, walkAccess)
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
   // material_cost (saved with the module) ends up tax-inclusive too,
@@ -399,7 +406,7 @@ export default function ConcreteModule({ projectName, onSave, onBack, saving, in
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
       data: {
         ...state,
-        laborRatePerHour, gpmd,
+        walkAccess, laborRatePerHour, gpmd,
         laborRates,    // ← production rate snapshot
         materialRates, // ← material cost snapshot
         subRates,      // ← sub/equipment cost snapshot

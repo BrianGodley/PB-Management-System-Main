@@ -37,6 +37,7 @@ import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
+import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 
 const n = v => parseFloat(v) || 0
 const sfToTons = (sf, depthIn) => (n(sf) / 200) * n(depthIn)
@@ -84,7 +85,8 @@ const MAT_DEFAULTS = {
 }
 
 // ── Calculation engine ────────────────────────────────────────────────────────
-function calcPaver(state, laborRatePerHour, laborRates, materialRates, paverPrices, gpmd = 425) {
+function calcPaver(state, laborRatePerHour, laborRates, materialRates, paverPrices, gpmd = 425, walkAccess = null) {
+  const _pace = (parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN)
   const lr = laborRates   || {}
   const mr = materialRates || {}
   const pp = paverPrices   || []
@@ -185,7 +187,9 @@ function calcPaver(state, laborRatePerHour, laborRates, materialRates, paverPric
     restraintsHrs + sleevesHrs + vertSoldierHrs + sealerHrs + polySandHrs +
     addStoneHrs + addColorHrs
   const adjustedInstallHrs = rawInstallHrs * diff + hrsAdj
-  const totalHrs = adjustedInstallHrs + totalBaseHrs + manualHrs
+  const _preWalkHrs        = adjustedInstallHrs + totalBaseHrs + manualHrs
+  const walkHrs            = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
+  const totalHrs           = _preWalkHrs + walkHrs
 
   // ── Materials ─────────────────────────────────────────────────────────────────
   const baseRockCost     = totalBaseTons * baseRockPerTon
@@ -217,6 +221,7 @@ function calcPaver(state, laborRatePerHour, laborRates, materialRates, paverPric
   const price     = laborCost + burden + totalMat + gp + commission + subCost
 
   return {
+    walkHrs,
     totalHrs, adjustedInstallHrs, totalBaseHrs, rawInstallHrs,
     manDays, laborCost, burden, totalMat, subCost, gp, commission, price,
     areas, totalInstallSF, totalBaseTons, totalPallets, totalAreaPallets,
@@ -238,6 +243,7 @@ function calcPaver(state, laborRatePerHour, laborRates, materialRates, paverPric
 
 // ── Default state ─────────────────────────────────────────────────────────────
 const DEFAULT_STATE = {
+  distanceLF: '',  // Avg truck → work area (LF) for walk-access penalty
   difficulty: 0,
   crewType: 'Paver',
   hoursAdj: 0,
@@ -406,6 +412,9 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
   const [laborRates,       setLaborRates]       = useState(initialData?.laborRates     || {})
   const [materialRates,    setMaterialRates]    = useState(initialData?.materialRates  || {})
   const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? 35)
+  const [walkAccess, setWalkAccess] = useState(initialData?.walkAccess ?? {
+    paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+  })
   const [paverPrices,      setPaverPrices]      = useState(initialData?.paverPrices    || [])
 
   // ── Sales tax — applied to totalMat across every module so the bid
@@ -438,7 +447,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       await Promise.all([
         // Company settings
         !initialData?.laborRatePerHour &&
-          supabase.from('company_settings').select('labor_rate_per_hour').single()
+          supabase.from('company_settings').select('labor_rate_per_hour, walk_access_pace_lf_per_min').single()
             .then(({ data }) => {
               if (!gone && data?.labor_rate_per_hour != null)
                 setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || 35)
@@ -463,7 +472,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
 
   const gpmd = initialData?.gpmd ?? 425
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
-  const calcRaw = calcPaver(state, laborRatePerHour, laborRates, materialRates, paverPrices, gpmd)
+  const calcRaw = calcPaver(state, laborRatePerHour, laborRates, materialRates, paverPrices, gpmd, walkAccess)
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
   // material_cost (saved with the module) ends up tax-inclusive too,
@@ -496,7 +505,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       sub_cost:      parseFloat(calc.subCost.toFixed(2)),
       total_price:   parseFloat(calc.price.toFixed(2)),
       data: {
-        ...state, laborRatePerHour, gpmd, laborRates, materialRates, paverPrices,
+        ...state, walkAccess, laborRatePerHour, gpmd, laborRates, materialRates, paverPrices,
         calc: {
           totalHrs:   calc.totalHrs,
           manDays:    calc.manDays,
