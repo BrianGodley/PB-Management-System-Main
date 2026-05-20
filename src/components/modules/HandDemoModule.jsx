@@ -291,9 +291,9 @@ const DEFAULT_STATE = {
 
 function SecHdr({ title }) {
   return (
-    <p className="col-span-full text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-1">
-      {title}
-    </p>
+    <div className="bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200 mb-2">
+      <h3 className="text-xs font-bold text-gray-600 uppercase tracking-wider">{title}</h3>
+    </div>
   )
 }
 
@@ -575,7 +575,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
 
       {/* Demolition */}
       <div>
-        <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2">
+        <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2">
           <span>Demolition — {calc.rateConc} t/hr hand</span>
           <RateEditPopover table="labor_rates" name="Demo - Hand Concrete/Dirt" category="Demo"
             mode="coefficient" unitLabel="t/hr" currentValue={calc.rateConc} onSaved={refreshAllRates} />
@@ -645,7 +645,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
 
       {/* Misc Flat */}
       <div>
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2 inline-flex items-center gap-2">
+        <p className="text-xs font-bold text-gray-600 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2 inline-flex items-center gap-2">
           <span>Misc Flat Demo — {calc.rateConc} t/hr (hand)</span>
           <RateEditPopover table="labor_rates" name="Demo - Hand Concrete/Dirt" category="Demo"
             mode="coefficient" unitLabel="t/hr" currentValue={calc.rateConc} onSaved={refreshAllRates} />
@@ -669,7 +669,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
 
       {/* Misc Vertical */}
       <div>
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2 inline-flex items-center gap-2">
+        <p className="text-xs font-bold text-gray-600 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2 inline-flex items-center gap-2">
           <span>Misc Vertical / Structural Demo — LF × Height × Width · {calc.rateConc} t/hr (hand)</span>
           <RateEditPopover table="labor_rates" name="Demo - Hand Concrete/Dirt" category="Demo"
             mode="coefficient" unitLabel="t/hr" currentValue={calc.rateConc} onSaved={refreshAllRates} />
@@ -694,7 +694,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
 
       {/* Footing */}
       <div>
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2 inline-flex items-center gap-2">
+        <p className="text-xs font-bold text-gray-600 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2 inline-flex items-center gap-2">
           <span>Footing Demo — SF × Depth · {calc.rateConc} t/hr (hand)</span>
           <RateEditPopover table="labor_rates" name="Demo - Hand Concrete/Dirt" category="Demo"
             mode="coefficient" unitLabel="t/hr" currentValue={calc.rateConc} onSaved={refreshAllRates} />
@@ -718,7 +718,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
 
       {/* Hand Bucket Areas */}
       <div>
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2 inline-flex items-center gap-2">
+        <p className="text-xs font-bold text-gray-600 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2 inline-flex items-center gap-2">
           <span>Hand Bucket Areas — tight/confined access · {calc.rateBucket} t/hr</span>
           <RateEditPopover table="labor_rates" name="Demo - Hand Bucket" category="Demo"
             mode="coefficient" unitLabel="t/hr" currentValue={calc.rateBucket} onSaved={refreshAllRates} />
@@ -743,7 +743,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
 
       {/* Grading */}
       <div>
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2">Grading</p>
+        <p className="text-xs font-bold text-gray-600 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2">Grading</p>
         <table className="w-full text-xs">
           <TH cols={[{label:'Operation',w:'w-40'},{label:'SF',w:'w-24'},{label:'Depth (in)',w:'w-20'},{label:'Tons',w:'w-16'},{label:'Labor Hrs',w:'w-20'}]} />
           <tbody className="divide-y divide-gray-50">
@@ -793,7 +793,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
 
       {/* Trees */}
       <div>
-        <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2">
+        <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2">
           <span>Tree Demo — qty × height × {ACCESS_LEVELS[state.access]}× access × size multiplier</span>
           <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
             (S:{calc.treeSmall}
@@ -834,7 +834,7 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
 
       {/* Manual */}
       <div>
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2">Manual Entry</p>
+        <p className="text-xs font-bold text-gray-600 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2">Manual Entry</p>
         <table className="w-full text-xs">
           <TH cols={[{label:'Description'},{label:'Hours',w:'w-20'},{label:'Materials ($)',w:'w-28'},{label:'Sub Cost ($)',w:'w-28'}]} />
           <tbody className="divide-y divide-gray-50">

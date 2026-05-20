@@ -262,9 +262,9 @@ const DEFAULT_STATE = {
 // ── UI helpers ────────────────────────────────────────────────────────────────
 function SecHdr({ title }) {
   return (
-    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-5 mb-2">
-      {title}
-    </p>
+    <div className="bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200 mb-2">
+      <h3 className="text-xs font-bold text-gray-600 uppercase tracking-wider">{title}</h3>
+    </div>
   )
 }
 function Inp({ value, onChange, placeholder = '0', type = 'number', step, className = '' }) {

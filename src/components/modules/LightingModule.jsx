@@ -134,7 +134,7 @@ const DEFAULT_MANUAL_ROWS = [
 // ── Sub-components ────────────────────────────────────────────────────────────
 function SectionHeader({ title, sub }) {
   return (
-    <div className="bg-gray-100 px-4 py-2 rounded-lg mb-2">
+    <div className="bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200 mb-2">
       <h3 className="text-xs font-bold text-gray-600 uppercase tracking-wider">{title}</h3>
       {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
     </div>
