@@ -560,8 +560,8 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       )}
 
       {/* ── Settings ─────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <SecHdr title="Settings" />
+      <SecHdr title="Settings" />
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
         <div>
           <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
           <Inp value={state.difficulty} onChange={e => set('difficulty', e.target.value)} step="5" />

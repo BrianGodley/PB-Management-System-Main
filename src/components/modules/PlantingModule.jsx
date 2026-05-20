@@ -437,42 +437,41 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
         </div>
       )}
 
-      {/* Till & Amend + Difficulty */}
-      <div className="grid grid-cols-2 gap-4">
+      {/* Settings */}
+      <SectionHeader title="Settings" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1 inline-flex items-center flex-wrap gap-1">
-            Till &amp; Amend Soil (sqft)
-            <span className="text-xs font-normal text-gray-400 inline-flex items-center gap-1">
-              ({lr(laborRates,'Till - Soil Move Rate')} CY/d
-              <RateEditPopover table="labor_rates" name="Till - Soil Move Rate" category="Planting"
-                mode="coefficient" unitLabel="CY/day" currentValue={lr(laborRates,'Till - Soil Move Rate')} onSaved={refreshAllRates} />
-              · {lr(laborRates,'Till - Tilling Rate')} SF/d
-              <RateEditPopover table="labor_rates" name="Till - Tilling Rate" category="Planting"
-                mode="coefficient" unitLabel="SF/day" currentValue={lr(laborRates,'Till - Tilling Rate')} onSaved={refreshAllRates} />
-              · {lr(laborRates,'Till - Amend Rate')} SF/d
-              <RateEditPopover table="labor_rates" name="Till - Amend Rate" category="Planting"
-                mode="coefficient" unitLabel="SF/day" currentValue={lr(laborRates,'Till - Amend Rate')} onSaved={refreshAllRates} />)
-            </span>
-          </label>
-          <NumInput value={tillSqft} onChange={setTillSqft} placeholder="0" />
-          {n(tillSqft) > 0 && (
-            <p className="text-xs text-gray-400 mt-1">{calc.tillHrs.toFixed(2)} hrs estimated</p>
-          )}
+          <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
+          <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Difficulty Add</label>
-          <div className="relative">
-            <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
-          </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1" title="Average Distance from Truck to Work Area">Truck → Work Area (Avg LF)</label>
+          <p className="text-xs text-gray-500 mb-0.5" title="Average Distance from Truck to Work Area">Truck → Work Area (Avg LF)</p>
           <NumInput value={distanceLF} onChange={setDistanceLF} placeholder="0" />
           {calc.walkHrs > 0 && (
-            <p className="text-[10px] text-gray-500 mt-0.5">+{calc.walkHrs.toFixed(2)} hrs walk-access</p>
+            <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">+{calc.walkHrs.toFixed(2)} hrs walk-access</p>
           )}
         </div>
+      </div>
+
+      {/* Till & Amend Soil */}
+      <SectionHeader title="Till & Amend Soil" />
+      <div>
+        <div className="flex items-center flex-wrap gap-2 text-xs text-gray-400 mb-1">
+          <span>{lr(laborRates,'Till - Soil Move Rate')} CY/d</span>
+          <RateEditPopover table="labor_rates" name="Till - Soil Move Rate" category="Planting"
+            mode="coefficient" unitLabel="CY/day" currentValue={lr(laborRates,'Till - Soil Move Rate')} onSaved={refreshAllRates} />
+          <span>· {lr(laborRates,'Till - Tilling Rate')} SF/d</span>
+          <RateEditPopover table="labor_rates" name="Till - Tilling Rate" category="Planting"
+            mode="coefficient" unitLabel="SF/day" currentValue={lr(laborRates,'Till - Tilling Rate')} onSaved={refreshAllRates} />
+          <span>· {lr(laborRates,'Till - Amend Rate')} SF/d</span>
+          <RateEditPopover table="labor_rates" name="Till - Amend Rate" category="Planting"
+            mode="coefficient" unitLabel="SF/day" currentValue={lr(laborRates,'Till - Amend Rate')} onSaved={refreshAllRates} />
         </div>
+        <p className="text-xs text-gray-500 mb-0.5">Sqft</p>
+        <NumInput value={tillSqft} onChange={setTillSqft} placeholder="0" />
+        {n(tillSqft) > 0 && (
+          <p className="text-xs text-gray-400 mt-1">{calc.tillHrs.toFixed(2)} hrs estimated</p>
+        )}
       </div>
 
       {/* ── Small Plants ── */}

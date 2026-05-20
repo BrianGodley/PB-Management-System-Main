@@ -463,16 +463,12 @@ export default function ConcreteModule({ projectName, onSave, onBack, saving, in
             <label className="text-xs text-gray-500 block mb-1" title="Average Distance from Truck to Work Area">Truck → Work Area (Avg LF)</label>
             <NumInput value={distanceLF} onChange={setDistanceLF} placeholder="0" />
             {calc.walkHrs > 0 && (
-              <p className="text-[10px] text-gray-500 mt-0.5">+{calc.walkHrs.toFixed(2)} hrs walk-access</p>
+              <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">+{calc.walkHrs.toFixed(2)} hrs walk-access</p>
             )}
           </div>
           <div>
             <label className="text-xs text-gray-500 block mb-1">Layout Time (hrs)</label>
             <NumInput value={layoutHrs} onChange={setLayoutHrs} placeholder="0" />
-          </div>
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">Dist. from Truck (LF)</label>
-            <NumInput value={distanceLF} onChange={setDistanceLF} placeholder="0" />
           </div>
           <div>
             <label className="text-xs text-gray-500 block mb-1">% of Paving in Backyard</label>

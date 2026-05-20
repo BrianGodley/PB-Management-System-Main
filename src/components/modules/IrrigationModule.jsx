@@ -309,26 +309,22 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
       )}
 
       {/* Settings */}
-      <div className="grid grid-cols-2 gap-3">
-        <SecHdr title="Settings" />
-        <div className="col-span-2 grid grid-cols-3 gap-3">
-          <div>
-            <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
-            <Inp value={state.difficulty} onChange={e => set('difficulty', e.target.value)} step="5" />
-          </div>
-          <div>
-            <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
-            <Inp value={state.hoursAdj} onChange={e => set('hoursAdj', e.target.value)} step="0.5" />
-          </div>
-          <div>
-            <p className="text-xs text-gray-500 mb-0.5" title="Average Distance from Truck to Work Area">
-              Truck → Work Area (LF)
-            </p>
-            <Inp value={state.distanceLF} onChange={e => set('distanceLF', e.target.value)} step="5" />
-            {calc.walkHrs > 0 && (
-              <p className="text-[10px] text-gray-500 mt-0.5">+{calc.walkHrs.toFixed(2)} hrs walk-access</p>
-            )}
-          </div>
+      <SecHdr title="Settings" />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+          <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
+          <Inp value={state.difficulty} onChange={e => set('difficulty', e.target.value)} step="5" />
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 mb-0.5" title="Average Distance from Truck to Work Area">Truck → Work Area (Avg LF)</p>
+          <Inp value={state.distanceLF} onChange={e => set('distanceLF', e.target.value)} step="5" />
+          {calc.walkHrs > 0 && (
+            <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">+{calc.walkHrs.toFixed(2)} hrs walk-access</p>
+          )}
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
+          <Inp value={state.hoursAdj} onChange={e => set('hoursAdj', e.target.value)} step="0.5" />
         </div>
       </div>
 
