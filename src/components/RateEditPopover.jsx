@@ -67,6 +67,10 @@ export default function RateEditPopover({
   const [loaded,  setLoaded]  = useState(false)
   const [saving,  setSaving]  = useState(false)
   const [error,   setError]   = useState('')
+  // Sticky confirmation message that appears in the popover after a
+  // successful save. Kept separate from `error` so the user clearly sees
+  // SUCCESS vs FAILURE before the popover closes.
+  const [saveMsg, setSaveMsg] = useState('')
   const wrapRef   = useRef(null)
 
   // Whenever the popover opens, fetch the current rate from the DB so the
@@ -76,6 +80,7 @@ export default function RateEditPopover({
     if (!open) return
     setLoaded(false)
     setError('')
+    setSaveMsg('')
     let q = supabase.from(table).select(`${field}, id`).eq(nameCol, name)
     // Filter by category on every table that has one (material_rates,
     // labor_rates, subcontractor_rates). The previous code only did this
@@ -112,30 +117,65 @@ export default function RateEditPopover({
     if (!Number.isFinite(v) || v < 0) { setError('Enter a number ≥ 0'); return }
     setSaving(true)
     setError('')
-    // Try to find an existing row by name (+ category for material_rates).
-    let query = supabase.from(table).select('id').eq(nameCol, name)
-    // Same category-scoped lookup as the open-fetch above. Without this,
-    // the UPDATE may target a row in a different category and the module
-    // never sees the new value on refresh.
-    if (category) query = query.eq('category', category)
-    const { data: matches } = await query.limit(1)
-    if (matches && matches.length > 0) {
-      const { error: upErr } = await supabase.from(table)
-        .update({ [field]: v }).eq('id', matches[0].id)
-      if (upErr) { setError(upErr.message); setSaving(false); return }
-    } else {
-      const insertRow = { [nameCol]: name, [field]: v }
-      // Tag every new rate row with the caller's category (defaulting to
-      // 'General' when omitted) so module refreshes that filter by
-      // category can find the row they just helped create.
-      if (category)                          insertRow.category = category
-      else if (table === 'labor_rates')      insertRow.category = 'General'
-      const { error: insErr } = await supabase.from(table).insert(insertRow)
-      if (insErr) { setError(insErr.message); setSaving(false); return }
+    setSaveMsg('')
+
+    // Three-step save that self-heals when a same-named row already lives
+    // in a DIFFERENT category (a common leftover from earlier seeding).
+    // Without the self-heal, the in-category UPDATE finds nothing → INSERT
+    // → UNIQUE-name constraint fails or two rows compete → the module's
+    // category-scoped refreshAllRates never sees the change.
+    try {
+      // Step 1 — try to find a row in the caller's category.
+      let q1 = supabase.from(table).select('id').eq(nameCol, name)
+      if (category) q1 = q1.eq('category', category)
+      const { data: inCat, error: selErr } = await q1.limit(1)
+      if (selErr) throw new Error('Lookup failed: ' + selErr.message)
+
+      if (inCat && inCat.length > 0) {
+        // ── 1a. UPDATE the in-category row.
+        const { error: upErr } = await supabase.from(table)
+          .update({ [field]: v }).eq('id', inCat[0].id)
+        if (upErr) throw new Error('Save failed: ' + upErr.message)
+      } else {
+        // Step 2 — fall back to a name-only lookup. If a wrong-category row
+        // exists, UPDATE it AND reassign category so future category-scoped
+        // refreshes find it. If still nothing, INSERT a fresh row.
+        const { data: anyRow, error: anySelErr } = await supabase.from(table)
+          .select('id, category').eq(nameCol, name).limit(1)
+        if (anySelErr) throw new Error('Lookup failed: ' + anySelErr.message)
+
+        if (anyRow && anyRow.length > 0) {
+          const update = { [field]: v }
+          if (category) update.category = category
+          const { error: reErr } = await supabase.from(table)
+            .update(update).eq('id', anyRow[0].id)
+          if (reErr) throw new Error('Save failed: ' + reErr.message)
+        } else {
+          // Step 3 — no row at all → INSERT.
+          const insertRow = { [nameCol]: name, [field]: v }
+          if (category)                          insertRow.category = category
+          else if (table === 'labor_rates')      insertRow.category = 'General'
+          const { error: insErr } = await supabase.from(table).insert(insertRow)
+          if (insErr) throw new Error('Save failed: ' + insErr.message)
+        }
+      }
+    } catch (e) {
+      setError(e?.message || 'Save failed.')
+      setSaving(false)
+      return
     }
+
+    // Success — show inline confirmation, refresh parent, then auto-close
+    // after a short delay so the user sees what was saved.
     setSaving(false)
-    setOpen(false)
-    if (onSaved) await onSaved()
+    const display = mode === 'currency'
+      ? `$${v.toLocaleString(undefined, { maximumFractionDigits: 4 })}`
+      : `${v}${unitLabel ? ' ' + unitLabel : ''}`
+    setSaveMsg(`Saved! New rate: ${display}`)
+    if (onSaved) {
+      try { await onSaved() } catch { /* non-fatal */ }
+    }
+    setTimeout(() => setOpen(false), 1500)
   }
 
   // Global toggle — when "Access/Edit Rates" is OFF, render nothing.
@@ -210,6 +250,11 @@ export default function RateEditPopover({
               </div>
             )}
             {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+            {saveMsg && (
+              <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2 mt-2 font-medium">
+                ✓ {saveMsg}
+              </p>
+            )}
 
             <div className="flex gap-2 mt-5">
               <button
