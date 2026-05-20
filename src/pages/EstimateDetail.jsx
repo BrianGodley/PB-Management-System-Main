@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { generateBidDoc, downloadBidDoc } from '../lib/generateBidDoc'
+import { generateBidDoc } from '../lib/generateBidDoc'
 import { fetchGlobalGpmd, DEFAULT_ESTIMATE_GPMD } from '../lib/companyDefaults'
 import { useRateIcons } from '../contexts/RateIconsContext'
 import DrainageModule      from '../components/modules/DrainageModule'
@@ -95,7 +95,7 @@ export default function EstimateDetail() {
   const { user }       = useAuth()
   const [searchParams] = useSearchParams()
 
-  // Change Order mode — set when navigating from NewChangeOrderModal
+  // Change Order mode — set when navigating in from the New Change Order flow
   const isCOMode  = searchParams.get('co') === '1'
   const coJobId   = searchParams.get('job_id')   || null
   const coName    = searchParams.get('co_name')  || ''
