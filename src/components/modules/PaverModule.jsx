@@ -276,7 +276,7 @@ const DEFAULT_STATE = {
 // ── UI helpers ────────────────────────────────────────────────────────────────
 function SecHdr({ title, sub }) {
   return (
-    <p className="col-span-full text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-1">
+    <p className="col-span-full text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-1">
       {title}{sub && <span className="ml-2 font-normal normal-case text-gray-400">{sub}</span>}
     </p>
   )
@@ -586,7 +586,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
 
       {/* ── Paver Material ──────────────────────────────────────────────────────── */}
       <div>
-        <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2">
+        <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           <span>Paver Material</span>
           {calc.totalInstallSF > 0 && (
             <span className="font-normal normal-case text-gray-400">
@@ -673,7 +673,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
 
       {/* ── Paver Labor ─────────────────────────────────────────────────────── */}
       <div>
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2">
+        <p className="text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           Paver Labor
           <span className="ml-2 font-normal normal-case text-gray-400">
             {calc.installRate} SF/hr install · {calc.straightCutRate}/{calc.curvedCutRate} LF/hr cuts
@@ -809,7 +809,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
 
       {/* ── Vertical Soldier Course ───────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <div className="col-span-full flex items-center flex-wrap gap-x-2 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-1">
+        <div className="col-span-full flex items-center flex-wrap gap-x-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-1">
           <span>Vertical Soldier Course</span>
           <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
             {calc.vertSoldierRate} LF/hr
@@ -895,7 +895,7 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
 
       {/* ── Manual Entry ──────────────────────────────────────────────────────── */}
       <div>
-        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200 pb-1 mt-4 mb-2">
+        <p className="text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           Manual Entry
         </p>
         <table className="w-full text-xs">
