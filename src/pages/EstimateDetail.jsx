@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { generateBidDoc, downloadBidDoc } from '../lib/generateBidDoc'
 import { fetchGlobalGpmd, DEFAULT_ESTIMATE_GPMD } from '../lib/companyDefaults'
+import { useRateIcons } from '../contexts/RateIconsContext'
 import DrainageModule      from '../components/modules/DrainageModule'
 import DrainageSummary     from '../components/modules/DrainageSummary'
 import LightingModule      from '../components/modules/LightingModule'
@@ -146,6 +147,12 @@ export default function EstimateDetail() {
     fetchGlobalGpmd().then(n => { if (alive) setGlobalGpmd(n) })
     return () => { alive = false }
   }, [])
+
+  // Rate-icon toggle — controls visibility of every <RateEditPopover/> across
+  // the open module editor. The "Edit Rates" button in the module modal
+  // header flips this. Off by default; gated by canAccessRates so only users
+  // with the `clients_access_edit_rates` permission see the button.
+  const { showRateIcons, toggleRateIcons, canAccessRates } = useRateIcons()
 
   // Per-project sub GP markup rates  { [projectId]: number }
   const [projectSubRates, setProjectSubRates] = useState({})
@@ -1417,7 +1424,44 @@ export default function EstimateDetail() {
                   <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-0.5">
                     {editingModule ? 'Edit Module' : 'Add Module'}
                   </p>
-                  <h2 className="text-xl font-bold text-gray-900">{selectedType}</h2>
+                  {/* Module name + Edit Rates toggle on the same row. The
+                      toggle is permission-gated (clients_access_edit_rates)
+                      and only ever appears in the module-detail modal, never
+                      on the estimate/project totals bars. */}
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-xl font-bold text-gray-900">{selectedType}</h2>
+                    {canAccessRates && (
+                      <button
+                        type="button"
+                        onClick={toggleRateIcons}
+                        title={showRateIcons
+                          ? 'Hide the inline rate-edit calculator icons'
+                          : 'Show calculator icons next to every rate so you can adjust master rates inline'}
+                        className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-md border transition-colors ${
+                          showRateIcons
+                            ? 'bg-green-600 border-green-500 text-white hover:bg-green-700'
+                            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400'
+                        }`}
+                      >
+                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <rect x="4" y="3" width="16" height="18" rx="2" />
+                          <line x1="8" y1="7"  x2="16" y2="7" />
+                          <line x1="8" y1="11" x2="10" y2="11" />
+                          <line x1="13" y1="11" x2="16" y2="11" />
+                          <line x1="8" y1="15" x2="10" y2="15" />
+                          <line x1="13" y1="15" x2="16" y2="15" />
+                          <line x1="8" y1="19" x2="10" y2="19" />
+                          <line x1="13" y1="19" x2="16" y2="19" />
+                        </svg>
+                        Edit Rates
+                        <span className={`text-[10px] uppercase tracking-wide ml-0.5 ${
+                          showRateIcons ? 'text-green-100' : 'text-gray-500'
+                        }`}>
+                          {showRateIcons ? 'on' : 'off'}
+                        </span>
+                      </button>
+                    )}
+                  </div>
                   <p className="text-sm text-gray-500 mt-0.5">{selectedProject?.project_name}</p>
                 </div>
                 <button onClick={closeModuleFlow} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>

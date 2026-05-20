@@ -451,7 +451,6 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel }) {
       <div className="sticky top-0 z-20 -mx-6 px-6 pt-2 pb-2 bg-gray-900 shadow-lg">
       {/* GPMD summary bar */}
       <GpmdBar
-          showEditRatesButton
           sticky
         totalMat={calc.totalMat}
         totalHrs={calc.totalHrs}
