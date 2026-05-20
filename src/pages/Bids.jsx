@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { fetchAllPaginated } from '../lib/fetchAll'
 import { useAuth } from '../contexts/AuthContext'
-import { generateBidDoc, downloadBidDoc } from '../lib/generateBidDoc'
+import { generateBidDoc, downloadBidDoc, fetchFinanceOacRate } from '../lib/generateBidDoc'
 import BidDocViewerModal from '../components/BidDocViewerModal'
 import { JOB_ROLES, nameInitials } from '../components/JobInfoModal'
 
@@ -74,7 +74,7 @@ export default function Bids() {
     // Project's max-rows hard-caps at 1k server-side; paginate.
     const { data } = await fetchAllPaginated(() =>
       supabase.from('bids')
-        .select('*, estimates(estimate_name, created_by)')
+        .select('*, estimates(estimate_name, created_by, client_id)')
         .in('record_type', ['bid'])
         .order('date_submitted', { ascending: false })
     )
@@ -347,7 +347,8 @@ export default function Bids() {
         .select('*, estimate_modules(*)')
         .eq('estimate_id', bid.estimate_id)
         .order('created_at')
-      const blob = await generateBidDoc(est, projs || [], bid.job_address || '')
+      const financeOacRate = await fetchFinanceOacRate()
+      const blob = await generateBidDoc(est, projs || [], bid.job_address || '', { financeOacRate })
       const safeName = (est?.estimate_name || bid.client_name || 'Bid').replace(/[^a-z0-9]/gi, '_')
       downloadBidDoc(blob, `${safeName}_Bid_${bid.date_submitted}.docx`)
     } catch (err) {
@@ -595,6 +596,7 @@ export default function Bids() {
           <div className="flex border-b border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0">
             {[
               { key: 'general', label: '⚙️ General' },
+              { key: 'finance', label: '💰 Finance' },
             ].map(t => (
               <button key={t.key} onClick={() => setBidsSettingsTab(t.key)}
                 className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
@@ -613,6 +615,7 @@ export default function Bids() {
                 </div>
               </div>
             )}
+            {bidsSettingsTab === 'finance' && <FinanceSettingsCard />}
           </div>
         </div>
       )}
@@ -694,7 +697,17 @@ export default function Bids() {
                 return (
                   <tr key={bid.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
                     <td className="px-4 py-3">
-                      <p className="font-bold text-gray-900">{bid.client_name}</p>
+                      {/* Client name → opportunity page when we can resolve
+                          a client_id from the joined estimate. Falls back to
+                          plain text for legacy bids without an estimate. */}
+                      {bid.estimates?.client_id ? (
+                        <Link to={`/clients/${bid.estimates.client_id}`}
+                              className="font-bold text-gray-900 hover:text-green-700 hover:underline">
+                          {bid.client_name}
+                        </Link>
+                      ) : (
+                        <p className="font-bold text-gray-900">{bid.client_name}</p>
+                      )}
                       {bid.estimates?.estimate_name && <p className="text-xs text-gray-500">{bid.estimates.estimate_name}</p>}
                       {bid.job_address && <p className="text-xs text-gray-400 truncate max-w-[180px]">{bid.job_address}</p>}
                       {bid.salesperson && <p className="text-xs text-gray-400">👤 {bid.salesperson}</p>}
@@ -771,6 +784,143 @@ export default function Bids() {
         />
       )}
       </>}
+    </div>
+  )
+}
+
+// ── FinanceSettingsCard ──────────────────────────────────────────────────────
+// Edits the company-wide Finance OAC markup (company_settings.finance_oac_rate).
+// Stored as a fractional rate (0.10 = 10%) but edited in the UI as a percent
+// for readability. Used by generateBidDoc → buildJobTotals to compute the
+// "Job Total $X - Finance OAC Price" line shown on the bid PDF / docx.
+function FinanceSettingsCard() {
+  const [pct,     setPct]     = useState('')      // user-facing percent string, e.g. "10"
+  const [loading, setLoading] = useState(true)
+  const [saving,  setSaving]  = useState(false)
+  const [msg,     setMsg]     = useState('')      // "ok:..." or "error:..."
+  const [original, setOriginal] = useState('')
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      setLoading(true)
+      try {
+        const { data } = await supabase
+          .from('company_settings').select('finance_oac_rate').maybeSingle()
+        if (!alive) return
+        const rate = parseFloat(data?.finance_oac_rate)
+        const display = Number.isFinite(rate) ? String(+(rate * 100).toFixed(4)) : '10'
+        setPct(display)
+        setOriginal(display)
+      } catch {
+        if (alive) { setPct('10'); setOriginal('10') }
+      }
+      if (alive) setLoading(false)
+    })()
+    return () => { alive = false }
+  }, [])
+
+  async function save() {
+    const n = parseFloat(pct)
+    if (!Number.isFinite(n) || n < 0 || n > 100) {
+      setMsg('error:Enter a percent between 0 and 100.')
+      return
+    }
+    setSaving(true); setMsg('')
+    try {
+      // Single-row table (id=1). Fetch id defensively in case it ever isn't 1.
+      const { data: existing } = await supabase
+        .from('company_settings').select('id').maybeSingle()
+      const { error } = await supabase.from('company_settings').upsert(
+        { id: existing?.id || 1, finance_oac_rate: n / 100, updated_at: new Date().toISOString() },
+        { onConflict: 'id' }
+      )
+      if (error) {
+        setMsg('error:' + error.message)
+      } else {
+        setOriginal(pct)
+        setMsg('ok:Finance OAC rate saved.')
+        setTimeout(() => setMsg(''), 4000)
+      }
+    } catch (err) {
+      setMsg('error:' + (err?.message || 'Save failed.'))
+    }
+    setSaving(false)
+  }
+
+  const dirty = pct !== original
+
+  return (
+    <div className="max-w-2xl">
+      <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <h2 className="text-base font-semibold text-gray-800 mb-1 flex items-center gap-2">
+          <span>💰</span> Finance OAC Markup
+        </h2>
+        <p className="text-sm text-gray-500 mb-5">
+          Sets the percentage added to the cash price for the <em>"Job Total $X - Finance OAC Price"</em> line on every bid document. The Sauer template default is 10%.
+        </p>
+
+        {loading ? (
+          <div className="py-8 text-center text-gray-400 text-sm">Loading…</div>
+        ) : (
+          <>
+            <div className="flex items-end gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">
+                  Markup %
+                </label>
+                <div className="flex items-center">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    value={pct}
+                    onChange={e => { setPct(e.target.value); if (msg) setMsg('') }}
+                    className="w-32 text-sm border border-gray-300 rounded-l-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <span className="inline-flex items-center px-3 py-2 text-sm text-gray-600 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg">%</span>
+                </div>
+              </div>
+              <button
+                onClick={save}
+                disabled={!dirty || saving}
+                className="text-sm font-semibold text-white bg-green-700 hover:bg-green-800 disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2 rounded-lg transition-colors"
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+              {msg && (
+                <span className={`text-xs px-2 py-1 rounded ${
+                  msg.startsWith('ok:')
+                    ? 'text-green-800 bg-green-50 border border-green-200'
+                    : 'text-red-700 bg-red-50 border border-red-200'
+                }`}>
+                  {msg.slice(msg.indexOf(':') + 1)}
+                </span>
+              )}
+            </div>
+
+            {/* Live preview */}
+            {(() => {
+              const n = parseFloat(pct)
+              if (!Number.isFinite(n) || n < 0) return null
+              const example = 33915  // matches the Sauer template example for clarity
+              const finance = Math.round(example * (1 + n / 100))
+              return (
+                <div className="mt-5 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                  <p className="text-[10px] uppercase tracking-wide font-semibold text-gray-500 mb-2">Example</p>
+                  <p className="text-sm text-gray-700">
+                    Cash/Check price <span className="font-semibold">${example.toLocaleString()}</span> &nbsp;→&nbsp;
+                    Finance OAC price <span className="font-semibold text-green-800">${finance.toLocaleString()}</span>
+                    <span className="text-xs text-gray-500 ml-1">({n}% markup)</span>
+                  </p>
+                </div>
+              )
+            })()}
+          </>
+        )}
+      </div>
     </div>
   )
 }
