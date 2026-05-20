@@ -114,10 +114,8 @@ export default function RateEditPopover({
   }, [open])
 
   async function save() {
-    console.log('[RateEditPopover] save() ENTERED', { table, name, category, draft, mode })
     const v = parseFloat(draft)
     if (!Number.isFinite(v) || v < 0) {
-      console.log('[RateEditPopover] validation failed — draft is not a valid number ≥ 0')
       setError('Enter a number ≥ 0'); return
     }
     setSaving(true)
@@ -145,7 +143,6 @@ export default function RateEditPopover({
         let upQ = supabase.from(table).update({ [field]: v }).eq(nameCol, name)
         if (category) upQ = upQ.eq('category', category)
         const { data: upRows, error: upErr } = await upQ.select()
-        console.log('[RateEditPopover] in-cat UPDATE →', { rowsTargeted: inCat.length, returned: upRows?.length, upErr })
         if (upErr) throw new Error('Save failed: ' + upErr.message)
         if (!upRows || upRows.length === 0) {
           throw new Error('Save returned 0 rows — RLS likely blocked the write. Check Supabase Auth + your user role.')
@@ -163,7 +160,6 @@ export default function RateEditPopover({
           if (category) update.category = category
           const { data: reRows, error: reErr } = await supabase.from(table)
             .update(update).eq('id', anyRow[0].id).select()
-          console.log('[RateEditPopover] wrong-cat UPDATE+reassign →', { id: anyRow[0].id, oldCategory: anyRow[0].category, newCategory: category, returned: reRows?.length, reErr })
           if (reErr) throw new Error('Save failed: ' + reErr.message)
           if (!reRows || reRows.length === 0) {
             throw new Error('Save returned 0 rows — RLS likely blocked the write.')
@@ -174,7 +170,6 @@ export default function RateEditPopover({
           if (category)                          insertRow.category = category
           else if (table === 'labor_rates')      insertRow.category = 'General'
           const { data: insRows, error: insErr } = await supabase.from(table).insert(insertRow).select()
-          console.log('[RateEditPopover] INSERT →', { insertRow, returned: insRows?.length, insErr })
           if (insErr) throw new Error('Save failed: ' + insErr.message)
           if (!insRows || insRows.length === 0) {
             throw new Error('Insert returned 0 rows — RLS likely blocked the write.')
@@ -197,7 +192,8 @@ export default function RateEditPopover({
     if (onSaved) {
       try { await onSaved() } catch { /* non-fatal */ }
     }
-    setTimeout(() => setOpen(false), 1500)
+    // Stay open with the confirmation banner visible until the user closes
+    // the popover manually (Cancel button, X, Escape, or backdrop click).
   }
 
   // Global toggle — when "Access/Edit Rates" is OFF, render nothing.
@@ -285,7 +281,7 @@ export default function RateEditPopover({
                 onClick={() => setOpen(false)}
                 className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50"
               >
-                Cancel
+                {saveMsg ? 'Close' : 'Cancel'}
               </button>
               <button
                 type="button"
@@ -295,16 +291,13 @@ export default function RateEditPopover({
                   // event we still get the save. The `saving` ref guards
                   // against double-fire from the cascading handlers.
                   e.preventDefault()
-                  console.log('[RateEditPopover] Save button MOUSEDOWN', { table, name, draft, saving, loaded })
                   if (!saving && loaded) save()
                 }}
                 onPointerDown={e => {
                   e.preventDefault()
-                  console.log('[RateEditPopover] Save button POINTERDOWN', { table, name, draft, saving, loaded })
                   if (!saving && loaded) save()
                 }}
                 onClick={() => {
-                  console.log('[RateEditPopover] Save button CLICKED', { table, name, draft, saving, loaded })
                   if (!saving && loaded) save()
                 }}
                 disabled={saving || !loaded}
