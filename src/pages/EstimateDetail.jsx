@@ -1420,16 +1420,17 @@ export default function EstimateDetail() {
             <div className={`relative bg-white rounded-2xl shadow-xl w-full mx-4 flex flex-col ${selectedType === 'Pavers' || selectedType === 'Pool' ? 'max-w-6xl' : 'max-w-5xl'}`}
                  style={{ maxHeight: '90vh' }}>
               <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-gray-200">
-                <div>
+                <div className="flex-1">
                   <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-0.5">
                     {editingModule ? 'Edit Module' : 'Add Module'}
                   </p>
-                  {/* Module name + Edit Rates toggle on the same row. The
-                      toggle is permission-gated (clients_access_edit_rates)
-                      and only ever appears in the module-detail modal, never
-                      on the estimate/project totals bars. */}
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-xl font-bold text-gray-900">{selectedType}</h2>
+                  <h2 className="text-xl font-bold text-gray-900">{selectedType}</h2>
+                  {/* Project-name row: project name on the left, Edit Rates
+                      toggle on the right so it sits directly above the
+                      "Total Price" cell of the GPMD bar (which is right-most
+                      in the dark bar). Permission-gated and module-only. */}
+                  <div className="flex items-center justify-between gap-3 mt-0.5">
+                    <p className="text-sm text-gray-500">{selectedProject?.project_name}</p>
                     {canAccessRates && (
                       <button
                         type="button"
@@ -1462,7 +1463,6 @@ export default function EstimateDetail() {
                       </button>
                     )}
                   </div>
-                  <p className="text-sm text-gray-500 mt-0.5">{selectedProject?.project_name}</p>
                 </div>
                 <button onClick={closeModuleFlow} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
               </div>

@@ -43,7 +43,11 @@ export default function GpmdBar({
   const [editingSubPct,  setEditingSubPct]  = useState(false)
   const [draftSubPct,    setDraftSubPct]    = useState('')
 
-  if (price <= 0) return null
+  // Previously: `if (price <= 0) return null` — but the module-level
+  // sticky wrapper has its own padding, so returning null left a thin
+  // empty dark strip on initial load before any quantities were entered.
+  // Now we always render with $0 placeholders so the bar's layout is
+  // stable from the moment the module opens.
 
   // ── Core calculations ──────────────────────────────────────────────────────
   const effectiveGp    = directGp != null ? directGp : manDays * gpmd
