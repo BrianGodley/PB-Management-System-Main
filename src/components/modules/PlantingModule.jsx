@@ -464,6 +464,13 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
             <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
           </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1" title="Average Distance from Truck to Work Area">Truck → Work Area (Avg LF)</label>
+          <NumInput value={distanceLF} onChange={setDistanceLF} placeholder="0" />
+          {calc.walkHrs > 0 && (
+            <p className="text-[10px] text-gray-500 mt-0.5">+{calc.walkHrs.toFixed(2)} hrs walk-access</p>
+          )}
+        </div>
         </div>
       </div>
 

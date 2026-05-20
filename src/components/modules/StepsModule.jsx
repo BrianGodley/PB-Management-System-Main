@@ -339,6 +339,18 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
         </div>
       </div>
 
+      {/* Truck → Work Area (walk-access penalty input) */}
+      <div className="flex items-center gap-3">
+        <label className="text-sm font-medium text-gray-700 whitespace-nowrap" title="Average Distance from Truck to Work Area">Truck → Work Area</label>
+        <div className="relative w-32">
+          <NumInput value={state.distanceLF} onChange={v => setState(p => ({ ...p, distanceLF: v }))} placeholder="0" />
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">Avg LF</span>
+        </div>
+        {calc.walkHrs > 0 && (
+          <span className="text-xs text-gray-500">+{calc.walkHrs.toFixed(2)} hrs walk-access</span>
+        )}
+      </div>
+
       {/* ── Paver Steps ── */}
       <div>
         <SectionHeader

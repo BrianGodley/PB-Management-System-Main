@@ -663,16 +663,34 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
         />
       </div>
 
-      {/* Crew Type */}
-      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
-        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
-        <select value={state.crewType} onChange={e => upd('crewType', e.target.value)} className="input text-sm py-1 w-36">
-          <option value="Demo">Demo</option>
-          <option value="Landscape">Landscape</option>
-          <option value="Masonry">Masonry</option>
-          <option value="Paver">Paver</option>
-          <option value="Specialty">Specialty</option>
-        </select>
+      {/* Crew Type + Truck → Work Area (walk-access penalty) */}
+      <div className="flex items-center gap-6 flex-wrap bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
+          <select value={state.crewType} onChange={e => upd('crewType', e.target.value)} className="input text-sm py-1 w-36">
+            <option value="Demo">Demo</option>
+            <option value="Landscape">Landscape</option>
+            <option value="Masonry">Masonry</option>
+            <option value="Paver">Paver</option>
+            <option value="Specialty">Specialty</option>
+          </select>
+        </div>
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-medium text-gray-700 whitespace-nowrap" title="Average Distance from Truck to Work Area">
+            Truck → Work Area
+          </label>
+          <input
+            type="number" step="5"
+            value={state.distanceLF}
+            onChange={e => upd('distanceLF', e.target.value)}
+            placeholder="0"
+            className="input text-sm py-1 w-24"
+          />
+          <span className="text-xs text-gray-400">Avg LF</span>
+          {calc.walkHrs > 0 && (
+            <span className="text-xs text-gray-500">+{calc.walkHrs.toFixed(2)} hrs walk-access</span>
+          )}
+        </div>
       </div>
 
       {/* ─── 1. Structure Dimensions ─── */}

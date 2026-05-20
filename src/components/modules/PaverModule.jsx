@@ -568,6 +568,13 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           <p className="text-xs text-gray-400 mt-0.5">Adds % to install hrs</p>
         </div>
         <div>
+          <p className="text-xs text-gray-500 mb-0.5" title="Average Distance from Truck to Work Area">Truck → Work Area (Avg LF)</p>
+          <Inp value={state.distanceLF} onChange={e => set('distanceLF', e.target.value)} step="5" />
+          {calc.walkHrs > 0 && (
+            <p className="text-[10px] text-gray-500 mt-0.5">+{calc.walkHrs.toFixed(2)} hrs walk-access</p>
+          )}
+        </div>
+        <div>
           <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
           <Inp value={state.hoursAdj} onChange={e => set('hoursAdj', e.target.value)} step="0.5" />
         </div>
