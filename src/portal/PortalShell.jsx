@@ -96,36 +96,126 @@ function ClientInfoView({ client, jobs }) {
   )
 }
 
-// ── Schedule ─────────────────────────────────────────────────────────────────
+// ── Schedule (read-only month calendar board) ────────────────────────────────
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+function dayKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+    d.getDate()
+  ).padStart(2, '0')}`
+}
+function parseDay(v) {
+  if (!v) return null
+  const d = new Date(v)
+  return isNaN(d.getTime()) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate())
+}
+
 function ScheduleView() {
   const [rows, setRows] = useState(null)
+  const [month, setMonth] = useState(() => {
+    const n = new Date()
+    return new Date(n.getFullYear(), n.getMonth(), 1)
+  })
   useEffect(() => {
     supabase.rpc('portal_schedule').then(({ data }) => setRows(data || []))
   }, [])
   if (rows === null) return <Loading />
-  if (rows.length === 0) return <Empty label="No schedule items yet." />
+
+  // 6-week (42-day) grid covering the displayed month.
+  const first = new Date(month.getFullYear(), month.getMonth(), 1)
+  const gridStart = new Date(first)
+  gridStart.setDate(1 - first.getDay())
+  const days = []
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(gridStart)
+    d.setDate(gridStart.getDate() + i)
+    days.push(d)
+  }
+
+  // Index schedule items onto every day their start..end range covers.
+  const itemsByDay = {}
+  for (const s of rows) {
+    const start = parseDay(pick(s, 'start_date'))
+    if (!start) continue
+    const end = parseDay(pick(s, 'end_date')) || start
+    const cur = new Date(start)
+    let guard = 0
+    while (cur <= end && guard < 400) {
+      const k = dayKey(cur)
+      ;(itemsByDay[k] = itemsByDay[k] || []).push(s)
+      cur.setDate(cur.getDate() + 1)
+      guard++
+    }
+  }
+
+  const monthLabel = month.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  const shift = n => setMonth(new Date(month.getFullYear(), month.getMonth() + n, 1))
+  const todayKey = dayKey(new Date())
+
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-      <table className="w-full text-sm">
-        <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-          <tr>
-            <th className="px-4 py-2.5">Item</th>
-            <th className="px-4 py-2.5">Start</th>
-            <th className="px-4 py-2.5">End</th>
-            <th className="px-4 py-2.5">Crew</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {rows.map(s => (
-            <tr key={s.id}>
-              <td className="px-4 py-2.5 text-gray-800">{pick(s, 'title', 'name') || '—'}</td>
-              <td className="px-4 py-2.5 text-gray-600">{dateStr(pick(s, 'start_date'))}</td>
-              <td className="px-4 py-2.5 text-gray-600">{dateStr(pick(s, 'end_date'))}</td>
-              <td className="px-4 py-2.5 text-gray-600">{pick(s, 'crew_type', 'crew_id') || '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="rounded-xl border border-gray-200 bg-white p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <button
+          onClick={() => shift(-1)}
+          className="rounded-lg px-3 py-1 text-lg text-gray-500 hover:bg-gray-100"
+        >
+          ‹
+        </button>
+        <p className="text-sm font-semibold text-gray-800">{monthLabel}</p>
+        <button
+          onClick={() => shift(1)}
+          className="rounded-lg px-3 py-1 text-lg text-gray-500 hover:bg-gray-100"
+        >
+          ›
+        </button>
+      </div>
+      <div className="grid grid-cols-7 gap-px overflow-hidden rounded-lg bg-gray-200">
+        {WEEKDAYS.map(w => (
+          <div key={w} className="bg-gray-50 py-1.5 text-center text-xs font-semibold text-gray-500">
+            {w}
+          </div>
+        ))}
+        {days.map(d => {
+          const k = dayKey(d)
+          const inMonth = d.getMonth() === month.getMonth()
+          const items = itemsByDay[k] || []
+          return (
+            <div
+              key={k}
+              className={`min-h-[78px] p-1 ${inMonth ? 'bg-white' : 'bg-gray-50'}`}
+            >
+              <div
+                className={`text-xs ${
+                  k === todayKey
+                    ? 'font-bold text-green-700'
+                    : inMonth
+                      ? 'text-gray-500'
+                      : 'text-gray-300'
+                }`}
+              >
+                {d.getDate()}
+              </div>
+              <div className="mt-0.5 space-y-0.5">
+                {items.slice(0, 3).map((s, i) => (
+                  <div
+                    key={i}
+                    title={pick(s, 'title', 'name') || ''}
+                    className="truncate rounded bg-green-100 px-1 py-0.5 text-[10px] text-green-800"
+                  >
+                    {pick(s, 'title', 'name') || 'Scheduled'}
+                  </div>
+                ))}
+                {items.length > 3 && (
+                  <div className="text-[10px] text-gray-400">+{items.length - 3} more</div>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      {rows.length === 0 && (
+        <p className="mt-3 text-center text-xs text-gray-400">No schedule items yet.</p>
+      )}
     </div>
   )
 }
