@@ -614,6 +614,30 @@ export default function EstimateDetail() {
 
   // ── Create Bid ────────────────────────────────────────────────────────────
   const [creatingBid, setCreatingBid] = useState(false)
+  // Date (YYYY-MM-DD) of the most recent bid created from this estimate, or
+  // null if no bids exist yet. Shown as small black text under the Create
+  // Bid button so the user knows whether they're about to make a duplicate.
+  const [lastBidDate, setLastBidDate] = useState(null)
+  // After a successful create, we open a confirmation modal pointing the
+  // user to the Bids table (so they don't lose track of where the new bid
+  // landed). null = closed; { bidId, recordType } = open.
+  const [bidCreatedModal, setBidCreatedModal] = useState(null)
+
+  // Fetch the most-recent bid date for this estimate (refreshed after each
+  // create so the "Last bid" line updates immediately).
+  async function refreshLastBidDate() {
+    if (!id) return
+    const { data } = await supabase
+      .from('bids')
+      .select('date_submitted')
+      .eq('estimate_id', id)
+      .eq('record_type', 'bid')
+      .order('date_submitted', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    setLastBidDate(data?.date_submitted || null)
+  }
+  useEffect(() => { refreshLastBidDate() }, [id])
 
   async function createBid() {
     if (!projects.length) {
@@ -703,6 +727,15 @@ export default function EstimateDetail() {
       // No auto-download — the user typically needs to edit the bid in
       // the Bids module before sending. The Word doc can be generated
       // from there once the bid is finalised.
+
+      // Confirmation modal: tell the user it saved + point them at the
+      // Bids table so they can find it. CO mode keeps the existing
+      // navigate-back behavior (Jobs → Change Orders flow), so we skip
+      // the modal there to avoid disrupting that workflow.
+      if (!isCOMode) {
+        setBidCreatedModal({ bidId: bid.id, clientName: bid.client_name })
+        refreshLastBidDate()
+      }
 
       // Navigate back if a return path was provided (e.g., back to Jobs > Change Orders)
       if (isCOMode && returnTo) {
@@ -854,6 +887,40 @@ export default function EstimateDetail() {
       )}
 
       {/* ── Estimate Delete Cascade Modal ── */}
+      {/* Bid-created confirmation modal — opens after a successful bid
+          create. User can close it or click through to /bids. */}
+      {bidCreatedModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+             onClick={() => setBidCreatedModal(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-gray-200 overflow-hidden"
+               onClick={e => e.stopPropagation()}>
+            <div className="px-5 pt-5 pb-3">
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-2xl">✅</span>
+                <h3 className="text-lg font-semibold text-gray-900">Bid created</h3>
+              </div>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                A new bid for <strong className="text-gray-900">{bidCreatedModal.clientName || estimate?.client_name || 'this opportunity'}</strong> has been saved.
+                You can find it in the <strong>Bids</strong> table (look for today's date).
+              </p>
+            </div>
+            <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-end gap-2 bg-gray-50">
+              <button
+                onClick={() => setBidCreatedModal(null)}
+                className="text-xs font-semibold text-gray-600 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-white">
+                Close
+              </button>
+              <Link
+                to="/bids"
+                onClick={() => setBidCreatedModal(null)}
+                className="text-xs font-semibold text-white bg-green-700 hover:bg-green-800 px-3 py-1.5 rounded-lg transition-colors">
+                Go to Bids →
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
       {estDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
@@ -1009,19 +1076,29 @@ export default function EstimateDetail() {
             </button>
           )}
           {/* Create Bid / Change Order */}
-          <button
-            onClick={createBid}
-            disabled={creatingBid}
-            className={`text-sm px-4 py-2 rounded-lg font-semibold transition-colors disabled:opacity-50 ${
-              isCOMode
-                ? 'border border-blue-700 text-blue-700 hover:bg-blue-50'
-                : 'border border-green-700 text-green-700 hover:bg-green-50'
-            }`}
-          >
-            {creatingBid
-              ? '⏳ Generating...'
-              : isCOMode ? '📋 Create Change Order' : '📄 Create Bid'}
-          </button>
+          <div className="flex flex-col items-stretch">
+            <button
+              onClick={createBid}
+              disabled={creatingBid}
+              className={`text-sm px-4 py-2 rounded-lg font-semibold transition-colors disabled:opacity-50 ${
+                isCOMode
+                  ? 'border border-blue-700 text-blue-700 hover:bg-blue-50'
+                  : 'border border-green-700 text-green-700 hover:bg-green-50'
+              }`}
+            >
+              {creatingBid
+                ? '⏳ Generating...'
+                : isCOMode ? '📋 Create Change Order' : '📄 Create Bid'}
+            </button>
+            {/* Show the most-recent bid date so the user can tell if a
+                fresh bid would be a duplicate. Hidden in CO mode (the
+                date isn't relevant to change orders). */}
+            {!isCOMode && lastBidDate && (
+              <p className="text-[11px] text-black text-center mt-1">
+                Last bid: {new Date(lastBidDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })}
+              </p>
+            )}
+          </div>
 
           <button
             onClick={deleteEstimate}
