@@ -541,8 +541,8 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
 
   useEffect(() => {
     if (!initialData?.laborRatePerHour) {
-      supabase.from('company_settings').select('value').eq('key', 'labor_rate_per_hour').single()
-        .then(({ data }) => { if (data) setLaborRatePerHour(parseFloat(data.value) || DEFAULTS.laborRatePerHour) })
+      supabase.from('company_settings').select('labor_rate_per_hour').single()
+        .then(({ data }) => { if (data) setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour) })
     }
     if (initialData?.materialPrices) { setPricesLoading(false); return }
     refreshAllRates().then(() => setPricesLoading(false))

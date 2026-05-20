@@ -245,8 +245,8 @@ export default function FirePitModule({ projectName, onSave, onBack, saving, ini
 
   useEffect(() => {
     if (!initialData?.laborRatePerHour) {
-      supabase.from('company_settings').select('value').eq('key', 'labor_rate_per_hour').single()
-        .then(({ data }) => { if (data) setLaborRatePerHour(parseFloat(data.value) || DEFAULTS.laborRatePerHour) })
+      supabase.from('company_settings').select('labor_rate_per_hour').single()
+        .then(({ data }) => { if (data) setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour) })
     }
     if (initialData?.materialPrices) return
     refreshAllRates().then(() => setPricesLoading(false))

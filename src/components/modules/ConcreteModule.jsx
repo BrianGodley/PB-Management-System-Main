@@ -293,7 +293,7 @@ export default function ConcreteModule({ projectName, onSave, onBack, saving, in
   // Fetch company labor rate per hour
   useEffect(() => {
     if (initialData?.laborRatePerHour) return
-    supabase.from('company_settings').select('value').eq('key', 'labor_rate_per_hour').single()
+    supabase.from('company_settings').select('labor_rate_per_hour').single()
       .then(({ data }) => { if (data) setLaborRatePerHour(parseFloat(data.value) || 35) })
   }, [])
 

@@ -170,8 +170,8 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
   useEffect(() => {
     // Fetch labor rate (skip if editing with a saved rate)
     if (!initialData?.laborRatePerHour) {
-      supabase.from('company_settings').select('value').eq('key', 'labor_rate_per_hour').single()
-        .then(({ data }) => { if (data) setLaborRatePerHour(parseFloat(data.value) || DEFAULTS.laborRatePerHour) })
+      supabase.from('company_settings').select('labor_rate_per_hour').single()
+        .then(({ data }) => { if (data) setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour) })
     }
     refreshAllRates()
   }, [refreshAllRates])

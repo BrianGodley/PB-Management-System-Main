@@ -292,8 +292,7 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
     if (!initialData?.laborRatePerHour) {
       supabase
         .from('company_settings')
-        .select('value')
-        .eq('key', 'labor_rate_per_hour')
+        .select('labor_rate_per_hour')
         .single()
         .then(({ data }) => {
           if (data) setLaborRatePerHour(parseFloat(data.value) || WORKER_DEFAULTS.laborRatePerHour)
