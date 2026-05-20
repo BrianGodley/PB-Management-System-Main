@@ -655,13 +655,16 @@ const log_feature_request_run: ToolExecutor = async (args, ctx) => {
   }).select('id').single()
   if (error) throw new Error('Could not save request: ' + error.message)
 
-  // Look up reporter name for the email
+  // Look up reporter profile — name for the admin notification's prose,
+  // email for the reporter's own confirmation email below.
   let reporter = 'a user'
+  let reporterEmail: string | null = null
   try {
     const { data: prof } = await sb.from('profiles')
       .select('full_name, email').eq('id', ctx.userId).maybeSingle()
     if (prof?.full_name) reporter = prof.full_name
     else if (prof?.email) reporter = prof.email
+    reporterEmail = (prof?.email as string) || null
   } catch { /* non-fatal */ }
 
   // Fire-and-forget email notification to Brian. Don't block the user reply if it fails.
