@@ -299,10 +299,20 @@ serve(async (req: Request) => {
     ])
     history.push({ role: 'user', content: message })
 
+    // Origin of the browser making the chat request — preferred Origin
+    // header, falling back to extracting host from Referer. Used by tools
+    // (e.g. log_feature_request) to build absolute URLs in emails.
+    let appOrigin = req.headers.get('origin') || ''
+    if (!appOrigin) {
+      const ref = req.headers.get('referer') || ''
+      try { appOrigin = ref ? new URL(ref).origin : '' } catch { appOrigin = '' }
+    }
+
     const result = await runAgenticLoop(admin, conversationId, history, {
       userJwt: jwt,
       userId,
       conversationId,
+      appOrigin,
     })
 
     await admin

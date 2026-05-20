@@ -14,6 +14,7 @@ export type ToolContext = {
   userJwt:         string
   userId:          string
   conversationId?: string  // current conversation, used by log_feature_request to link the request back to the chat
+  appOrigin?:      string  // browser origin that made the request (e.g. "https://pbs.picturebuild.com"), used to build absolute URLs in emails
 }
 
 export type ToolDefinition = {
@@ -702,9 +703,13 @@ const log_feature_request_run: ToolExecutor = async (args, ctx) => {
       const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
       const escapeHtml = (s: string) => s.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]!))
       const brandColor = '#3A5038'
-      // Help-page button URL. Reads APP_URL env var; if unset, the
-      // button is omitted (avoids shipping a broken link).
-      const appUrl  = (Deno.env.get('APP_URL') || '').replace(/\/$/, '')
+      // Help-page button URL. Priority:
+      //   1. ctx.appOrigin — the actual browser origin that initiated the
+      //      chat request (sent automatically as the Origin/Referer header).
+      //   2. APP_URL env var — manual override for cases where Origin isn't
+      //      reliable (e.g. mobile clients without a Referer policy).
+      //   3. Empty → button is omitted so we never ship a broken link.
+      const appUrl  = (ctx.appOrigin || Deno.env.get('APP_URL') || '').replace(/\/$/, '')
       const helpUrl = appUrl ? `${appUrl}/help` : ''
       // Category pill colors (mirror the BUCKET_BADGE_STYLE swatches in Help.jsx).
       const badge = (() => {
