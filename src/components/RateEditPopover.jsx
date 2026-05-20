@@ -77,7 +77,11 @@ export default function RateEditPopover({
     setLoaded(false)
     setError('')
     let q = supabase.from(table).select(`${field}, id`).eq(nameCol, name)
-    if (table === 'material_rates' && category) q = q.eq('category', category)
+    // Filter by category on every table that has one (material_rates,
+    // labor_rates, subcontractor_rates). The previous code only did this
+    // for material_rates, so a labor_rates save could update a same-named
+    // row in a DIFFERENT category and the module's refresh would miss it.
+    if (category) q = q.eq('category', category)
     q.limit(1).then(({ data, error: fetchErr }) => {
       if (fetchErr) { setError(fetchErr.message); setLoaded(true); return }
       if (data && data.length > 0) {
@@ -110,7 +114,10 @@ export default function RateEditPopover({
     setError('')
     // Try to find an existing row by name (+ category for material_rates).
     let query = supabase.from(table).select('id').eq(nameCol, name)
-    if (table === 'material_rates' && category) query = query.eq('category', category)
+    // Same category-scoped lookup as the open-fetch above. Without this,
+    // the UPDATE may target a row in a different category and the module
+    // never sees the new value on refresh.
+    if (category) query = query.eq('category', category)
     const { data: matches } = await query.limit(1)
     if (matches && matches.length > 0) {
       const { error: upErr } = await supabase.from(table)
@@ -118,8 +125,11 @@ export default function RateEditPopover({
       if (upErr) { setError(upErr.message); setSaving(false); return }
     } else {
       const insertRow = { [nameCol]: name, [field]: v }
-      if (table === 'material_rates' && category) insertRow.category = category
-      if (table === 'labor_rates')                 insertRow.category = category || 'General'
+      // Tag every new rate row with the caller's category (defaulting to
+      // 'General' when omitted) so module refreshes that filter by
+      // category can find the row they just helped create.
+      if (category)                          insertRow.category = category
+      else if (table === 'labor_rates')      insertRow.category = 'General'
       const { error: insErr } = await supabase.from(table).insert(insertRow)
       if (insErr) { setError(insErr.message); setSaving(false); return }
     }
