@@ -184,7 +184,6 @@ const newManualRow = () => ({ label: '', hours: '', materials: '', subCost: '' }
 
 function makeInitial(data = {}) {
   return {
-    walkHrs,
     pool:   data.pool   ?? defaultStruct(true),
     spa:    data.spa    ?? defaultStruct(),
     basin:  data.basin  ?? defaultStruct(),
@@ -397,6 +396,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
 
   return {
     totalHrs, manDays, totalMat, laborCost, burden, subCost, gp, commission, price,
+    walkHrs,
     totalExcavCY, totalShotCY,
     excavHrs, tileHrs, spillwayHrs, copingHrs, raisedHrs,
     excavSub, shotcreteSub, interiorSub, equipmentSub, plumbSub, steelSub,
