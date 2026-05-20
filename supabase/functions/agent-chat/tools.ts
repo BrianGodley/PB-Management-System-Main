@@ -681,6 +681,93 @@ const log_feature_request_run: ToolExecutor = async (args, ctx) => {
     console.warn('feature_request email notify failed:', e)
   }
 
+  // Reporter confirmation email — acknowledges receipt and restates the
+  // ticket so the originator can verify Sam captured it correctly. Branded
+  // template mirrors the look of sendFeedbackStatusEmail in lib/notify.js
+  // for consistency. Failures are swallowed so they never block the chat.
+  if (reporterEmail) {
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+      const esc = (s: string) => s.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]!))
+      const niceCategory = ({
+        feature: 'Feature Request',
+        bug: 'Bug Report',
+        enhancement: 'Enhancement',
+        other: 'Request',
+      } as Record<string, string>)[category] || 'Request'
+      const cb = ({
+        feature: { bg: '#eff6ff', border: '#bfdbfe', text: '#1e40af' },
+        bug:     { bg: '#fef2f2', border: '#fecaca', text: '#991b1b' },
+        enhancement: { bg: '#faf5ff', border: '#e9d5ff', text: '#6b21a8' },
+        other:   { bg: '#f3f4f6', border: '#d1d5db', text: '#374151' },
+      } as Record<string, {bg:string;border:string;text:string}>)[category]
+      const ackHtml = `
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <tr>
+          <td style="background:#3A5038;padding:28px 32px;text-align:center;">
+            <span style="font-size:28px;">🌿</span>
+            <p style="margin:8px 0 0;color:#ffffff;font-size:18px;font-weight:700;letter-spacing:-0.3px;">
+              Picture Build System
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px;">
+            <h1 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#111827;">
+              We got your ${niceCategory.toLowerCase()}!
+            </h1>
+            <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+              Thanks ${esc(reporter)} — Sam logged your request and the team has been notified. Here's what we captured so you can confirm it's right:
+            </p>
+            <div style="display:inline-block;background:${cb.bg};border:1px solid ${cb.border};color:${cb.text};padding:4px 12px;border-radius:999px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;">
+              ${esc(niceCategory)}
+            </div>
+            <p style="color:#111827;font-size:16px;font-weight:600;margin:0 0 12px;">
+              ${esc(title)}
+            </p>
+            <p style="color:#374151;font-size:14px;line-height:1.6;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px;white-space:pre-wrap;margin:0 0 20px;">
+              ${esc(body)}
+            </p>
+            <p style="color:#6b7280;font-size:13px;line-height:1.6;margin:0 0 4px;">
+              You'll get another email when the team moves this to <strong>In Progress</strong> or <strong>Completed</strong>. You can also track it any time under <strong>Help &amp; Support → Support Tickets</strong>.
+            </p>
+            <p style="color:#9ca3af;font-size:11px;margin:20px 0 0;">
+              Reference: <code style="background:#f3f4f6;padding:2px 6px;border-radius:4px;">${esc(row.id)}</code>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 32px;border-top:1px solid #f3f4f6;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;">
+              Picture Build System<br>
+              You're receiving this because you submitted a request through Sam.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`.trim()
+      await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ctx.userJwt}` },
+        body: JSON.stringify({
+          to:      reporterEmail,
+          subject: `We got your ${niceCategory.toLowerCase()}: ${title}`,
+          html:    ackHtml,
+          text:    `Thanks ${reporter} — your ${niceCategory.toLowerCase()} has been logged.\n\nTitle: ${title}\n\nDetails:\n${body}\n\nYou'll get another email when the status changes. Reference: ${row.id}`,
+        }),
+      })
+    } catch (e) {
+      console.warn('feature_request reporter confirmation email failed:', e)
+    }
+  }
+
   return {
     saved:       true,
     request_id:  row.id,
