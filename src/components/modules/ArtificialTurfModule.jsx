@@ -464,6 +464,9 @@ export default function ArtificialTurfModule({ initialData, onSave, onCancel }) 
           <div>
             <p className="text-xs text-gray-500 mb-0.5" title="Average Distance from Truck to Work Area">Truck → Work Area (Average LF)</p>
             <Inp value={state.distanceLF} onChange={e => set('distanceLF', e.target.value)} step="1" />
+            {calc.walkHrs > 0 && (
+              <p className="text-[10px] text-gray-500 mt-0.5">+{calc.walkHrs.toFixed(2)} hrs walk-access</p>
+            )}
           </div>
         </div>
       </div>

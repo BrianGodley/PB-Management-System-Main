@@ -295,7 +295,10 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
       <div className="flex items-center gap-3">
         <label className="text-sm font-medium text-gray-700 whitespace-nowrap" title="Average Distance from Truck to Work Area">Truck → Work Area</label>
         <div className="relative w-32">
-          <NumInput value={distanceLF} onChange={setDistanceLF} placeholder="0" />
+          <input type="number" step="any" value={distanceLF}
+            onChange={e => setDistanceLF(e.target.value)}
+            placeholder="0"
+            className="input text-sm py-1.5 w-full pr-12" />
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">Avg LF</span>
         </div>
         {calc.walkHrs > 0 && (
