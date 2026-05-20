@@ -693,86 +693,120 @@ const log_feature_request_run: ToolExecutor = async (args, ctx) => {
     console.warn('feature_request email notify failed:', e)
   }
 
-  // Reporter confirmation email — acknowledges receipt and restates the
-  // ticket so the originator can verify Sam captured it correctly. Branded
-  // template mirrors the look of sendFeedbackStatusEmail in lib/notify.js
-  // for consistency. Failures are swallowed so they never block the chat.
+  // Reporter confirmation email — uses the SAME branded layout as the
+  // status-change email (sendFeedbackStatusEmail in src/lib/notify.js) so
+  // the reporter sees a consistent look for both the "we got it" and "it's
+  // done" messages. Failures are swallowed so they never block the chat.
   if (reporterEmail) {
     try {
       const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
-      const esc = (s: string) => s.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]!))
-      const niceCategory = ({
-        feature: 'Feature Request',
-        bug: 'Bug Report',
-        enhancement: 'Enhancement',
-        other: 'Request',
-      } as Record<string, string>)[category] || 'Request'
-      const cb = ({
-        feature: { bg: '#eff6ff', border: '#bfdbfe', text: '#1e40af' },
-        bug:     { bg: '#fef2f2', border: '#fecaca', text: '#991b1b' },
-        enhancement: { bg: '#faf5ff', border: '#e9d5ff', text: '#6b21a8' },
-        other:   { bg: '#f3f4f6', border: '#d1d5db', text: '#374151' },
-      } as Record<string, {bg:string;border:string;text:string}>)[category]
+      const escapeHtml = (s: string) => s.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]!))
+      const brandColor = '#3A5038'
+      // Help-page button URL. Reads APP_URL env var; if unset, the
+      // button is omitted (avoids shipping a broken link).
+      const appUrl  = (Deno.env.get('APP_URL') || '').replace(/\/$/, '')
+      const helpUrl = appUrl ? `${appUrl}/help` : ''
+      // Category pill colors (mirror the BUCKET_BADGE_STYLE swatches in Help.jsx).
+      const badge = (() => {
+        switch (category) {
+          case 'feature':     return { bg: '#eff6ff', border: '#bfdbfe', text: '#1e40af', label: 'Feature Request' }
+          case 'bug':         return { bg: '#fef2f2', border: '#fecaca', text: '#991b1b', label: 'Bug Report' }
+          case 'enhancement': return { bg: '#faf5ff', border: '#e9d5ff', text: '#6b21a8', label: 'Enhancement' }
+          default:            return { bg: '#f3f4f6', border: '#d1d5db', text: '#374151', label: 'Request' }
+        }
+      })()
+      const subject = `We got your ${badge.label.toLowerCase()}: ${title}`
+
+      // Body uses the exact same shape as the status-change email's body
+      // (intro prose → bold title → pill badge → gray notes box →
+      // closing prose), then baseTemplate wraps it with the green header,
+      // h1, optional button, and footer.
+      const innerBody = `
+    <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 12px;">
+      Thanks for the heads up — Sam logged the following and the team has been notified:
+    </p>
+    <p style="color:#111827;font-size:16px;font-weight:600;margin:0 0 16px;">
+      ${escapeHtml(title)}
+    </p>
+    <div style="display:inline-block;background:${badge.bg};border:1px solid ${badge.border};
+                color:${badge.text};padding:8px 20px;border-radius:8px;font-weight:700;font-size:15px;margin-bottom:16px;">
+      ${badge.label}
+    </div>
+    <p style="color:#6b7280;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;margin:20px 0 6px;">
+      What you sent us
+    </p>
+    <p style="color:#374151;font-size:14px;line-height:1.6;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px;white-space:pre-wrap;margin:0;">
+      ${escapeHtml(body)}
+    </p>
+    <p style="color:#6b7280;font-size:13px;margin:20px 0 0;">
+      You'll get another email when the team moves this to In Progress or Completed. You can see all your open and resolved requests in the Help section of PBS.
+    </p>`
+
+      // Mirror of baseTemplate() from src/lib/notify.js — kept inline here
+      // because Edge Functions can't import from src/.
       const ackHtml = `
 <!DOCTYPE html>
-<html><head><meta charset="utf-8"></head>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Request Received</title>
+</head>
 <body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:40px 20px;">
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+        <!-- Header -->
         <tr>
-          <td style="background:#3A5038;padding:28px 32px;text-align:center;">
+          <td style="background:${brandColor};padding:28px 32px;text-align:center;">
             <span style="font-size:28px;">🌿</span>
             <p style="margin:8px 0 0;color:#ffffff;font-size:18px;font-weight:700;letter-spacing:-0.3px;">
               Picture Build System
             </p>
           </td>
         </tr>
+
+        <!-- Body -->
         <tr>
           <td style="padding:32px;">
-            <h1 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#111827;">
-              We got your ${niceCategory.toLowerCase()}!
-            </h1>
-            <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
-              Thanks ${esc(reporter)} — Sam logged your request and the team has been notified. Here's what we captured so you can confirm it's right:
-            </p>
-            <div style="display:inline-block;background:${cb.bg};border:1px solid ${cb.border};color:${cb.text};padding:4px 12px;border-radius:999px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;">
-              ${esc(niceCategory)}
-            </div>
-            <p style="color:#111827;font-size:16px;font-weight:600;margin:0 0 12px;">
-              ${esc(title)}
-            </p>
-            <p style="color:#374151;font-size:14px;line-height:1.6;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px;white-space:pre-wrap;margin:0 0 20px;">
-              ${esc(body)}
-            </p>
-            <p style="color:#6b7280;font-size:13px;line-height:1.6;margin:0 0 4px;">
-              You'll get another email when the team moves this to <strong>In Progress</strong> or <strong>Completed</strong>. You can also track it any time under <strong>Help &amp; Support → Support Tickets</strong>.
-            </p>
-            <p style="color:#9ca3af;font-size:11px;margin:20px 0 0;">
-              Reference: <code style="background:#f3f4f6;padding:2px 6px;border-radius:4px;">${esc(row.id)}</code>
-            </p>
+            <h1 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#111827;">Request Received</h1>
+            ${innerBody}
+            ${helpUrl ? `
+            <div style="margin-top:28px;text-align:center;">
+              <a href="${helpUrl}"
+                 style="display:inline-block;background:${brandColor};color:#ffffff;text-decoration:none;
+                        padding:12px 28px;border-radius:10px;font-weight:700;font-size:15px;">
+                Open Help &amp; Support
+              </a>
+            </div>` : ''}
           </td>
         </tr>
+
+        <!-- Footer -->
         <tr>
           <td style="padding:20px 32px;border-top:1px solid #f3f4f6;text-align:center;">
             <p style="margin:0;font-size:12px;color:#9ca3af;">
               Picture Build System<br>
-              You're receiving this because you submitted a request through Sam.
+              You're receiving this because you have an account on this system.
             </p>
           </td>
         </tr>
+
       </table>
     </td></tr>
   </table>
-</body></html>`.trim()
+</body>
+</html>`.trim()
+
       await fetch(`${supabaseUrl}/functions/v1/send-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ctx.userJwt}` },
         body: JSON.stringify({
           to:      reporterEmail,
-          subject: `We got your ${niceCategory.toLowerCase()}: ${title}`,
+          subject,
           html:    ackHtml,
-          text:    `Thanks ${reporter} — your ${niceCategory.toLowerCase()} has been logged.\n\nTitle: ${title}\n\nDetails:\n${body}\n\nYou'll get another email when the status changes. Reference: ${row.id}`,
+          text:    `Thanks — your ${badge.label.toLowerCase()} has been logged.\n\nTitle: ${title}\n\nWhat you sent us:\n${body}\n\nYou'll get another email when the status changes. Reference: ${row.id}`,
         }),
       })
     } catch (e) {
@@ -780,7 +814,7 @@ const log_feature_request_run: ToolExecutor = async (args, ctx) => {
     }
   }
 
-  return {
+    return {
     saved:       true,
     request_id:  row.id,
     confirmation: `Logged as ${category} #${row.id.slice(0, 8)}. Brian was notified by email.`,
