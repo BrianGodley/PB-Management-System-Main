@@ -974,3 +974,128 @@ function colWidth(key) {
     default:             return 'auto'
   }
 }
+
+// ── EstimateGpmdCard ────────────────────────────────────────────────────────
+// Edits the company-wide default GPMD target used by the estimating module
+// (company_settings.estimate_gpmd_default). This is the BASE rate that
+// seeds every new module / project. Per-project overrides
+// (estimate_projects.gpmd_override) and What-If adjustments still take
+// precedence — they layer on top of this baseline.
+function EstimateGpmdCard() {
+  const [val,      setVal]      = useState('')
+  const [original, setOriginal] = useState('')
+  const [loading,  setLoading]  = useState(true)
+  const [saving,   setSaving]   = useState(false)
+  const [msg,      setMsg]      = useState('')   // "ok:..." or "error:..."
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      setLoading(true)
+      try {
+        const { data } = await supabase
+          .from('company_settings').select('estimate_gpmd_default').maybeSingle()
+        if (!alive) return
+        const n = parseFloat(data?.estimate_gpmd_default)
+        const display = Number.isFinite(n) && n > 0 ? String(n) : String(DEFAULT_ESTIMATE_GPMD)
+        setVal(display)
+        setOriginal(display)
+      } catch {
+        if (alive) {
+          setVal(String(DEFAULT_ESTIMATE_GPMD))
+          setOriginal(String(DEFAULT_ESTIMATE_GPMD))
+        }
+      }
+      if (alive) setLoading(false)
+    })()
+    return () => { alive = false }
+  }, [])
+
+  async function save() {
+    const n = parseFloat(val)
+    if (!Number.isFinite(n) || n <= 0) {
+      setMsg('error:Enter a positive number.')
+      return
+    }
+    setSaving(true); setMsg('')
+    try {
+      const { data: existing } = await supabase
+        .from('company_settings').select('id').maybeSingle()
+      const { error } = await supabase.from('company_settings').upsert(
+        { id: existing?.id || 1, estimate_gpmd_default: n, updated_at: new Date().toISOString() },
+        { onConflict: 'id' }
+      )
+      if (error) {
+        setMsg('error:' + error.message)
+      } else {
+        setOriginal(val)
+        setMsg('ok:Estimate GPMD saved. Newly opened estimates will use this baseline.')
+        setTimeout(() => setMsg(''), 5000)
+      }
+    } catch (err) {
+      setMsg('error:' + (err?.message || 'Save failed.'))
+    }
+    setSaving(false)
+  }
+
+  const dirty = val !== original
+
+  return (
+    <div className="max-w-2xl">
+      <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <h2 className="text-base font-semibold text-gray-800 mb-1 flex items-center gap-2">
+          <span>📊</span> Estimate GPMD (Global Baseline)
+        </h2>
+        <p className="text-sm text-gray-500 mb-5">
+          The target Gross Profit per Man-Day used as the starting point for every new estimate module. Per-project GPMD overrides and What-If adjustments still take precedence; this just sets the baseline before any user changes.
+        </p>
+
+        {loading ? (
+          <div className="py-8 text-center text-gray-400 text-sm">Loading…</div>
+        ) : (
+          <>
+            <div className="flex items-end gap-3 flex-wrap">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">
+                  Target GPMD
+                </label>
+                <div className="flex items-center">
+                  <span className="inline-flex items-center px-3 py-2 text-sm text-gray-600 bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg">$</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="1"
+                    min="1"
+                    value={val}
+                    onChange={e => { setVal(e.target.value); if (msg) setMsg('') }}
+                    className="w-32 text-sm border border-gray-300 rounded-r-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+              </div>
+              <button
+                onClick={save}
+                disabled={!dirty || saving}
+                className="text-sm font-semibold text-white bg-green-700 hover:bg-green-800 disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2 rounded-lg transition-colors"
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+              {msg && (
+                <span className={`text-xs px-2 py-1 rounded ${
+                  msg.startsWith('ok:')
+                    ? 'text-green-800 bg-green-50 border border-green-200'
+                    : 'text-red-700 bg-red-50 border border-red-200'
+                }`}>
+                  {msg.slice(msg.indexOf(':') + 1)}
+                </span>
+              )}
+            </div>
+
+            <div className="mt-5 p-4 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 leading-relaxed">
+              <strong>Heads up:</strong> changing this value only affects modules opened after the save. Existing modules keep whatever GPMD they were created with (stored on the module itself); to reprice them, edit the project's GPMD override or open the What If? modal.
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
