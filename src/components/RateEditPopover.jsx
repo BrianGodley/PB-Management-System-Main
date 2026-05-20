@@ -136,12 +136,15 @@ export default function RateEditPopover({
       if (selErr) throw new Error('Lookup failed: ' + selErr.message)
 
       if (inCat && inCat.length > 0) {
-        // ── 1a. UPDATE the in-category row. The trailing .select() makes
-        // Supabase return the affected rows so we can detect the silent
-        // zero-row case (e.g. RLS blocked the write but returned no error).
-        const { data: upRows, error: upErr } = await supabase.from(table)
-          .update({ [field]: v }).eq('id', inCat[0].id).select()
-        console.log('[RateEditPopover] in-cat UPDATE →', { id: inCat[0].id, returned: upRows?.length, upErr })
+        // ── 1a. UPDATE every in-category row matching this name. Targeting
+        // by (name, category) instead of (id) means any historical
+        // duplicates all get the same new value — so the popover and the
+        // module's refreshAllRates can't disagree based on which dupe gets
+        // returned first. .select() so we can detect silent zero-row writes.
+        let upQ = supabase.from(table).update({ [field]: v }).eq(nameCol, name)
+        if (category) upQ = upQ.eq('category', category)
+        const { data: upRows, error: upErr } = await upQ.select()
+        console.log('[RateEditPopover] in-cat UPDATE →', { rowsTargeted: inCat.length, returned: upRows?.length, upErr })
         if (upErr) throw new Error('Save failed: ' + upErr.message)
         if (!upRows || upRows.length === 0) {
           throw new Error('Save returned 0 rows — RLS likely blocked the write. Check Supabase Auth + your user role.')
