@@ -1568,7 +1568,11 @@ export default function EstimateDetail() {
                   <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-0.5">
                     {editingModule ? 'Edit Module' : 'Add Module'}
                   </p>
-                  <h2 className="text-xl font-bold text-gray-900">{selectedType}</h2>
+                  <h2 className="text-xl font-bold text-gray-900">
+                    {(moduleNameInput && moduleNameInput.trim())
+                      || editingModule?.module_name
+                      || selectedType}
+                  </h2>
                   {/* Project-name row: project name on the left, Edit Rates
                       toggle on the right so it sits directly above the
                       "Total Price" cell of the GPMD bar (which is right-most
