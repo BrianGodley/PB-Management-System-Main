@@ -102,7 +102,7 @@ const n = (v) => parseFloat(v) || 0
 // materialPrices — { 'dbName': unit_cost, ... } fetched from material_rates
 function calcDrainage(state, laborRatePerHour = DEFAULTS.laborRatePerHour, materialPrices = {}, gpmd = DEFAULTS.gpmd, walkAccess = null) {
   const _pace = (parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN)
-  const { difficulty, trenchRows, pipeRows, fixtureRows, additionalItems, manualRows } = state
+  const { difficulty, hoursAdj, trenchRows, pipeRows, fixtureRows, additionalItems, manualRows } = state
 
   let trenchHrs = 0, pipeHrs = 0, pipeMat = 0
   let fixHrs = 0, fixMat = 0
@@ -157,7 +157,7 @@ function calcDrainage(state, laborRatePerHour = DEFAULTS.laborRatePerHour, mater
 
   const baseHrs  = trenchHrs + pipeHrs + fixHrs + addHrs + manHrs
   const diffMod  = 1 + (n(difficulty) / 100)
-  const _preWalkHrs = baseHrs * diffMod
+  const _preWalkHrs = baseHrs * diffMod + (parseFloat(hoursAdj) || 0)
   const walkHrs     = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
   const totalHrs    = _preWalkHrs + walkHrs
   const manDays  = totalHrs / 8
@@ -285,6 +285,7 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
 
   const [difficulty,      setDifficulty]     = useState(initialData?.difficulty      ?? '')
+  const [hoursAdj,    setHoursAdj]   = useState(initialData?.hoursAdj    ?? '')
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Demo')
   const [trenchRows,      setTrenchRows]     = useState(initialData?.trenchRows      ?? DEFAULT_TRENCH_ROWS)
   const [pipeRows,        setPipeRows]       = useState(initialData?.pipeRows        ?? DEFAULT_PIPE_ROWS)
@@ -305,7 +306,7 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
 
 
   const calcRaw = calcDrainage(
-    { difficulty, trenchRows, pipeRows, fixtureRows, additionalItems, manualRows, distanceLF },
+    { difficulty, hoursAdj, trenchRows, pipeRows, fixtureRows, additionalItems, manualRows, distanceLF },
     laborRatePerHour,
     materialPrices,
     gpmd,
@@ -395,7 +396,7 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
 
       {/* Settings */}
       <SectionHeader title="Settings" />
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
           <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
@@ -406,6 +407,10 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
           {calc.walkHrs > 0 && (
             <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">+{calc.walkHrs.toFixed(2)} hrs walk-access</p>
           )}
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
+          <NumInput value={hoursAdj} onChange={setHoursAdj} placeholder="0" />
         </div>
       </div>
 

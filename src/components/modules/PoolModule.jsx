@@ -184,6 +184,8 @@ const newManualRow = () => ({ label: '', hours: '', materials: '', subCost: '' }
 
 function makeInitial(data = {}) {
   return {
+    hoursAdj: data.hoursAdj ?? '',
+    difficulty: data.difficulty ?? '',
     pool:   data.pool   ?? defaultStruct(true),
     spa:    data.spa    ?? defaultStruct(),
     basin:  data.basin  ?? defaultStruct(),
@@ -382,7 +384,7 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
     manSub += n(r.subCost)
   })
 
-  const _preWalkHrs = excavHrs + tileHrs + spillwayHrs + copingHrs + raisedHrs + equipmentHrs + manHrs
+  const _preWalkHrs = excavHrs + tileHrs + spillwayHrs + copingHrs + raisedHrs + equipmentHrs + manHrs + (parseFloat(state.hoursAdj) || 0)
   const walkHrs     = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
   const totalHrs    = _preWalkHrs + walkHrs
   const manDays    = totalHrs / 8
@@ -677,7 +679,7 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
 
       {/* Settings */}
       <SectionHeader title="Settings" />
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
           <input type="number" step="5" value={state.difficulty ?? ''}
@@ -694,6 +696,13 @@ export default function PoolModule({ projectName, onSave, onBack, saving, initia
           {calc.walkHrs > 0 && (
             <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">+{calc.walkHrs.toFixed(2)} hrs walk-access</p>
           )}
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
+          <input type="number" step="0.5" value={state.hoursAdj ?? ''}
+            onChange={e => upd('hoursAdj', e.target.value)}
+            placeholder="0"
+            className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
         </div>
       </div>
 

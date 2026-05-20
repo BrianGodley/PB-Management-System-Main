@@ -106,7 +106,7 @@ function getLargePerDay(laborRates, type) {
 // ── Calc ──────────────────────────────────────────────────────────────────────
 function calcPlanting(state, laborRatePerHour, gpmd, materialPrices, laborRates, walkAccess = null) {
   const _pace = (parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN)
-  const { tillSqft, difficulty, smallPlantRows, largePlantRows, addons, manualRows } = state
+  const { tillSqft, difficulty, hoursAdj, smallPlantRows, largePlantRows, addons, manualRows } = state
 
   // Till and Amend
   const sqft = n(tillSqft)
@@ -189,7 +189,7 @@ function calcPlanting(state, laborRatePerHour, gpmd, materialPrices, laborRates,
     manSub += n(r.subCost)
   })
 
-  const _preWalkHrs = plantHrs + addonHrs + diffHrs + manHrs
+  const _preWalkHrs = plantHrs + addonHrs + diffHrs + manHrs + (parseFloat(hoursAdj) || 0)
   const walkHrs     = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
   const totalHrs    = _preWalkHrs + walkHrs
   const manDays   = totalHrs / 8
@@ -317,6 +317,7 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
 
   const [tillSqft,       setTillSqft]       = useState(initialData?.tillSqft       ?? '')
   const [difficulty,     setDifficulty]     = useState(initialData?.difficulty     ?? '')
+  const [hoursAdj,       setHoursAdj]     = useState(initialData?.hoursAdj       ?? '')
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Landscape')
   const [smallPlantRows, setSmallPlantRows] = useState(initialData?.smallPlantRows ?? DEFAULT_SMALL_ROWS())
   const [largePlantRows, setLargePlantRows] = useState(initialData?.largePlantRows ?? DEFAULT_LARGE_ROWS())
@@ -337,7 +338,7 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
 
 
   const calcRaw = calcPlanting(
-    { tillSqft, difficulty, smallPlantRows, largePlantRows, addons, manualRows, distanceLF },
+    { tillSqft, difficulty, hoursAdj, smallPlantRows, largePlantRows, addons, manualRows, distanceLF },
     laborRatePerHour, gpmd, materialPrices, laborRates, walkAccess,
   )
   // Apply company sales tax to the module's total material cost so the
@@ -439,7 +440,7 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
 
       {/* Settings */}
       <SectionHeader title="Settings" />
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
           <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
@@ -450,6 +451,10 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
           {calc.walkHrs > 0 && (
             <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">+{calc.walkHrs.toFixed(2)} hrs walk-access</p>
           )}
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
+          <NumInput value={hoursAdj} onChange={setHoursAdj} placeholder="0" />
         </div>
       </div>
 

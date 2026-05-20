@@ -57,7 +57,7 @@ const n = (v) => parseFloat(v) || 0
 // laborRates:     { [labDbName]: hours_per_unit } — overrides hardcoded labor defaults
 function calcLighting(state, laborRatePerHour = DEFAULTS.laborRatePerHour, materialPrices = {}, laborRates = {}, gpmd = DEFAULTS.gpmd, walkAccess = null) {
   const _pace = (parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN)
-  const { difficulty, fixtureQtys, transformerQtys, wireQtys, manualRows } = state
+  const { difficulty, hoursAdj, fixtureQtys, transformerQtys, wireQtys, manualRows } = state
 
   let fixHrs = 0, fixMat = 0, totalWatts = 0, totalVA = 0
   FIXTURE_TYPES.forEach(f => {
@@ -103,7 +103,7 @@ function calcLighting(state, laborRatePerHour = DEFAULTS.laborRatePerHour, mater
 
   const subtotalHrs = fixHrs + xfrmHrs
   const diffHrs     = subtotalHrs * (n(difficulty) / 100)
-  const _preWalkHrs = subtotalHrs + diffHrs + manHrs
+  const _preWalkHrs = subtotalHrs + diffHrs + manHrs + (parseFloat(hoursAdj) || 0)
   const walkHrs     = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
   const totalHrs    = _preWalkHrs + walkHrs
   const manDays     = totalHrs / 8
@@ -195,6 +195,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
 
   const [difficulty,      setDifficulty]      = useState(initialData?.difficulty      ?? '')
+  const [hoursAdj,      setHoursAdj]   = useState(initialData?.hoursAdj      ?? '')
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Landscape')
   const [fixtureQtys,     setFixtureQtys]     = useState(initialData?.fixtureQtys     ?? blankFixtureQtys())
   const [transformerQtys, setTransformerQtys] = useState(initialData?.transformerQtys ?? blankTransformerQtys())
@@ -213,7 +214,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
   }, [])
 
 
-  const calcRaw = calcLighting({ difficulty, fixtureQtys, transformerQtys, wireQtys, manualRows, distanceLF }, laborRatePerHour, materialPrices, laborRates, gpmd, walkAccess)
+  const calcRaw = calcLighting({ difficulty, hoursAdj, fixtureQtys, transformerQtys, wireQtys, manualRows, distanceLF }, laborRatePerHour, materialPrices, laborRates, gpmd, walkAccess)
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
   // material_cost (saved with the module) ends up tax-inclusive too,
@@ -278,7 +279,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
 
       {/* Settings */}
       <SectionHeader title="Settings" />
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
           <input type="number" step="5" value={difficulty}
@@ -295,6 +296,13 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
           {calc.walkHrs > 0 && (
             <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">+{calc.walkHrs.toFixed(2)} hrs walk-access</p>
           )}
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
+          <input type="number" step="0.5" value={hoursAdj}
+            onChange={e => setHoursAdj(e.target.value)}
+            placeholder="0"
+            className="input text-sm py-1.5 w-full" />
         </div>
       </div>
 
