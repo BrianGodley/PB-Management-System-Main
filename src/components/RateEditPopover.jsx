@@ -113,8 +113,12 @@ export default function RateEditPopover({
   }, [open])
 
   async function save() {
+    console.log('[RateEditPopover] save() ENTERED', { table, name, category, draft, mode })
     const v = parseFloat(draft)
-    if (!Number.isFinite(v) || v < 0) { setError('Enter a number ≥ 0'); return }
+    if (!Number.isFinite(v) || v < 0) {
+      console.log('[RateEditPopover] validation failed — draft is not a valid number ≥ 0')
+      setError('Enter a number ≥ 0'); return
+    }
     setSaving(true)
     setError('')
     setSaveMsg('')
@@ -278,7 +282,10 @@ export default function RateEditPopover({
                 Cancel
               </button>
               <button
-                onClick={save}
+                onClick={() => {
+                  console.log('[RateEditPopover] Save button CLICKED', { table, name, draft, saving, loaded })
+                  save()
+                }}
                 disabled={saving || !loaded}
                 className="flex-1 py-2 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800 disabled:opacity-50"
               >
