@@ -15,6 +15,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import ClientPortalTab from './ClientPortalTab'
+import JobFinanceTab from './JobFinanceTab'
 
 // Same list ClientDetail uses for its state dropdown — keep them in sync.
 const US_STATES = [
@@ -541,6 +542,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
     { key: 'info', label: 'Job Details' },
     { key: 'client', label: 'Client' },
     { key: 'client_portal', label: 'Client Portal' },
+    { key: 'finance', label: 'Finance' },
     { key: 'employees', label: 'Employees' },
   ]
 
@@ -1397,6 +1399,8 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
         {activeTab === 'client_portal' && (
           <ClientPortalTab clientId={clientData?.id} clientData={clientData} />
         )}
+
+        {activeTab === 'finance' && <JobFinanceTab job={job} />}
       </div>
 
       {/* Footer — Save lives in each tab now (Edit → Save/Cancel pattern).
