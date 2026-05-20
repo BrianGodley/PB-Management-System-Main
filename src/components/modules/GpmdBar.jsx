@@ -16,7 +16,7 @@
 // Commission:
 //   effectiveComm = (effectiveGp + subGp) × 12%  ← includes sub GP in base
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState } from 'react'
+import React, { useState } from 'react'
 
 const fmt  = v => `$${Math.round(v || 0).toLocaleString()}`
 const fmt2 = v => `$${(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -215,13 +215,12 @@ export default function GpmdBar({
         {/* Data columns — flex-1 so they share width evenly */}
         {cols.map((col, i) => {
           const isAfterSubCost = col.label === 'Gross Profit'
+          // Use a keyed Fragment so React stops warning about missing keys
+          // on this iterator (shorthand <> can't accept a key prop).
           return (
-            <>
-              {isAfterSubCost && <SubGpCol key="sub-gp" />}
-              <div
-                key={col.label}
-                className="px-1.5 flex-1 min-w-0 text-center"
-              >
+            <React.Fragment key={col.label}>
+              {isAfterSubCost && <SubGpCol />}
+              <div className="px-1.5 flex-1 min-w-0 text-center">
                 <p className="text-[10px] text-gray-400 truncate mb-0.5">{col.label}</p>
                 <p className={`font-bold tabular-nums truncate ${
                   col.big   ? 'text-base text-green-400' :
@@ -232,7 +231,7 @@ export default function GpmdBar({
                 </p>
                 {col.dim && <p className="text-[10px] text-gray-500 truncate">{col.dim}</p>}
               </div>
-            </>
+            </React.Fragment>
           )
         })}
 
