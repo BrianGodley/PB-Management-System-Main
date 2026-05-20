@@ -219,6 +219,7 @@ export default function JobsList() {
   }
   const [stages,          setStages]          = useState([])
   const [dragOverStage,   setDragOverStage]   = useState(null)
+  const [dragJobId,       setDragJobId]       = useState(null)
   const [showExceptions,    setShowExceptions]    = useState(false)
   const [exceptionsCount,   setExceptionsCount]   = useState(0)
   const [addScheduleTrigger, setAddScheduleTrigger] = useState(0)

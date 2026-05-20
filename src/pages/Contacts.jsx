@@ -693,7 +693,7 @@ export default function Contacts() {
                 {filtered.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="px-4 py-10 text-center text-gray-400">
-                      {search || stageFilter !== 'all' ? 'No contacts match your filters.' : 'No contacts yet — add your first one.'}
+                      {search ? 'No contacts match your search.' : 'No contacts yet — add your first one.'}
                     </td>
                   </tr>
                 ) : paginated.map(c => (
@@ -765,7 +765,7 @@ export default function Contacts() {
                 {filteredCompanies.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-4 py-10 text-center text-gray-400">
-                      {search || stageFilter !== 'all' ? 'No companies match your filters.' : 'No companies yet — add your first one.'}
+                      {search ? 'No companies match your search.' : 'No companies yet — add your first one.'}
                     </td>
                   </tr>
                 ) : paginated.map(c => (

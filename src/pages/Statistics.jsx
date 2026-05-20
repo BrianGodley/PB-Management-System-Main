@@ -7436,7 +7436,7 @@ export default function Statistics() {
           profiles={profiles}
           isAdmin={isCurrentUserAdmin}
           onEditStat={editStatById}
-          onRestored={() => { fetchStats() }}
+          onRestored={() => { fetchAll() }}
           showStatArchiveFolder={showStatArchiveFolder}
           onShowStatArchiveFolderChange={v => setShowStatArchiveFolder(v)}
         />
