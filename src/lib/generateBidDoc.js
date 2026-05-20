@@ -27,9 +27,22 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import {
-  Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
-  Header, Footer, ImageRun, AlignmentType, BorderStyle, WidthType,
-  VerticalAlign, PageNumber, HeadingLevel,
+  Document,
+  Packer,
+  Paragraph,
+  TextRun,
+  Table,
+  TableRow,
+  TableCell,
+  Header,
+  Footer,
+  ImageRun,
+  AlignmentType,
+  BorderStyle,
+  WidthType,
+  VerticalAlign,
+  PageNumber,
+  HeadingLevel,
 } from 'docx'
 import { LOGO_B64 } from './logoBase64'
 import { MODULE_VERBIAGE } from './bidVerbiage'
@@ -42,7 +55,9 @@ import { supabase } from './supabase'
 export async function fetchFinanceOacRate() {
   try {
     const { data } = await supabase
-      .from('company_settings').select('finance_oac_rate').maybeSingle()
+      .from('company_settings')
+      .select('finance_oac_rate')
+      .maybeSingle()
     const n = parseFloat(data?.finance_oac_rate)
     return Number.isFinite(n) && n >= 0 ? n : DEFAULT_FINANCE_OAC_RATE
   } catch {
@@ -52,31 +67,31 @@ export async function fetchFinanceOacRate() {
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const HEADER_FONT = 'Times New Roman'   // matches Sauer header
-const BODY_FONT   = 'Calibri'           // matches Sauer body
+const HEADER_FONT = 'Times New Roman' // matches Sauer header
+const BODY_FONT = 'Calibri' // matches Sauer body
 
 // Finance OAC markup default. Sauer template: $33,915 cash → $37,307 finance
 // = +10.0%. Now configurable in Bids → Settings → Finance, persisted to
 // company_settings.finance_oac_rate. Callers should fetch that value and
 // pass it in; this constant is the fallback when nothing is set.
-const DEFAULT_FINANCE_OAC_RATE = 0.10
+const DEFAULT_FINANCE_OAC_RATE = 0.1
 
 // Half-point sizes used throughout (docx sizes are in half-points).
-const SZ_BODY      = 22   // 11pt
-const SZ_BODY_SM   = 18   //  9pt (header lines)
-const SZ_TITLE     = 24   // 12pt — "Estimate For …" + COST lines
-const SZ_SECTION   = 32   // 16pt — module heading
-const SZ_TOTAL     = 26   // 13pt — final Job Total lines
+const SZ_BODY = 22 // 11pt
+const SZ_BODY_SM = 18 //  9pt (header lines)
+const SZ_TITLE = 24 // 12pt — "Estimate For …" + COST lines
+const SZ_SECTION = 32 // 16pt — module heading
+const SZ_TOTAL = 26 // 13pt — final Job Total lines
 
 // Borders for header/footer tables (all invisible).
-const NO_BORDER  = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
+const NO_BORDER = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' }
 const NO_BORDERS = { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function b64ToUint8(b64) {
   const binary = atob(b64)
-  const bytes  = new Uint8Array(binary.length)
+  const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
   return bytes
 }
@@ -128,7 +143,14 @@ function buildHeader() {
   const headerTable = new Table({
     width: { size: 9360, type: WidthType.DXA },
     columnWidths: [3000, 6360],
-    borders: { top: NO_BORDER, bottom: NO_BORDER, left: NO_BORDER, right: NO_BORDER, insideH: NO_BORDER, insideV: NO_BORDER },
+    borders: {
+      top: NO_BORDER,
+      bottom: NO_BORDER,
+      left: NO_BORDER,
+      right: NO_BORDER,
+      insideH: NO_BORDER,
+      insideV: NO_BORDER,
+    },
     rows: [
       new TableRow({
         children: [
@@ -136,9 +158,7 @@ function buildHeader() {
             borders: NO_BORDERS,
             width: { size: 3000, type: WidthType.DXA },
             verticalAlign: VerticalAlign.CENTER,
-            children: [
-              new Paragraph({ spacing: { after: 0 }, children: [logo] }),
-            ],
+            children: [new Paragraph({ spacing: { after: 0 }, children: [logo] })],
           }),
           new TableCell({
             borders: NO_BORDERS,
@@ -148,17 +168,35 @@ function buildHeader() {
               new Paragraph({
                 alignment: AlignmentType.RIGHT,
                 spacing: { after: 20 },
-                children: [new TextRun({ text: '12410 Foothill Blvd Unit U  Sylmar, CA 91342', font: HEADER_FONT, size: SZ_BODY_SM })],
+                children: [
+                  new TextRun({
+                    text: '12410 Foothill Blvd Unit U  Sylmar, CA 91342',
+                    font: HEADER_FONT,
+                    size: SZ_BODY_SM,
+                  }),
+                ],
               }),
               new Paragraph({
                 alignment: AlignmentType.RIGHT,
                 spacing: { after: 20 },
-                children: [new TextRun({ text: '(818) 751-2690    www.picturebuild.com', font: HEADER_FONT, size: SZ_BODY_SM })],
+                children: [
+                  new TextRun({
+                    text: '(818) 751-2690    www.picturebuild.com',
+                    font: HEADER_FONT,
+                    size: SZ_BODY_SM,
+                  }),
+                ],
               }),
               new Paragraph({
                 alignment: AlignmentType.RIGHT,
                 spacing: { after: 0 },
-                children: [new TextRun({ text: "CA Contractor's License    B, C-27,8,53: 990772", font: HEADER_FONT, size: SZ_BODY_SM })],
+                children: [
+                  new TextRun({
+                    text: "CA Contractor's License    B, C-27,8,53: 990772",
+                    font: HEADER_FONT,
+                    size: SZ_BODY_SM,
+                  }),
+                ],
               }),
             ],
           }),
@@ -179,9 +217,19 @@ function buildFooter() {
         spacing: { after: 0 },
         children: [
           new TextRun({ text: 'Page ', font: BODY_FONT, size: SZ_BODY_SM, bold: true }),
-          new TextRun({ children: [PageNumber.CURRENT], font: BODY_FONT, size: SZ_BODY_SM, bold: true }),
+          new TextRun({
+            children: [PageNumber.CURRENT],
+            font: BODY_FONT,
+            size: SZ_BODY_SM,
+            bold: true,
+          }),
           new TextRun({ text: ' of ', font: BODY_FONT, size: SZ_BODY_SM, bold: true }),
-          new TextRun({ children: [PageNumber.TOTAL_PAGES], font: BODY_FONT, size: SZ_BODY_SM, bold: true }),
+          new TextRun({
+            children: [PageNumber.TOTAL_PAGES],
+            font: BODY_FONT,
+            size: SZ_BODY_SM,
+            bold: true,
+          }),
         ],
       }),
     ],
@@ -194,18 +242,27 @@ function buildOpening(estimate, bidDate, clientAddress) {
   const name = (estimate.client_name || '').trim() || 'Client'
 
   // Single bold line: "Estimate For <Name> - M/D/YYYY"
-  out.push(new Paragraph({
-    spacing: { before: 0, after: 120, line: 276 },
-    children: [bRun(`Estimate For ${name} - ${fmtDate(bidDate)}`, { bold: true, size: SZ_TITLE })],
-  }))
+  out.push(
+    new Paragraph({
+      spacing: { before: 0, after: 120, line: 276 },
+      children: [
+        bRun(`Estimate For ${name} - ${fmtDate(bidDate)}`, { bold: true, size: SZ_TITLE }),
+      ],
+    })
+  )
 
   // Plain address lines — no spacing between them, mirrors Sauer.
-  const addressLines = (clientAddress || '').split('\n').map(s => s.trim()).filter(Boolean)
+  const addressLines = (clientAddress || '')
+    .split('\n')
+    .map(s => s.trim())
+    .filter(Boolean)
   addressLines.forEach(line => {
-    out.push(new Paragraph({
-      spacing: { after: 0, line: 276 },
-      children: [bRun(line)],
-    }))
+    out.push(
+      new Paragraph({
+        spacing: { after: 0, line: 276 },
+        children: [bRun(line)],
+      })
+    )
   })
 
   out.push(emptyLine(120))
@@ -222,38 +279,46 @@ function buildModuleSection(mod, project) {
   const title = v?.title || mod.module_type || 'Scope of Work'
 
   // Heading 2 → mammoth renders <h2>; print CSS sizes it to 16pt.
-  out.push(new Paragraph({
-    heading: HeadingLevel.HEADING_2,
-    spacing: { before: 200, after: 80 },
-    children: [bRun(title, { bold: true, size: SZ_SECTION })],
-  }))
+  out.push(
+    new Paragraph({
+      heading: HeadingLevel.HEADING_2,
+      spacing: { before: 200, after: 80 },
+      children: [bRun(title, { bold: true, size: SZ_SECTION })],
+    })
+  )
 
   // Scope lines — italic, indented (~0.5in = 720 twips), NO numbering.
   if (v?.scope?.length) {
     v.scope.forEach(line => {
-      out.push(new Paragraph({
-        spacing: { after: 40, line: 276 },
-        indent: { left: 720 },
-        children: [bRun(line, { italics: true })],
-      }))
+      out.push(
+        new Paragraph({
+          spacing: { after: 40, line: 276 },
+          indent: { left: 720 },
+          children: [bRun(line, { italics: true })],
+        })
+      )
     })
   }
 
   // Custom user note (if present) + standard disclaimer notes — italic, indented.
   if (mod.notes && mod.notes.trim()) {
-    out.push(new Paragraph({
-      spacing: { before: 80, after: 40, line: 276 },
-      indent: { left: 720 },
-      children: [bRun(`*${mod.notes.trim()}`, { italics: true })],
-    }))
+    out.push(
+      new Paragraph({
+        spacing: { before: 80, after: 40, line: 276 },
+        indent: { left: 720 },
+        children: [bRun(`*${mod.notes.trim()}`, { italics: true })],
+      })
+    )
   }
   if (v?.notes?.length) {
     v.notes.forEach((note, i) => {
-      out.push(new Paragraph({
-        spacing: { before: i === 0 ? 80 : 0, after: 40, line: 276 },
-        indent: { left: 720 },
-        children: [bRun(`*${note}`, { italics: true })],
-      }))
+      out.push(
+        new Paragraph({
+          spacing: { before: i === 0 ? 80 : 0, after: 40, line: 276 },
+          indent: { left: 720 },
+          children: [bRun(`*${note}`, { italics: true })],
+        })
+      )
     })
   }
 
@@ -263,14 +328,16 @@ function buildModuleSection(mod, project) {
   // This keeps the per-module COSTs adding up to the same grand total the
   // current code produces (which rolls Sub GP × 1.12 into each project total).
   const modSubCost = parseFloat(mod.sub_cost || mod.data?.calc?.subCost || 0)
-  const modSubGp   = modSubCost * (project?.sub_gp_markup_rate ?? 0.20)
-  const modTotal   = modPrice + modSubGp + modSubGp * 0.12
+  const modSubGp = modSubCost * (project?.sub_gp_markup_rate ?? 0.2)
+  const modTotal = modPrice + modSubGp + modSubGp * 0.12
 
   if (modTotal > 0) {
-    out.push(new Paragraph({
-      spacing: { before: 120, after: 0, line: 276 },
-      children: [bRun(`COST ${usd(modTotal)}`, { bold: true, size: SZ_TITLE })],
-    }))
+    out.push(
+      new Paragraph({
+        spacing: { before: 120, after: 0, line: 276 },
+        children: [bRun(`COST ${usd(modTotal)}`, { bold: true, size: SZ_TITLE })],
+      })
+    )
   }
   out.push(emptyLine(160))
 
@@ -279,8 +346,9 @@ function buildModuleSection(mod, project) {
 
 // ── Final Job Total lines (Cash / Finance OAC) ───────────────────────────────
 function buildJobTotals(grandTotal, financeOacRate) {
-  const cash    = grandTotal
-  const finance = grandTotal * (1 + (Number.isFinite(financeOacRate) ? financeOacRate : DEFAULT_FINANCE_OAC_RATE))
+  const cash = grandTotal
+  const finance =
+    grandTotal * (1 + (Number.isFinite(financeOacRate) ? financeOacRate : DEFAULT_FINANCE_OAC_RATE))
   return [
     emptyLine(120),
     new Paragraph({
@@ -289,7 +357,9 @@ function buildJobTotals(grandTotal, financeOacRate) {
     }),
     new Paragraph({
       spacing: { after: 0, line: 276 },
-      children: [bRun(`Job Total ${usd(finance)} - Finance OAC Price`, { bold: true, size: SZ_TOTAL })],
+      children: [
+        bRun(`Job Total ${usd(finance)} - Finance OAC Price`, { bold: true, size: SZ_TOTAL }),
+      ],
     }),
   ]
 }
@@ -370,8 +440,8 @@ export async function generateBidDoc(estimate, projects, clientAddress = '', opt
  */
 export function downloadBidDoc(blob, filename) {
   const url = URL.createObjectURL(blob)
-  const a   = document.createElement('a')
-  a.href     = url
+  const a = document.createElement('a')
+  a.href = url
   a.download = filename
   document.body.appendChild(a)
   a.click()

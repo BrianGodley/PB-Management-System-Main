@@ -40,16 +40,18 @@ const FG = '#3A5038'
 // the same way without external assets.
 const LETTERHEAD_HTML =
   '<table data-letterhead="picture-build" style="width:100%;border-collapse:collapse;margin:0 0 12px 0;border:none;" cellpadding="0" cellspacing="0" border="0">' +
-    '<tr>' +
-      '<td style="width:30%;vertical-align:middle;border:none;padding:0;">' +
-        '<img src="data:image/png;base64,' + LOGO_B64 + '" alt="Picture Build" width="213" height="50" style="width:213px;height:50px;display:block;" />' +
-      '</td>' +
-      '<td style="width:70%;vertical-align:middle;text-align:right;border:none;padding:0;font-family:Calibri,Arial,sans-serif;font-size:9pt;color:#333;line-height:1.4;">' +
-        '12410 Foothill Blvd Unit U &nbsp; Sylmar, CA 91342<br/>' +
-        '(818) 751-2690 &nbsp;&nbsp; www.picturebuild.com<br/>' +
-        "CA Contractor's License &nbsp; B, C-27,8,53: 990772" +
-      '</td>' +
-    '</tr>' +
+  '<tr>' +
+  '<td style="width:30%;vertical-align:middle;border:none;padding:0;">' +
+  '<img src="data:image/png;base64,' +
+  LOGO_B64 +
+  '" alt="Picture Build" width="213" height="50" style="width:213px;height:50px;display:block;" />' +
+  '</td>' +
+  '<td style="width:70%;vertical-align:middle;text-align:right;border:none;padding:0;font-family:Calibri,Arial,sans-serif;font-size:9pt;color:#333;line-height:1.4;">' +
+  '12410 Foothill Blvd Unit U &nbsp; Sylmar, CA 91342<br/>' +
+  '(818) 751-2690 &nbsp;&nbsp; www.picturebuild.com<br/>' +
+  "CA Contractor's License &nbsp; B, C-27,8,53: 990772" +
+  '</td>' +
+  '</tr>' +
   '</table>' +
   '<hr style="border:none;border-top:1px solid #d0d0d0;margin:0 0 16px 0;" />'
 
@@ -64,19 +66,18 @@ function ensureLetterhead(html) {
   return LETTERHEAD_HTML + (html || '')
 }
 
-
 export default function BidDocViewerModal({ bid, onClose }) {
   const editorRef = useRef(null)
 
-  const [html,             setHtml]             = useState('')
-  const [loading,          setLoading]          = useState(true)
-  const [error,            setError]            = useState('')
-  const [dirty,            setDirty]            = useState(false)
-  const [saving,           setSaving]           = useState(false)
-  const [saveMsg,          setSaveMsg]          = useState('') // "ok:..." or "error:..."
-  const [hasSavedVersion,  setHasSavedVersion]  = useState(false)
-  const [regenerating,     setRegenerating]     = useState(false)
-  const [downloadingPdf,  setDownloadingPdf]  = useState(false)
+  const [html, setHtml] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [dirty, setDirty] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveMsg, setSaveMsg] = useState('') // "ok:..." or "error:..."
+  const [hasSavedVersion, setHasSavedVersion] = useState(false)
+  const [regenerating, setRegenerating] = useState(false)
+  const [downloadingPdf, setDownloadingPdf] = useState(false)
 
   // -- Initial load -------------------------------------------------------
   useEffect(() => {
@@ -88,7 +89,9 @@ export default function BidDocViewerModal({ bid, onClose }) {
 
         const { data: latest, error: bidErr } = await supabase
           .from('bids')
-          .select('bid_doc_html, bid_doc_updated_at, estimate_id, client_name, date_submitted, job_address')
+          .select(
+            'bid_doc_html, bid_doc_updated_at, estimate_id, client_name, date_submitted, job_address'
+          )
           .eq('id', bid.id)
           .single()
         if (bidErr) throw bidErr
@@ -102,7 +105,9 @@ export default function BidDocViewerModal({ bid, onClose }) {
         }
 
         if (!latest.estimate_id) {
-          throw new Error('This bid has no linked estimate, so its bid document cannot be generated. Edit and save manually if you want a starting draft.')
+          throw new Error(
+            'This bid has no linked estimate, so its bid document cannot be generated. Edit and save manually if you want a starting draft.'
+          )
         }
         const fresh = await generateFromEstimate(latest)
         if (cancelled) return
@@ -118,13 +123,18 @@ export default function BidDocViewerModal({ bid, onClose }) {
     }
 
     load()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [bid?.id])
 
   // -- Generate fresh HTML from the linked estimate ----------------------
   async function generateFromEstimate(bidLite) {
     const { data: est, error: estErr } = await supabase
-      .from('estimates').select('*').eq('id', bidLite.estimate_id).single()
+      .from('estimates')
+      .select('*')
+      .eq('id', bidLite.estimate_id)
+      .single()
     if (estErr) throw estErr
 
     const { data: projs, error: projErr } = await supabase
@@ -135,9 +145,11 @@ export default function BidDocViewerModal({ bid, onClose }) {
     if (projErr) throw projErr
 
     const financeOacRate = await fetchFinanceOacRate()
-    const blob = await generateBidDoc(est, projs || [], bidLite.job_address || '', { financeOacRate })
-    const ab   = await blob.arrayBuffer()
-    const res  = await mammoth.convertToHtml({ arrayBuffer: ab })
+    const blob = await generateBidDoc(est, projs || [], bidLite.job_address || '', {
+      financeOacRate,
+    })
+    const ab = await blob.arrayBuffer()
+    const res = await mammoth.convertToHtml({ arrayBuffer: ab })
     const body = res.value || '<p class="text-gray-400">Document is empty.</p>'
     return LETTERHEAD_HTML + body
   }
@@ -158,7 +170,7 @@ export default function BidDocViewerModal({ bid, onClose }) {
     const { error: upErr } = await supabase
       .from('bids')
       .update({
-        bid_doc_html:       newHtml,
+        bid_doc_html: newHtml,
         bid_doc_updated_at: new Date().toISOString(),
       })
       .eq('id', bid.id)
@@ -178,7 +190,7 @@ export default function BidDocViewerModal({ bid, onClose }) {
   async function handleRegenerate() {
     const ok = window.confirm(
       'Discard your edits and regenerate this bid document from the latest estimate?\n\n' +
-      'Your saved version will be replaced when you click Save afterward.'
+        'Your saved version will be replaced when you click Save afterward.'
     )
     if (!ok) return
 
@@ -239,10 +251,7 @@ export default function BidDocViewerModal({ bid, onClose }) {
     document.body.appendChild(container)
 
     try {
-      const [{ jsPDF }, h2c] = await Promise.all([
-        import('jspdf'),
-        import('html2canvas'),
-      ])
+      const [{ jsPDF }, h2c] = await Promise.all([import('jspdf'), import('html2canvas')])
       const html2canvas = h2c.default || h2c
 
       // Render container to canvas, then page-slice into a letter-size PDF
@@ -279,13 +288,19 @@ export default function BidDocViewerModal({ bid, onClose }) {
       }
 
       const safeName = (bid.client_name || 'Bid').replace(/[^a-z0-9]/gi, '_')
-      const dateStr  = bid.date_submitted || new Date().toISOString().split('T')[0]
+      const dateStr = bid.date_submitted || new Date().toISOString().split('T')[0]
       pdf.save(`${safeName}_Bid_${dateStr}.pdf`)
     } catch (err) {
       console.error('PDF download failed:', err)
-      setSaveMsg('error:PDF download failed: ' + (err?.message || err) + '. Try the Print button as a fallback.')
+      setSaveMsg(
+        'error:PDF download failed: ' +
+          (err?.message || err) +
+          '. Try the Print button as a fallback.'
+      )
     } finally {
-      try { document.body.removeChild(container) } catch (_) {}
+      try {
+        document.body.removeChild(container)
+      } catch {}
       setDownloadingPdf(false)
     }
   }
@@ -301,8 +316,8 @@ export default function BidDocViewerModal({ bid, onClose }) {
     if (!editorRef.current) return
     const currentHtml = ensureLetterhead(editorRef.current.innerHTML)
     const safeName = (bid.client_name || 'Bid').replace(/[^a-z0-9]/gi, '_')
-    const dateStr  = bid.date_submitted || new Date().toISOString().split('T')[0]
-    const title    = `${safeName}_Bid_${dateStr}`
+    const dateStr = bid.date_submitted || new Date().toISOString().split('T')[0]
+    const title = `${safeName}_Bid_${dateStr}`
 
     const docHtml =
       '<!DOCTYPE html><html><head>' +
@@ -321,7 +336,9 @@ export default function BidDocViewerModal({ bid, onClose }) {
       'img { max-width: 100%; height: auto; }' +
       '* { print-color-adjust: exact; -webkit-print-color-adjust: exact; }' +
       '</style></head>' +
-      '<body>' + currentHtml + '</body></html>'
+      '<body>' +
+      currentHtml +
+      '</body></html>'
 
     const win = window.open('', '_blank', 'width=900,height=1100')
     if (!win) {
@@ -334,7 +351,12 @@ export default function BidDocViewerModal({ bid, onClose }) {
 
     // Wait for layout + base64 image decode, then open print dialog
     setTimeout(() => {
-      try { win.focus(); win.print() } catch (_) { /* user closed window */ }
+      try {
+        win.focus()
+        win.print()
+      } catch {
+        /* user closed window */
+      }
     }, 400)
   }
 
@@ -452,11 +474,17 @@ export default function BidDocViewerModal({ bid, onClose }) {
         {!loading && !error && (
           <div className="px-6 py-2 bg-gray-50 border-t border-gray-200 text-xs text-gray-500 flex-shrink-0">
             {dirty ? (
-              <span>Unsaved changes — click <strong className="text-green-800">Save</strong> to persist them.</span>
+              <span>
+                Unsaved changes — click <strong className="text-green-800">Save</strong> to persist
+                them.
+              </span>
             ) : hasSavedVersion ? (
               <span>Showing the saved edited version. Click anywhere to make further edits.</span>
             ) : (
-              <span>Showing a fresh template generated from the estimate. Edit anywhere and Save to keep your changes.</span>
+              <span>
+                Showing a fresh template generated from the estimate. Edit anywhere and Save to keep
+                your changes.
+              </span>
             )}
           </div>
         )}

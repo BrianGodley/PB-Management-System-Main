@@ -21,21 +21,21 @@ import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../
 // Grout cubic-yards per block is derived per block type from W/H/L exactly
 // like the Excel formula: cells (L-2) × H × (W-2) inches³ → cubic yards.
 const CMU_BLOCK_TYPES = [
-  { name: '8x8x16 (GREY)',         w: 8,  h: 8, l: 16, spec: 24, price: 2.59 },
-  { name: '8x8x16 SPLITFACE',      w: 8,  h: 8, l: 16, spec: 24, price: 5.19 },
-  { name: '8x8x16 (COLOR)',        w: 8,  h: 8, l: 16, spec: 24, price: 6.19 },
-  { name: '8x6x16 SLUMP (GREY)',   w: 8,  h: 6, l: 16, spec: 20, price: 4.09 },
-  { name: '8x6x16 SLUMP (COLOR)',  w: 8,  h: 6, l: 16, spec: 20, price: 4.59 },
-  { name: '12x8x16 (GREY)',        w: 12, h: 8, l: 16, spec: 16, price: 5.39 },
-  { name: '12x8x16 SPLITFACE',     w: 12, h: 8, l: 16, spec: 16, price: 7.59 },
-  { name: '12x8x16 (COLOR)',       w: 12, h: 8, l: 16, spec: 16, price: 6.39 },
-  { name: '12x6x16 SLUMP (COLOR)', w: 12, h: 6, l: 16, spec: 14, price: 8.60 },
-  { name: '12x6x16 SLUMP (GREY)',  w: 12, h: 6, l: 16, spec: 14, price: 7.89 },
-  { name: '6x8x16 (GREY)',         w: 6,  h: 8, l: 16, spec: 28, price: 2.13 },
-  { name: '6x8x16 SPLITFACE',      w: 6,  h: 8, l: 16, spec: 28, price: 4.59 },
-  { name: '6x8x16 (COLOR)',        w: 6,  h: 8, l: 16, spec: 28, price: 2.59 },
-  { name: '6x6x16 SLUMP (COLOR)',  w: 6,  h: 6, l: 16, spec: 26, price: 3.00 },
-  { name: '6x6x16 SLUMP (GREY)',   w: 6,  h: 6, l: 16, spec: 26, price: 3.01 },
+  { name: '8x8x16 (GREY)', w: 8, h: 8, l: 16, spec: 24, price: 2.59 },
+  { name: '8x8x16 SPLITFACE', w: 8, h: 8, l: 16, spec: 24, price: 5.19 },
+  { name: '8x8x16 (COLOR)', w: 8, h: 8, l: 16, spec: 24, price: 6.19 },
+  { name: '8x6x16 SLUMP (GREY)', w: 8, h: 6, l: 16, spec: 20, price: 4.09 },
+  { name: '8x6x16 SLUMP (COLOR)', w: 8, h: 6, l: 16, spec: 20, price: 4.59 },
+  { name: '12x8x16 (GREY)', w: 12, h: 8, l: 16, spec: 16, price: 5.39 },
+  { name: '12x8x16 SPLITFACE', w: 12, h: 8, l: 16, spec: 16, price: 7.59 },
+  { name: '12x8x16 (COLOR)', w: 12, h: 8, l: 16, spec: 16, price: 6.39 },
+  { name: '12x6x16 SLUMP (COLOR)', w: 12, h: 6, l: 16, spec: 14, price: 8.6 },
+  { name: '12x6x16 SLUMP (GREY)', w: 12, h: 6, l: 16, spec: 14, price: 7.89 },
+  { name: '6x8x16 (GREY)', w: 6, h: 8, l: 16, spec: 28, price: 2.13 },
+  { name: '6x8x16 SPLITFACE', w: 6, h: 8, l: 16, spec: 28, price: 4.59 },
+  { name: '6x8x16 (COLOR)', w: 6, h: 8, l: 16, spec: 28, price: 2.59 },
+  { name: '6x6x16 SLUMP (COLOR)', w: 6, h: 6, l: 16, spec: 26, price: 3.0 },
+  { name: '6x6x16 SLUMP (GREY)', w: 6, h: 6, l: 16, spec: 26, price: 3.01 },
 ]
 const DEFAULT_BLOCK_NAME = '8x8x16 (GREY)'
 function blockByName(name) {
@@ -45,64 +45,89 @@ function blockByName(name) {
 // price via RateEditPopover the row is stored under this name in the
 // material_rates table (category='Walls'). When no override exists, the
 // calc falls back to the catalog's default price.
-function wallBlockRateName(name) { return `Wall Block ${name}` }
+function wallBlockRateName(name) {
+  return `Wall Block ${name}`
+}
 function groutCyPerBlock(b) {
   // Same formula as the Excel ((L-2) × H × (W-2)) in³ → yd³
   return ((b.l - 2) * b.h * (b.w - 2)) / 1728 / 27
 }
 
 const WALL_RATES = {
-  greyBlock:       { db: 'Wall Grey Block',                 fb: 2.59   },
-  bondbeamBlock:   { db: 'Wall Bondbeam Block',             fb: 2.59   },
-  rebar:           { db: 'Wall Rebar',                      fb: 1.399  },
-  concreteHand:    { db: 'Wall Concrete Hand Mix',          fb: 92.00  },
-  concreteTruck:   { db: 'Wall Concrete Truck',             fb: 185.00 },
-  groutPumpSetup:  { db: 'Wall Grout Pump Setup',           fb: 402.50 },
-  groutPumpPerYd:  { db: 'Wall Grout Pump Per Yard',        fb: 9.20   },
-  digLab:          { db: 'Wall Dig Footing Labor Rate',     fb: 4.0    },
-  rebarLab:        { db: 'Wall Set Rebar Labor Rate',       fb: 35.0   },
-  blockLab:        { db: 'Wall Set Block Labor Rate',       fb: 10.4   },
-  handGroutLab:    { db: 'Wall Hand Grout Labor Rate',      fb: 5.5    },
-  pumpGroutLab:    { db: 'Wall Pump Grout Labor Rate',      fb: 81.0   },
-  setupCleanLab:   { db: 'Wall Setup Clean Labor Rate',     fb: 30.0   },
-  sandStucco:      { db: 'Sand Stucco - Wall',              fb: 0.00   },
-  smoothStucco:    { db: 'Smooth Stucco - Wall',            fb: 0.00   },
-  ledgerstone:     { db: 'Ledgerstone - Wall',              fb: 10.00  },
-  stackedStone:    { db: 'Stacked Stone - Wall',            fb: 10.00  },
-  tile:            { db: 'Tile - Wall',                     fb: 6.50   },
-  flagstone:       { db: 'Real Flagstone - Wall',           fb: 400.00 },
-  realStone:       { db: 'Real Stone - Wall',               fb: 400.00 },
-  sandStuccoLab:   { db: 'Sand Stucco - Wall Labor Rate',   fb: 92     },
-  smoothStuccoLab: { db: 'Smooth Stucco - Wall Labor Rate', fb: 65     },
-  ledgerstoneLab:  { db: 'Ledgerstone - Wall Labor Rate',   fb: 24     },
-  stackedStoneLab: { db: 'Stacked Stone - Wall Labor Rate', fb: 24     },
-  tileLab:         { db: 'Tile - Wall Labor Rate',          fb: 0.2867 },
-  flagstoneLab:    { db: 'Real Flagstone - Wall Labor Rate',fb: 0.4487 },
-  realStoneLab:    { db: 'Real Stone - Wall Labor Rate',    fb: 0.8954 },
-  capFlagstone:    { db: 'Wall Cap Flagstone',              fb: 500.00 },
-  capPrecast:      { db: 'Wall Cap Precast',                fb: 50.00  },
-  capBullnose:     { db: 'Wall Cap Bullnose Brick',         fb: 5.00   },
-  wpPrimerMembrane:{ db: 'Wall WP Primer Membrane',         fb: 1.80   },
-  wp3CoatRollOn:   { db: 'Wall WP 3 Coat Roll On',          fb: 1.20   },
-  wpThoroseal:     { db: 'Wall WP Thoroseal Roll On',       fb: 1.50   },
-  wpDimpleMembrane:{ db: 'Wall WP Dimple Membrane',         fb: 2.10   },
+  greyBlock: { db: 'Wall Grey Block', fb: 2.59 },
+  bondbeamBlock: { db: 'Wall Bondbeam Block', fb: 2.59 },
+  rebar: { db: 'Wall Rebar', fb: 1.399 },
+  concreteHand: { db: 'Wall Concrete Hand Mix', fb: 92.0 },
+  concreteTruck: { db: 'Wall Concrete Truck', fb: 185.0 },
+  groutPumpSetup: { db: 'Wall Grout Pump Setup', fb: 402.5 },
+  groutPumpPerYd: { db: 'Wall Grout Pump Per Yard', fb: 9.2 },
+  digLab: { db: 'Wall Dig Footing Labor Rate', fb: 4.0 },
+  rebarLab: { db: 'Wall Set Rebar Labor Rate', fb: 35.0 },
+  blockLab: { db: 'Wall Set Block Labor Rate', fb: 10.4 },
+  handGroutLab: { db: 'Wall Hand Grout Labor Rate', fb: 5.5 },
+  pumpGroutLab: { db: 'Wall Pump Grout Labor Rate', fb: 81.0 },
+  setupCleanLab: { db: 'Wall Setup Clean Labor Rate', fb: 30.0 },
+  sandStucco: { db: 'Sand Stucco - Wall', fb: 0.0 },
+  smoothStucco: { db: 'Smooth Stucco - Wall', fb: 0.0 },
+  ledgerstone: { db: 'Ledgerstone - Wall', fb: 10.0 },
+  stackedStone: { db: 'Stacked Stone - Wall', fb: 10.0 },
+  tile: { db: 'Tile - Wall', fb: 6.5 },
+  flagstone: { db: 'Real Flagstone - Wall', fb: 400.0 },
+  realStone: { db: 'Real Stone - Wall', fb: 400.0 },
+  sandStuccoLab: { db: 'Sand Stucco - Wall Labor Rate', fb: 92 },
+  smoothStuccoLab: { db: 'Smooth Stucco - Wall Labor Rate', fb: 65 },
+  ledgerstoneLab: { db: 'Ledgerstone - Wall Labor Rate', fb: 24 },
+  stackedStoneLab: { db: 'Stacked Stone - Wall Labor Rate', fb: 24 },
+  tileLab: { db: 'Tile - Wall Labor Rate', fb: 0.2867 },
+  flagstoneLab: { db: 'Real Flagstone - Wall Labor Rate', fb: 0.4487 },
+  realStoneLab: { db: 'Real Stone - Wall Labor Rate', fb: 0.8954 },
+  capFlagstone: { db: 'Wall Cap Flagstone', fb: 500.0 },
+  capPrecast: { db: 'Wall Cap Precast', fb: 50.0 },
+  capBullnose: { db: 'Wall Cap Bullnose Brick', fb: 5.0 },
+  wpPrimerMembrane: { db: 'Wall WP Primer Membrane', fb: 1.8 },
+  wp3CoatRollOn: { db: 'Wall WP 3 Coat Roll On', fb: 1.2 },
+  wpThoroseal: { db: 'Wall WP Thoroseal Roll On', fb: 1.5 },
+  wpDimpleMembrane: { db: 'Wall WP Dimple Membrane', fb: 2.1 },
 }
 
 const DEFAULTS = { laborRatePerHour: 35, laborBurdenPct: 0.29, gpmd: 425, commissionRate: 0.12 }
-const n = (v) => parseFloat(v) || 0
+const n = v => parseFloat(v) || 0
 
 // Default entries
 const DEFAULT_CMU = () => ({
   blockType: DEFAULT_BLOCK_NAME,
-  lf: '', heightIn: '', footingWIn: '12', footingDIn: '12',
-  rebarSpIn: '16', horizBars: '2', bondBeams: '1',
-  pctGrouted: '100', pctCurved: '0',
+  lf: '',
+  heightIn: '',
+  footingWIn: '12',
+  footingDIn: '12',
+  rebarSpIn: '16',
+  horizBars: '2',
+  bondBeams: '1',
+  pctGrouted: '100',
+  pctCurved: '0',
 })
-const DEFAULT_PIP = () => ({ lf: '', heightIn: '', footingWIn: '12', footingDIn: '12', horizBars: '2' })
+const DEFAULT_PIP = () => ({
+  lf: '',
+  heightIn: '',
+  footingWIn: '12',
+  footingDIn: '12',
+  horizBars: '2',
+})
 
 // ── Per-wall calculators ──────────────────────────────────────────────────────
 function calcOneCMU(wall, footingPump, groutPump, r, mp = {}) {
-  const { blockType, lf, heightIn, footingWIn, footingDIn, rebarSpIn, horizBars, bondBeams, pctGrouted, pctCurved } = wall
+  const {
+    blockType,
+    lf,
+    heightIn,
+    footingWIn,
+    footingDIn,
+    rebarSpIn,
+    horizBars,
+    bondBeams,
+    pctGrouted,
+    pctCurved,
+  } = wall
   if (!n(lf) || !n(heightIn)) return { hrs: 0, mat: 0, detail: null }
 
   // Selected block type drives both DIMENSIONS (how many blocks per course /
@@ -113,47 +138,53 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}) {
   const b = blockByName(blockType)
   const blockPrice = mp[wallBlockRateName(b.name)] ?? b.price
   const blocksPerCourse = Math.ceil((n(lf) * 12) / b.l)
-  const totalCourses    = Math.ceil(n(heightIn) / b.h)
-  const bbCourses       = Math.min(n(bondBeams), totalCourses)
-  const regCourses      = Math.max(0, totalCourses - bbCourses)
-  const rawBlocks       = blocksPerCourse * totalCourses
-  const orderGreyBlock  = Math.ceil(blocksPerCourse * regCourses * 1.10)
-  const orderBBBlock    = Math.ceil(blocksPerCourse * bbCourses  * 1.10)
+  const totalCourses = Math.ceil(n(heightIn) / b.h)
+  const bbCourses = Math.min(n(bondBeams), totalCourses)
+  const regCourses = Math.max(0, totalCourses - bbCourses)
+  const rawBlocks = blocksPerCourse * totalCourses
+  const orderGreyBlock = Math.ceil(blocksPerCourse * regCourses * 1.1)
+  const orderBBBlock = Math.ceil(blocksPerCourse * bbCourses * 1.1)
 
-  const footingCF  = (n(footingWIn) / 12) * (n(footingDIn) / 12) * n(lf)
-  const footingCY  = footingCF / 27
-  const groutCY    = rawBlocks * groutCyPerBlock(b) * (n(pctGrouted) / 100)
-  const groutCF    = groutCY * 27
+  const footingCF = (n(footingWIn) / 12) * (n(footingDIn) / 12) * n(lf)
+  const footingCY = footingCF / 27
+  const groutCY = rawBlocks * groutCyPerBlock(b) * (n(pctGrouted) / 100)
+  const groutCF = groutCY * 27
 
-  const vertRebars   = n(rebarSpIn) > 0 ? Math.ceil((n(lf) * 12) / n(rebarSpIn)) : 0
-  const vertRebarLF  = vertRebars * (n(heightIn) + n(footingDIn)) / 12
+  const vertRebars = n(rebarSpIn) > 0 ? Math.ceil((n(lf) * 12) / n(rebarSpIn)) : 0
+  const vertRebarLF = (vertRebars * (n(heightIn) + n(footingDIn))) / 12
   const horizRebarLF = (n(horizBars) + bbCourses) * n(lf)
   const totalRebarLF = vertRebarLF + horizRebarLF
 
-  const groutRate  = groutPump === 'Yes' ? r('pumpGroutLab') : r('handGroutLab')
-  const structBase = (footingCF > 0 ? footingCF / r('digLab') : 0)
-                   + (totalRebarLF > 0 ? totalRebarLF / r('rebarLab') : 0)
-                   + (footingCY > 0 ? footingCY / 0.2037 : 0)
-                   + (rawBlocks > 0 ? rawBlocks / r('blockLab') : 0)
-                   + (groutCF > 0 ? groutCF / groutRate : 0)
-                   + n(lf) / r('setupCleanLab')
-  const curveAdd   = structBase * (n(pctCurved) / 100) * 0.50
-  const hrs        = structBase + curveAdd
+  const groutRate = groutPump === 'Yes' ? r('pumpGroutLab') : r('handGroutLab')
+  const structBase =
+    (footingCF > 0 ? footingCF / r('digLab') : 0) +
+    (totalRebarLF > 0 ? totalRebarLF / r('rebarLab') : 0) +
+    (footingCY > 0 ? footingCY / 0.2037 : 0) +
+    (rawBlocks > 0 ? rawBlocks / r('blockLab') : 0) +
+    (groutCF > 0 ? groutCF / groutRate : 0) +
+    n(lf) / r('setupCleanLab')
+  const curveAdd = structBase * (n(pctCurved) / 100) * 0.5
+  const hrs = structBase + curveAdd
 
-  const footConcrPrc     = footingPump === 'Yes' ? r('concreteTruck') : r('concreteHand')
-  const groutConcrPrc    = groutPump   === 'Yes' ? r('concreteTruck') : r('concreteHand')
+  const footConcrPrc = footingPump === 'Yes' ? r('concreteTruck') : r('concreteHand')
+  const groutConcrPrc = groutPump === 'Yes' ? r('concreteTruck') : r('concreteHand')
   // Grey block price comes from the selected block type's catalog entry
   // (mirroring the Excel VLOOKUP into the CmuBlockPrices table). Bond-beam
   // block stays on the flat master rate — there's only one BB SKU.
-  const mat = orderGreyBlock * blockPrice
-            + orderBBBlock   * r('bondbeamBlock')
-            + totalRebarLF   * r('rebar')
-            + footingCY      * footConcrPrc
-            + (footingPump === 'Yes' ? r('groutPumpSetup') : 0)
-            + groutCY        * groutConcrPrc
-            + (groutPump === 'Yes' && groutCY > 0 ? r('groutPumpSetup') + groutCY * r('groutPumpPerYd') : 0)
+  const mat =
+    orderGreyBlock * blockPrice +
+    orderBBBlock * r('bondbeamBlock') +
+    totalRebarLF * r('rebar') +
+    footingCY * footConcrPrc +
+    (footingPump === 'Yes' ? r('groutPumpSetup') : 0) +
+    groutCY * groutConcrPrc +
+    (groutPump === 'Yes' && groutCY > 0 ? r('groutPumpSetup') + groutCY * r('groutPumpPerYd') : 0)
 
-  return { hrs, mat, detail: { orderGreyBlock, orderBBBlock, footingCY, groutCY, totalRebarLF, curveAdd } }
+  return {
+    hrs,
+    mat,
+    detail: { orderGreyBlock, orderBBBlock, footingCY, groutCY, totalRebarLF, curveAdd },
+  }
 }
 
 function calcOnePIP(wall, r) {
@@ -161,35 +192,46 @@ function calcOnePIP(wall, r) {
   if (!n(lf) || !n(heightIn)) return { hrs: 0, mat: 0, concCY: 0 }
   // Wall stem (existing formula)
   const addlCourses = Math.max(0, Math.ceil((n(heightIn) - 6) / 6))
-  const wallHrs    = n(lf) * (1.0833 + addlCourses * 1.6167)
+  const wallHrs = n(lf) * (1.0833 + addlCourses * 1.6167)
   const wallConcCY = n(lf) * (0.2833 + addlCourses * 0.3667)
 
   // Footing — same dig + rebar + pour coefficients as the CMU calc so PIP
   // footings price out consistently. Optional: if the user leaves footing
   // fields blank, the footing contribution is just 0 and the wall behaves
   // exactly like the previous (footing-less) version.
-  const fW = n(footingWIn), fD = n(footingDIn), hb = n(horizBars)
-  const footingCF    = (fW > 0 && fD > 0) ? n(lf) * (fW / 12) * (fD / 12) : 0
-  const footingCY    = footingCF / 27
+  const fW = n(footingWIn),
+    fD = n(footingDIn),
+    hb = n(horizBars)
+  const footingCF = fW > 0 && fD > 0 ? n(lf) * (fW / 12) * (fD / 12) : 0
+  const footingCY = footingCF / 27
   const horizRebarLF = hb * n(lf)
-  const footingHrs   = (footingCF    > 0 ? footingCF    / r('digLab')   : 0)
-                     + (horizRebarLF > 0 ? horizRebarLF / r('rebarLab') : 0)
-                     + (footingCY    > 0 ? footingCY    / 0.2037        : 0)
-  const footingMat   = footingCY * r('concreteTruck') + horizRebarLF * r('rebar')
+  const footingHrs =
+    (footingCF > 0 ? footingCF / r('digLab') : 0) +
+    (horizRebarLF > 0 ? horizRebarLF / r('rebarLab') : 0) +
+    (footingCY > 0 ? footingCY / 0.2037 : 0)
+  const footingMat = footingCY * r('concreteTruck') + horizRebarLF * r('rebar')
 
-  const hrs    = wallHrs + footingHrs
+  const hrs = wallHrs + footingHrs
   const concCY = wallConcCY + footingCY
-  const mat    = wallConcCY * r('concreteTruck') + footingMat
+  const mat = wallConcCY * r('concreteTruck') + footingMat
   return { hrs, mat, concCY, footingCY, horizRebarLF }
 }
 
 // ── Main calc ─────────────────────────────────────────────────────────────────
-function calcWalls(state, lrph = DEFAULTS.laborRatePerHour, mp = {}, gpmd = DEFAULTS.gpmd, walkAccess = null) {
-  const r = (key) => mp[WALL_RATES[key].db] ?? WALL_RATES[key].fb
+function calcWalls(
+  state,
+  lrph = DEFAULTS.laborRatePerHour,
+  mp = {},
+  gpmd = DEFAULTS.gpmd,
+  walkAccess = null
+) {
+  const r = key => mp[WALL_RATES[key].db] ?? WALL_RATES[key].fb
   const _pace = n(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
 
-  let structuralHrs = 0, structuralMat = 0
-  let cmuDetails = [], pipDetails = []
+  let structuralHrs = 0,
+    structuralMat = 0
+  let cmuDetails = [],
+    pipDetails = []
 
   // ALL wall types contribute simultaneously — switching the visible tab
   // no longer drops the other types from the calc. Each section is its
@@ -200,7 +242,6 @@ function calcWalls(state, lrph = DEFAULTS.laborRatePerHour, mp = {}, gpmd = DEFA
     structuralMat += res.mat
     cmuDetails.push(res.detail)
   })
-
   ;(state.pipWalls || []).forEach(wall => {
     const res = calcOnePIP(wall, r)
     structuralHrs += res.hrs
@@ -211,7 +252,7 @@ function calcWalls(state, lrph = DEFAULTS.laborRatePerHour, mp = {}, gpmd = DEFA
   if (n(state.timberLF) > 0 || n(state.timberPosts) > 0) {
     const addlCourses = Math.max(0, Math.ceil((n(state.timberHeightIn) - 8) / 8))
     const postQty = n(state.timberPosts)
-    structuralHrs += n(state.timberLF) * (0.4417 + addlCourses * 0.80) + postQty * 0.4667
+    structuralHrs += n(state.timberLF) * (0.4417 + addlCourses * 0.8) + postQty * 0.4667
     structuralMat += n(state.timberLF) * (0.2917 + addlCourses * 0.55) * 50 + postQty * 100
   }
 
@@ -221,70 +262,117 @@ function calcWalls(state, lrph = DEFAULTS.laborRatePerHour, mp = {}, gpmd = DEFA
   // estimator types into the Finishes row. Quoted prices vary by supplier
   // and project, so the override always wins when set; otherwise we fall
   // back to the master rate.
-  const { sandStuccoSF, sandStuccoRateIn, smoothStuccoSF, smoothStuccoRateIn,
-          ledgerstoneSF, ledgerstoneRateIn, stackedStoneSF, stackedStoneRateIn,
-          tileSF, tileRateIn, flagstoneSF, flagstoneRateIn,
-          realStoneSF, realStoneRateIn } = state
+  const {
+    sandStuccoSF,
+    sandStuccoRateIn,
+    smoothStuccoSF,
+    smoothStuccoRateIn,
+    ledgerstoneSF,
+    ledgerstoneRateIn,
+    stackedStoneSF,
+    stackedStoneRateIn,
+    tileSF,
+    tileRateIn,
+    flagstoneSF,
+    flagstoneRateIn,
+    realStoneSF,
+    realStoneRateIn,
+  } = state
   // Override-or-master helper. Empty string / 0 / NaN → fall back.
   const ovr = (input, key) => {
     const v = parseFloat(input)
     return Number.isFinite(v) && v > 0 ? v : r(key)
   }
-  const sandStuccoRate   = ovr(sandStuccoRateIn,   'sandStucco')
+  const sandStuccoRate = ovr(sandStuccoRateIn, 'sandStucco')
   const smoothStuccoRate = ovr(smoothStuccoRateIn, 'smoothStucco')
-  const ledgerstoneRate  = ovr(ledgerstoneRateIn,  'ledgerstone')
+  const ledgerstoneRate = ovr(ledgerstoneRateIn, 'ledgerstone')
   const stackedStoneRate = ovr(stackedStoneRateIn, 'stackedStone')
-  const tileRate         = ovr(tileRateIn,         'tile')
+  const tileRate = ovr(tileRateIn, 'tile')
 
-  const sandStuccoHrs   = n(sandStuccoSF)   > 0 ? (n(sandStuccoSF)   / r('sandStuccoLab'))   * 8 : 0
+  const sandStuccoHrs = n(sandStuccoSF) > 0 ? (n(sandStuccoSF) / r('sandStuccoLab')) * 8 : 0
   const smoothStuccoHrs = n(smoothStuccoSF) > 0 ? (n(smoothStuccoSF) / r('smoothStuccoLab')) * 8 : 0
-  const ledgerstoneHrs  = n(ledgerstoneSF)  > 0 ? (n(ledgerstoneSF)  / r('ledgerstoneLab'))  * 8 : 0
+  const ledgerstoneHrs = n(ledgerstoneSF) > 0 ? (n(ledgerstoneSF) / r('ledgerstoneLab')) * 8 : 0
   const stackedStoneHrs = n(stackedStoneSF) > 0 ? (n(stackedStoneSF) / r('stackedStoneLab')) * 8 : 0
-  const tileHrs         = n(tileSF)   > 0 ? n(tileSF)   * r('tileLab')    : 0
-  const flagstoneHrs    = n(flagstoneSF) > 0 ? n(flagstoneSF) * r('flagstoneLab') : 0
-  const realStoneHrs    = n(realStoneSF)  > 0 ? n(realStoneSF)  * r('realStoneLab')  : 0
+  const tileHrs = n(tileSF) > 0 ? n(tileSF) * r('tileLab') : 0
+  const flagstoneHrs = n(flagstoneSF) > 0 ? n(flagstoneSF) * r('flagstoneLab') : 0
+  const realStoneHrs = n(realStoneSF) > 0 ? n(realStoneSF) * r('realStoneLab') : 0
 
-  const sandStuccoMat   = n(sandStuccoSF)   * sandStuccoRate
+  const sandStuccoMat = n(sandStuccoSF) * sandStuccoRate
   const smoothStuccoMat = n(smoothStuccoSF) * smoothStuccoRate
-  const ledgerstoneMat  = n(ledgerstoneSF)  > 0 ? n(ledgerstoneSF) * ledgerstoneRate * 1.1 + (n(ledgerstoneSF) / 5) * 2 : 0
-  const stackedStoneMat = n(stackedStoneSF) > 0 ? n(stackedStoneSF) * stackedStoneRate * 1.1 + (n(stackedStoneSF) / 5) * 2 : 0
-  const tileMat         = n(tileSF) > 0 ? n(tileSF) * tileRate + n(tileSF) : 0
-  const flagstoneRate   = n(flagstoneRateIn) || r('flagstone')
-  const flagstoneMat    = n(flagstoneSF) > 0 ? (n(flagstoneSF) / 80) * flagstoneRate + n(flagstoneSF) * 1.5 : 0
-  const realStoneRate   = n(realStoneRateIn) || r('realStone')
-  const realStoneMat    = n(realStoneSF)  > 0 ? (n(realStoneSF)  / 70) * realStoneRate  + n(realStoneSF) * 2 : 0
+  const ledgerstoneMat =
+    n(ledgerstoneSF) > 0 ? n(ledgerstoneSF) * ledgerstoneRate * 1.1 + (n(ledgerstoneSF) / 5) * 2 : 0
+  const stackedStoneMat =
+    n(stackedStoneSF) > 0
+      ? n(stackedStoneSF) * stackedStoneRate * 1.1 + (n(stackedStoneSF) / 5) * 2
+      : 0
+  const tileMat = n(tileSF) > 0 ? n(tileSF) * tileRate + n(tileSF) : 0
+  const flagstoneRate = n(flagstoneRateIn) || r('flagstone')
+  const flagstoneMat =
+    n(flagstoneSF) > 0 ? (n(flagstoneSF) / 80) * flagstoneRate + n(flagstoneSF) * 1.5 : 0
+  const realStoneRate = n(realStoneRateIn) || r('realStone')
+  const realStoneMat =
+    n(realStoneSF) > 0 ? (n(realStoneSF) / 70) * realStoneRate + n(realStoneSF) * 2 : 0
 
-  const finishHrs = sandStuccoHrs + smoothStuccoHrs + ledgerstoneHrs + stackedStoneHrs + tileHrs + flagstoneHrs + realStoneHrs
-  const finishMat = sandStuccoMat + smoothStuccoMat + ledgerstoneMat + stackedStoneMat + tileMat + flagstoneMat + realStoneMat
+  const finishHrs =
+    sandStuccoHrs +
+    smoothStuccoHrs +
+    ledgerstoneHrs +
+    stackedStoneHrs +
+    tileHrs +
+    flagstoneHrs +
+    realStoneHrs
+  const finishMat =
+    sandStuccoMat +
+    smoothStuccoMat +
+    ledgerstoneMat +
+    stackedStoneMat +
+    tileMat +
+    flagstoneMat +
+    realStoneMat
 
   // Caps
-  let capHrs = 0, capMat = 0
+  let capHrs = 0,
+    capMat = 0
   ;(state.capRows || []).forEach(cap => {
-    const lf = n(cap.lf), qty = n(cap.qty)
-    if (cap.type === 'Flagstone')    { capMat += (n(cap.widthIn)/12)*lf*0.0833*100/2000*r('capFlagstone'); capHrs += lf*0.25 }
-    else if (cap.type === 'Precast') {
+    const lf = n(cap.lf),
+      qty = n(cap.qty)
+    if (cap.type === 'Flagstone') {
+      capMat += (((n(cap.widthIn) / 12) * lf * 0.0833 * 100) / 2000) * r('capFlagstone')
+      capHrs += lf * 0.25
+    } else if (cap.type === 'Precast') {
       // Width scales the unit price — base $/ea is keyed to an 8" cap;
       // empty/0 width falls back to 8" so old entries price identically.
       const widthFactor = (n(cap.widthIn) || 8) / 8
       capMat += qty * r('capPrecast') * widthFactor
-      capHrs += qty * 0.20
+      capHrs += qty * 0.2
+    } else if (cap.type === 'PIP Concrete') {
+      capMat += ((lf * (n(cap.widthIn) / 12) * 0.333) / 27) * r('concreteTruck')
+      capHrs += lf * 0.15
+    } else if (cap.type === 'Bullnose Brick') {
+      capMat += lf * r('capBullnose')
+      capHrs += lf * 0.08
     }
-    else if (cap.type === 'PIP Concrete') { capMat += lf*(n(cap.widthIn)/12)*0.333/27*r('concreteTruck'); capHrs += lf*0.15 }
-    else if (cap.type === 'Bullnose Brick') { capMat += lf*r('capBullnose'); capHrs += lf*0.08 }
   })
 
   // Waterproofing — supports multiple rows now (one row per wall section
   // that needs its own spec). Each row is { type, sf }; type 'None' or 0 SF
   // contributes nothing. Legacy single entry (wpType / wpSF) is migrated
   // into the array form by the component, so callers don't need to change.
-  const WP_KEY = { 'Primer & Membrane':'wpPrimerMembrane','3 Coats Roll On':'wp3CoatRollOn','Thoroseal & Roll On':'wpThoroseal','Dimple Membrane':'wpDimpleMembrane' }
-  const wpRows = Array.isArray(state.wpRows) && state.wpRows.length
-    ? state.wpRows
-    : [{ type: state.wpType, sf: state.wpSF }]
-  let wpMat = 0, wpHrs = 0
+  const WP_KEY = {
+    'Primer & Membrane': 'wpPrimerMembrane',
+    '3 Coats Roll On': 'wp3CoatRollOn',
+    'Thoroseal & Roll On': 'wpThoroseal',
+    'Dimple Membrane': 'wpDimpleMembrane',
+  }
+  const wpRows =
+    Array.isArray(state.wpRows) && state.wpRows.length
+      ? state.wpRows
+      : [{ type: state.wpType, sf: state.wpSF }]
+  let wpMat = 0,
+    wpHrs = 0
   wpRows.forEach(row => {
     const sf = n(row?.sf)
-    const k  = WP_KEY[row?.type]
+    const k = WP_KEY[row?.type]
     if (sf > 0 && k) {
       wpMat += sf * r(k)
       wpHrs += sf / 200
@@ -292,30 +380,57 @@ function calcWalls(state, lrph = DEFAULTS.laborRatePerHour, mp = {}, gpmd = DEFA
   })
 
   // Manual
-  let manHrs = 0, manMat = 0, manSub = 0
-  ;(state.manualRows || []).forEach(row => { manHrs += n(row.hours); manMat += n(row.materials); manSub += n(row.subCost) })
+  let manHrs = 0,
+    manMat = 0,
+    manSub = 0
+  ;(state.manualRows || []).forEach(row => {
+    manHrs += n(row.hours)
+    manMat += n(row.materials)
+    manSub += n(row.subCost)
+  })
 
-  const baseHrs    = structuralHrs + finishHrs + capHrs + wpHrs + manHrs
-  const diffMod    = 1 + n(state.difficulty) / 100
-  const _adjHrs    = baseHrs * diffMod + n(state.hoursAdj)
-  const walkHrs    = calcWalkAccessLabor(_adjHrs, state.distanceLF, { paceLfPerMin: _pace })
-  const totalHrs   = _adjHrs + walkHrs
-  const manDays   = totalHrs / 8
-  const totalMat  = structuralMat + finishMat + capMat + wpMat + manMat
+  const baseHrs = structuralHrs + finishHrs + capHrs + wpHrs + manHrs
+  const diffMod = 1 + n(state.difficulty) / 100
+  const _adjHrs = baseHrs * diffMod + n(state.hoursAdj)
+  const walkHrs = calcWalkAccessLabor(_adjHrs, state.distanceLF, { paceLfPerMin: _pace })
+  const totalHrs = _adjHrs + walkHrs
+  const manDays = totalHrs / 8
+  const totalMat = structuralMat + finishMat + capMat + wpMat + manMat
 
-  const laborCost  = totalHrs * lrph
-  const burden     = laborCost * DEFAULTS.laborBurdenPct
-  const gp         = manDays * gpmd
+  const laborCost = totalHrs * lrph
+  const burden = laborCost * DEFAULTS.laborBurdenPct
+  const gp = manDays * gpmd
   const commission = gp * DEFAULTS.commissionRate
-  const price      = totalMat + laborCost + burden + gp + commission + manSub
+  const price = totalMat + laborCost + burden + gp + commission + manSub
 
   return {
-    totalHrs, manDays, totalMat, laborCost, burden, gp, commission, subCost: manSub, price,
+    totalHrs,
+    manDays,
+    totalMat,
+    laborCost,
+    burden,
+    gp,
+    commission,
+    subCost: manSub,
+    price,
     walkHrs,
-    structuralHrs, finishHrs, capHrs, wpHrs,
-    structuralMat, finishMat, capMat, wpMat,
-    cmuDetails, pipDetails,
-    sandStuccoMat, smoothStuccoMat, ledgerstoneMat, stackedStoneMat, tileMat, flagstoneMat, realStoneMat,
+    structuralHrs,
+    finishHrs,
+    capHrs,
+    wpHrs,
+    structuralMat,
+    finishMat,
+    capMat,
+    wpMat,
+    cmuDetails,
+    pipDetails,
+    sandStuccoMat,
+    smoothStuccoMat,
+    ledgerstoneMat,
+    stackedStoneMat,
+    tileMat,
+    flagstoneMat,
+    realStoneMat,
   }
 }
 
@@ -330,9 +445,12 @@ function SectionHeader({ title }) {
 
 function NumInput({ value, onChange, placeholder = '0', className = '' }) {
   return (
-    <input type="number" step="any"
+    <input
+      type="number"
+      step="any"
       className={`input text-sm py-1.5 ${className}`}
-      placeholder={placeholder} value={value}
+      placeholder={placeholder}
+      value={value}
       onChange={e => onChange(e.target.value)}
     />
   )
@@ -360,8 +478,17 @@ const DEFAULT_CAP_ROWS = [
 const CAP_TYPES = ['None', 'Flagstone', 'Precast', 'PIP Concrete', 'Bullnose Brick']
 
 // ── CMU Wall Entry ────────────────────────────────────────────────────────────
-function CmuWallEntry({ wall, idx, total, onChange, onRemove, detail, materialPrices, refreshAllRates }) {
-  const set = (field) => (val) => onChange(idx, field, val)
+function CmuWallEntry({
+  wall,
+  idx,
+  total,
+  onChange,
+  onRemove,
+  detail,
+  materialPrices,
+  refreshAllRates,
+}) {
+  const set = field => val => onChange(idx, field, val)
   const hasData = n(wall.lf) > 0 && n(wall.heightIn) > 0
   return (
     <div className="border border-gray-200 rounded-xl p-3 mb-3 bg-white">
@@ -370,8 +497,10 @@ function CmuWallEntry({ wall, idx, total, onChange, onRemove, detail, materialPr
           Wall {idx + 1}
         </span>
         {total > 1 && (
-          <button onClick={() => onRemove(idx)}
-            className="text-xs text-red-400 hover:text-red-600 px-2 py-0.5 rounded border border-red-100 hover:border-red-300 transition-colors">
+          <button
+            onClick={() => onRemove(idx)}
+            className="text-xs text-red-400 hover:text-red-600 px-2 py-0.5 rounded border border-red-100 hover:border-red-300 transition-colors"
+          >
             Remove
           </button>
         )}
@@ -399,10 +528,12 @@ function CmuWallEntry({ wall, idx, total, onChange, onRemove, detail, materialPr
               default — so an empty DB still yields a sensible quote. */}
           {(() => {
             const b = blockByName(wall.blockType)
-            const price = (materialPrices?.[wallBlockRateName(b.name)] ?? b.price)
+            const price = materialPrices?.[wallBlockRateName(b.name)] ?? b.price
             return (
               <div className="mt-1 flex items-center gap-1 text-[11px] text-gray-500">
-                <span>Price: <strong className="text-gray-800">${price.toFixed(2)}</strong>/ea</span>
+                <span>
+                  Price: <strong className="text-gray-800">${price.toFixed(2)}</strong>/ea
+                </span>
                 <RateEditPopover
                   table="material_rates"
                   name={wallBlockRateName(b.name)}
@@ -447,25 +578,43 @@ function CmuWallEntry({ wall, idx, total, onChange, onRemove, detail, materialPr
           <label className="block text-xs text-gray-500 mb-1">% Grouted Solid</label>
           <div className="relative">
             <NumInput value={wall.pctGrouted} onChange={set('pctGrouted')} placeholder="100" />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+              %
+            </span>
           </div>
         </div>
         <div className="col-span-2 sm:col-span-1">
           <label className="block text-xs text-gray-500 mb-1">% of Wall Curved</label>
           <div className="relative">
             <NumInput value={wall.pctCurved} onChange={set('pctCurved')} placeholder="0" />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+              %
+            </span>
           </div>
         </div>
       </div>
       {hasData && detail && (
         <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 text-xs text-gray-600 flex flex-wrap gap-3">
-          <span>Grey: <strong>{detail.orderGreyBlock}</strong></span>
-          <span>BB: <strong>{detail.orderBBBlock}</strong></span>
-          <span>Footing: <strong>{detail.footingCY.toFixed(3)} CY</strong></span>
-          <span>Grout: <strong>{detail.groutCY.toFixed(3)} CY</strong></span>
-          <span>Rebar: <strong>{Math.round(detail.totalRebarLF)} LF</strong></span>
-          {detail.curveAdd > 0 && <span>Curve: <strong>+{detail.curveAdd.toFixed(2)} hrs</strong></span>}
+          <span>
+            Grey: <strong>{detail.orderGreyBlock}</strong>
+          </span>
+          <span>
+            BB: <strong>{detail.orderBBBlock}</strong>
+          </span>
+          <span>
+            Footing: <strong>{detail.footingCY.toFixed(3)} CY</strong>
+          </span>
+          <span>
+            Grout: <strong>{detail.groutCY.toFixed(3)} CY</strong>
+          </span>
+          <span>
+            Rebar: <strong>{Math.round(detail.totalRebarLF)} LF</strong>
+          </span>
+          {detail.curveAdd > 0 && (
+            <span>
+              Curve: <strong>+{detail.curveAdd.toFixed(2)} hrs</strong>
+            </span>
+          )}
         </div>
       )}
     </div>
@@ -474,7 +623,7 @@ function CmuWallEntry({ wall, idx, total, onChange, onRemove, detail, materialPr
 
 // ── PIP Wall Entry ────────────────────────────────────────────────────────────
 function PipWallEntry({ wall, idx, total, onChange, onRemove, detail }) {
-  const set = (field) => (val) => onChange(idx, field, val)
+  const set = field => val => onChange(idx, field, val)
   const hasData = n(wall.lf) > 0 && n(wall.heightIn) > 0
   return (
     <div className="border border-gray-200 rounded-xl p-3 mb-3 bg-white">
@@ -483,8 +632,10 @@ function PipWallEntry({ wall, idx, total, onChange, onRemove, detail }) {
           Wall {idx + 1}
         </span>
         {total > 1 && (
-          <button onClick={() => onRemove(idx)}
-            className="text-xs text-red-400 hover:text-red-600 px-2 py-0.5 rounded border border-red-100 hover:border-red-300 transition-colors">
+          <button
+            onClick={() => onRemove(idx)}
+            className="text-xs text-red-400 hover:text-red-600 px-2 py-0.5 rounded border border-red-100 hover:border-red-300 transition-colors"
+          >
             Remove
           </button>
         )}
@@ -513,10 +664,22 @@ function PipWallEntry({ wall, idx, total, onChange, onRemove, detail }) {
       </div>
       {hasData && detail && (
         <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 text-xs text-gray-600 flex flex-wrap gap-4">
-          <span>Concrete: <strong>{detail.concCY.toFixed(2)} CY</strong></span>
-          {detail.footingCY > 0 && <span>Footing: <strong>{detail.footingCY.toFixed(3)} CY</strong></span>}
-          {detail.horizRebarLF > 0 && <span>Footing rebar: <strong>{Math.round(detail.horizRebarLF)} LF</strong></span>}
-          <span>Labor: <strong>{detail.hrs.toFixed(2)} hrs</strong></span>
+          <span>
+            Concrete: <strong>{detail.concCY.toFixed(2)} CY</strong>
+          </span>
+          {detail.footingCY > 0 && (
+            <span>
+              Footing: <strong>{detail.footingCY.toFixed(3)} CY</strong>
+            </span>
+          )}
+          {detail.horizRebarLF > 0 && (
+            <span>
+              Footing rebar: <strong>{Math.round(detail.horizRebarLF)} LF</strong>
+            </span>
+          )}
+          <span>
+            Labor: <strong>{detail.hrs.toFixed(2)} hrs</strong>
+          </span>
         </div>
       )}
     </div>
@@ -526,13 +689,17 @@ function PipWallEntry({ wall, idx, total, onChange, onRemove, detail }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Main component
 // ─────────────────────────────────────────────────────────────────────────────
-export default function WallsModule({ projectName, onSave, onBack, saving, initialData }) {
-  const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? DEFAULTS.laborRatePerHour)
-  const [walkAccess, setWalkAccess] = useState(initialData?.walkAccess ?? {
-    paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
-  })
+export default function WallsModule({ onSave, onBack, saving, initialData }) {
+  const [laborRatePerHour, setLaborRatePerHour] = useState(
+    initialData?.laborRatePerHour ?? DEFAULTS.laborRatePerHour
+  )
+  const [walkAccess, setWalkAccess] = useState(
+    initialData?.walkAccess ?? {
+      paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+    }
+  )
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
-  const [pricesLoading, setPricesLoading]   = useState(!initialData?.materialPrices)
+  const [pricesLoading, setPricesLoading] = useState(!initialData?.materialPrices)
 
   // Re-fetch the merged labor+material rate map. Called once on mount and
   // again after any RateEditPopover save so the calc reflects edits.
@@ -542,35 +709,51 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
       supabase.from('labor_rates').select('name, rate').eq('category', 'Walls'),
     ])
     const p = {}
-    ;(matRes.data || []).forEach(row => { p[row.name] = parseFloat(row.unit_cost) || 0 })
-    ;(labRes.data  || []).forEach(row => { p[row.name] = parseFloat(row.rate)     || 0 })
+    ;(matRes.data || []).forEach(row => {
+      p[row.name] = parseFloat(row.unit_cost) || 0
+    })
+    ;(labRes.data || []).forEach(row => {
+      p[row.name] = parseFloat(row.rate) || 0
+    })
     setMaterialPrices(p)
   }, [])
 
   useEffect(() => {
     if (!initialData?.laborRatePerHour) {
-      supabase.from('company_settings').select('labor_rate_per_hour, walk_access_pace_lf_per_min').maybeSingle()
+      supabase
+        .from('company_settings')
+        .select('labor_rate_per_hour, walk_access_pace_lf_per_min')
+        .maybeSingle()
         .then(({ data }) => {
           if (!data) return
-          if (data.labor_rate_per_hour != null) setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
+          if (data.labor_rate_per_hour != null)
+            setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
           if (data.walk_access_pace_lf_per_min != null) {
             const _wpace = parseFloat(data.walk_access_pace_lf_per_min)
-            setWalkAccess({ paceLfPerMin: Number.isFinite(_wpace) && _wpace > 0 ? _wpace : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN })
+            setWalkAccess({
+              paceLfPerMin:
+                Number.isFinite(_wpace) && _wpace > 0
+                  ? _wpace
+                  : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+            })
           }
         })
     }
-    if (initialData?.materialPrices) { setPricesLoading(false); return }
+    if (initialData?.materialPrices) {
+      setPricesLoading(false)
+      return
+    }
     refreshAllRates().then(() => setPricesLoading(false))
   }, [refreshAllRates])
 
-  const gpmd            = initialData?.gpmd            ?? DEFAULTS.gpmd
-  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
+  const gpmd = initialData?.gpmd ?? DEFAULTS.gpmd
+  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
 
   // ── Shared state ──────────────────────────────────────────────────────────
   const [difficulty, setDifficulty] = useState(initialData?.difficulty ?? '')
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Masonry')
-  const [hoursAdj,   setHoursAdj]   = useState(initialData?.hoursAdj   ?? '')
-  const [wallType,   setWallType]   = useState(initialData?.wallType   ?? 'CMU')
+  const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
+  const [wallType, setWallType] = useState(initialData?.wallType ?? 'CMU')
   const [distanceLF, setDistanceLF] = useState(initialData?.distanceLF ?? '')
 
   // ── CMU walls array ───────────────────────────────────────────────────────
@@ -580,52 +763,64 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
       // Backfill blockType on legacy entries saved before block-type support.
       return initialData.cmuWalls.map(w => ({ blockType: DEFAULT_BLOCK_NAME, ...w }))
     }
-    if (initialData?.cmuLF !== undefined) return [{
-      blockType: DEFAULT_BLOCK_NAME,
-      lf: initialData.cmuLF, heightIn: initialData.cmuHeightIn,
-      footingWIn: initialData.cmuFootingWIn ?? '12', footingDIn: initialData.cmuFootingDIn ?? '12',
-      rebarSpIn: initialData.cmuRebarSpIn ?? '16', horizBars: initialData.cmuHorizBars ?? '2',
-      bondBeams: initialData.cmuBondBeams ?? '1', pctGrouted: initialData.cmuPctGrouted ?? '100',
-      pctCurved: initialData.cmuPctCurved ?? '0',
-    }]
+    if (initialData?.cmuLF !== undefined)
+      return [
+        {
+          blockType: DEFAULT_BLOCK_NAME,
+          lf: initialData.cmuLF,
+          heightIn: initialData.cmuHeightIn,
+          footingWIn: initialData.cmuFootingWIn ?? '12',
+          footingDIn: initialData.cmuFootingDIn ?? '12',
+          rebarSpIn: initialData.cmuRebarSpIn ?? '16',
+          horizBars: initialData.cmuHorizBars ?? '2',
+          bondBeams: initialData.cmuBondBeams ?? '1',
+          pctGrouted: initialData.cmuPctGrouted ?? '100',
+          pctCurved: initialData.cmuPctCurved ?? '0',
+        },
+      ]
     return [DEFAULT_CMU()]
   }
-  const [cmuWalls,      setCmuWalls]      = useState(initCmuWalls)
-  const [cmuFootingPump,setCmuFootingPump]= useState(initialData?.cmuFootingPump ?? 'No')
-  const [cmuGroutPump,  setCmuGroutPump]  = useState(initialData?.cmuGroutPump   ?? 'No')
+  const [cmuWalls, setCmuWalls] = useState(initCmuWalls)
+  const [cmuFootingPump, setCmuFootingPump] = useState(initialData?.cmuFootingPump ?? 'No')
+  const [cmuGroutPump, setCmuGroutPump] = useState(initialData?.cmuGroutPump ?? 'No')
 
   // ── PIP walls array ───────────────────────────────────────────────────────
   const initPipWalls = () => {
     if (initialData?.pipWalls) return initialData.pipWalls
-    if (initialData?.pipLF !== undefined) return [{ lf: initialData.pipLF, heightIn: initialData.pipHeightIn }]
+    if (initialData?.pipLF !== undefined)
+      return [{ lf: initialData.pipLF, heightIn: initialData.pipHeightIn }]
     return [DEFAULT_PIP()]
   }
   const [pipWalls, setPipWalls] = useState(initPipWalls)
 
   // ── Timber (single) ───────────────────────────────────────────────────────
-  const [timberLF,       setTimberLF]       = useState(initialData?.timberLF       ?? '')
+  const [timberLF, setTimberLF] = useState(initialData?.timberLF ?? '')
   const [timberHeightIn, setTimberHeightIn] = useState(initialData?.timberHeightIn ?? '')
-  const [timberType,     setTimberType]     = useState(initialData?.timberType     ?? 'Railroad Treated')
-  const [timberPosts,    setTimberPosts]    = useState(initialData?.timberPosts    ?? '')
+  const [timberType, setTimberType] = useState(initialData?.timberType ?? 'Railroad Treated')
+  const [timberPosts, setTimberPosts] = useState(initialData?.timberPosts ?? '')
 
   // ── Wall Finishes ─────────────────────────────────────────────────────────
-  const [sandStuccoSF,      setSandStuccoSF]      = useState(initialData?.sandStuccoSF      ?? '')
-  const [sandStuccoRateIn,  setSandStuccoRateIn]  = useState(initialData?.sandStuccoRateIn  ?? '')
-  const [smoothStuccoSF,    setSmoothStuccoSF]    = useState(initialData?.smoothStuccoSF    ?? '')
-  const [smoothStuccoRateIn,setSmoothStuccoRateIn]= useState(initialData?.smoothStuccoRateIn?? '')
-  const [ledgerstoneSF,     setLedgerstoneSF]     = useState(initialData?.ledgerstoneSF     ?? '')
+  const [sandStuccoSF, setSandStuccoSF] = useState(initialData?.sandStuccoSF ?? '')
+  const [sandStuccoRateIn, setSandStuccoRateIn] = useState(initialData?.sandStuccoRateIn ?? '')
+  const [smoothStuccoSF, setSmoothStuccoSF] = useState(initialData?.smoothStuccoSF ?? '')
+  const [smoothStuccoRateIn, setSmoothStuccoRateIn] = useState(
+    initialData?.smoothStuccoRateIn ?? ''
+  )
+  const [ledgerstoneSF, setLedgerstoneSF] = useState(initialData?.ledgerstoneSF ?? '')
   const [ledgerstoneRateIn, setLedgerstoneRateIn] = useState(initialData?.ledgerstoneRateIn ?? '')
-  const [stackedStoneSF,    setStackedStoneSF]    = useState(initialData?.stackedStoneSF    ?? '')
-  const [stackedStoneRateIn,setStackedStoneRateIn]= useState(initialData?.stackedStoneRateIn?? '')
-  const [tileSF,            setTileSF]            = useState(initialData?.tileSF            ?? '')
-  const [tileRateIn,        setTileRateIn]        = useState(initialData?.tileRateIn        ?? '')
-  const [flagstoneSF,       setFlagstoneSF]       = useState(initialData?.flagstoneSF       ?? '')
-  const [flagstoneRateIn,   setFlagstoneRateIn]   = useState(initialData?.flagstoneRateIn   ?? '')
-  const [realStoneSF,       setRealStoneSF]       = useState(initialData?.realStoneSF       ?? '')
-  const [realStoneRateIn,   setRealStoneRateIn]   = useState(initialData?.realStoneRateIn   ?? '')
+  const [stackedStoneSF, setStackedStoneSF] = useState(initialData?.stackedStoneSF ?? '')
+  const [stackedStoneRateIn, setStackedStoneRateIn] = useState(
+    initialData?.stackedStoneRateIn ?? ''
+  )
+  const [tileSF, setTileSF] = useState(initialData?.tileSF ?? '')
+  const [tileRateIn, setTileRateIn] = useState(initialData?.tileRateIn ?? '')
+  const [flagstoneSF, setFlagstoneSF] = useState(initialData?.flagstoneSF ?? '')
+  const [flagstoneRateIn, setFlagstoneRateIn] = useState(initialData?.flagstoneRateIn ?? '')
+  const [realStoneSF, setRealStoneSF] = useState(initialData?.realStoneSF ?? '')
+  const [realStoneRateIn, setRealStoneRateIn] = useState(initialData?.realStoneRateIn ?? '')
 
   // ── Caps / Waterproofing / Manual ─────────────────────────────────────────
-  const [capRows,    setCapRows]    = useState(initialData?.capRows    ?? DEFAULT_CAP_ROWS)
+  const [capRows, setCapRows] = useState(initialData?.capRows ?? DEFAULT_CAP_ROWS)
   // Multi-row waterproofing. Migrate legacy single-entry initialData on
   // mount so existing saved walls keep their waterproofing line.
   const [wpRows, setWpRows] = useState(() => {
@@ -636,10 +831,14 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
     return [{ type: 'None', sf: '' }]
   })
   function updateWpRow(i, field, val) {
-    setWpRows(rs => rs.map((r, idx) => idx === i ? { ...r, [field]: val } : r))
+    setWpRows(rs => rs.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
-  function addWpRow()    { setWpRows(rs => [...rs, { type: 'None', sf: '' }]) }
-  function removeWpRow(idx) { setWpRows(rs => rs.length > 1 ? rs.filter((_, i) => i !== idx) : rs) }
+  function addWpRow() {
+    setWpRows(rs => [...rs, { type: 'None', sf: '' }])
+  }
+  function removeWpRow(idx) {
+    setWpRows(rs => (rs.length > 1 ? rs.filter((_, i) => i !== idx) : rs))
+  }
   const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
 
   // ── Sales tax — applied to totalMat across every module so the bid
@@ -649,10 +848,13 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
   const [salesTaxRate, setSalesTaxRate] = useState(0)
   useEffect(() => {
     let alive = true
-    fetchSalesTaxRate().then(r => { if (alive) setSalesTaxRate(r) })
-    return () => { alive = false }
+    fetchSalesTaxRate().then(r => {
+      if (alive) setSalesTaxRate(r)
+    })
+    return () => {
+      alive = false
+    }
   }, [])
-
 
   useEffect(() => {
     if (Object.keys(materialPrices).length === 0) return
@@ -664,40 +866,65 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
 
   // ── Array helpers ─────────────────────────────────────────────────────────
   function updateCmuWall(idx, field, val) {
-    setCmuWalls(ws => ws.map((w, i) => i === idx ? { ...w, [field]: val } : w))
+    setCmuWalls(ws => ws.map((w, i) => (i === idx ? { ...w, [field]: val } : w)))
   }
-  function addCmuWall()    { setCmuWalls(ws => [...ws, DEFAULT_CMU()]) }
-  function removeCmuWall(idx) { setCmuWalls(ws => ws.filter((_, i) => i !== idx)) }
+  function addCmuWall() {
+    setCmuWalls(ws => [...ws, DEFAULT_CMU()])
+  }
+  function removeCmuWall(idx) {
+    setCmuWalls(ws => ws.filter((_, i) => i !== idx))
+  }
 
   function updatePipWall(idx, field, val) {
-    setPipWalls(ws => ws.map((w, i) => i === idx ? { ...w, [field]: val } : w))
+    setPipWalls(ws => ws.map((w, i) => (i === idx ? { ...w, [field]: val } : w)))
   }
-  function addPipWall()    { setPipWalls(ws => [...ws, DEFAULT_PIP()]) }
-  function removePipWall(idx) { setPipWalls(ws => ws.filter((_, i) => i !== idx)) }
+  function addPipWall() {
+    setPipWalls(ws => [...ws, DEFAULT_PIP()])
+  }
+  function removePipWall(idx) {
+    setPipWalls(ws => ws.filter((_, i) => i !== idx))
+  }
 
   function updateManual(i, field, val) {
-    setManualRows(rows => rows.map((row, idx) => idx === i ? { ...row, [field]: val } : row))
+    setManualRows(rows => rows.map((row, idx) => (idx === i ? { ...row, [field]: val } : row)))
   }
   function updateCap(i, field, val) {
-    setCapRows(rows => rows.map((row, idx) => idx === i ? { ...row, [field]: val } : row))
+    setCapRows(rows => rows.map((row, idx) => (idx === i ? { ...row, [field]: val } : row)))
   }
 
-  const r = (key) => materialPrices[WALL_RATES[key].db] ?? WALL_RATES[key].fb
+  const r = key => materialPrices[WALL_RATES[key].db] ?? WALL_RATES[key].fb
 
   const state = {
     crewType,
-    difficulty, hoursAdj, wallType, distanceLF,
-    cmuWalls, cmuFootingPump, cmuGroutPump,
+    difficulty,
+    hoursAdj,
+    wallType,
+    distanceLF,
+    cmuWalls,
+    cmuFootingPump,
+    cmuGroutPump,
     pipWalls,
-    timberLF, timberHeightIn, timberType, timberPosts,
-    sandStuccoSF,   sandStuccoRateIn,
-    smoothStuccoSF, smoothStuccoRateIn,
-    ledgerstoneSF,  ledgerstoneRateIn,
-    stackedStoneSF, stackedStoneRateIn,
-    tileSF,         tileRateIn,
-    flagstoneSF,    flagstoneRateIn,
-    realStoneSF,    realStoneRateIn,
-    capRows, wpRows, manualRows,
+    timberLF,
+    timberHeightIn,
+    timberType,
+    timberPosts,
+    sandStuccoSF,
+    sandStuccoRateIn,
+    smoothStuccoSF,
+    smoothStuccoRateIn,
+    ledgerstoneSF,
+    ledgerstoneRateIn,
+    stackedStoneSF,
+    stackedStoneRateIn,
+    tileSF,
+    tileRateIn,
+    flagstoneSF,
+    flagstoneRateIn,
+    realStoneSF,
+    realStoneRateIn,
+    capRows,
+    wpRows,
+    manualRows,
   }
   const calcRaw = calcWalls(state, laborRatePerHour, materialPrices, gpmd, walkAccess)
   // Apply company sales tax to the module's total material cost so the
@@ -705,19 +932,19 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
   // material_cost (saved with the module) ends up tax-inclusive too,
   // so bid totals add up to GpmdBar's displayed price.
   const _salesTaxAmt = (calcRaw.totalMat || 0) * (salesTaxRate || 0)
-  const calc = _salesTaxAmt > 0
-    ? {
-        ...calcRaw,
-        totalMat: (calcRaw.totalMat || 0) + _salesTaxAmt,
-        price:    (calcRaw.price    || 0) + _salesTaxAmt,
-        salesTax: _salesTaxAmt,
-      }
-    : calcRaw
-
+  const calc =
+    _salesTaxAmt > 0
+      ? {
+          ...calcRaw,
+          totalMat: (calcRaw.totalMat || 0) + _salesTaxAmt,
+          price: (calcRaw.price || 0) + _salesTaxAmt,
+          salesTax: _salesTaxAmt,
+        }
+      : calcRaw
 
   function handleSave() {
     onSave({
-      man_days:      parseFloat(calc.manDays.toFixed(2)),
+      man_days: parseFloat(calc.manDays.toFixed(2)),
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
       data: { ...state, laborRatePerHour, gpmd, materialPrices, walkAccess, calc },
     })
@@ -727,19 +954,31 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
     <div className="space-y-5">
       {/* ── Sticky GPMD bar ── */}
       <div className="sticky top-0 z-20 -mx-6 px-6 pt-2 pb-2 bg-gray-900 shadow-lg">
-      <GpmdBar
+        <GpmdBar
           sticky
-        totalMat={calc.totalMat} totalHrs={calc.totalHrs} manDays={calc.manDays}
-        laborCost={calc.laborCost} laborRatePerHour={laborRatePerHour}
-        burden={calc.burden} gp={calc.gp} commission={calc.commission}
-        subCost={calc.subCost} gpmd={gpmd} price={calc.price} subMarkupRate={subGpMarkupRate}
-      />
+          totalMat={calc.totalMat}
+          totalHrs={calc.totalHrs}
+          manDays={calc.manDays}
+          laborCost={calc.laborCost}
+          laborRatePerHour={laborRatePerHour}
+          burden={calc.burden}
+          gp={calc.gp}
+          commission={calc.commission}
+          subCost={calc.subCost}
+          gpmd={gpmd}
+          price={calc.price}
+          subMarkupRate={subGpMarkupRate}
+        />
       </div>
 
       {/* Crew Type */}
       <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
         <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
-        <select value={crewType} onChange={e => setCrewType(e.target.value)} className="input text-sm py-1 w-36">
+        <select
+          value={crewType}
+          onChange={e => setCrewType(e.target.value)}
+          className="input text-sm py-1 w-36"
+        >
           <option value="Demo">Demo</option>
           <option value="Landscape">Landscape</option>
           <option value="Masonry">Masonry</option>
@@ -762,10 +1001,17 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
           <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
         </div>
         <div>
-          <p className="text-xs text-gray-500 mb-0.5" title="Average Distance from Truck to Work Area">Truck → Work Area (Avg LF)</p>
+          <p
+            className="text-xs text-gray-500 mb-0.5"
+            title="Average Distance from Truck to Work Area"
+          >
+            Truck → Work Area (Avg LF)
+          </p>
           <NumInput value={distanceLF} onChange={setDistanceLF} placeholder="0" />
           {calc.walkHrs > 0 && (
-            <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">+{calc.walkHrs.toFixed(2)} hrs walk-access</p>
+            <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">
+              +{calc.walkHrs.toFixed(2)} hrs walk-access
+            </p>
           )}
         </div>
         <div>
@@ -779,22 +1025,41 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
         <SectionHeader title="Wall Type" />
         <div className="flex gap-2">
           {[
-            { key: 'CMU',    label: 'CMU Block',        count: cmuWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0).length },
-            { key: 'PIP',    label: 'Poured In Place',  count: pipWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0).length },
-            { key: 'Timber', label: 'Timber / Lumber',  count: (n(timberLF) > 0 || n(timberPosts) > 0) ? 1 : 0 },
+            {
+              key: 'CMU',
+              label: 'CMU Block',
+              count: cmuWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0).length,
+            },
+            {
+              key: 'PIP',
+              label: 'Poured In Place',
+              count: pipWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0).length,
+            },
+            {
+              key: 'Timber',
+              label: 'Timber / Lumber',
+              count: n(timberLF) > 0 || n(timberPosts) > 0 ? 1 : 0,
+            },
           ].map(t => (
-            <button key={t.key} onClick={() => setWallType(t.key)}
+            <button
+              key={t.key}
+              onClick={() => setWallType(t.key)}
               className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                wallType === t.key ? 'bg-green-700 text-white border-green-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-              }`}>
-              {t.label}{t.count > 0 ? ` (${t.count})` : ''}
+                wallType === t.key
+                  ? 'bg-green-700 text-white border-green-700'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {t.label}
+              {t.count > 0 ? ` (${t.count})` : ''}
             </button>
           ))}
         </div>
         {/* Reassurance line — explains the new behavior so users coming
             from the old toggle don't worry about data loss. */}
         <p className="text-[11px] text-gray-500 mt-1">
-          Switching tabs only changes what you see — every wall type's entries continue to contribute to the totals.
+          Switching tabs only changes what you see — every wall type's entries continue to
+          contribute to the totals.
         </p>
       </div>
 
@@ -805,48 +1070,160 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
 
           {/* Inline CMU rate reference — labor + material — all editable */}
           <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-2 text-[11px] text-gray-500">
-            <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">CMU Rates (click any to edit)</p>
+            <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">
+              CMU Rates (click any to edit)
+            </p>
             <div className="flex flex-wrap gap-x-3 gap-y-1">
-              <span className="inline-flex items-center gap-1">Grey block ${r('greyBlock')}/ea
-                <RateEditPopover table="material_rates" name={WALL_RATES.greyBlock.db} category="Walls" unitLabel="ea" currentValue={r('greyBlock')} onSaved={refreshAllRates} />
+              <span className="inline-flex items-center gap-1">
+                Grey block ${r('greyBlock')}/ea
+                <RateEditPopover
+                  table="material_rates"
+                  name={WALL_RATES.greyBlock.db}
+                  category="Walls"
+                  unitLabel="ea"
+                  currentValue={r('greyBlock')}
+                  onSaved={refreshAllRates}
+                />
               </span>
-              <span className="inline-flex items-center gap-1">Bondbeam ${r('bondbeamBlock')}/ea
-                <RateEditPopover table="material_rates" name={WALL_RATES.bondbeamBlock.db} category="Walls" unitLabel="ea" currentValue={r('bondbeamBlock')} onSaved={refreshAllRates} />
+              <span className="inline-flex items-center gap-1">
+                Bondbeam ${r('bondbeamBlock')}/ea
+                <RateEditPopover
+                  table="material_rates"
+                  name={WALL_RATES.bondbeamBlock.db}
+                  category="Walls"
+                  unitLabel="ea"
+                  currentValue={r('bondbeamBlock')}
+                  onSaved={refreshAllRates}
+                />
               </span>
-              <span className="inline-flex items-center gap-1">Rebar ${r('rebar')}/LF
-                <RateEditPopover table="material_rates" name={WALL_RATES.rebar.db} category="Walls" unitLabel="LF" currentValue={r('rebar')} onSaved={refreshAllRates} />
+              <span className="inline-flex items-center gap-1">
+                Rebar ${r('rebar')}/LF
+                <RateEditPopover
+                  table="material_rates"
+                  name={WALL_RATES.rebar.db}
+                  category="Walls"
+                  unitLabel="LF"
+                  currentValue={r('rebar')}
+                  onSaved={refreshAllRates}
+                />
               </span>
-              <span className="inline-flex items-center gap-1">Conc hand ${r('concreteHand')}/CY
-                <RateEditPopover table="material_rates" name={WALL_RATES.concreteHand.db} category="Walls" unitLabel="CY" currentValue={r('concreteHand')} onSaved={refreshAllRates} />
+              <span className="inline-flex items-center gap-1">
+                Conc hand ${r('concreteHand')}/CY
+                <RateEditPopover
+                  table="material_rates"
+                  name={WALL_RATES.concreteHand.db}
+                  category="Walls"
+                  unitLabel="CY"
+                  currentValue={r('concreteHand')}
+                  onSaved={refreshAllRates}
+                />
               </span>
-              <span className="inline-flex items-center gap-1">Conc truck ${r('concreteTruck')}/CY
-                <RateEditPopover table="material_rates" name={WALL_RATES.concreteTruck.db} category="Walls" unitLabel="CY" currentValue={r('concreteTruck')} onSaved={refreshAllRates} />
+              <span className="inline-flex items-center gap-1">
+                Conc truck ${r('concreteTruck')}/CY
+                <RateEditPopover
+                  table="material_rates"
+                  name={WALL_RATES.concreteTruck.db}
+                  category="Walls"
+                  unitLabel="CY"
+                  currentValue={r('concreteTruck')}
+                  onSaved={refreshAllRates}
+                />
               </span>
-              <span className="inline-flex items-center gap-1">Grout pump setup ${r('groutPumpSetup')}
-                <RateEditPopover table="material_rates" name={WALL_RATES.groutPumpSetup.db} category="Walls" unitLabel="flat" currentValue={r('groutPumpSetup')} onSaved={refreshAllRates} />
+              <span className="inline-flex items-center gap-1">
+                Grout pump setup ${r('groutPumpSetup')}
+                <RateEditPopover
+                  table="material_rates"
+                  name={WALL_RATES.groutPumpSetup.db}
+                  category="Walls"
+                  unitLabel="flat"
+                  currentValue={r('groutPumpSetup')}
+                  onSaved={refreshAllRates}
+                />
               </span>
-              <span className="inline-flex items-center gap-1">Grout pump ${r('groutPumpPerYd')}/CY
-                <RateEditPopover table="material_rates" name={WALL_RATES.groutPumpPerYd.db} category="Walls" unitLabel="CY" currentValue={r('groutPumpPerYd')} onSaved={refreshAllRates} />
+              <span className="inline-flex items-center gap-1">
+                Grout pump ${r('groutPumpPerYd')}/CY
+                <RateEditPopover
+                  table="material_rates"
+                  name={WALL_RATES.groutPumpPerYd.db}
+                  category="Walls"
+                  unitLabel="CY"
+                  currentValue={r('groutPumpPerYd')}
+                  onSaved={refreshAllRates}
+                />
               </span>
             </div>
             <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
-              <span className="inline-flex items-center gap-1">Dig {r('digLab')} CF/hr
-                <RateEditPopover table="labor_rates" name={WALL_RATES.digLab.db} category="Walls" mode="coefficient" unitLabel="CF/hr" currentValue={r('digLab')} onSaved={refreshAllRates} />
+              <span className="inline-flex items-center gap-1">
+                Dig {r('digLab')} CF/hr
+                <RateEditPopover
+                  table="labor_rates"
+                  name={WALL_RATES.digLab.db}
+                  category="Walls"
+                  mode="coefficient"
+                  unitLabel="CF/hr"
+                  currentValue={r('digLab')}
+                  onSaved={refreshAllRates}
+                />
               </span>
-              <span className="inline-flex items-center gap-1">Rebar {r('rebarLab')} LF/hr
-                <RateEditPopover table="labor_rates" name={WALL_RATES.rebarLab.db} category="Walls" mode="coefficient" unitLabel="LF/hr" currentValue={r('rebarLab')} onSaved={refreshAllRates} />
+              <span className="inline-flex items-center gap-1">
+                Rebar {r('rebarLab')} LF/hr
+                <RateEditPopover
+                  table="labor_rates"
+                  name={WALL_RATES.rebarLab.db}
+                  category="Walls"
+                  mode="coefficient"
+                  unitLabel="LF/hr"
+                  currentValue={r('rebarLab')}
+                  onSaved={refreshAllRates}
+                />
               </span>
-              <span className="inline-flex items-center gap-1">Block {r('blockLab')} blk/hr
-                <RateEditPopover table="labor_rates" name={WALL_RATES.blockLab.db} category="Walls" mode="coefficient" unitLabel="blk/hr" currentValue={r('blockLab')} onSaved={refreshAllRates} />
+              <span className="inline-flex items-center gap-1">
+                Block {r('blockLab')} blk/hr
+                <RateEditPopover
+                  table="labor_rates"
+                  name={WALL_RATES.blockLab.db}
+                  category="Walls"
+                  mode="coefficient"
+                  unitLabel="blk/hr"
+                  currentValue={r('blockLab')}
+                  onSaved={refreshAllRates}
+                />
               </span>
-              <span className="inline-flex items-center gap-1">Hand grout {r('handGroutLab')} CF/hr
-                <RateEditPopover table="labor_rates" name={WALL_RATES.handGroutLab.db} category="Walls" mode="coefficient" unitLabel="CF/hr" currentValue={r('handGroutLab')} onSaved={refreshAllRates} />
+              <span className="inline-flex items-center gap-1">
+                Hand grout {r('handGroutLab')} CF/hr
+                <RateEditPopover
+                  table="labor_rates"
+                  name={WALL_RATES.handGroutLab.db}
+                  category="Walls"
+                  mode="coefficient"
+                  unitLabel="CF/hr"
+                  currentValue={r('handGroutLab')}
+                  onSaved={refreshAllRates}
+                />
               </span>
-              <span className="inline-flex items-center gap-1">Pump grout {r('pumpGroutLab')} CF/hr
-                <RateEditPopover table="labor_rates" name={WALL_RATES.pumpGroutLab.db} category="Walls" mode="coefficient" unitLabel="CF/hr" currentValue={r('pumpGroutLab')} onSaved={refreshAllRates} />
+              <span className="inline-flex items-center gap-1">
+                Pump grout {r('pumpGroutLab')} CF/hr
+                <RateEditPopover
+                  table="labor_rates"
+                  name={WALL_RATES.pumpGroutLab.db}
+                  category="Walls"
+                  mode="coefficient"
+                  unitLabel="CF/hr"
+                  currentValue={r('pumpGroutLab')}
+                  onSaved={refreshAllRates}
+                />
               </span>
-              <span className="inline-flex items-center gap-1">Setup/clean {r('setupCleanLab')} LF/hr
-                <RateEditPopover table="labor_rates" name={WALL_RATES.setupCleanLab.db} category="Walls" mode="coefficient" unitLabel="LF/hr" currentValue={r('setupCleanLab')} onSaved={refreshAllRates} />
+              <span className="inline-flex items-center gap-1">
+                Setup/clean {r('setupCleanLab')} LF/hr
+                <RateEditPopover
+                  table="labor_rates"
+                  name={WALL_RATES.setupCleanLab.db}
+                  category="Walls"
+                  mode="coefficient"
+                  unitLabel="LF/hr"
+                  currentValue={r('setupCleanLab')}
+                  onSaved={refreshAllRates}
+                />
               </span>
             </div>
           </div>
@@ -865,22 +1242,36 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
             />
           ))}
 
-          <button onClick={addCmuWall}
-            className="w-full py-2 rounded-lg border border-dashed border-green-400 text-green-700 text-sm font-medium hover:bg-green-50 transition-colors mb-3">
+          <button
+            onClick={addCmuWall}
+            className="w-full py-2 rounded-lg border border-dashed border-green-400 text-green-700 text-sm font-medium hover:bg-green-50 transition-colors mb-3"
+          >
             + Add Another CMU Wall
           </button>
 
           {/* Module-level pump options */}
           <div className="border border-gray-200 rounded-xl p-3 bg-gray-50 space-y-0 mb-2">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Pump Options (all walls)</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              Pump Options (all walls)
+            </p>
             <LabeledRow label="Pump for Pouring Footing?">
-              <select className="input text-sm py-1.5 w-24" value={cmuFootingPump} onChange={e => setCmuFootingPump(e.target.value)}>
-                <option>No</option><option>Yes</option>
+              <select
+                className="input text-sm py-1.5 w-24"
+                value={cmuFootingPump}
+                onChange={e => setCmuFootingPump(e.target.value)}
+              >
+                <option>No</option>
+                <option>Yes</option>
               </select>
             </LabeledRow>
             <LabeledRow label="Pump for Grouting Block?">
-              <select className="input text-sm py-1.5 w-24" value={cmuGroutPump} onChange={e => setCmuGroutPump(e.target.value)}>
-                <option>No</option><option>Yes</option>
+              <select
+                className="input text-sm py-1.5 w-24"
+                value={cmuGroutPump}
+                onChange={e => setCmuGroutPump(e.target.value)}
+              >
+                <option>No</option>
+                <option>Yes</option>
               </select>
             </LabeledRow>
           </div>
@@ -891,13 +1282,20 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
             <label className="block text-xs text-gray-500 mb-1 font-medium">Waterproofing</label>
             <div className="space-y-2">
               {wpRows.map((row, i) => {
-                const WP_KEY = { 'Primer & Membrane':'wpPrimerMembrane','3 Coats Roll On':'wp3CoatRollOn','Thoroseal & Roll On':'wpThoroseal','Dimple Membrane':'wpDimpleMembrane' }
+                const WP_KEY = {
+                  'Primer & Membrane': 'wpPrimerMembrane',
+                  '3 Coats Roll On': 'wp3CoatRollOn',
+                  'Thoroseal & Roll On': 'wpThoroseal',
+                  'Dimple Membrane': 'wpDimpleMembrane',
+                }
                 const wpKey = WP_KEY[row.type]
                 return (
                   <div key={i} className="flex items-center gap-2 flex-wrap">
-                    <select className="input text-sm py-1.5 flex-1"
-                            value={row.type}
-                            onChange={e => updateWpRow(i, 'type', e.target.value)}>
+                    <select
+                      className="input text-sm py-1.5 flex-1"
+                      value={row.type}
+                      onChange={e => updateWpRow(i, 'type', e.target.value)}
+                    >
                       <option>None</option>
                       <option>Primer &amp; Membrane</option>
                       <option>3 Coats Roll On</option>
@@ -905,28 +1303,44 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
                       <option>Dimple Membrane</option>
                     </select>
                     {row.type !== 'None' && (
-                      <NumInput value={row.sf} onChange={v => updateWpRow(i, 'sf', v)}
-                                placeholder="0" className="w-28" />
+                      <NumInput
+                        value={row.sf}
+                        onChange={v => updateWpRow(i, 'sf', v)}
+                        placeholder="0"
+                        className="w-28"
+                      />
                     )}
-                    {row.type !== 'None' && <span className="text-xs text-gray-400 shrink-0">SF</span>}
+                    {row.type !== 'None' && (
+                      <span className="text-xs text-gray-400 shrink-0">SF</span>
+                    )}
                     {row.type !== 'None' && wpKey && (
                       <span className="inline-flex items-center gap-1 text-xs text-gray-400">
                         ${r(wpKey).toFixed(2)}/SF
-                        <RateEditPopover table="material_rates" name={WALL_RATES[wpKey].db} category="Walls"
-                          unitLabel="SF" currentValue={r(wpKey)} onSaved={refreshAllRates} />
+                        <RateEditPopover
+                          table="material_rates"
+                          name={WALL_RATES[wpKey].db}
+                          category="Walls"
+                          unitLabel="SF"
+                          currentValue={r(wpKey)}
+                          onSaved={refreshAllRates}
+                        />
                       </span>
                     )}
                     {wpRows.length > 1 && (
-                      <button onClick={() => removeWpRow(i)}
-                              className="text-xs text-red-400 hover:text-red-600 px-2 py-0.5 rounded border border-red-100 hover:border-red-300">
+                      <button
+                        onClick={() => removeWpRow(i)}
+                        className="text-xs text-red-400 hover:text-red-600 px-2 py-0.5 rounded border border-red-100 hover:border-red-300"
+                      >
                         Remove
                       </button>
                     )}
                   </div>
                 )
               })}
-              <button onClick={addWpRow}
-                      className="w-full py-1.5 rounded-lg border border-dashed border-green-400 text-green-700 text-xs font-medium hover:bg-green-50 transition-colors">
+              <button
+                onClick={addWpRow}
+                className="w-full py-1.5 rounded-lg border border-dashed border-green-400 text-green-700 text-xs font-medium hover:bg-green-50 transition-colors"
+              >
                 + Add another waterproofing line
               </button>
             </div>
@@ -940,10 +1354,19 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
           <SectionHeader title="Poured In Place Walls" />
 
           <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-2 text-[11px] text-gray-500">
-            <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">PIP Rate (click to edit)</p>
-            <span className="inline-flex items-center gap-1">Concrete truck ${r('concreteTruck')}/CY
-              <RateEditPopover table="material_rates" name={WALL_RATES.concreteTruck.db} category="Walls"
-                unitLabel="CY" currentValue={r('concreteTruck')} onSaved={refreshAllRates} />
+            <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">
+              PIP Rate (click to edit)
+            </p>
+            <span className="inline-flex items-center gap-1">
+              Concrete truck ${r('concreteTruck')}/CY
+              <RateEditPopover
+                table="material_rates"
+                name={WALL_RATES.concreteTruck.db}
+                category="Walls"
+                unitLabel="CY"
+                currentValue={r('concreteTruck')}
+                onSaved={refreshAllRates}
+              />
             </span>
           </div>
 
@@ -959,8 +1382,10 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
             />
           ))}
 
-          <button onClick={addPipWall}
-            className="w-full py-2 rounded-lg border border-dashed border-green-400 text-green-700 text-sm font-medium hover:bg-green-50 transition-colors">
+          <button
+            onClick={addPipWall}
+            className="w-full py-2 rounded-lg border border-dashed border-green-400 text-green-700 text-sm font-medium hover:bg-green-50 transition-colors"
+          >
             + Add Another PIP Wall
           </button>
         </div>
@@ -972,7 +1397,11 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
           <SectionHeader title="Timber / Lumber Wall" />
           <div className="mb-3">
             <label className="block text-xs text-gray-500 mb-1">Timber Type</label>
-            <select className="input text-sm py-1.5 w-full" value={timberType} onChange={e => setTimberType(e.target.value)}>
+            <select
+              className="input text-sm py-1.5 w-full"
+              value={timberType}
+              onChange={e => setTimberType(e.target.value)}
+            >
               <option>Railroad Treated</option>
               <option>Douglas Fir 6×6</option>
               <option>Cedar 6×6</option>
@@ -990,9 +1419,16 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
             </div>
           </div>
           <div className="mt-2">
-            <label className="block text-xs text-gray-500 mb-1">Pile-Driven Steel Posts (qty)</label>
+            <label className="block text-xs text-gray-500 mb-1">
+              Pile-Driven Steel Posts (qty)
+            </label>
             <div className="flex items-center gap-2">
-              <NumInput value={timberPosts} onChange={setTimberPosts} placeholder="0" className="w-28" />
+              <NumInput
+                value={timberPosts}
+                onChange={setTimberPosts}
+                placeholder="0"
+                className="w-28"
+              />
               <span className="text-xs text-gray-400">$100 mat + 0.47 hr each</span>
             </div>
           </div>
@@ -1013,81 +1449,197 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
           </thead>
           <tbody>
             {[
-              { label: 'Sand Stucco',        sf: sandStuccoSF,   setSf: setSandStuccoSF,   rate: sandStuccoRateIn,   setRate: setSandStuccoRateIn,   mat: calc.sandStuccoMat,   matKey: 'sandStucco',   labKey: 'sandStuccoLab' },
-              { label: 'Smooth Stucco',      sf: smoothStuccoSF, setSf: setSmoothStuccoSF, rate: smoothStuccoRateIn, setRate: setSmoothStuccoRateIn, mat: calc.smoothStuccoMat, matKey: 'smoothStucco', labKey: 'smoothStuccoLab' },
-              { label: 'Ledgerstone Veneer', sf: ledgerstoneSF,  setSf: setLedgerstoneSF,  rate: ledgerstoneRateIn,  setRate: setLedgerstoneRateIn,  mat: calc.ledgerstoneMat,  matKey: 'ledgerstone',  labKey: 'ledgerstoneLab' },
-              { label: 'Stacked Stone',      sf: stackedStoneSF, setSf: setStackedStoneSF, rate: stackedStoneRateIn, setRate: setStackedStoneRateIn, mat: calc.stackedStoneMat, matKey: 'stackedStone', labKey: 'stackedStoneLab' },
-              { label: 'Tile',               sf: tileSF,         setSf: setTileSF,         rate: tileRateIn,         setRate: setTileRateIn,         mat: calc.tileMat,         matKey: 'tile',         labKey: 'tileLab' },
+              {
+                label: 'Sand Stucco',
+                sf: sandStuccoSF,
+                setSf: setSandStuccoSF,
+                rate: sandStuccoRateIn,
+                setRate: setSandStuccoRateIn,
+                mat: calc.sandStuccoMat,
+                matKey: 'sandStucco',
+                labKey: 'sandStuccoLab',
+              },
+              {
+                label: 'Smooth Stucco',
+                sf: smoothStuccoSF,
+                setSf: setSmoothStuccoSF,
+                rate: smoothStuccoRateIn,
+                setRate: setSmoothStuccoRateIn,
+                mat: calc.smoothStuccoMat,
+                matKey: 'smoothStucco',
+                labKey: 'smoothStuccoLab',
+              },
+              {
+                label: 'Ledgerstone Veneer',
+                sf: ledgerstoneSF,
+                setSf: setLedgerstoneSF,
+                rate: ledgerstoneRateIn,
+                setRate: setLedgerstoneRateIn,
+                mat: calc.ledgerstoneMat,
+                matKey: 'ledgerstone',
+                labKey: 'ledgerstoneLab',
+              },
+              {
+                label: 'Stacked Stone',
+                sf: stackedStoneSF,
+                setSf: setStackedStoneSF,
+                rate: stackedStoneRateIn,
+                setRate: setStackedStoneRateIn,
+                mat: calc.stackedStoneMat,
+                matKey: 'stackedStone',
+                labKey: 'stackedStoneLab',
+              },
+              {
+                label: 'Tile',
+                sf: tileSF,
+                setSf: setTileSF,
+                rate: tileRateIn,
+                setRate: setTileRateIn,
+                mat: calc.tileMat,
+                matKey: 'tile',
+                labKey: 'tileLab',
+              },
             ].map(({ label, sf, setSf, rate, setRate, mat, matKey, labKey }) => (
               <tr key={label} className="border-b border-gray-100">
                 <td className="py-1 pr-2 text-xs text-gray-700">{label}</td>
-                <td className="py-1 pr-2"><NumInput value={sf} onChange={setSf} /></td>
+                <td className="py-1 pr-2">
+                  <NumInput value={sf} onChange={setSf} />
+                </td>
                 <td className="py-1 pr-2">
                   {/* Per-estimate $/SF override. Empty falls back to the
                       master rate (whose placeholder shows the current
                       default + a RateEdit popover for admin edits). */}
                   <div className="flex items-center gap-1">
                     <div className="relative w-24">
-                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-                      <input type="number" step="any" className="input text-sm py-1.5 pl-5 w-full"
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                        $
+                      </span>
+                      <input
+                        type="number"
+                        step="any"
+                        className="input text-sm py-1.5 pl-5 w-full"
                         placeholder={r(matKey).toFixed(2)}
                         value={rate}
-                        onChange={e => setRate(e.target.value)} />
+                        onChange={e => setRate(e.target.value)}
+                      />
                     </div>
-                    <RateEditPopover table="material_rates" name={WALL_RATES[matKey].db} category="Walls"
-                      unitLabel="SF" currentValue={r(matKey)} onSaved={refreshAllRates} />
-                    <RateEditPopover table="labor_rates" name={WALL_RATES[labKey].db} category="Walls"
-                      mode="coefficient" unitLabel="rate" currentValue={r(labKey)} onSaved={refreshAllRates} />
+                    <RateEditPopover
+                      table="material_rates"
+                      name={WALL_RATES[matKey].db}
+                      category="Walls"
+                      unitLabel="SF"
+                      currentValue={r(matKey)}
+                      onSaved={refreshAllRates}
+                    />
+                    <RateEditPopover
+                      table="labor_rates"
+                      name={WALL_RATES[labKey].db}
+                      category="Walls"
+                      mode="coefficient"
+                      unitLabel="rate"
+                      currentValue={r(labKey)}
+                      onSaved={refreshAllRates}
+                    />
                   </div>
                 </td>
-                <td className="py-1 text-right text-xs text-gray-600">{n(sf) > 0 ? `$${mat.toFixed(2)}` : '—'}</td>
+                <td className="py-1 text-right text-xs text-gray-600">
+                  {n(sf) > 0 ? `$${mat.toFixed(2)}` : '—'}
+                </td>
               </tr>
             ))}
             <tr className="border-b border-gray-100">
               <td className="py-1 pr-2 text-xs text-gray-700">
                 <span className="inline-flex items-center gap-1">
                   Real Flagstone
-                  <RateEditPopover table="labor_rates" name={WALL_RATES.flagstoneLab.db} category="Walls"
-                    mode="coefficient" unitLabel="rate" currentValue={r('flagstoneLab')} onSaved={refreshAllRates} />
+                  <RateEditPopover
+                    table="labor_rates"
+                    name={WALL_RATES.flagstoneLab.db}
+                    category="Walls"
+                    mode="coefficient"
+                    unitLabel="rate"
+                    currentValue={r('flagstoneLab')}
+                    onSaved={refreshAllRates}
+                  />
                 </span>
               </td>
-              <td className="py-1 pr-2"><NumInput value={flagstoneSF} onChange={setFlagstoneSF} /></td>
+              <td className="py-1 pr-2">
+                <NumInput value={flagstoneSF} onChange={setFlagstoneSF} />
+              </td>
               <td className="py-1 pr-2">
                 <div className="flex items-center gap-1">
                   <div className="relative w-24">
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-                    <input type="number" step="any" className="input text-sm py-1.5 pl-5 w-full"
-                      placeholder={r('flagstone').toString()} value={flagstoneRateIn}
-                      onChange={e => setFlagstoneRateIn(e.target.value)} />
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                      $
+                    </span>
+                    <input
+                      type="number"
+                      step="any"
+                      className="input text-sm py-1.5 pl-5 w-full"
+                      placeholder={r('flagstone').toString()}
+                      value={flagstoneRateIn}
+                      onChange={e => setFlagstoneRateIn(e.target.value)}
+                    />
                   </div>
-                  <RateEditPopover table="material_rates" name={WALL_RATES.flagstone.db} category="Walls"
-                    unitLabel="ton" currentValue={r('flagstone')} onSaved={refreshAllRates} />
+                  <RateEditPopover
+                    table="material_rates"
+                    name={WALL_RATES.flagstone.db}
+                    category="Walls"
+                    unitLabel="ton"
+                    currentValue={r('flagstone')}
+                    onSaved={refreshAllRates}
+                  />
                 </div>
               </td>
-              <td className="py-1 text-right text-xs text-gray-600">{n(flagstoneSF) > 0 ? `$${calc.flagstoneMat.toFixed(2)}` : '—'}</td>
+              <td className="py-1 text-right text-xs text-gray-600">
+                {n(flagstoneSF) > 0 ? `$${calc.flagstoneMat.toFixed(2)}` : '—'}
+              </td>
             </tr>
             <tr className="border-b border-gray-100">
               <td className="py-1 pr-2 text-xs text-gray-700">
                 <span className="inline-flex items-center gap-1">
                   Real Stone
-                  <RateEditPopover table="labor_rates" name={WALL_RATES.realStoneLab.db} category="Walls"
-                    mode="coefficient" unitLabel="rate" currentValue={r('realStoneLab')} onSaved={refreshAllRates} />
+                  <RateEditPopover
+                    table="labor_rates"
+                    name={WALL_RATES.realStoneLab.db}
+                    category="Walls"
+                    mode="coefficient"
+                    unitLabel="rate"
+                    currentValue={r('realStoneLab')}
+                    onSaved={refreshAllRates}
+                  />
                 </span>
               </td>
-              <td className="py-1 pr-2"><NumInput value={realStoneSF} onChange={setRealStoneSF} /></td>
+              <td className="py-1 pr-2">
+                <NumInput value={realStoneSF} onChange={setRealStoneSF} />
+              </td>
               <td className="py-1 pr-2">
                 <div className="flex items-center gap-1">
                   <div className="relative w-24">
-                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-                    <input type="number" step="any" className="input text-sm py-1.5 pl-5 w-full"
-                      placeholder={r('realStone').toString()} value={realStoneRateIn}
-                      onChange={e => setRealStoneRateIn(e.target.value)} />
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                      $
+                    </span>
+                    <input
+                      type="number"
+                      step="any"
+                      className="input text-sm py-1.5 pl-5 w-full"
+                      placeholder={r('realStone').toString()}
+                      value={realStoneRateIn}
+                      onChange={e => setRealStoneRateIn(e.target.value)}
+                    />
                   </div>
-                  <RateEditPopover table="material_rates" name={WALL_RATES.realStone.db} category="Walls"
-                    unitLabel="ton" currentValue={r('realStone')} onSaved={refreshAllRates} />
+                  <RateEditPopover
+                    table="material_rates"
+                    name={WALL_RATES.realStone.db}
+                    category="Walls"
+                    unitLabel="ton"
+                    currentValue={r('realStone')}
+                    onSaved={refreshAllRates}
+                  />
                 </div>
               </td>
-              <td className="py-1 text-right text-xs text-gray-600">{n(realStoneSF) > 0 ? `$${calc.realStoneMat.toFixed(2)}` : '—'}</td>
+              <td className="py-1 text-right text-xs text-gray-600">
+                {n(realStoneSF) > 0 ? `$${calc.realStoneMat.toFixed(2)}` : '—'}
+              </td>
             </tr>
           </tbody>
         </table>
@@ -1097,17 +1649,40 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
       <div>
         <SectionHeader title="Wall Caps" />
         <p className="text-xs text-gray-400 mb-1 inline-flex items-center flex-wrap gap-x-2">
-          <span className="inline-flex items-center gap-1">Flagstone ${r('capFlagstone')}/ton
-            <RateEditPopover table="material_rates" name={WALL_RATES.capFlagstone.db} category="Walls"
-              unitLabel="ton" currentValue={r('capFlagstone')} onSaved={refreshAllRates} />
-          </span>·
-          <span className="inline-flex items-center gap-1">Precast ${r('capPrecast')}/ea
-            <RateEditPopover table="material_rates" name={WALL_RATES.capPrecast.db} category="Walls"
-              unitLabel="ea" currentValue={r('capPrecast')} onSaved={refreshAllRates} />
-          </span>·
-          <span className="inline-flex items-center gap-1">Bullnose ${r('capBullnose')}/LF
-            <RateEditPopover table="material_rates" name={WALL_RATES.capBullnose.db} category="Walls"
-              unitLabel="LF" currentValue={r('capBullnose')} onSaved={refreshAllRates} />
+          <span className="inline-flex items-center gap-1">
+            Flagstone ${r('capFlagstone')}/ton
+            <RateEditPopover
+              table="material_rates"
+              name={WALL_RATES.capFlagstone.db}
+              category="Walls"
+              unitLabel="ton"
+              currentValue={r('capFlagstone')}
+              onSaved={refreshAllRates}
+            />
+          </span>
+          ·
+          <span className="inline-flex items-center gap-1">
+            Precast ${r('capPrecast')}/ea
+            <RateEditPopover
+              table="material_rates"
+              name={WALL_RATES.capPrecast.db}
+              category="Walls"
+              unitLabel="ea"
+              currentValue={r('capPrecast')}
+              onSaved={refreshAllRates}
+            />
+          </span>
+          ·
+          <span className="inline-flex items-center gap-1">
+            Bullnose ${r('capBullnose')}/LF
+            <RateEditPopover
+              table="material_rates"
+              name={WALL_RATES.capBullnose.db}
+              category="Walls"
+              unitLabel="LF"
+              currentValue={r('capBullnose')}
+              onSaved={refreshAllRates}
+            />
           </span>
         </p>
         <table className="w-full text-sm">
@@ -1124,14 +1699,24 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
               return (
                 <tr key={i} className="border-b border-gray-100">
                   <td className="py-1 pr-2">
-                    <select className="input text-sm py-1 w-36" value={cap.type}
-                      onChange={e => updateCap(i, 'type', e.target.value)}>
-                      {CAP_TYPES.map(t => <option key={t}>{t}</option>)}
+                    <select
+                      className="input text-sm py-1 w-36"
+                      value={cap.type}
+                      onChange={e => updateCap(i, 'type', e.target.value)}
+                    >
+                      {CAP_TYPES.map(t => (
+                        <option key={t}>{t}</option>
+                      ))}
                     </select>
                   </td>
                   <td className="py-1 pr-2">
                     {isActive && (
-                      <NumInput value={cap.widthIn} onChange={v => updateCap(i, 'widthIn', v)} className="w-20" placeholder="4" />
+                      <NumInput
+                        value={cap.widthIn}
+                        onChange={v => updateCap(i, 'widthIn', v)}
+                        className="w-20"
+                        placeholder="4"
+                      />
                     )}
                   </td>
                   <td className="py-1">
@@ -1139,7 +1724,8 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
                       <NumInput
                         value={cap.type === 'Precast' ? cap.qty : cap.lf}
                         onChange={v => updateCap(i, cap.type === 'Precast' ? 'qty' : 'lf', v)}
-                        className="w-20" placeholder="0"
+                        className="w-20"
+                        placeholder="0"
                       />
                     )}
                   </td>
@@ -1166,21 +1752,32 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
             {manualRows.map((row, i) => (
               <tr key={i} className="border-b border-gray-100">
                 <td className="py-1 pr-2">
-                  <input className="input text-sm py-1" value={row.label}
-                    onChange={e => updateManual(i, 'label', e.target.value)} />
+                  <input
+                    className="input text-sm py-1"
+                    value={row.label}
+                    onChange={e => updateManual(i, 'label', e.target.value)}
+                  />
                 </td>
-                <td className="py-1 pr-2"><NumInput value={row.hours}     onChange={v => updateManual(i, 'hours', v)} /></td>
-                <td className="py-1 pr-2"><NumInput value={row.materials} onChange={v => updateManual(i, 'materials', v)} /></td>
-                <td className="py-1">     <NumInput value={row.subCost}   onChange={v => updateManual(i, 'subCost', v)} /></td>
+                <td className="py-1 pr-2">
+                  <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} />
+                </td>
+                <td className="py-1 pr-2">
+                  <NumInput value={row.materials} onChange={v => updateManual(i, 'materials', v)} />
+                </td>
+                <td className="py-1">
+                  {' '}
+                  <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} />
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-
       <div className="flex gap-3 pt-2">
-        <button onClick={onBack} className="btn-secondary flex-1">← Back</button>
+        <button onClick={onBack} className="btn-secondary flex-1">
+          ← Back
+        </button>
         <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">
           {saving ? 'Saving...' : 'Add Module'}
         </button>

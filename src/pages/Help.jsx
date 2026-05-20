@@ -27,8 +27,8 @@ const FG = '#3A5038'
 // product surface only exposes 3 (New / Pending / Completed). These helpers
 // keep that mapping in one place.
 const BUCKETS = {
-  new:       ['new'],
-  pending:   ['triaged', 'in_progress'],
+  new: ['new'],
+  pending: ['triaged', 'in_progress'],
   completed: ['done', 'declined'],
 }
 function bucketOf(status) {
@@ -39,33 +39,33 @@ function bucketOf(status) {
 }
 // DB value to set when the user clicks a "Move to X" button.
 const BUCKET_TO_DB = {
-  new:       'new',
-  pending:   'in_progress',
+  new: 'new',
+  pending: 'in_progress',
   completed: 'done',
 }
 const BUCKET_LABEL = { new: 'New', pending: 'Pending', completed: 'Completed' }
 const BUCKET_BADGE_STYLE = {
-  new:       'bg-yellow-50 text-yellow-800 border-yellow-200',
-  pending:   'bg-purple-50 text-purple-800 border-purple-200',
+  new: 'bg-yellow-50 text-yellow-800 border-yellow-200',
+  pending: 'bg-purple-50 text-purple-800 border-purple-200',
   completed: 'bg-green-50  text-green-800  border-green-200',
 }
 
 const CATEGORY_STYLE = {
-  feature:     'bg-blue-50   text-blue-800   border-blue-200',
-  bug:         'bg-red-50    text-red-800    border-red-200',
+  feature: 'bg-blue-50   text-blue-800   border-blue-200',
+  bug: 'bg-red-50    text-red-800    border-red-200',
   enhancement: 'bg-purple-50 text-purple-800 border-purple-200',
-  other:       'bg-gray-50   text-gray-700   border-gray-200',
+  other: 'bg-gray-50   text-gray-700   border-gray-200',
 }
 const PRIORITY_STYLE = {
-  low:    'text-gray-500',
+  low: 'text-gray-500',
   medium: 'text-gray-700',
-  high:   'text-red-700 font-bold',
+  high: 'text-red-700 font-bold',
 }
 
 const TABS = [
   { key: 'tickets', label: 'Support Tickets', icon: '🎫' },
-  { key: 'docs',    label: 'Docs',            icon: '📘' },
-  { key: 'videos',  label: 'Videos',          icon: '🎬' },
+  { key: 'docs', label: 'Docs', icon: '📘' },
+  { key: 'videos', label: 'Videos', icon: '🎬' },
 ]
 
 // ── Note parsing/serializing ────────────────────────────────────────────────
@@ -130,7 +130,8 @@ export default function Help() {
                   : 'border-transparent text-gray-500 hover:text-gray-800'
               }`}
             >
-              <span className="mr-1.5">{t.icon}</span>{t.label}
+              <span className="mr-1.5">{t.icon}</span>
+              {t.label}
             </button>
           ))}
         </div>
@@ -138,10 +139,20 @@ export default function Help() {
 
       {/* Content */}
       {tab === 'tickets' && <SupportTickets />}
-      {tab === 'docs'    && <ComingSoon icon="📘" label="Documentation"
-        copy="Step-by-step guides for every PBS module will live here." />}
-      {tab === 'videos'  && <ComingSoon icon="🎬" label="Training Videos"
-        copy="Short walkthrough videos for common PBS workflows are on the way." />}
+      {tab === 'docs' && (
+        <ComingSoon
+          icon="📘"
+          label="Documentation"
+          copy="Step-by-step guides for every PBS module will live here."
+        />
+      )}
+      {tab === 'videos' && (
+        <ComingSoon
+          icon="🎬"
+          label="Training Videos"
+          copy="Short walkthrough videos for common PBS workflows are on the way."
+        />
+      )}
     </div>
   )
 }
@@ -149,14 +160,14 @@ export default function Help() {
 // ── Support Tickets tab ──────────────────────────────────────────────────────
 function SupportTickets() {
   const { user } = useAuth()
-  const [tickets,  setTickets]  = useState([])
-  const [userMap,  setUserMap]  = useState({})   // user_id → { full_name, email }
-  const [loading,  setLoading]  = useState(true)
-  const [filter,   setFilter]   = useState('all')    // 'all' | 'new' | 'pending' | 'completed'
-  const [scope,    setScope]    = useState('all')    // 'mine' | 'all'  (admins only)
+  const [tickets, setTickets] = useState([])
+  const [userMap, setUserMap] = useState({}) // user_id → { full_name, email }
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState('all') // 'all' | 'new' | 'pending' | 'completed'
+  const [scope, setScope] = useState('all') // 'mine' | 'all'  (admins only)
   const [expanded, setExpanded] = useState(null)
-  const [isAdmin,  setIsAdmin]  = useState(false)
-  const [showNew,  setShowNew]  = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [showNew, setShowNew] = useState(false)
 
   // Status-change/note modal. When set, opens StatusChangeModal.
   //   { ticket, targetBucket }    → admin clicked Move-to-X (status will change)
@@ -170,13 +181,20 @@ function SupportTickets() {
     let alive = true
     ;(async () => {
       try {
-        const { data } = await supabase.from('profiles')
-          .select('role').eq('id', user.id).maybeSingle()
+        const { data } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .maybeSingle()
         const role = data?.role || ''
         if (alive) setIsAdmin(role === 'admin' || role === 'super_admin')
-      } catch { /* fail-closed → non-admin view */ }
+      } catch {
+        /* fail-closed → non-admin view */
+      }
     })()
-    return () => { alive = false }
+    return () => {
+      alive = false
+    }
   }, [user?.id])
 
   useEffect(() => {
@@ -187,8 +205,11 @@ function SupportTickets() {
   async function fetchTickets() {
     setLoading(true)
     try {
-      let q = supabase.from('feature_requests').select('*')
-        .order('created_at', { ascending: false }).limit(500)
+      let q = supabase
+        .from('feature_requests')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(500)
       if (!isAdmin || scope === 'mine') {
         q = q.eq('user_id', user.id)
       }
@@ -198,8 +219,10 @@ function SupportTickets() {
 
       const ids = [...new Set(rows.map(r => r.user_id).filter(Boolean))]
       if (ids.length) {
-        const { data: profs } = await supabase.from('profiles')
-          .select('id, full_name, email').in('id', ids)
+        const { data: profs } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', ids)
         setUserMap(Object.fromEntries((profs || []).map(p => [p.id, p])))
       } else {
         setUserMap({})
@@ -237,33 +260,39 @@ function SupportTickets() {
     if (newDbStatus) updates.status = newDbStatus
 
     // Optimistic UI
-    setTickets(prev => prev.map(r => r.id === row.id ? { ...r, ...updates } : r))
+    setTickets(prev => prev.map(r => (r.id === row.id ? { ...r, ...updates } : r)))
 
     try {
       await supabase.from('feature_requests').update(updates).eq('id', row.id)
     } catch (err) {
       console.warn('[Help] ticket update failed', err)
       // Roll back optimistic update so UI matches DB.
-      setTickets(prev => prev.map(r => r.id === row.id ? row : r))
+      setTickets(prev => prev.map(r => (r.id === row.id ? row : r)))
       return
     }
 
     // Email only on a real bucket transition to pending or completed.
-    if (newDbStatus && ['pending','completed'].includes(targetBucket)
-        && bucketOf(row.status) !== targetBucket) {
+    if (
+      newDbStatus &&
+      ['pending', 'completed'].includes(targetBucket) &&
+      bucketOf(row.status) !== targetBucket
+    ) {
       try {
         let toEmail = userMap[row.user_id]?.email
         if (!toEmail && row.user_id) {
           const { data: prof } = await supabase
-            .from('profiles').select('email').eq('id', row.user_id).maybeSingle()
+            .from('profiles')
+            .select('email')
+            .eq('id', row.user_id)
+            .maybeSingle()
           toEmail = prof?.email
         }
         if (toEmail) {
           await sendFeedbackStatusEmail({
-            to:      toEmail,
-            title:   row.title || 'your request',
-            status:  newDbStatus,
-            notes:   admin_notes || '',
+            to: toEmail,
+            title: row.title || 'your request',
+            status: newDbStatus,
+            notes: admin_notes || '',
             helpUrl: `${window.location.origin}/help`,
           })
         }
@@ -286,16 +315,16 @@ function SupportTickets() {
   })
 
   const counts = {
-    all:       tickets.length,
-    new:       tickets.filter(r => bucketOf(r.status) === 'new').length,
-    pending:   tickets.filter(r => bucketOf(r.status) === 'pending').length,
+    all: tickets.length,
+    new: tickets.filter(r => bucketOf(r.status) === 'new').length,
+    pending: tickets.filter(r => bucketOf(r.status) === 'pending').length,
     completed: tickets.filter(r => bucketOf(r.status) === 'completed').length,
   }
 
   const FILTERS = [
-    { key: 'all',       label: `All (${counts.all})` },
-    { key: 'new',       label: `New (${counts.new})` },
-    { key: 'pending',   label: `Pending (${counts.pending})` },
+    { key: 'all', label: `All (${counts.all})` },
+    { key: 'new', label: `New (${counts.new})` },
+    { key: 'pending', label: `Pending (${counts.pending})` },
     { key: 'completed', label: `Completed (${counts.completed})` },
   ]
 
@@ -304,12 +333,15 @@ function SupportTickets() {
       {/* Filter chips + new ticket */}
       <div className="flex items-center gap-2 mb-4 flex-wrap">
         {FILTERS.map(f => (
-          <button key={f.key} onClick={() => setFilter(f.key)}
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
             className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ${
               filter === f.key
                 ? 'bg-green-700 text-white border-green-700'
                 : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-            }`}>
+            }`}
+          >
             {f.label}
           </button>
         ))}
@@ -317,17 +349,22 @@ function SupportTickets() {
         {/* Admin-only scope toggle */}
         {isAdmin && (
           <div className="flex items-center gap-1 ml-2 pl-3 border-l border-gray-200">
-            <span className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mr-1">View</span>
+            <span className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mr-1">
+              View
+            </span>
             {[
-              { key: 'all',  label: 'All users' },
+              { key: 'all', label: 'All users' },
               { key: 'mine', label: 'Mine only' },
             ].map(s => (
-              <button key={s.key} onClick={() => setScope(s.key)}
+              <button
+                key={s.key}
+                onClick={() => setScope(s.key)}
                 className={`text-xs font-semibold px-2.5 py-1 rounded-md border transition-colors ${
                   scope === s.key
                     ? 'bg-gray-800 text-white border-gray-800'
                     : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-                }`}>
+                }`}
+              >
                 {s.label}
               </button>
             ))}
@@ -335,7 +372,12 @@ function SupportTickets() {
         )}
 
         <div className="flex-1" />
-        <button onClick={fetchTickets} className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1">↻ Refresh</button>
+        <button
+          onClick={fetchTickets}
+          className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1"
+        >
+          ↻ Refresh
+        </button>
         <button
           onClick={() => setShowNew(true)}
           style={{ backgroundColor: FG }}
@@ -370,12 +412,16 @@ function SupportTickets() {
             <tbody>
               {visible.map(r => {
                 const dateStr = new Date(r.created_at).toLocaleDateString('en-US', {
-                  month: 'short', day: 'numeric', year: '2-digit',
+                  month: 'short',
+                  day: 'numeric',
+                  year: '2-digit',
                 })
                 const isOpen = expanded === r.id
                 const reporter = userMap[r.user_id]
-                const reporterName = reporter?.full_name || reporter?.email
-                  || (r.user_id ? r.user_id.slice(0, 8) : '—')
+                const reporterName =
+                  reporter?.full_name ||
+                  reporter?.email ||
+                  (r.user_id ? r.user_id.slice(0, 8) : '—')
                 return (
                   <SupportRow
                     key={r.id}
@@ -398,7 +444,8 @@ function SupportTickets() {
       )}
 
       <p className="text-xs text-gray-400 mt-3">
-        Tip: tickets can also be logged automatically when you ask Sam to file a feature request or bug report. You'll get an email when something you reported moves to Pending or Completed.
+        Tip: tickets can also be logged automatically when you ask Sam to file a feature request or
+        bug report. You'll get an email when something you reported moves to Pending or Completed.
       </p>
 
       {showNew && (
@@ -423,8 +470,16 @@ function SupportTickets() {
 
 // ── Single ticket row + expandable detail ────────────────────────────────────
 function SupportRow({
-  row, dateStr, isAdmin, showReporter, reporterName, reporterEmail,
-  isOpen, onToggle, onRequestMove, onRequestAddNote,
+  row,
+  dateStr,
+  isAdmin,
+  showReporter,
+  reporterName,
+  reporterEmail,
+  isOpen,
+  onToggle,
+  onRequestMove,
+  onRequestAddNote,
 }) {
   const r = row
   const bucket = bucketOf(r.status)
@@ -442,7 +497,9 @@ function SupportRow({
           </td>
         )}
         <td className="px-3 py-2">
-          <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold uppercase ${CATEGORY_STYLE[r.category] || CATEGORY_STYLE.other}`}>
+          <span
+            className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold uppercase ${CATEGORY_STYLE[r.category] || CATEGORY_STYLE.other}`}
+          >
             {r.category}
           </span>
         </td>
@@ -451,7 +508,9 @@ function SupportRow({
           <span className={PRIORITY_STYLE[r.priority] || PRIORITY_STYLE.medium}>{r.priority}</span>
         </td>
         <td className="px-3 py-2">
-          <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold uppercase ${BUCKET_BADGE_STYLE[bucket]}`}>
+          <span
+            className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold uppercase ${BUCKET_BADGE_STYLE[bucket]}`}
+          >
             {BUCKET_LABEL[bucket]}
           </span>
         </td>
@@ -487,7 +546,9 @@ function SupportRow({
                     <div className="bg-white border border-gray-200 rounded-lg p-3 space-y-2">
                       {list.map((n, i) => (
                         <div key={i} className="text-sm text-gray-800 flex gap-2">
-                          <span className="font-semibold text-gray-500 flex-shrink-0">{i + 1}.</span>
+                          <span className="font-semibold text-gray-500 flex-shrink-0">
+                            {i + 1}.
+                          </span>
                           <span className="whitespace-pre-wrap">{n}</span>
                         </div>
                       ))}
@@ -497,10 +558,13 @@ function SupportRow({
               </div>
 
               <div className="space-y-3">
-                <DetailLine label="Status"   value={BUCKET_LABEL[bucket]} />
+                <DetailLine label="Status" value={BUCKET_LABEL[bucket]} />
                 <DetailLine label="Priority" value={r.priority} />
                 <DetailLine label="Category" value={r.category} />
-                <DetailLine label="Source"   value={r.source === 'sam' ? 'Logged via Sam' : 'Manual'} />
+                <DetailLine
+                  label="Source"
+                  value={r.source === 'sam' ? 'Logged via Sam' : 'Manual'}
+                />
                 <DetailLine label="Submitted" value={new Date(r.created_at).toLocaleString()} />
                 {r.updated_at && r.updated_at !== r.created_at && (
                   <DetailLine label="Last update" value={new Date(r.updated_at).toLocaleString()} />
@@ -515,7 +579,7 @@ function SupportRow({
                       Move to
                     </p>
                     <div className="flex gap-1.5 flex-wrap" onClick={e => e.stopPropagation()}>
-                      {['new','pending','completed'].map(b => {
+                      {['new', 'pending', 'completed'].map(b => {
                         const active = bucket === b
                         return (
                           <button
@@ -567,16 +631,20 @@ function DetailLine({ label, value }) {
 
 function EmptyState({ filter, onNew }) {
   const msg =
-    filter === 'new'       ? "No new tickets right now." :
-    filter === 'pending'   ? "Nothing is in progress at the moment." :
-    filter === 'completed' ? "No tickets have been completed yet." :
-    "There are no tickets to show."
+    filter === 'new'
+      ? 'No new tickets right now.'
+      : filter === 'pending'
+        ? 'Nothing is in progress at the moment.'
+        : filter === 'completed'
+          ? 'No tickets have been completed yet.'
+          : 'There are no tickets to show.'
   return (
     <div className="text-center py-16 text-gray-400 bg-white border border-gray-200 rounded-xl">
       <p className="text-4xl mb-3">📭</p>
       <p className="text-sm font-medium text-gray-500">{msg}</p>
       <p className="text-xs mt-1 max-w-md mx-auto mb-4">
-        File one yourself with the New Ticket button, or ask Sam to log a feature request or bug report.
+        File one yourself with the New Ticket button, or ask Sam to log a feature request or bug
+        report.
       </p>
       <button
         onClick={onNew}
@@ -593,45 +661,63 @@ function EmptyState({ filter, onNew }) {
 // Lets any signed-in user file a ticket directly without going through Sam.
 // Inserts to feature_requests with source='manual' and status='new'.
 function NewTicketModal({ onClose, onCreated, userId }) {
-  const [title,    setTitle]    = useState('')
-  const [body,     setBody]     = useState('')
+  const [title, setTitle] = useState('')
+  const [body, setBody] = useState('')
   const [category, setCategory] = useState('feature')
   const [priority, setPriority] = useState('medium')
-  const [saving,   setSaving]   = useState(false)
-  const [error,    setError]    = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   async function submit() {
     setError('')
     const t = title.trim()
     const b = body.trim()
-    if (!t) { setError('Please enter a title.'); return }
-    if (!b) { setError('Please describe the request or issue.'); return }
+    if (!t) {
+      setError('Please enter a title.')
+      return
+    }
+    if (!b) {
+      setError('Please describe the request or issue.')
+      return
+    }
 
     setSaving(true)
     const { error: err } = await supabase.from('feature_requests').insert({
-      user_id:  userId,
-      title:    t,
-      body:     b,
-      category, priority,
-      status:   'new',
-      source:   'manual',
+      user_id: userId,
+      title: t,
+      body: b,
+      category,
+      priority,
+      status: 'new',
+      source: 'manual',
     })
     setSaving(false)
-    if (err) { setError(err.message || 'Save failed.'); return }
+    if (err) {
+      setError(err.message || 'Save failed.')
+      return
+    }
     onCreated?.()
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-         onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200 overflow-hidden"
-           onClick={e => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200 overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
             <span>🎫</span> New Support Ticket
           </h3>
-          <button onClick={onClose}
-            className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-700 text-xl leading-none"
+          >
+            ×
+          </button>
         </div>
 
         <div className="px-5 py-4 space-y-4">
@@ -702,13 +788,18 @@ function NewTicketModal({ onClose, onCreated, userId }) {
         </div>
 
         <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-end gap-2 bg-gray-50">
-          <button onClick={onClose}
-            className="text-xs font-semibold text-gray-600 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-white">
+          <button
+            onClick={onClose}
+            className="text-xs font-semibold text-gray-600 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-white"
+          >
             Cancel
           </button>
-          <button onClick={submit} disabled={saving}
+          <button
+            onClick={submit}
+            disabled={saving}
             style={{ backgroundColor: FG }}
-            className="text-xs font-semibold text-white px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50">
+            className="text-xs font-semibold text-white px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
             {saving ? 'Submitting…' : 'Submit Ticket'}
           </button>
         </div>
@@ -735,9 +826,9 @@ function StatusChangeModal({ ticket, targetBucket, onClose, onSaved }) {
 
   // Queue of new notes being added in this session. Each entry is plain text.
   const [queued, setQueued] = useState([])
-  const [draft,  setDraft]  = useState('')
+  const [draft, setDraft] = useState('')
   const [saving, setSaving] = useState(false)
-  const [err,    setErr]    = useState('')
+  const [err, setErr] = useState('')
 
   // "Add to list" — pushes the current draft onto queued and clears the
   // textarea so the admin can type the next note. If the draft is empty,
@@ -782,20 +873,22 @@ function StatusChangeModal({ ticket, targetBucket, onClose, onSaved }) {
     }
   }
 
-  const headerLabel = targetBucket
-    ? `Move to ${BUCKET_LABEL[targetBucket]}`
-    : 'Add Note'
+  const headerLabel = targetBucket ? `Move to ${BUCKET_LABEL[targetBucket]}` : 'Add Note'
   const saveLabel = saving
     ? 'Saving…'
-    : targetBucket && ['pending','completed'].includes(targetBucket)
+    : targetBucket && ['pending', 'completed'].includes(targetBucket)
       ? 'Save & Email Reporter'
       : 'Save'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-         onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl border border-gray-200 overflow-hidden"
-           onClick={e => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-xl border border-gray-200 overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="px-5 py-4 border-b border-gray-100">
           <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
@@ -835,9 +928,11 @@ function StatusChangeModal({ ticket, targetBucket, onClose, onSaved }) {
                       {existing.length + i + 1}.
                     </span>
                     <span className="whitespace-pre-wrap flex-1">{t}</span>
-                    <button onClick={() => removeQueued(i)}
+                    <button
+                      onClick={() => removeQueued(i)}
                       className="text-xs text-gray-400 hover:text-red-600 flex-shrink-0"
-                      title="Remove this note">
+                      title="Remove this note"
+                    >
                       ×
                     </button>
                   </div>
@@ -856,12 +951,17 @@ function StatusChangeModal({ ticket, targetBucket, onClose, onSaved }) {
             </label>
             <textarea
               value={draft}
-              onChange={e => { setDraft(e.target.value); if (err) setErr('') }}
+              onChange={e => {
+                setDraft(e.target.value)
+                if (err) setErr('')
+              }}
               rows={3}
               autoFocus
-              placeholder={targetBucket
-                ? "Optional note for the reporter (will be included in the email)…"
-                : "What's the update?"}
+              placeholder={
+                targetBucket
+                  ? 'Optional note for the reporter (will be included in the email)…'
+                  : "What's the update?"
+              }
               className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
             />
             <div className="mt-1 flex justify-end">
@@ -875,9 +975,11 @@ function StatusChangeModal({ ticket, targetBucket, onClose, onSaved }) {
             </div>
           </div>
 
-          {targetBucket && ['pending','completed'].includes(targetBucket) && (
+          {targetBucket && ['pending', 'completed'].includes(targetBucket) && (
             <div className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-snug">
-              When you save, the ticket status changes to <strong>{BUCKET_LABEL[targetBucket]}</strong> and the reporter is emailed with the full notes list.
+              When you save, the ticket status changes to{' '}
+              <strong>{BUCKET_LABEL[targetBucket]}</strong> and the reporter is emailed with the
+              full notes list.
             </div>
           )}
 
@@ -889,13 +991,18 @@ function StatusChangeModal({ ticket, targetBucket, onClose, onSaved }) {
         </div>
 
         <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-end gap-2 bg-gray-50">
-          <button onClick={onClose}
-            className="text-xs font-semibold text-gray-600 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-white">
+          <button
+            onClick={onClose}
+            className="text-xs font-semibold text-gray-600 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-white"
+          >
             Cancel
           </button>
-          <button onClick={save} disabled={saving}
+          <button
+            onClick={save}
+            disabled={saving}
             style={{ backgroundColor: FG }}
-            className="text-xs font-semibold text-white px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50">
+            className="text-xs font-semibold text-white px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
             {saveLabel}
           </button>
         </div>

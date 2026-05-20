@@ -9,7 +9,9 @@ function ColorDropdown({ value, onChange, allowClear = false }) {
   const ref = useRef(null)
 
   useEffect(() => {
-    function handleClick(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    function handleClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
@@ -21,11 +23,21 @@ function ColorDropdown({ value, onChange, allowClear = false }) {
         onClick={() => setOpen(o => !o)}
         className="flex items-center gap-2 px-2.5 py-1.5 border border-gray-300 rounded-lg bg-white hover:border-gray-400 transition-colors text-sm"
       >
-        {value
-          ? <span className="w-5 h-5 rounded-full border border-gray-200 flex-shrink-0" style={{ backgroundColor: value }} />
-          : <span className="w-5 h-5 rounded-full border-2 border-dashed border-gray-300 flex-shrink-0" />}
+        {value ? (
+          <span
+            className="w-5 h-5 rounded-full border border-gray-200 flex-shrink-0"
+            style={{ backgroundColor: value }}
+          />
+        ) : (
+          <span className="w-5 h-5 rounded-full border-2 border-dashed border-gray-300 flex-shrink-0" />
+        )}
         <span className="font-mono text-gray-700 text-xs">{value || 'None'}</span>
-        <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg
+          className="w-3.5 h-3.5 text-gray-400"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
@@ -37,7 +49,10 @@ function ColorDropdown({ value, onChange, allowClear = false }) {
               <button
                 key={c}
                 type="button"
-                onClick={() => { onChange(c); setOpen(false) }}
+                onClick={() => {
+                  onChange(c)
+                  setOpen(false)
+                }}
                 style={{ backgroundColor: c }}
                 className={`w-6 h-6 rounded-full transition-transform hover:scale-110 ${value === c ? 'ring-2 ring-offset-1 ring-gray-600 scale-110' : ''}`}
                 title={c}
@@ -46,10 +61,15 @@ function ColorDropdown({ value, onChange, allowClear = false }) {
             {allowClear && (
               <button
                 type="button"
-                onClick={() => { onChange(''); setOpen(false) }}
+                onClick={() => {
+                  onChange('')
+                  setOpen(false)
+                }}
                 className="w-6 h-6 rounded-full border-2 border-dashed border-gray-300 text-gray-400 text-[9px] flex items-center justify-center hover:border-gray-500 transition-colors"
                 title="No color"
-              >✕</button>
+              >
+                ✕
+              </button>
             )}
           </div>
         </div>
@@ -59,28 +79,35 @@ function ColorDropdown({ value, onChange, allowClear = false }) {
 }
 
 // ── Constants ────────────────────────────────────────────────
-const COLORS = [
-  { label: 'Green',  value: '#15803d' },
-  { label: 'Blue',   value: '#3b82f6' },
-  { label: 'Purple', value: '#a855f7' },
-  { label: 'Orange', value: '#f97316' },
-  { label: 'Red',    value: '#ef4444' },
-  { label: 'Teal',   value: '#14b8a6' },
-  { label: 'Yellow', value: '#eab308' },
-  { label: 'Pink',   value: '#ec4899' },
+const REMINDERS = ['None', '1 day before', '2 days before', '3 days before', '1 week before']
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ]
-const REMINDERS  = ['None', '1 day before', '2 days before', '3 days before', '1 week before']
-const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December']
-const DAY_NAMES   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-const DAY_H = 30  // height of the day-number header row in px
+const DAY_H = 30 // height of the day-number header row in px
 
 // ── Date helpers ─────────────────────────────────────────────
-function daysInMonth(y, m) { return new Date(y, m + 1, 0).getDate() }
-function firstDayOfMonth(y, m) { return new Date(y, m, 1).getDay() }
+function daysInMonth(y, m) {
+  return new Date(y, m + 1, 0).getDate()
+}
+function firstDayOfMonth(y, m) {
+  return new Date(y, m, 1).getDay()
+}
 
 function dateStr(d) {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 // Returns true if the date counts as a working day given exceptions + per-item weekend flags
@@ -101,7 +128,8 @@ function isWorkingDay(date, exceptions = [], includeSat = false, includeSun = fa
 
 function addWorkDays(startDate, workDays, exceptions = [], includeSat = false, includeSun = false) {
   if (!workDays || workDays < 1) return startDate
-  let d = new Date(startDate), added = 0
+  let d = new Date(startDate),
+    added = 0
   while (added < workDays - 1) {
     d.setDate(d.getDate() + 1)
     if (isWorkingDay(d, exceptions, includeSat, includeSun)) added++
@@ -118,7 +146,9 @@ function toLocalDate(s) {
 
 function countWorkDays(start, end, exceptions = [], includeSat = false, includeSun = false) {
   if (!start || !end) return 0
-  let d = toLocalDate(start), e = toLocalDate(end), count = 0
+  let d = toLocalDate(start),
+    e = toLocalDate(end),
+    count = 0
   while (d <= e) {
     if (isWorkingDay(d, exceptions, includeSat, includeSun)) count++
     d.setDate(d.getDate() + 1)
@@ -147,7 +177,7 @@ function cellExceptionLabel(date, exceptions) {
 function isCellException(date, exceptions) {
   if (!date) return false
   const dow = date.getDay()
-  if (dow === 0 || dow === 6) return true   // weekends always shaded by default
+  if (dow === 0 || dow === 6) return true // weekends always shaded by default
   const ds = dateStr(date)
   return exceptions.some(ex => {
     if (ex.type === 'day_of_week') return ex.day_of_week === dow
@@ -164,18 +194,37 @@ function fmtDate(ds) {
 }
 
 const EMPTY_FORM = {
-  title: '', display_color: '#15803d', assignee_color: '', assignees: '',
-  start_date: '', end_date: '', work_days: '', progress: 0, reminder: 'None', notes: '',
-  crew_id: '', sub_id: '',
-  include_saturday: false, include_sunday: false,
+  title: '',
+  display_color: '#15803d',
+  assignee_color: '',
+  assignees: '',
+  start_date: '',
+  end_date: '',
+  work_days: '',
+  progress: 0,
+  reminder: 'None',
+  notes: '',
+  crew_id: '',
+  sub_id: '',
+  include_saturday: false,
+  include_sunday: false,
 }
 
-const DOW_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+const DOW_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 // ── WeekRow: renders one 7-day row with spanning item bars ───
 // Bars skip over exception days — rendered as multiple segments
 // so gaps appear on weekends / holidays instead of solid spans.
-function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, onDayClick, onItemClick, exceptions = [] }) {
+function WeekRow({
+  weekDays,
+  month,
+  items,
+  jobMap,
+  todayStr,
+  onDayClick,
+  onItemClick,
+  exceptions = [],
+}) {
   // weekDays is now an array of 7 Date objects (incl. prev/next-month spillover).
   const weekDates = weekDays
   const validDates = weekDates.filter(Boolean)
@@ -187,7 +236,7 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
   const weekItems = items
     .filter(item => {
       const s = new Date(item.start_date + 'T00:00:00').getTime()
-      const e = new Date(item.end_date   + 'T00:00:00').getTime()
+      const e = new Date(item.end_date + 'T00:00:00').getTime()
       return s <= weekMaxMs && e >= weekMinMs
     })
     .sort((a, b) => (a.title || '').localeCompare(b.title || ''))
@@ -197,23 +246,27 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
 
   weekItems.forEach(item => {
     const iStart = new Date(item.start_date + 'T00:00:00')
-    const iEnd   = new Date(item.end_date   + 'T00:00:00')
+    const iEnd = new Date(item.end_date + 'T00:00:00')
     const incSat = item.include_saturday || false
-    const incSun = item.include_sunday   || false
+    const incSun = item.include_sunday || false
 
     // Build contiguous working-day segments within this week row.
     // Exception days (and non-working days) break the bar — no rendering on those cols.
     const segments = []
-    let segStart = -1, lastWorkingCol = -1
+    let segStart = -1,
+      lastWorkingCol = -1
 
     weekDates.forEach((date, col) => {
-      const inRange   = date && date >= iStart && date <= iEnd
+      const inRange = date && date >= iStart && date <= iEnd
       const isWorking = inRange && isWorkingDay(date, exceptions, incSat, incSun)
       if (isWorking) {
         if (segStart === -1) segStart = col
         lastWorkingCol = col
       } else {
-        if (segStart !== -1) { segments.push({ startCol: segStart, endCol: lastWorkingCol }); segStart = -1 }
+        if (segStart !== -1) {
+          segments.push({ startCol: segStart, endCol: lastWorkingCol })
+          segStart = -1
+        }
       }
     })
     if (segStart !== -1) segments.push({ startCol: segStart, endCol: lastWorkingCol })
@@ -221,7 +274,7 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
 
     // Use overall first→last col for lane conflict detection
     const overallStart = segments[0].startCol
-    const overallEnd   = segments[segments.length - 1].endCol
+    const overallEnd = segments[segments.length - 1].endCol
 
     let lane = 0
     while (true) {
@@ -237,31 +290,34 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
 
     // isItemStart/End: does this week's first/last segment touch the item's actual start/end date?
     const firstSegDate = weekDates[segments[0].startCol]
-    const lastSegDate  = weekDates[segments[segments.length - 1].endCol]
+    const lastSegDate = weekDates[segments[segments.length - 1].endCol]
     itemInfo[item.id] = {
       segments,
       lane,
       isItemStart: firstSegDate && firstSegDate.getTime() === iStart.getTime(),
-      isItemEnd:   lastSegDate  && lastSegDate.getTime()  === iEnd.getTime(),
+      isItemEnd: lastSegDate && lastSegDate.getTime() === iEnd.getTime(),
     }
   })
 
   return (
     <div className="relative border-b border-gray-200">
-
       {/* ── Layer 1: day cell backgrounds + click targets (absolute, fills full row height) ── */}
       <div className="absolute inset-0 grid grid-cols-7">
         {weekDays.map((cellDate, col) => {
-          const inMonth  = cellDate.getMonth() === month
+          const inMonth = cellDate.getMonth() === month
           const isExcept = isCellException(cellDate, exceptions)
           return (
             <div
               key={col}
               onClick={() => onDayClick(cellDate)}
               className={`border-r border-gray-200
-                ${!inMonth ? 'bg-gray-50 cursor-pointer hover:bg-green-50'
-                : isExcept ? 'bg-gray-100 cursor-pointer'
-                :             'bg-white hover:bg-green-50 cursor-pointer'}`}
+                ${
+                  !inMonth
+                    ? 'bg-gray-50 cursor-pointer hover:bg-green-50'
+                    : isExcept
+                      ? 'bg-gray-100 cursor-pointer'
+                      : 'bg-white hover:bg-green-50 cursor-pointer'
+                }`}
             />
           )
         })}
@@ -270,16 +326,18 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
       {/* ── Layer 2: day number headers (normal flow — sets the top DAY_H px of the row) ── */}
       <div className="relative grid grid-cols-7 pointer-events-none" style={{ height: DAY_H }}>
         {weekDays.map((cellDate, col) => {
-          const ds = `${cellDate.getFullYear()}-${String(cellDate.getMonth()+1).padStart(2,'0')}-${String(cellDate.getDate()).padStart(2,'0')}`
+          const ds = `${cellDate.getFullYear()}-${String(cellDate.getMonth() + 1).padStart(2, '0')}-${String(cellDate.getDate()).padStart(2, '0')}`
           const isToday = ds === todayStr
           const inMonth = cellDate.getMonth() === month
           const exLabel = cellExceptionLabel(cellDate, exceptions)
           return (
             <div key={col} className="pt-1 px-1 flex items-center gap-1 min-w-0 overflow-hidden">
-              <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-medium flex-shrink-0
-                ${isToday ? 'bg-green-700 text-white'
-                  : !inMonth ? 'text-gray-300'
-                  : 'text-gray-500'}`}>
+              <span
+                className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-medium flex-shrink-0
+                ${
+                  isToday ? 'bg-green-700 text-white' : !inMonth ? 'text-gray-300' : 'text-gray-500'
+                }`}
+              >
                 {cellDate.getDate()}
               </span>
               {exLabel && (
@@ -308,55 +366,73 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
           if (!info) return []
           const { segments, lane, isItemStart, isItemEnd } = info
 
-          const clientName  = jobMap[item.job_id] || ''
+          const clientName = jobMap[item.job_id] || ''
           const displayText = clientName ? `${item.title} (${clientName})` : item.title
 
           return segments.map((seg, segIdx) => {
             const isFirst = segIdx === 0
-            const isLast  = segIdx === segments.length - 1
+            const isLast = segIdx === segments.length - 1
 
-            const roundLeft  = isFirst && isItemStart
-            const roundRight = isLast  && isItemEnd
-            const radius = roundLeft && roundRight ? '4px'
-              : roundLeft  ? '4px 0 0 4px'
-              : roundRight ? '0 4px 4px 0'
-              : '0'
+            const roundLeft = isFirst && isItemStart
+            const roundRight = isLast && isItemEnd
+            const radius =
+              roundLeft && roundRight
+                ? '4px'
+                : roundLeft
+                  ? '4px 0 0 4px'
+                  : roundRight
+                    ? '0 4px 4px 0'
+                    : '0'
 
             return (
               <div
                 key={`${item.id}-s${segIdx}`}
-                onClick={e => { e.stopPropagation(); onItemClick(e, item) }}
+                onClick={e => {
+                  e.stopPropagation()
+                  onItemClick(e, item)
+                }}
                 style={{
-                  gridRow:         lane + 1,
-                  gridColumn:      `${seg.startCol + 1} / ${seg.endCol + 2}`,
-                  backgroundColor: item.needs_crew ? '#b45309' : item.scheduling_type === 'yard_check' ? '#3b82f6' : item.display_color,
+                  gridRow: lane + 1,
+                  gridColumn: `${seg.startCol + 1} / ${seg.endCol + 2}`,
+                  backgroundColor: item.needs_crew
+                    ? '#b45309'
+                    : item.scheduling_type === 'yard_check'
+                      ? '#3b82f6'
+                      : item.display_color,
                   backgroundImage: item.needs_crew
                     ? 'repeating-linear-gradient(45deg,rgba(0,0,0,0.12),rgba(0,0,0,0.12) 3px,transparent 3px,transparent 10px)'
                     : item.scheduling_type === 'yard_check'
                       ? 'repeating-linear-gradient(45deg,rgba(255,255,255,0.15),rgba(255,255,255,0.15) 3px,transparent 3px,transparent 10px)'
                       : 'none',
-                  borderRadius:    radius,
-                  margin:          '0 3px',
-                  minHeight:       24,
-                  pointerEvents:   'auto',
-                  alignSelf:       'stretch',
-                  border:          item.needs_crew ? '2px dashed rgba(255,200,0,0.6)' : item.scheduling_type === 'yard_check' ? '2px dashed rgba(147,197,253,0.8)' : 'none',
+                  borderRadius: radius,
+                  margin: '0 3px',
+                  minHeight: 24,
+                  pointerEvents: 'auto',
+                  alignSelf: 'stretch',
+                  border: item.needs_crew
+                    ? '2px dashed rgba(255,200,0,0.6)'
+                    : item.scheduling_type === 'yard_check'
+                      ? '2px dashed rgba(147,197,253,0.8)'
+                      : 'none',
                 }}
                 className="flex items-start gap-1.5 px-2 pt-1.5 pb-1.5 text-white text-sm font-semibold cursor-pointer hover:opacity-80 leading-snug"
                 title={item.needs_crew ? `${displayText} — Crew not assigned` : displayText}
               >
                 {isFirst && (
                   <>
-                    {item.needs_crew
-                      ? null
-                      : item.assignee_color
-                        ? <span className="flex-shrink-0 w-4 h-4 rounded-full border border-white/50 mt-0.5"
-                                style={{ backgroundColor: item.assignee_color }} />
-                        : null
-                    }
+                    {item.needs_crew ? null : item.assignee_color ? (
+                      <span
+                        className="flex-shrink-0 w-4 h-4 rounded-full border border-white/50 mt-0.5"
+                        style={{ backgroundColor: item.assignee_color }}
+                      />
+                    ) : null}
                     <span className="min-w-0 break-words">
                       {displayText}
-                      {item.needs_crew && <span className="ml-1 font-normal text-yellow-200 text-[10px]">— Assign Crew</span>}
+                      {item.needs_crew && (
+                        <span className="ml-1 font-normal text-yellow-200 text-[10px]">
+                          — Assign Crew
+                        </span>
+                      )}
                     </span>
                   </>
                 )}
@@ -365,7 +441,6 @@ function WeekRow({ weekDays, year, month, items, selectedJob, jobMap, todayStr, 
           })
         })}
       </div>
-
     </div>
   )
 }
@@ -382,24 +457,34 @@ function MobileScheduleCard({ item, jobName, onClick }) {
       <div className="flex items-start gap-3">
         <div
           className="w-1.5 self-stretch rounded-full flex-shrink-0"
-          style={{ backgroundColor: item.needs_crew ? '#b45309' : item.scheduling_type === 'yard_check' ? '#3b82f6' : (item.display_color || '#15803d'), minHeight: 40 }}
+          style={{
+            backgroundColor: item.needs_crew
+              ? '#b45309'
+              : item.scheduling_type === 'yard_check'
+                ? '#3b82f6'
+                : item.display_color || '#15803d',
+            minHeight: 40,
+          }}
         />
         <div className="flex-1 min-w-0">
           {item.needs_crew && (
-            <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wide mb-0.5">Crew Not Assigned</p>
+            <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wide mb-0.5">
+              Crew Not Assigned
+            </p>
           )}
           <p className="font-semibold text-gray-900 text-sm leading-tight">{item.title}</p>
-          {jobName && (
-            <p className="text-xs text-purple-600 mt-0.5 font-medium">{jobName}</p>
-          )}
+          {jobName && <p className="text-xs text-purple-600 mt-0.5 font-medium">{jobName}</p>}
           <p className="text-xs text-gray-500 mt-1">
             {fmtDate(item.start_date)}
             {item.start_date !== item.end_date && <> – {fmtDate(item.end_date)}</>}
-            {item.work_days > 0 && <span className="text-gray-400"> · {item.work_days} day{item.work_days !== 1 ? 's' : ''}</span>}
+            {item.work_days > 0 && (
+              <span className="text-gray-400">
+                {' '}
+                · {item.work_days} day{item.work_days !== 1 ? 's' : ''}
+              </span>
+            )}
           </p>
-          {item.assignees && (
-            <p className="text-xs text-gray-400 mt-0.5">👤 {item.assignees}</p>
-          )}
+          {item.assignees && <p className="text-xs text-gray-400 mt-0.5">👤 {item.assignees}</p>}
           {item.progress > 0 && (
             <div className="mt-2">
               <div className="flex items-center justify-between mb-0.5">
@@ -409,13 +494,21 @@ function MobileScheduleCard({ item, jobName, onClick }) {
               <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
                 <div
                   className="h-1.5 rounded-full"
-                  style={{ width: `${item.progress}%`, backgroundColor: item.display_color || '#15803d' }}
+                  style={{
+                    width: `${item.progress}%`,
+                    backgroundColor: item.display_color || '#15803d',
+                  }}
                 />
               </div>
             </div>
           )}
         </div>
-        <svg className="w-4 h-4 text-gray-300 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg
+          className="w-4 h-4 text-gray-300 flex-shrink-0 mt-0.5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
       </div>
@@ -427,11 +520,13 @@ function MobileScheduleCard({ item, jobName, onClick }) {
 // ── Searchable picker used for both Crew and Sub selection ───────────────────
 function CrewSubPicker({ label, emptyMsg, options, selectedId, onSelect }) {
   const [search, setSearch] = useState('')
-  const [open,   setOpen]   = useState(false)
+  const [open, setOpen] = useState(false)
 
-  const filtered = options.filter(o =>
-    !search || o.searchText.includes(search.toLowerCase()) ||
-    o.primary.toLowerCase().includes(search.toLowerCase())
+  const filtered = options.filter(
+    o =>
+      !search ||
+      o.searchText.includes(search.toLowerCase()) ||
+      o.primary.toLowerCase().includes(search.toLowerCase())
   )
 
   const selected = options.find(o => o.id === selectedId)
@@ -446,8 +541,14 @@ function CrewSubPicker({ label, emptyMsg, options, selectedId, onSelect }) {
           <input
             type="text"
             value={search || (selected && !open ? selected.primary : '')}
-            onChange={e => { setSearch(e.target.value); setOpen(true) }}
-            onFocus={() => { setSearch(''); setOpen(true) }}
+            onChange={e => {
+              setSearch(e.target.value)
+              setOpen(true)
+            }}
+            onFocus={() => {
+              setSearch('')
+              setOpen(true)
+            }}
             onBlur={() => setTimeout(() => setOpen(false), 200)}
             placeholder={`Search ${label.toLowerCase()}…`}
             className="input text-sm w-full"
@@ -455,23 +556,39 @@ function CrewSubPicker({ label, emptyMsg, options, selectedId, onSelect }) {
           {selected && !open && (
             <div className="mt-1.5 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
               <p className="text-sm font-semibold text-green-800">{selected.primary}</p>
-              {selected.secondary && <p className="text-xs text-gray-500 mt-0.5">{selected.secondary}</p>}
+              {selected.secondary && (
+                <p className="text-xs text-gray-500 mt-0.5">{selected.secondary}</p>
+              )}
             </div>
           )}
           {open && (
             <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-56 overflow-y-auto">
               {filtered.length === 0 ? (
-                <p className="text-sm text-gray-400 px-4 py-3 italic">No results match "{search}"</p>
-              ) : filtered.map(opt => (
-                <button key={opt.id}
-                  onMouseDown={() => { onSelect(opt); setSearch(''); setOpen(false) }}
-                  className={`w-full text-left px-4 py-2.5 hover:bg-green-50 border-b border-gray-50 last:border-0 transition-colors ${selectedId === opt.id ? 'bg-green-50' : ''}`}>
-                  <p className={`text-sm font-semibold ${selectedId === opt.id ? 'text-green-800' : 'text-gray-800'}`}>
-                    {opt.primary}
-                  </p>
-                  {opt.secondary && <p className="text-xs text-gray-400 mt-0.5 truncate">{opt.secondary}</p>}
-                </button>
-              ))}
+                <p className="text-sm text-gray-400 px-4 py-3 italic">
+                  No results match "{search}"
+                </p>
+              ) : (
+                filtered.map(opt => (
+                  <button
+                    key={opt.id}
+                    onMouseDown={() => {
+                      onSelect(opt)
+                      setSearch('')
+                      setOpen(false)
+                    }}
+                    className={`w-full text-left px-4 py-2.5 hover:bg-green-50 border-b border-gray-50 last:border-0 transition-colors ${selectedId === opt.id ? 'bg-green-50' : ''}`}
+                  >
+                    <p
+                      className={`text-sm font-semibold ${selectedId === opt.id ? 'text-green-800' : 'text-gray-800'}`}
+                    >
+                      {opt.primary}
+                    </p>
+                    {opt.secondary && (
+                      <p className="text-xs text-gray-400 mt-0.5 truncate">{opt.secondary}</p>
+                    )}
+                  </button>
+                ))
+              )}
             </div>
           )}
         </div>
@@ -482,7 +599,8 @@ function CrewSubPicker({ label, emptyMsg, options, selectedId, onSelect }) {
 
 // ── US Holiday helpers ────────────────────────────────────────
 function findNthWeekday(year, month, weekday, nth) {
-  let d = new Date(year, month, 1), count = 0
+  let d = new Date(year, month, 1),
+    count = 0
   while (d.getMonth() === month) {
     if (d.getDay() === weekday && ++count === nth) return new Date(d)
     d.setDate(d.getDate() + 1)
@@ -495,31 +613,31 @@ function findLastWeekday(year, month, weekday) {
   return new Date(d)
 }
 const US_HOLIDAYS = [
-  { name: "New Year's Day",         getDate: y => new Date(y, 0, 1) },
+  { name: "New Year's Day", getDate: y => new Date(y, 0, 1) },
   { name: 'Martin Luther King Day', getDate: y => findNthWeekday(y, 0, 1, 3) },
-  { name: "Presidents' Day",        getDate: y => findNthWeekday(y, 1, 1, 3) },
-  { name: 'Memorial Day',           getDate: y => findLastWeekday(y, 4, 1) },
-  { name: 'Juneteenth',             getDate: y => new Date(y, 5, 19) },
-  { name: 'Independence Day',       getDate: y => new Date(y, 6, 4) },
-  { name: 'Labor Day',              getDate: y => findNthWeekday(y, 8, 1, 1) },
-  { name: 'Columbus Day',           getDate: y => findNthWeekday(y, 9, 1, 2) },
-  { name: 'Veterans Day',           getDate: y => new Date(y, 10, 11) },
-  { name: 'Thanksgiving',           getDate: y => findNthWeekday(y, 10, 4, 4) },
-  { name: 'Christmas Day',          getDate: y => new Date(y, 11, 25) },
+  { name: "Presidents' Day", getDate: y => findNthWeekday(y, 1, 1, 3) },
+  { name: 'Memorial Day', getDate: y => findLastWeekday(y, 4, 1) },
+  { name: 'Juneteenth', getDate: y => new Date(y, 5, 19) },
+  { name: 'Independence Day', getDate: y => new Date(y, 6, 4) },
+  { name: 'Labor Day', getDate: y => findNthWeekday(y, 8, 1, 1) },
+  { name: 'Columbus Day', getDate: y => findNthWeekday(y, 9, 1, 2) },
+  { name: 'Veterans Day', getDate: y => new Date(y, 10, 11) },
+  { name: 'Thanksgiving', getDate: y => findNthWeekday(y, 10, 4, 4) },
+  { name: 'Christmas Day', getDate: y => new Date(y, 11, 25) },
 ]
 const NON_RECOGNIZED_HOLIDAYS = [
-  { name: "Christmas Eve",  getDate: y => new Date(y, 11, 24) },
+  { name: 'Christmas Eve', getDate: y => new Date(y, 11, 24) },
   { name: "New Year's Eve", getDate: y => new Date(y, 11, 31) },
 ]
 
 // ── Workday Exceptions Modal ──────────────────────────────────
 function WorkdayExceptionsModal({ exceptions, onAdd, onDelete, onClose, recalculating }) {
-  const [type,            setType]            = useState('day_of_week')
-  const [dayOfWeek,       setDayOfWeek]       = useState(1)
-  const [dateStart,       setDateStart]       = useState('')
-  const [dateEnd,         setDateEnd]         = useState('')
-  const [label,           setLabel]           = useState('')
-  const [saving,          setSaving]          = useState(false)
+  const [type, setType] = useState('day_of_week')
+  const [dayOfWeek, setDayOfWeek] = useState(1)
+  const [dateStart, setDateStart] = useState('')
+  const [dateEnd, setDateEnd] = useState('')
+  const [label, setLabel] = useState('')
+  const [saving, setSaving] = useState(false)
   const [togglingHoliday, setTogglingHoliday] = useState(null)
 
   const curYear = new Date().getFullYear()
@@ -532,18 +650,21 @@ function WorkdayExceptionsModal({ exceptions, onAdd, onDelete, onClose, recalcul
     const active = isHolidayActive(holiday.name)
     setTogglingHoliday(holiday.name)
     if (active) {
-      const toRemove = exceptions.filter(e => e.type === 'specific_date' && e.label === holiday.name)
+      const toRemove = exceptions.filter(
+        e => e.type === 'specific_date' && e.label === holiday.name
+      )
       for (const ex of toRemove) await onDelete(ex.id)
     } else {
       for (let y = curYear; y <= curYear + 2; y++) {
         const d = holiday.getDate(y)
-        if (d) await onAdd({
-          type:               'specific_date',
-          day_of_week:        null,
-          exception_date:     dateStr(d),
-          exception_date_end: null,
-          label:              holiday.name,
-        })
+        if (d)
+          await onAdd({
+            type: 'specific_date',
+            day_of_week: null,
+            exception_date: dateStr(d),
+            exception_date_end: null,
+            label: holiday.name,
+          })
       }
     }
     setTogglingHoliday(null)
@@ -554,65 +675,98 @@ function WorkdayExceptionsModal({ exceptions, onAdd, onDelete, onClose, recalcul
     setSaving(true)
     await onAdd({
       type,
-      day_of_week:        type === 'day_of_week'   ? +dayOfWeek  : null,
-      exception_date:     type === 'specific_date' ? dateStart    : null,
-      exception_date_end: type === 'specific_date' && dateEnd && dateEnd > dateStart ? dateEnd : null,
+      day_of_week: type === 'day_of_week' ? +dayOfWeek : null,
+      exception_date: type === 'specific_date' ? dateStart : null,
+      exception_date_end:
+        type === 'specific_date' && dateEnd && dateEnd > dateStart ? dateEnd : null,
       label: label.trim() || null,
     })
     setSaving(false)
-    setDateStart(''); setDateEnd(''); setLabel('')
+    setDateStart('')
+    setDateEnd('')
+    setLabel('')
   }
 
   const recurring = exceptions.filter(e => e.type === 'day_of_week')
-  const specific  = exceptions.filter(e => e.type === 'specific_date')
+  const specific = exceptions.filter(e => e.type === 'specific_date')
 
   return (
     <ModalOverlay onClose={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col" style={{ maxHeight: '92vh' }}>
-
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col"
+        style={{ maxHeight: '92vh' }}
+      >
         {/* Header */}
         <div className="px-6 pt-5 pb-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
           <div>
             <h3 className="text-base font-bold text-gray-800">Workday Exceptions</h3>
-            <p className="text-xs text-gray-400 mt-0.5">Days that are greyed out and skipped in scheduling</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Days that are greyed out and skipped in scheduling
+            </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 ml-4">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
 
         <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
-
           {/* Info note */}
           <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2.5 text-xs text-blue-700">
-            Saturday and Sunday are excluded by default. You can override them per schedule item using the "Include Saturdays / Sundays" toggle in each item's details.
+            Saturday and Sunday are excluded by default. You can override them per schedule item
+            using the "Include Saturdays / Sundays" toggle in each item's details.
           </div>
 
           {/* Add form */}
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
-            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Add Exception</p>
+            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+              Add Exception
+            </p>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
-                <select value={type} onChange={e => setType(e.target.value)} className="input text-sm w-full">
+                <select
+                  value={type}
+                  onChange={e => setType(e.target.value)}
+                  className="input text-sm w-full"
+                >
                   <option value="day_of_week">Recurring Day</option>
                   <option value="specific_date">Specific Date</option>
                 </select>
               </div>
               {type === 'day_of_week' ? (
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Day of Week</label>
-                  <select value={dayOfWeek} onChange={e => setDayOfWeek(+e.target.value)} className="input text-sm w-full">
-                    {DOW_NAMES.map((n, i) => <option key={i} value={i}>{n}</option>)}
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Day of Week
+                  </label>
+                  <select
+                    value={dayOfWeek}
+                    onChange={e => setDayOfWeek(+e.target.value)}
+                    className="input text-sm w-full"
+                  >
+                    {DOW_NAMES.map((n, i) => (
+                      <option key={i} value={i}>
+                        {n}
+                      </option>
+                    ))}
                   </select>
                 </div>
               ) : (
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Start Date</label>
-                  <input type="date" value={dateStart} onChange={e => setDateStart(e.target.value)} className="input text-sm w-full" />
+                  <input
+                    type="date"
+                    value={dateStart}
+                    onChange={e => setDateStart(e.target.value)}
+                    className="input text-sm w-full"
+                  />
                 </div>
               )}
             </div>
@@ -620,22 +774,40 @@ function WorkdayExceptionsModal({ exceptions, onAdd, onDelete, onClose, recalcul
             {type === 'specific_date' && (
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
-                  End Date <span className="text-gray-400 font-normal">(optional — leave blank for single day)</span>
+                  End Date{' '}
+                  <span className="text-gray-400 font-normal">
+                    (optional — leave blank for single day)
+                  </span>
                 </label>
-                <input type="date" value={dateEnd} min={dateStart}
-                  onChange={e => setDateEnd(e.target.value)} className="input text-sm w-full" />
+                <input
+                  type="date"
+                  value={dateEnd}
+                  min={dateStart}
+                  onChange={e => setDateEnd(e.target.value)}
+                  className="input text-sm w-full"
+                />
               </div>
             )}
 
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Label <span className="text-gray-400 font-normal">(optional)</span></label>
-              <input type="text" value={label} onChange={e => setLabel(e.target.value)}
-                placeholder="e.g. Holiday, Company day off…" className="input text-sm w-full" />
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Label <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={label}
+                onChange={e => setLabel(e.target.value)}
+                placeholder="e.g. Holiday, Company day off…"
+                className="input text-sm w-full"
+              />
             </div>
 
             <div className="flex items-center gap-3">
-              <button onClick={handleAdd} disabled={saving || (type === 'specific_date' && !dateStart)}
-                className="btn-primary text-sm px-4 py-2 disabled:opacity-50">
+              <button
+                onClick={handleAdd}
+                disabled={saving || (type === 'specific_date' && !dateStart)}
+                className="btn-primary text-sm px-4 py-2 disabled:opacity-50"
+              >
                 {saving ? 'Adding…' : 'Add Exception'}
               </button>
               {recalculating && (
@@ -649,20 +821,42 @@ function WorkdayExceptionsModal({ exceptions, onAdd, onDelete, onClose, recalcul
 
           {/* Recurring exceptions */}
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Recurring Days</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              Recurring Days
+            </p>
             {recurring.length === 0 ? (
-              <p className="text-xs text-gray-400 italic py-2">None added — Sat & Sun are always excluded by default.</p>
+              <p className="text-xs text-gray-400 italic py-2">
+                None added — Sat & Sun are always excluded by default.
+              </p>
             ) : (
               <div className="space-y-1.5">
                 {recurring.map(ex => (
-                  <div key={ex.id} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
+                  <div
+                    key={ex.id}
+                    className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2"
+                  >
                     <div>
-                      <p className="text-sm font-semibold text-gray-800">Every {DOW_NAMES[ex.day_of_week]}</p>
+                      <p className="text-sm font-semibold text-gray-800">
+                        Every {DOW_NAMES[ex.day_of_week]}
+                      </p>
                       {ex.label && <p className="text-xs text-gray-500">{ex.label}</p>}
                     </div>
-                    <button onClick={() => onDelete(ex.id)} className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <button
+                      onClick={() => onDelete(ex.id)}
+                      className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
                       </svg>
                     </button>
                   </div>
@@ -674,24 +868,31 @@ function WorkdayExceptionsModal({ exceptions, onAdd, onDelete, onClose, recalcul
           {/* US National Holidays */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">🇺🇸 US National Holidays</p>
-              <span className="text-xs text-gray-400">{curYear}–{curYear + 2}</span>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                🇺🇸 US National Holidays
+              </p>
+              <span className="text-xs text-gray-400">
+                {curYear}–{curYear + 2}
+              </span>
             </div>
             <p className="text-xs text-gray-400 mb-3">
-              Select holidays to block them out on the calendar. Each checked holiday is added as an exception for {curYear}, {curYear + 1}, and {curYear + 2}.
+              Select holidays to block them out on the calendar. Each checked holiday is added as an
+              exception for {curYear}, {curYear + 1}, and {curYear + 2}.
             </p>
             <div className="rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
               {US_HOLIDAYS.map(holiday => {
-                const active   = isHolidayActive(holiday.name)
+                const active = isHolidayActive(holiday.name)
                 const toggling = togglingHoliday === holiday.name
-                const d        = holiday.getDate(curYear)
+                const d = holiday.getDate(curYear)
                 return (
                   <label
                     key={holiday.name}
                     className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${
-                      active   ? 'bg-red-50'
-                      : toggling ? 'bg-gray-50 opacity-60'
-                      : 'bg-white hover:bg-gray-50'
+                      active
+                        ? 'bg-red-50'
+                        : toggling
+                          ? 'bg-gray-50 opacity-60'
+                          : 'bg-white hover:bg-gray-50'
                     }`}
                   >
                     <input
@@ -701,7 +902,9 @@ function WorkdayExceptionsModal({ exceptions, onAdd, onDelete, onClose, recalcul
                       onChange={() => toggleHoliday(holiday)}
                       className="w-4 h-4 flex-shrink-0 accent-red-600"
                     />
-                    <span className={`flex-1 text-sm font-medium ${active ? 'text-red-700' : 'text-gray-700'}`}>
+                    <span
+                      className={`flex-1 text-sm font-medium ${active ? 'text-red-700' : 'text-gray-700'}`}
+                    >
                       {holiday.name}
                     </span>
                     <span className="text-xs text-gray-400 flex-shrink-0 tabular-nums">
@@ -719,24 +922,31 @@ function WorkdayExceptionsModal({ exceptions, onAdd, onDelete, onClose, recalcul
           {/* Non-Recognized Holidays */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">🎄 Other Common Closures</p>
-              <span className="text-xs text-gray-400">{curYear}–{curYear + 2}</span>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                🎄 Other Common Closures
+              </p>
+              <span className="text-xs text-gray-400">
+                {curYear}–{curYear + 2}
+              </span>
             </div>
             <p className="text-xs text-gray-400 mb-3">
-              Commonly observed but not federally recognized. Added as exceptions for {curYear}, {curYear + 1}, and {curYear + 2}.
+              Commonly observed but not federally recognized. Added as exceptions for {curYear},{' '}
+              {curYear + 1}, and {curYear + 2}.
             </p>
             <div className="rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-100">
               {NON_RECOGNIZED_HOLIDAYS.map(holiday => {
-                const active   = isHolidayActive(holiday.name)
+                const active = isHolidayActive(holiday.name)
                 const toggling = togglingHoliday === holiday.name
-                const d        = holiday.getDate(curYear)
+                const d = holiday.getDate(curYear)
                 return (
                   <label
                     key={holiday.name}
                     className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${
-                      active   ? 'bg-orange-50'
-                      : toggling ? 'bg-gray-50 opacity-60'
-                      : 'bg-white hover:bg-gray-50'
+                      active
+                        ? 'bg-orange-50'
+                        : toggling
+                          ? 'bg-gray-50 opacity-60'
+                          : 'bg-white hover:bg-gray-50'
                     }`}
                   >
                     <input
@@ -746,7 +956,9 @@ function WorkdayExceptionsModal({ exceptions, onAdd, onDelete, onClose, recalcul
                       onChange={() => toggleHoliday(holiday)}
                       className="w-4 h-4 flex-shrink-0 accent-orange-500"
                     />
-                    <span className={`flex-1 text-sm font-medium ${active ? 'text-orange-700' : 'text-gray-700'}`}>
+                    <span
+                      className={`flex-1 text-sm font-medium ${active ? 'text-orange-700' : 'text-gray-700'}`}
+                    >
                       {holiday.name}
                     </span>
                     <span className="text-xs text-gray-400 flex-shrink-0 tabular-nums">
@@ -763,13 +975,18 @@ function WorkdayExceptionsModal({ exceptions, onAdd, onDelete, onClose, recalcul
 
           {/* Specific date exceptions */}
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Specific Dates</p>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              Specific Dates
+            </p>
             {specific.length === 0 ? (
               <p className="text-xs text-gray-400 italic py-2">No specific dates added.</p>
             ) : (
               <div className="space-y-1.5">
                 {specific.map(ex => (
-                  <div key={ex.id} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
+                  <div
+                    key={ex.id}
+                    className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2"
+                  >
                     <div>
                       <p className="text-sm font-semibold text-gray-800">
                         {ex.exception_date_end
@@ -778,9 +995,22 @@ function WorkdayExceptionsModal({ exceptions, onAdd, onDelete, onClose, recalcul
                       </p>
                       {ex.label && <p className="text-xs text-gray-500">{ex.label}</p>}
                     </div>
-                    <button onClick={() => onDelete(ex.id)} className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <button
+                      onClick={() => onDelete(ex.id)}
+                      className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
                       </svg>
                     </button>
                   </div>
@@ -788,7 +1018,6 @@ function WorkdayExceptionsModal({ exceptions, onAdd, onDelete, onClose, recalcul
               </div>
             )}
           </div>
-
         </div>
       </div>
     </ModalOverlay>
@@ -825,63 +1054,69 @@ export default function ScheduleCalendar({
   onOpenScheduleAssist,
 }) {
   const today = new Date()
-  const [year,  setYear]  = useState(today.getFullYear())
+  const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
 
-  const [phase,       setPhase]       = useState(null)
+  const [phase, setPhase] = useState(null)
   const [clickedDate, setClickedDate] = useState(null)
-  const [editItem,    setEditItem]    = useState(null)
-  const [form,        setForm]        = useState(EMPTY_FORM)
-  const [modalJobId,  setModalJobId]  = useState(null)
+  const [editItem, setEditItem] = useState(null)
+  const [form, setForm] = useState(EMPTY_FORM)
+  const [modalJobId, setModalJobId] = useState(null)
   const [jobPickerSearch, setJobPickerSearch] = useState('')
-  const [saving,      setSaving]      = useState(false)
+  const [saving, setSaving] = useState(false)
   // Administrative scheduling form (crew time off / supervisor scheduling).
   // job_id stays null on these rows; title is prefixed "X - " and uses X's color.
   const [adminForm, setAdminForm] = useState({
-    supervisorId: '', consultantId: '',
-    crewChiefId:  '', crewMemberId: '',
-    description:  '',  // 'job_walk' | 'time_off' | 'custom'
-    customDesc:   '',
-    startDate:    '', endDate: '', workDays: 1,
+    supervisorId: '',
+    consultantId: '',
+    crewChiefId: '',
+    crewMemberId: '',
+    description: '', // 'job_walk' | 'time_off' | 'custom'
+    customDesc: '',
+    startDate: '',
+    endDate: '',
+    workDays: 1,
   })
-  const [entryMode,          setEntryMode]          = useState('crew')
-  const [crews,              setCrews]              = useState([])
-  const [employees,          setEmployees]          = useState([])
-  const [subs,               setSubs]               = useState([])
-  const [defaultSchedColor,  setDefaultSchedColor]  = useState('#15803d')
-  const [exceptions,         setExceptions]         = useState([])
+  const [entryMode, setEntryMode] = useState('crew')
+  const [crews, setCrews] = useState([])
+  const [employees, setEmployees] = useState([])
+  const [subs, setSubs] = useState([])
+  const [defaultSchedColor] = useState('#15803d')
+  const [exceptions, setExceptions] = useState([])
   const [localShowExceptions, setLocalShowExceptions] = useState(false)
-  const [recalculating,      setRecalculating]      = useState(false)
+  const [recalculating, setRecalculating] = useState(false)
 
   // ── Work Order scheduling state ───────────────────────────────
-  const [schedType,    setSchedType]    = useState(null)    // 'crew_type' | 'work_order'
-  const [workOrders,     setWorkOrders]     = useState([])
+  const [schedType, setSchedType] = useState(null) // 'crew_type' | 'work_order'
+  const [workOrders, setWorkOrders] = useState([])
   const [scheduledWOIds, setScheduledWOIds] = useState(new Set()) // WO IDs already on the calendar
-  const [selectedWOs,    setSelectedWOs]    = useState(new Set())
-  const [woSequence,     setWoSequence]     = useState([])     // Ordered array of selected WO IDs
+  const [selectedWOs, setSelectedWOs] = useState(new Set())
+  const [woSequence, setWoSequence] = useState([]) // Ordered array of selected WO IDs
   // Per-WO crew assignment: { [woId]: { mode: 'crew'|'sub'|'none', crewId: string, subId: string } }
   const [woAssignments, setWoAssignments] = useState({})
-  const [woStartDate,  setWoStartDate]  = useState('')
-  const [woLoading,    setWoLoading]    = useState(false)
-  const [woSaving,     setWoSaving]     = useState(false)
+  const [woStartDate, setWoStartDate] = useState('')
+  const [woLoading, setWoLoading] = useState(false)
+  const [woSaving, setWoSaving] = useState(false)
 
   // Yard Check scheduling state
-  const [ycJobs,         setYcJobs]         = useState([])       // Yard Check stage jobs
-  const [ycSelected,     setYcSelected]     = useState(new Set()) // selected job IDs
-  const [ycStartDate,    setYcStartDate]    = useState('')
-  const [ycWeeks,        setYcWeeks]        = useState(4)
-  const [ycOptimize,     setYcOptimize]     = useState(false)
-  const [ycOptOrder,     setYcOptOrder]     = useState([])        // optimized job ID order
-  const [ycLoading,      setYcLoading]      = useState(false)
-  const [ycOptimizing,   setYcOptimizing]   = useState(false)
-  const [ycSaving,       setYcSaving]       = useState(false)
-  const [ycEmployee,     setYcEmployee]     = useState('')       // assigned employee name
+  const [ycJobs, setYcJobs] = useState([]) // Yard Check stage jobs
+  const [ycSelected, setYcSelected] = useState(new Set()) // selected job IDs
+  const [ycStartDate, setYcStartDate] = useState('')
+  const [ycWeeks, setYcWeeks] = useState(4)
+  const [ycOptimize, setYcOptimize] = useState(false)
+  const [ycOptOrder, setYcOptOrder] = useState([]) // optimized job ID order
+  const [ycLoading, setYcLoading] = useState(false)
+  const [ycOptimizing, setYcOptimizing] = useState(false)
+  const [ycSaving, setYcSaving] = useState(false)
+  const [ycEmployee, setYcEmployee] = useState('') // assigned employee name
 
   // Support controlled (from parent sidebar button) or uncontrolled mode
-  const showExceptions    = showExceptionsExternal !== undefined ? showExceptionsExternal : localShowExceptions
-  const setShowExceptions = onSetShowExceptions    !== undefined ? onSetShowExceptions    : setLocalShowExceptions
+  const showExceptions =
+    showExceptionsExternal !== undefined ? showExceptionsExternal : localShowExceptions
+  const setShowExceptions =
+    onSetShowExceptions !== undefined ? onSetShowExceptions : setLocalShowExceptions
 
   // crew color lookup: { crewId: hexColor }
   const crewColorMap = Object.fromEntries(crews.map(c => [c.id, c.color || '#15803d']))
@@ -890,8 +1125,15 @@ export default function ScheduleCalendar({
   function getCrewSize(crewId) {
     const crew = crews.find(c => c.id === crewId)
     if (!crew) return 3
-    return [crew.crew_chief_id, crew.journeyman_id, crew.laborer_1_id, crew.laborer_2_id, crew.laborer_3_id]
-      .filter(Boolean).length || 3
+    return (
+      [
+        crew.crew_chief_id,
+        crew.journeyman_id,
+        crew.laborer_1_id,
+        crew.laborer_2_id,
+        crew.laborer_3_id,
+      ].filter(Boolean).length || 3
+    )
   }
 
   // Calendar days = ceil(totalManDays / crewSize). No crew → default 3 men.
@@ -906,8 +1148,17 @@ export default function ScheduleCalendar({
 
     // Fetch work orders and existing schedule items in parallel
     const [woRes, schedRes] = await Promise.all([
-      supabase.from('work_orders').select('*').eq('job_id', jobId).in('status', ['pending', 'in_progress']).order('module_type'),
-      supabase.from('schedule_items').select('work_order_ids').eq('job_id', jobId).eq('scheduling_type', 'work_order'),
+      supabase
+        .from('work_orders')
+        .select('*')
+        .eq('job_id', jobId)
+        .in('status', ['pending', 'in_progress'])
+        .order('module_type'),
+      supabase
+        .from('schedule_items')
+        .select('work_order_ids')
+        .eq('job_id', jobId)
+        .eq('scheduling_type', 'work_order'),
     ])
 
     // Build the set of already-scheduled WO IDs from all schedule items for this job
@@ -929,12 +1180,15 @@ export default function ScheduleCalendar({
     if (isClosed) {
       const ok = confirm(
         `"${job.name || job.client_name}" is currently ${s === 'cancelled' ? 'cancelled' : 'closed'}.\n\n` +
-        `You'll need to re-open it before you can schedule anything against it.\n\n` +
-        `Re-open this job now?`
+          `You'll need to re-open it before you can schedule anything against it.\n\n` +
+          `Re-open this job now?`
       )
       if (!ok) return
       const { error } = await supabase.from('jobs').update({ status: 'active' }).eq('id', job.id)
-      if (error) { alert('Could not reopen the job: ' + error.message); return }
+      if (error) {
+        alert('Could not reopen the job: ' + error.message)
+        return
+      }
       if (typeof onReopenJob === 'function') onReopenJob(job.id)
     }
     setModalJobId(job.id)
@@ -960,20 +1214,24 @@ export default function ScheduleCalendar({
     // before the parent list has refreshed).
     let job = jobs.find(j => j.id === jobId)
     if (!job) {
-      const { data } = await supabase.from('jobs')
+      const { data } = await supabase
+        .from('jobs')
         .select('id, client_name, job_address, job_city, job_state, job_zip')
-        .eq('id', jobId).maybeSingle()
+        .eq('id', jobId)
+        .maybeSingle()
       if (!data) return
       job = data
     }
-    setYcJobs([{
-      id:           job.id,
-      client_name:  job.client_name || job.name || '',
-      job_address:  job.job_address || '',
-      job_city:     job.job_city || '',
-      job_state:    job.job_state || '',
-      job_zip:      job.job_zip || '',
-    }])
+    setYcJobs([
+      {
+        id: job.id,
+        client_name: job.client_name || job.name || '',
+        job_address: job.job_address || '',
+        job_city: job.job_city || '',
+        job_state: job.job_state || '',
+        job_zip: job.job_zip || '',
+      },
+    ])
     setYcSelected(new Set([jobId]))
     setModalJobId(jobId)
     setPhase('yard-check-config')
@@ -996,7 +1254,10 @@ export default function ScheduleCalendar({
 
     if (!stageData || stageData.length === 0) {
       const { data: allStages } = await supabase.from('job_stages').select('name')
-      console.warn('[YC] No Yard Check stage matched. All stage names:', (allStages || []).map(s => s.name))
+      console.warn(
+        '[YC] No Yard Check stage matched. All stage names:',
+        (allStages || []).map(s => s.name)
+      )
       setYcJobs([])
     } else {
       const stageIds = stageData.map(s => s.id)
@@ -1017,37 +1278,49 @@ export default function ScheduleCalendar({
     const selected = ycJobs.filter(j => ycSelected.has(j.id))
 
     // Geocode each address using Nominatim
-    const geocoded = await Promise.all(selected.map(async job => {
-      try {
-        const fullAddr = [job.job_address, job.job_city, job.job_state, job.job_zip].filter(Boolean).join(', ')
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(fullAddr)}&format=json&limit=1`,
-          { headers: { 'Accept-Language': 'en' } }
-        )
-        const data = await res.json()
-        return { ...job, lat: parseFloat(data[0]?.lat) || 0, lng: parseFloat(data[0]?.lon) || 0 }
-      } catch {
-        return { ...job, lat: 0, lng: 0 }
-      }
-    }))
+    const geocoded = await Promise.all(
+      selected.map(async job => {
+        try {
+          const fullAddr = [job.job_address, job.job_city, job.job_state, job.job_zip]
+            .filter(Boolean)
+            .join(', ')
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(fullAddr)}&format=json&limit=1`,
+            { headers: { 'Accept-Language': 'en' } }
+          )
+          const data = await res.json()
+          return { ...job, lat: parseFloat(data[0]?.lat) || 0, lng: parseFloat(data[0]?.lon) || 0 }
+        } catch {
+          return { ...job, lat: 0, lng: 0 }
+        }
+      })
+    )
 
     // Nearest-neighbor route optimization
     function haversine(lat1, lon1, lat2, lon2) {
       const R = 3959
-      const dLat = (lat2 - lat1) * Math.PI / 180
-      const dLon = (lon2 - lon1) * Math.PI / 180
-      const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2
-      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+      const dLat = ((lat2 - lat1) * Math.PI) / 180
+      const dLon = ((lon2 - lon1) * Math.PI) / 180
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos((lat1 * Math.PI) / 180) *
+          Math.cos((lat2 * Math.PI) / 180) *
+          Math.sin(dLon / 2) ** 2
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
     }
 
     const remaining = [...geocoded]
     const ordered = remaining.length > 0 ? [remaining.shift()] : []
     while (remaining.length > 0) {
       const last = ordered[ordered.length - 1]
-      let nearestIdx = 0, nearestDist = Infinity
+      let nearestIdx = 0,
+        nearestDist = Infinity
       remaining.forEach((j, i) => {
         const d = haversine(last.lat, last.lng, j.lat, j.lng)
-        if (d < nearestDist) { nearestDist = d; nearestIdx = i }
+        if (d < nearestDist) {
+          nearestDist = d
+          nearestIdx = i
+        }
       })
       ordered.push(remaining.splice(nearestIdx, 1)[0])
     }
@@ -1071,27 +1344,27 @@ export default function ScheduleCalendar({
       const ds = dateStr(d)
       orderedJobs.forEach((job, stopIdx) => {
         items.push({
-          job_id:           job.id,
+          job_id: job.id,
           // Number each yard check sequentially in date order — #1 is the
           // earliest, #ycWeeks is the latest. Same numbering applies whether
           // it's 2 checks or 4 (or any count).
-          title:            `Yard Check #${week + 1}`,
-          start_date:       ds,
-          end_date:         ds,
-          work_days:        1,
-          scheduling_type:  'yard_check',
-          notes:            `Yard Check ${week + 1} of ${ycWeeks}${ycOptimize ? ` · Stop ${stopIdx + 1} of ${orderedJobs.length}` : ''}`,
-          progress:         0,
-          reminder:         'None',
-          display_color:    '#3b82f6',
-          assignee_color:   null,
-          assignees:        ycEmployee || '',
-          crew_id:          null,
-          sub_id:           null,
+          title: `Yard Check #${week + 1}`,
+          start_date: ds,
+          end_date: ds,
+          work_days: 1,
+          scheduling_type: 'yard_check',
+          notes: `Yard Check ${week + 1} of ${ycWeeks}${ycOptimize ? ` · Stop ${stopIdx + 1} of ${orderedJobs.length}` : ''}`,
+          progress: 0,
+          reminder: 'None',
+          display_color: '#3b82f6',
+          assignee_color: null,
+          assignees: ycEmployee || '',
+          crew_id: null,
+          sub_id: null,
           include_saturday: false,
-          include_sunday:   false,
-          needs_crew:       false,
-          work_order_ids:   [],
+          include_sunday: false,
+          needs_crew: false,
+          work_order_ids: [],
         })
       })
     }
@@ -1105,20 +1378,37 @@ export default function ScheduleCalendar({
 
   // Fetch crews, employees, subs, default color, and workday exceptions on mount
   useEffect(() => {
-    supabase.from('crews').select('*').order('label')
-      .then(({ data }) => { if (data) setCrews(data) })
-    supabase.from('employees').select('id, first_name, last_name, nickname')
-      .eq('status', 'active').order('last_name')
+    supabase
+      .from('crews')
+      .select('*')
+      .order('label')
+      .then(({ data }) => {
+        if (data) setCrews(data)
+      })
+    supabase
+      .from('employees')
+      .select('id, first_name, last_name, nickname')
+      .eq('status', 'active')
+      .order('last_name')
       .then(({ data }) => {
         if (data) {
           setEmployees(data)
-          const bryan = data.find(e => `${e.first_name} ${e.last_name}`.toLowerCase().includes('bryan vielman') || `${e.first_name} ${e.last_name}`.toLowerCase().includes('vielman'))
+          const bryan = data.find(
+            e =>
+              `${e.first_name} ${e.last_name}`.toLowerCase().includes('bryan vielman') ||
+              `${e.first_name} ${e.last_name}`.toLowerCase().includes('vielman')
+          )
           if (bryan) setYcEmployee(`${bryan.first_name} ${bryan.last_name}`.trim())
         }
       })
-    supabase.from('subs_vendors').select('id, company_name, divisions, status')
-      .eq('type', 'sub').order('company_name')
-      .then(({ data }) => { if (data) setSubs(data) })
+    supabase
+      .from('subs_vendors')
+      .select('id, company_name, divisions, status')
+      .eq('type', 'sub')
+      .order('company_name')
+      .then(({ data }) => {
+        if (data) setSubs(data)
+      })
     fetchExceptions()
   }, [])
 
@@ -1136,25 +1426,32 @@ export default function ScheduleCalendar({
     const { data: allItems } = await fetchAllPaginated(() =>
       supabase.from('schedule_items').select('*')
     )
-    if (!allItems) { setRecalculating(false); return }
+    if (!allItems) {
+      setRecalculating(false)
+      return
+    }
 
     const updates = allItems
       .map(item => {
         if (!item.start_date || !item.work_days) return null
-        const newEnd = dateStr(addWorkDays(
-          new Date(item.start_date + 'T00:00:00'),
-          item.work_days,
-          updatedExceptions,
-          item.include_saturday || false,
-          item.include_sunday   || false,
-        ))
+        const newEnd = dateStr(
+          addWorkDays(
+            new Date(item.start_date + 'T00:00:00'),
+            item.work_days,
+            updatedExceptions,
+            item.include_saturday || false,
+            item.include_sunday || false
+          )
+        )
         return newEnd !== item.end_date ? { id: item.id, end_date: newEnd } : null
       })
       .filter(Boolean)
 
-    await Promise.all(updates.map(u =>
-      supabase.from('schedule_items').update({ end_date: u.end_date }).eq('id', u.id)
-    ))
+    await Promise.all(
+      updates.map(u =>
+        supabase.from('schedule_items').update({ end_date: u.end_date }).eq('id', u.id)
+      )
+    )
     setRecalculating(false)
     fetchItems()
   }
@@ -1177,7 +1474,9 @@ export default function ScheduleCalendar({
     recalculateScheduleItems(updated)
   }
 
-  useEffect(() => { fetchItems() }, [year, month, selectedJob])
+  useEffect(() => {
+    fetchItems()
+  }, [year, month, selectedJob])
 
   async function fetchItems() {
     setLoading(true)
@@ -1187,53 +1486,74 @@ export default function ScheduleCalendar({
     // that overlaps that wider range — not just items inside the current
     // month — otherwise the leading/trailing weeks render empty when the
     // user pages between months.
-    const firstDow   = firstDayOfMonth(year, month)
-    const numDays    = daysInMonth(year, month)
+    const firstDow = firstDayOfMonth(year, month)
+    const numDays = daysInMonth(year, month)
     const totalCells = Math.ceil((firstDow + numDays) / 7) * 7
-    const visStart   = new Date(year, month, 1 - firstDow)
-    const visEnd     = new Date(year, month, 1 - firstDow + (totalCells - 1))
-    const fmt        = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-    const startOf    = fmt(visStart)
-    const endOf      = fmt(visEnd)
+    const visStart = new Date(year, month, 1 - firstDow)
+    const visEnd = new Date(year, month, 1 - firstDow + (totalCells - 1))
+    const fmt = d =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const startOf = fmt(visStart)
+    const endOf = fmt(visEnd)
 
     let q = supabase
       .from('schedule_items')
       .select('*')
       .lte('start_date', endOf)
-      .gte('end_date',   startOf)
+      .gte('end_date', startOf)
       .order('start_date')
 
     if (selectedJob !== 'all') q = q.eq('job_id', selectedJob)
 
     const { data, error } = await q
     if (error) console.error('schedule fetch:', error)
-    if (data)  setItems(data)
+    if (data) setItems(data)
     setLoading(false)
   }
 
   function prevMonth() {
-    if (month === 0) { setMonth(11); setYear(y => y - 1) }
-    else setMonth(m => m - 1)
+    if (month === 0) {
+      setMonth(11)
+      setYear(y => y - 1)
+    } else setMonth(m => m - 1)
   }
   function nextMonth() {
-    if (month === 11) { setMonth(0); setYear(y => y + 1) }
-    else setMonth(m => m + 1)
+    if (month === 11) {
+      setMonth(0)
+      setYear(y => y + 1)
+    } else setMonth(m => m + 1)
   }
-  function prevYear()  { setYear(y => y - 1) }
-  function nextYear()  { setYear(y => y + 1) }
-  function goToToday() { setMonth(today.getMonth()); setYear(today.getFullYear()) }
+  function prevYear() {
+    setYear(y => y - 1)
+  }
+  function nextYear() {
+    setYear(y => y + 1)
+  }
+  function goToToday() {
+    setMonth(today.getMonth())
+    setYear(today.getFullYear())
+  }
 
   function handleDayClick(date) {
     // `date` is a Date (may be a spillover day from prev/next month).
-    const ds = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`
+    const ds = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
     setClickedDate(ds)
     setWoStartDate(ds)
-    setForm({ ...EMPTY_FORM, display_color: defaultSchedColor, start_date: ds, end_date: ds, work_days: 1 })
+    setForm({
+      ...EMPTY_FORM,
+      display_color: defaultSchedColor,
+      start_date: ds,
+      end_date: ds,
+      work_days: 1,
+    })
     setEditItem(null)
     if (selectedJob === 'all') {
-      setModalJobId(null); setJobPickerSearch(''); setPhase('job-select')
+      setModalJobId(null)
+      setJobPickerSearch('')
+      setPhase('job-select')
     } else {
-      setModalJobId(selectedJob); setPhase('type-select')
+      setModalJobId(selectedJob)
+      setPhase('type-select')
     }
   }
 
@@ -1241,22 +1561,33 @@ export default function ScheduleCalendar({
     const ds = dateStr(today)
     setClickedDate(ds)
     setWoStartDate(ds)
-    setForm({ ...EMPTY_FORM, display_color: defaultSchedColor, start_date: ds, end_date: ds, work_days: 1 })
+    setForm({
+      ...EMPTY_FORM,
+      display_color: defaultSchedColor,
+      start_date: ds,
+      end_date: ds,
+      work_days: 1,
+    })
     setEditItem(null)
     if (selectedJob === 'all') {
-      setModalJobId(null); setJobPickerSearch(''); setPhase('job-select')
+      setModalJobId(null)
+      setJobPickerSearch('')
+      setPhase('job-select')
     } else {
-      setModalJobId(selectedJob); setPhase('type-select')
+      setModalJobId(selectedJob)
+      setPhase('type-select')
     }
   }
 
   // Respond to external "Add Schedule" button in parent sidebar
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (addScheduleTrigger > 0) handleAddNew() }, [addScheduleTrigger])
+
+  useEffect(() => {
+    if (addScheduleTrigger > 0) handleAddNew()
+  }, [addScheduleTrigger])
 
   // Auto-open the Yard Check config modal when the parent signals a stage
   // change to Yard Check. The user can close it to skip scheduling.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (yardCheckTrigger && yardCheckTrigger.jobId) {
       startYardCheckForJob(yardCheckTrigger.jobId)
@@ -1271,48 +1602,69 @@ export default function ScheduleCalendar({
     const mode = item.needs_crew ? 'crew' : item.crew_id ? 'crew' : item.sub_id ? 'sub' : 'custom'
     setEntryMode(mode)
     setForm({
-      title:          item.title          || '',
-      display_color:  item.display_color  || defaultSchedColor,
+      title: item.title || '',
+      display_color: item.display_color || defaultSchedColor,
       assignee_color: item.assignee_color || '',
-      assignees:      item.assignees      || '',
-      start_date:     item.start_date     || '',
-      end_date:       item.end_date       || '',
-      work_days:      item.work_days      ?? '',
-      progress:       item.progress       ?? 0,
-      reminder:       item.reminder       || 'None',
-      notes:          item.notes          || '',
-      crew_id:          item.crew_id          || '',
-      sub_id:           item.sub_id           || '',
+      assignees: item.assignees || '',
+      start_date: item.start_date || '',
+      end_date: item.end_date || '',
+      work_days: item.work_days ?? '',
+      progress: item.progress ?? 0,
+      reminder: item.reminder || 'None',
+      notes: item.notes || '',
+      crew_id: item.crew_id || '',
+      sub_id: item.sub_id || '',
       include_saturday: item.include_saturday || false,
-      include_sunday:   item.include_sunday   || false,
+      include_sunday: item.include_sunday || false,
     })
     setPhase('details')
   }
 
   function closeModal() {
-    setPhase(null); setEditItem(null); setForm(EMPTY_FORM); setModalJobId(null); setEntryMode('crew')
+    setPhase(null)
+    setEditItem(null)
+    setForm(EMPTY_FORM)
+    setModalJobId(null)
+    setEntryMode('crew')
     setAdminForm({
-      supervisorId: '', consultantId: '',
-      crewChiefId:  '', crewMemberId: '',
-      description:  '',
-      customDesc:   '',
-      startDate:    '', endDate: '', workDays: 1,
+      supervisorId: '',
+      consultantId: '',
+      crewChiefId: '',
+      crewMemberId: '',
+      description: '',
+      customDesc: '',
+      startDate: '',
+      endDate: '',
+      workDays: 1,
     })
-    setSchedType(null); setWorkOrders([]); setSelectedWOs(new Set()); setWoSequence([])
-    setWoAssignments({}); setWoStartDate('')
+    setSchedType(null)
+    setWorkOrders([])
+    setSelectedWOs(new Set())
+    setWoSequence([])
+    setWoAssignments({})
+    setWoStartDate('')
   }
 
   function updateField(key, val) {
     setForm(prev => {
       const next = { ...prev, [key]: val }
-      const excs   = exceptions
+      const excs = exceptions
       const incSat = key === 'include_saturday' ? val : next.include_saturday
-      const incSun = key === 'include_sunday'   ? val : next.include_sunday
-      if ((key === 'start_date' || key === 'include_saturday' || key === 'include_sunday') && next.work_days && +next.work_days > 0 && next.start_date) {
-        next.end_date = dateStr(addWorkDays(toLocalDate(next.start_date), +next.work_days, excs, incSat, incSun))
+      const incSun = key === 'include_sunday' ? val : next.include_sunday
+      if (
+        (key === 'start_date' || key === 'include_saturday' || key === 'include_sunday') &&
+        next.work_days &&
+        +next.work_days > 0 &&
+        next.start_date
+      ) {
+        next.end_date = dateStr(
+          addWorkDays(toLocalDate(next.start_date), +next.work_days, excs, incSat, incSun)
+        )
       }
       if (key === 'work_days' && next.start_date && +val > 0) {
-        next.end_date = dateStr(addWorkDays(toLocalDate(next.start_date), +val, excs, incSat, incSun))
+        next.end_date = dateStr(
+          addWorkDays(toLocalDate(next.start_date), +val, excs, incSat, incSun)
+        )
       }
       if (key === 'end_date' && next.start_date) {
         next.work_days = countWorkDays(next.start_date, val, excs, incSat, incSun)
@@ -1331,77 +1683,92 @@ export default function ScheduleCalendar({
       return e ? `${e.first_name || ''} ${e.last_name || ''}`.trim() : ''
     }
 
-    const sup    = adminForm.supervisorId ? fullName(adminForm.supervisorId) : ''
-    const cons   = adminForm.consultantId ? fullName(adminForm.consultantId) : ''
-    const chief  = adminForm.crewChiefId  ? fullName(adminForm.crewChiefId)  : ''
+    const sup = adminForm.supervisorId ? fullName(adminForm.supervisorId) : ''
+    const cons = adminForm.consultantId ? fullName(adminForm.consultantId) : ''
+    const chief = adminForm.crewChiefId ? fullName(adminForm.crewChiefId) : ''
     const member = adminForm.crewMemberId ? fullName(adminForm.crewMemberId) : ''
 
-    const assigneeNames = mode === 'supervisor'
-      ? [sup, cons].filter(Boolean)
-      : [chief, member].filter(Boolean)
+    const assigneeNames =
+      mode === 'supervisor' ? [sup, cons].filter(Boolean) : [chief, member].filter(Boolean)
     if (assigneeNames.length === 0) {
-      alert(mode === 'supervisor'
-        ? 'Pick at least one — Supervisor or Consultant.'
-        : 'Pick at least one — Crew Chief or Crew Member.')
+      alert(
+        mode === 'supervisor'
+          ? 'Pick at least one — Supervisor or Consultant.'
+          : 'Pick at least one — Crew Chief or Crew Member.'
+      )
       return
     }
 
-    const descLabel = adminForm.description === 'job_walk' ? 'Job Walk'
-                    : adminForm.description === 'time_off' ? 'Time Off'
-                    : adminForm.description === 'custom'   ? adminForm.customDesc.trim()
-                    : ''
-    if (!descLabel) { alert('Pick a description.'); return }
-    if (!adminForm.startDate) { alert('Pick a start date.'); return }
+    const descLabel =
+      adminForm.description === 'job_walk'
+        ? 'Job Walk'
+        : adminForm.description === 'time_off'
+          ? 'Time Off'
+          : adminForm.description === 'custom'
+            ? adminForm.customDesc.trim()
+            : ''
+    if (!descLabel) {
+      alert('Pick a description.')
+      return
+    }
+    if (!adminForm.startDate) {
+      alert('Pick a start date.')
+      return
+    }
 
-    const xCrew  = crews.find(c => (c.label || '').toUpperCase() === 'X')
+    const xCrew = crews.find(c => (c.label || '').toUpperCase() === 'X')
     const xColor = xCrew?.color || '#b91c1c'
     const assignees = assigneeNames.join(', ')
-    const title     = `X - ${descLabel}: ${assignees}`
+    const title = `X - ${descLabel}: ${assignees}`
 
     setSaving(true)
     const payload = {
-      job_id:         null,
+      job_id: null,
       title,
-      display_color:  xColor,
+      display_color: xColor,
       assignee_color: xColor,
       assignees,
-      start_date:     adminForm.startDate,
-      end_date:       adminForm.endDate || adminForm.startDate,
-      work_days:      +adminForm.workDays || 1,
-      progress:       0,
-      reminder:       'None',
-      notes:          '',
-      crew_id:        null,
-      sub_id:         null,
+      start_date: adminForm.startDate,
+      end_date: adminForm.endDate || adminForm.startDate,
+      work_days: +adminForm.workDays || 1,
+      progress: 0,
+      reminder: 'None',
+      notes: '',
+      crew_id: null,
+      sub_id: null,
       include_saturday: false,
-      include_sunday:   false,
-      needs_crew:     false,
+      include_sunday: false,
+      needs_crew: false,
     }
     const { error } = await supabase.from('schedule_items').insert(payload)
     setSaving(false)
-    if (error) { alert('Failed to save: ' + error.message); return }
-    closeModal(); fetchItems()
+    if (error) {
+      alert('Failed to save: ' + error.message)
+      return
+    }
+    closeModal()
+    fetchItems()
   }
 
   async function saveItem() {
     if (!form.title.trim()) return
     setSaving(true)
     const payload = {
-      job_id:        modalJobId,
-      title:         form.title.trim(),
+      job_id: modalJobId,
+      title: form.title.trim(),
       display_color: form.display_color,
-      assignees:     form.assignees,
-      start_date:    form.start_date,
-      end_date:      form.end_date || form.start_date,
-      work_days:     +form.work_days || 1,
-      progress:      +form.progress  || 0,
-      reminder:      form.reminder,
-      notes:         form.notes,
-      crew_id:          entryMode === 'crew' ? (form.crew_id || null) : null,
-      sub_id:           entryMode === 'sub'  ? (form.sub_id  || null) : null,
-      assignee_color:   form.assignee_color || null,
+      assignees: form.assignees,
+      start_date: form.start_date,
+      end_date: form.end_date || form.start_date,
+      work_days: +form.work_days || 1,
+      progress: +form.progress || 0,
+      reminder: form.reminder,
+      notes: form.notes,
+      crew_id: entryMode === 'crew' ? form.crew_id || null : null,
+      sub_id: entryMode === 'sub' ? form.sub_id || null : null,
+      assignee_color: form.assignee_color || null,
       include_saturday: form.include_saturday || false,
-      include_sunday:   form.include_sunday   || false,
+      include_sunday: form.include_sunday || false,
       // Clear needs_crew when a crew or sub is assigned on edit
       needs_crew: editItem?.needs_crew
         ? !(form.crew_id || form.sub_id)
@@ -1410,14 +1777,21 @@ export default function ScheduleCalendar({
     const { error } = editItem
       ? await supabase.from('schedule_items').update(payload).eq('id', editItem.id)
       : await supabase.from('schedule_items').insert(payload)
-    if (error) { console.error(error); setSaving(false); return }
-    setSaving(false); closeModal(); fetchItems()
+    if (error) {
+      console.error(error)
+      setSaving(false)
+      return
+    }
+    setSaving(false)
+    closeModal()
+    fetchItems()
   }
 
   async function deleteItem() {
     if (!editItem || !confirm(`Delete "${editItem.title}"?`)) return
     await supabase.from('schedule_items').delete().eq('id', editItem.id)
-    closeModal(); fetchItems()
+    closeModal()
+    fetchItems()
   }
 
   async function saveWorkOrderSchedule() {
@@ -1437,60 +1811,72 @@ export default function ScheduleCalendar({
     // Build one schedule_item per selected WO, each with its own crew, cascading dates
     let runningStart = toLocalDate(woStartDate)
     const schedulePayloads = selWOs.map(wo => {
-      const asgn     = woAssignments[wo.id] || { mode: 'none', crewId: '', subId: '' }
-      const manDays  = parseFloat(wo.man_days || 0) || 1
-      const crewId   = asgn.mode === 'crew' ? asgn.crewId : null
-      const subId    = asgn.mode === 'sub'  ? asgn.subId  : null
+      const asgn = woAssignments[wo.id] || { mode: 'none', crewId: '', subId: '' }
+      const manDays = parseFloat(wo.man_days || 0) || 1
+      const crewId = asgn.mode === 'crew' ? asgn.crewId : null
+      const subId = asgn.mode === 'sub' ? asgn.subId : null
       const needsCrew = asgn.mode === 'none'
       const workDays = calcScheduleDays(manDays, crewId)
       const startDateStr = dateStr(runningStart)
-      const endDateObj   = addWorkDays(runningStart, workDays, exceptions, false, false)
-      const endDate      = dateStr(endDateObj)
+      const endDateObj = addWorkDays(runningStart, workDays, exceptions, false, false)
+      const endDate = dateStr(endDateObj)
       runningStart = nextWorkDayAfterLocal(endDateObj, exceptions)
 
       const crew = crews.find(c => c.id === crewId)
-      const sub  = subs.find(s => s.id === subId)
+      const sub = subs.find(s => s.id === subId)
 
       let title = wo.module_type
       if (asgn.mode === 'crew' && crew) title = `Crew ${crew.label} — ${wo.module_type}`
       else if (asgn.mode === 'sub' && sub) title = `${sub.company_name} — ${wo.module_type}`
 
       return {
-        job_id:           modalJobId,
+        job_id: modalJobId,
         title,
-        display_color:    defaultSchedColor,
-        assignee_color:   asgn.mode === 'crew' ? (crewColorMap[crewId] || null)
-                        : asgn.mode === 'sub'  ? '#000000'
-                        : null,
-        assignees:        '',
-        start_date:       startDateStr,
-        end_date:         endDate,
-        work_days:        workDays,
-        progress:         0,
-        reminder:         'None',
-        notes:            `${manDays.toFixed(1)} man-days`,
-        crew_id:          crewId || null,
-        sub_id:           subId  || null,
+        display_color: defaultSchedColor,
+        assignee_color:
+          asgn.mode === 'crew'
+            ? crewColorMap[crewId] || null
+            : asgn.mode === 'sub'
+              ? '#000000'
+              : null,
+        assignees: '',
+        start_date: startDateStr,
+        end_date: endDate,
+        work_days: workDays,
+        progress: 0,
+        reminder: 'None',
+        notes: `${manDays.toFixed(1)} man-days`,
+        crew_id: crewId || null,
+        sub_id: subId || null,
         include_saturday: false,
-        include_sunday:   false,
-        scheduling_type:  'work_order',
-        work_order_ids:   [wo.id],
-        needs_crew:       needsCrew,
+        include_sunday: false,
+        scheduling_type: 'work_order',
+        work_order_ids: [wo.id],
+        needs_crew: needsCrew,
       }
     })
 
     // Insert all schedule items
     const { error: schedErr } = await supabase.from('schedule_items').insert(schedulePayloads)
-    if (schedErr) { console.error('WO schedule save:', schedErr); setWoSaving(false); return }
+    if (schedErr) {
+      console.error('WO schedule save:', schedErr)
+      setWoSaving(false)
+      return
+    }
 
     // Stamp each work_order with its scheduled crew/sub
-    await Promise.all(selWOs.map(wo => {
-      const asgn = woAssignments[wo.id] || { mode: 'none', crewId: '', subId: '' }
-      return supabase.from('work_orders').update({
-        scheduled_crew_id: asgn.mode === 'crew' ? (asgn.crewId || null) : null,
-        scheduled_sub_id:  asgn.mode === 'sub'  ? (asgn.subId  || null) : null,
-      }).eq('id', wo.id)
-    }))
+    await Promise.all(
+      selWOs.map(wo => {
+        const asgn = woAssignments[wo.id] || { mode: 'none', crewId: '', subId: '' }
+        return supabase
+          .from('work_orders')
+          .update({
+            scheduled_crew_id: asgn.mode === 'crew' ? asgn.crewId || null : null,
+            scheduled_sub_id: asgn.mode === 'sub' ? asgn.subId || null : null,
+          })
+          .eq('id', wo.id)
+      })
+    )
 
     setWoSaving(false)
     closeModal()
@@ -1501,15 +1887,16 @@ export default function ScheduleCalendar({
   // prev/next-month spillover days so every week is a complete Sun→Sat row
   // (no truncation at month edges).
   const firstDay = firstDayOfMonth(year, month)
-  const numDays  = daysInMonth(year, month)
+  const numDays = daysInMonth(year, month)
   const totalCells = Math.ceil((firstDay + numDays) / 7) * 7
-  const cells = Array.from({ length: totalCells }, (_, i) =>
-    new Date(year, month, 1 + (i - firstDay))
+  const cells = Array.from(
+    { length: totalCells },
+    (_, i) => new Date(year, month, 1 + (i - firstDay))
   )
   const weeks = []
   for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7))
 
-  const jobMap   = Object.fromEntries(jobs.map(j => [j.id, j.name || j.client_name]))
+  const jobMap = Object.fromEntries(jobs.map(j => [j.id, j.name || j.client_name]))
   const todayStr = dateStr(today)
 
   // Month navigation header (shared between mobile and desktop)
@@ -1527,12 +1914,22 @@ export default function ScheduleCalendar({
       <div className={wrapCls}>
         <button onClick={prevYear} className={dblBtn} title="Previous year">
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
+            />
           </svg>
         </button>
         <button onClick={prevMonth} className={btn} title="Previous month">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 19l-7-7 7-7"
+            />
           </svg>
         </button>
         <h3 className="text-sm font-bold text-gray-800 min-w-[8.5rem] text-center px-1">
@@ -1545,7 +1942,12 @@ export default function ScheduleCalendar({
         </button>
         <button onClick={nextYear} className={dblBtn} title="Next year">
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M13 5l7 7-7 7M5 5l7 7-7 7"
+            />
           </svg>
         </button>
         <button
@@ -1566,7 +1968,6 @@ export default function ScheduleCalendar({
 
   return (
     <div className="flex flex-col select-none">
-
       {/* ══════════════════════════════════════════════════════
           MOBILE VIEW — hidden on lg+ screens
       ══════════════════════════════════════════════════════ */}
@@ -1612,7 +2013,6 @@ export default function ScheduleCalendar({
           DESKTOP VIEW — hidden on mobile, shown on lg+
       ══════════════════════════════════════════════════════ */}
       <div className="hidden lg:flex lg:flex-col">
-
         {/* Month navigation + day headers — sticky.
             Toolbar row layout: [Add Schedule][Exceptions]  ‹‹ ‹ Month Year › ›› [Today]  [✨ Schedule Assistance]
             Each side button is ~60% of the old sidebar-button width. */}
@@ -1627,8 +2027,18 @@ export default function ScheduleCalendar({
                 onClick={handleAddNew}
                 className="flex items-center justify-center gap-1 h-7 px-2 rounded-lg bg-green-700 text-white text-[11px] font-semibold hover:bg-green-800 transition-colors w-[140px]"
               >
-                <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                <svg
+                  className="w-3 h-3 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
                 </svg>
                 <span>Add Schedule</span>
               </button>
@@ -1636,9 +2046,18 @@ export default function ScheduleCalendar({
                 onClick={() => onSetShowExceptions && onSetShowExceptions(true)}
                 className="flex items-center justify-center gap-1 h-7 px-2 ml-6 rounded-lg border border-gray-200 text-[11px] font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-colors w-[140px]"
               >
-                <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                <svg
+                  className="w-3 h-3 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+                  />
                 </svg>
                 <span>Exceptions</span>
                 {exceptionsCount > 0 && (
@@ -1670,7 +2089,10 @@ export default function ScheduleCalendar({
 
           <div className="grid grid-cols-7 border-l border-t border-gray-200">
             {DAY_NAMES.map(d => (
-              <div key={d} className="text-center text-xs font-semibold text-gray-400 py-1.5 border-r border-b border-gray-200 bg-white">
+              <div
+                key={d}
+                className="text-center text-xs font-semibold text-gray-400 py-1.5 border-r border-b border-gray-200 bg-white"
+              >
                 {d}
               </div>
             ))}
@@ -1719,142 +2141,161 @@ export default function ScheduleCalendar({
       )}
 
       {/* Job Selector */}
-      {phase === 'job-select' && (() => {
-        // Match the JobsList sidebar's Open/Closed/Both filter so the picker
-        // shows the same set of jobs the user is already looking at.
-        const matchesStatus = j => {
-          const s = j.status || 'active'
-          const isOpen = s === 'active' || s === 'on_hold'
-          if (statusFilter === 'open')   return isOpen
-          if (statusFilter === 'closed') return !isOpen
-          return true
-        }
-        const q = jobPickerSearch.trim().toLowerCase()
-        const matchesSearch = j => {
-          if (!q) return true
-          const name   = (j.name || '').toLowerCase()
-          const client = (j.client_name || '').toLowerCase()
-          const addr   = (j.job_address || '').toLowerCase()
-          return name.includes(q) || client.includes(q) || addr.includes(q)
-        }
-        const filtered = (jobs || [])
-          .filter(j => matchesStatus(j) && matchesSearch(j))
-          .sort((a, b) =>
-            (a.name || a.client_name || '').localeCompare(
-              b.name || b.client_name || '', undefined, { numeric: true, sensitivity: 'base' }
+      {phase === 'job-select' &&
+        (() => {
+          // Match the JobsList sidebar's Open/Closed/Both filter so the picker
+          // shows the same set of jobs the user is already looking at.
+          const matchesStatus = j => {
+            const s = j.status || 'active'
+            const isOpen = s === 'active' || s === 'on_hold'
+            if (statusFilter === 'open') return isOpen
+            if (statusFilter === 'closed') return !isOpen
+            return true
+          }
+          const q = jobPickerSearch.trim().toLowerCase()
+          const matchesSearch = j => {
+            if (!q) return true
+            const name = (j.name || '').toLowerCase()
+            const client = (j.client_name || '').toLowerCase()
+            const addr = (j.job_address || '').toLowerCase()
+            return name.includes(q) || client.includes(q) || addr.includes(q)
+          }
+          const filtered = (jobs || [])
+            .filter(j => matchesStatus(j) && matchesSearch(j))
+            .sort((a, b) =>
+              (a.name || a.client_name || '').localeCompare(
+                b.name || b.client_name || '',
+                undefined,
+                { numeric: true, sensitivity: 'base' }
+              )
             )
-          )
-        const filterLabel = statusFilter === 'open' ? 'Open' : statusFilter === 'closed' ? 'Closed' : 'All'
+          const filterLabel =
+            statusFilter === 'open' ? 'Open' : statusFilter === 'closed' ? 'Closed' : 'All'
 
-        // Group the filtered jobs by stage_id so the picker mirrors the
-        // sidebar layout. Stages come pre-sorted by sort_order; jobs within
-        // each stage are already alpha-numeric from the sort above.
-        const stageGroups = []
-        const byStage = {}
-        for (const s of stages) byStage[s.id] = []
-        const unassigned = []
-        for (const j of filtered) {
-          if (j.stage_id && byStage[j.stage_id]) byStage[j.stage_id].push(j)
-          else unassigned.push(j)
-        }
-        if (unassigned.length > 0) stageGroups.push({ id: '__none__', label: 'Unassigned', jobs: unassigned })
-        stages.forEach((s, idx) => {
-          if (byStage[s.id]?.length) stageGroups.push({ id: s.id, label: `${idx + 1} - ${s.name}`, jobs: byStage[s.id] })
-        })
+          // Group the filtered jobs by stage_id so the picker mirrors the
+          // sidebar layout. Stages come pre-sorted by sort_order; jobs within
+          // each stage are already alpha-numeric from the sort above.
+          const stageGroups = []
+          const byStage = {}
+          for (const s of stages) byStage[s.id] = []
+          const unassigned = []
+          for (const j of filtered) {
+            if (j.stage_id && byStage[j.stage_id]) byStage[j.stage_id].push(j)
+            else unassigned.push(j)
+          }
+          if (unassigned.length > 0)
+            stageGroups.push({ id: '__none__', label: 'Unassigned', jobs: unassigned })
+          stages.forEach((s, idx) => {
+            if (byStage[s.id]?.length)
+              stageGroups.push({ id: s.id, label: `${idx + 1} - ${s.name}`, jobs: byStage[s.id] })
+          })
 
-        return (
-          <ModalOverlay onClose={closeModal}>
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-[605px] mx-4 flex flex-col max-h-[85vh] overflow-hidden">
-              {/* Header */}
-              <div className="px-5 pt-5 pb-3 border-b border-gray-100 flex-shrink-0">
-                <div className="flex items-baseline justify-between gap-2 mb-2">
-                  <h3 className="text-sm font-bold text-gray-800">Select a Job</h3>
-                  <p className="text-[11px] text-gray-400">{clickedDate}</p>
+          return (
+            <ModalOverlay onClose={closeModal}>
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-[605px] mx-4 flex flex-col max-h-[85vh] overflow-hidden">
+                {/* Header */}
+                <div className="px-5 pt-5 pb-3 border-b border-gray-100 flex-shrink-0">
+                  <div className="flex items-baseline justify-between gap-2 mb-2">
+                    <h3 className="text-sm font-bold text-gray-800">Select a Job</h3>
+                    <p className="text-[11px] text-gray-400">{clickedDate}</p>
+                  </div>
+
+                  {/* Administrative shortcut — for non-job-related schedule
+                     items like crew time off and supervisor scheduling. */}
+                  <button
+                    onClick={() => setPhase('admin-select')}
+                    className="w-full flex items-center justify-between gap-3 px-3 py-2 mb-3 rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 hover:border-purple-300 transition-colors text-left"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-purple-800">📋 Administrative</p>
+                      <p className="text-[11px] text-purple-600 mt-0.5">
+                        For crew time off and supervisor scheduling
+                      </p>
+                    </div>
+                    <span className="text-purple-400 text-lg flex-shrink-0">›</span>
+                  </button>
+
+                  <input
+                    autoFocus
+                    type="text"
+                    value={jobPickerSearch}
+                    onChange={e => setJobPickerSearch(e.target.value)}
+                    placeholder="Search jobs by name, opportunity, or address…"
+                    className="input text-sm w-full py-1.5"
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1.5">
+                    Showing <span className="font-semibold text-gray-600">{filterLabel}</span> jobs
+                    ({filtered.length})
+                  </p>
                 </div>
 
-                {/* Administrative shortcut — for non-job-related schedule
-                     items like crew time off and supervisor scheduling. */}
-                <button
-                  onClick={() => setPhase('admin-select')}
-                  className="w-full flex items-center justify-between gap-3 px-3 py-2 mb-3 rounded-lg border border-purple-200 bg-purple-50 hover:bg-purple-100 hover:border-purple-300 transition-colors text-left"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-purple-800">📋 Administrative</p>
-                    <p className="text-[11px] text-purple-600 mt-0.5">For crew time off and supervisor scheduling</p>
-                  </div>
-                  <span className="text-purple-400 text-lg flex-shrink-0">›</span>
-                </button>
-
-                <input
-                  autoFocus
-                  type="text"
-                  value={jobPickerSearch}
-                  onChange={e => setJobPickerSearch(e.target.value)}
-                  placeholder="Search jobs by name, opportunity, or address…"
-                  className="input text-sm w-full py-1.5"
-                />
-                <p className="text-[11px] text-gray-400 mt-1.5">
-                  Showing <span className="font-semibold text-gray-600">{filterLabel}</span> jobs ({filtered.length})
-                </p>
-              </div>
-
-              {/* List — scrolls within the modal. Jobs are grouped by stage
+                {/* List — scrolls within the modal. Jobs are grouped by stage
                   so the user can quickly scroll to a known stage section. */}
-              <div className="overflow-y-auto flex-1">
-                {filtered.length === 0 ? (
-                  <p className="text-xs text-gray-400 text-center py-8 italic">
-                    {q ? 'No jobs match your search.' : `No ${filterLabel.toLowerCase()} jobs.`}
-                  </p>
-                ) : (
-                  <div>
-                    {stageGroups.map(group => (
-                      <div key={group.id}>
-                        {/* Sticky stage header — keeps current section visible while scrolling */}
-                        <div className="sticky top-0 z-10 bg-gray-50 border-y border-gray-200 px-3 py-1.5">
-                          <p className="text-[11px] font-bold text-gray-600 uppercase tracking-wide">
-                            {group.label} <span className="text-gray-400 font-normal normal-case">· {group.jobs.length}</span>
-                          </p>
+                <div className="overflow-y-auto flex-1">
+                  {filtered.length === 0 ? (
+                    <p className="text-xs text-gray-400 text-center py-8 italic">
+                      {q ? 'No jobs match your search.' : `No ${filterLabel.toLowerCase()} jobs.`}
+                    </p>
+                  ) : (
+                    <div>
+                      {stageGroups.map(group => (
+                        <div key={group.id}>
+                          {/* Sticky stage header — keeps current section visible while scrolling */}
+                          <div className="sticky top-0 z-10 bg-gray-50 border-y border-gray-200 px-3 py-1.5">
+                            <p className="text-[11px] font-bold text-gray-600 uppercase tracking-wide">
+                              {group.label}{' '}
+                              <span className="text-gray-400 font-normal normal-case">
+                                · {group.jobs.length}
+                              </span>
+                            </p>
+                          </div>
+                          <div className="divide-y divide-gray-100">
+                            {group.jobs.map(j => {
+                              const isClosed = j.status === 'completed' || j.status === 'cancelled'
+                              return (
+                                <button
+                                  key={j.id}
+                                  onClick={() => pickJobForSchedule(j)}
+                                  title={
+                                    isClosed
+                                      ? 'This job is closed — selecting it will prompt you to reopen it.'
+                                      : undefined
+                                  }
+                                  className={`w-full text-left px-3 py-1.5 text-sm transition-colors truncate flex items-center gap-2 ${
+                                    isClosed
+                                      ? 'text-gray-500 hover:bg-yellow-50 hover:text-yellow-800'
+                                      : 'text-gray-700 hover:bg-green-50 hover:text-green-800'
+                                  }`}
+                                >
+                                  <span className="flex-1 truncate">{j.name || j.client_name}</span>
+                                  {isClosed && (
+                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200 uppercase tracking-wide flex-shrink-0">
+                                      Closed
+                                    </span>
+                                  )}
+                                </button>
+                              )
+                            })}
+                          </div>
                         </div>
-                        <div className="divide-y divide-gray-100">
-                          {group.jobs.map(j => {
-                            const isClosed = j.status === 'completed' || j.status === 'cancelled'
-                            return (
-                              <button
-                                key={j.id}
-                                onClick={() => pickJobForSchedule(j)}
-                                title={isClosed ? 'This job is closed — selecting it will prompt you to reopen it.' : undefined}
-                                className={`w-full text-left px-3 py-1.5 text-sm transition-colors truncate flex items-center gap-2 ${
-                                  isClosed
-                                    ? 'text-gray-500 hover:bg-yellow-50 hover:text-yellow-800'
-                                    : 'text-gray-700 hover:bg-green-50 hover:text-green-800'
-                                }`}
-                              >
-                                <span className="flex-1 truncate">{j.name || j.client_name}</span>
-                                {isClosed && (
-                                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200 uppercase tracking-wide flex-shrink-0">
-                                    Closed
-                                  </span>
-                                )}
-                              </button>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
-              {/* Footer */}
-              <div className="px-5 py-3 border-t border-gray-100 flex-shrink-0">
-                <button onClick={closeModal} className="w-full text-xs text-gray-400 hover:text-gray-600 text-center">
-                  Cancel
-                </button>
+                {/* Footer */}
+                <div className="px-5 py-3 border-t border-gray-100 flex-shrink-0">
+                  <button
+                    onClick={closeModal}
+                    className="w-full text-xs text-gray-400 hover:text-gray-600 text-center"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
-            </div>
-          </ModalOverlay>
-        )
-      })()}
+            </ModalOverlay>
+          )
+        })()}
 
       {/* ── Administrative scheduling picker ────────────────────
            Two paths: 1) Supervisor + Consultant scheduling
@@ -1873,28 +2314,42 @@ export default function ScheduleCalendar({
             <div className="space-y-2">
               <button
                 onClick={() => {
-                  setAdminForm(p => ({ ...p, startDate: clickedDate || '', endDate: clickedDate || '', workDays: 1 }))
+                  setAdminForm(p => ({
+                    ...p,
+                    startDate: clickedDate || '',
+                    endDate: clickedDate || '',
+                    workDays: 1,
+                  }))
                   setPhase('admin-supervisor')
                 }}
                 className="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-colors text-left"
               >
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-gray-800">👤 Supervisor / Consultant</p>
-                  <p className="text-[11px] text-gray-500 mt-0.5">Job walk, time off, or a custom item</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">
+                    Job walk, time off, or a custom item
+                  </p>
                 </div>
                 <span className="text-gray-400 text-lg flex-shrink-0">›</span>
               </button>
 
               <button
                 onClick={() => {
-                  setAdminForm(p => ({ ...p, startDate: clickedDate || '', endDate: clickedDate || '', workDays: 1 }))
+                  setAdminForm(p => ({
+                    ...p,
+                    startDate: clickedDate || '',
+                    endDate: clickedDate || '',
+                    workDays: 1,
+                  }))
                   setPhase('admin-crew')
                 }}
                 className="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-colors text-left"
               >
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-gray-800">🛠️ Crew Member</p>
-                  <p className="text-[11px] text-gray-500 mt-0.5">Time off or a custom item for a chief or crew member</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">
+                    Time off or a custom item for a chief or crew member
+                  </p>
                 </div>
                 <span className="text-gray-400 text-lg flex-shrink-0">›</span>
               </button>
@@ -1907,10 +2362,7 @@ export default function ScheduleCalendar({
               >
                 ← Back to job picker
               </button>
-              <button
-                onClick={closeModal}
-                className="text-xs text-gray-400 hover:text-gray-600"
-              >
+              <button onClick={closeModal} className="text-xs text-gray-400 hover:text-gray-600">
                 Cancel
               </button>
             </div>
@@ -1919,632 +2371,918 @@ export default function ScheduleCalendar({
       )}
 
       {/* ── Administrative: Supervisor / Consultant ──────────── */}
-      {phase === 'admin-supervisor' && (() => {
-        const supervisorOpts = employees.map(e => ({ id: e.id, label: `${e.last_name || ''}, ${e.first_name || ''}`.trim() }))
-        return (
-          <ModalOverlay onClose={closeModal}>
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-5 max-h-[90vh] overflow-y-auto">
-              <div className="flex items-baseline justify-between mb-1">
-                <h3 className="text-sm font-bold text-gray-800">Supervisor / Consultant</h3>
-                <p className="text-[11px] text-gray-400">{adminForm.startDate || clickedDate}</p>
-              </div>
-              <p className="text-xs text-gray-500 mb-4">Pick a supervisor, a consultant, or both.</p>
+      {phase === 'admin-supervisor' &&
+        (() => {
+          const supervisorOpts = employees.map(e => ({
+            id: e.id,
+            label: `${e.last_name || ''}, ${e.first_name || ''}`.trim(),
+          }))
+          return (
+            <ModalOverlay onClose={closeModal}>
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-5 max-h-[90vh] overflow-y-auto">
+                <div className="flex items-baseline justify-between mb-1">
+                  <h3 className="text-sm font-bold text-gray-800">Supervisor / Consultant</h3>
+                  <p className="text-[11px] text-gray-400">{adminForm.startDate || clickedDate}</p>
+                </div>
+                <p className="text-xs text-gray-500 mb-4">
+                  Pick a supervisor, a consultant, or both.
+                </p>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Job Supervisor</label>
-                  <select className="input text-sm w-full"
-                    value={adminForm.supervisorId}
-                    onChange={e => setAdminForm(p => ({ ...p, supervisorId: e.target.value }))}>
-                    <option value="">— None —</option>
-                    {supervisorOpts.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-                  </select>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Job Supervisor</label>
+                    <select
+                      className="input text-sm w-full"
+                      value={adminForm.supervisorId}
+                      onChange={e => setAdminForm(p => ({ ...p, supervisorId: e.target.value }))}
+                    >
+                      <option value="">— None —</option>
+                      {supervisorOpts.map(o => (
+                        <option key={o.id} value={o.id}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Consultant</label>
+                    <select
+                      className="input text-sm w-full"
+                      value={adminForm.consultantId}
+                      onChange={e => setAdminForm(p => ({ ...p, consultantId: e.target.value }))}
+                    >
+                      <option value="">— None —</option>
+                      {supervisorOpts.map(o => (
+                        <option key={o.id} value={o.id}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Consultant</label>
-                  <select className="input text-sm w-full"
-                    value={adminForm.consultantId}
-                    onChange={e => setAdminForm(p => ({ ...p, consultantId: e.target.value }))}>
-                    <option value="">— None —</option>
-                    {supervisorOpts.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-                  </select>
-                </div>
-              </div>
 
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Description</p>
-              <div className="space-y-1.5 mb-4">
-                {[
-                  { key: 'job_walk', label: 'Job Walk' },
-                  { key: 'time_off', label: 'Time Off' },
-                  { key: 'custom',   label: 'Custom…'  },
-                ].map(opt => (
-                  <label key={opt.key} className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
-                    adminForm.description === opt.key ? 'border-purple-300 bg-purple-50' : 'border-gray-200 hover:bg-gray-50'
-                  }`}>
-                    <input type="radio" name="admin-desc-sup"
-                      checked={adminForm.description === opt.key}
-                      onChange={() => setAdminForm(p => ({ ...p, description: opt.key }))}
-                      className="accent-purple-600" />
-                    <span className="text-sm text-gray-800">{opt.label}</span>
-                  </label>
-                ))}
-                {adminForm.description === 'custom' && (
-                  <input type="text" autoFocus
-                    value={adminForm.customDesc}
-                    onChange={e => setAdminForm(p => ({ ...p, customDesc: e.target.value }))}
-                    placeholder="Describe the schedule item…"
-                    className="input text-sm w-full mt-1" />
-                )}
-              </div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                  Description
+                </p>
+                <div className="space-y-1.5 mb-4">
+                  {[
+                    { key: 'job_walk', label: 'Job Walk' },
+                    { key: 'time_off', label: 'Time Off' },
+                    { key: 'custom', label: 'Custom…' },
+                  ].map(opt => (
+                    <label
+                      key={opt.key}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+                        adminForm.description === opt.key
+                          ? 'border-purple-300 bg-purple-50'
+                          : 'border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="admin-desc-sup"
+                        checked={adminForm.description === opt.key}
+                        onChange={() => setAdminForm(p => ({ ...p, description: opt.key }))}
+                        className="accent-purple-600"
+                      />
+                      <span className="text-sm text-gray-800">{opt.label}</span>
+                    </label>
+                  ))}
+                  {adminForm.description === 'custom' && (
+                    <input
+                      type="text"
+                      autoFocus
+                      value={adminForm.customDesc}
+                      onChange={e => setAdminForm(p => ({ ...p, customDesc: e.target.value }))}
+                      placeholder="Describe the schedule item…"
+                      className="input text-sm w-full mt-1"
+                    />
+                  )}
+                </div>
 
-              <div className="grid grid-cols-3 gap-2 mb-4">
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Start</label>
-                  <input type="date" value={adminForm.startDate}
-                    onChange={e => setAdminForm(p => ({ ...p, startDate: e.target.value }))}
-                    className="input text-sm w-full" />
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Start</label>
+                    <input
+                      type="date"
+                      value={adminForm.startDate}
+                      onChange={e => setAdminForm(p => ({ ...p, startDate: e.target.value }))}
+                      className="input text-sm w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">End</label>
+                    <input
+                      type="date"
+                      value={adminForm.endDate}
+                      onChange={e => setAdminForm(p => ({ ...p, endDate: e.target.value }))}
+                      className="input text-sm w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Work days</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={adminForm.workDays}
+                      onChange={e => setAdminForm(p => ({ ...p, workDays: e.target.value }))}
+                      className="input text-sm w-full"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">End</label>
-                  <input type="date" value={adminForm.endDate}
-                    onChange={e => setAdminForm(p => ({ ...p, endDate: e.target.value }))}
-                    className="input text-sm w-full" />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Work days</label>
-                  <input type="number" min="1" value={adminForm.workDays}
-                    onChange={e => setAdminForm(p => ({ ...p, workDays: e.target.value }))}
-                    className="input text-sm w-full" />
-                </div>
-              </div>
 
-              <div className="flex justify-between items-center">
-                <button onClick={() => setPhase('admin-select')}
-                  className="text-xs text-gray-400 hover:text-gray-600">← Back</button>
-                <div className="flex gap-2">
-                  <button onClick={closeModal}
-                    className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50">Cancel</button>
-                  <button onClick={() => saveAdminItem('supervisor')}
-                    disabled={saving}
-                    className="px-3 py-1.5 rounded-lg bg-green-700 text-white text-xs font-semibold hover:bg-green-800 disabled:opacity-50">
-                    {saving ? 'Saving…' : 'Save'}
+                <div className="flex justify-between items-center">
+                  <button
+                    onClick={() => setPhase('admin-select')}
+                    className="text-xs text-gray-400 hover:text-gray-600"
+                  >
+                    ← Back
                   </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={closeModal}
+                      className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => saveAdminItem('supervisor')}
+                      disabled={saving}
+                      className="px-3 py-1.5 rounded-lg bg-green-700 text-white text-xs font-semibold hover:bg-green-800 disabled:opacity-50"
+                    >
+                      {saving ? 'Saving…' : 'Save'}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          </ModalOverlay>
-        )
-      })()}
+            </ModalOverlay>
+          )
+        })()}
 
       {/* ── Administrative: Crew Chief / Member ──────────────── */}
-      {phase === 'admin-crew' && (() => {
-        const empById = new Map(employees.map(e => [e.id, e]))
-        const chiefIds = [...new Set(crews.map(c => c.crew_chief_id).filter(Boolean))]
-        const memberIds = [...new Set(crews.flatMap(c => [c.journeyman_id, c.laborer_1_id, c.laborer_2_id, c.laborer_3_id]).filter(Boolean))]
-        const toOpts = ids => ids
-          .map(id => empById.get(id))
-          .filter(Boolean)
-          .map(e => ({ id: e.id, label: `${e.last_name || ''}, ${e.first_name || ''}`.trim() }))
-          .sort((a, b) => a.label.localeCompare(b.label))
-        const chiefOpts  = toOpts(chiefIds)
-        const memberOpts = toOpts(memberIds)
-        return (
-          <ModalOverlay onClose={closeModal}>
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-5 max-h-[90vh] overflow-y-auto">
-              <div className="flex items-baseline justify-between mb-1">
-                <h3 className="text-sm font-bold text-gray-800">Crew Member Scheduling</h3>
-                <p className="text-[11px] text-gray-400">{adminForm.startDate || clickedDate}</p>
-              </div>
-              <p className="text-xs text-gray-500 mb-4">Pick a crew chief, a crew member, or both.</p>
+      {phase === 'admin-crew' &&
+        (() => {
+          const empById = new Map(employees.map(e => [e.id, e]))
+          const chiefIds = [...new Set(crews.map(c => c.crew_chief_id).filter(Boolean))]
+          const memberIds = [
+            ...new Set(
+              crews
+                .flatMap(c => [c.journeyman_id, c.laborer_1_id, c.laborer_2_id, c.laborer_3_id])
+                .filter(Boolean)
+            ),
+          ]
+          const toOpts = ids =>
+            ids
+              .map(id => empById.get(id))
+              .filter(Boolean)
+              .map(e => ({ id: e.id, label: `${e.last_name || ''}, ${e.first_name || ''}`.trim() }))
+              .sort((a, b) => a.label.localeCompare(b.label))
+          const chiefOpts = toOpts(chiefIds)
+          const memberOpts = toOpts(memberIds)
+          return (
+            <ModalOverlay onClose={closeModal}>
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-5 max-h-[90vh] overflow-y-auto">
+                <div className="flex items-baseline justify-between mb-1">
+                  <h3 className="text-sm font-bold text-gray-800">Crew Member Scheduling</h3>
+                  <p className="text-[11px] text-gray-400">{adminForm.startDate || clickedDate}</p>
+                </div>
+                <p className="text-xs text-gray-500 mb-4">
+                  Pick a crew chief, a crew member, or both.
+                </p>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Crew Chief</label>
-                  <select className="input text-sm w-full"
-                    value={adminForm.crewChiefId}
-                    onChange={e => setAdminForm(p => ({ ...p, crewChiefId: e.target.value }))}>
-                    <option value="">— None —</option>
-                    {chiefOpts.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-                  </select>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Crew Chief</label>
+                    <select
+                      className="input text-sm w-full"
+                      value={adminForm.crewChiefId}
+                      onChange={e => setAdminForm(p => ({ ...p, crewChiefId: e.target.value }))}
+                    >
+                      <option value="">— None —</option>
+                      {chiefOpts.map(o => (
+                        <option key={o.id} value={o.id}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Crew Member</label>
+                    <select
+                      className="input text-sm w-full"
+                      value={adminForm.crewMemberId}
+                      onChange={e => setAdminForm(p => ({ ...p, crewMemberId: e.target.value }))}
+                    >
+                      <option value="">— None —</option>
+                      {memberOpts.map(o => (
+                        <option key={o.id} value={o.id}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Crew Member</label>
-                  <select className="input text-sm w-full"
-                    value={adminForm.crewMemberId}
-                    onChange={e => setAdminForm(p => ({ ...p, crewMemberId: e.target.value }))}>
-                    <option value="">— None —</option>
-                    {memberOpts.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-                  </select>
-                </div>
-              </div>
 
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Description</p>
-              <div className="space-y-1.5 mb-4">
-                {[
-                  { key: 'time_off', label: 'Time Off' },
-                  { key: 'custom',   label: 'Custom…'  },
-                ].map(opt => (
-                  <label key={opt.key} className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
-                    adminForm.description === opt.key ? 'border-purple-300 bg-purple-50' : 'border-gray-200 hover:bg-gray-50'
-                  }`}>
-                    <input type="radio" name="admin-desc-crew"
-                      checked={adminForm.description === opt.key}
-                      onChange={() => setAdminForm(p => ({ ...p, description: opt.key }))}
-                      className="accent-purple-600" />
-                    <span className="text-sm text-gray-800">{opt.label}</span>
-                  </label>
-                ))}
-                {adminForm.description === 'custom' && (
-                  <input type="text" autoFocus
-                    value={adminForm.customDesc}
-                    onChange={e => setAdminForm(p => ({ ...p, customDesc: e.target.value }))}
-                    placeholder="Describe the schedule item…"
-                    className="input text-sm w-full mt-1" />
-                )}
-              </div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                  Description
+                </p>
+                <div className="space-y-1.5 mb-4">
+                  {[
+                    { key: 'time_off', label: 'Time Off' },
+                    { key: 'custom', label: 'Custom…' },
+                  ].map(opt => (
+                    <label
+                      key={opt.key}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+                        adminForm.description === opt.key
+                          ? 'border-purple-300 bg-purple-50'
+                          : 'border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="admin-desc-crew"
+                        checked={adminForm.description === opt.key}
+                        onChange={() => setAdminForm(p => ({ ...p, description: opt.key }))}
+                        className="accent-purple-600"
+                      />
+                      <span className="text-sm text-gray-800">{opt.label}</span>
+                    </label>
+                  ))}
+                  {adminForm.description === 'custom' && (
+                    <input
+                      type="text"
+                      autoFocus
+                      value={adminForm.customDesc}
+                      onChange={e => setAdminForm(p => ({ ...p, customDesc: e.target.value }))}
+                      placeholder="Describe the schedule item…"
+                      className="input text-sm w-full mt-1"
+                    />
+                  )}
+                </div>
 
-              <div className="grid grid-cols-3 gap-2 mb-4">
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Start</label>
-                  <input type="date" value={adminForm.startDate}
-                    onChange={e => setAdminForm(p => ({ ...p, startDate: e.target.value }))}
-                    className="input text-sm w-full" />
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Start</label>
+                    <input
+                      type="date"
+                      value={adminForm.startDate}
+                      onChange={e => setAdminForm(p => ({ ...p, startDate: e.target.value }))}
+                      className="input text-sm w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">End</label>
+                    <input
+                      type="date"
+                      value={adminForm.endDate}
+                      onChange={e => setAdminForm(p => ({ ...p, endDate: e.target.value }))}
+                      className="input text-sm w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Work days</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={adminForm.workDays}
+                      onChange={e => setAdminForm(p => ({ ...p, workDays: e.target.value }))}
+                      className="input text-sm w-full"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">End</label>
-                  <input type="date" value={adminForm.endDate}
-                    onChange={e => setAdminForm(p => ({ ...p, endDate: e.target.value }))}
-                    className="input text-sm w-full" />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Work days</label>
-                  <input type="number" min="1" value={adminForm.workDays}
-                    onChange={e => setAdminForm(p => ({ ...p, workDays: e.target.value }))}
-                    className="input text-sm w-full" />
-                </div>
-              </div>
 
-              <div className="flex justify-between items-center">
-                <button onClick={() => setPhase('admin-select')}
-                  className="text-xs text-gray-400 hover:text-gray-600">← Back</button>
-                <div className="flex gap-2">
-                  <button onClick={closeModal}
-                    className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50">Cancel</button>
-                  <button onClick={() => saveAdminItem('crew')}
-                    disabled={saving}
-                    className="px-3 py-1.5 rounded-lg bg-green-700 text-white text-xs font-semibold hover:bg-green-800 disabled:opacity-50">
-                    {saving ? 'Saving…' : 'Save'}
+                <div className="flex justify-between items-center">
+                  <button
+                    onClick={() => setPhase('admin-select')}
+                    className="text-xs text-gray-400 hover:text-gray-600"
+                  >
+                    ← Back
                   </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={closeModal}
+                      className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => saveAdminItem('crew')}
+                      disabled={saving}
+                      className="px-3 py-1.5 rounded-lg bg-green-700 text-white text-xs font-semibold hover:bg-green-800 disabled:opacity-50"
+                    >
+                      {saving ? 'Saving…' : 'Save'}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          </ModalOverlay>
-        )
-      })()}
+            </ModalOverlay>
+          )
+        })()}
 
       {/* ── Scheduling Type Selector ──────────────────────────── */}
       {phase === 'type-select' && (
         <ModalOverlay onClose={closeModal}>
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-5">
-            <h3 className="text-sm font-bold text-gray-800 mb-0.5">How would you like to schedule?</h3>
+            <h3 className="text-sm font-bold text-gray-800 mb-0.5">
+              How would you like to schedule?
+            </h3>
             {modalJobId && (
               <p className="text-xs text-green-700 font-medium mb-4">{jobMap[modalJobId]}</p>
             )}
             <div className="space-y-2">
               <button
-                onClick={() => { setSchedType('work_order'); fetchPendingWOs(modalJobId); setPhase('wo-select') }}
+                onClick={() => {
+                  setSchedType('work_order')
+                  fetchPendingWOs(modalJobId)
+                  setPhase('wo-select')
+                }}
                 className="w-full flex items-start gap-3 p-3.5 rounded-xl border-2 border-gray-200 hover:border-green-500 hover:bg-green-50 text-left transition-colors group"
               >
                 <span className="text-xl mt-0.5">🏗️</span>
                 <div>
-                  <p className="text-sm font-bold text-gray-800 group-hover:text-green-800">Install Work Order</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Schedule by pending work orders. Auto-calculates work days from man-days ÷ crew size.</p>
+                  <p className="text-sm font-bold text-gray-800 group-hover:text-green-800">
+                    Install Work Order
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Schedule by pending work orders. Auto-calculates work days from man-days ÷ crew
+                    size.
+                  </p>
                 </div>
               </button>
               <button
-                onClick={() => { setSchedType('crew_type'); setPhase('details') }}
+                onClick={() => {
+                  setSchedType('crew_type')
+                  setPhase('details')
+                }}
                 className="w-full flex items-start gap-3 p-3.5 rounded-xl border-2 border-gray-200 hover:border-green-500 hover:bg-green-50 text-left transition-colors group"
               >
                 <span className="text-xl mt-0.5">👷</span>
                 <div>
-                  <p className="text-sm font-bold text-gray-800 group-hover:text-green-800">Install Crew Type</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Manually set dates, crew, and details — standard scheduling flow.</p>
+                  <p className="text-sm font-bold text-gray-800 group-hover:text-green-800">
+                    Install Crew Type
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Manually set dates, crew, and details — standard scheduling flow.
+                  </p>
                 </div>
               </button>
               <button
-                onClick={() => { startYardCheckForJob(modalJobId) }}
+                onClick={() => {
+                  startYardCheckForJob(modalJobId)
+                }}
                 className="w-full flex items-start gap-3 p-3.5 rounded-xl border-2 border-gray-200 hover:border-teal-500 hover:bg-teal-50 text-left transition-colors group"
               >
                 <span className="text-xl mt-0.5">🌿</span>
                 <div>
-                  <p className="text-sm font-bold text-gray-800 group-hover:text-teal-800">Yard Check & Maintenance</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Schedule recurring yard checks for this job. Set start date and how many checks to schedule.</p>
+                  <p className="text-sm font-bold text-gray-800 group-hover:text-teal-800">
+                    Yard Check & Maintenance
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Schedule recurring yard checks for this job. Set start date and how many checks
+                    to schedule.
+                  </p>
                 </div>
               </button>
               <button
-                onClick={() => { setSchedType('warranty'); setPhase('details') }}
+                onClick={() => {
+                  setSchedType('warranty')
+                  setPhase('details')
+                }}
                 className="w-full flex items-start gap-3 p-3.5 rounded-xl border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 text-left transition-colors group"
               >
                 <span className="text-xl mt-0.5">🛡️</span>
                 <div>
-                  <p className="text-sm font-bold text-gray-800 group-hover:text-blue-800">Warranty</p>
-                  <p className="text-xs text-gray-500 mt-0.5">Schedule warranty follow-up visits. Set dates, crew, and details manually.</p>
+                  <p className="text-sm font-bold text-gray-800 group-hover:text-blue-800">
+                    Warranty
+                  </p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Schedule warranty follow-up visits. Set dates, crew, and details manually.
+                  </p>
                 </div>
               </button>
             </div>
-            <button onClick={closeModal} className="mt-4 text-xs text-gray-400 hover:text-gray-600 w-full text-center">Cancel</button>
+            <button
+              onClick={closeModal}
+              className="mt-4 text-xs text-gray-400 hover:text-gray-600 w-full text-center"
+            >
+              Cancel
+            </button>
           </div>
         </ModalOverlay>
       )}
 
       {/* ── Work Order Selection + Per-WO Crew Assignment ───────── */}
-      {phase === 'wo-select' && (() => {
-        const selWOList = woSequence.map(id => workOrders.find(w => w.id === id)).filter(Boolean)
-        const totalMD   = selWOList.reduce((s, w) => s + parseFloat(w.man_days || 0), 0)
+      {phase === 'wo-select' &&
+        (() => {
+          const selWOList = woSequence.map(id => workOrders.find(w => w.id === id)).filter(Boolean)
+          const totalMD = selWOList.reduce((s, w) => s + parseFloat(w.man_days || 0), 0)
 
-        // Helper: label for a crew option
-        const empName = id => {
-          const e = employees.find(em => em.id === id)
-          return e ? (e.nickname?.trim() || e.first_name) : null
-        }
-        const crewOptionLabel = c => {
-          const names = [c.crew_chief_id, c.journeyman_id, c.laborer_1_id, c.laborer_2_id, c.laborer_3_id]
-            .filter(Boolean).map(empName).filter(Boolean)
-          return `Crew ${c.label} — ${names.join(', ')} (${names.length})`
-        }
+          // Helper: label for a crew option
+          const empName = id => {
+            const e = employees.find(em => em.id === id)
+            return e ? e.nickname?.trim() || e.first_name : null
+          }
+          const crewOptionLabel = c => {
+            const names = [
+              c.crew_chief_id,
+              c.journeyman_id,
+              c.laborer_1_id,
+              c.laborer_2_id,
+              c.laborer_3_id,
+            ]
+              .filter(Boolean)
+              .map(empName)
+              .filter(Boolean)
+            return `Crew ${c.label} — ${names.join(', ')} (${names.length})`
+          }
 
-        // Helper: get or default assignment for a WO
-        const getAsgn = woId => woAssignments[woId] || { mode: 'none', crewId: '', subId: '' }
-        const setAsgn = (woId, patch) => setWoAssignments(prev => ({
-          ...prev, [woId]: { ...getAsgn(woId), ...patch }
-        }))
+          // Helper: get or default assignment for a WO
+          const getAsgn = woId => woAssignments[woId] || { mode: 'none', crewId: '', subId: '' }
+          const setAsgn = (woId, patch) =>
+            setWoAssignments(prev => ({
+              ...prev,
+              [woId]: { ...getAsgn(woId), ...patch },
+            }))
 
-        // Helper: advance date to next working day after
-        function nextWorkDayAfter(date, excs) {
-          const d = new Date(date)
-          d.setDate(d.getDate() + 1)
-          while (!isWorkingDay(d, excs, false, false)) d.setDate(d.getDate() + 1)
-          return d
-        }
+          // Helper: advance date to next working day after
+          function nextWorkDayAfter(date, excs) {
+            const d = new Date(date)
+            d.setDate(d.getDate() + 1)
+            while (!isWorkingDay(d, excs, false, false)) d.setDate(d.getDate() + 1)
+            return d
+          }
 
-        // Per-WO day preview with cascading dates
-        let runningStart = woStartDate ? toLocalDate(woStartDate) : null
-        const woPreview = selWOList.map(wo => {
-          const asgn      = getAsgn(wo.id)
-          const md        = parseFloat(wo.man_days || 0) || 1
-          const crewId    = asgn.mode === 'crew' ? asgn.crewId : null
-          const days      = calcScheduleDays(md, crewId)
-          const crewSz    = crewId ? getCrewSize(crewId) : 3
-          const startDate = runningStart ? dateStr(runningStart) : null
-          const endDate   = runningStart ? dateStr(addWorkDays(runningStart, days, exceptions, false, false)) : null
-          if (runningStart) runningStart = nextWorkDayAfter(addWorkDays(runningStart, days, exceptions, false, false), exceptions)
-          return { wo, asgn, md, days, crewSz, startDate, endDate }
-        })
+          // Per-WO day preview with cascading dates
+          let runningStart = woStartDate ? toLocalDate(woStartDate) : null
+          const woPreview = selWOList.map(wo => {
+            const asgn = getAsgn(wo.id)
+            const md = parseFloat(wo.man_days || 0) || 1
+            const crewId = asgn.mode === 'crew' ? asgn.crewId : null
+            const days = calcScheduleDays(md, crewId)
+            const crewSz = crewId ? getCrewSize(crewId) : 3
+            const startDate = runningStart ? dateStr(runningStart) : null
+            const endDate = runningStart
+              ? dateStr(addWorkDays(runningStart, days, exceptions, false, false))
+              : null
+            if (runningStart)
+              runningStart = nextWorkDayAfter(
+                addWorkDays(runningStart, days, exceptions, false, false),
+                exceptions
+              )
+            return { wo, asgn, md, days, crewSz, startDate, endDate }
+          })
 
-        // Summary counts
-        const totalDays   = woPreview.reduce((s, p) => s + p.days, 0)
-        const needsCrewCt = woPreview.filter(p => p.asgn.mode === 'none').length
+          // Summary counts
+          const needsCrewCt = woPreview.filter(p => p.asgn.mode === 'none').length
 
-        return (
-          <ModalOverlay onClose={closeModal}>
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 flex flex-col" style={{ maxHeight: '94vh' }}>
-
-              {/* Header */}
-              <div className="px-6 pt-5 pb-4 border-b border-gray-100 flex-shrink-0">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-base font-bold text-gray-800">Schedule by Work Order</h3>
-                    {modalJobId && <p className="text-xs text-green-700 font-medium mt-0.5">{jobMap[modalJobId]}</p>}
-                  </div>
-                  <button onClick={() => setPhase('type-select')} className="text-xs text-gray-400 hover:text-gray-600">← Back</button>
-                </div>
-              </div>
-
-              <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
-
-                {/* ── Step 1: Select WOs ── */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">1 · Select Work Orders</p>
-                    <div className="flex gap-3">
-                      <button
-                        onClick={() => {
-                          const unscheduled = workOrders.filter(w => !scheduledWOIds.has(w.id))
-                          setSelectedWOs(new Set(unscheduled.map(w => w.id)))
-                          setWoSequence(unscheduled.map(w => w.id))
-                        }}
-                        className="text-xs text-green-700 hover:underline"
-                      >Select All</button>
-                      {selectedWOs.size > 0 && (
-                        <button onClick={() => { setSelectedWOs(new Set()); setWoAssignments({}); setWoSequence([]) }}
-                          className="text-xs text-gray-400 hover:underline">Clear</button>
+          return (
+            <ModalOverlay onClose={closeModal}>
+              <div
+                className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 flex flex-col"
+                style={{ maxHeight: '94vh' }}
+              >
+                {/* Header */}
+                <div className="px-6 pt-5 pb-4 border-b border-gray-100 flex-shrink-0">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-base font-bold text-gray-800">Schedule by Work Order</h3>
+                      {modalJobId && (
+                        <p className="text-xs text-green-700 font-medium mt-0.5">
+                          {jobMap[modalJobId]}
+                        </p>
                       )}
                     </div>
+                    <button
+                      onClick={() => setPhase('type-select')}
+                      className="text-xs text-gray-400 hover:text-gray-600"
+                    >
+                      ← Back
+                    </button>
                   </div>
-
-                  {woLoading ? (
-                    <div className="flex justify-center py-6">
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-700" />
-                    </div>
-                  ) : workOrders.length === 0 ? (
-                    <div className="text-center py-8 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
-                      <p className="text-2xl mb-1">📋</p>
-                      <p className="text-sm font-medium text-gray-500">No pending work orders</p>
-                      <p className="text-xs mt-1">Add work orders in the Work Orders tab first.</p>
-                    </div>
-                  ) : (
-                    <div className="border border-gray-200 rounded-xl overflow-hidden">
-                      {workOrders.map((wo, idx) => {
-                        const checked    = selectedWOs.has(wo.id)
-                        const isScheduled = scheduledWOIds.has(wo.id)
-                        return (
-                          <div
-                            key={wo.id}
-                            className={`flex items-center gap-3 px-3 py-2.5 transition-colors ${idx > 0 ? 'border-t border-gray-100' : ''} ${
-                              isScheduled
-                                ? 'bg-gray-50 opacity-60 cursor-not-allowed'
-                                : checked
-                                  ? 'bg-green-50 cursor-pointer'
-                                  : 'hover:bg-gray-50 cursor-pointer'
-                            }`}
-                            onClick={() => {
-                              if (isScheduled) return
-                              setSelectedWOs(prev => {
-                                const next = new Set(prev)
-                                if (next.has(wo.id)) {
-                                  next.delete(wo.id)
-                                  setAsgn(wo.id, { mode: 'none', crewId: '', subId: '' })
-                                  setWoSequence(s => s.filter(id => id !== wo.id))
-                                } else {
-                                  next.add(wo.id)
-                                  setWoSequence(s => [...s, wo.id])
-                                }
-                                return next
-                              })
-                            }}
-                          >
-                            {isScheduled
-                              ? <span className="w-4 h-4 flex-shrink-0 text-gray-400 text-[10px]">✓</span>
-                              : <input type="checkbox" readOnly checked={checked} className="w-4 h-4 rounded accent-green-600 flex-shrink-0" />
-                            }
-                            <div className="flex-1 min-w-0">
-                              <p className={`text-sm font-semibold truncate ${isScheduled ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{wo.module_type}</p>
-                              {wo.project_name && <p className="text-xs text-gray-400 truncate">{wo.project_name}</p>}
-                              {wo.crew_type && !isScheduled && (
-                                <p className="text-[10px] text-purple-600 font-medium mt-0.5">Crew type: {wo.crew_type}</p>
-                              )}
-                            </div>
-                            {isScheduled ? (
-                              <span className="flex-shrink-0 text-[10px] font-semibold text-gray-400 bg-gray-200 px-2 py-0.5 rounded-full">Scheduled</span>
-                            ) : parseFloat(wo.man_days) > 0 ? (
-                              <span className="flex-shrink-0 text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
-                                {parseFloat(wo.man_days).toFixed(1)} MD
-                              </span>
-                            ) : null}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                  {selWOList.length > 0 && (
-                    <p className="text-xs text-gray-400 mt-1.5 text-right">
-                      {selWOList.length} selected · {totalMD.toFixed(1)} total man-days
-                    </p>
-                  )}
                 </div>
 
-                {/* ── Step 2: Module Sequence ── */}
-                {selWOList.length > 1 && (
+                <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+                  {/* ── Step 1: Select WOs ── */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">2 · Set Module Sequence</p>
-                      <p className="text-[10px] text-gray-400">Modules schedule one after another</p>
-                    </div>
-                    <div className="border border-gray-200 rounded-xl overflow-hidden">
-                      {selWOList.map((wo, idx) => (
-                        <div key={wo.id} className={`flex items-center gap-2 px-3 py-2 bg-white ${idx > 0 ? 'border-t border-gray-100' : ''}`}>
-                          <span className="text-xs font-bold text-gray-300 w-5 text-center flex-shrink-0">{idx + 1}</span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-gray-800 truncate">{wo.module_type}</p>
-                            {wo.project_name && <p className="text-[10px] text-gray-400 truncate">{wo.project_name}</p>}
-                          </div>
-                          {woStartDate && woPreview[idx]?.startDate && (
-                            <span className="text-[10px] text-green-700 font-medium flex-shrink-0">
-                              {fmtDate(woPreview[idx].startDate)} → {fmtDate(woPreview[idx].endDate)}
-                            </span>
-                          )}
-                          <div className="flex flex-col gap-0.5 flex-shrink-0">
-                            <button
-                              disabled={idx === 0}
-                              onClick={() => setWoSequence(prev => {
-                                const next = [...prev]
-                                ;[next[idx - 1], next[idx]] = [next[idx], next[idx - 1]]
-                                return next
-                              })}
-                              className="w-5 h-5 flex items-center justify-center border border-gray-200 rounded text-gray-400 hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed text-[10px] leading-none"
-                            >▲</button>
-                            <button
-                              disabled={idx === selWOList.length - 1}
-                              onClick={() => setWoSequence(prev => {
-                                const next = [...prev]
-                                ;[next[idx], next[idx + 1]] = [next[idx + 1], next[idx]]
-                                return next
-                              })}
-                              className="w-5 h-5 flex items-center justify-center border border-gray-200 rounded text-gray-400 hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed text-[10px] leading-none"
-                            >▼</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* ── Step 3: Per-WO crew assignment ── */}
-                {selWOList.length > 0 && (
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">3 · Assign Crew per Module</p>
-                      {/* Quick-apply: apply one crew to all */}
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-gray-400">Apply to all:</span>
-                        <select
-                          className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-green-500"
-                          defaultValue=""
-                          onChange={e => {
-                            const val = e.target.value
-                            if (!val) return
-                            const [mode, id] = val.split(':')
-                            selWOList.forEach(wo => setAsgn(wo.id, {
-                              mode,
-                              crewId: mode === 'crew' ? id : '',
-                              subId:  mode === 'sub'  ? id : '',
-                            }))
-                            e.target.value = ''
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        1 · Select Work Orders
+                      </p>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => {
+                            const unscheduled = workOrders.filter(w => !scheduledWOIds.has(w.id))
+                            setSelectedWOs(new Set(unscheduled.map(w => w.id)))
+                            setWoSequence(unscheduled.map(w => w.id))
                           }}
+                          className="text-xs text-green-700 hover:underline"
                         >
-                          <option value="">— pick —</option>
-                          <optgroup label="Crews">
-                            {crews.map(c => <option key={c.id} value={`crew:${c.id}`}>{`Crew ${c.label}`}</option>)}
-                          </optgroup>
-                          <optgroup label="Subcontractors">
-                            {subs.map(s => <option key={s.id} value={`sub:${s.id}`}>{s.company_name}</option>)}
-                          </optgroup>
-                          <option value="none:">Skip all</option>
-                        </select>
+                          Select All
+                        </button>
+                        {selectedWOs.size > 0 && (
+                          <button
+                            onClick={() => {
+                              setSelectedWOs(new Set())
+                              setWoAssignments({})
+                              setWoSequence([])
+                            }}
+                            className="text-xs text-gray-400 hover:underline"
+                          >
+                            Clear
+                          </button>
+                        )}
                       </div>
                     </div>
 
-                    <div className="border border-gray-200 rounded-xl overflow-hidden">
-                      {woPreview.map(({ wo, asgn, md, days, crewSz }, idx) => (
-                        <div key={wo.id} className={`px-3 py-3 space-y-2 ${idx > 0 ? 'border-t border-gray-100' : ''}`}>
-                          {/* WO header row */}
-                          <div className="flex items-center gap-2">
+                    {woLoading ? (
+                      <div className="flex justify-center py-6">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-700" />
+                      </div>
+                    ) : workOrders.length === 0 ? (
+                      <div className="text-center py-8 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
+                        <p className="text-2xl mb-1">📋</p>
+                        <p className="text-sm font-medium text-gray-500">No pending work orders</p>
+                        <p className="text-xs mt-1">
+                          Add work orders in the Work Orders tab first.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="border border-gray-200 rounded-xl overflow-hidden">
+                        {workOrders.map((wo, idx) => {
+                          const checked = selectedWOs.has(wo.id)
+                          const isScheduled = scheduledWOIds.has(wo.id)
+                          return (
+                            <div
+                              key={wo.id}
+                              className={`flex items-center gap-3 px-3 py-2.5 transition-colors ${idx > 0 ? 'border-t border-gray-100' : ''} ${
+                                isScheduled
+                                  ? 'bg-gray-50 opacity-60 cursor-not-allowed'
+                                  : checked
+                                    ? 'bg-green-50 cursor-pointer'
+                                    : 'hover:bg-gray-50 cursor-pointer'
+                              }`}
+                              onClick={() => {
+                                if (isScheduled) return
+                                setSelectedWOs(prev => {
+                                  const next = new Set(prev)
+                                  if (next.has(wo.id)) {
+                                    next.delete(wo.id)
+                                    setAsgn(wo.id, { mode: 'none', crewId: '', subId: '' })
+                                    setWoSequence(s => s.filter(id => id !== wo.id))
+                                  } else {
+                                    next.add(wo.id)
+                                    setWoSequence(s => [...s, wo.id])
+                                  }
+                                  return next
+                                })
+                              }}
+                            >
+                              {isScheduled ? (
+                                <span className="w-4 h-4 flex-shrink-0 text-gray-400 text-[10px]">
+                                  ✓
+                                </span>
+                              ) : (
+                                <input
+                                  type="checkbox"
+                                  readOnly
+                                  checked={checked}
+                                  className="w-4 h-4 rounded accent-green-600 flex-shrink-0"
+                                />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p
+                                  className={`text-sm font-semibold truncate ${isScheduled ? 'text-gray-400 line-through' : 'text-gray-800'}`}
+                                >
+                                  {wo.module_type}
+                                </p>
+                                {wo.project_name && (
+                                  <p className="text-xs text-gray-400 truncate">
+                                    {wo.project_name}
+                                  </p>
+                                )}
+                                {wo.crew_type && !isScheduled && (
+                                  <p className="text-[10px] text-purple-600 font-medium mt-0.5">
+                                    Crew type: {wo.crew_type}
+                                  </p>
+                                )}
+                              </div>
+                              {isScheduled ? (
+                                <span className="flex-shrink-0 text-[10px] font-semibold text-gray-400 bg-gray-200 px-2 py-0.5 rounded-full">
+                                  Scheduled
+                                </span>
+                              ) : parseFloat(wo.man_days) > 0 ? (
+                                <span className="flex-shrink-0 text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
+                                  {parseFloat(wo.man_days).toFixed(1)} MD
+                                </span>
+                              ) : null}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                    {selWOList.length > 0 && (
+                      <p className="text-xs text-gray-400 mt-1.5 text-right">
+                        {selWOList.length} selected · {totalMD.toFixed(1)} total man-days
+                      </p>
+                    )}
+                  </div>
+
+                  {/* ── Step 2: Module Sequence ── */}
+                  {selWOList.length > 1 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                          2 · Set Module Sequence
+                        </p>
+                        <p className="text-[10px] text-gray-400">
+                          Modules schedule one after another
+                        </p>
+                      </div>
+                      <div className="border border-gray-200 rounded-xl overflow-hidden">
+                        {selWOList.map((wo, idx) => (
+                          <div
+                            key={wo.id}
+                            className={`flex items-center gap-2 px-3 py-2 bg-white ${idx > 0 ? 'border-t border-gray-100' : ''}`}
+                          >
+                            <span className="text-xs font-bold text-gray-300 w-5 text-center flex-shrink-0">
+                              {idx + 1}
+                            </span>
                             <div className="flex-1 min-w-0">
-                              <span className="text-sm font-semibold text-gray-800">{wo.module_type}</span>
-                              {wo.crew_type && (
-                                <span className="ml-2 text-[10px] font-medium text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded">
-                                  {wo.crew_type}
+                              <p className="text-sm font-semibold text-gray-800 truncate">
+                                {wo.module_type}
+                              </p>
+                              {wo.project_name && (
+                                <p className="text-[10px] text-gray-400 truncate">
+                                  {wo.project_name}
+                                </p>
+                              )}
+                            </div>
+                            {woStartDate && woPreview[idx]?.startDate && (
+                              <span className="text-[10px] text-green-700 font-medium flex-shrink-0">
+                                {fmtDate(woPreview[idx].startDate)} →{' '}
+                                {fmtDate(woPreview[idx].endDate)}
+                              </span>
+                            )}
+                            <div className="flex flex-col gap-0.5 flex-shrink-0">
+                              <button
+                                disabled={idx === 0}
+                                onClick={() =>
+                                  setWoSequence(prev => {
+                                    const next = [...prev]
+                                    ;[next[idx - 1], next[idx]] = [next[idx], next[idx - 1]]
+                                    return next
+                                  })
+                                }
+                                className="w-5 h-5 flex items-center justify-center border border-gray-200 rounded text-gray-400 hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed text-[10px] leading-none"
+                              >
+                                ▲
+                              </button>
+                              <button
+                                disabled={idx === selWOList.length - 1}
+                                onClick={() =>
+                                  setWoSequence(prev => {
+                                    const next = [...prev]
+                                    ;[next[idx], next[idx + 1]] = [next[idx + 1], next[idx]]
+                                    return next
+                                  })
+                                }
+                                className="w-5 h-5 flex items-center justify-center border border-gray-200 rounded text-gray-400 hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed text-[10px] leading-none"
+                              >
+                                ▼
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Step 3: Per-WO crew assignment ── */}
+                  {selWOList.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                          3 · Assign Crew per Module
+                        </p>
+                        {/* Quick-apply: apply one crew to all */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-gray-400">Apply to all:</span>
+                          <select
+                            className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-green-500"
+                            defaultValue=""
+                            onChange={e => {
+                              const val = e.target.value
+                              if (!val) return
+                              const [mode, id] = val.split(':')
+                              selWOList.forEach(wo =>
+                                setAsgn(wo.id, {
+                                  mode,
+                                  crewId: mode === 'crew' ? id : '',
+                                  subId: mode === 'sub' ? id : '',
+                                })
+                              )
+                              e.target.value = ''
+                            }}
+                          >
+                            <option value="">— pick —</option>
+                            <optgroup label="Crews">
+                              {crews.map(c => (
+                                <option
+                                  key={c.id}
+                                  value={`crew:${c.id}`}
+                                >{`Crew ${c.label}`}</option>
+                              ))}
+                            </optgroup>
+                            <optgroup label="Subcontractors">
+                              {subs.map(s => (
+                                <option key={s.id} value={`sub:${s.id}`}>
+                                  {s.company_name}
+                                </option>
+                              ))}
+                            </optgroup>
+                            <option value="none:">Skip all</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="border border-gray-200 rounded-xl overflow-hidden">
+                        {woPreview.map(({ wo, asgn, md, days, crewSz }, idx) => (
+                          <div
+                            key={wo.id}
+                            className={`px-3 py-3 space-y-2 ${idx > 0 ? 'border-t border-gray-100' : ''}`}
+                          >
+                            {/* WO header row */}
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 min-w-0">
+                                <span className="text-sm font-semibold text-gray-800">
+                                  {wo.module_type}
+                                </span>
+                                {wo.crew_type && (
+                                  <span className="ml-2 text-[10px] font-medium text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded">
+                                    {wo.crew_type}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10px] text-gray-400 flex-shrink-0">
+                                {md.toFixed(1)} MD
+                              </span>
+                              {woStartDate && (
+                                <span className="text-[10px] font-semibold text-green-700 bg-green-50 px-2 py-0.5 rounded-full flex-shrink-0">
+                                  {days} day{days !== 1 ? 's' : ''} ({crewSz} men)
                                 </span>
                               )}
                             </div>
-                            <span className="text-[10px] text-gray-400 flex-shrink-0">{md.toFixed(1)} MD</span>
-                            {woStartDate && (
-                              <span className="text-[10px] font-semibold text-green-700 bg-green-50 px-2 py-0.5 rounded-full flex-shrink-0">
-                                {days} day{days !== 1 ? 's' : ''} ({crewSz} men)
-                              </span>
-                            )}
-                          </div>
 
-                          {/* Crew / Sub / None selector row */}
-                          <div className="flex gap-1.5 items-center">
-                            <div className="flex rounded-lg border border-gray-200 overflow-hidden text-[11px] font-semibold flex-shrink-0">
-                              {[
-                                { key: 'crew', label: '👷' },
-                                { key: 'sub',  label: '🏢' },
-                                { key: 'none', label: '—' },
-                              ].map(opt => (
-                                <button
-                                  key={opt.key}
-                                  onClick={() => setAsgn(wo.id, { mode: opt.key, crewId: '', subId: '' })}
-                                  className={`px-2.5 py-1.5 transition-colors ${asgn.mode === opt.key ? 'bg-green-700 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
-                                  title={{ crew: 'Assign Crew', sub: 'Assign Sub', none: 'Skip' }[opt.key]}
-                                >{opt.label}</button>
-                              ))}
-                            </div>
-
-                            {asgn.mode === 'crew' && (
-                              <select
-                                value={asgn.crewId}
-                                onChange={e => setAsgn(wo.id, { crewId: e.target.value })}
-                                className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-green-500"
-                              >
-                                <option value="">— Select crew —</option>
-                                {crews.map(c => <option key={c.id} value={c.id}>{crewOptionLabel(c)}</option>)}
-                              </select>
-                            )}
-                            {asgn.mode === 'sub' && (
-                              <select
-                                value={asgn.subId}
-                                onChange={e => setAsgn(wo.id, { subId: e.target.value })}
-                                className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-green-500"
-                              >
-                                <option value="">— Select sub —</option>
-                                {subs.map(s => <option key={s.id} value={s.id}>{s.company_name}</option>)}
-                              </select>
-                            )}
-                            {asgn.mode === 'none' && (
-                              <span className="text-xs text-amber-600 ml-1">Will show "Assign Crew" on calendar</span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* ── Step 4: Start date + summary ── */}
-                {selWOList.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">4 · Start Date</p>
-                    <input
-                      type="date"
-                      value={woStartDate}
-                      onChange={e => setWoStartDate(e.target.value)}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600"
-                    />
-
-                    {woStartDate && (
-                      <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-xl">
-                        <p className="text-xs font-semibold text-gray-600 mb-2">Summary — {selWOList.length} calendar item{selWOList.length !== 1 ? 's' : ''} will be created</p>
-                        <div className="space-y-1">
-                          {woPreview.map(({ wo, asgn, startDate, endDate }) => {
-                            const crew = crews.find(c => c.id === asgn.crewId)
-                            const sub  = subs.find(s => s.id === asgn.subId)
-                            return (
-                              <div key={wo.id} className="flex items-center gap-2 text-xs">
-                                <span className="truncate font-medium text-gray-700 flex-1">{wo.module_type}</span>
-                                <span className="text-gray-400 flex-shrink-0">{fmtDate(startDate)}→{fmtDate(endDate)}</span>
-                                {asgn.mode === 'crew' && crew && (
-                                  <span className="text-[10px] bg-green-100 text-green-800 px-1.5 py-0.5 rounded font-semibold flex-shrink-0">Crew {crew.label}</span>
-                                )}
-                                {asgn.mode === 'sub' && sub && (
-                                  <span className="text-[10px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded font-semibold flex-shrink-0">{sub.company_name}</span>
-                                )}
-                                {asgn.mode === 'none' && (
-                                  <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold flex-shrink-0">No Crew</span>
-                                )}
+                            {/* Crew / Sub / None selector row */}
+                            <div className="flex gap-1.5 items-center">
+                              <div className="flex rounded-lg border border-gray-200 overflow-hidden text-[11px] font-semibold flex-shrink-0">
+                                {[
+                                  { key: 'crew', label: '👷' },
+                                  { key: 'sub', label: '🏢' },
+                                  { key: 'none', label: '—' },
+                                ].map(opt => (
+                                  <button
+                                    key={opt.key}
+                                    onClick={() =>
+                                      setAsgn(wo.id, { mode: opt.key, crewId: '', subId: '' })
+                                    }
+                                    className={`px-2.5 py-1.5 transition-colors ${asgn.mode === opt.key ? 'bg-green-700 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+                                    title={
+                                      { crew: 'Assign Crew', sub: 'Assign Sub', none: 'Skip' }[
+                                        opt.key
+                                      ]
+                                    }
+                                  >
+                                    {opt.label}
+                                  </button>
+                                ))}
                               </div>
-                            )
-                          })}
-                        </div>
-                        {needsCrewCt > 0 && (
-                          <p className="text-[10px] text-amber-600 mt-2">
-                            {needsCrewCt} item{needsCrewCt !== 1 ? 's' : ''} will show "Assign Crew" on the calendar.
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
 
-              {/* Footer */}
-              <div className="px-6 pb-5 pt-3 border-t border-gray-100 flex gap-3 flex-shrink-0">
-                <button
-                  onClick={saveWorkOrderSchedule}
-                  disabled={woSaving || selWOList.length === 0 || !woStartDate}
-                  className="flex-1 py-2.5 bg-green-700 text-white rounded-xl text-sm font-semibold hover:bg-green-800 disabled:opacity-50 transition-colors"
-                >
-                  {woSaving ? 'Scheduling…' : `Create ${selWOList.length} Schedule Item${selWOList.length !== 1 ? 's' : ''}`}
-                </button>
-                <button onClick={closeModal} className="px-4 py-2.5 text-sm rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50">
-                  Cancel
-                </button>
+                              {asgn.mode === 'crew' && (
+                                <select
+                                  value={asgn.crewId}
+                                  onChange={e => setAsgn(wo.id, { crewId: e.target.value })}
+                                  className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-green-500"
+                                >
+                                  <option value="">— Select crew —</option>
+                                  {crews.map(c => (
+                                    <option key={c.id} value={c.id}>
+                                      {crewOptionLabel(c)}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+                              {asgn.mode === 'sub' && (
+                                <select
+                                  value={asgn.subId}
+                                  onChange={e => setAsgn(wo.id, { subId: e.target.value })}
+                                  className="flex-1 text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-green-500"
+                                >
+                                  <option value="">— Select sub —</option>
+                                  {subs.map(s => (
+                                    <option key={s.id} value={s.id}>
+                                      {s.company_name}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+                              {asgn.mode === 'none' && (
+                                <span className="text-xs text-amber-600 ml-1">
+                                  Will show "Assign Crew" on calendar
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Step 4: Start date + summary ── */}
+                  {selWOList.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                        4 · Start Date
+                      </p>
+                      <input
+                        type="date"
+                        value={woStartDate}
+                        onChange={e => setWoStartDate(e.target.value)}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600"
+                      />
+
+                      {woStartDate && (
+                        <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-xl">
+                          <p className="text-xs font-semibold text-gray-600 mb-2">
+                            Summary — {selWOList.length} calendar item
+                            {selWOList.length !== 1 ? 's' : ''} will be created
+                          </p>
+                          <div className="space-y-1">
+                            {woPreview.map(({ wo, asgn, startDate, endDate }) => {
+                              const crew = crews.find(c => c.id === asgn.crewId)
+                              const sub = subs.find(s => s.id === asgn.subId)
+                              return (
+                                <div key={wo.id} className="flex items-center gap-2 text-xs">
+                                  <span className="truncate font-medium text-gray-700 flex-1">
+                                    {wo.module_type}
+                                  </span>
+                                  <span className="text-gray-400 flex-shrink-0">
+                                    {fmtDate(startDate)}→{fmtDate(endDate)}
+                                  </span>
+                                  {asgn.mode === 'crew' && crew && (
+                                    <span className="text-[10px] bg-green-100 text-green-800 px-1.5 py-0.5 rounded font-semibold flex-shrink-0">
+                                      Crew {crew.label}
+                                    </span>
+                                  )}
+                                  {asgn.mode === 'sub' && sub && (
+                                    <span className="text-[10px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded font-semibold flex-shrink-0">
+                                      {sub.company_name}
+                                    </span>
+                                  )}
+                                  {asgn.mode === 'none' && (
+                                    <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold flex-shrink-0">
+                                      No Crew
+                                    </span>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                          {needsCrewCt > 0 && (
+                            <p className="text-[10px] text-amber-600 mt-2">
+                              {needsCrewCt} item{needsCrewCt !== 1 ? 's' : ''} will show "Assign
+                              Crew" on the calendar.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="px-6 pb-5 pt-3 border-t border-gray-100 flex gap-3 flex-shrink-0">
+                  <button
+                    onClick={saveWorkOrderSchedule}
+                    disabled={woSaving || selWOList.length === 0 || !woStartDate}
+                    className="flex-1 py-2.5 bg-green-700 text-white rounded-xl text-sm font-semibold hover:bg-green-800 disabled:opacity-50 transition-colors"
+                  >
+                    {woSaving
+                      ? 'Scheduling…'
+                      : `Create ${selWOList.length} Schedule Item${selWOList.length !== 1 ? 's' : ''}`}
+                  </button>
+                  <button
+                    onClick={closeModal}
+                    className="px-4 py-2.5 text-sm rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
-            </div>
-          </ModalOverlay>
-        )
-      })()}
+            </ModalOverlay>
+          )
+        })()}
 
       {/* ── Yard Check: Job Selection ──────────────────────────── */}
       {phase === 'yard-check-select' && (
@@ -2555,9 +3293,16 @@ export default function ScheduleCalendar({
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-base font-bold text-gray-800">Yard Check & Maintenance</h3>
-                  <p className="text-xs text-green-700 font-medium mt-0.5">Select jobs to schedule</p>
+                  <p className="text-xs text-green-700 font-medium mt-0.5">
+                    Select jobs to schedule
+                  </p>
                 </div>
-                <button onClick={() => setPhase('type-select')} className="text-xs text-gray-400 hover:text-gray-600">← Back</button>
+                <button
+                  onClick={() => setPhase('type-select')}
+                  className="text-xs text-gray-400 hover:text-gray-600"
+                >
+                  ← Back
+                </button>
               </div>
             </div>
 
@@ -2565,15 +3310,31 @@ export default function ScheduleCalendar({
               {/* Job list */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Yard Check Jobs</p>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    Yard Check Jobs
+                  </p>
                   <div className="flex gap-3">
-                    <button onClick={() => setYcSelected(new Set(ycJobs.map(j => j.id)))} className="text-xs text-teal-700 hover:underline">Select All</button>
-                    {ycSelected.size > 0 && <button onClick={() => setYcSelected(new Set())} className="text-xs text-gray-400 hover:underline">Clear</button>}
+                    <button
+                      onClick={() => setYcSelected(new Set(ycJobs.map(j => j.id)))}
+                      className="text-xs text-teal-700 hover:underline"
+                    >
+                      Select All
+                    </button>
+                    {ycSelected.size > 0 && (
+                      <button
+                        onClick={() => setYcSelected(new Set())}
+                        className="text-xs text-gray-400 hover:underline"
+                      >
+                        Clear
+                      </button>
+                    )}
                   </div>
                 </div>
 
                 {ycLoading ? (
-                  <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-teal-600" /></div>
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-teal-600" />
+                  </div>
                 ) : ycJobs.length === 0 ? (
                   <div className="text-center py-8 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
                     <p className="text-2xl mb-1">🌿</p>
@@ -2587,18 +3348,33 @@ export default function ScheduleCalendar({
                       return (
                         <div
                           key={job.id}
-                          onClick={() => setYcSelected(prev => {
-                            const next = new Set(prev)
-                            if (next.has(job.id)) next.delete(job.id)
-                            else next.add(job.id)
-                            return next
-                          })}
+                          onClick={() =>
+                            setYcSelected(prev => {
+                              const next = new Set(prev)
+                              if (next.has(job.id)) next.delete(job.id)
+                              else next.add(job.id)
+                              return next
+                            })
+                          }
                           className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors ${idx > 0 ? 'border-t border-gray-100' : ''} ${checked ? 'bg-teal-50' : 'hover:bg-gray-50'}`}
                         >
-                          <input type="checkbox" readOnly checked={checked} className="w-4 h-4 rounded accent-teal-600 flex-shrink-0" />
+                          <input
+                            type="checkbox"
+                            readOnly
+                            checked={checked}
+                            className="w-4 h-4 rounded accent-teal-600 flex-shrink-0"
+                          />
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-gray-800 truncate">{job.client_name}</p>
-                            {job.job_address && <p className="text-xs text-gray-400 truncate">{[job.job_address, job.job_city, job.job_state].filter(Boolean).join(', ')}</p>}
+                            <p className="text-sm font-semibold text-gray-800 truncate">
+                              {job.client_name}
+                            </p>
+                            {job.job_address && (
+                              <p className="text-xs text-gray-400 truncate">
+                                {[job.job_address, job.job_city, job.job_state]
+                                  .filter(Boolean)
+                                  .join(', ')}
+                              </p>
+                            )}
                           </div>
                         </div>
                       )
@@ -2614,12 +3390,18 @@ export default function ScheduleCalendar({
                     type="checkbox"
                     id="ycOptimize"
                     checked={ycOptimize}
-                    onChange={e => { setYcOptimize(e.target.checked); setYcOptOrder([]) }}
+                    onChange={e => {
+                      setYcOptimize(e.target.checked)
+                      setYcOptOrder([])
+                    }}
                     className="w-4 h-4 mt-0.5 rounded accent-teal-600 flex-shrink-0"
                   />
                   <label htmlFor="ycOptimize" className="cursor-pointer">
                     <p className="text-sm font-semibold text-teal-800">Optimize Route</p>
-                    <p className="text-xs text-teal-600 mt-0.5">Automatically sort jobs in the most efficient driving order using address geocoding.</p>
+                    <p className="text-xs text-teal-600 mt-0.5">
+                      Automatically sort jobs in the most efficient driving order using address
+                      geocoding.
+                    </p>
                   </label>
                 </div>
               )}
@@ -2640,168 +3422,244 @@ export default function ScheduleCalendar({
       )}
 
       {/* ── Yard Check: Schedule Configuration ─────────────────── */}
-      {phase === 'yard-check-config' && (() => {
-        const orderedIds  = ycOptimize && ycOptOrder.length > 0 ? ycOptOrder : [...ycSelected]
-        const orderedJobs = orderedIds.map(id => ycJobs.find(j => j.id === id)).filter(Boolean)
-        const unoptimizedJobs = ycJobs.filter(j => ycSelected.has(j.id))
-        const totalItems  = ycSelected.size * ycWeeks
+      {phase === 'yard-check-config' &&
+        (() => {
+          const orderedIds = ycOptimize && ycOptOrder.length > 0 ? ycOptOrder : [...ycSelected]
+          const orderedJobs = orderedIds.map(id => ycJobs.find(j => j.id === id)).filter(Boolean)
+          const unoptimizedJobs = ycJobs.filter(j => ycSelected.has(j.id))
+          const totalItems = ycSelected.size * ycWeeks
 
-        return (
-          <ModalOverlay onClose={closeModal}>
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 flex flex-col max-h-[90vh] overflow-hidden">
-              {/* Header */}
-              <div className="px-6 pt-5 pb-4 border-b border-gray-100 flex-shrink-0">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-base font-bold text-gray-800">Configure Yard Checks</h3>
-                    <p className="text-xs text-teal-700 font-medium mt-0.5">
-                      {modalJobId && jobMap[modalJobId]
-                        ? jobMap[modalJobId]
-                        : `${ycSelected.size} job${ycSelected.size !== 1 ? 's' : ''} selected`}
-                    </p>
-                  </div>
-                  <button onClick={() => setPhase('type-select')} className="text-xs text-gray-400 hover:text-gray-600">← Back</button>
-                </div>
-              </div>
-
-              <div className="overflow-y-auto flex-1 px-6 py-4 space-y-5">
-
-                {/* Start date */}
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Start Date (First Yard Check Day)</p>
-                  <input
-                    type="date"
-                    value={ycStartDate}
-                    onChange={e => setYcStartDate(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/30 focus:border-teal-600"
-                  />
-                </div>
-
-                {/* Assigned Employee */}
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Assigned Employee</p>
-                  <select
-                    value={ycEmployee}
-                    onChange={e => setYcEmployee(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/30 focus:border-teal-600"
-                  >
-                    <option value="">— Unassigned —</option>
-                    {employees.map(e => {
-                      const name = `${e.first_name} ${e.last_name}`.trim()
-                      return <option key={e.id} value={name}>{name}</option>
-                    })}
-                  </select>
-                </div>
-
-                {/* Number of weeks */}
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Number of Yard Checks to Schedule</p>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="number"
-                      min={1}
-                      max={52}
-                      value={ycWeeks}
-                      onChange={e => setYcWeeks(Math.max(1, Math.min(52, parseInt(e.target.value) || 1)))}
-                      className="w-24 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/30 focus:border-teal-600"
-                    />
-                    <p className="text-xs text-gray-500">visits · each successive week on the same day</p>
-                  </div>
-                </div>
-
-                {/* Route optimization panel */}
-                {ycOptimize && (
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Route Optimization</p>
-                      <button
-                        onClick={handleYcOptimize}
-                        disabled={ycOptimizing}
-                        className="text-xs px-3 py-1.5 bg-teal-700 text-white rounded-lg hover:bg-teal-800 disabled:opacity-50 font-medium"
-                      >
-                        {ycOptimizing ? 'Optimizing…' : ycOptOrder.length > 0 ? 'Re-Optimize' : '🗺 Run Optimization'}
-                      </button>
+          return (
+            <ModalOverlay onClose={closeModal}>
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 flex flex-col max-h-[90vh] overflow-hidden">
+                {/* Header */}
+                <div className="px-6 pt-5 pb-4 border-b border-gray-100 flex-shrink-0">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-base font-bold text-gray-800">Configure Yard Checks</h3>
+                      <p className="text-xs text-teal-700 font-medium mt-0.5">
+                        {modalJobId && jobMap[modalJobId]
+                          ? jobMap[modalJobId]
+                          : `${ycSelected.size} job${ycSelected.size !== 1 ? 's' : ''} selected`}
+                      </p>
                     </div>
-
-                    {ycOptOrder.length > 0 ? (
-                      <div className="border border-teal-200 rounded-xl overflow-hidden bg-teal-50">
-                        <div className="px-3 py-2 bg-teal-700 text-white">
-                          <p className="text-xs font-bold">Optimized Route — {orderedJobs.length} stops</p>
-                          <p className="text-[10px] text-teal-200 mt-0.5">Jobs ordered by closest driving distance</p>
-                        </div>
-                        {orderedJobs.map((job, idx) => (
-                          <div key={job.id} className={`flex items-center gap-3 px-3 py-2 ${idx > 0 ? 'border-t border-teal-100' : ''}`}>
-                            <span className="w-6 h-6 rounded-full bg-teal-700 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">{idx + 1}</span>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold text-gray-800 truncate">{job.client_name}</p>
-                              {job.job_address && <p className="text-[10px] text-gray-500 truncate">{[job.job_address, job.job_city, job.job_state].filter(Boolean).join(', ')}</p>}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="border border-gray-200 rounded-xl overflow-hidden">
-                        {unoptimizedJobs.map((job, idx) => (
-                          <div key={job.id} className={`flex items-center gap-3 px-3 py-2 ${idx > 0 ? 'border-t border-gray-100' : ''}`}>
-                            <span className="w-5 h-5 rounded-full bg-gray-200 text-gray-500 text-[10px] font-bold flex items-center justify-center flex-shrink-0">{idx + 1}</span>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-600 truncate">{job.client_name}</p>
-                              {job.job_address && <p className="text-[10px] text-gray-400 truncate">{[job.job_address, job.job_city, job.job_state].filter(Boolean).join(', ')}</p>}
-                            </div>
-                          </div>
-                        ))}
-                        <div className="px-3 py-2 border-t border-gray-100 bg-gray-50">
-                          <p className="text-[10px] text-gray-400 italic">Click "Run Optimization" to sort by best driving route</p>
-                        </div>
-                      </div>
-                    )}
+                    <button
+                      onClick={() => setPhase('type-select')}
+                      className="text-xs text-gray-400 hover:text-gray-600"
+                    >
+                      ← Back
+                    </button>
                   </div>
-                )}
+                </div>
 
-                {/* Summary */}
-                {ycStartDate && ycSelected.size > 0 && (
-                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl">
-                    <p className="text-xs font-semibold text-gray-600 mb-2">Summary — {totalItems} schedule item{totalItems !== 1 ? 's' : ''} will be created</p>
-                    <div className="space-y-1">
-                      {Array.from({ length: Math.min(ycWeeks, 6) }, (_, week) => {
-                        const d = new Date(ycStartDate + 'T00:00:00')
-                        d.setDate(d.getDate() + week * 7)
+                <div className="overflow-y-auto flex-1 px-6 py-4 space-y-5">
+                  {/* Start date */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                      Start Date (First Yard Check Day)
+                    </p>
+                    <input
+                      type="date"
+                      value={ycStartDate}
+                      onChange={e => setYcStartDate(e.target.value)}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/30 focus:border-teal-600"
+                    />
+                  </div>
+
+                  {/* Assigned Employee */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                      Assigned Employee
+                    </p>
+                    <select
+                      value={ycEmployee}
+                      onChange={e => setYcEmployee(e.target.value)}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/30 focus:border-teal-600"
+                    >
+                      <option value="">— Unassigned —</option>
+                      {employees.map(e => {
+                        const name = `${e.first_name} ${e.last_name}`.trim()
                         return (
-                          <div key={week} className="flex items-center gap-2 text-xs">
-                            <span className="text-gray-500 font-medium w-16 flex-shrink-0">Week {week + 1}</span>
-                            <span className="text-gray-400">{d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
-                            <span className="text-gray-400 ml-auto">{ycSelected.size} job{ycSelected.size !== 1 ? 's' : ''}</span>
-                          </div>
+                          <option key={e.id} value={name}>
+                            {name}
+                          </option>
                         )
                       })}
-                      {ycWeeks > 6 && (
-                        <p className="text-[10px] text-gray-400 italic">+ {ycWeeks - 6} more weeks…</p>
-                      )}
+                    </select>
+                  </div>
+
+                  {/* Number of weeks */}
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                      Number of Yard Checks to Schedule
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="number"
+                        min={1}
+                        max={52}
+                        value={ycWeeks}
+                        onChange={e =>
+                          setYcWeeks(Math.max(1, Math.min(52, parseInt(e.target.value) || 1)))
+                        }
+                        className="w-24 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-600/30 focus:border-teal-600"
+                      />
+                      <p className="text-xs text-gray-500">
+                        visits · each successive week on the same day
+                      </p>
                     </div>
                   </div>
-                )}
-              </div>
 
-              {/* Footer */}
-              <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
-                <button
-                  onClick={saveYardCheckSchedule}
-                  disabled={ycSaving || !ycStartDate || ycSelected.size === 0}
-                  className="w-full py-2.5 bg-teal-700 text-white text-sm font-bold rounded-xl hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  {ycSaving ? 'Creating…' : `Create ${totalItems} Schedule Item${totalItems !== 1 ? 's' : ''}`}
-                </button>
+                  {/* Route optimization panel */}
+                  {ycOptimize && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                          Route Optimization
+                        </p>
+                        <button
+                          onClick={handleYcOptimize}
+                          disabled={ycOptimizing}
+                          className="text-xs px-3 py-1.5 bg-teal-700 text-white rounded-lg hover:bg-teal-800 disabled:opacity-50 font-medium"
+                        >
+                          {ycOptimizing
+                            ? 'Optimizing…'
+                            : ycOptOrder.length > 0
+                              ? 'Re-Optimize'
+                              : '🗺 Run Optimization'}
+                        </button>
+                      </div>
+
+                      {ycOptOrder.length > 0 ? (
+                        <div className="border border-teal-200 rounded-xl overflow-hidden bg-teal-50">
+                          <div className="px-3 py-2 bg-teal-700 text-white">
+                            <p className="text-xs font-bold">
+                              Optimized Route — {orderedJobs.length} stops
+                            </p>
+                            <p className="text-[10px] text-teal-200 mt-0.5">
+                              Jobs ordered by closest driving distance
+                            </p>
+                          </div>
+                          {orderedJobs.map((job, idx) => (
+                            <div
+                              key={job.id}
+                              className={`flex items-center gap-3 px-3 py-2 ${idx > 0 ? 'border-t border-teal-100' : ''}`}
+                            >
+                              <span className="w-6 h-6 rounded-full bg-teal-700 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                                {idx + 1}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-gray-800 truncate">
+                                  {job.client_name}
+                                </p>
+                                {job.job_address && (
+                                  <p className="text-[10px] text-gray-500 truncate">
+                                    {[job.job_address, job.job_city, job.job_state]
+                                      .filter(Boolean)
+                                      .join(', ')}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="border border-gray-200 rounded-xl overflow-hidden">
+                          {unoptimizedJobs.map((job, idx) => (
+                            <div
+                              key={job.id}
+                              className={`flex items-center gap-3 px-3 py-2 ${idx > 0 ? 'border-t border-gray-100' : ''}`}
+                            >
+                              <span className="w-5 h-5 rounded-full bg-gray-200 text-gray-500 text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                                {idx + 1}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-600 truncate">
+                                  {job.client_name}
+                                </p>
+                                {job.job_address && (
+                                  <p className="text-[10px] text-gray-400 truncate">
+                                    {[job.job_address, job.job_city, job.job_state]
+                                      .filter(Boolean)
+                                      .join(', ')}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                          <div className="px-3 py-2 border-t border-gray-100 bg-gray-50">
+                            <p className="text-[10px] text-gray-400 italic">
+                              Click "Run Optimization" to sort by best driving route
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Summary */}
+                  {ycStartDate && ycSelected.size > 0 && (
+                    <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl">
+                      <p className="text-xs font-semibold text-gray-600 mb-2">
+                        Summary — {totalItems} schedule item{totalItems !== 1 ? 's' : ''} will be
+                        created
+                      </p>
+                      <div className="space-y-1">
+                        {Array.from({ length: Math.min(ycWeeks, 6) }, (_, week) => {
+                          const d = new Date(ycStartDate + 'T00:00:00')
+                          d.setDate(d.getDate() + week * 7)
+                          return (
+                            <div key={week} className="flex items-center gap-2 text-xs">
+                              <span className="text-gray-500 font-medium w-16 flex-shrink-0">
+                                Week {week + 1}
+                              </span>
+                              <span className="text-gray-400">
+                                {d.toLocaleDateString('en-US', {
+                                  weekday: 'short',
+                                  month: 'short',
+                                  day: 'numeric',
+                                })}
+                              </span>
+                              <span className="text-gray-400 ml-auto">
+                                {ycSelected.size} job{ycSelected.size !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          )
+                        })}
+                        {ycWeeks > 6 && (
+                          <p className="text-[10px] text-gray-400 italic">
+                            + {ycWeeks - 6} more weeks…
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer */}
+                <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
+                  <button
+                    onClick={saveYardCheckSchedule}
+                    disabled={ycSaving || !ycStartDate || ycSelected.size === 0}
+                    className="w-full py-2.5 bg-teal-700 text-white text-sm font-bold rounded-xl hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {ycSaving
+                      ? 'Creating…'
+                      : `Create ${totalItems} Schedule Item${totalItems !== 1 ? 's' : ''}`}
+                  </button>
+                </div>
               </div>
-            </div>
-          </ModalOverlay>
-        )
-      })()}
+            </ModalOverlay>
+          )
+        })()}
 
       {/* Schedule Item Details */}
       {phase === 'details' && (
         <ModalOverlay onClose={closeModal}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 flex flex-col" style={{ maxHeight: '92vh' }}>
-
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 flex flex-col"
+            style={{ maxHeight: '92vh' }}
+          >
             {/* Header */}
             <div className="px-6 pt-5 pb-4 border-b border-gray-100 flex-shrink-0">
               <h3 className="text-base font-bold text-gray-800">
@@ -2813,33 +3671,39 @@ export default function ScheduleCalendar({
               {editItem?.needs_crew && (
                 <div className="mt-2 px-3 py-2 bg-amber-50 border border-amber-300 rounded-lg flex items-center gap-2">
                   <span className="text-amber-500">⚠</span>
-                  <p className="text-xs font-semibold text-amber-700">Crew not yet assigned — select a crew below and save to update the calendar.</p>
+                  <p className="text-xs font-semibold text-amber-700">
+                    Crew not yet assigned — select a crew below and save to update the calendar.
+                  </p>
                 </div>
               )}
             </div>
 
             <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
-
               {/* ── Mode selector ── */}
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Select Entry Type</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                  Select Entry Type
+                </p>
                 <div className="flex gap-2">
                   {[
                     { key: 'crew', label: 'Crew' },
-                    { key: 'sub',  label: 'Subcontractor' },
+                    { key: 'sub', label: 'Subcontractor' },
                     { key: 'custom', label: 'Custom' },
                   ].map(opt => (
-                    <button key={opt.key} onClick={() => {
-                      setEntryMode(opt.key)
-                      updateField('crew_id', '')
-                      updateField('sub_id', '')
-                      if (opt.key !== 'custom') updateField('title', '')
-                    }}
+                    <button
+                      key={opt.key}
+                      onClick={() => {
+                        setEntryMode(opt.key)
+                        updateField('crew_id', '')
+                        updateField('sub_id', '')
+                        if (opt.key !== 'custom') updateField('title', '')
+                      }}
                       className={`flex-1 py-2 rounded-lg text-sm font-semibold border-2 transition-colors ${
                         entryMode === opt.key
                           ? 'bg-green-700 text-white border-green-700'
                           : 'border-gray-200 text-gray-500 hover:border-green-400 hover:text-green-700'
-                      }`}>
+                      }`}
+                    >
                       {opt.label}
                     </button>
                   ))}
@@ -2847,69 +3711,90 @@ export default function ScheduleCalendar({
               </div>
 
               {/* ── Crew searchable dropdown ── */}
-              {entryMode === 'crew' && (() => {
-                // nickname || first_name for calendar display
-                const empDisplay = id => {
-                  const e = employees.find(em => em.id === id)
-                  return e ? (e.nickname?.trim() || e.first_name) : null
-                }
-                const empFull = id => {
-                  const e = employees.find(em => em.id === id)
-                  return e ? `${e.first_name} ${e.last_name}` : null
-                }
-                const crewLabel = crew => {
-                  const names = [
-                    crew.crew_chief_id, crew.journeyman_id,
-                    crew.laborer_1_id, crew.laborer_2_id, crew.laborer_3_id
-                  ].filter(Boolean).map(empDisplay).filter(Boolean)
-                  return `${crew.label} - ${names.join(', ')}`
-                }
-                const crewSearch = crew => {
-                  const allNames = [
-                    crew.crew_chief_id, crew.journeyman_id,
-                    crew.laborer_1_id, crew.laborer_2_id, crew.laborer_3_id
-                  ].filter(Boolean).map(empFull).filter(Boolean).join(' ')
-                  return `${crew.label} ${allNames}`.toLowerCase()
-                }
+              {entryMode === 'crew' &&
+                (() => {
+                  // nickname || first_name for calendar display
+                  const empDisplay = id => {
+                    const e = employees.find(em => em.id === id)
+                    return e ? e.nickname?.trim() || e.first_name : null
+                  }
+                  const empFull = id => {
+                    const e = employees.find(em => em.id === id)
+                    return e ? `${e.first_name} ${e.last_name}` : null
+                  }
+                  const crewLabel = crew => {
+                    const names = [
+                      crew.crew_chief_id,
+                      crew.journeyman_id,
+                      crew.laborer_1_id,
+                      crew.laborer_2_id,
+                      crew.laborer_3_id,
+                    ]
+                      .filter(Boolean)
+                      .map(empDisplay)
+                      .filter(Boolean)
+                    return `${crew.label} - ${names.join(', ')}`
+                  }
+                  const crewSearch = crew => {
+                    const allNames = [
+                      crew.crew_chief_id,
+                      crew.journeyman_id,
+                      crew.laborer_1_id,
+                      crew.laborer_2_id,
+                      crew.laborer_3_id,
+                    ]
+                      .filter(Boolean)
+                      .map(empFull)
+                      .filter(Boolean)
+                      .join(' ')
+                    return `${crew.label} ${allNames}`.toLowerCase()
+                  }
 
-                return (
-                  <CrewSubPicker
-                    label="Select Crew"
-                    emptyMsg="No crews built yet. Add crews in Master Crews."
-                    options={crews.map(c => ({
-                      id: c.id,
-                      primary: `Crew ${c.label}`,
-                      secondary: (() => {
-                        const members = [
-                          c.crew_chief_id && { role: 'Chief',      name: empFull(c.crew_chief_id) },
-                          c.journeyman_id && { role: 'Journeyman', name: empFull(c.journeyman_id) },
-                          c.laborer_1_id  && { role: 'Laborer 1',  name: empFull(c.laborer_1_id) },
-                          c.laborer_2_id  && { role: 'Laborer 2',  name: empFull(c.laborer_2_id) },
-                          c.laborer_3_id  && { role: 'Laborer 3',  name: empFull(c.laborer_3_id) },
-                        ].filter(m => m && m.name)
-                        return members.map(m => `${m.role}: ${m.name}`).join('  ·  ')
-                      })(),
-                      searchText: crewSearch(c),
-                      autoTitle: crewLabel(c),
-                    }))}
-                    selectedId={form.crew_id}
-                    onSelect={opt => {
-                      updateField('crew_id', opt.id)
-                      updateField('sub_id', '')
-                      updateField('title', opt.autoTitle)
-                      updateField('assignee_color', crewColorMap[opt.id] || '#15803d')
-                    }}
-                  />
-                )
-              })()}
+                  return (
+                    <CrewSubPicker
+                      label="Select Crew"
+                      emptyMsg="No crews built yet. Add crews in Master Crews."
+                      options={crews.map(c => ({
+                        id: c.id,
+                        primary: `Crew ${c.label}`,
+                        secondary: (() => {
+                          const members = [
+                            c.crew_chief_id && { role: 'Chief', name: empFull(c.crew_chief_id) },
+                            c.journeyman_id && {
+                              role: 'Journeyman',
+                              name: empFull(c.journeyman_id),
+                            },
+                            c.laborer_1_id && { role: 'Laborer 1', name: empFull(c.laborer_1_id) },
+                            c.laborer_2_id && { role: 'Laborer 2', name: empFull(c.laborer_2_id) },
+                            c.laborer_3_id && { role: 'Laborer 3', name: empFull(c.laborer_3_id) },
+                          ].filter(m => m && m.name)
+                          return members.map(m => `${m.role}: ${m.name}`).join('  ·  ')
+                        })(),
+                        searchText: crewSearch(c),
+                        autoTitle: crewLabel(c),
+                      }))}
+                      selectedId={form.crew_id}
+                      onSelect={opt => {
+                        updateField('crew_id', opt.id)
+                        updateField('sub_id', '')
+                        updateField('title', opt.autoTitle)
+                        updateField('assignee_color', crewColorMap[opt.id] || '#15803d')
+                      }}
+                    />
+                  )
+                })()}
               {entryMode === 'crew' && form.crew_id && (
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">
-                    Schedule Item Label <span className="text-gray-400 font-normal">(auto-filled, editable)</span>
+                    Schedule Item Label{' '}
+                    <span className="text-gray-400 font-normal">(auto-filled, editable)</span>
                   </label>
-                  <input type="text" value={form.title}
+                  <input
+                    type="text"
+                    value={form.title}
                     onChange={e => updateField('title', e.target.value)}
-                    className="input text-sm w-full" />
+                    className="input text-sm w-full"
+                  />
                 </div>
               )}
 
@@ -2923,7 +3808,8 @@ export default function ScheduleCalendar({
                       id: s.id,
                       primary: s.company_name,
                       secondary: s.divisions?.join(' · ') || '',
-                      searchText: `${s.company_name} ${(s.divisions||[]).join(' ')}`.toLowerCase(),
+                      searchText:
+                        `${s.company_name} ${(s.divisions || []).join(' ')}`.toLowerCase(),
                       autoTitle: `S - ${s.company_name}`,
                     }))}
                     selectedId={form.sub_id}
@@ -2937,11 +3823,15 @@ export default function ScheduleCalendar({
                   {form.sub_id && (
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">
-                        Schedule Item Label <span className="text-gray-400 font-normal">(auto-filled, editable)</span>
+                        Schedule Item Label{' '}
+                        <span className="text-gray-400 font-normal">(auto-filled, editable)</span>
                       </label>
-                      <input type="text" value={form.title}
+                      <input
+                        type="text"
+                        value={form.title}
                         onChange={e => updateField('title', e.target.value)}
-                        className="input text-sm w-full" />
+                        className="input text-sm w-full"
+                      />
                     </div>
                   )}
                 </>
@@ -2953,21 +3843,29 @@ export default function ScheduleCalendar({
                   <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
                     Schedule Item Label <span className="text-red-400">*</span>
                   </label>
-                  <input type="text" value={form.title}
+                  <input
+                    type="text"
+                    value={form.title}
                     onChange={e => updateField('title', e.target.value)}
                     placeholder="e.g. Install pavers, Concrete pour, Site prep…"
-                    className="input text-sm w-full" autoFocus />
+                    className="input text-sm w-full"
+                    autoFocus
+                  />
                 </div>
               )}
 
               {/* ── Schedule Details ── */}
               <div className="border-t border-gray-100 pt-4 grid grid-cols-2 gap-4">
-
                 {/* Left column */}
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1.5">Display Color</label>
-                    <ColorDropdown value={form.display_color} onChange={c => updateField('display_color', c)} />
+                    <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                      Display Color
+                    </label>
+                    <ColorDropdown
+                      value={form.display_color}
+                      onChange={c => updateField('display_color', c)}
+                    />
                   </div>
 
                   {/* Assignee Color */}
@@ -2981,18 +3879,37 @@ export default function ScheduleCalendar({
                         <span className="text-[10px] text-gray-400">Auto: crew color</span>
                       )}
                     </div>
-                    <ColorDropdown value={form.assignee_color} onChange={c => updateField('assignee_color', c)} allowClear />
+                    <ColorDropdown
+                      value={form.assignee_color}
+                      onChange={c => updateField('assignee_color', c)}
+                      allowClear
+                    />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Assignees</label>
-                    <input type="text" value={form.assignees} onChange={e => updateField('assignees', e.target.value)}
-                      placeholder="e.g. Mike, Sarah" className="input text-sm w-full" />
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Assignees
+                    </label>
+                    <input
+                      type="text"
+                      value={form.assignees}
+                      onChange={e => updateField('assignees', e.target.value)}
+                      placeholder="e.g. Mike, Sarah"
+                      className="input text-sm w-full"
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Reminder</label>
-                    <select value={form.reminder} onChange={e => updateField('reminder', e.target.value)} className="input text-sm w-full">
-                      {REMINDERS.map(r => <option key={r} value={r}>{r}</option>)}
+                    <select
+                      value={form.reminder}
+                      onChange={e => updateField('reminder', e.target.value)}
+                      className="input text-sm w-full"
+                    >
+                      {REMINDERS.map(r => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -3002,30 +3919,52 @@ export default function ScheduleCalendar({
                   <div className="grid grid-cols-3 gap-2">
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Start</label>
-                      <input type="date" value={form.start_date} onChange={e => updateField('start_date', e.target.value)} className="input text-sm w-full" />
+                      <input
+                        type="date"
+                        value={form.start_date}
+                        onChange={e => updateField('start_date', e.target.value)}
+                        className="input text-sm w-full"
+                      />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">Days</label>
-                      <input type="number" min="1" value={form.work_days} onChange={e => updateField('work_days', e.target.value)} className="input text-sm w-full" />
+                      <input
+                        type="number"
+                        min="1"
+                        value={form.work_days}
+                        onChange={e => updateField('work_days', e.target.value)}
+                        className="input text-sm w-full"
+                      />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-600 mb-1">End</label>
-                      <input type="date" value={form.end_date} onChange={e => updateField('end_date', e.target.value)} className="input text-sm w-full" />
+                      <input
+                        type="date"
+                        value={form.end_date}
+                        onChange={e => updateField('end_date', e.target.value)}
+                        className="input text-sm w-full"
+                      />
                     </div>
                   </div>
 
                   {/* Weekend overrides */}
                   <div className="flex gap-4">
                     <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
-                      <input type="checkbox" checked={!!form.include_saturday}
+                      <input
+                        type="checkbox"
+                        checked={!!form.include_saturday}
                         onChange={e => updateField('include_saturday', e.target.checked)}
-                        className="rounded border-gray-300 text-green-700 focus:ring-green-600" />
+                        className="rounded border-gray-300 text-green-700 focus:ring-green-600"
+                      />
                       Include Saturdays
                     </label>
                     <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
-                      <input type="checkbox" checked={!!form.include_sunday}
+                      <input
+                        type="checkbox"
+                        checked={!!form.include_sunday}
                         onChange={e => updateField('include_sunday', e.target.checked)}
-                        className="rounded border-gray-300 text-green-700 focus:ring-green-600" />
+                        className="rounded border-gray-300 text-green-700 focus:ring-green-600"
+                      />
                       Include Sundays
                     </label>
                   </div>
@@ -3033,33 +3972,55 @@ export default function ScheduleCalendar({
                     <label className="block text-xs font-medium text-gray-600 mb-1">
                       Progress — <span className="text-green-700 font-bold">{form.progress}%</span>
                     </label>
-                    <input type="range" min="0" max="100" step="5" value={form.progress}
-                      onChange={e => updateField('progress', e.target.value)} className="w-full accent-green-700" />
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="5"
+                      value={form.progress}
+                      onChange={e => updateField('progress', e.target.value)}
+                      className="w-full accent-green-700"
+                    />
                     <div className="flex justify-between text-[10px] text-gray-400 mt-0.5">
-                      <span>0%</span><span>50%</span><span>100%</span>
+                      <span>0%</span>
+                      <span>50%</span>
+                      <span>100%</span>
                     </div>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Notes</label>
-                    <textarea value={form.notes} onChange={e => updateField('notes', e.target.value)}
-                      rows={3} placeholder="Optional notes…" className="input text-sm w-full resize-none" />
+                    <textarea
+                      value={form.notes}
+                      onChange={e => updateField('notes', e.target.value)}
+                      rows={3}
+                      placeholder="Optional notes…"
+                      className="input text-sm w-full resize-none"
+                    />
                   </div>
                 </div>
-
               </div>
             </div>
 
             {/* Footer */}
             <div className="px-6 pb-5 pt-3 border-t border-gray-100 flex items-center gap-2 flex-shrink-0">
-              <button onClick={saveItem} disabled={saving || !form.title.trim()}
-                className="flex-1 btn-primary text-sm py-2.5 disabled:opacity-50">
+              <button
+                onClick={saveItem}
+                disabled={saving || !form.title.trim()}
+                className="flex-1 btn-primary text-sm py-2.5 disabled:opacity-50"
+              >
                 {saving ? 'Saving…' : editItem ? 'Update' : 'Save'}
               </button>
-              <button onClick={closeModal} className="px-4 py-2.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">
+              <button
+                onClick={closeModal}
+                className="px-4 py-2.5 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
+              >
                 Cancel
               </button>
               {editItem && (
-                <button onClick={deleteItem} className="px-3 py-2.5 text-sm rounded-lg border border-red-100 text-red-400 hover:bg-red-50 hover:text-red-600">
+                <button
+                  onClick={deleteItem}
+                  className="px-3 py-2.5 text-sm rounded-lg border border-red-100 text-red-400 hover:bg-red-50 hover:text-red-600"
+                >
                   Delete
                 </button>
               )}
@@ -3073,8 +4034,12 @@ export default function ScheduleCalendar({
 
 function ModalOverlay({ children, onClose }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-0 sm:px-4"
-      onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-0 sm:px-4"
+      onMouseDown={e => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
       {children}
     </div>
   )

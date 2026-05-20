@@ -54,7 +54,11 @@ export function RateIconsProvider({ children }) {
 
   // Persist visibility choice on every change so a refresh keeps it.
   useEffect(() => {
-    try { window.localStorage.setItem(STORAGE_KEY, String(showRateIcons)) } catch { /* ignore quota errors */ }
+    try {
+      window.localStorage.setItem(STORAGE_KEY, String(showRateIcons))
+    } catch {
+      /* ignore quota errors */
+    }
   }, [showRateIcons])
 
   // Load the permission flag whenever the auth user changes. Wrapped in a
@@ -62,14 +66,20 @@ export function RateIconsProvider({ children }) {
   // hiccup) can NEVER lock up the UI — worst case the toggle stays hidden.
   useEffect(() => {
     if (authLoading) return
-    if (!user) { setCanAccessRates(false); return }
+    if (!user) {
+      setCanAccessRates(false)
+      return
+    }
 
     let alive = true
     ;(async () => {
       try {
         // Admins always have access
         const { data: profile } = await supabase
-          .from('profiles').select('role').eq('id', user.id).maybeSingle()
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .maybeSingle()
         if (!alive) return
         if (profile?.role === 'admin' || profile?.role === 'super_admin') {
           setCanAccessRates(true)
@@ -79,8 +89,10 @@ export function RateIconsProvider({ children }) {
         // exist yet (SQL hasn't been run) Supabase returns an error and
         // perms will be null — we fall through to false.
         const { data: perms } = await supabase
-          .from('user_permissions').select('clients_access_edit_rates')
-          .eq('user_id', user.id).maybeSingle()
+          .from('user_permissions')
+          .select('clients_access_edit_rates')
+          .eq('user_id', user.id)
+          .maybeSingle()
         if (alive) setCanAccessRates(perms?.clients_access_edit_rates === true)
       } catch (err) {
         // Any unexpected failure → no access (fail-closed). Logged for debug.
@@ -88,7 +100,9 @@ export function RateIconsProvider({ children }) {
         if (alive) setCanAccessRates(false)
       }
     })()
-    return () => { alive = false }
+    return () => {
+      alive = false
+    }
   }, [user, authLoading])
 
   // If the user loses permission mid-session, force the icons off so nothing
@@ -98,12 +112,14 @@ export function RateIconsProvider({ children }) {
   }, [canAccessRates, showRateIcons])
 
   const toggleRateIcons = useCallback(() => {
-    if (!canAccessRates) return  // no-op when not permitted (defence in depth)
+    if (!canAccessRates) return // no-op when not permitted (defence in depth)
     setShowRateIcons(v => !v)
   }, [canAccessRates])
 
   return (
-    <RateIconsContext.Provider value={{ showRateIcons, toggleRateIcons, setShowRateIcons, canAccessRates }}>
+    <RateIconsContext.Provider
+      value={{ showRateIcons, toggleRateIcons, setShowRateIcons, canAccessRates }}
+    >
       {children}
     </RateIconsContext.Provider>
   )

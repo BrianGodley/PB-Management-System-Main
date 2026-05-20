@@ -30,7 +30,7 @@
 import { supabase } from './supabase'
 
 export const DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN = 60
-export const DEFAULT_BOBCAT_BASELINE_LF          = 15  // Excel BobcatTravel
+export const DEFAULT_BOBCAT_BASELINE_LF = 15 // Excel BobcatTravel
 
 const num = v => {
   const n = parseFloat(v)
@@ -42,13 +42,13 @@ const num = v => {
  *   addedHours = (laborSubtotalHrs / 8) × (distanceLF × 2) / paceLfPerMin
  */
 export function calcWalkAccessLabor(laborSubtotalHrs, distanceLF, opts = {}) {
-  const hrs  = num(laborSubtotalHrs)
-  const lf   = num(distanceLF)
+  const hrs = num(laborSubtotalHrs)
+  const lf = num(distanceLF)
   const pace = num(opts.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   if (hrs <= 0 || lf <= 0 || pace <= 0) return 0
   const tripsPerJob = hrs / 8
   const roundTripFt = lf * 2
-  return tripsPerJob * roundTripFt / pace
+  return (tripsPerJob * roundTripFt) / pace
 }
 
 /**
@@ -56,14 +56,14 @@ export function calcWalkAccessLabor(laborSubtotalHrs, distanceLF, opts = {}) {
  *   addedHours = max(0, distanceLF − baselineLF) × trips × 2 / (pace × 60)
  */
 export function calcWalkAccessTrips(trips, distanceLF, opts = {}) {
-  const t    = num(trips)
-  const lf   = num(distanceLF)
+  const t = num(trips)
+  const lf = num(distanceLF)
   const base = num(opts.baselineLF) || DEFAULT_BOBCAT_BASELINE_LF
   const pace = num(opts.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   if (t <= 0 || lf <= 0 || pace <= 0) return 0
   const effectiveLF = Math.max(0, lf - base)
   if (effectiveLF <= 0) return 0
-  return effectiveLF * t * 2 / pace / 60
+  return (effectiveLF * t * 2) / pace / 60
 }
 
 /**

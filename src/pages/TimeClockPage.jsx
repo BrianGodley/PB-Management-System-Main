@@ -6,20 +6,22 @@ import TimeClock from '../components/TimeClock'
 
 export default function TimeClockPage() {
   const { t } = useLang()
-  const [jobs,        setJobs]        = useState([])
+  const [jobs, setJobs] = useState([])
   const [selectedJob, setSelectedJob] = useState('all')
-  const [loading,     setLoading]     = useState(true)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     // Server max-rows is 1k; paginate to get all 2k+ jobs.
     fetchAllPaginated(() =>
       supabase.from('jobs').select('*').order('sold_date', { ascending: false })
-    ).then(({ data }) => { if (data) setJobs(data); setLoading(false) })
+    ).then(({ data }) => {
+      if (data) setJobs(data)
+      setLoading(false)
+    })
   }, [])
 
   return (
     <div className="flex flex-col h-full">
-
       {/* Minimal header with job filter */}
       <div className="flex-shrink-0 mb-4">
         <h1 className="text-lg font-bold text-gray-900 mb-3">{t('timeClockTitle')}</h1>
@@ -32,13 +34,13 @@ export default function TimeClockPage() {
             >
               <option value="all">{t('selectJob')}</option>
               {jobs.map(j => (
-                <option key={j.id} value={j.id}>{j.name || j.client_name}</option>
+                <option key={j.id} value={j.id}>
+                  {j.name || j.client_name}
+                </option>
               ))}
             </select>
             {selectedJob === 'all' && (
-              <p className="text-xs text-red-500 mt-1.5 px-0.5">
-                {t('jobRequired')}
-              </p>
+              <p className="text-xs text-red-500 mt-1.5 px-0.5">{t('jobRequired')}</p>
             )}
           </>
         )}

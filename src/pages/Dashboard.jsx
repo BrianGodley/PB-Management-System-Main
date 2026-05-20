@@ -12,9 +12,13 @@ const STATUS_LABELS = {
 
 function calcJobGP(job) {
   const laborRate = job.labor_rate || 400
-  let estManDays = 0, estMaterials = 0
-  let actualManDays = 0, actualMaterials = 0
-  let changeOrderPrice = 0, changeOrderMD = 0, changeOrderMat = 0
+  let estManDays = 0,
+    estMaterials = 0
+  let actualManDays = 0,
+    actualMaterials = 0
+  let changeOrderPrice = 0,
+    changeOrderMD = 0,
+    changeOrderMat = 0
 
   for (const project of job.projects || []) {
     for (const mod of project.modules || []) {
@@ -61,7 +65,11 @@ export default function Dashboard() {
     const [settingsRes, jobsRes] = await Promise.all([
       supabase.from('company_settings').select('*').single(),
       // Server max-rows is 1k; paginate to get all 2k+ jobs.
-      fetchAllPaginated(() => supabase.from('jobs').select(`
+      fetchAllPaginated(() =>
+        supabase
+          .from('jobs')
+          .select(
+            `
         *,
         projects (
           *,
@@ -71,38 +79,52 @@ export default function Dashboard() {
           )
         ),
         change_orders (*)
-      `).order('created_at', { ascending: false }))
+      `
+          )
+          .order('created_at', { ascending: false })
+      ),
     ])
 
     if (settingsRes.data) setLaborRate(parseFloat(settingsRes.data.labor_rate_per_man_day) || 400)
     if (jobsRes.data) {
-      setJobs(jobsRes.data.map(j => ({ ...j, labor_rate: parseFloat(settingsRes.data?.labor_rate_per_man_day) || 400 })))
+      setJobs(
+        jobsRes.data.map(j => ({
+          ...j,
+          labor_rate: parseFloat(settingsRes.data?.labor_rate_per_man_day) || 400,
+        }))
+      )
     }
     setLoading(false)
   }
 
   const filteredJobs = jobs.filter(j => {
     const matchStatus = filter === 'all' || j.status === filter
-    const matchSearch = j.client_name.toLowerCase().includes(search.toLowerCase()) ||
+    const matchSearch =
+      j.client_name.toLowerCase().includes(search.toLowerCase()) ||
       j.job_address.toLowerCase().includes(search.toLowerCase())
     return matchStatus && matchSearch
   })
 
-  const totalActiveRevenue = jobs.filter(j => j.status === 'active').reduce((s, j) => {
-    const { totalRevenue } = calcJobGP(j)
-    return s + totalRevenue
-  }, 0)
+  const totalActiveRevenue = jobs
+    .filter(j => j.status === 'active')
+    .reduce((s, j) => {
+      const { totalRevenue } = calcJobGP(j)
+      return s + totalRevenue
+    }, 0)
 
-  const totalEstGP = jobs.filter(j => j.status === 'active').reduce((s, j) => {
-    const { estGP } = calcJobGP(j)
-    return s + estGP
-  }, 0)
+  const totalEstGP = jobs
+    .filter(j => j.status === 'active')
+    .reduce((s, j) => {
+      const { estGP } = calcJobGP(j)
+      return s + estGP
+    }, 0)
 
-  if (loading) return (
-    <div className="flex items-center justify-center py-20">
-      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-700"></div>
-    </div>
-  )
+  if (loading)
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-700"></div>
+      </div>
+    )
 
   return (
     <div>
@@ -110,9 +132,13 @@ export default function Dashboard() {
       <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{jobs.filter(j => j.status === 'active').length} active jobs</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {jobs.filter(j => j.status === 'active').length} active jobs
+          </p>
         </div>
-        <Link to="/jobs/new" className="btn-primary hidden sm:block text-sm px-3 py-1.5">+ Add Job</Link>
+        <Link to="/jobs/new" className="btn-primary hidden sm:block text-sm px-3 py-1.5">
+          + Add Job
+        </Link>
       </div>
 
       {/* Summary bar */}
@@ -129,7 +155,9 @@ export default function Dashboard() {
         </div>
         <div className="card hidden md:block">
           <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Active Jobs</p>
-          <p className="text-xl font-bold text-gray-900">{jobs.filter(j => j.status === 'active').length}</p>
+          <p className="text-xl font-bold text-gray-900">
+            {jobs.filter(j => j.status === 'active').length}
+          </p>
         </div>
       </div>
 
@@ -148,7 +176,9 @@ export default function Dashboard() {
               key={s}
               onClick={() => setFilter(s)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium capitalize transition-colors ${
-                filter === s ? 'bg-green-700 text-white' : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'
+                filter === s
+                  ? 'bg-green-700 text-white'
+                  : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'
               }`}
             >
               {s === 'on_hold' ? 'On Hold' : s.charAt(0).toUpperCase() + s.slice(1)}
@@ -162,15 +192,27 @@ export default function Dashboard() {
         <div className="card text-center py-12">
           <p className="text-4xl mb-3">🌿</p>
           <p className="text-gray-500 mb-4">No jobs found.</p>
-          <Link to="/jobs/new" className="btn-primary inline-block">Create Your First Job</Link>
+          <Link to="/jobs/new" className="btn-primary inline-block">
+            Create Your First Job
+          </Link>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filteredJobs.map(job => {
-            const { totalRevenue, estGP, estGPPct, actualGP, actualGPPct } = calcJobGP(job)
+            const { totalRevenue, estGPPct, actualGPPct } = calcJobGP(job)
             const statusInfo = STATUS_LABELS[job.status] || STATUS_LABELS.active
-            const gpColor = estGPPct >= 30 ? 'text-green-700' : estGPPct >= 15 ? 'text-yellow-600' : 'text-red-600'
-            const actualColor = actualGPPct >= 30 ? 'text-green-700' : actualGPPct >= 15 ? 'text-yellow-600' : 'text-red-600'
+            const gpColor =
+              estGPPct >= 30
+                ? 'text-green-700'
+                : estGPPct >= 15
+                  ? 'text-yellow-600'
+                  : 'text-red-600'
+            const actualColor =
+              actualGPPct >= 30
+                ? 'text-green-700'
+                : actualGPPct >= 15
+                  ? 'text-yellow-600'
+                  : 'text-red-600'
 
             return (
               <div key={job.id} className="card hover:shadow-md transition-shadow">
@@ -187,7 +229,9 @@ export default function Dashboard() {
                 <div className="grid grid-cols-3 gap-2 mb-3 text-center">
                   <div className="bg-gray-50 rounded-lg p-2">
                     <p className="text-xs text-gray-500">Revenue</p>
-                    <p className="text-sm font-semibold text-gray-900">${totalRevenue.toLocaleString()}</p>
+                    <p className="text-sm font-semibold text-gray-900">
+                      ${totalRevenue.toLocaleString()}
+                    </p>
                   </div>
                   <div className="bg-gray-50 rounded-lg p-2">
                     <p className="text-xs text-gray-500">Est. GP</p>
@@ -195,14 +239,18 @@ export default function Dashboard() {
                   </div>
                   <div className="bg-gray-50 rounded-lg p-2">
                     <p className="text-xs text-gray-500">Act. GP</p>
-                    <p className={`text-sm font-semibold ${actualColor}`}>{actualGPPct.toFixed(0)}%</p>
+                    <p className={`text-sm font-semibold ${actualColor}`}>
+                      {actualGPPct.toFixed(0)}%
+                    </p>
                   </div>
                 </div>
 
                 {/* Info row */}
                 <div className="text-xs text-gray-500 mb-3 space-y-0.5">
                   {job.salesperson && <p>👤 {job.salesperson}</p>}
-                  {job.start_date && <p>📅 Start: {new Date(job.start_date).toLocaleDateString()}</p>}
+                  {job.start_date && (
+                    <p>📅 Start: {new Date(job.start_date).toLocaleDateString()}</p>
+                  )}
                   <p>📁 {(job.projects || []).length} project(s)</p>
                 </div>
 
@@ -211,7 +259,10 @@ export default function Dashboard() {
                   <Link to={`/jobs/${job.id}`} className="flex-1 btn-secondary text-center text-sm">
                     View Job
                   </Link>
-                  <Link to={`/jobs/${job.id}/tracker`} className="flex-1 btn-primary text-center text-sm">
+                  <Link
+                    to={`/jobs/${job.id}/tracker`}
+                    className="flex-1 btn-primary text-center text-sm"
+                  >
                     📊 Tracker
                   </Link>
                 </div>

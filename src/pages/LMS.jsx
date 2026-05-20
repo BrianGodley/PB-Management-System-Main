@@ -16,19 +16,23 @@ import ActionsManager from '../components/lms/admin/ActionsManager'
 import CourseAssignmentsManager from '../components/lms/admin/CourseAssignmentsManager'
 
 const ADMIN_TABS = [
-  { key: 'checksheets',  label: 'Checksheets',       icon: '📋' },
-  { key: 'assignments',  label: 'Course Assignments', icon: '🎯' },
-  { key: 'read_items',   label: 'Read Items',         icon: '📖' },
-  { key: 'drills',       label: 'Learning Drills',    icon: '🔁' },
-  { key: 'quizzes',      label: 'Quizzes',            icon: '📝' },
-  { key: 'tests',        label: 'Final Tests',        icon: '🎓' },
-  { key: 'actions',      label: 'Actions',            icon: '⚡' },
-  { key: 'progress',     label: 'Progress',           icon: '📊' },
+  { key: 'checksheets', label: 'Checksheets', icon: '📋' },
+  { key: 'assignments', label: 'Course Assignments', icon: '🎯' },
+  { key: 'read_items', label: 'Read Items', icon: '📖' },
+  { key: 'drills', label: 'Learning Drills', icon: '🔁' },
+  { key: 'quizzes', label: 'Quizzes', icon: '📝' },
+  { key: 'tests', label: 'Final Tests', icon: '🎓' },
+  { key: 'actions', label: 'Actions', icon: '⚡' },
+  { key: 'progress', label: 'Progress', icon: '📊' },
 ]
 
 function fmt(dateStr) {
   if (!dateStr) return null
-  return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+  return new Date(dateStr).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
 }
 
 // ── Rich My Training card ──────────────────────────────────────────────────
@@ -52,7 +56,9 @@ function TrainingCard({ a, onStart }) {
         {/* Progress bar */}
         <div className="mt-4 mb-1">
           <div className="flex justify-between text-xs mb-1.5">
-            <span className="text-gray-500">{a.done_steps} of {a.total_steps} steps complete</span>
+            <span className="text-gray-500">
+              {a.done_steps} of {a.total_steps} steps complete
+            </span>
             <span className={`font-bold ${done ? 'text-green-600' : 'text-gray-700'}`}>{pct}%</span>
           </div>
           <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
@@ -120,8 +126,8 @@ function TrainingCard({ a, onStart }) {
             !started
               ? 'bg-green-700 text-white hover:bg-green-800'
               : done
-              ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              : 'bg-green-700 text-white hover:bg-green-800'
+                ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                : 'bg-green-700 text-white hover:bg-green-800'
           }`}
         >
           {!started ? 'Start Course' : done ? 'Review' : 'Continue →'}
@@ -162,8 +168,14 @@ export default function LMS() {
 
   useEffect(() => {
     if (!user?.id) return
-    supabase.from('profiles').select('role').eq('id', user.id).single()
-      .then(({ data }) => { if (data?.role === 'admin' || data?.role === 'super_admin') setIsAdmin(true) })
+    supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+      .then(({ data }) => {
+        if (data?.role === 'admin' || data?.role === 'super_admin') setIsAdmin(true)
+      })
   }, [user?.id])
 
   useEffect(() => {
@@ -177,10 +189,18 @@ export default function LMS() {
 
   const loadCourses = async () => {
     setCoursesLoading(true)
-    const { data } = await supabase.from('lms_courses').select('*').order('created_at', { ascending: false })
+    const { data } = await supabase
+      .from('lms_courses')
+      .select('*')
+      .order('created_at', { ascending: false })
     if (data?.length) {
       const counts = await Promise.all(
-        data.map(c => supabase.from('lms_steps').select('id', { count: 'exact', head: true }).eq('course_id', c.id))
+        data.map(c =>
+          supabase
+            .from('lms_steps')
+            .select('id', { count: 'exact', head: true })
+            .eq('course_id', c.id)
+        )
       )
       setCourses(data.map((c, i) => ({ ...c, step_count: counts[i].count || 0 })))
     } else {
@@ -191,8 +211,15 @@ export default function LMS() {
 
   const loadProgress = async () => {
     const [empRes, assRes, compRes] = await Promise.all([
-      supabase.from('employees').select('id, first_name, last_name').eq('status', 'active').order('last_name'),
-      supabase.from('lms_assignments').select('*, course:lms_courses(title)').order('assigned_at', { ascending: false }),
+      supabase
+        .from('employees')
+        .select('id, first_name, last_name')
+        .eq('status', 'active')
+        .order('last_name'),
+      supabase
+        .from('lms_assignments')
+        .select('*, course:lms_courses(title)')
+        .order('assigned_at', { ascending: false }),
       supabase.from('lms_step_completions').select('assignment_id, step_id'),
     ])
     setProgressEmployees(empRes.data || [])
@@ -202,61 +229,82 @@ export default function LMS() {
 
   const loadMyTraining = async () => {
     setTrainingLoading(true)
-    const { data: emp } = await supabase.from('employees').select('id, first_name, last_name').eq('email', user?.email).maybeSingle()
+    const { data: emp } = await supabase
+      .from('employees')
+      .select('id, first_name, last_name')
+      .eq('email', user?.email)
+      .maybeSingle()
     setMyEmployee(emp || null)
 
-    if (!emp) { setTrainingLoading(false); return }
+    if (!emp) {
+      setTrainingLoading(false)
+      return
+    }
 
-    const { data: asgn } = await supabase.from('lms_assignments')
+    const { data: asgn } = await supabase
+      .from('lms_assignments')
       .select('*, course:lms_courses(*)')
       .eq('employee_id', emp.id)
       .order('assigned_at', { ascending: false })
 
-    if (!asgn?.length) { setAssignments([]); setTrainingLoading(false); return }
+    if (!asgn?.length) {
+      setAssignments([])
+      setTrainingLoading(false)
+      return
+    }
 
     const assignmentIds = asgn.map(a => a.id)
     const courseIds = [...new Set(asgn.map(a => a.course_id))]
 
     // Batch load all needed data
     const [stepsRes, compsRes, attemptsRes] = await Promise.all([
-      supabase.from('lms_steps').select('id, course_id, step_type, title').in('course_id', courseIds).order('step_order'),
+      supabase
+        .from('lms_steps')
+        .select('id, course_id, step_type, title')
+        .in('course_id', courseIds)
+        .order('step_order'),
       supabase.from('lms_step_completions').select('*').in('assignment_id', assignmentIds),
       supabase.from('lms_quiz_attempts').select('*').in('assignment_id', assignmentIds),
     ])
 
-    const allSteps    = stepsRes.data    || []
-    const allComps    = compsRes.data    || []
+    const allSteps = stepsRes.data || []
+    const allComps = compsRes.data || []
     const allAttempts = attemptsRes.data || []
 
     const enriched = asgn.map(a => {
       const steps = allSteps.filter(s => s.course_id === a.course_id)
       const comps = allComps.filter(c => c.assignment_id === a.id)
-      const atts  = allAttempts.filter(at => at.assignment_id === a.id)
+      const atts = allAttempts.filter(at => at.assignment_id === a.id)
 
       // Quiz and test completions (with scores)
       const quizResults = steps
         .filter(s => s.step_type === 'quiz')
-        .map(s => { const c = comps.find(c => c.step_id === s.id); return c ? { title: s.title, score: c.score } : null })
+        .map(s => {
+          const c = comps.find(c => c.step_id === s.id)
+          return c ? { title: s.title, score: c.score } : null
+        })
         .filter(Boolean)
 
       const testResults = steps
         .filter(s => s.step_type === 'final_test')
-        .map(s => { const c = comps.find(c => c.step_id === s.id); return c ? { title: s.title, score: c.score } : null })
+        .map(s => {
+          const c = comps.find(c => c.step_id === s.id)
+          return c ? { title: s.title, score: c.score } : null
+        })
         .filter(Boolean)
 
       // Activity timestamps
-      const allTs = [
-        ...comps.map(c => c.completed_at),
-        ...atts.map(at => at.attempted_at),
-      ].filter(Boolean).sort()
+      const allTs = [...comps.map(c => c.completed_at), ...atts.map(at => at.attempted_at)]
+        .filter(Boolean)
+        .sort()
 
       return {
         ...a,
-        total_steps:  steps.length,
-        done_steps:   comps.length,
+        total_steps: steps.length,
+        done_steps: comps.length,
         quiz_results: quizResults,
         test_results: testResults,
-        started_at:   allTs[0] || null,
+        started_at: allTs[0] || null,
         last_activity: allTs[allTs.length - 1] || null,
       }
     })
@@ -265,7 +313,7 @@ export default function LMS() {
     setTrainingLoading(false)
   }
 
-  const deleteCourse = async (id) => {
+  const deleteCourse = async id => {
     if (!confirm('Delete this checksheet and all its steps?')) return
     await supabase.from('lms_courses').delete().eq('id', id)
     loadCourses()
@@ -274,7 +322,12 @@ export default function LMS() {
   const assignFromChecksheets = async () => {
     if (!assignEmployee || !showAssign) return
     setAssigning(true)
-    await supabase.from('lms_assignments').upsert({ course_id: showAssign.id, employee_id: assignEmployee }, { onConflict: 'course_id,employee_id' })
+    await supabase
+      .from('lms_assignments')
+      .upsert(
+        { course_id: showAssign.id, employee_id: assignEmployee },
+        { onConflict: 'course_id,employee_id' }
+      )
     setAssigning(false)
     setShowAssign(null)
     setAssignEmployee('')
@@ -286,10 +339,17 @@ export default function LMS() {
       <div className="flex items-center justify-between mb-5">
         <div>
           <h3 className="font-semibold text-gray-800">Checksheets</h3>
-          <p className="text-xs text-gray-500 mt-0.5">Build step-by-step training courses for employees.</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Build step-by-step training courses for employees.
+          </p>
         </div>
-        <button onClick={() => { setEditCourse(null); setShowBuilder(true) }}
-          className="px-4 py-2 bg-green-700 text-white rounded-xl font-medium hover:bg-green-800">
+        <button
+          onClick={() => {
+            setEditCourse(null)
+            setShowBuilder(true)
+          }}
+          className="px-4 py-2 bg-green-700 text-white rounded-xl font-medium hover:bg-green-800"
+        >
           + New Checksheet
         </button>
       </div>
@@ -307,10 +367,16 @@ export default function LMS() {
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-500">Checksheet</th>
-                <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-500">Category</th>
+                <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-500">
+                  Checksheet
+                </th>
+                <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-500">
+                  Category
+                </th>
                 <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-500">Steps</th>
-                <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-500">Created By</th>
+                <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-500">
+                  Created By
+                </th>
                 <th className="text-left py-2.5 px-4 text-xs font-medium text-gray-500">Date</th>
                 <th className="py-2.5 px-4"></th>
               </tr>
@@ -320,7 +386,11 @@ export default function LMS() {
                 <tr key={course.id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="py-3 px-4">
                     <p className="font-medium text-gray-900">{course.title}</p>
-                    {course.description && <p className="text-xs text-gray-400 truncate max-w-xs">{course.description}</p>}
+                    {course.description && (
+                      <p className="text-xs text-gray-400 truncate max-w-xs">
+                        {course.description}
+                      </p>
+                    )}
                   </td>
                   <td className="py-3 px-4 text-gray-500 text-xs">{course.category || '—'}</td>
                   <td className="py-3 px-4">
@@ -328,16 +398,35 @@ export default function LMS() {
                       {course.step_count} step{course.step_count !== 1 ? 's' : ''}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-gray-400 text-xs">{course.created_by_email || '—'}</td>
-                  <td className="py-3 px-4 text-gray-400 text-xs">{new Date(course.created_at).toLocaleDateString()}</td>
+                  <td className="py-3 px-4 text-gray-400 text-xs">
+                    {course.created_by_email || '—'}
+                  </td>
+                  <td className="py-3 px-4 text-gray-400 text-xs">
+                    {new Date(course.created_at).toLocaleDateString()}
+                  </td>
                   <td className="py-3 px-4">
                     <div className="flex gap-3">
-                      <button onClick={() => { setEditCourse(course); setShowBuilder(true) }}
-                        className="text-xs text-blue-600 hover:underline">Edit</button>
-                      <button onClick={() => setShowAssign(course)}
-                        className="text-xs text-green-700 hover:underline">Assign</button>
-                      <button onClick={() => deleteCourse(course.id)}
-                        className="text-xs text-red-400 hover:text-red-600">Delete</button>
+                      <button
+                        onClick={() => {
+                          setEditCourse(course)
+                          setShowBuilder(true)
+                        }}
+                        className="text-xs text-blue-600 hover:underline"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => setShowAssign(course)}
+                        className="text-xs text-green-700 hover:underline"
+                      >
+                        Assign
+                      </button>
+                      <button
+                        onClick={() => deleteCourse(course.id)}
+                        className="text-xs text-red-400 hover:text-red-600"
+                      >
+                        Delete
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -351,11 +440,13 @@ export default function LMS() {
 
   // ── Admin: Progress ─────────────────────────────────────────────────────────
   const renderProgress = () => {
-    const getProgress = (empId) => {
-      return allAssignments.filter(a => a.employee_id === empId).map(a => ({
-        ...a,
-        done: allCompletions.filter(c => c.assignment_id === a.id).length,
-      }))
+    const getProgress = empId => {
+      return allAssignments
+        .filter(a => a.employee_id === empId)
+        .map(a => ({
+          ...a,
+          done: allCompletions.filter(c => c.assignment_id === a.id).length,
+        }))
     }
     return (
       <div>
@@ -370,10 +461,15 @@ export default function LMS() {
                 <div key={emp.id} className="bg-white border border-gray-200 rounded-2xl p-4">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-sm font-bold text-green-700">
-                      {emp.first_name?.[0]}{emp.last_name?.[0]}
+                      {emp.first_name?.[0]}
+                      {emp.last_name?.[0]}
                     </div>
-                    <p className="font-medium text-gray-900">{emp.first_name} {emp.last_name}</p>
-                    <span className="ml-auto text-xs text-gray-400">{empProgress.length} course{empProgress.length !== 1 ? 's' : ''} assigned</span>
+                    <p className="font-medium text-gray-900">
+                      {emp.first_name} {emp.last_name}
+                    </p>
+                    <span className="ml-auto text-xs text-gray-400">
+                      {empProgress.length} course{empProgress.length !== 1 ? 's' : ''} assigned
+                    </span>
                   </div>
                   {empProgress.length === 0 ? (
                     <p className="text-xs text-gray-400 pl-12">No courses assigned</p>
@@ -381,7 +477,9 @@ export default function LMS() {
                     <div className="space-y-2 pl-12">
                       {empProgress.map(a => (
                         <div key={a.id} className="flex items-center gap-3">
-                          <span className="text-xs text-gray-700 flex-1 truncate">{a.course?.title}</span>
+                          <span className="text-xs text-gray-700 flex-1 truncate">
+                            {a.course?.title}
+                          </span>
                           <span className="text-xs text-gray-400">{a.done} steps done</span>
                         </div>
                       ))}
@@ -405,7 +503,10 @@ export default function LMS() {
         <div className="text-center py-14 text-gray-400">
           <div className="text-5xl mb-3">🔍</div>
           <p className="font-medium text-gray-700">No employee record found</p>
-          <p className="text-sm mt-2">Your account ({user?.email}) isn't linked to an employee profile yet. Ask an admin to set it up.</p>
+          <p className="text-sm mt-2">
+            Your account ({user?.email}) isn't linked to an employee profile yet. Ask an admin to
+            set it up.
+          </p>
         </div>
       )
     }
@@ -433,29 +534,50 @@ export default function LMS() {
   const QuickAssignModal = () => {
     const [empList, setEmpList] = useState([])
     useEffect(() => {
-      supabase.from('employees').select('id, first_name, last_name').eq('status', 'active').order('last_name')
+      supabase
+        .from('employees')
+        .select('id, first_name, last_name')
+        .eq('status', 'active')
+        .order('last_name')
         .then(({ data }) => setEmpList(data || []))
     }, [])
     return (
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
           <h3 className="font-bold text-gray-900 text-lg">Assign: {showAssign?.title}</h3>
-          <p className="text-xs text-gray-500">To manage all assignments at once, use the Course Assignments tab.</p>
+          <p className="text-xs text-gray-500">
+            To manage all assignments at once, use the Course Assignments tab.
+          </p>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Employee</label>
-            <select value={assignEmployee} onChange={e => setAssignEmployee(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-green-500">
+            <select
+              value={assignEmployee}
+              onChange={e => setAssignEmployee(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-green-500"
+            >
               <option value="">— Select Employee —</option>
-              {empList.map(e => <option key={e.id} value={e.id}>{e.first_name} {e.last_name}</option>)}
+              {empList.map(e => (
+                <option key={e.id} value={e.id}>
+                  {e.first_name} {e.last_name}
+                </option>
+              ))}
             </select>
           </div>
           <div className="flex gap-3">
-            <button onClick={assignFromChecksheets} disabled={!assignEmployee || assigning}
-              className="flex-1 py-2.5 bg-green-700 text-white rounded-xl font-medium hover:bg-green-800 disabled:opacity-50">
+            <button
+              onClick={assignFromChecksheets}
+              disabled={!assignEmployee || assigning}
+              className="flex-1 py-2.5 bg-green-700 text-white rounded-xl font-medium hover:bg-green-800 disabled:opacity-50"
+            >
               {assigning ? 'Assigning…' : 'Assign Course'}
             </button>
-            <button onClick={() => { setShowAssign(null); setAssignEmployee('') }}
-              className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200">
+            <button
+              onClick={() => {
+                setShowAssign(null)
+                setAssignEmployee('')
+              }}
+              className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200"
+            >
               Cancel
             </button>
           </div>
@@ -473,17 +595,25 @@ export default function LMS() {
 
       {/* Tab bar */}
       <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0">
-        <button onClick={() => setMainTab('training')}
+        <button
+          onClick={() => setMainTab('training')}
           className={`flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
-            mainTab === 'training' ? 'border-green-700 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}>
+            mainTab === 'training'
+              ? 'border-green-700 text-green-700'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
           🎓 My Training
         </button>
         {isAdmin && (
-          <button onClick={() => setMainTab('admin')}
+          <button
+            onClick={() => setMainTab('admin')}
             className={`flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
-              mainTab === 'admin' ? 'border-green-700 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}>
+              mainTab === 'admin'
+                ? 'border-green-700 text-green-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
             ⚙️ Settings
           </button>
         )}
@@ -495,10 +625,15 @@ export default function LMS() {
           <div className="w-52 flex-shrink-0">
             <nav className="space-y-0.5">
               {ADMIN_TABS.map(tab => (
-                <button key={tab.key} onClick={() => setAdminTab(tab.key)}
+                <button
+                  key={tab.key}
+                  onClick={() => setAdminTab(tab.key)}
                   className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-left transition-colors ${
-                    adminTab === tab.key ? 'bg-green-50 text-green-800' : 'text-gray-600 hover:bg-gray-50'
-                  }`}>
+                    adminTab === tab.key
+                      ? 'bg-green-50 text-green-800'
+                      : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
                   <span>{tab.icon}</span> {tab.label}
                 </button>
               ))}
@@ -506,14 +641,14 @@ export default function LMS() {
           </div>
 
           <div className="flex-1 min-w-0 bg-white rounded-2xl border border-gray-200 p-6">
-            {adminTab === 'checksheets'  && renderChecksheets()}
-            {adminTab === 'assignments'  && <CourseAssignmentsManager />}
-            {adminTab === 'read_items'   && <ReadItemsManager />}
-            {adminTab === 'drills'       && <LearningDrillsManager />}
-            {adminTab === 'quizzes'      && <QuizzesManager />}
-            {adminTab === 'tests'        && <TestsManager />}
-            {adminTab === 'actions'      && <ActionsManager />}
-            {adminTab === 'progress'     && renderProgress()}
+            {adminTab === 'checksheets' && renderChecksheets()}
+            {adminTab === 'assignments' && <CourseAssignmentsManager />}
+            {adminTab === 'read_items' && <ReadItemsManager />}
+            {adminTab === 'drills' && <LearningDrillsManager />}
+            {adminTab === 'quizzes' && <QuizzesManager />}
+            {adminTab === 'tests' && <TestsManager />}
+            {adminTab === 'actions' && <ActionsManager />}
+            {adminTab === 'progress' && renderProgress()}
           </div>
         </div>
       )}
@@ -532,7 +667,10 @@ export default function LMS() {
       {showBuilder && (
         <ChecksheetBuilder
           course={editCourse}
-          onClose={() => { setShowBuilder(false); setEditCourse(null) }}
+          onClose={() => {
+            setShowBuilder(false)
+            setEditCourse(null)
+          }}
           onSaved={loadCourses}
         />
       )}
@@ -541,7 +679,10 @@ export default function LMS() {
       {showPlayer && (
         <CoursePlayer
           assignment={showPlayer}
-          onClose={() => { setShowPlayer(null); loadMyTraining() }}
+          onClose={() => {
+            setShowPlayer(null)
+            loadMyTraining()
+          }}
         />
       )}
 

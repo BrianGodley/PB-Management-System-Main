@@ -23,67 +23,97 @@ const DEFAULTS = { laborRatePerHour: 35, laborBurdenPct: 0.29, gpmd: 425, commis
 const n = v => parseFloat(v) || 0
 
 // ── Calculation engine ────────────────────────────────────────────────────────
-function calcSteps(state, lrph, laborRates, materialRates, paverPrices, gpmd = DEFAULTS.gpmd, walkAccess = null) {
-  const _pace = (parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN)
-  const lr = laborRates   || {}
+function calcSteps(
+  state,
+  lrph,
+  laborRates,
+  materialRates,
+  paverPrices,
+  gpmd = DEFAULTS.gpmd,
+  walkAccess = null
+) {
+  const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
+  const lr = laborRates || {}
   const mr = materialRates || {}
-  const pp = paverPrices   || []
+  const pp = paverPrices || []
 
   // Paver step rates
-  const straightRate = lr['Steps - Straight'] ?? 1.5  // LF/hr
-  const curvedRate   = lr['Steps - Curved']   ?? 1.0  // LF/hr
+  const straightRate = lr['Steps - Straight'] ?? 1.5 // LF/hr
+  const curvedRate = lr['Steps - Curved'] ?? 1.0 // LF/hr
 
   // Concrete step rates
-  const concStraightRate = lr['Steps - Concrete Straight'] ?? 1.0   // LF/hr
-  const concCurvedRate   = lr['Steps - Concrete Curved']   ?? 0.5   // LF/hr
-  const concMatPerLF     = mr['Steps - Concrete']          ?? 12.00 // $/LF
+  const concStraightRate = lr['Steps - Concrete Straight'] ?? 1.0 // LF/hr
+  const concCurvedRate = lr['Steps - Concrete Curved'] ?? 0.5 // LF/hr
+  const concMatPerLF = mr['Steps - Concrete'] ?? 12.0 // $/LF
 
   // Paver step labor hours
   const straightHrs = n(state.straightLF) > 0 ? n(state.straightLF) / straightRate : 0
-  const curvedHrs   = n(state.curvedLF)   > 0 ? n(state.curvedLF)   / curvedRate   : 0
+  const curvedHrs = n(state.curvedLF) > 0 ? n(state.curvedLF) / curvedRate : 0
 
   // Paver step material cost
   const stepPaverData = pp.find(p => p.brand === state.paverBrand && p.name === state.paverName)
-  const pricePerSF  = stepPaverData?.price_per_sf  || 0
+  const pricePerSF = stepPaverData?.price_per_sf || 0
   const sfPerPallet = stepPaverData?.sf_per_pallet || 0
-  const paverSF     = n(state.paverSF)
-  const paverCost   = paverSF * pricePerSF
-  const pallets     = paverSF > 0 && sfPerPallet > 0 ? Math.ceil(paverSF / sfPerPallet) : 0
+  const paverSF = n(state.paverSF)
+  const paverCost = paverSF * pricePerSF
+  const pallets = paverSF > 0 && sfPerPallet > 0 ? Math.ceil(paverSF / sfPerPallet) : 0
 
   // Concrete step labor hours + material
-  const concStraightHrs  = n(state.concStraightLF) > 0 ? n(state.concStraightLF) / concStraightRate : 0
-  const concCurvedHrs    = n(state.concCurvedLF)   > 0 ? n(state.concCurvedLF)   / concCurvedRate   : 0
-  const concTotalLF      = n(state.concStraightLF) + n(state.concCurvedLF)
-  const concMat          = concTotalLF * concMatPerLF
+  const concStraightHrs =
+    n(state.concStraightLF) > 0 ? n(state.concStraightLF) / concStraightRate : 0
+  const concCurvedHrs = n(state.concCurvedLF) > 0 ? n(state.concCurvedLF) / concCurvedRate : 0
+  const concTotalLF = n(state.concStraightLF) + n(state.concCurvedLF)
+  const concMat = concTotalLF * concMatPerLF
 
   // Manual entry
-  let manHrs = 0, manMat = 0, manSub = 0
+  let manHrs = 0,
+    manMat = 0,
+    manSub = 0
   ;(state.manualRows || []).forEach(r => {
-    manHrs += n(r.hours); manMat += n(r.materials); manSub += n(r.subCost)
+    manHrs += n(r.hours)
+    manMat += n(r.materials)
+    manSub += n(r.subCost)
   })
 
-  const baseHrs   = straightHrs + curvedHrs + concStraightHrs + concCurvedHrs + manHrs
-  const diffMod   = 1 + n(state.difficulty) / 100
+  const baseHrs = straightHrs + curvedHrs + concStraightHrs + concCurvedHrs + manHrs
+  const diffMod = 1 + n(state.difficulty) / 100
   const _preWalkHrs = baseHrs * diffMod + n(state.hoursAdj)
-  const walkHrs     = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
-  const totalHrs    = _preWalkHrs + walkHrs
-  const manDays   = totalHrs / 8
-  const totalMat  = paverCost + concMat + manMat
+  const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
+  const totalHrs = _preWalkHrs + walkHrs
+  const manDays = totalHrs / 8
+  const totalMat = paverCost + concMat + manMat
 
-  const laborCost  = totalHrs * (n(lrph) || DEFAULTS.laborRatePerHour)
-  const burden     = laborCost * DEFAULTS.laborBurdenPct
-  const gp         = manDays * gpmd
+  const laborCost = totalHrs * (n(lrph) || DEFAULTS.laborRatePerHour)
+  const burden = laborCost * DEFAULTS.laborBurdenPct
+  const gp = manDays * gpmd
   const commission = gp * DEFAULTS.commissionRate
-  const subCost    = manSub
-  const price      = totalMat + laborCost + burden + gp + commission + subCost
+  const subCost = manSub
+  const price = totalMat + laborCost + burden + gp + commission + subCost
 
   return {
     walkHrs,
-    totalHrs, manDays, totalMat, laborCost, burden, gp, commission, subCost, price,
-    straightHrs, curvedHrs, paverCost, pallets, pricePerSF,
-    straightRate, curvedRate,
-    concStraightHrs, concCurvedHrs, concMat, concMatPerLF,
-    concStraightRate, concCurvedRate,
+    totalHrs,
+    manDays,
+    totalMat,
+    laborCost,
+    burden,
+    gp,
+    commission,
+    subCost,
+    price,
+    straightHrs,
+    curvedHrs,
+    paverCost,
+    pallets,
+    pricePerSF,
+    straightRate,
+    curvedRate,
+    concStraightHrs,
+    concCurvedHrs,
+    concMat,
+    concMatPerLF,
+    concStraightRate,
+    concCurvedRate,
   }
 }
 
@@ -101,9 +131,12 @@ function SectionHeader({ title, sub }) {
 
 function NumInput({ value, onChange, placeholder = '0', className = '' }) {
   return (
-    <input type="number" step="any"
+    <input
+      type="number"
+      step="any"
       className={`input text-sm py-1.5 ${className}`}
-      placeholder={placeholder} value={value}
+      placeholder={placeholder}
+      value={value}
       onChange={e => onChange(e.target.value)}
     />
   )
@@ -112,11 +145,13 @@ function NumInput({ value, onChange, placeholder = '0', className = '' }) {
 // ── Paver picker (brand dropdown + searchable model) ─────────────────────────
 function PaverPicker({ brand, name, onSelect, paverPrices }) {
   const [search, setSearch] = useState(name || '')
-  const [open,   setOpen]   = useState(false)
+  const [open, setOpen] = useState(false)
 
-  useEffect(() => { setSearch(name || '') }, [name])
+  useEffect(() => {
+    setSearch(name || '')
+  }, [name])
 
-  const brands   = [...new Set(paverPrices.map(p => p.brand))].filter(Boolean).sort()
+  const brands = [...new Set(paverPrices.map(p => p.brand))].filter(Boolean).sort()
   const filtered = paverPrices.filter(p => {
     if (brand && p.brand !== brand) return false
     if (!search) return true
@@ -127,16 +162,28 @@ function PaverPicker({ brand, name, onSelect, paverPrices }) {
     <div className="flex gap-1.5">
       <select
         value={brand || ''}
-        onChange={e => { onSelect(e.target.value, ''); setSearch('') }}
+        onChange={e => {
+          onSelect(e.target.value, '')
+          setSearch('')
+        }}
         className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400 flex-shrink-0 w-24"
       >
         <option value="">— Brand —</option>
-        {brands.map(b => <option key={b} value={b}>{b}</option>)}
+        {brands.map(b => (
+          <option key={b} value={b}>
+            {b}
+          </option>
+        ))}
       </select>
 
       <div className="relative min-w-0 flex-[2]">
-        <input type="text" value={search}
-          onChange={e => { setSearch(e.target.value); setOpen(true) }}
+        <input
+          type="text"
+          value={search}
+          onChange={e => {
+            setSearch(e.target.value)
+            setOpen(true)
+          }}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 200)}
           placeholder={brand ? 'Search model…' : 'Select brand first'}
@@ -148,9 +195,20 @@ function PaverPicker({ brand, name, onSelect, paverPrices }) {
             {filtered.map(p => {
               const isSelected = p.name === name
               return (
-                <button key={p.name} onMouseDown={() => { onSelect(p.brand, p.name); setSearch(p.name); setOpen(false) }}
-                  className={`w-full text-left px-2.5 py-1.5 hover:bg-blue-50 border-b border-gray-50 last:border-0 ${isSelected ? 'bg-blue-50' : ''}`}>
-                  <span className={`block text-xs truncate ${isSelected ? 'font-semibold text-blue-800' : 'text-gray-800'}`}>{p.name}</span>
+                <button
+                  key={p.name}
+                  onMouseDown={() => {
+                    onSelect(p.brand, p.name)
+                    setSearch(p.name)
+                    setOpen(false)
+                  }}
+                  className={`w-full text-left px-2.5 py-1.5 hover:bg-blue-50 border-b border-gray-50 last:border-0 ${isSelected ? 'bg-blue-50' : ''}`}
+                >
+                  <span
+                    className={`block text-xs truncate ${isSelected ? 'font-semibold text-blue-800' : 'text-gray-800'}`}
+                  >
+                    {p.name}
+                  </span>
                   <span className="text-xs text-gray-400">
                     ${parseFloat(p.price_per_sf || 0).toFixed(2)}/SF
                     {p.sf_per_pallet ? ` · ${p.sf_per_pallet} SF/pallet` : ''}
@@ -178,16 +236,20 @@ const DEFAULT_MANUAL_ROWS = [
 ]
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function StepsModule({ projectName, onSave, onBack, saving, initialData }) {
-  const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? DEFAULTS.laborRatePerHour)
+export default function StepsModule({ onSave, onBack, saving, initialData }) {
+  const [laborRatePerHour, setLaborRatePerHour] = useState(
+    initialData?.laborRatePerHour ?? DEFAULTS.laborRatePerHour
+  )
   const [distanceLF, setDistanceLF] = useState(initialData?.distanceLF ?? '')
-  const [walkAccess, setWalkAccess] = useState(initialData?.walkAccess ?? {
-    paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
-  })
-  const [laborRates,    setLaborRates]    = useState(initialData?.laborRates    || {})
+  const [walkAccess] = useState(
+    initialData?.walkAccess ?? {
+      paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+    }
+  )
+  const [laborRates, setLaborRates] = useState(initialData?.laborRates || {})
   const [materialRates, setMaterialRates] = useState(initialData?.materialRates || {})
-  const [paverPrices,   setPaverPrices]   = useState(initialData?.paverPrices   || [])
-  const [loading,       setLoading]       = useState(true)
+  const [paverPrices, setPaverPrices] = useState(initialData?.paverPrices || [])
+  const [loading, setLoading] = useState(true)
 
   // Re-fetch Steps rate maps. Called once on mount and again after any
   // RateEditPopover save so the calc picks up the change immediately.
@@ -196,46 +258,70 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
       supabase.from('labor_rates').select('name, rate').eq('category', 'Steps'),
       supabase.from('material_rates').select('name, unit_cost').eq('category', 'Steps'),
     ])
-    if (lrRes.data) { const m = {}; lrRes.data.forEach(r => { m[r.name] = parseFloat(r.rate) }); setLaborRates(m) }
-    if (mrRes.data) { const m = {}; mrRes.data.forEach(r => { m[r.name] = parseFloat(r.unit_cost) }); setMaterialRates(m) }
+    if (lrRes.data) {
+      const m = {}
+      lrRes.data.forEach(r => {
+        m[r.name] = parseFloat(r.rate)
+      })
+      setLaborRates(m)
+    }
+    if (mrRes.data) {
+      const m = {}
+      mrRes.data.forEach(r => {
+        m[r.name] = parseFloat(r.unit_cost)
+      })
+      setMaterialRates(m)
+    }
   }, [])
 
   useEffect(() => {
     let gone = false
     Promise.all([
       !initialData?.laborRatePerHour &&
-        supabase.from('company_settings').select('labor_rate_per_hour, walk_access_pace_lf_per_min').single()
+        supabase
+          .from('company_settings')
+          .select('labor_rate_per_hour, walk_access_pace_lf_per_min')
+          .single()
           .then(({ data }) => {
             if (!gone && data?.labor_rate_per_hour != null)
               setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
           }),
       refreshAllRates(),
-      supabase.from('paver_prices').select('brand, name, price_per_sf, sf_per_pallet')
-        .order('brand').order('name')
-        .then(({ data }) => { if (!gone && data) setPaverPrices(data) }),
-    ]).then(() => { if (!gone) setLoading(false) })
-    return () => { gone = true }
+      supabase
+        .from('paver_prices')
+        .select('brand, name, price_per_sf, sf_per_pallet')
+        .order('brand')
+        .order('name')
+        .then(({ data }) => {
+          if (!gone && data) setPaverPrices(data)
+        }),
+    ]).then(() => {
+      if (!gone) setLoading(false)
+    })
+    return () => {
+      gone = true
+    }
   }, [refreshAllRates])
 
-  const gpmd            = initialData?.gpmd            ?? DEFAULTS.gpmd
-  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
+  const gpmd = initialData?.gpmd ?? DEFAULTS.gpmd
+  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
 
   // ── State ──────────────────────────────────────────────────────────────────
-  const [difficulty,  setDifficulty]  = useState(initialData?.difficulty  ?? '')
+  const [difficulty, setDifficulty] = useState(initialData?.difficulty ?? '')
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Masonry')
-  const [hoursAdj,    setHoursAdj]    = useState(initialData?.hoursAdj    ?? '')
+  const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
 
   // Paver Steps
-  const [straightLF,  setStraightLF]  = useState(initialData?.straightLF  ?? '')
-  const [curvedLF,    setCurvedLF]    = useState(initialData?.curvedLF    ?? '')
+  const [straightLF, setStraightLF] = useState(initialData?.straightLF ?? '')
+  const [curvedLF, setCurvedLF] = useState(initialData?.curvedLF ?? '')
   const [groutedBullnose, setGroutedBullnose] = useState(initialData?.groutedBullnose ?? false)
-  const [paverBrand,  setPaverBrand]  = useState(initialData?.paverBrand  ?? '')
-  const [paverName,   setPaverName]   = useState(initialData?.paverName   ?? '')
-  const [paverSF,     setPaverSF]     = useState(initialData?.paverSF     ?? '')
+  const [paverBrand, setPaverBrand] = useState(initialData?.paverBrand ?? '')
+  const [paverName, setPaverName] = useState(initialData?.paverName ?? '')
+  const [paverSF, setPaverSF] = useState(initialData?.paverSF ?? '')
 
   // Concrete Steps
   const [concStraightLF, setConcStraightLF] = useState(initialData?.concStraightLF ?? '')
-  const [concCurvedLF,   setConcCurvedLF]   = useState(initialData?.concCurvedLF   ?? '')
+  const [concCurvedLF, setConcCurvedLF] = useState(initialData?.concCurvedLF ?? '')
 
   // Manual entry
   const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
@@ -247,46 +333,72 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
   const [salesTaxRate, setSalesTaxRate] = useState(0)
   useEffect(() => {
     let alive = true
-    fetchSalesTaxRate().then(r => { if (alive) setSalesTaxRate(r) })
-    return () => { alive = false }
+    fetchSalesTaxRate().then(r => {
+      if (alive) setSalesTaxRate(r)
+    })
+    return () => {
+      alive = false
+    }
   }, [])
-
 
   const state = {
     crewType,
-    difficulty, hoursAdj,
-    straightLF, curvedLF, groutedBullnose,
-    paverBrand, paverName, paverSF,
-    concStraightLF, concCurvedLF,
+    difficulty,
+    hoursAdj,
+    straightLF,
+    curvedLF,
+    groutedBullnose,
+    paverBrand,
+    paverName,
+    paverSF,
+    concStraightLF,
+    concCurvedLF,
     manualRows,
     distanceLF,
   }
 
-  const calcRaw = calcSteps(state, laborRatePerHour, laborRates, materialRates, paverPrices, gpmd, walkAccess)
+  const calcRaw = calcSteps(
+    state,
+    laborRatePerHour,
+    laborRates,
+    materialRates,
+    paverPrices,
+    gpmd,
+    walkAccess
+  )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
   // material_cost (saved with the module) ends up tax-inclusive too,
   // so bid totals add up to GpmdBar's displayed price.
   const _salesTaxAmt = (calcRaw.totalMat || 0) * (salesTaxRate || 0)
-  const calc = _salesTaxAmt > 0
-    ? {
-        ...calcRaw,
-        totalMat: (calcRaw.totalMat || 0) + _salesTaxAmt,
-        price:    (calcRaw.price    || 0) + _salesTaxAmt,
-        salesTax: _salesTaxAmt,
-      }
-    : calcRaw
-
+  const calc =
+    _salesTaxAmt > 0
+      ? {
+          ...calcRaw,
+          totalMat: (calcRaw.totalMat || 0) + _salesTaxAmt,
+          price: (calcRaw.price || 0) + _salesTaxAmt,
+          salesTax: _salesTaxAmt,
+        }
+      : calcRaw
 
   function updateManual(i, field, val) {
-    setManualRows(rows => rows.map((row, idx) => idx === i ? { ...row, [field]: val } : row))
+    setManualRows(rows => rows.map((row, idx) => (idx === i ? { ...row, [field]: val } : row)))
   }
 
   function handleSave() {
     onSave({
-      man_days:      parseFloat(calc.manDays.toFixed(2)),
+      man_days: parseFloat(calc.manDays.toFixed(2)),
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
-      data: { ...state, walkAccess, laborRatePerHour, gpmd, laborRates, materialRates, paverPrices, calc },
+      data: {
+        ...state,
+        walkAccess,
+        laborRatePerHour,
+        gpmd,
+        laborRates,
+        materialRates,
+        paverPrices,
+        calc,
+      },
     })
   }
 
@@ -294,7 +406,6 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
 
   return (
     <div className="space-y-5">
-
       {/* ── Sticky GPMD bar ── */}
       <div className="sticky top-0 z-20 -mx-6 px-6 pt-2 pb-2 bg-gray-900 shadow-lg">
         <GpmdBar
@@ -317,7 +428,11 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
       {/* Crew Type */}
       <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
         <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
-        <select value={crewType} onChange={e => setCrewType(e.target.value)} className="input text-sm py-1 w-36">
+        <select
+          value={crewType}
+          onChange={e => setCrewType(e.target.value)}
+          className="input text-sm py-1 w-36"
+        >
           <option value="Demo">Demo</option>
           <option value="Landscape">Landscape</option>
           <option value="Masonry">Masonry</option>
@@ -340,10 +455,17 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
           <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
         </div>
         <div>
-          <p className="text-xs text-gray-500 mb-0.5" title="Average Distance from Truck to Work Area">Truck → Work Area (Avg LF)</p>
+          <p
+            className="text-xs text-gray-500 mb-0.5"
+            title="Average Distance from Truck to Work Area"
+          >
+            Truck → Work Area (Avg LF)
+          </p>
           <NumInput value={distanceLF} onChange={setDistanceLF} placeholder="0" />
           {calc.walkHrs > 0 && (
-            <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">+{calc.walkHrs.toFixed(2)} hrs walk-access</p>
+            <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">
+              +{calc.walkHrs.toFixed(2)} hrs walk-access
+            </p>
           )}
         </div>
         <div>
@@ -364,8 +486,15 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
           <div>
             <label className="block text-xs text-gray-500 mb-1 inline-flex items-center gap-1">
               Straight Steps (LF) — {calc.straightRate} LF/hr
-              <RateEditPopover table="labor_rates" name="Steps - Straight" category="Steps"
-                mode="coefficient" unitLabel="LF/hr" currentValue={calc.straightRate} onSaved={refreshAllRates} />
+              <RateEditPopover
+                table="labor_rates"
+                name="Steps - Straight"
+                category="Steps"
+                mode="coefficient"
+                unitLabel="LF/hr"
+                currentValue={calc.straightRate}
+                onSaved={refreshAllRates}
+              />
             </label>
             <NumInput value={straightLF} onChange={setStraightLF} placeholder="0" />
             {calc.straightHrs > 0 && (
@@ -377,8 +506,15 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
           <div>
             <label className="block text-xs text-gray-500 mb-1 inline-flex items-center gap-1">
               Curved Steps (LF) — {calc.curvedRate} LF/hr
-              <RateEditPopover table="labor_rates" name="Steps - Curved" category="Steps"
-                mode="coefficient" unitLabel="LF/hr" currentValue={calc.curvedRate} onSaved={refreshAllRates} />
+              <RateEditPopover
+                table="labor_rates"
+                name="Steps - Curved"
+                category="Steps"
+                mode="coefficient"
+                unitLabel="LF/hr"
+                currentValue={calc.curvedRate}
+                onSaved={refreshAllRates}
+              />
             </label>
             <NumInput value={curvedLF} onChange={setCurvedLF} placeholder="0" />
             {calc.curvedHrs > 0 && (
@@ -400,7 +536,9 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
           {/* Grouted / Bullnose toggle */}
           <div className="flex flex-col justify-center pt-4">
             <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input type="checkbox" checked={groutedBullnose}
+              <input
+                type="checkbox"
+                checked={groutedBullnose}
                 onChange={e => setGroutedBullnose(e.target.checked)}
                 className="w-4 h-4 rounded accent-blue-600"
               />
@@ -415,7 +553,10 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
           <PaverPicker
             brand={paverBrand}
             name={paverName}
-            onSelect={(b, nm) => { setPaverBrand(b); setPaverName(nm) }}
+            onSelect={(b, nm) => {
+              setPaverBrand(b)
+              setPaverName(nm)
+            }}
             paverPrices={paverPrices}
           />
           {calc.paverCost > 0 && (
@@ -435,16 +576,29 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
         <div className="flex items-center gap-2 mb-2 -mt-1 flex-wrap text-xs text-gray-400">
           <span className="inline-flex items-center gap-1">
             Material ${calc.concMatPerLF}/LF
-            <RateEditPopover table="material_rates" name="Steps - Concrete" category="Steps"
-              unitLabel="LF" currentValue={calc.concMatPerLF} onSaved={refreshAllRates} />
+            <RateEditPopover
+              table="material_rates"
+              name="Steps - Concrete"
+              category="Steps"
+              unitLabel="LF"
+              currentValue={calc.concMatPerLF}
+              onSaved={refreshAllRates}
+            />
           </span>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs text-gray-500 mb-1 inline-flex items-center gap-1">
               Straight Steps (LF) — {calc.concStraightRate} LF/hr
-              <RateEditPopover table="labor_rates" name="Steps - Concrete Straight" category="Steps"
-                mode="coefficient" unitLabel="LF/hr" currentValue={calc.concStraightRate} onSaved={refreshAllRates} />
+              <RateEditPopover
+                table="labor_rates"
+                name="Steps - Concrete Straight"
+                category="Steps"
+                mode="coefficient"
+                unitLabel="LF/hr"
+                currentValue={calc.concStraightRate}
+                onSaved={refreshAllRates}
+              />
             </label>
             <NumInput value={concStraightLF} onChange={setConcStraightLF} placeholder="0" />
             {calc.concStraightHrs > 0 && (
@@ -454,8 +608,15 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
           <div>
             <label className="block text-xs text-gray-500 mb-1 inline-flex items-center gap-1">
               Curved Steps (LF) — {calc.concCurvedRate} LF/hr
-              <RateEditPopover table="labor_rates" name="Steps - Concrete Curved" category="Steps"
-                mode="coefficient" unitLabel="LF/hr" currentValue={calc.concCurvedRate} onSaved={refreshAllRates} />
+              <RateEditPopover
+                table="labor_rates"
+                name="Steps - Concrete Curved"
+                category="Steps"
+                mode="coefficient"
+                unitLabel="LF/hr"
+                currentValue={calc.concCurvedRate}
+                onSaved={refreshAllRates}
+              />
             </label>
             <NumInput value={concCurvedLF} onChange={setConcCurvedLF} placeholder="0" />
             {calc.concCurvedHrs > 0 && (
@@ -465,7 +626,8 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
         </div>
         {calc.concMat > 0 && (
           <p className="text-xs text-gray-400 mt-2">
-            {n(concStraightLF) + n(concCurvedLF)} LF × {fmt2(calc.concMatPerLF)}/LF = {fmt2(calc.concMat)}
+            {n(concStraightLF) + n(concCurvedLF)} LF × {fmt2(calc.concMatPerLF)}/LF ={' '}
+            {fmt2(calc.concMat)}
           </p>
         )}
       </div>
@@ -486,12 +648,22 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
             {manualRows.map((row, i) => (
               <tr key={i} className="border-b border-gray-100">
                 <td className="py-1 pr-2">
-                  <input className="input text-sm py-1" value={row.label}
-                    onChange={e => updateManual(i, 'label', e.target.value)} />
+                  <input
+                    className="input text-sm py-1"
+                    value={row.label}
+                    onChange={e => updateManual(i, 'label', e.target.value)}
+                  />
                 </td>
-                <td className="py-1 pr-2"><NumInput value={row.hours}     onChange={v => updateManual(i, 'hours', v)} /></td>
-                <td className="py-1 pr-2"><NumInput value={row.materials} onChange={v => updateManual(i, 'materials', v)} /></td>
-                <td className="py-1">     <NumInput value={row.subCost}   onChange={v => updateManual(i, 'subCost', v)} /></td>
+                <td className="py-1 pr-2">
+                  <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} />
+                </td>
+                <td className="py-1 pr-2">
+                  <NumInput value={row.materials} onChange={v => updateManual(i, 'materials', v)} />
+                </td>
+                <td className="py-1">
+                  {' '}
+                  <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -500,7 +672,9 @@ export default function StepsModule({ projectName, onSave, onBack, saving, initi
 
       {/* Actions */}
       <div className="flex gap-3 pt-2">
-        <button onClick={onBack} className="btn-secondary flex-1">← Back</button>
+        <button onClick={onBack} className="btn-secondary flex-1">
+          ← Back
+        </button>
         <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">
           {saving ? 'Saving...' : 'Add Module'}
         </button>

@@ -14,95 +14,149 @@ import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../
 // dbName = name in material_rates (category = 'Columns')
 // Hardcoded values are fallbacks when DB row is absent.
 const FINISH_TYPES = {
-  'Sand Stucco':               { costPerSF: 0,      unit: 'SF',  dbName: 'Sand Stucco',               laborDbName: 'Sand Stucco - Labor Rate',               laborHrsPerSF: 0.05  },
-  'Smooth Stucco':             { costPerSF: 0,      unit: 'SF',  dbName: 'Smooth Stucco',             laborDbName: 'Smooth Stucco - Labor Rate',             laborHrsPerSF: 0.05  },
-  'Ledgerstone Veneer Panels': { costPerSF: 10.00,  unit: 'SF',  dbName: 'Ledgerstone Veneer Panels', laborDbName: 'Ledgerstone Veneer Panels - Labor Rate', laborHrsPerSF: 0.10  },
-  'Stacked Stone Veneer':      { costPerSF: 10.00,  unit: 'SF',  dbName: 'Stacked Stone Veneer',      laborDbName: 'Stacked Stone Veneer - Labor Rate',      laborHrsPerSF: 0.10  },
-  'Tile':                      { costPerSF: 6.50,   unit: 'SF',  dbName: 'Tile - Columns',            laborDbName: 'Tile - Columns - Labor Rate',            laborHrsPerSF: 0.125 },
-  'Real Flagstone, Flat':      { costPerTon: 400.0, unit: 'ton', dbName: 'Real Flagstone Flat',       laborDbName: 'Real Flagstone Flat - Labor Rate',       laborHrsPer: 0.5     },
-  'Real Stone':                { costPerTon: 400.0, unit: 'ton', dbName: 'Real Stone - Columns',      laborDbName: 'Real Stone - Columns - Labor Rate',      laborHrsPer: 0.5     },
+  'Sand Stucco': {
+    costPerSF: 0,
+    unit: 'SF',
+    dbName: 'Sand Stucco',
+    laborDbName: 'Sand Stucco - Labor Rate',
+    laborHrsPerSF: 0.05,
+  },
+  'Smooth Stucco': {
+    costPerSF: 0,
+    unit: 'SF',
+    dbName: 'Smooth Stucco',
+    laborDbName: 'Smooth Stucco - Labor Rate',
+    laborHrsPerSF: 0.05,
+  },
+  'Ledgerstone Veneer Panels': {
+    costPerSF: 10.0,
+    unit: 'SF',
+    dbName: 'Ledgerstone Veneer Panels',
+    laborDbName: 'Ledgerstone Veneer Panels - Labor Rate',
+    laborHrsPerSF: 0.1,
+  },
+  'Stacked Stone Veneer': {
+    costPerSF: 10.0,
+    unit: 'SF',
+    dbName: 'Stacked Stone Veneer',
+    laborDbName: 'Stacked Stone Veneer - Labor Rate',
+    laborHrsPerSF: 0.1,
+  },
+  Tile: {
+    costPerSF: 6.5,
+    unit: 'SF',
+    dbName: 'Tile - Columns',
+    laborDbName: 'Tile - Columns - Labor Rate',
+    laborHrsPerSF: 0.125,
+  },
+  'Real Flagstone, Flat': {
+    costPerTon: 400.0,
+    unit: 'ton',
+    dbName: 'Real Flagstone Flat',
+    laborDbName: 'Real Flagstone Flat - Labor Rate',
+    laborHrsPer: 0.5,
+  },
+  'Real Stone': {
+    costPerTon: 400.0,
+    unit: 'ton',
+    dbName: 'Real Stone - Columns',
+    laborDbName: 'Real Stone - Columns - Labor Rate',
+    laborHrsPer: 0.5,
+  },
 }
 
 const BLOCK_RATES = {
-  blockMatCost:    { dbName: 'CMU Block',          fallback: 2.50  },  // $/block
-  rebarMatCost:    { dbName: 'Rebar - Columns',    fallback: 0.80  },  // $/LF
-  faceBlockMat:    { dbName: 'Face Block',         fallback: 3.00  },  // $/block (decorative)
-  fillMatCost:     { dbName: 'Fill Block / Grout', fallback: 0.75  },  // $/block
+  blockMatCost: { dbName: 'CMU Block', fallback: 2.5 }, // $/block
+  rebarMatCost: { dbName: 'Rebar - Columns', fallback: 0.8 }, // $/LF
+  faceBlockMat: { dbName: 'Face Block', fallback: 3.0 }, // $/block (decorative)
+  fillMatCost: { dbName: 'Fill Block / Grout', fallback: 0.75 }, // $/block
   // Labor rates
-  installLaborHrs: { dbName: 'CMU Install Labor',  fallback: 0.083 },  // hrs per block (~5 min)
-  excavateLaborHrs:{ dbName: 'Excavate Footing Labor', fallback: 0.5 },// hrs per column
-  pourLaborHrs:    { dbName: 'Pour Footing Labor', fallback: 0.25  },  // hrs per column
-  fillLaborHrs:    { dbName: 'Fill Labor',         fallback: 0.05  },  // hrs per block
+  installLaborHrs: { dbName: 'CMU Install Labor', fallback: 0.083 }, // hrs per block (~5 min)
+  excavateLaborHrs: { dbName: 'Excavate Footing Labor', fallback: 0.5 }, // hrs per column
+  pourLaborHrs: { dbName: 'Pour Footing Labor', fallback: 0.25 }, // hrs per column
+  fillLaborHrs: { dbName: 'Fill Labor', fallback: 0.05 }, // hrs per block
 }
 
 const MISC_RATES = {
-  bbqBlock:        { dbName: 'BBQ Block',          matCost: 5.00, laborHrs: 0.10, label: 'BBQ Block'        },
-  backsplashBlock: { dbName: 'Backsplash Block',   matCost: 3.50, laborHrs: 0.05, label: 'Backsplash Block' },
+  bbqBlock: { dbName: 'BBQ Block', matCost: 5.0, laborHrs: 0.1, label: 'BBQ Block' },
+  backsplashBlock: {
+    dbName: 'Backsplash Block',
+    matCost: 3.5,
+    laborHrs: 0.05,
+    label: 'Backsplash Block',
+  },
 }
 
 const DEFAULTS = {
   laborRatePerHour: 35,
-  laborBurdenPct:   0.29,
-  gpmd:             425,
-  commissionRate:   0.12,
+  laborBurdenPct: 0.29,
+  gpmd: 425,
+  commissionRate: 0.12,
 }
 
-const n = (v) => parseFloat(v) || 0
+const n = v => parseFloat(v) || 0
 
 // ── Column geometry helpers ───────────────────────────────────────────────────
 // Standard CMU blocks are 8"×8"×16" (face) or 8"×8"×8" (corner/half)
 // We use 8" module for both dimensions.
 function columnGeometry(heightIn, widthIn) {
-  const courses     = Math.ceil(n(heightIn) / 8)           // 8" per course
-  const blocksWide  = Math.ceil(n(widthIn)  / 8)           // blocks per side
-  const blocksPerCourse = blocksWide * blocksWide           // solid column
+  const courses = Math.ceil(n(heightIn) / 8) // 8" per course
+  const blocksWide = Math.ceil(n(widthIn) / 8) // blocks per side
+  const blocksPerCourse = blocksWide * blocksWide // solid column
   const totalBlocks = courses * blocksPerCourse
-  const rebarLF     = (n(heightIn) / 12) * (blocksWide > 1 ? 4 : 1) // LF rebar per column
-  const footingArea = Math.pow((n(widthIn) / 12) + 1, 2)  // SF (1 ft larger each side)
+  const rebarLF = (n(heightIn) / 12) * (blocksWide > 1 ? 4 : 1) // LF rebar per column
+  const footingArea = Math.pow(n(widthIn) / 12 + 1, 2) // SF (1 ft larger each side)
   return { courses, blocksWide, blocksPerCourse, totalBlocks, rebarLF, footingArea }
 }
 
-function calcColumns(state, laborRatePerHour = DEFAULTS.laborRatePerHour, materialPrices = {}, gpmd = DEFAULTS.gpmd, walkAccess = null) {
-  const _pace = (parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN)
-  const { difficulty, hoursAdj, qty, heightIn, widthIn,
-          finishRows, miscQty, manualRows } = state
+function calcColumns(
+  state,
+  laborRatePerHour = DEFAULTS.laborRatePerHour,
+  materialPrices = {},
+  gpmd = DEFAULTS.gpmd,
+  walkAccess = null
+) {
+  const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
+  const { difficulty, hoursAdj, qty, heightIn, widthIn, finishRows, miscQty, manualRows } = state
 
   const mp = (dbName, fallback) => materialPrices[dbName] ?? fallback
 
-  let installHrs = 0, installMat = 0
+  let installHrs = 0,
+    installMat = 0
 
   if (n(qty) > 0 && n(heightIn) > 0 && n(widthIn) > 0) {
     const geo = columnGeometry(heightIn, widthIn)
     const totalBlocks = geo.totalBlocks * n(qty)
-    const totalRebar  = geo.rebarLF    * n(qty)
+    const totalRebar = geo.rebarLF * n(qty)
 
     // Material costs
     installMat +=
-      totalBlocks * mp(BLOCK_RATES.blockMatCost.dbName, BLOCK_RATES.blockMatCost.fallback)
-      + totalBlocks * mp(BLOCK_RATES.fillMatCost.dbName, BLOCK_RATES.fillMatCost.fallback)
-      + totalRebar  * mp(BLOCK_RATES.rebarMatCost.dbName, BLOCK_RATES.rebarMatCost.fallback)
+      totalBlocks * mp(BLOCK_RATES.blockMatCost.dbName, BLOCK_RATES.blockMatCost.fallback) +
+      totalBlocks * mp(BLOCK_RATES.fillMatCost.dbName, BLOCK_RATES.fillMatCost.fallback) +
+      totalRebar * mp(BLOCK_RATES.rebarMatCost.dbName, BLOCK_RATES.rebarMatCost.fallback)
 
     // Labor hours
     installHrs +=
-      n(qty) * mp(BLOCK_RATES.excavateLaborHrs.dbName, BLOCK_RATES.excavateLaborHrs.fallback)
-      + n(qty) * mp(BLOCK_RATES.pourLaborHrs.dbName,    BLOCK_RATES.pourLaborHrs.fallback)
-      + totalBlocks * mp(BLOCK_RATES.installLaborHrs.dbName, BLOCK_RATES.installLaborHrs.fallback)
-      + totalBlocks * mp(BLOCK_RATES.fillLaborHrs.dbName,    BLOCK_RATES.fillLaborHrs.fallback)
+      n(qty) * mp(BLOCK_RATES.excavateLaborHrs.dbName, BLOCK_RATES.excavateLaborHrs.fallback) +
+      n(qty) * mp(BLOCK_RATES.pourLaborHrs.dbName, BLOCK_RATES.pourLaborHrs.fallback) +
+      totalBlocks * mp(BLOCK_RATES.installLaborHrs.dbName, BLOCK_RATES.installLaborHrs.fallback) +
+      totalBlocks * mp(BLOCK_RATES.fillLaborHrs.dbName, BLOCK_RATES.fillLaborHrs.fallback)
   }
 
   // Finishes
-  let finishHrs = 0, finishMat = 0
+  let finishHrs = 0,
+    finishMat = 0
   finishRows.forEach(r => {
     const rate = FINISH_TYPES[r.type]
     if (!rate || !n(r.qty)) return
     if (rate.unit === 'SF') {
-      const cost    = mp(rate.dbName, rate.costPerSF)
+      const cost = mp(rate.dbName, rate.costPerSF)
       const labRate = mp(rate.laborDbName, rate.laborHrsPerSF)
       finishMat += n(r.qty) * cost
       finishHrs += n(r.qty) * labRate
     } else {
       // ton-based (flagstone, real stone)
-      const cost    = mp(rate.dbName, rate.costPerTon)
+      const cost = mp(rate.dbName, rate.costPerTon)
       const labRate = mp(rate.laborDbName, rate.laborHrsPer)
       finishMat += n(r.qty) * cost
       finishHrs += n(r.qty) * labRate
@@ -110,7 +164,8 @@ function calcColumns(state, laborRatePerHour = DEFAULTS.laborRatePerHour, materi
   })
 
   // Misc (BBQ block, backsplash)
-  let miscHrs = 0, miscMat = 0
+  let miscHrs = 0,
+    miscMat = 0
   Object.entries(MISC_RATES).forEach(([key, rate]) => {
     const q = n(miscQty[`${key}Qty`])
     if (q > 0) {
@@ -120,25 +175,45 @@ function calcColumns(state, laborRatePerHour = DEFAULTS.laborRatePerHour, materi
   })
 
   // Manual
-  let manHrs = 0, manMat = 0, manSub = 0
-  manualRows.forEach(r => { manHrs += n(r.hours); manMat += n(r.materials); manSub += n(r.subCost) })
+  let manHrs = 0,
+    manMat = 0,
+    manSub = 0
+  manualRows.forEach(r => {
+    manHrs += n(r.hours)
+    manMat += n(r.materials)
+    manSub += n(r.subCost)
+  })
 
-  const baseHrs  = installHrs + finishHrs + miscHrs + manHrs
-  const diffMod  = 1 + (n(difficulty) / 100)
-  const _preWalkHrs = (baseHrs * diffMod) + n(hoursAdj)
-  const walkHrs     = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
-  const totalHrs    = _preWalkHrs + walkHrs
-  const manDays  = totalHrs / 8
+  const baseHrs = installHrs + finishHrs + miscHrs + manHrs
+  const diffMod = 1 + n(difficulty) / 100
+  const _preWalkHrs = baseHrs * diffMod + n(hoursAdj)
+  const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
+  const totalHrs = _preWalkHrs + walkHrs
+  const manDays = totalHrs / 8
   const totalMat = installMat + finishMat + miscMat + manMat
-  const laborCost   = totalHrs * laborRatePerHour
-  const burden      = laborCost * DEFAULTS.laborBurdenPct
-  const gp          = manDays * gpmd
-  const commission  = gp * DEFAULTS.commissionRate
-  const subCost     = manSub
-  const price       = totalMat + laborCost + burden + gp + commission + subCost
+  const laborCost = totalHrs * laborRatePerHour
+  const burden = laborCost * DEFAULTS.laborBurdenPct
+  const gp = manDays * gpmd
+  const commission = gp * DEFAULTS.commissionRate
+  const subCost = manSub
+  const price = totalMat + laborCost + burden + gp + commission + subCost
 
-  return { totalHrs, manDays, totalMat, laborCost, burden, gp, commission, subCost, price, walkHrs,
-           installHrs, installMat, finishHrs, finishMat }
+  return {
+    totalHrs,
+    manDays,
+    totalMat,
+    laborCost,
+    burden,
+    gp,
+    commission,
+    subCost,
+    price,
+    walkHrs,
+    installHrs,
+    installMat,
+    finishHrs,
+    finishMat,
+  }
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -153,7 +228,8 @@ function SectionHeader({ title }) {
 function NumInput({ value, onChange, placeholder = '0', className = '' }) {
   return (
     <input
-      type="number" step="any"
+      type="number"
+      step="any"
       className={`input text-sm py-1.5 ${className}`}
       placeholder={placeholder}
       value={value}
@@ -178,16 +254,18 @@ const DEFAULT_MANUAL_ROWS = [
 ]
 
 // ── Main Component ────────────────────────────────────────────────────────────
-export default function ColumnsModule({ projectName, onSave, onBack, saving, initialData }) {
+export default function ColumnsModule({ onSave, onBack, saving, initialData }) {
   const [laborRatePerHour, setLaborRatePerHour] = useState(
     initialData?.laborRatePerHour ?? DEFAULTS.laborRatePerHour
   )
   const [distanceLF, setDistanceLF] = useState(initialData?.distanceLF ?? '')
-  const [walkAccess, setWalkAccess] = useState(initialData?.walkAccess ?? {
-    paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
-  })
+  const [walkAccess, setWalkAccess] = useState(
+    initialData?.walkAccess ?? {
+      paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+    }
+  )
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
-  const [pricesLoading, setPricesLoading]   = useState(!initialData?.materialPrices)
+  const [pricesLoading, setPricesLoading] = useState(!initialData?.materialPrices)
 
   // Re-fetch Columns merged labor+material map. Used on mount and after edits.
   const refreshAllRates = useCallback(async () => {
@@ -196,20 +274,33 @@ export default function ColumnsModule({ projectName, onSave, onBack, saving, ini
       supabase.from('labor_rates').select('name, rate').eq('category', 'Columns'),
     ])
     const prices = {}
-    ;(matRes.data || []).forEach(r => { prices[r.name] = parseFloat(r.unit_cost) || 0 })
-    ;(labRes.data  || []).forEach(r => { prices[r.name] = parseFloat(r.rate)     || 0 })
+    ;(matRes.data || []).forEach(r => {
+      prices[r.name] = parseFloat(r.unit_cost) || 0
+    })
+    ;(labRes.data || []).forEach(r => {
+      prices[r.name] = parseFloat(r.rate) || 0
+    })
     setMaterialPrices(prices)
   }, [])
 
   useEffect(() => {
     if (!initialData?.laborRatePerHour) {
-      supabase.from('company_settings').select('labor_rate_per_hour, walk_access_pace_lf_per_min').single()
+      supabase
+        .from('company_settings')
+        .select('labor_rate_per_hour, walk_access_pace_lf_per_min')
+        .single()
         .then(({ data }) => {
           if (!data) return
-          if (data.labor_rate_per_hour != null) setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
+          if (data.labor_rate_per_hour != null)
+            setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
           if (data.walk_access_pace_lf_per_min != null) {
             const _wpace = parseFloat(data.walk_access_pace_lf_per_min)
-            setWalkAccess({ paceLfPerMin: Number.isFinite(_wpace) && _wpace > 0 ? _wpace : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN })
+            setWalkAccess({
+              paceLfPerMin:
+                Number.isFinite(_wpace) && _wpace > 0
+                  ? _wpace
+                  : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+            })
           }
         })
     }
@@ -217,18 +308,18 @@ export default function ColumnsModule({ projectName, onSave, onBack, saving, ini
     refreshAllRates().then(() => setPricesLoading(false))
   }, [refreshAllRates])
 
-  const gpmd          = initialData?.gpmd ?? DEFAULTS.gpmd
-  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
+  const gpmd = initialData?.gpmd ?? DEFAULTS.gpmd
+  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
 
-  const [difficulty,  setDifficulty]  = useState(initialData?.difficulty  ?? '')
+  const [difficulty, setDifficulty] = useState(initialData?.difficulty ?? '')
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Masonry')
-  const [hoursAdj,    setHoursAdj]    = useState(initialData?.hoursAdj    ?? '')
-  const [qty,         setQty]         = useState(initialData?.qty         ?? '')
-  const [heightIn,    setHeightIn]    = useState(initialData?.heightIn    ?? '')
-  const [widthIn,     setWidthIn]     = useState(initialData?.widthIn     ?? '')
-  const [finishRows,  setFinishRows]  = useState(initialData?.finishRows  ?? DEFAULT_FINISH_ROWS)
-  const [miscQty,     setMiscQty]     = useState(initialData?.miscQty     ?? DEFAULT_MISC_QTY)
-  const [manualRows,  setManualRows]  = useState(initialData?.manualRows  ?? DEFAULT_MANUAL_ROWS)
+  const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
+  const [qty, setQty] = useState(initialData?.qty ?? '')
+  const [heightIn, setHeightIn] = useState(initialData?.heightIn ?? '')
+  const [widthIn, setWidthIn] = useState(initialData?.widthIn ?? '')
+  const [finishRows, setFinishRows] = useState(initialData?.finishRows ?? DEFAULT_FINISH_ROWS)
+  const [miscQty, setMiscQty] = useState(initialData?.miscQty ?? DEFAULT_MISC_QTY)
+  const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
 
   // ── Sales tax — applied to totalMat across every module so the bid
   //    reflects supplier-invoiced material cost. Sourced from
@@ -237,50 +328,64 @@ export default function ColumnsModule({ projectName, onSave, onBack, saving, ini
   const [salesTaxRate, setSalesTaxRate] = useState(0)
   useEffect(() => {
     let alive = true
-    fetchSalesTaxRate().then(r => { if (alive) setSalesTaxRate(r) })
-    return () => { alive = false }
+    fetchSalesTaxRate().then(r => {
+      if (alive) setSalesTaxRate(r)
+    })
+    return () => {
+      alive = false
+    }
   }, [])
-
 
   const calcRaw = calcColumns(
     { difficulty, hoursAdj, qty, heightIn, widthIn, finishRows, miscQty, manualRows, distanceLF },
-    laborRatePerHour, materialPrices, gpmd, walkAccess,
+    laborRatePerHour,
+    materialPrices,
+    gpmd,
+    walkAccess
   )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
   // material_cost (saved with the module) ends up tax-inclusive too,
   // so bid totals add up to GpmdBar's displayed price.
   const _salesTaxAmt = (calcRaw.totalMat || 0) * (salesTaxRate || 0)
-  const calc = _salesTaxAmt > 0
-    ? {
-        ...calcRaw,
-        totalMat: (calcRaw.totalMat || 0) + _salesTaxAmt,
-        price:    (calcRaw.price    || 0) + _salesTaxAmt,
-        salesTax: _salesTaxAmt,
-      }
-    : calcRaw
-
+  const calc =
+    _salesTaxAmt > 0
+      ? {
+          ...calcRaw,
+          totalMat: (calcRaw.totalMat || 0) + _salesTaxAmt,
+          price: (calcRaw.price || 0) + _salesTaxAmt,
+          salesTax: _salesTaxAmt,
+        }
+      : calcRaw
 
   // Show geometry preview when all three inputs filled
-  const geo = (n(qty) > 0 && n(heightIn) > 0 && n(widthIn) > 0)
-    ? columnGeometry(heightIn, widthIn)
-    : null
+  const geo =
+    n(qty) > 0 && n(heightIn) > 0 && n(widthIn) > 0 ? columnGeometry(heightIn, widthIn) : null
 
   function updateFinish(i, field, val) {
-    setFinishRows(rows => rows.map((r, idx) => idx === i ? { ...r, [field]: val } : r))
+    setFinishRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
   function updateManual(i, field, val) {
-    setManualRows(rows => rows.map((r, idx) => idx === i ? { ...r, [field]: val } : r))
+    setManualRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
 
   function handleSave() {
     onSave({
-      man_days:      parseFloat(calc.manDays.toFixed(2)),
+      man_days: parseFloat(calc.manDays.toFixed(2)),
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
       data: {
-        difficulty, hoursAdj, qty, heightIn, widthIn,
-        finishRows, miscQty, manualRows, laborRatePerHour, gpmd,
-        materialPrices, calc,
+        difficulty,
+        hoursAdj,
+        qty,
+        heightIn,
+        widthIn,
+        finishRows,
+        miscQty,
+        manualRows,
+        laborRatePerHour,
+        gpmd,
+        materialPrices,
+        calc,
       },
     })
   }
@@ -289,28 +394,32 @@ export default function ColumnsModule({ projectName, onSave, onBack, saving, ini
     <div className="space-y-5">
       {/* ── Sticky GPMD bar ── */}
       <div className="sticky top-0 z-20 -mx-6 px-6 pt-2 pb-2 bg-gray-900 shadow-lg">
-      {/* GPMD summary bar */}
-      <GpmdBar
+        {/* GPMD summary bar */}
+        <GpmdBar
           sticky
-        totalMat={calc.totalMat}
-        totalHrs={calc.totalHrs}
-        manDays={calc.manDays}
-        laborCost={calc.laborCost}
-        laborRatePerHour={laborRatePerHour}
-        burden={calc.burden}
-        gp={calc.gp}
-        commission={calc.commission}
-        subCost={calc.subCost}
-        gpmd={gpmd}
-        price={calc.price}
-        subMarkupRate={subGpMarkupRate}
-      />
+          totalMat={calc.totalMat}
+          totalHrs={calc.totalHrs}
+          manDays={calc.manDays}
+          laborCost={calc.laborCost}
+          laborRatePerHour={laborRatePerHour}
+          burden={calc.burden}
+          gp={calc.gp}
+          commission={calc.commission}
+          subCost={calc.subCost}
+          gpmd={gpmd}
+          price={calc.price}
+          subMarkupRate={subGpMarkupRate}
+        />
       </div>
 
       {/* Crew Type */}
       <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
         <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
-        <select value={crewType} onChange={e => setCrewType(e.target.value)} className="input text-sm py-1 w-36">
+        <select
+          value={crewType}
+          onChange={e => setCrewType(e.target.value)}
+          className="input text-sm py-1 w-36"
+        >
           <option value="Demo">Demo</option>
           <option value="Landscape">Landscape</option>
           <option value="Masonry">Masonry</option>
@@ -333,10 +442,17 @@ export default function ColumnsModule({ projectName, onSave, onBack, saving, ini
           <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
         </div>
         <div>
-          <p className="text-xs text-gray-500 mb-0.5" title="Average Distance from Truck to Work Area">Truck → Work Area (Avg LF)</p>
+          <p
+            className="text-xs text-gray-500 mb-0.5"
+            title="Average Distance from Truck to Work Area"
+          >
+            Truck → Work Area (Avg LF)
+          </p>
           <NumInput value={distanceLF} onChange={setDistanceLF} placeholder="0" />
           {calc.walkHrs > 0 && (
-            <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">+{calc.walkHrs.toFixed(2)} hrs walk-access</p>
+            <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">
+              +{calc.walkHrs.toFixed(2)} hrs walk-access
+            </p>
           )}
         </div>
         <div>
@@ -349,37 +465,134 @@ export default function ColumnsModule({ projectName, onSave, onBack, saving, ini
       <div>
         <SectionHeader title="Column Install" />
         <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-3 text-[11px] text-gray-500">
-          <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">Column Install Rates (click any to edit)</p>
+          <p className="font-semibold uppercase tracking-wide text-gray-400 mb-1">
+            Column Install Rates (click any to edit)
+          </p>
           <div className="flex flex-wrap gap-x-3 gap-y-1">
-            <span className="inline-flex items-center gap-1">Block ${(materialPrices[BLOCK_RATES.blockMatCost.dbName] ?? BLOCK_RATES.blockMatCost.fallback).toFixed(2)}/ea
-              <RateEditPopover table="material_rates" name={BLOCK_RATES.blockMatCost.dbName} category="Columns" unitLabel="ea"
-                currentValue={materialPrices[BLOCK_RATES.blockMatCost.dbName] ?? BLOCK_RATES.blockMatCost.fallback} onSaved={refreshAllRates} />
+            <span className="inline-flex items-center gap-1">
+              Block $
+              {(
+                materialPrices[BLOCK_RATES.blockMatCost.dbName] ?? BLOCK_RATES.blockMatCost.fallback
+              ).toFixed(2)}
+              /ea
+              <RateEditPopover
+                table="material_rates"
+                name={BLOCK_RATES.blockMatCost.dbName}
+                category="Columns"
+                unitLabel="ea"
+                currentValue={
+                  materialPrices[BLOCK_RATES.blockMatCost.dbName] ??
+                  BLOCK_RATES.blockMatCost.fallback
+                }
+                onSaved={refreshAllRates}
+              />
             </span>
-            <span className="inline-flex items-center gap-1">Rebar ${(materialPrices[BLOCK_RATES.rebarMatCost.dbName] ?? BLOCK_RATES.rebarMatCost.fallback).toFixed(2)}/LF
-              <RateEditPopover table="material_rates" name={BLOCK_RATES.rebarMatCost.dbName} category="Columns" unitLabel="LF"
-                currentValue={materialPrices[BLOCK_RATES.rebarMatCost.dbName] ?? BLOCK_RATES.rebarMatCost.fallback} onSaved={refreshAllRates} />
+            <span className="inline-flex items-center gap-1">
+              Rebar $
+              {(
+                materialPrices[BLOCK_RATES.rebarMatCost.dbName] ?? BLOCK_RATES.rebarMatCost.fallback
+              ).toFixed(2)}
+              /LF
+              <RateEditPopover
+                table="material_rates"
+                name={BLOCK_RATES.rebarMatCost.dbName}
+                category="Columns"
+                unitLabel="LF"
+                currentValue={
+                  materialPrices[BLOCK_RATES.rebarMatCost.dbName] ??
+                  BLOCK_RATES.rebarMatCost.fallback
+                }
+                onSaved={refreshAllRates}
+              />
             </span>
-            <span className="inline-flex items-center gap-1">Fill ${(materialPrices[BLOCK_RATES.fillMatCost.dbName] ?? BLOCK_RATES.fillMatCost.fallback).toFixed(2)}/block
-              <RateEditPopover table="material_rates" name={BLOCK_RATES.fillMatCost.dbName} category="Columns" unitLabel="block"
-                currentValue={materialPrices[BLOCK_RATES.fillMatCost.dbName] ?? BLOCK_RATES.fillMatCost.fallback} onSaved={refreshAllRates} />
+            <span className="inline-flex items-center gap-1">
+              Fill $
+              {(
+                materialPrices[BLOCK_RATES.fillMatCost.dbName] ?? BLOCK_RATES.fillMatCost.fallback
+              ).toFixed(2)}
+              /block
+              <RateEditPopover
+                table="material_rates"
+                name={BLOCK_RATES.fillMatCost.dbName}
+                category="Columns"
+                unitLabel="block"
+                currentValue={
+                  materialPrices[BLOCK_RATES.fillMatCost.dbName] ?? BLOCK_RATES.fillMatCost.fallback
+                }
+                onSaved={refreshAllRates}
+              />
             </span>
           </div>
           <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
-            <span className="inline-flex items-center gap-1">Install {(materialPrices[BLOCK_RATES.installLaborHrs.dbName] ?? BLOCK_RATES.installLaborHrs.fallback)} hrs/blk
-              <RateEditPopover table="labor_rates" name={BLOCK_RATES.installLaborHrs.dbName} category="Columns" mode="coefficient" unitLabel="hrs/blk"
-                currentValue={materialPrices[BLOCK_RATES.installLaborHrs.dbName] ?? BLOCK_RATES.installLaborHrs.fallback} onSaved={refreshAllRates} />
+            <span className="inline-flex items-center gap-1">
+              Install{' '}
+              {materialPrices[BLOCK_RATES.installLaborHrs.dbName] ??
+                BLOCK_RATES.installLaborHrs.fallback}{' '}
+              hrs/blk
+              <RateEditPopover
+                table="labor_rates"
+                name={BLOCK_RATES.installLaborHrs.dbName}
+                category="Columns"
+                mode="coefficient"
+                unitLabel="hrs/blk"
+                currentValue={
+                  materialPrices[BLOCK_RATES.installLaborHrs.dbName] ??
+                  BLOCK_RATES.installLaborHrs.fallback
+                }
+                onSaved={refreshAllRates}
+              />
             </span>
-            <span className="inline-flex items-center gap-1">Excavate {(materialPrices[BLOCK_RATES.excavateLaborHrs.dbName] ?? BLOCK_RATES.excavateLaborHrs.fallback)} hrs/col
-              <RateEditPopover table="labor_rates" name={BLOCK_RATES.excavateLaborHrs.dbName} category="Columns" mode="coefficient" unitLabel="hrs/col"
-                currentValue={materialPrices[BLOCK_RATES.excavateLaborHrs.dbName] ?? BLOCK_RATES.excavateLaborHrs.fallback} onSaved={refreshAllRates} />
+            <span className="inline-flex items-center gap-1">
+              Excavate{' '}
+              {materialPrices[BLOCK_RATES.excavateLaborHrs.dbName] ??
+                BLOCK_RATES.excavateLaborHrs.fallback}{' '}
+              hrs/col
+              <RateEditPopover
+                table="labor_rates"
+                name={BLOCK_RATES.excavateLaborHrs.dbName}
+                category="Columns"
+                mode="coefficient"
+                unitLabel="hrs/col"
+                currentValue={
+                  materialPrices[BLOCK_RATES.excavateLaborHrs.dbName] ??
+                  BLOCK_RATES.excavateLaborHrs.fallback
+                }
+                onSaved={refreshAllRates}
+              />
             </span>
-            <span className="inline-flex items-center gap-1">Pour {(materialPrices[BLOCK_RATES.pourLaborHrs.dbName] ?? BLOCK_RATES.pourLaborHrs.fallback)} hrs/col
-              <RateEditPopover table="labor_rates" name={BLOCK_RATES.pourLaborHrs.dbName} category="Columns" mode="coefficient" unitLabel="hrs/col"
-                currentValue={materialPrices[BLOCK_RATES.pourLaborHrs.dbName] ?? BLOCK_RATES.pourLaborHrs.fallback} onSaved={refreshAllRates} />
+            <span className="inline-flex items-center gap-1">
+              Pour{' '}
+              {materialPrices[BLOCK_RATES.pourLaborHrs.dbName] ?? BLOCK_RATES.pourLaborHrs.fallback}{' '}
+              hrs/col
+              <RateEditPopover
+                table="labor_rates"
+                name={BLOCK_RATES.pourLaborHrs.dbName}
+                category="Columns"
+                mode="coefficient"
+                unitLabel="hrs/col"
+                currentValue={
+                  materialPrices[BLOCK_RATES.pourLaborHrs.dbName] ??
+                  BLOCK_RATES.pourLaborHrs.fallback
+                }
+                onSaved={refreshAllRates}
+              />
             </span>
-            <span className="inline-flex items-center gap-1">Fill {(materialPrices[BLOCK_RATES.fillLaborHrs.dbName] ?? BLOCK_RATES.fillLaborHrs.fallback)} hrs/blk
-              <RateEditPopover table="labor_rates" name={BLOCK_RATES.fillLaborHrs.dbName} category="Columns" mode="coefficient" unitLabel="hrs/blk"
-                currentValue={materialPrices[BLOCK_RATES.fillLaborHrs.dbName] ?? BLOCK_RATES.fillLaborHrs.fallback} onSaved={refreshAllRates} />
+            <span className="inline-flex items-center gap-1">
+              Fill{' '}
+              {materialPrices[BLOCK_RATES.fillLaborHrs.dbName] ?? BLOCK_RATES.fillLaborHrs.fallback}{' '}
+              hrs/blk
+              <RateEditPopover
+                table="labor_rates"
+                name={BLOCK_RATES.fillLaborHrs.dbName}
+                category="Columns"
+                mode="coefficient"
+                unitLabel="hrs/blk"
+                currentValue={
+                  materialPrices[BLOCK_RATES.fillLaborHrs.dbName] ??
+                  BLOCK_RATES.fillLaborHrs.fallback
+                }
+                onSaved={refreshAllRates}
+              />
             </span>
           </div>
         </div>
@@ -401,12 +614,24 @@ export default function ColumnsModule({ projectName, onSave, onBack, saving, ini
         {/* Geometry preview */}
         {geo && (
           <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-xs text-gray-700 grid grid-cols-2 gap-x-6 gap-y-1">
-            <span>Blocks per course: <strong>{geo.blocksPerCourse}</strong></span>
-            <span>Courses: <strong>{geo.courses}</strong></span>
-            <span>Total blocks per column: <strong>{geo.totalBlocks}</strong></span>
-            <span>Total blocks (all): <strong>{geo.totalBlocks * n(qty)}</strong></span>
-            <span>Rebar per column: <strong>{geo.rebarLF.toFixed(1)} LF</strong></span>
-            <span>Footing area: <strong>{geo.footingArea.toFixed(1)} SF</strong></span>
+            <span>
+              Blocks per course: <strong>{geo.blocksPerCourse}</strong>
+            </span>
+            <span>
+              Courses: <strong>{geo.courses}</strong>
+            </span>
+            <span>
+              Total blocks per column: <strong>{geo.totalBlocks}</strong>
+            </span>
+            <span>
+              Total blocks (all): <strong>{geo.totalBlocks * n(qty)}</strong>
+            </span>
+            <span>
+              Rebar per column: <strong>{geo.rebarLF.toFixed(1)} LF</strong>
+            </span>
+            <span>
+              Footing area: <strong>{geo.footingArea.toFixed(1)} SF</strong>
+            </span>
           </div>
         )}
       </div>
@@ -427,24 +652,36 @@ export default function ColumnsModule({ projectName, onSave, onBack, saving, ini
             </thead>
             <tbody>
               {finishRows.map((row, i) => {
-                const rate    = FINISH_TYPES[row.type]
-                const isTon   = rate?.unit === 'ton'
+                const rate = FINISH_TYPES[row.type]
+                const isTon = rate?.unit === 'ton'
                 const defCost = isTon ? rate?.costPerTon : rate?.costPerSF
-                const cost    = materialPrices[rate?.dbName] ?? defCost ?? 0
-                const defLab  = isTon ? rate?.laborHrsPer : rate?.laborHrsPerSF
+                const cost = materialPrices[rate?.dbName] ?? defCost ?? 0
+                const defLab = isTon ? rate?.laborHrsPer : rate?.laborHrsPerSF
                 const labRate = materialPrices[rate?.laborDbName] ?? defLab ?? 0
-                const mat     = n(row.qty) * cost
+                const mat = n(row.qty) * cost
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-2">
                       <div className="flex items-center gap-1">
-                        <select className="input text-sm py-1 flex-1 min-w-0" value={row.type}
-                                onChange={e => updateFinish(i, 'type', e.target.value)}>
-                          {Object.keys(FINISH_TYPES).map(t => <option key={t}>{t}</option>)}
+                        <select
+                          className="input text-sm py-1 flex-1 min-w-0"
+                          value={row.type}
+                          onChange={e => updateFinish(i, 'type', e.target.value)}
+                        >
+                          {Object.keys(FINISH_TYPES).map(t => (
+                            <option key={t}>{t}</option>
+                          ))}
                         </select>
                         {rate && (
-                          <RateEditPopover table="labor_rates" name={rate.laborDbName} category="Columns"
-                            mode="coefficient" unitLabel={`hrs/${rate.unit}`} currentValue={labRate} onSaved={refreshAllRates} />
+                          <RateEditPopover
+                            table="labor_rates"
+                            name={rate.laborDbName}
+                            category="Columns"
+                            mode="coefficient"
+                            unitLabel={`hrs/${rate.unit}`}
+                            currentValue={labRate}
+                            onSaved={refreshAllRates}
+                          />
                         )}
                       </div>
                     </td>
@@ -456,12 +693,20 @@ export default function ColumnsModule({ projectName, onSave, onBack, saving, ini
                       <span className="inline-flex items-center justify-end gap-1">
                         ${cost.toFixed(2)}
                         {rate && (
-                          <RateEditPopover table="material_rates" name={rate.dbName} category="Columns"
-                            unitLabel={rate.unit} currentValue={cost} onSaved={refreshAllRates} />
+                          <RateEditPopover
+                            table="material_rates"
+                            name={rate.dbName}
+                            category="Columns"
+                            unitLabel={rate.unit}
+                            currentValue={cost}
+                            onSaved={refreshAllRates}
+                          />
                         )}
                       </span>
                     </td>
-                    <td className="py-1 text-right text-gray-600 text-xs">{mat > 0 ? `$${mat.toFixed(2)}` : '—'}</td>
+                    <td className="py-1 text-right text-gray-600 text-xs">
+                      {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
+                    </td>
                   </tr>
                 )
               })}
@@ -471,7 +716,9 @@ export default function ColumnsModule({ projectName, onSave, onBack, saving, ini
             type="button"
             className="mt-1 text-xs text-green-700 hover:text-green-900 font-medium"
             onClick={() => setFinishRows(r => [...r, { type: 'Sand Stucco', qty: '' }])}
-          >+ Add row</button>
+          >
+            + Add row
+          </button>
         </div>
       </div>
 
@@ -480,17 +727,24 @@ export default function ColumnsModule({ projectName, onSave, onBack, saving, ini
         <SectionHeader title="Additional Items" />
         <div className="space-y-2">
           {Object.entries(MISC_RATES).map(([key, rate]) => {
-            const q       = n(miscQty[`${key}Qty`])
+            const q = n(miscQty[`${key}Qty`])
             const matCost = materialPrices[rate.dbName] ?? rate.matCost
             return (
               <div key={key} className="flex items-center gap-3 py-1.5 border-b border-gray-100">
                 <span className="text-xs text-gray-700 flex-1 inline-flex items-center gap-1">
                   {rate.label}
-                  <RateEditPopover table="material_rates" name={rate.dbName} category="Columns"
-                    unitLabel="ea" currentValue={matCost} onSaved={refreshAllRates} />
+                  <RateEditPopover
+                    table="material_rates"
+                    name={rate.dbName}
+                    category="Columns"
+                    unitLabel="ea"
+                    currentValue={matCost}
+                    onSaved={refreshAllRates}
+                  />
                 </span>
                 <input
-                  type="number" step="1"
+                  type="number"
+                  step="1"
                   className="input text-sm py-1 w-24"
                   placeholder="Qty"
                   value={miscQty[`${key}Qty`]}
@@ -522,12 +776,25 @@ export default function ColumnsModule({ projectName, onSave, onBack, saving, ini
               {manualRows.map((row, i) => (
                 <tr key={i} className="border-b border-gray-100">
                   <td className="py-1 pr-2">
-                    <input className="input text-sm py-1" value={row.label}
-                           onChange={e => updateManual(i, 'label', e.target.value)} />
+                    <input
+                      className="input text-sm py-1"
+                      value={row.label}
+                      onChange={e => updateManual(i, 'label', e.target.value)}
+                    />
                   </td>
-                  <td className="py-1 pr-2"><NumInput value={row.hours}     onChange={v => updateManual(i, 'hours', v)} /></td>
-                  <td className="py-1 pr-2"><NumInput value={row.materials} onChange={v => updateManual(i, 'materials', v)} /></td>
-                  <td className="py-1">     <NumInput value={row.subCost}   onChange={v => updateManual(i, 'subCost', v)} /></td>
+                  <td className="py-1 pr-2">
+                    <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} />
+                  </td>
+                  <td className="py-1 pr-2">
+                    <NumInput
+                      value={row.materials}
+                      onChange={v => updateManual(i, 'materials', v)}
+                    />
+                  </td>
+                  <td className="py-1">
+                    {' '}
+                    <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} />
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -535,10 +802,11 @@ export default function ColumnsModule({ projectName, onSave, onBack, saving, ini
         </div>
       </div>
 
-
       {/* Actions */}
       <div className="flex gap-3 pt-2">
-        <button onClick={onBack} className="btn-secondary flex-1">← Back</button>
+        <button onClick={onBack} className="btn-secondary flex-1">
+          ← Back
+        </button>
         <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">
           {saving ? 'Saving...' : 'Add Module'}
         </button>

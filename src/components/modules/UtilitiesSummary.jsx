@@ -6,23 +6,31 @@ import FinancialSummaryList from './FinancialSummaryList'
 
 const UTILITY_LINE_TYPES = {
   'PVC Conduit with Electrical': {
-    costPerLF: 1.92,  dbName: 'PVC Conduit with Electrical',
-    laborPerLF: 0.05, laborDbName: 'PVC Conduit with Electrical - Labor Rate',
+    costPerLF: 1.92,
+    dbName: 'PVC Conduit with Electrical',
+    laborPerLF: 0.05,
+    laborDbName: 'PVC Conduit with Electrical - Labor Rate',
   },
   '1" Black Iron Gas Pipe': {
-    costPerLF: 2.76,  dbName: '1" Black Iron Gas Pipe',
-    laborPerLF: 0.15, laborDbName: '1" Black Iron Gas Pipe - Labor Rate',
+    costPerLF: 2.76,
+    dbName: '1" Black Iron Gas Pipe',
+    laborPerLF: 0.15,
+    laborDbName: '1" Black Iron Gas Pipe - Labor Rate',
   },
   '1-1/2" Black Iron Gas Pipe': {
-    costPerLF: 4.23,  dbName: '1-1/2" Black Iron Gas Pipe',
-    laborPerLF: 0.20, laborDbName: '1-1/2" Black Iron Gas Pipe - Labor Rate',
+    costPerLF: 4.23,
+    dbName: '1-1/2" Black Iron Gas Pipe',
+    laborPerLF: 0.2,
+    laborDbName: '1-1/2" Black Iron Gas Pipe - Labor Rate',
   },
 }
 
 const FIXTURE_TYPES = {
   '12" Single Gas Ring': {
-    cost: 61.75,  dbName: '12" Single Gas Ring',
-    laborHrs: 2,  laborDbName: '12" Single Gas Ring - Labor Rate',
+    cost: 61.75,
+    dbName: '12" Single Gas Ring',
+    laborHrs: 2,
+    laborDbName: '12" Single Gas Ring - Labor Rate',
   },
 }
 
@@ -30,16 +38,22 @@ const TRENCH_MINS_PER_CF = { Trench: 10, Hand: 12.5 }
 
 const ADD_ITEM_RATES = {
   curbCore: {
-    matCost: 250, dbName: 'Curb Core',                label: 'Curb Core *',
-    laborHrs: 2,  laborDbName: 'Curb Core - Labor Rate',
+    matCost: 250,
+    dbName: 'Curb Core',
+    label: 'Curb Core *',
+    laborHrs: 2,
+    laborDbName: 'Curb Core - Labor Rate',
   },
   hydrocut: {
-    matCost: 50,  dbName: 'Hydrocut Under Hardscape', label: 'Hydrocut Under Hardscape *',
-    laborHrs: 2,  laborDbName: 'Hydrocut Under Hardscape - Labor Rate',
+    matCost: 50,
+    dbName: 'Hydrocut Under Hardscape',
+    label: 'Hydrocut Under Hardscape *',
+    laborHrs: 2,
+    laborDbName: 'Hydrocut Under Hardscape - Labor Rate',
   },
 }
 
-const n = (v) => parseFloat(v) || 0
+const n = v => parseFloat(v) || 0
 
 function SectionLabel({ title }) {
   return (
@@ -51,10 +65,16 @@ function SectionLabel({ title }) {
 
 function LineRow({ label, value, sub, highlight }) {
   return (
-    <div className={`flex items-start justify-between py-1 border-b border-gray-50 ${highlight ? 'font-semibold' : ''}`}>
-      <span className={`text-xs ${highlight ? 'text-gray-800' : 'text-gray-600'} flex-1 pr-2`}>{label}</span>
+    <div
+      className={`flex items-start justify-between py-1 border-b border-gray-50 ${highlight ? 'font-semibold' : ''}`}
+    >
+      <span className={`text-xs ${highlight ? 'text-gray-800' : 'text-gray-600'} flex-1 pr-2`}>
+        {label}
+      </span>
       <div className="text-right shrink-0">
-        <span className={`text-xs ${highlight ? 'text-gray-900 font-semibold' : 'text-gray-700'}`}>{value}</span>
+        <span className={`text-xs ${highlight ? 'text-gray-900 font-semibold' : 'text-gray-700'}`}>
+          {value}
+        </span>
         {sub && <p className="text-xs text-gray-400">{sub}</p>}
       </div>
     </div>
@@ -64,17 +84,17 @@ function LineRow({ label, value, sub, highlight }) {
 export default function UtilitiesSummary({ module }) {
   const data = module?.data || {}
   const {
-    difficulty              = 0,
-    hoursAdj                = 0,
-    trenchRows              = [],
-    lineRows                = [],
-    fixtureRows             = [],
-    additionalItems         = {},
+    difficulty = 0,
+    hoursAdj = 0,
+    trenchRows = [],
+    lineRows = [],
+    fixtureRows = [],
+    additionalItems = {},
     electricSubpanelSubCost = 0,
-    manualRows              = [],
-    laborRatePerHour        = 35,
-    materialPrices          = {},
-    calc                    = null,
+    manualRows = [],
+    laborRatePerHour = 35,
+    materialPrices = {},
+    calc = null,
   } = data
 
   const price = (dbName, fallback) =>
@@ -83,44 +103,56 @@ export default function UtilitiesSummary({ module }) {
   // ── Trenching ───────────────────────────────────────────────────────────────
   const trenchLines = trenchRows
     .map((r, i) => {
-      const lf = n(r.lf), w = n(r.width), d = n(r.depth)
+      const lf = n(r.lf),
+        w = n(r.width),
+        d = n(r.depth)
       if (!lf || !w || !d) return null
-      const cf  = lf * (w / 12) * (d / 12)
+      const cf = lf * (w / 12) * (d / 12)
       const hrs = (cf * (TRENCH_MINS_PER_CF[r.equipment] || 10)) / 60
-      return { key: i, label: `${r.equipment} — ${lf} LF × ${w}"W × ${d}"D`,
-               value: `${hrs.toFixed(2)} hrs`, sub: `${cf.toFixed(1)} CF` }
+      return {
+        key: i,
+        label: `${r.equipment} — ${lf} LF × ${w}"W × ${d}"D`,
+        value: `${hrs.toFixed(2)} hrs`,
+        sub: `${cf.toFixed(1)} CF`,
+      }
     })
     .filter(Boolean)
 
   // ── Utility lines ───────────────────────────────────────────────────────────
   const lineLines = lineRows
     .map((r, i) => {
-      const lf   = n(r.lf)
+      const lf = n(r.lf)
       const rate = UTILITY_LINE_TYPES[r.type]
       if (!lf || !rate) return null
-      const costPerLF  = price(rate.dbName,      rate.costPerLF)
-      const laborPerLF = price(rate.laborDbName,  rate.laborPerLF)
+      const costPerLF = price(rate.dbName, rate.costPerLF)
+      const laborPerLF = price(rate.laborDbName, rate.laborPerLF)
       const mat = lf * costPerLF
       const hrs = lf * laborPerLF
-      return { key: i, label: `${r.type} — ${lf} LF`,
-               value: `$${mat.toFixed(2)}`,
-               sub: `${hrs.toFixed(2)} hrs labor  ·  $${costPerLF.toFixed(2)}/LF` }
+      return {
+        key: i,
+        label: `${r.type} — ${lf} LF`,
+        value: `$${mat.toFixed(2)}`,
+        sub: `${hrs.toFixed(2)} hrs labor  ·  $${costPerLF.toFixed(2)}/LF`,
+      }
     })
     .filter(Boolean)
 
   // ── Fixtures ────────────────────────────────────────────────────────────────
   const fixtureLines = fixtureRows
     .map((r, i) => {
-      const qty  = n(r.qty)
+      const qty = n(r.qty)
       const rate = FIXTURE_TYPES[r.type]
       if (!qty || !rate) return null
-      const costEa   = price(rate.dbName,      rate.cost)
-      const laborHrs = price(rate.laborDbName,  rate.laborHrs)
+      const costEa = price(rate.dbName, rate.cost)
+      const laborHrs = price(rate.laborDbName, rate.laborHrs)
       const mat = qty * costEa
       const hrs = qty * laborHrs
-      return { key: i, label: `${r.type} × ${qty}`,
-               value: `$${mat.toFixed(2)}`,
-               sub: `${hrs.toFixed(2)} hrs labor  ·  $${costEa.toFixed(2)}/ea` }
+      return {
+        key: i,
+        label: `${r.type} × ${qty}`,
+        value: `$${mat.toFixed(2)}`,
+        sub: `${hrs.toFixed(2)} hrs labor  ·  $${costEa.toFixed(2)}/ea`,
+      }
     })
     .filter(Boolean)
 
@@ -129,36 +161,49 @@ export default function UtilitiesSummary({ module }) {
     .map(([key, rate]) => {
       const qty = n(additionalItems[`${key}Qty`])
       if (!qty) return null
-      const matCostEa  = price(rate.dbName,      rate.matCost)
-      const laborHrsEa = price(rate.laborDbName,  rate.laborHrs)
-      return { key, label: rate.label, qty,
-               laborHrs: qty * laborHrsEa, matCost: qty * matCostEa, matCostEa }
+      const matCostEa = price(rate.dbName, rate.matCost)
+      const laborHrsEa = price(rate.laborDbName, rate.laborHrs)
+      return {
+        key,
+        label: rate.label,
+        qty,
+        laborHrs: qty * laborHrsEa,
+        matCost: qty * matCostEa,
+        matCostEa,
+      }
     })
     .filter(Boolean)
 
   // ── Manual rows ─────────────────────────────────────────────────────────────
-  const manualLines = manualRows.filter(r => n(r.hours) > 0 || n(r.materials) > 0 || n(r.subCost) > 0)
+  const manualLines = manualRows.filter(
+    r => n(r.hours) > 0 || n(r.materials) > 0 || n(r.subCost) > 0
+  )
 
-  const hasAnyLines = trenchLines.length || lineLines.length || fixtureLines.length ||
-                      addLines.length || manualLines.length || n(electricSubpanelSubCost) > 0
+  const hasAnyLines =
+    trenchLines.length ||
+    lineLines.length ||
+    fixtureLines.length ||
+    addLines.length ||
+    manualLines.length ||
+    n(electricSubpanelSubCost) > 0
 
   // Financials from saved calc or module-level fallbacks
-  const savedCalc  = calc || {}
-  const totalHrs   = n(savedCalc.totalHrs)
-  const manDays    = n(savedCalc.manDays)    || n(module.man_days)
-  const totalMat   = n(savedCalc.totalMat)   || n(module.material_cost)
-  const laborCost  = n(savedCalc.laborCost)  || (totalHrs * n(laborRatePerHour))
-  const burden     = n(savedCalc.burden)
-  const gp         = n(savedCalc.gp)
+  const savedCalc = calc || {}
+  const totalHrs = n(savedCalc.totalHrs)
+  const manDays = n(savedCalc.manDays) || n(module.man_days)
+  const totalMat = n(savedCalc.totalMat) || n(module.material_cost)
+  const laborCost = n(savedCalc.laborCost) || totalHrs * n(laborRatePerHour)
+  const burden = n(savedCalc.burden)
+  const gp = n(savedCalc.gp)
   const commission = n(savedCalc.commission) || gp * 0.12
-  const subCost    = n(savedCalc.subCost)
+  const subCost = n(savedCalc.subCost)
   const priceTotal = n(savedCalc.price)
 
-  const fmt2 = (v) => `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const fmt2 = v =>
+    `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   return (
     <div className="space-y-1 text-sm">
-
       {/* Top stat bar */}
       <div className="grid grid-cols-2 gap-2 mb-2">
         <div className="bg-gray-50 rounded-lg p-3 text-center">
@@ -181,7 +226,10 @@ export default function UtilitiesSummary({ module }) {
       {n(hoursAdj) !== 0 && (
         <div className="flex items-center justify-between text-xs text-blue-700 bg-blue-50 rounded px-3 py-1.5">
           <span>Hours adjustment</span>
-          <span className="font-semibold">{n(hoursAdj) > 0 ? '+' : ''}{n(hoursAdj).toFixed(1)} hrs</span>
+          <span className="font-semibold">
+            {n(hoursAdj) > 0 ? '+' : ''}
+            {n(hoursAdj).toFixed(1)} hrs
+          </span>
         </div>
       )}
 
@@ -193,21 +241,27 @@ export default function UtilitiesSummary({ module }) {
           {trenchLines.length > 0 && (
             <>
               <SectionLabel title="Trenching" />
-              {trenchLines.map(l => <LineRow key={l.key} label={l.label} value={l.value} sub={l.sub} />)}
+              {trenchLines.map(l => (
+                <LineRow key={l.key} label={l.label} value={l.value} sub={l.sub} />
+              ))}
             </>
           )}
 
           {lineLines.length > 0 && (
             <>
               <SectionLabel title="Utility Lines" />
-              {lineLines.map(l => <LineRow key={l.key} label={l.label} value={l.value} sub={l.sub} />)}
+              {lineLines.map(l => (
+                <LineRow key={l.key} label={l.label} value={l.value} sub={l.sub} />
+              ))}
             </>
           )}
 
           {fixtureLines.length > 0 && (
             <>
               <SectionLabel title="Gas Fixtures" />
-              {fixtureLines.map(l => <LineRow key={l.key} label={l.label} value={l.value} sub={l.sub} />)}
+              {fixtureLines.map(l => (
+                <LineRow key={l.key} label={l.label} value={l.value} sub={l.sub} />
+              ))}
             </>
           )}
 
@@ -215,7 +269,11 @@ export default function UtilitiesSummary({ module }) {
             <>
               <SectionLabel title="Additional Items" />
               {n(electricSubpanelSubCost) > 0 && (
-                <LineRow label="Electric Sub-panel" value={fmt2(electricSubpanelSubCost)} sub="sub cost" />
+                <LineRow
+                  label="Electric Sub-panel"
+                  value={fmt2(electricSubpanelSubCost)}
+                  sub="sub cost"
+                />
               )}
               {addLines.map(a => (
                 <LineRow
@@ -238,9 +296,15 @@ export default function UtilitiesSummary({ module }) {
                 <div key={i} className="py-1 border-b border-gray-50">
                   <p className="text-xs font-medium text-gray-700">{r.label}</p>
                   <div className="flex gap-3 mt-0.5">
-                    {n(r.hours)     > 0 && <span className="text-xs text-gray-500">{n(r.hours).toFixed(1)} hrs</span>}
-                    {n(r.materials) > 0 && <span className="text-xs text-gray-500">{fmt2(r.materials)} mat.</span>}
-                    {n(r.subCost)   > 0 && <span className="text-xs text-gray-500">{fmt2(r.subCost)} sub</span>}
+                    {n(r.hours) > 0 && (
+                      <span className="text-xs text-gray-500">{n(r.hours).toFixed(1)} hrs</span>
+                    )}
+                    {n(r.materials) > 0 && (
+                      <span className="text-xs text-gray-500">{fmt2(r.materials)} mat.</span>
+                    )}
+                    {n(r.subCost) > 0 && (
+                      <span className="text-xs text-gray-500">{fmt2(r.subCost)} sub</span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -250,9 +314,16 @@ export default function UtilitiesSummary({ module }) {
       )}
 
       <FinancialSummaryList
-        totalHrs={totalHrs} manDays={manDays} totalMat={totalMat}
-        laborCost={laborCost} lrph={n(laborRatePerHour)} burden={burden}
-        subCost={subCost} gp={gp} commission={commission} price={priceTotal}
+        totalHrs={totalHrs}
+        manDays={manDays}
+        totalMat={totalMat}
+        laborCost={laborCost}
+        lrph={n(laborRatePerHour)}
+        burden={burden}
+        subCost={subCost}
+        gp={gp}
+        commission={commission}
+        price={priceTotal}
       />
     </div>
   )

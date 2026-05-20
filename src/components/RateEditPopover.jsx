@@ -28,20 +28,20 @@ import { supabase } from '../lib/supabase'
 import { useRateIcons } from '../contexts/RateIconsContext'
 
 const DEFAULT_VALUE_FIELD = {
-  material_rates:      'unit_cost',
-  labor_rates:         'rate',
+  material_rates: 'unit_cost',
+  labor_rates: 'rate',
   subcontractor_rates: 'rate',
 }
 
 const SOURCE_LABEL = {
-  material_rates:      'Master Rates → Materials',
-  labor_rates:         'Master Rates → Labor',
+  material_rates: 'Master Rates → Materials',
+  labor_rates: 'Master Rates → Labor',
   subcontractor_rates: 'Master Rates → Subcontractors',
 }
 
 const NAME_COLUMN = {
-  material_rates:      'name',
-  labor_rates:         'name',
+  material_rates: 'name',
+  labor_rates: 'name',
   subcontractor_rates: 'company_name',
 }
 
@@ -51,7 +51,7 @@ export default function RateEditPopover({
   category,
   valueField,
   unitLabel,
-  currentValue,        // optional fallback if DB has no row yet
+  currentValue, // optional fallback if DB has no row yet
   onSaved,
   // 'currency' (default) → shows '$' prefix on the input.
   // 'coefficient'        → no prefix, shows unitLabel as a suffix inside
@@ -59,19 +59,19 @@ export default function RateEditPopover({
   //                        'min/cf' or 'hr/LF' where the value isn't dollars.
   mode = 'currency',
 }) {
-  const field    = valueField || DEFAULT_VALUE_FIELD[table] || 'unit_cost'
-  const nameCol  = NAME_COLUMN[table] || 'name'
+  const field = valueField || DEFAULT_VALUE_FIELD[table] || 'unit_cost'
+  const nameCol = NAME_COLUMN[table] || 'name'
   const { showRateIcons } = useRateIcons()
-  const [open,    setOpen]    = useState(false)
-  const [draft,   setDraft]   = useState('')
-  const [loaded,  setLoaded]  = useState(false)
-  const [saving,  setSaving]  = useState(false)
-  const [error,   setError]   = useState('')
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [loaded, setLoaded] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
   // Sticky confirmation message that appears in the popover after a
   // successful save. Kept separate from `error` so the user clearly sees
   // SUCCESS vs FAILURE before the popover closes.
   const [saveMsg, setSaveMsg] = useState('')
-  const wrapRef   = useRef(null)
+  const wrapRef = useRef(null)
 
   // Whenever the popover opens, fetch the current rate from the DB so the
   // input reflects whatever is saved RIGHT NOW (not whatever stale value
@@ -88,7 +88,11 @@ export default function RateEditPopover({
     // row in a DIFFERENT category and the module's refresh would miss it.
     if (category) q = q.eq('category', category)
     q.limit(1).then(({ data, error: fetchErr }) => {
-      if (fetchErr) { setError(fetchErr.message); setLoaded(true); return }
+      if (fetchErr) {
+        setError(fetchErr.message)
+        setLoaded(true)
+        return
+      }
       if (data && data.length > 0) {
         setDraft(String(data[0][field] ?? ''))
       } else {
@@ -108,7 +112,9 @@ export default function RateEditPopover({
   // popover before the saveMsg banner could render.
   useEffect(() => {
     if (!open) return
-    function onKey(e) { if (e.key === 'Escape') setOpen(false) }
+    function onKey(e) {
+      if (e.key === 'Escape') setOpen(false)
+    }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [open])
@@ -116,7 +122,8 @@ export default function RateEditPopover({
   async function save() {
     const v = parseFloat(draft)
     if (!Number.isFinite(v) || v < 0) {
-      setError('Enter a number ≥ 0'); return
+      setError('Enter a number ≥ 0')
+      return
     }
     setSaving(true)
     setError('')
@@ -140,26 +147,37 @@ export default function RateEditPopover({
         // duplicates all get the same new value — so the popover and the
         // module's refreshAllRates can't disagree based on which dupe gets
         // returned first. .select() so we can detect silent zero-row writes.
-        let upQ = supabase.from(table).update({ [field]: v }).eq(nameCol, name)
+        let upQ = supabase
+          .from(table)
+          .update({ [field]: v })
+          .eq(nameCol, name)
         if (category) upQ = upQ.eq('category', category)
         const { data: upRows, error: upErr } = await upQ.select()
         if (upErr) throw new Error('Save failed: ' + upErr.message)
         if (!upRows || upRows.length === 0) {
-          throw new Error('Save returned 0 rows — RLS likely blocked the write. Check Supabase Auth + your user role.')
+          throw new Error(
+            'Save returned 0 rows — RLS likely blocked the write. Check Supabase Auth + your user role.'
+          )
         }
       } else {
         // Step 2 — fall back to a name-only lookup. If a wrong-category row
         // exists, UPDATE it AND reassign category so future category-scoped
         // refreshes find it. If still nothing, INSERT a fresh row.
-        const { data: anyRow, error: anySelErr } = await supabase.from(table)
-          .select('id, category').eq(nameCol, name).limit(1)
+        const { data: anyRow, error: anySelErr } = await supabase
+          .from(table)
+          .select('id, category')
+          .eq(nameCol, name)
+          .limit(1)
         if (anySelErr) throw new Error('Lookup failed: ' + anySelErr.message)
 
         if (anyRow && anyRow.length > 0) {
           const update = { [field]: v }
           if (category) update.category = category
-          const { data: reRows, error: reErr } = await supabase.from(table)
-            .update(update).eq('id', anyRow[0].id).select()
+          const { data: reRows, error: reErr } = await supabase
+            .from(table)
+            .update(update)
+            .eq('id', anyRow[0].id)
+            .select()
           if (reErr) throw new Error('Save failed: ' + reErr.message)
           if (!reRows || reRows.length === 0) {
             throw new Error('Save returned 0 rows — RLS likely blocked the write.')
@@ -167,9 +185,12 @@ export default function RateEditPopover({
         } else {
           // Step 3 — no row at all → INSERT.
           const insertRow = { [nameCol]: name, [field]: v }
-          if (category)                          insertRow.category = category
-          else if (table === 'labor_rates')      insertRow.category = 'General'
-          const { data: insRows, error: insErr } = await supabase.from(table).insert(insertRow).select()
+          if (category) insertRow.category = category
+          else if (table === 'labor_rates') insertRow.category = 'General'
+          const { data: insRows, error: insErr } = await supabase
+            .from(table)
+            .insert(insertRow)
+            .select()
           if (insErr) throw new Error('Save failed: ' + insErr.message)
           if (!insRows || insRows.length === 0) {
             throw new Error('Insert returned 0 rows — RLS likely blocked the write.')
@@ -185,12 +206,17 @@ export default function RateEditPopover({
     // Success — show inline confirmation, refresh parent, then auto-close
     // after a short delay so the user sees what was saved.
     setSaving(false)
-    const display = mode === 'currency'
-      ? `$${v.toLocaleString(undefined, { maximumFractionDigits: 4 })}`
-      : `${v}${unitLabel ? ' ' + unitLabel : ''}`
+    const display =
+      mode === 'currency'
+        ? `$${v.toLocaleString(undefined, { maximumFractionDigits: 4 })}`
+        : `${v}${unitLabel ? ' ' + unitLabel : ''}`
     setSaveMsg(`Saved! New rate: ${display}`)
     if (onSaved) {
-      try { await onSaved() } catch { /* non-fatal */ }
+      try {
+        await onSaved()
+      } catch {
+        /* non-fatal */
+      }
     }
     // Stay open with the confirmation banner visible until the user closes
     // the popover manually (Cancel button, X, Escape, or backdrop click).
@@ -209,7 +235,13 @@ export default function RateEditPopover({
         className="ml-1.5 inline-flex items-center justify-center w-5 h-5 rounded border border-green-300 bg-green-50 text-green-700 hover:bg-green-100 hover:border-green-500 transition-colors"
       >
         {/* Calculator icon — boxed in a small badge so it's easy to spot */}
-        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+        <svg
+          className="w-3 h-3"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+        >
           <rect x="4" y="3" width="16" height="18" rx="2" />
           <line x1="8" y1="7" x2="16" y2="7" />
           <line x1="8" y1="11" x2="10" y2="11" />
@@ -221,133 +253,166 @@ export default function RateEditPopover({
         </svg>
       </button>
 
-      {open && createPortal(
-        <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
-          style={{ pointerEvents: 'auto' }}
-          onMouseDown={e => { if (e.target === e.currentTarget) setOpen(false) }}
-        >
+      {open &&
+        createPortal(
           <div
-            className="bg-white border border-gray-200 rounded-xl shadow-2xl w-full max-w-sm p-5 relative z-[10000]"
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
             style={{ pointerEvents: 'auto' }}
-            onClick={e => e.stopPropagation()}
+            onMouseDown={e => {
+              if (e.target === e.currentTarget) setOpen(false)
+            }}
           >
-            {saveMsg ? (
-              // ─── SUCCESS STATE — minimal confirmation + a single Close. ───
-              // Hides the rate input and the green Save button entirely so
-              // there's no ambiguity about whether the save committed.
-              <>
-                <div className="flex items-start justify-between mb-4">
-                  <div className="min-w-0 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xl flex-shrink-0">✓</div>
-                    <div className="min-w-0">
-                      <p className="text-base font-semibold text-gray-900 leading-tight">Rate updated</p>
-                      <p className="text-xs text-gray-500 mt-0.5">{SOURCE_LABEL[table] || 'Master Rates'}</p>
+            <div
+              className="bg-white border border-gray-200 rounded-xl shadow-2xl w-full max-w-sm p-5 relative z-[10000]"
+              style={{ pointerEvents: 'auto' }}
+              onClick={e => e.stopPropagation()}
+            >
+              {saveMsg ? (
+                // ─── SUCCESS STATE — minimal confirmation + a single Close. ───
+                // Hides the rate input and the green Save button entirely so
+                // there's no ambiguity about whether the save committed.
+                <>
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="min-w-0 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xl flex-shrink-0">
+                        ✓
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-base font-semibold text-gray-900 leading-tight">
+                          Rate updated
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {SOURCE_LABEL[table] || 'Master Rates'}
+                        </p>
+                      </div>
                     </div>
+                    <button
+                      onClick={() => setOpen(false)}
+                      className="text-gray-300 hover:text-gray-600 text-xl leading-none p-1 -mt-1 flex-shrink-0"
+                      title="Close"
+                    >
+                      ×
+                    </button>
                   </div>
+
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-1.5 mb-5">
+                    <p className="text-sm text-gray-800 font-medium" title={name}>
+                      {name}
+                    </p>
+                    {category && <p className="text-[11px] text-gray-500">Category: {category}</p>}
+                    <p className="text-sm text-gray-700">
+                      New {mode === 'coefficient' ? 'coefficient' : 'rate'}:{' '}
+                      <strong className="text-green-800">
+                        {saveMsg.replace(/^Saved! New rate:\s*/, '')}
+                      </strong>
+                    </p>
+                  </div>
+
                   <button
                     onClick={() => setOpen(false)}
-                    className="text-gray-300 hover:text-gray-600 text-xl leading-none p-1 -mt-1 flex-shrink-0"
-                    title="Close"
-                  >×</button>
-                </div>
-
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-1.5 mb-5">
-                  <p className="text-sm text-gray-800 font-medium" title={name}>{name}</p>
-                  {category && <p className="text-[11px] text-gray-500">Category: {category}</p>}
-                  <p className="text-sm text-gray-700">
-                    New {mode === 'coefficient' ? 'coefficient' : 'rate'}:{' '}
-                    <strong className="text-green-800">
-                      {saveMsg.replace(/^Saved! New rate:\s*/, '')}
-                    </strong>
-                  </p>
-                </div>
-
-                <button
-                  onClick={() => setOpen(false)}
-                  className="w-full py-2 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800"
-                >
-                  Close
-                </button>
-              </>
-            ) : (
-              // ─── EDIT STATE — original input + Cancel/Save row. ───
-              <>
-                <div className="flex items-start justify-between mb-3">
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">{SOURCE_LABEL[table] || 'Master Rates'}</p>
-                    <p className="text-base font-semibold text-gray-900 leading-tight" title={name}>{name}</p>
-                    {category && <p className="text-xs text-gray-500 mt-0.5">Category: {category}</p>}
-                  </div>
-                  <button
-                    onClick={() => setOpen(false)}
-                    className="text-gray-300 hover:text-gray-600 text-xl leading-none p-1 -mt-1 flex-shrink-0"
-                    title="Close"
-                  >×</button>
-                </div>
-
-                <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
-                  {mode === 'coefficient'
-                    ? `Coefficient${unitLabel ? ` (${unitLabel})` : ''}`
-                    : `Rate${unitLabel ? ` ($/${unitLabel})` : ''}`}
-                </label>
-                {!loaded ? (
-                  <p className="text-sm text-gray-400 py-3">Loading current value…</p>
-                ) : (
-                  <div className="relative">
-                    {mode === 'currency' && (
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">$</span>
-                    )}
-                    <input
-                      type="number" step="0.001" min="0" autoFocus
-                      value={draft}
-                      onChange={e => setDraft(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') save() }}
-                      className={`input text-base w-full ${mode === 'currency' ? 'pl-7' : 'pl-3'} ${mode === 'coefficient' && unitLabel ? 'pr-16' : ''}`}
-                    />
-                    {mode === 'coefficient' && unitLabel && (
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">{unitLabel}</span>
-                    )}
-                  </div>
-                )}
-                {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
-
-                <div className="flex gap-2 mt-5">
-                  <button
-                    onClick={() => setOpen(false)}
-                    className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50"
+                    className="w-full py-2 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800"
                   >
-                    Cancel
+                    Close
                   </button>
-                  <button
-                    type="button"
-                    onMouseDown={e => {
-                      e.preventDefault()
-                      if (!saving && loaded) save()
-                    }}
-                    onPointerDown={e => {
-                      e.preventDefault()
-                      if (!saving && loaded) save()
-                    }}
-                    onClick={() => {
-                      if (!saving && loaded) save()
-                    }}
-                    disabled={saving || !loaded}
-                    className="flex-1 py-2 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800 disabled:opacity-50"
-                  >
-                    {saving ? 'Saving…' : 'Save'}
-                  </button>
-                </div>
-              </>
-            )}
+                </>
+              ) : (
+                // ─── EDIT STATE — original input + Cancel/Save row. ───
+                <>
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                        {SOURCE_LABEL[table] || 'Master Rates'}
+                      </p>
+                      <p
+                        className="text-base font-semibold text-gray-900 leading-tight"
+                        title={name}
+                      >
+                        {name}
+                      </p>
+                      {category && (
+                        <p className="text-xs text-gray-500 mt-0.5">Category: {category}</p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setOpen(false)}
+                      className="text-gray-300 hover:text-gray-600 text-xl leading-none p-1 -mt-1 flex-shrink-0"
+                      title="Close"
+                    >
+                      ×
+                    </button>
+                  </div>
 
-            <p className="text-[11px] text-gray-400 mt-3 italic text-center">
-              Updates the master rate everywhere it's used.
-            </p>
-          </div>
-        </div>,
-        document.body
-      )}
+                  <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                    {mode === 'coefficient'
+                      ? `Coefficient${unitLabel ? ` (${unitLabel})` : ''}`
+                      : `Rate${unitLabel ? ` ($/${unitLabel})` : ''}`}
+                  </label>
+                  {!loaded ? (
+                    <p className="text-sm text-gray-400 py-3">Loading current value…</p>
+                  ) : (
+                    <div className="relative">
+                      {mode === 'currency' && (
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                          $
+                        </span>
+                      )}
+                      <input
+                        type="number"
+                        step="0.001"
+                        min="0"
+                        autoFocus
+                        value={draft}
+                        onChange={e => setDraft(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') save()
+                        }}
+                        className={`input text-base w-full ${mode === 'currency' ? 'pl-7' : 'pl-3'} ${mode === 'coefficient' && unitLabel ? 'pr-16' : ''}`}
+                      />
+                      {mode === 'coefficient' && unitLabel && (
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">
+                          {unitLabel}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+
+                  <div className="flex gap-2 mt-5">
+                    <button
+                      onClick={() => setOpen(false)}
+                      className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onMouseDown={e => {
+                        e.preventDefault()
+                        if (!saving && loaded) save()
+                      }}
+                      onPointerDown={e => {
+                        e.preventDefault()
+                        if (!saving && loaded) save()
+                      }}
+                      onClick={() => {
+                        if (!saving && loaded) save()
+                      }}
+                      disabled={saving || !loaded}
+                      className="flex-1 py-2 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800 disabled:opacity-50"
+                    >
+                      {saving ? 'Saving…' : 'Save'}
+                    </button>
+                  </div>
+                </>
+              )}
+
+              <p className="text-[11px] text-gray-400 mt-3 italic text-center">
+                Updates the master rate everywhere it's used.
+              </p>
+            </div>
+          </div>,
+          document.body
+        )}
     </span>
   )
 }

@@ -29,16 +29,23 @@ import { useAuth } from '../contexts/AuthContext'
 
 const FG = '#3A5038'
 
-export default function StatSharesModal({ statId, statName, ownerUserId, onClose, initialShares, onLocalSave }) {
+export default function StatSharesModal({
+  statId,
+  statName,
+  ownerUserId,
+  onClose,
+  initialShares,
+  onLocalSave,
+}) {
   const { user } = useAuth()
 
-  const [employees,  setEmployees]  = useState([]) // [{id, name, email, user_id}]
-  const [shares,     setShares]     = useState({}) // user_id -> 'view'|'edit'
-  const [original,   setOriginal]   = useState({}) // snapshot for change detection
-  const [loading,    setLoading]    = useState(true)
-  const [saving,     setSaving]     = useState(false)
-  const [error,      setError]      = useState('')
-  const [search,     setSearch]     = useState('')
+  const [employees, setEmployees] = useState([]) // [{id, name, email, user_id}]
+  const [shares, setShares] = useState({}) // user_id -> 'view'|'edit'
+  const [original, setOriginal] = useState({}) // snapshot for change detection
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [search, setSearch] = useState('')
   // Owner discovered from the DB (or seeded from the prop). The DB lookup is
   // the source of truth — it avoids a long-standing footgun where the parent
   // didn't have the stat's real owner and accidentally fell back to the
@@ -52,11 +59,14 @@ export default function StatSharesModal({ statId, statName, ownerUserId, onClose
       try {
         // Base: every profile = every user who can log in.
         // Enrich: employees table for first/last name where user_id is linked.
-        const [{ data: profData, error: profErr }, { data: empData, error: empErr }] = await Promise.all([
-          supabase.from('profiles').select('id, email, full_name').order('full_name'),
-          supabase.from('employees').select('id, first_name, last_name, email, user_id, status')
-            .not('user_id', 'is', null),
-        ])
+        const [{ data: profData, error: profErr }, { data: empData, error: empErr }] =
+          await Promise.all([
+            supabase.from('profiles').select('id, email, full_name').order('full_name'),
+            supabase
+              .from('employees')
+              .select('id, first_name, last_name, email, user_id, status')
+              .not('user_id', 'is', null),
+          ])
         if (profErr) throw profErr
         if (empErr) throw empErr
 
@@ -64,13 +74,17 @@ export default function StatSharesModal({ statId, statName, ownerUserId, onClose
         // Local mode → seed from initialShares, skip DB reads
         let sharesMap = {}
         if (statId) {
-          const [{ data: shareData, error: shareErr }, { data: statRow, error: statErr }] = await Promise.all([
-            supabase.from('statistic_shares').select('user_id, permission').eq('statistic_id', statId),
-            supabase.from('statistics').select('owner_user_id').eq('id', statId).maybeSingle(),
-          ])
+          const [{ data: shareData, error: shareErr }, { data: statRow, error: statErr }] =
+            await Promise.all([
+              supabase
+                .from('statistic_shares')
+                .select('user_id, permission')
+                .eq('statistic_id', statId),
+              supabase.from('statistics').select('owner_user_id').eq('id', statId).maybeSingle(),
+            ])
           if (shareErr) throw shareErr
           if (statErr) throw statErr
-          for (const row of (shareData || [])) sharesMap[row.user_id] = row.permission
+          for (const row of shareData || []) sharesMap[row.user_id] = row.permission
           if (statRow?.owner_user_id) setResolvedOwnerId(statRow.owner_user_id)
         } else {
           sharesMap = { ...(initialShares || {}) }
@@ -80,7 +94,7 @@ export default function StatSharesModal({ statId, statName, ownerUserId, onClose
 
         // Build a lookup: auth user_id → employee record (non-archived preferred)
         const empByUserId = {}
-        for (const e of (empData || [])) {
+        for (const e of empData || []) {
           if (!e.user_id) continue
           // Prefer active over archived if multiple rows somehow share a user_id
           if (!empByUserId[e.user_id] || e.status !== 'archived') {
@@ -90,20 +104,22 @@ export default function StatSharesModal({ statId, statName, ownerUserId, onClose
 
         // Build list from profiles — everyone in profiles can log in.
         // Use employee first/last name when available; fall back to profile full_name then email.
-        const list = (profData || []).map(p => {
-          const emp = empByUserId[p.id]
-          // Skip if the matched employee is archived (they can still log in but
-          // are no longer active staff — keep them only if no emp record exists).
-          if (emp?.status === 'archived') return null
-          const empName = emp ? [emp.first_name, emp.last_name].filter(Boolean).join(' ') : ''
-          const name    = empName || p.full_name || p.email || '—'
-          return {
-            id:      emp?.id || `profile-${p.id}`,
-            user_id: p.id,
-            name,
-            email:   emp?.email || p.email || '',
-          }
-        }).filter(Boolean)
+        const list = (profData || [])
+          .map(p => {
+            const emp = empByUserId[p.id]
+            // Skip if the matched employee is archived (they can still log in but
+            // are no longer active staff — keep them only if no emp record exists).
+            if (emp?.status === 'archived') return null
+            const empName = emp ? [emp.first_name, emp.last_name].filter(Boolean).join(' ') : ''
+            const name = empName || p.full_name || p.email || '—'
+            return {
+              id: emp?.id || `profile-${p.id}`,
+              user_id: p.id,
+              name,
+              email: emp?.email || p.email || '',
+            }
+          })
+          .filter(Boolean)
 
         // Sort by name
         list.sort((a, b) => a.name.localeCompare(b.name))
@@ -120,7 +136,9 @@ export default function StatSharesModal({ statId, statName, ownerUserId, onClose
       }
     }
     load()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [statId])
 
   // ── Toggle helpers ───────────────────────────────────────────────────────
@@ -178,16 +196,16 @@ export default function StatSharesModal({ statId, statName, ownerUserId, onClose
       const allUserIds = new Set([...Object.keys(shares), ...Object.keys(original)])
       for (const uid of allUserIds) {
         const before = original[uid]
-        const after  = shares[uid]
+        const after = shares[uid]
         if (before === after) continue
         if (!after && before) {
           toDelete.push(uid)
         } else if (after) {
           toUpsert.push({
             statistic_id: statId,
-            user_id:      uid,
-            permission:   after,
-            created_by:   user?.id || null,
+            user_id: uid,
+            permission: after,
+            created_by: user?.id || null,
           })
         }
       }
@@ -220,9 +238,8 @@ export default function StatSharesModal({ statId, statName, ownerUserId, onClose
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     if (!q) return employees
-    return employees.filter(e =>
-      e.name.toLowerCase().includes(q) ||
-      e.email.toLowerCase().includes(q)
+    return employees.filter(
+      e => e.name.toLowerCase().includes(q) || e.email.toLowerCase().includes(q)
     )
   }, [employees, search])
 
@@ -304,16 +321,23 @@ export default function StatSharesModal({ statId, statName, ownerUserId, onClose
                 </thead>
                 <tbody>
                   {visibleEmployees.length === 0 && (
-                    <tr><td colSpan={3} className="text-center py-12 text-gray-400 text-sm">
-                      {search ? 'No employees match your search.' : 'No employees with linked accounts to share with.'}
-                    </td></tr>
+                    <tr>
+                      <td colSpan={3} className="text-center py-12 text-gray-400 text-sm">
+                        {search
+                          ? 'No employees match your search.'
+                          : 'No employees with linked accounts to share with.'}
+                      </td>
+                    </tr>
                   )}
                   {visibleEmployees.map(emp => {
                     const perm = shares[emp.user_id]
                     const hasView = perm === 'view' || perm === 'edit'
                     const hasEdit = perm === 'edit'
                     return (
-                      <tr key={emp.user_id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                      <tr
+                        key={emp.user_id}
+                        className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                      >
                         <td className="px-6 py-2.5">
                           <p className="font-medium text-gray-800">{emp.name}</p>
                           {emp.email && <p className="text-xs text-gray-400">{emp.email}</p>}

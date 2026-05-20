@@ -33,15 +33,13 @@ function buildGreeting({ firstName, tagline }) {
 
 export default function SamChat() {
   const { user } = useAuth()
-  const [open,            setOpen]            = useState(false)
-  const [conversationId,  setConversationId]  = useState(null)
-  const [greeting,        setGreeting]        = useState(DEFAULT_GREETING)
-  const [messages,        setMessages]        = useState([
-    { role: 'assistant', content: DEFAULT_GREETING },
-  ])
-  const [input,           setInput]           = useState('')
-  const [sending,         setSending]         = useState(false)
-  const [error,           setError]           = useState('')
+  const [open, setOpen] = useState(false)
+  const [conversationId, setConversationId] = useState(null)
+  const [greeting, setGreeting] = useState(DEFAULT_GREETING)
+  const [messages, setMessages] = useState([{ role: 'assistant', content: DEFAULT_GREETING }])
+  const [input, setInput] = useState('')
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState('')
   const scrollRef = useRef(null)
 
   // Personalise the greeting once we know who the user is. Pulls full_name +
@@ -57,7 +55,7 @@ export default function SamChat() {
         .eq('id', user.id)
         .maybeSingle()
       if (cancelled) return
-      const fullName  = (data?.full_name || '').trim()
+      const fullName = (data?.full_name || '').trim()
       const firstName = fullName ? fullName.split(/\s+/)[0] : ''
       const g = buildGreeting({ firstName, tagline: data?.greeting_tagline })
       setGreeting(g)
@@ -69,7 +67,9 @@ export default function SamChat() {
         return m
       })
     })()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [user?.id])
 
   // Auto-scroll to the latest message whenever the list grows.
@@ -87,21 +87,20 @@ export default function SamChat() {
     setSending(true)
     try {
       // Forward the user's JWT so the Edge Function can run tools as the user.
-      const { data: { session } } = await supabase.auth.getSession()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
       const jwt = session?.access_token
       if (!jwt) throw new Error('Not signed in.')
 
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agent-chat`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type':  'application/json',
-            'Authorization': `Bearer ${jwt}`,
-          },
-          body: JSON.stringify({ conversation_id: conversationId, message: text }),
-        }
-      )
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agent-chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${jwt}`,
+        },
+        body: JSON.stringify({ conversation_id: conversationId, message: text }),
+      })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`)
       if (data.conversation_id && !conversationId) setConversationId(data.conversation_id)
@@ -143,13 +142,18 @@ export default function SamChat() {
       {open && (
         <div className="fixed bottom-4 right-4 sm:bottom-5 sm:right-5 z-50 w-[475px] max-w-[95vw] h-[87vh] max-h-[800px] flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
           {/* Header */}
-          <div className="flex items-center gap-2 px-4 py-3 flex-shrink-0" style={{ backgroundColor: FG }}>
+          <div
+            className="flex items-center gap-2 px-4 py-3 flex-shrink-0"
+            style={{ backgroundColor: FG }}
+          >
             <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white font-bold">
               S
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-white text-sm font-semibold leading-tight">Sam</p>
-              <p className="text-green-200 text-[11px] leading-tight">Your friendly, neighborhood AI assistant.</p>
+              <p className="text-green-200 text-[11px] leading-tight">
+                Your friendly, neighborhood AI assistant.
+              </p>
             </div>
             <button
               onClick={newThread}
@@ -221,9 +225,7 @@ export default function SamChat() {
                 Send
               </button>
             </div>
-            {error && (
-              <p className="text-[11px] text-red-600 mt-1 px-1 truncate">{error}</p>
-            )}
+            {error && <p className="text-[11px] text-red-600 mt-1 px-1 truncate">{error}</p>}
           </div>
         </div>
       )}

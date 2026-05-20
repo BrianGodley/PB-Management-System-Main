@@ -18,30 +18,31 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useState } from 'react'
 
-const fmt  = v => `$${Math.round(v || 0).toLocaleString()}`
-const fmt2 = v => `$${(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-const fnum = v => (v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const fmt = v => `$${Math.round(v || 0).toLocaleString()}`
+const fmt2 = v =>
+  `$${(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const fnum = v =>
+  (v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 export default function GpmdBar({
-  totalMat         = 0,
-  totalHrs         = 0,
-  manDays          = 0,
-  laborCost        = 0,
+  totalMat = 0,
+  totalHrs = 0,
+  manDays = 0,
+  laborCost = 0,
   laborRatePerHour = 35,
-  burden           = 0,
-  gpmd             = 425,   // PROJECT mode: GP = manDays × gpmd
-  directGp         = null,  // ESTIMATE mode: actual GP total; GPMD is derived
-  subCost          = 0,
-  price            = 0,
-  onGpmdSave       = null,  // if provided → PROJECT mode (editable GPMD)
-  subMarkupRate    = 0.20,  // Sub GP = subCost × subMarkupRate
-  onSubMarkupSave  = null,  // if provided → Sub % cell is editable
-  sticky           = false, // when true: renders with sticky positioning (handled by parent wrapper)
+  burden = 0,
+  gpmd = 425, // PROJECT mode: GP = manDays × gpmd
+  directGp = null, // ESTIMATE mode: actual GP total; GPMD is derived
+  subCost = 0,
+  onGpmdSave = null, // if provided → PROJECT mode (editable GPMD)
+  subMarkupRate = 0.2, // Sub GP = subCost × subMarkupRate
+  onSubMarkupSave = null, // if provided → Sub % cell is editable
+  sticky = false, // when true: renders with sticky positioning (handled by parent wrapper)
 }) {
-  const [editingGpmd,    setEditingGpmd]    = useState(false)
-  const [draftGpmd,      setDraftGpmd]      = useState('')
-  const [editingSubPct,  setEditingSubPct]  = useState(false)
-  const [draftSubPct,    setDraftSubPct]    = useState('')
+  const [editingGpmd, setEditingGpmd] = useState(false)
+  const [draftGpmd, setDraftGpmd] = useState('')
+  const [editingSubPct, setEditingSubPct] = useState(false)
+  const [draftSubPct, setDraftSubPct] = useState('')
 
   // Previously: `if (price <= 0) return null` — but the module-level
   // sticky wrapper has its own padding, so returning null left a thin
@@ -50,14 +51,13 @@ export default function GpmdBar({
   // stable from the moment the module opens.
 
   // ── Core calculations ──────────────────────────────────────────────────────
-  const effectiveGp    = directGp != null ? directGp : manDays * gpmd
-  const displayGpmd    = directGp != null
-    ? (manDays > 0 ? Math.round(directGp / manDays) : 0)
-    : gpmd
-  const subGp          = (subCost || 0) * (subMarkupRate || 0)
-  const displaySubPct  = Math.round((subMarkupRate || 0) * 100)
-  const effectiveComm  = (effectiveGp + subGp) * 0.12
-  const effectivePrice = laborCost + burden + totalMat + (subCost || 0) + effectiveGp + subGp + effectiveComm
+  const effectiveGp = directGp != null ? directGp : manDays * gpmd
+  const displayGpmd = directGp != null ? (manDays > 0 ? Math.round(directGp / manDays) : 0) : gpmd
+  const subGp = (subCost || 0) * (subMarkupRate || 0)
+  const displaySubPct = Math.round((subMarkupRate || 0) * 100)
+  const effectiveComm = (effectiveGp + subGp) * 0.12
+  const effectivePrice =
+    laborCost + burden + totalMat + (subCost || 0) + effectiveGp + subGp + effectiveComm
 
   // ── GPMD edit handlers ─────────────────────────────────────────────────────
   function startGpmdEdit() {
@@ -94,7 +94,10 @@ export default function GpmdBar({
             value={draftGpmd}
             onChange={e => setDraftGpmd(e.target.value)}
             onBlur={commitGpmdEdit}
-            onKeyDown={e => { if (e.key === 'Enter') commitGpmdEdit(); if (e.key === 'Escape') setEditingGpmd(false) }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') commitGpmdEdit()
+              if (e.key === 'Escape') setEditingGpmd(false)
+            }}
             className="w-16 bg-gray-800 border border-amber-400 rounded text-amber-200 text-sm font-bold text-center tabular-nums outline-none px-1"
           />
         </div>
@@ -117,51 +120,20 @@ export default function GpmdBar({
   }
 
   // ── Sub % cell ─────────────────────────────────────────────────────────────
-  function SubMarkupCell() {
-    if (onSubMarkupSave && editingSubPct) {
-      return (
-        <div className="rounded-lg bg-blue-500/20 border border-blue-400/50 px-3 py-1 text-center min-w-[58px]">
-          <p className="text-xs mb-0.5 whitespace-nowrap text-blue-300">Sub %</p>
-          <div className="flex items-center justify-center gap-0.5">
-            <input
-              autoFocus
-              value={draftSubPct}
-              onChange={e => setDraftSubPct(e.target.value)}
-              onBlur={commitSubEdit}
-              onKeyDown={e => { if (e.key === 'Enter') commitSubEdit(); if (e.key === 'Escape') setEditingSubPct(false) }}
-              className="w-10 bg-gray-800 border border-blue-400 rounded text-blue-200 text-sm font-bold text-center tabular-nums outline-none px-1"
-            />
-            <span className="text-blue-300 text-sm font-bold">%</span>
-          </div>
-        </div>
-      )
-    }
-    return (
-      <div
-        className={`rounded-lg bg-blue-500/20 border border-blue-400/30 px-3 py-1 text-center min-w-[58px] ${onSubMarkupSave ? 'cursor-pointer hover:bg-blue-500/30 transition-colors' : ''}`}
-        onClick={startSubEdit}
-        title={onSubMarkupSave ? 'Click to edit Sub GP markup rate' : undefined}
-      >
-        <p className="text-xs mb-0.5 whitespace-nowrap text-blue-300">
-          Sub %{onSubMarkupSave && <span className="text-blue-500 text-[10px] ml-1">✎</span>}
-        </p>
-        <p className="font-bold tabular-nums text-sm text-blue-200">
-          {displaySubPct}%
-        </p>
-      </div>
-    )
-  }
-
   const cols = [
-    { label: 'Labor Hours',  value: fnum(totalHrs),                    dim: 'hrs'                                         },
-    { label: 'Man Days',     value: fnum(manDays),                     dim: 'MD'                                          },
-    { label: 'Materials',    value: fmt2(totalMat),                    dim: null                                          },
-    { label: 'Crew Labor',   value: fmt(laborCost),                    dim: `@ $${parseFloat(laborRatePerHour).toFixed(0)}/hr` },
-    { label: 'Labor Burden', value: fmt(burden),                       dim: '29%'                                         },
-    { label: 'Sub Cost',     value: subCost > 0 ? fmt(subCost) : '—', dim: null                                          },
-    { label: 'Gross Profit', value: fmt(effectiveGp),                  dim: null,  green: true                           },
-    { label: 'Commission',   value: fmt(effectiveComm),                dim: '12%'                                         },
-    { label: 'Total Price',  value: fmt(effectivePrice),               dim: null,  green: true, big: true                },
+    { label: 'Labor Hours', value: fnum(totalHrs), dim: 'hrs' },
+    { label: 'Man Days', value: fnum(manDays), dim: 'MD' },
+    { label: 'Materials', value: fmt2(totalMat), dim: null },
+    {
+      label: 'Crew Labor',
+      value: fmt(laborCost),
+      dim: `@ $${parseFloat(laborRatePerHour).toFixed(0)}/hr`,
+    },
+    { label: 'Labor Burden', value: fmt(burden), dim: '29%' },
+    { label: 'Sub Cost', value: subCost > 0 ? fmt(subCost) : '—', dim: null },
+    { label: 'Gross Profit', value: fmt(effectiveGp), dim: null, green: true },
+    { label: 'Commission', value: fmt(effectiveComm), dim: '12%' },
+    { label: 'Total Price', value: fmt(effectivePrice), dim: null, green: true, big: true },
   ]
 
   // ── Sub GP column — rendered separately so the rate is inline-editable ─────
@@ -180,7 +152,10 @@ export default function GpmdBar({
               value={draftSubPct}
               onChange={e => setDraftSubPct(e.target.value)}
               onBlur={commitSubEdit}
-              onKeyDown={e => { if (e.key === 'Enter') commitSubEdit(); if (e.key === 'Escape') setEditingSubPct(false) }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') commitSubEdit()
+                if (e.key === 'Escape') setEditingSubPct(false)
+              }}
               className="w-8 bg-gray-800 border border-blue-400 rounded text-blue-200 text-xs font-bold text-center tabular-nums outline-none px-0.5"
             />
             <span className="text-blue-300 text-xs font-bold">%</span>
@@ -204,16 +179,14 @@ export default function GpmdBar({
 
   return (
     <div className={containerCls}>
-
       <div className="flex gap-0 divide-x divide-white/10 flex-wrap">
-
         {/* Left: GPMD editable cell */}
         <div className="pr-2 shrink-0">
           <GpmdCell />
         </div>
 
         {/* Data columns — flex-1 so they share width evenly */}
-        {cols.map((col, i) => {
+        {cols.map(col => {
           const isAfterSubCost = col.label === 'Gross Profit'
           // Use a keyed Fragment so React stops warning about missing keys
           // on this iterator (shorthand <> can't accept a key prop).
@@ -222,11 +195,15 @@ export default function GpmdBar({
               {isAfterSubCost && <SubGpCol />}
               <div className="px-1.5 flex-1 min-w-0 text-center">
                 <p className="text-[10px] text-gray-400 truncate mb-0.5">{col.label}</p>
-                <p className={`font-bold tabular-nums truncate ${
-                  col.big   ? 'text-base text-green-400' :
-                  col.green ? 'text-sm text-green-400' :
-                              'text-sm text-white'
-                }`}>
+                <p
+                  className={`font-bold tabular-nums truncate ${
+                    col.big
+                      ? 'text-base text-green-400'
+                      : col.green
+                        ? 'text-sm text-green-400'
+                        : 'text-sm text-white'
+                  }`}
+                >
                   {col.value}
                 </p>
                 {col.dim && <p className="text-[10px] text-gray-500 truncate">{col.dim}</p>}
@@ -234,7 +211,6 @@ export default function GpmdBar({
             </React.Fragment>
           )
         })}
-
       </div>
     </div>
   )

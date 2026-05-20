@@ -3,9 +3,17 @@ import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import {
-  LineChart, Line, BarChart, Bar, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Customized
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Customized,
 } from 'recharts'
 import StatSharesModal from '../components/StatSharesModal'
 
@@ -16,24 +24,34 @@ const OVERLAY_COLORS = ['#3A5038', '#2563EB', '#DC2626'] // green, blue, red —
 function fmt(value, statType) {
   if (value == null) return ''
   const n = Number(value)
-  if (statType === 'currency')   return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  if (statType === 'currency')
+    return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   if (statType === 'percentage') return n.toFixed(2) + '%'
   return n.toLocaleString('en-US', { maximumFractionDigits: 2 })
 }
 
-function isoDate(d) { return d ? d.toISOString().slice(0, 10) : '' }
-function today()    { return isoDate(new Date()) }
-function daysAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return isoDate(d) }
+function isoDate(d) {
+  return d ? d.toISOString().slice(0, 10) : ''
+}
+function today() {
+  return isoDate(new Date())
+}
+function daysAgo(n) {
+  const d = new Date()
+  d.setDate(d.getDate() - n)
+  return isoDate(d)
+}
 
 // Period labels for X axis
 function periodLabel(dateStr, tracking) {
   const d = new Date(dateStr + 'T00:00:00')
-  if (tracking === 'yearly')    return d.getFullYear().toString()
+  if (tracking === 'yearly') return d.getFullYear().toString()
   if (tracking === 'quarterly') {
     const q = Math.floor(d.getMonth() / 3) + 1
     return `Q${q} ${d.getFullYear()}`
   }
-  if (tracking === 'monthly')   return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+  if (tracking === 'monthly')
+    return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
   // weekly and daily — full date including year, e.g. "Sep 20, 2025"
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
@@ -54,39 +72,50 @@ function computeTargetEndDate(startDate, endMode, endDate, endPeriods, unit) {
   const n = parseInt(endPeriods) || 0
   if (n === 0) return startDate
   const d = new Date(startDate + 'T00:00:00')
-  if      (unit === 'daily')     d.setDate(d.getDate() + n)
-  else if (unit === 'weekly')    d.setDate(d.getDate() + n * 7)
-  else if (unit === 'monthly')   d.setMonth(d.getMonth() + n)
+  if (unit === 'daily') d.setDate(d.getDate() + n)
+  else if (unit === 'weekly') d.setDate(d.getDate() + n * 7)
+  else if (unit === 'monthly') d.setMonth(d.getMonth() + n)
   else if (unit === 'quarterly') d.setMonth(d.getMonth() + n * 3)
-  else if (unit === 'yearly')    d.setFullYear(d.getFullYear() + n)
+  else if (unit === 'yearly') d.setFullYear(d.getFullYear() + n)
   return d.toISOString().slice(0, 10)
 }
 
 // ── PickSourceStatModal ───────────────────────────────────────────────────────
 function PickSourceStatModal({ stats, onPick, onClose }) {
-  const eligible = (stats || []).filter(s =>
-    !s.archived && !['equation', 'overlay', 'target'].includes(s.stat_category)
+  const eligible = (stats || []).filter(
+    s => !s.archived && !['equation', 'overlay', 'target'].includes(s.stat_category)
   )
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[80vh] overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-3.5 border-b border-gray-100 flex-shrink-0"
-             style={{ backgroundColor: '#3A5038' }}>
+        <div
+          className="flex items-center justify-between px-6 py-3.5 border-b border-gray-100 flex-shrink-0"
+          style={{ backgroundColor: '#3A5038' }}
+        >
           <h2 className="text-base font-bold text-white">🎯 Target Statistic — Pick Source</h2>
-          <button onClick={onClose} className="text-white/70 hover:text-white text-xl leading-none">✕</button>
+          <button onClick={onClose} className="text-white/70 hover:text-white text-xl leading-none">
+            ✕
+          </button>
         </div>
         <p className="px-6 pt-4 pb-2 text-sm text-gray-500">
           Pick the statistic you want to create a target for:
         </p>
         <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-1.5">
           {eligible.length === 0 && (
-            <p className="text-sm text-gray-400 italic py-4 text-center">No eligible statistics found.</p>
+            <p className="text-sm text-gray-400 italic py-4 text-center">
+              No eligible statistics found.
+            </p>
           )}
           {eligible.map(s => (
-            <button key={s.id} onClick={() => onPick(s)}
-              className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 hover:border-green-600 hover:bg-green-50 transition-colors">
+            <button
+              key={s.id}
+              onClick={() => onPick(s)}
+              className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 hover:border-green-600 hover:bg-green-50 transition-colors"
+            >
               <div className="text-sm font-semibold text-gray-800">{s.name}</div>
-              <div className="text-xs text-gray-500 mt-0.5 capitalize">{s.tracking} · {s.stat_type}</div>
+              <div className="text-xs text-gray-500 mt-0.5 capitalize">
+                {s.tracking} · {s.stat_type}
+              </div>
             </button>
           ))}
         </div>
@@ -99,172 +128,470 @@ function PickSourceStatModal({ stats, onPick, onClose }) {
 const STAT_TYPE_PREVIEWS = {
   basic: (
     // Single clean upward-trending line with dots
-    <svg viewBox="0 0 110 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-      <path d="M4,52 C18,46 28,38 38,30 C50,21 60,18 76,12 C86,8 96,6 106,4"
-        stroke="#3A5038" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
-      <circle cx="4"   cy="52" r="3" fill="#3A5038"/>
-      <circle cx="28"  cy="37" r="3" fill="#3A5038"/>
-      <circle cx="54"  cy="20" r="3" fill="#3A5038"/>
-      <circle cx="76"  cy="12" r="3" fill="#3A5038"/>
-      <circle cx="106" cy="4"  r="3" fill="#3A5038"/>
+    <svg
+      viewBox="0 0 110 60"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-full h-full"
+    >
+      <path
+        d="M4,52 C18,46 28,38 38,30 C50,21 60,18 76,12 C86,8 96,6 106,4"
+        stroke="#3A5038"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        fill="none"
+      />
+      <circle cx="4" cy="52" r="3" fill="#3A5038" />
+      <circle cx="28" cy="37" r="3" fill="#3A5038" />
+      <circle cx="54" cy="20" r="3" fill="#3A5038" />
+      <circle cx="76" cy="12" r="3" fill="#3A5038" />
+      <circle cx="106" cy="4" r="3" fill="#3A5038" />
       {/* Soft fill under line */}
-      <path d="M4,52 C18,46 28,38 38,30 C50,21 60,18 76,12 C86,8 96,6 106,4 L106,60 L4,60 Z"
-        fill="#3A5038" fillOpacity="0.08"/>
+      <path
+        d="M4,52 C18,46 28,38 38,30 C50,21 60,18 76,12 C86,8 96,6 106,4 L106,60 L4,60 Z"
+        fill="#3A5038"
+        fillOpacity="0.08"
+      />
     </svg>
   ),
   equation: (
     // Two small line graphs stacked with +/- in the middle, no labels
-    <svg viewBox="0 0 110 64" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+    <svg
+      viewBox="0 0 110 64"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-full h-full"
+    >
       {/* Top line graph — blue */}
-      <path d="M4,18 C18,16 30,12 44,8 C58,4 74,6 106,3"
-        stroke="#2563EB" strokeWidth="2" strokeLinecap="round"/>
-      <circle cx="4"   cy="18" r="2" fill="#2563EB"/>
-      <circle cx="44"  cy="8"  r="2" fill="#2563EB"/>
-      <circle cx="76"  cy="6"  r="2" fill="#2563EB"/>
-      <circle cx="106" cy="3"  r="2" fill="#2563EB"/>
+      <path
+        d="M4,18 C18,16 30,12 44,8 C58,4 74,6 106,3"
+        stroke="#2563EB"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <circle cx="4" cy="18" r="2" fill="#2563EB" />
+      <circle cx="44" cy="8" r="2" fill="#2563EB" />
+      <circle cx="76" cy="6" r="2" fill="#2563EB" />
+      <circle cx="106" cy="3" r="2" fill="#2563EB" />
       {/* Divider */}
-      <line x1="4" y1="28" x2="106" y2="28" stroke="#e5e7eb" strokeWidth="1"/>
+      <line x1="4" y1="28" x2="106" y2="28" stroke="#e5e7eb" strokeWidth="1" />
       {/* +/- stacked operator */}
-      <text x="55" y="26" textAnchor="middle" fontSize="12" fontWeight="900" fill="#374151" fontFamily="monospace">+</text>
-      <text x="55" y="39" textAnchor="middle" fontSize="12" fontWeight="900" fill="#6b7280" fontFamily="monospace">−</text>
+      <text
+        x="55"
+        y="26"
+        textAnchor="middle"
+        fontSize="12"
+        fontWeight="900"
+        fill="#374151"
+        fontFamily="monospace"
+      >
+        +
+      </text>
+      <text
+        x="55"
+        y="39"
+        textAnchor="middle"
+        fontSize="12"
+        fontWeight="900"
+        fill="#6b7280"
+        fontFamily="monospace"
+      >
+        −
+      </text>
       {/* Bottom line graph — pink */}
-      <path d="M4,60 C20,54 36,50 54,46 C70,42 88,44 106,40"
-        stroke="#db2777" strokeWidth="2" strokeLinecap="round"/>
-      <circle cx="4"   cy="60" r="2" fill="#db2777"/>
-      <circle cx="54"  cy="46" r="2" fill="#db2777"/>
-      <circle cx="82"  cy="43" r="2" fill="#db2777"/>
-      <circle cx="106" cy="40" r="2" fill="#db2777"/>
+      <path
+        d="M4,60 C20,54 36,50 54,46 C70,42 88,44 106,40"
+        stroke="#db2777"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <circle cx="4" cy="60" r="2" fill="#db2777" />
+      <circle cx="54" cy="46" r="2" fill="#db2777" />
+      <circle cx="82" cy="43" r="2" fill="#db2777" />
+      <circle cx="106" cy="40" r="2" fill="#db2777" />
     </svg>
   ),
   overlay: (
     // Two lines, different colors, on same axes
-    <svg viewBox="0 0 110 60" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+    <svg
+      viewBox="0 0 110 60"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-full h-full"
+    >
       {/* Line 1 — green */}
-      <path d="M4,48 C20,40 36,28 54,22 C70,16 88,18 106,8"
-        stroke="#3A5038" strokeWidth="2.5" strokeLinecap="round"/>
-      <circle cx="4"   cy="48" r="2.5" fill="#3A5038"/>
-      <circle cx="54"  cy="22" r="2.5" fill="#3A5038"/>
-      <circle cx="106" cy="8"  r="2.5" fill="#3A5038"/>
+      <path
+        d="M4,48 C20,40 36,28 54,22 C70,16 88,18 106,8"
+        stroke="#3A5038"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+      <circle cx="4" cy="48" r="2.5" fill="#3A5038" />
+      <circle cx="54" cy="22" r="2.5" fill="#3A5038" />
+      <circle cx="106" cy="8" r="2.5" fill="#3A5038" />
       {/* Line 2 — blue */}
-      <path d="M4,38 C20,50 36,42 54,36 C70,30 88,46 106,28"
-        stroke="#2563EB" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="5 2"/>
-      <circle cx="4"   cy="38" r="2.5" fill="#2563EB"/>
-      <circle cx="54"  cy="36" r="2.5" fill="#2563EB"/>
-      <circle cx="106" cy="28" r="2.5" fill="#2563EB"/>
+      <path
+        d="M4,38 C20,50 36,42 54,36 C70,30 88,46 106,28"
+        stroke="#2563EB"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeDasharray="5 2"
+      />
+      <circle cx="4" cy="38" r="2.5" fill="#2563EB" />
+      <circle cx="54" cy="36" r="2.5" fill="#2563EB" />
+      <circle cx="106" cy="28" r="2.5" fill="#2563EB" />
     </svg>
   ),
   secondary: (
     // Weekly line on top, down arrow, Monthly line below — content pushed down for breathing room
-    <svg viewBox="0 0 110 117" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+    <svg
+      viewBox="0 0 110 117"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-full h-full"
+    >
       {/* "Weekly" tag — well clear of top edge */}
-      <rect x="2" y="22" width="30" height="11" rx="3" fill="#f1f5f9" stroke="#94a3b8" strokeWidth="1"/>
-      <text x="17" y="30" textAnchor="middle" fontSize="6.5" fontWeight="700" fill="#475569" fontFamily="sans-serif">Weekly</text>
+      <rect
+        x="2"
+        y="22"
+        width="30"
+        height="11"
+        rx="3"
+        fill="#f1f5f9"
+        stroke="#94a3b8"
+        strokeWidth="1"
+      />
+      <text
+        x="17"
+        y="30"
+        textAnchor="middle"
+        fontSize="6.5"
+        fontWeight="700"
+        fill="#475569"
+        fontFamily="sans-serif"
+      >
+        Weekly
+      </text>
       {/* Weekly line — dense, wiggly */}
-      <path d="M2,56 C8,50 14,58 20,48 C26,40 32,54 38,44 C44,36 50,48 56,38 C62,30 68,42 74,34 C84,28 96,32 108,26"
-        stroke="#94a3b8" strokeWidth="1.8" strokeLinecap="round" fill="none"/>
-      <circle cx="2"   cy="56" r="1.5" fill="#94a3b8"/>
-      <circle cx="20"  cy="48" r="1.5" fill="#94a3b8"/>
-      <circle cx="38"  cy="44" r="1.5" fill="#94a3b8"/>
-      <circle cx="56"  cy="38" r="1.5" fill="#94a3b8"/>
-      <circle cx="74"  cy="34" r="1.5" fill="#94a3b8"/>
-      <circle cx="108" cy="26" r="1.5" fill="#94a3b8"/>
+      <path
+        d="M2,56 C8,50 14,58 20,48 C26,40 32,54 38,44 C44,36 50,48 56,38 C62,30 68,42 74,34 C84,28 96,32 108,26"
+        stroke="#94a3b8"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        fill="none"
+      />
+      <circle cx="2" cy="56" r="1.5" fill="#94a3b8" />
+      <circle cx="20" cy="48" r="1.5" fill="#94a3b8" />
+      <circle cx="38" cy="44" r="1.5" fill="#94a3b8" />
+      <circle cx="56" cy="38" r="1.5" fill="#94a3b8" />
+      <circle cx="74" cy="34" r="1.5" fill="#94a3b8" />
+      <circle cx="108" cy="26" r="1.5" fill="#94a3b8" />
       {/* Down arrow */}
-      <line x1="55" y1="62" x2="55" y2="72" stroke="#6b7280" strokeWidth="1.8" strokeLinecap="round"/>
-      <path d="M50,68 L55,74 L60,68" stroke="#6b7280" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      <line
+        x1="55"
+        y1="62"
+        x2="55"
+        y2="72"
+        stroke="#6b7280"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <path
+        d="M50,68 L55,74 L60,68"
+        stroke="#6b7280"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
       {/* "Monthly" tag */}
-      <rect x="2" y="78" width="34" height="11" rx="3" fill="#dcfce7" stroke="#3A5038" strokeWidth="1"/>
-      <text x="19" y="86" textAnchor="middle" fontSize="6.5" fontWeight="700" fill="#3A5038" fontFamily="sans-serif">Monthly</text>
+      <rect
+        x="2"
+        y="78"
+        width="34"
+        height="11"
+        rx="3"
+        fill="#dcfce7"
+        stroke="#3A5038"
+        strokeWidth="1"
+      />
+      <text
+        x="19"
+        y="86"
+        textAnchor="middle"
+        fontSize="6.5"
+        fontWeight="700"
+        fill="#3A5038"
+        fontFamily="sans-serif"
+      >
+        Monthly
+      </text>
       {/* Monthly line — smooth, fewer points */}
-      <path d="M2,110 C22,102 44,96 66,88 C84,82 96,78 108,74"
-        stroke="#3A5038" strokeWidth="2.2" strokeLinecap="round" fill="none"/>
-      <circle cx="2"   cy="110" r="2" fill="#3A5038"/>
-      <circle cx="40"  cy="96"  r="2" fill="#3A5038"/>
-      <circle cx="76"  cy="82"  r="2" fill="#3A5038"/>
-      <circle cx="108" cy="74"  r="2" fill="#3A5038"/>
+      <path
+        d="M2,110 C22,102 44,96 66,88 C84,82 96,78 108,74"
+        stroke="#3A5038"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        fill="none"
+      />
+      <circle cx="2" cy="110" r="2" fill="#3A5038" />
+      <circle cx="40" cy="96" r="2" fill="#3A5038" />
+      <circle cx="76" cy="82" r="2" fill="#3A5038" />
+      <circle cx="108" cy="74" r="2" fill="#3A5038" />
     </svg>
   ),
   auto_internal: (
     // Database cylinder on top, down arrow, computed line graph below
-    <svg viewBox="0 0 110 90" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+    <svg
+      viewBox="0 0 110 90"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-full h-full"
+    >
       {/* DB cylinder — centred at top */}
-      <ellipse cx="55" cy="10" rx="22" ry="7" fill="#e0f2fe" stroke="#0ea5e9" strokeWidth="1.5"/>
-      <rect x="33" y="10" width="44" height="22" fill="#e0f2fe" stroke="#0ea5e9" strokeWidth="1.5"/>
-      <ellipse cx="55" cy="32" rx="22" ry="7" fill="#bae6fd" stroke="#0ea5e9" strokeWidth="1.5"/>
+      <ellipse cx="55" cy="10" rx="22" ry="7" fill="#e0f2fe" stroke="#0ea5e9" strokeWidth="1.5" />
+      <rect
+        x="33"
+        y="10"
+        width="44"
+        height="22"
+        fill="#e0f2fe"
+        stroke="#0ea5e9"
+        strokeWidth="1.5"
+      />
+      <ellipse cx="55" cy="32" rx="22" ry="7" fill="#bae6fd" stroke="#0ea5e9" strokeWidth="1.5" />
       {/* Data rows inside cylinder */}
-      <line x1="40" y1="18" x2="70" y2="18" stroke="#0ea5e9" strokeWidth="1.2" strokeOpacity="0.7"/>
-      <line x1="40" y1="24" x2="70" y2="24" stroke="#0ea5e9" strokeWidth="1.2" strokeOpacity="0.7"/>
+      <line
+        x1="40"
+        y1="18"
+        x2="70"
+        y2="18"
+        stroke="#0ea5e9"
+        strokeWidth="1.2"
+        strokeOpacity="0.7"
+      />
+      <line
+        x1="40"
+        y1="24"
+        x2="70"
+        y2="24"
+        stroke="#0ea5e9"
+        strokeWidth="1.2"
+        strokeOpacity="0.7"
+      />
       {/* Down arrow */}
-      <line x1="55" y1="40" x2="55" y2="52" stroke="#0ea5e9" strokeWidth="2" strokeLinecap="round"/>
-      <path d="M50,48 L55,54 L60,48" stroke="#0ea5e9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      <line
+        x1="55"
+        y1="40"
+        x2="55"
+        y2="52"
+        stroke="#0ea5e9"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M50,48 L55,54 L60,48"
+        stroke="#0ea5e9"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
       {/* Computed line graph below */}
-      <path d="M4,86 C18,78 32,70 50,62 C66,55 82,54 106,46"
-        stroke="#1e40af" strokeWidth="2.5" strokeLinecap="round"/>
-      <circle cx="4"   cy="86" r="2.5" fill="#1e40af"/>
-      <circle cx="32"  cy="70" r="2.5" fill="#1e40af"/>
-      <circle cx="60"  cy="60" r="2.5" fill="#1e40af"/>
-      <circle cx="88"  cy="52" r="2.5" fill="#1e40af"/>
-      <circle cx="106" cy="46" r="2.5" fill="#1e40af"/>
+      <path
+        d="M4,86 C18,78 32,70 50,62 C66,55 82,54 106,46"
+        stroke="#1e40af"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+      <circle cx="4" cy="86" r="2.5" fill="#1e40af" />
+      <circle cx="32" cy="70" r="2.5" fill="#1e40af" />
+      <circle cx="60" cy="60" r="2.5" fill="#1e40af" />
+      <circle cx="88" cy="52" r="2.5" fill="#1e40af" />
+      <circle cx="106" cy="46" r="2.5" fill="#1e40af" />
       {/* Soft fill */}
-      <path d="M4,86 C18,78 32,70 50,62 C66,55 82,54 106,46 L106,90 L4,90 Z"
-        fill="#1e40af" fillOpacity="0.06"/>
+      <path
+        d="M4,86 C18,78 32,70 50,62 C66,55 82,54 106,46 L106,90 L4,90 Z"
+        fill="#1e40af"
+        fillOpacity="0.06"
+      />
     </svg>
   ),
   auto_external: (
     // Logos track UP+RIGHT along the line — pushed far above, short straight thick arrows
-    <svg viewBox="0 0 130 90" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+    <svg
+      viewBox="0 0 130 90"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-full h-full"
+    >
       {/* ── Line graph — shifted lower to give logos room above ── */}
-      <path d="M5,84 C22,74 46,62 70,52 C90,44 106,38 124,32"
-        stroke="#3A5038" strokeWidth="2.5" strokeLinecap="round"/>
-      <circle cx="5"   cy="84" r="2" fill="#3A5038"/>
-      <circle cx="40"  cy="66" r="2" fill="#3A5038"/>
-      <circle cx="70"  cy="52" r="2" fill="#3A5038"/>
-      <circle cx="100" cy="40" r="2" fill="#3A5038"/>
-      <circle cx="124" cy="32" r="2" fill="#3A5038"/>
-      <path d="M5,84 C22,74 46,62 70,52 C90,44 106,38 124,32 L124,90 L5,90 Z"
-        fill="#3A5038" fillOpacity="0.07"/>
+      <path
+        d="M5,84 C22,74 46,62 70,52 C90,44 106,38 124,32"
+        stroke="#3A5038"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+      <circle cx="5" cy="84" r="2" fill="#3A5038" />
+      <circle cx="40" cy="66" r="2" fill="#3A5038" />
+      <circle cx="70" cy="52" r="2" fill="#3A5038" />
+      <circle cx="100" cy="40" r="2" fill="#3A5038" />
+      <circle cx="124" cy="32" r="2" fill="#3A5038" />
+      <path
+        d="M5,84 C22,74 46,62 70,52 C90,44 106,38 124,32 L124,90 L5,90 Z"
+        fill="#3A5038"
+        fillOpacity="0.07"
+      />
 
       {/* ── QB — above line START, well separated ── */}
-      <rect x="2" y="46" width="16" height="16" rx="3" fill="#2CA01C"/>
-      <text x="10" y="57" textAnchor="middle" fontSize="10" fontWeight="900" fill="white" fontFamily="serif">Q</text>
+      <rect x="2" y="46" width="16" height="16" rx="3" fill="#2CA01C" />
+      <text
+        x="10"
+        y="57"
+        textAnchor="middle"
+        fontSize="10"
+        fontWeight="900"
+        fill="white"
+        fontFamily="serif"
+      >
+        Q
+      </text>
       {/* Short straight thick arrow pointing down toward line start */}
-      <line x1="8" y1="62" x2="7" y2="74" stroke="#6b7280" strokeWidth="2.2" strokeLinecap="round"/>
-      <path d="M4,71 L7,75 L10,71" stroke="#6b7280" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      <line
+        x1="8"
+        y1="62"
+        x2="7"
+        y2="74"
+        stroke="#6b7280"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M4,71 L7,75 L10,71"
+        stroke="#6b7280"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
 
       {/* ── Salesforce — above line MIDDLE, well separated ── */}
-      <ellipse cx="62" cy="16" rx="10" ry="7"  fill="#00A1E0"/>
-      <ellipse cx="56" cy="21" rx="6"  ry="4"  fill="#00A1E0"/>
-      <ellipse cx="68" cy="21" rx="6"  ry="4"  fill="#00A1E0"/>
-      <rect x="54" y="16" width="16" height="7" fill="#00A1E0"/>
-      <text x="62" y="22" textAnchor="middle" fontSize="6" fontWeight="800" fill="white" fontFamily="sans-serif">SF</text>
+      <ellipse cx="62" cy="16" rx="10" ry="7" fill="#00A1E0" />
+      <ellipse cx="56" cy="21" rx="6" ry="4" fill="#00A1E0" />
+      <ellipse cx="68" cy="21" rx="6" ry="4" fill="#00A1E0" />
+      <rect x="54" y="16" width="16" height="7" fill="#00A1E0" />
+      <text
+        x="62"
+        y="22"
+        textAnchor="middle"
+        fontSize="6"
+        fontWeight="800"
+        fill="white"
+        fontFamily="sans-serif"
+      >
+        SF
+      </text>
       {/* Short straight thick arrow pointing down toward line middle */}
-      <line x1="64" y1="25" x2="67" y2="38" stroke="#6b7280" strokeWidth="2.2" strokeLinecap="round"/>
-      <path d="M63,35 L67,39 L71,35" stroke="#6b7280" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      <line
+        x1="64"
+        y1="25"
+        x2="67"
+        y2="38"
+        stroke="#6b7280"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M63,35 L67,39 L71,35"
+        stroke="#6b7280"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
 
       {/* ── GHL — above line END, well separated ── */}
-      <rect x="102" y="4" width="22" height="16" rx="3" fill="#1a1f36"/>
-      <text x="113" y="12" textAnchor="middle" fontSize="6" fontWeight="800" fill="#f97316" fontFamily="sans-serif">GO</text>
-      <text x="113" y="18" textAnchor="middle" fontSize="5.5" fontWeight="700" fill="#fdba74" fontFamily="sans-serif">HIGH</text>
+      <rect x="102" y="4" width="22" height="16" rx="3" fill="#1a1f36" />
+      <text
+        x="113"
+        y="12"
+        textAnchor="middle"
+        fontSize="6"
+        fontWeight="800"
+        fill="#f97316"
+        fontFamily="sans-serif"
+      >
+        GO
+      </text>
+      <text
+        x="113"
+        y="18"
+        textAnchor="middle"
+        fontSize="5.5"
+        fontWeight="700"
+        fill="#fdba74"
+        fontFamily="sans-serif"
+      >
+        HIGH
+      </text>
       {/* Short straight thick arrow pointing down toward line end */}
-      <line x1="118" y1="20" x2="121" y2="28" stroke="#6b7280" strokeWidth="2.2" strokeLinecap="round"/>
-      <path d="M117,25 L121,29 L125,25" stroke="#6b7280" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+      <line
+        x1="118"
+        y1="20"
+        x2="121"
+        y2="28"
+        stroke="#6b7280"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M117,25 L121,29 L125,25"
+        stroke="#6b7280"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
     </svg>
   ),
   target: (
     // Actual line + dashed target line above it
-    <svg viewBox="0 0 200 50" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+    <svg
+      viewBox="0 0 200 50"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-full h-full"
+    >
       {/* Dashed target line */}
-      <line x1="4" y1="12" x2="196" y2="12"
-        stroke="#DC2626" strokeWidth="1.8" strokeDasharray="6 4" strokeLinecap="round"/>
-      <text x="4" y="9" fontSize="7" fill="#DC2626" fontWeight="600">TARGET</text>
+      <line
+        x1="4"
+        y1="12"
+        x2="196"
+        y2="12"
+        stroke="#DC2626"
+        strokeWidth="1.8"
+        strokeDasharray="6 4"
+        strokeLinecap="round"
+      />
+      <text x="4" y="9" fontSize="7" fill="#DC2626" fontWeight="600">
+        TARGET
+      </text>
       {/* Actual stat line — trending up but below target */}
-      <path d="M4,44 C30,40 55,36 80,30 C105,24 130,22 160,18 C175,16 185,20 196,16"
-        stroke="#3A5038" strokeWidth="2.5" strokeLinecap="round"/>
-      <circle cx="4"   cy="44" r="2.5" fill="#3A5038"/>
-      <circle cx="80"  cy="30" r="2.5" fill="#3A5038"/>
-      <circle cx="160" cy="18" r="2.5" fill="#3A5038"/>
-      <circle cx="196" cy="16" r="2.5" fill="#3A5038"/>
-      <path d="M4,44 C30,40 55,36 80,30 C105,24 130,22 160,18 C175,16 185,20 196,16 L196,50 L4,50 Z"
-        fill="#3A5038" fillOpacity="0.06"/>
+      <path
+        d="M4,44 C30,40 55,36 80,30 C105,24 130,22 160,18 C175,16 185,20 196,16"
+        stroke="#3A5038"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+      <circle cx="4" cy="44" r="2.5" fill="#3A5038" />
+      <circle cx="80" cy="30" r="2.5" fill="#3A5038" />
+      <circle cx="160" cy="18" r="2.5" fill="#3A5038" />
+      <circle cx="196" cy="16" r="2.5" fill="#3A5038" />
+      <path
+        d="M4,44 C30,40 55,36 80,30 C105,24 130,22 160,18 C175,16 185,20 196,16 L196,50 L4,50 Z"
+        fill="#3A5038"
+        fillOpacity="0.06"
+      />
     </svg>
   ),
 }
@@ -272,19 +599,49 @@ const STAT_TYPE_PREVIEWS = {
 // ── TypeSelectorModal ─────────────────────────────────────────────────────────
 function TypeSelectorModal({ onSelect, onClose }) {
   const types = [
-    { key: 'basic',      label: 'Basic Statistic',    desc: 'Track a single numeric value over time.',   available: true  },
-    { key: 'equation',   label: 'Equation Statistic',  desc: 'Combine multiple stats with a formula.',    available: true  },
-    { key: 'overlay',    label: 'Overlay Statistic',   desc: 'Overlay two or more stats on one chart.',  available: true  },
-    { key: 'secondary',  label: 'Secondary Statistic', desc: 'Make Longer Period Stats.', available: true  },
-    { key: 'auto_internal', label: 'Auto Internal Stats', desc: 'Pull live data from jobs, bids, schedule, and more — auto-computed each period.', available: true  },
-    { key: 'auto_external', label: 'Auto External Stats', desc: 'Connect external apps via API — QuickBooks, Salesforce, GoHighLevel, and more.',   available: true  },
+    {
+      key: 'basic',
+      label: 'Basic Statistic',
+      desc: 'Track a single numeric value over time.',
+      available: true,
+    },
+    {
+      key: 'equation',
+      label: 'Equation Statistic',
+      desc: 'Combine multiple stats with a formula.',
+      available: true,
+    },
+    {
+      key: 'overlay',
+      label: 'Overlay Statistic',
+      desc: 'Overlay two or more stats on one chart.',
+      available: true,
+    },
+    {
+      key: 'secondary',
+      label: 'Secondary Statistic',
+      desc: 'Make Longer Period Stats.',
+      available: true,
+    },
+    {
+      key: 'auto_internal',
+      label: 'Auto Internal Stats',
+      desc: 'Pull live data from jobs, bids, schedule, and more — auto-computed each period.',
+      available: true,
+    },
+    {
+      key: 'auto_external',
+      label: 'Auto External Stats',
+      desc: 'Connect external apps via API — QuickBooks, Salesforce, GoHighLevel, and more.',
+      available: true,
+    },
   ]
   // Preview container size per stat type (portrait ones need more height)
   const previewSize = {
-    basic:         'w-32 h-20',
-    equation:      'w-32 h-20',
-    overlay:       'w-32 h-20',
-    secondary:     'w-28 h-28',
+    basic: 'w-32 h-20',
+    equation: 'w-32 h-20',
+    overlay: 'w-32 h-20',
+    secondary: 'w-28 h-28',
     auto_internal: 'w-28 h-28',
     auto_external: 'w-32 h-28',
   }
@@ -293,8 +650,15 @@ function TypeSelectorModal({ onSelect, onClose }) {
     <div className="fixed inset-0 bg-black/40 flex items-start sm:items-center justify-center z-50 p-3 pt-6 sm:p-0">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl sm:mx-4 overflow-hidden">
         <div className="flex items-center justify-between px-4 sm:px-7 py-3 sm:py-4 border-b border-gray-100">
-          <h2 className="text-sm sm:text-lg font-semibold text-gray-900">New Statistic — Choose Type</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+          <h2 className="text-sm sm:text-lg font-semibold text-gray-900">
+            New Statistic — Choose Type
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+          >
+            ✕
+          </button>
         </div>
         {/* Mobile: tight 2-col grid of name-only buttons. Tablet+: original
             illustrated cards. */}
@@ -316,7 +680,9 @@ function TypeSelectorModal({ onSelect, onClose }) {
                 </span>
               )}
               {STAT_TYPE_PREVIEWS[t.key] && (
-                <div className={`absolute bottom-0 right-0 ${previewSize[t.key] || 'w-32 h-20'} opacity-[0.45] pointer-events-none select-none`}>
+                <div
+                  className={`absolute bottom-0 right-0 ${previewSize[t.key] || 'w-32 h-20'} opacity-[0.45] pointer-events-none select-none`}
+                >
                   {STAT_TYPE_PREVIEWS[t.key]}
                 </div>
               )}
@@ -359,7 +725,9 @@ function TypeSelectorModal({ onSelect, onClose }) {
             <div className="absolute bottom-0 right-0 w-56 h-14 opacity-[0.45] pointer-events-none select-none">
               {STAT_TYPE_PREVIEWS.target}
             </div>
-            <div className="relative font-semibold text-green-800 mb-1.5 text-sm">🎯 Target Statistic</div>
+            <div className="relative font-semibold text-green-800 mb-1.5 text-sm">
+              🎯 Target Statistic
+            </div>
             <div className="relative text-xs text-gray-500 leading-snug pr-48">
               Mirror an existing stat and overlay a custom target line showing your goal over time.
             </div>
@@ -372,73 +740,107 @@ function TypeSelectorModal({ onSelect, onClose }) {
 
 // ── TargetLinesSection ───────────────────────────────────────────────────────
 const PERIOD_UNITS = [
-  { value: 'daily',     label: 'Days' },
-  { value: 'weekly',    label: 'Weeks' },
-  { value: 'monthly',   label: 'Months' },
+  { value: 'daily', label: 'Days' },
+  { value: 'weekly', label: 'Weeks' },
+  { value: 'monthly', label: 'Months' },
   { value: 'quarterly', label: 'Quarters' },
-  { value: 'yearly',    label: 'Years' },
+  { value: 'yearly', label: 'Years' },
 ]
 
 function TargetLinesSection({ targetLines, setTargetLines, tracking }) {
   function addLine() {
-    setTargetLines(prev => [...prev, {
-      start_date: '', end_mode: 'date', end_date: '',
-      end_periods: '', end_unit: tracking || 'monthly',
-      start_value: '', end_value: '',
-    }])
+    setTargetLines(prev => [
+      ...prev,
+      {
+        start_date: '',
+        end_mode: 'date',
+        end_date: '',
+        end_periods: '',
+        end_unit: tracking || 'monthly',
+        start_value: '',
+        end_value: '',
+      },
+    ])
   }
   function removeLine(i) {
     setTargetLines(prev => prev.filter((_, idx) => idx !== i))
   }
   function updateLine(i, key, val) {
-    setTargetLines(prev => prev.map((tl, idx) => idx === i ? { ...tl, [key]: val } : tl))
+    setTargetLines(prev => prev.map((tl, idx) => (idx === i ? { ...tl, [key]: val } : tl)))
   }
 
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
         <span className="text-sm font-semibold text-gray-700">Target Lines</span>
-        <button type="button" onClick={addLine}
-          className="text-xs px-2.5 py-1 rounded-lg bg-green-700 text-white font-semibold hover:bg-green-800 transition-colors">
+        <button
+          type="button"
+          onClick={addLine}
+          className="text-xs px-2.5 py-1 rounded-lg bg-green-700 text-white font-semibold hover:bg-green-800 transition-colors"
+        >
           + Add Target Line
         </button>
       </div>
       {targetLines.length === 0 && (
-        <p className="text-xs text-gray-400 italic">No target lines. Add one to draw a goal line on the chart.</p>
+        <p className="text-xs text-gray-400 italic">
+          No target lines. Add one to draw a goal line on the chart.
+        </p>
       )}
       <div className="space-y-3">
         {targetLines.map((tl, i) => (
           <div key={i} className="border border-gray-200 rounded-xl p-3 bg-gray-50 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-green-700">Target Line {i + 1}</span>
-              <button type="button" onClick={() => removeLine(i)}
-                className="text-xs text-red-400 hover:text-red-600 font-semibold">Remove</button>
+              <button
+                type="button"
+                onClick={() => removeLine(i)}
+                className="text-xs text-red-400 hover:text-red-600 font-semibold"
+              >
+                Remove
+              </button>
             </div>
             {/* Start date + start value */}
             <div className="flex gap-2">
               <div className="flex-1">
-                <label className="block text-[11px] font-semibold text-gray-500 mb-0.5">Start Date</label>
-                <input type="date" value={tl.start_date}
+                <label className="block text-[11px] font-semibold text-gray-500 mb-0.5">
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  value={tl.start_date}
                   onChange={e => updateLine(i, 'start_date', e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-green-600" />
+                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-green-600"
+                />
               </div>
               <div className="flex-1">
-                <label className="block text-[11px] font-semibold text-gray-500 mb-0.5">Start Value</label>
-                <input type="number" value={tl.start_value} placeholder="0"
+                <label className="block text-[11px] font-semibold text-gray-500 mb-0.5">
+                  Start Value
+                </label>
+                <input
+                  type="number"
+                  value={tl.start_value}
+                  placeholder="0"
                   onChange={e => updateLine(i, 'start_value', e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-green-600" />
+                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-green-600"
+                />
               </div>
             </div>
             {/* End mode toggle */}
             <div className="flex gap-1">
-              {[['date', 'End Date'], ['periods', '# of Periods']].map(([mode, label]) => (
-                <button key={mode} type="button"
+              {[
+                ['date', 'End Date'],
+                ['periods', '# of Periods'],
+              ].map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
                   onClick={() => updateLine(i, 'end_mode', mode)}
                   className={`text-xs px-2.5 py-1 rounded-lg font-semibold border transition-colors ${
                     tl.end_mode === mode
                       ? 'bg-green-700 text-white border-green-700'
                       : 'bg-white text-gray-600 border-gray-300 hover:border-green-600'
-                  }`}>
+                  }`}
+                >
                   {label}
                 </button>
               ))}
@@ -448,24 +850,39 @@ function TargetLinesSection({ targetLines, setTargetLines, tracking }) {
               <div className="flex-1">
                 {tl.end_mode === 'date' ? (
                   <>
-                    <label className="block text-[11px] font-semibold text-gray-500 mb-0.5">End Date</label>
-                    <input type="date" value={tl.end_date}
+                    <label className="block text-[11px] font-semibold text-gray-500 mb-0.5">
+                      End Date
+                    </label>
+                    <input
+                      type="date"
+                      value={tl.end_date}
                       onChange={e => updateLine(i, 'end_date', e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-green-600" />
+                      className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-green-600"
+                    />
                   </>
                 ) : (
                   <>
-                    <label className="block text-[11px] font-semibold text-gray-500 mb-0.5">Number &amp; Unit</label>
+                    <label className="block text-[11px] font-semibold text-gray-500 mb-0.5">
+                      Number &amp; Unit
+                    </label>
                     <div className="flex gap-1">
-                      <input type="number" min="1" value={tl.end_periods} placeholder="e.g. 4"
+                      <input
+                        type="number"
+                        min="1"
+                        value={tl.end_periods}
+                        placeholder="e.g. 4"
                         onChange={e => updateLine(i, 'end_periods', e.target.value)}
-                        className="w-20 border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-green-600" />
+                        className="w-20 border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-green-600"
+                      />
                       <select
                         value={tl.end_unit || tracking || 'monthly'}
                         onChange={e => updateLine(i, 'end_unit', e.target.value)}
-                        className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-green-600 bg-white">
+                        className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-green-600 bg-white"
+                      >
                         {PERIOD_UNITS.map(u => (
-                          <option key={u.value} value={u.value}>{u.label}</option>
+                          <option key={u.value} value={u.value}>
+                            {u.label}
+                          </option>
                         ))}
                       </select>
                     </div>
@@ -473,10 +890,16 @@ function TargetLinesSection({ targetLines, setTargetLines, tracking }) {
                 )}
               </div>
               <div className="flex-1">
-                <label className="block text-[11px] font-semibold text-gray-500 mb-0.5">End Value</label>
-                <input type="number" value={tl.end_value} placeholder="0"
+                <label className="block text-[11px] font-semibold text-gray-500 mb-0.5">
+                  End Value
+                </label>
+                <input
+                  type="number"
+                  value={tl.end_value}
+                  placeholder="0"
                   onChange={e => updateLine(i, 'end_value', e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-green-600" />
+                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-green-600"
+                />
               </div>
             </div>
           </div>
@@ -487,43 +910,65 @@ function TargetLinesSection({ targetLines, setTargetLines, tracking }) {
 }
 
 // ── BasicStatForm ─────────────────────────────────────────────────────────────
-function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete, targetSource, onOpenShares }) {
+function BasicStatForm({
+  initialData,
+  profiles,
+  onSave,
+  onClose,
+  onDelete,
+  targetSource,
+  onOpenShares,
+}) {
   const { user } = useAuth()
 
   const [form, setForm] = useState({
-    name:                  initialData?.name || (targetSource ? `${targetSource.name} Target` : ''),
-    stat_type:             initialData?.stat_type  || targetSource?.stat_type  || 'currency',
-    tracking:              initialData?.tracking   || targetSource?.tracking   || 'monthly',
-    beginning_date:        initialData?.beginning_date || daysAgo(90),
-    upside_down:           initialData?.upside_down  || false,
-    show_values:           initialData?.show_values  ?? false,
-    owner_type:            initialData?.owner_type   || 'user',
-    owner_user_id:         initialData?.owner_user_id || user?.id || '',
-    owner_position_id:     initialData?.owner_position_id || '',
-    default_periods:       initialData?.default_periods ?? '',
+    name: initialData?.name || (targetSource ? `${targetSource.name} Target` : ''),
+    stat_type: initialData?.stat_type || targetSource?.stat_type || 'currency',
+    tracking: initialData?.tracking || targetSource?.tracking || 'monthly',
+    beginning_date: initialData?.beginning_date || daysAgo(90),
+    upside_down: initialData?.upside_down || false,
+    show_values: initialData?.show_values ?? false,
+    owner_type: initialData?.owner_type || 'user',
+    owner_user_id: initialData?.owner_user_id || user?.id || '',
+    owner_position_id: initialData?.owner_position_id || '',
+    default_periods: initialData?.default_periods ?? '',
     missing_value_display: initialData?.missing_value_display || 'skip',
   })
   const [targetLines, setTargetLines] = useState(() => {
     const existing = initialData?.target_lines
     if (existing && Array.isArray(existing)) return existing
     // Pre-add one empty target line when creating a target stat
-    if (targetSource) return [{ start_date: '', end_mode: 'date', end_date: '', end_periods: '', end_unit: targetSource.tracking || 'monthly', start_value: '', end_value: '' }]
+    if (targetSource)
+      return [
+        {
+          start_date: '',
+          end_mode: 'date',
+          end_date: '',
+          end_periods: '',
+          end_unit: targetSource.tracking || 'monthly',
+          start_value: '',
+          end_value: '',
+        },
+      ]
     return []
   })
-  const [saving,        setSaving]        = useState(false)
-  const [pendingShares,  setPendingShares]  = useState({}) // user_id -> 'view'|'edit', applied to DB after stat insert
-  const [archiving,     setArchiving]     = useState(false)
-  const [deleting,      setDeleting]      = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [pendingShares, setPendingShares] = useState({}) // user_id -> 'view'|'edit', applied to DB after stat insert
+  const [archiving, setArchiving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [err,           setErr]           = useState('')
+  const [err, setErr] = useState('')
 
-  const isEdit     = !!initialData?.id
+  const isEdit = !!initialData?.id
   const isArchived = !!initialData?.archived
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const handleSave = async () => {
-    if (!form.name.trim())    { setErr('Statistic Name is required.'); return }
+    if (!form.name.trim()) {
+      setErr('Statistic Name is required.')
+      return
+    }
     if (!form.default_periods || parseInt(form.default_periods) < 1) {
       setErr('Default # of Periods to Show is required.')
       return
@@ -538,30 +983,29 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete, targe
       setErr('Beginning Date is required.')
       return
     }
-    setSaving(true); setErr('')
+    setSaving(true)
+    setErr('')
     try {
       // Always ensure owner_user_id falls back to the current user when type = 'user'
       const resolvedOwnerUserId =
-        form.owner_type === 'user'
-          ? (form.owner_user_id || user?.id || null)
-          : null
+        form.owner_type === 'user' ? form.owner_user_id || user?.id || null : null
 
       const payload = {
-        name:                  form.name.trim(),
-        stat_type:             form.stat_type,
-        tracking:              form.tracking,
-        beginning_date:        effectiveBeginningDate,
-        upside_down:           form.upside_down,
-        show_values:           form.show_values,
-        owner_type:            form.owner_type,
-        owner_user_id:         resolvedOwnerUserId,
-        owner_position_id:     form.owner_type === 'position' ? (form.owner_position_id || null) : null,
-        is_public:             initialData?.is_public || false,
-        stat_category:         isTargetStat ? 'target' : 'General',
-        created_by:            user?.id || null,
-        default_periods:       form.default_periods !== '' ? parseInt(form.default_periods) : null,
+        name: form.name.trim(),
+        stat_type: form.stat_type,
+        tracking: form.tracking,
+        beginning_date: effectiveBeginningDate,
+        upside_down: form.upside_down,
+        show_values: form.show_values,
+        owner_type: form.owner_type,
+        owner_user_id: resolvedOwnerUserId,
+        owner_position_id: form.owner_type === 'position' ? form.owner_position_id || null : null,
+        is_public: initialData?.is_public || false,
+        stat_category: isTargetStat ? 'target' : 'General',
+        created_by: user?.id || null,
+        default_periods: form.default_periods !== '' ? parseInt(form.default_periods) : null,
         missing_value_display: form.missing_value_display,
-        target_lines:          targetLines.length > 0 ? targetLines : null,
+        target_lines: targetLines.length > 0 ? targetLines : null,
       }
 
       console.log('[Statistics] saving payload:', payload)
@@ -569,13 +1013,20 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete, targe
       let error
       let newStatId = initialData?.id || null
       if (initialData?.id) {
-        ({ error } = await supabase.from('statistics').update(payload).eq('id', initialData.id))
+        ;({ error } = await supabase.from('statistics').update(payload).eq('id', initialData.id))
         console.log('[Statistics] update result — error:', error)
       } else {
         const res = await supabase.from('statistics').insert(payload).select().single()
         error = res.error
         newStatId = res.data?.id || null
-        console.log('[Statistics] insert result — error:', error, 'status:', res.status, 'newId:', newStatId)
+        console.log(
+          '[Statistics] insert result — error:',
+          error,
+          'status:',
+          res.status,
+          'newId:',
+          newStatId
+        )
       }
 
       if (error) {
@@ -587,9 +1038,9 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete, targe
       if (newStatId && pendingShares && Object.keys(pendingShares).length > 0) {
         const rows = Object.entries(pendingShares).map(([uid, perm]) => ({
           statistic_id: newStatId,
-          user_id:      uid,
-          permission:   perm,
-          created_by:   user?.id || null,
+          user_id: uid,
+          permission: perm,
+          created_by: user?.id || null,
         }))
         const { error: shareErr } = await supabase.from('statistic_shares').insert(rows)
         if (shareErr) console.error('[Statistics] failed to write pending shares:', shareErr)
@@ -604,38 +1055,50 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete, targe
   }
 
   const handleArchive = async () => {
-    setArchiving(true); setErr('')
+    setArchiving(true)
+    setErr('')
     const { error } = await supabase
       .from('statistics')
       .update({ archived: !isArchived })
       .eq('id', initialData.id)
     setArchiving(false)
-    if (error) { setErr(error.message); return }
+    if (error) {
+      setErr(error.message)
+      return
+    }
     await onSave(initialData.id, initialData.name)
   }
 
   const handleDelete = async () => {
-    setDeleting(true); setErr('')
-    const { error } = await supabase
-      .from('statistics')
-      .delete()
-      .eq('id', initialData.id)
+    setDeleting(true)
+    setErr('')
+    const { error } = await supabase.from('statistics').delete().eq('id', initialData.id)
     setDeleting(false)
-    if (error) { setErr(error.message); return }
+    if (error) {
+      setErr(error.message)
+      return
+    }
     onDelete()
   }
 
   const lbl = 'block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1'
-  const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white'
+  const inp =
+    'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white'
 
   // Compact pill toggle for Yes/No fields
-  const PillToggle = ({ name, value, onChange, options }) => (
+  const PillToggle = ({ value, onChange, options }) => (
     <div className="flex gap-1 mt-1">
       {options.map(([val, lab]) => (
-        <button key={val} type="button" onClick={() => onChange(val)}
+        <button
+          key={val}
+          type="button"
+          onClick={() => onChange(val)}
           className={`px-3 py-1 text-xs rounded-lg border font-semibold transition-colors ${
-            value === val ? 'bg-green-700 text-white border-green-700' : 'bg-white text-gray-600 border-gray-300 hover:border-green-500'
-          }`}>
+            value === val
+              ? 'bg-green-700 text-white border-green-700'
+              : 'bg-white text-gray-600 border-gray-300 hover:border-green-500'
+          }`}
+        >
           {lab}
         </button>
       ))}
@@ -647,22 +1110,29 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete, targe
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh] overflow-hidden">
-
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-3.5 border-b border-gray-100 flex-shrink-0"
-             style={{ backgroundColor: FG }}>
+        <div
+          className="flex items-center justify-between px-6 py-3.5 border-b border-gray-100 flex-shrink-0"
+          style={{ backgroundColor: FG }}
+        >
           <h2 className="text-base font-bold text-white">
-            {isEdit ? 'Edit Statistic' : isTargetStat ? 'New Target Statistic' : 'New Basic Statistic'}
+            {isEdit
+              ? 'Edit Statistic'
+              : isTargetStat
+                ? 'New Target Statistic'
+                : 'New Basic Statistic'}
           </h2>
-          <button onClick={onClose} className="text-white/70 hover:text-white text-xl leading-none">✕</button>
+          <button onClick={onClose} className="text-white/70 hover:text-white text-xl leading-none">
+            ✕
+          </button>
         </div>
 
         {/* Body — scrollable */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
-
           {isTargetStat && (
             <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 text-sm text-green-800 font-medium">
-              🎯 Target Statistic — based on <strong>{targetSource?.name || initialData?.name}</strong>
+              🎯 Target Statistic — based on{' '}
+              <strong>{targetSource?.name || initialData?.name}</strong>
             </div>
           )}
 
@@ -682,7 +1152,11 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete, targe
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className={lbl}>Statistic Type</label>
-              <select className={inp} value={form.stat_type} onChange={e => set('stat_type', e.target.value)}>
+              <select
+                className={inp}
+                value={form.stat_type}
+                onChange={e => set('stat_type', e.target.value)}
+              >
                 <option value="currency">($) Currency</option>
                 <option value="numeric">(#) Numeric</option>
                 <option value="percentage">(%) Percentage</option>
@@ -690,7 +1164,11 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete, targe
             </div>
             <div>
               <label className={lbl}>Tracking Period</label>
-              <select className={inp} value={form.tracking} onChange={e => set('tracking', e.target.value)}>
+              <select
+                className={inp}
+                value={form.tracking}
+                onChange={e => set('tracking', e.target.value)}
+              >
                 <option value="daily">Daily</option>
                 <option value="weekly">Weekly</option>
                 <option value="monthly">Monthly</option>
@@ -701,8 +1179,12 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete, targe
             {!isTargetStat && (
               <div>
                 <label className={lbl}>Beginning Date</label>
-                <input type="date" className={inp} value={form.beginning_date}
-                  onChange={e => set('beginning_date', e.target.value)} />
+                <input
+                  type="date"
+                  className={inp}
+                  value={form.beginning_date}
+                  onChange={e => set('beginning_date', e.target.value)}
+                />
               </div>
             )}
           </div>
@@ -714,7 +1196,10 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete, targe
               <PillToggle
                 value={form.upside_down ? 'yes' : 'no'}
                 onChange={v => set('upside_down', v === 'yes')}
-                options={[['no', 'No'], ['yes', 'Yes']]}
+                options={[
+                  ['no', 'No'],
+                  ['yes', 'Yes'],
+                ]}
               />
             </div>
             <div>
@@ -722,15 +1207,22 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete, targe
               <PillToggle
                 value={form.show_values ? 'yes' : 'no'}
                 onChange={v => set('show_values', v === 'yes')}
-                options={[['no', 'No'], ['yes', 'Yes']]}
+                options={[
+                  ['no', 'No'],
+                  ['yes', 'Yes'],
+                ]}
               />
             </div>
             <div>
               <label className={lbl}>Default # of Periods</label>
-              <input type="number" min="1" className={inp}
+              <input
+                type="number"
+                min="1"
+                className={inp}
                 value={form.default_periods}
                 onChange={e => set('default_periods', e.target.value)}
-                placeholder="e.g. 12" />
+                placeholder="e.g. 12"
+              />
             </div>
           </div>
 
@@ -741,26 +1233,44 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete, targe
               <PillToggle
                 value={form.missing_value_display}
                 onChange={v => set('missing_value_display', v)}
-                options={[['skip', 'Skip (gap)'], ['zero', 'Show as Zero']]}
+                options={[
+                  ['skip', 'Skip (gap)'],
+                  ['zero', 'Show as Zero'],
+                ]}
               />
             </div>
             <div>
               <label className={lbl}>Assigned To</label>
               <div className="flex gap-1 mt-1 mb-2">
-                {[['user', 'User'], ['position', 'Position']].map(([val, lab]) => (
-                  <button key={val} type="button" onClick={() => set('owner_type', val)}
+                {[
+                  ['user', 'User'],
+                  ['position', 'Position'],
+                ].map(([val, lab]) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => set('owner_type', val)}
                     className={`px-3 py-1 text-xs rounded-lg border font-semibold transition-colors ${
-                      form.owner_type === val ? 'bg-green-700 text-white border-green-700' : 'bg-white text-gray-600 border-gray-300 hover:border-green-500'
-                    }`}>
+                      form.owner_type === val
+                        ? 'bg-green-700 text-white border-green-700'
+                        : 'bg-white text-gray-600 border-gray-300 hover:border-green-500'
+                    }`}
+                  >
                     {lab}
                   </button>
                 ))}
               </div>
               {form.owner_type === 'user' ? (
-                <select className={inp} value={form.owner_user_id} onChange={e => set('owner_user_id', e.target.value)}>
+                <select
+                  className={inp}
+                  value={form.owner_user_id}
+                  onChange={e => set('owner_user_id', e.target.value)}
+                >
                   <option value="">— Select User —</option>
                   {profiles.map(p => (
-                    <option key={p.id} value={p.id}>{p.full_name || p.email}</option>
+                    <option key={p.id} value={p.id}>
+                      {p.full_name || p.email}
+                    </option>
                   ))}
                 </select>
               ) : (
@@ -776,7 +1286,11 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete, targe
           {/* Target Lines Section — only for target stats */}
           {isTargetStat && (
             <div className="border-t border-gray-100 pt-3">
-              <TargetLinesSection targetLines={targetLines} setTargetLines={setTargetLines} tracking={form.tracking} />
+              <TargetLinesSection
+                targetLines={targetLines}
+                setTargetLines={setTargetLines}
+                tracking={form.tracking}
+              />
             </div>
           )}
 
@@ -784,13 +1298,19 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete, targe
           {isEdit && (
             <div className="grid grid-cols-2 gap-3 pt-1 border-t border-gray-100">
               {/* Archive / Restore */}
-              <div className={`rounded-xl border px-4 py-3 flex flex-col gap-2 ${isArchived ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
+              <div
+                className={`rounded-xl border px-4 py-3 flex flex-col gap-2 ${isArchived ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}
+              >
                 <div className="flex items-center justify-between gap-2">
                   <div>
-                    <p className={`text-xs font-bold ${isArchived ? 'text-green-800' : 'text-amber-800'}`}>
+                    <p
+                      className={`text-xs font-bold ${isArchived ? 'text-green-800' : 'text-amber-800'}`}
+                    >
                       {isArchived ? '📦 Restore' : '📦 Archive'}
                     </p>
-                    <p className={`text-xs mt-0.5 ${isArchived ? 'text-green-700' : 'text-amber-700'}`}>
+                    <p
+                      className={`text-xs mt-0.5 ${isArchived ? 'text-green-700' : 'text-amber-700'}`}
+                    >
                       {isArchived ? 'Move back to active stats' : 'Hide — viewable under Archived'}
                     </p>
                   </div>
@@ -826,14 +1346,21 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete, targe
                 </div>
                 {confirmDelete && (
                   <div className="mt-2.5 space-y-2">
-                    <p className="text-xs font-semibold text-red-700">Delete "<strong>{initialData.name}</strong>" permanently?</p>
+                    <p className="text-xs font-semibold text-red-700">
+                      Delete "<strong>{initialData.name}</strong>" permanently?
+                    </p>
                     <div className="flex gap-2">
-                      <button onClick={handleDelete} disabled={deleting}
-                        className="px-3 py-1 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 disabled:opacity-50">
+                      <button
+                        onClick={handleDelete}
+                        disabled={deleting}
+                        className="px-3 py-1 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 disabled:opacity-50"
+                      >
                         {deleting ? 'Deleting…' : 'Yes, Delete'}
                       </button>
-                      <button onClick={() => setConfirmDelete(false)}
-                        className="px-3 py-1 rounded-lg border border-gray-300 text-xs text-gray-600 hover:bg-gray-50">
+                      <button
+                        onClick={() => setConfirmDelete(false)}
+                        className="px-3 py-1 rounded-lg border border-gray-300 text-xs text-gray-600 hover:bg-gray-50"
+                      >
                         Cancel
                       </button>
                     </div>
@@ -855,17 +1382,23 @@ function BasicStatForm({ initialData, profiles, onSave, onClose, onDelete, targe
                 } else {
                   onOpenShares(null, form.name?.trim() || 'New Stat', {
                     initialShares: pendingShares,
-                    onLocalSave:   (m) => setPendingShares(m),
+                    onLocalSave: m => setPendingShares(m),
                   })
                 }
               }}
               className="px-4 py-2 rounded-lg text-sm text-purple-700 hover:bg-purple-50 border border-purple-200 font-medium"
               title="Manage who else can view or edit this statistic"
             >
-              🔒 Shared Permissions{!initialData?.id && Object.keys(pendingShares).length > 0 ? ` (${Object.keys(pendingShares).length})` : ''}
+              🔒 Shared Permissions
+              {!initialData?.id && Object.keys(pendingShares).length > 0
+                ? ` (${Object.keys(pendingShares).length})`
+                : ''}
             </button>
           )}
-          <button onClick={onClose} className="px-5 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 font-medium">
+          <button
+            onClick={onClose}
+            className="px-5 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-100 font-medium"
+          >
             Cancel
           </button>
           <button
@@ -890,22 +1423,28 @@ function generatePeriods(fromDate, toDate, tracking, weekEndingDay) {
   let cur = new Date(fromDate + 'T00:00:00')
 
   if (tracking === 'daily') {
-    while (cur <= end) { periods.push(isoDate(cur)); cur.setDate(cur.getDate() + 1) }
+    while (cur <= end) {
+      periods.push(isoDate(cur))
+      cur.setDate(cur.getDate() + 1)
+    }
   } else if (tracking === 'weekly') {
     // Advance cur to the first week-ending day on or after fromDate
     const diff = (weekEndingDay - cur.getDay() + 7) % 7
     cur.setDate(cur.getDate() + diff)
-    while (cur <= end) { periods.push(isoDate(cur)); cur.setDate(cur.getDate() + 7) }
-  } else if (tracking === 'monthly') {
-    // Period date = last day of each month
-    cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 0)  // last day of fromDate's month
     while (cur <= end) {
       periods.push(isoDate(cur))
-      cur = new Date(cur.getFullYear(), cur.getMonth() + 2, 0)  // last day of next month
+      cur.setDate(cur.getDate() + 7)
+    }
+  } else if (tracking === 'monthly') {
+    // Period date = last day of each month
+    cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 0) // last day of fromDate's month
+    while (cur <= end) {
+      periods.push(isoDate(cur))
+      cur = new Date(cur.getFullYear(), cur.getMonth() + 2, 0) // last day of next month
     }
   } else if (tracking === 'quarterly') {
     // Period date = last day of each quarter (Mar 31, Jun 30, Sep 30, Dec 31)
-    const quarterEnd = (year, q) => new Date(year, q * 3 + 3, 0)  // last day of quarter q (0-indexed)
+    const quarterEnd = (year, q) => new Date(year, q * 3 + 3, 0) // last day of quarter q (0-indexed)
     let q = Math.floor(cur.getMonth() / 3)
     cur = quarterEnd(cur.getFullYear(), q)
     while (cur <= end) {
@@ -917,7 +1456,10 @@ function generatePeriods(fromDate, toDate, tracking, weekEndingDay) {
   } else if (tracking === 'yearly') {
     // Period date = Dec 31 of each year
     cur = new Date(cur.getFullYear(), 11, 31)
-    while (cur <= end) { periods.push(isoDate(cur)); cur = new Date(cur.getFullYear() + 1, 11, 31) }
+    while (cur <= end) {
+      periods.push(isoDate(cur))
+      cur = new Date(cur.getFullYear() + 1, 11, 31)
+    }
   }
   return periods
 }
@@ -927,11 +1469,19 @@ function generatePeriods(fromDate, toDate, tracking, weekEndingDay) {
 function matchesPeriod(valueDate, periodDate, tracking, weekEndingDay) {
   const v = new Date(valueDate + 'T00:00:00')
   const p = new Date(periodDate + 'T00:00:00')
-  if (tracking === 'daily')     return valueDate === periodDate
-  if (tracking === 'weekly')    return getWeekEndingDate(valueDate, weekEndingDay) === getWeekEndingDate(periodDate, weekEndingDay)
-  if (tracking === 'monthly')   return v.getFullYear()===p.getFullYear() && v.getMonth()===p.getMonth()
-  if (tracking === 'quarterly') return v.getFullYear()===p.getFullYear() && Math.floor(v.getMonth()/3)===Math.floor(p.getMonth()/3)
-  if (tracking === 'yearly')    return v.getFullYear()===p.getFullYear()
+  if (tracking === 'daily') return valueDate === periodDate
+  if (tracking === 'weekly')
+    return (
+      getWeekEndingDate(valueDate, weekEndingDay) === getWeekEndingDate(periodDate, weekEndingDay)
+    )
+  if (tracking === 'monthly')
+    return v.getFullYear() === p.getFullYear() && v.getMonth() === p.getMonth()
+  if (tracking === 'quarterly')
+    return (
+      v.getFullYear() === p.getFullYear() &&
+      Math.floor(v.getMonth() / 3) === Math.floor(p.getMonth() / 3)
+    )
+  if (tracking === 'yearly') return v.getFullYear() === p.getFullYear()
   return false
 }
 
@@ -940,18 +1490,21 @@ function DateRangeSelectorModal({ stat, onSelect, onClose }) {
   const [customDate, setCustomDate] = useState('')
 
   const presets = [
-    { label: '1 Month',   months: 1  },
-    { label: '3 Months',  months: 3  },
-    { label: '6 Months',  months: 6  },
-    { label: '1 Year',    months: 12 },
-    { label: '4 Years',   months: 48 },
+    { label: '1 Month', months: 1 },
+    { label: '3 Months', months: 3 },
+    { label: '6 Months', months: 6 },
+    { label: '1 Year', months: 12 },
+    { label: '4 Years', months: 48 },
     { label: 'Beginning', from: stat.beginning_date },
   ]
 
-  const pick = (from) => onSelect(from, today())
+  const pick = from => onSelect(from, today())
 
   const handlePreset = ({ months, from }) => {
-    if (from) { pick(from); return }
+    if (from) {
+      pick(from)
+      return
+    }
     const d = new Date()
     d.setMonth(d.getMonth() - months)
     pick(isoDate(d))
@@ -962,7 +1515,12 @@ function DateRangeSelectorModal({ stat, onSelect, onClose }) {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xs mx-4 overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h2 className="text-base font-semibold text-gray-900">How far back?</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+          >
+            ✕
+          </button>
         </div>
         <div className="p-5 space-y-2">
           {presets.map(p => (
@@ -998,13 +1556,21 @@ function DateRangeSelectorModal({ stat, onSelect, onClose }) {
 
 // ── Step 2: Edit Value History Modal ──────────────────────────────────────────
 const MODAL_BLUE = '#354fa0'
-const TH_BLUE    = '#c5d5e8'
+const TH_BLUE = '#c5d5e8'
 
-function EditValueHistoryModal({ stat, fromDate, values, onClose, onRefresh, weekEndingDay, readOnly = false }) {
-  const { user }     = useAuth()
-  const [drafts,     setDrafts]     = useState({})  // periodDate → string
-  const [saving,     setSaving]     = useState(false)
-  const [saveErr,    setSaveErr]    = useState('')
+function EditValueHistoryModal({
+  stat,
+  fromDate,
+  values,
+  onClose,
+  onRefresh,
+  weekEndingDay,
+  readOnly = false,
+}) {
+  const { user } = useAuth()
+  const [drafts, setDrafts] = useState({}) // periodDate → string
+  const [saving, setSaving] = useState(false)
+  const [saveErr, setSaveErr] = useState('')
 
   // ── All periods in range ───────────────────────────────────────────────────
   const periods = useMemo(
@@ -1026,23 +1592,26 @@ function EditValueHistoryModal({ stat, fromDate, values, onClose, onRefresh, wee
   // The table is always in edit mode now — no isEditing toggle.
   useEffect(() => {
     const d = {}
-    periods.forEach(p => { d[p] = valueByPeriod[p]?.value?.toString() ?? '' })
+    periods.forEach(p => {
+      d[p] = valueByPeriod[p]?.value?.toString() ?? ''
+    })
     setDrafts(d)
     setSaveErr('')
-  }, [periods])   // intentionally NOT on valueByPeriod to avoid resetting mid-edit
+  }, [periods]) // intentionally NOT on valueByPeriod to avoid resetting mid-edit
 
   // Dirty = any draft differs from the original DB value for that period
   const isDirty = useMemo(() => {
     for (const p of periods) {
       const draft = (drafts[p] ?? '').trim()
-      const orig  = valueByPeriod[p]?.value?.toString() ?? ''
+      const orig = valueByPeriod[p]?.value?.toString() ?? ''
       if (draft !== orig) return true
     }
     return false
   }, [drafts, periods, valueByPeriod])
 
   function handleClose() {
-    if (!readOnly && isDirty && !window.confirm('Leave without saving? Your edits will be lost.')) return
+    if (!readOnly && isDirty && !window.confirm('Leave without saving? Your edits will be lost.'))
+      return
     onClose()
   }
 
@@ -1056,12 +1625,13 @@ function EditValueHistoryModal({ stat, fromDate, values, onClose, onRefresh, wee
       const d = new Date(p + 'T00:00:00')
       let key, label
       if (stat.tracking === 'yearly') {
-        key = 'all'; label = 'All Years'
+        key = 'all'
+        label = 'All Years'
       } else if (stat.tracking === 'monthly' || stat.tracking === 'quarterly') {
-        key   = String(d.getFullYear())
+        key = String(d.getFullYear())
         label = String(d.getFullYear())
       } else {
-        key   = `${d.getFullYear()}-${d.getMonth()}`
+        key = `${d.getFullYear()}-${d.getMonth()}`
         label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
       }
       if (!map.has(key)) map.set(key, { label, periods: [] })
@@ -1086,12 +1656,13 @@ function EditValueHistoryModal({ stat, fromDate, values, onClose, onRefresh, wee
 
   // ── Save all changes in one batch ──────────────────────────────────────────
   const handleSave = async () => {
-    setSaving(true); setSaveErr('')
+    setSaving(true)
+    setSaveErr('')
     const toUpsert = []
     const toDelete = []
 
     for (const p of periods) {
-      const draft    = (drafts[p] ?? '').trim()
+      const draft = (drafts[p] ?? '').trim()
       const existing = valueByPeriod[p]
 
       if (draft !== '') {
@@ -1100,12 +1671,23 @@ function EditValueHistoryModal({ stat, fromDate, values, onClose, onRefresh, wee
           // Delete old row first if it was stored under a different date
           if (existing && existing.period_date !== p) {
             const { error: delErr } = await supabase
-              .from('statistic_values').delete().eq('id', existing.id)
-            if (delErr) { setSaveErr(delErr.message); setSaving(false); return }
+              .from('statistic_values')
+              .delete()
+              .eq('id', existing.id)
+            if (delErr) {
+              setSaveErr(delErr.message)
+              setSaving(false)
+              return
+            }
           }
           // Only upsert if value actually changed
           if (!existing || Number(existing.value) !== num) {
-            toUpsert.push({ statistic_id: stat.id, period_date: p, value: num, entered_by: user?.id })
+            toUpsert.push({
+              statistic_id: stat.id,
+              period_date: p,
+              value: num,
+              entered_by: user?.id,
+            })
           }
         }
       } else if (existing) {
@@ -1114,13 +1696,22 @@ function EditValueHistoryModal({ stat, fromDate, values, onClose, onRefresh, wee
     }
 
     if (toUpsert.length > 0) {
-      const { error } = await supabase.from('statistic_values')
+      const { error } = await supabase
+        .from('statistic_values')
         .upsert(toUpsert, { onConflict: 'statistic_id,period_date' })
-      if (error) { setSaveErr(error.message); setSaving(false); return }
+      if (error) {
+        setSaveErr(error.message)
+        setSaving(false)
+        return
+      }
     }
     if (toDelete.length > 0) {
       const { error } = await supabase.from('statistic_values').delete().in('id', toDelete)
-      if (error) { setSaveErr(error.message); setSaving(false); return }
+      if (error) {
+        setSaveErr(error.message)
+        setSaving(false)
+        return
+      }
     }
 
     setSaving(false)
@@ -1128,21 +1719,26 @@ function EditValueHistoryModal({ stat, fromDate, values, onClose, onRefresh, wee
   }
 
   // Grid columns: 2 for weekly/daily (matches screenshot), 2 for monthly/quarterly, 1 for yearly
-  const gridCls = stat.tracking === 'yearly'
-    ? 'grid-cols-1 max-w-sm mx-auto'
-    : 'grid-cols-1 sm:grid-cols-2'
+  const gridCls =
+    stat.tracking === 'yearly' ? 'grid-cols-1 max-w-sm mx-auto' : 'grid-cols-1 sm:grid-cols-2'
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col overflow-hidden" style={{ maxHeight: '90vh' }}>
-
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col overflow-hidden"
+        style={{ maxHeight: '90vh' }}
+      >
         {/* ── Header ──────────────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between px-6 py-3.5 flex-shrink-0"
-             style={{ backgroundColor: MODAL_BLUE }}>
+        <div
+          className="flex items-center justify-between px-6 py-3.5 flex-shrink-0"
+          style={{ backgroundColor: MODAL_BLUE }}
+        >
           <div className="flex items-center gap-2 min-w-0 mr-4">
             <h2 className="text-base font-semibold text-white truncate">{stat.name}</h2>
             {readOnly && (
-              <span className="flex-shrink-0 text-[10px] bg-white/20 text-white px-2 py-0.5 rounded font-semibold">⚡ Auto · Read Only</span>
+              <span className="flex-shrink-0 text-[10px] bg-white/20 text-white px-2 py-0.5 rounded font-semibold">
+                ⚡ Auto · Read Only
+              </span>
             )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -1180,16 +1776,26 @@ function EditValueHistoryModal({ stat, fromDate, values, onClose, onRefresh, wee
               {groups.map(group => (
                 <div key={group.label}>
                   {/* Group header */}
-                  <p className="text-center text-sm font-semibold text-gray-700 mb-1.5">{group.label}</p>
+                  <p className="text-center text-sm font-semibold text-gray-700 mb-1.5">
+                    {group.label}
+                  </p>
 
                   {/* Period table */}
                   <table className="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
                     <thead>
                       <tr>
-                        <th className="text-left px-3 py-2 font-semibold text-gray-700 w-1/2"
-                            style={{ backgroundColor: TH_BLUE }}>Date</th>
-                        <th className="text-left px-3 py-2 font-semibold text-gray-700 w-1/2"
-                            style={{ backgroundColor: TH_BLUE }}>Value</th>
+                        <th
+                          className="text-left px-3 py-2 font-semibold text-gray-700 w-1/2"
+                          style={{ backgroundColor: TH_BLUE }}
+                        >
+                          Date
+                        </th>
+                        <th
+                          className="text-left px-3 py-2 font-semibold text-gray-700 w-1/2"
+                          style={{ backgroundColor: TH_BLUE }}
+                        >
+                          Value
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -1197,20 +1803,24 @@ function EditValueHistoryModal({ stat, fromDate, values, onClose, onRefresh, wee
                         const hasVal = (drafts[p] ?? '') !== ''
                         return (
                           <tr key={p} className={readOnly && !hasVal ? 'opacity-40' : ''}>
-                            <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">{rowLabel(p)}</td>
+                            <td className="px-3 py-1.5 text-gray-700 whitespace-nowrap">
+                              {rowLabel(p)}
+                            </td>
                             <td className="px-3 py-1.5">
                               {readOnly ? (
-                                <span className={`text-sm font-medium ${hasVal ? 'text-gray-900' : 'text-gray-400'}`}>
+                                <span
+                                  className={`text-sm font-medium ${hasVal ? 'text-gray-900' : 'text-gray-400'}`}
+                                >
                                   {hasVal ? fmt(parseFloat(drafts[p]), stat.stat_type) : '—'}
                                 </span>
                               ) : (
-                              <input
-                                type="number"
-                                value={drafts[p] ?? ''}
-                                onChange={e => setDrafts(d => ({ ...d, [p]: e.target.value }))}
-                                placeholder="—"
-                                className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-                              />
+                                <input
+                                  type="number"
+                                  value={drafts[p] ?? ''}
+                                  onChange={e => setDrafts(d => ({ ...d, [p]: e.target.value }))}
+                                  placeholder="—"
+                                  className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                                />
                               )}
                             </td>
                           </tr>
@@ -1228,10 +1838,13 @@ function EditValueHistoryModal({ stat, fromDate, values, onClose, onRefresh, wee
         {/* Close button removed — header has Save + Close. Footer is now an info strip only. */}
         <div className="flex items-center px-6 py-3 border-t border-gray-200 flex-shrink-0">
           <span className="text-xs text-gray-400 capitalize">
-            {stat.tracking} · {fromDate} → {today()} · {Object.values(valueByPeriod).length} of {periods.length} {readOnly ? 'auto-filled' : 'entered'}
+            {stat.tracking} · {fromDate} → {today()} · {Object.values(valueByPeriod).length} of{' '}
+            {periods.length} {readOnly ? 'auto-filled' : 'entered'}
           </span>
           {readOnly && (
-            <span className="ml-auto text-xs text-blue-600 font-medium">Values are managed automatically by the Finance page</span>
+            <span className="ml-auto text-xs text-blue-600 font-medium">
+              Values are managed automatically by the Finance page
+            </span>
           )}
         </div>
       </div>
@@ -1240,48 +1853,43 @@ function EditValueHistoryModal({ stat, fromDate, values, onClose, onRefresh, wee
 }
 
 // ── Custom graph cursor: value badge at the point, date badge at bottom ──────
-function GraphCursor({ points, height, payload, stat, chartData }) {
+function GraphCursor({ points, height, payload, stat }) {
   if (!points?.length || !payload?.length) return null
   const { x } = points[0]
   const value = payload[0]?.value
   if (value == null || !isFinite(value)) return null
-  const y         = points[0].y
+  const y = points[0].y
   const dateLabel = payload[0]?.payload?.label ?? ''
 
   const badgeColor = FG
 
   // ── Value badge — centred ON the data point ───────────────────────────────
   const valText = fmt(value, stat?.stat_type)
-  const valW    = Math.max(64, valText.length * 7 + 16)
-  const valH    = 24
-  const valBX   = x - valW / 2   // horizontally centred on point
-  const valBY   = y - valH / 2   // vertically centred on point
+  const valW = Math.max(64, valText.length * 7 + 16)
+  const valH = 24
+  const valBX = x - valW / 2 // horizontally centred on point
+  const valBY = y - valH / 2 // vertically centred on point
 
   // ── Date badge — centred on the line at the very bottom ──────────────────
-  const dateW  = Math.max(90, dateLabel.length * 7 + 16)
-  const dateH  = 22
-  const dateY  = height + 32   // below x-axis labels
+  const dateW = Math.max(90, dateLabel.length * 7 + 16)
+  const dateH = 22
+  const dateY = height + 32 // below x-axis labels
 
   return (
     <g>
       {/* Dashed vertical line — extends down to the date badge */}
       <line
-        x1={x} y1={0}
-        x2={x} y2={dateY + dateH / 2}
+        x1={x}
+        y1={0}
+        x2={x}
+        y2={dateY + dateH / 2}
         stroke="#9ca3af"
         strokeWidth={1}
         strokeDasharray="3 3"
       />
 
       {/* Value badge centred on the data point */}
-      <rect
-        x={valBX}
-        y={valBY}
-        width={valW}
-        height={valH}
-        rx={5}
-        fill={badgeColor}
-      />
+      <rect x={valBX} y={valBY} width={valW} height={valH} rx={5} fill={badgeColor} />
       <text
         x={x}
         y={valBY + valH / 2 + 4}
@@ -1296,14 +1904,7 @@ function GraphCursor({ points, height, payload, stat, chartData }) {
       {/* Date badge at the bottom of the line */}
       {dateLabel && (
         <>
-          <rect
-            x={x - dateW / 2}
-            y={dateY}
-            width={dateW}
-            height={dateH}
-            rx={5}
-            fill="#0e7490"
-          />
+          <rect x={x - dateW / 2} y={dateY} width={dateW} height={dateH} rx={5} fill="#0e7490" />
           <text
             x={x}
             y={dateY + dateH / 2 + 4}
@@ -1323,7 +1924,7 @@ function GraphCursor({ points, height, payload, stat, chartData }) {
 // ── Clickable dot with note indicator ────────────────────────────────────────
 function NoteDot({ cx, cy, payload, notesByDate }) {
   if (!cx || !cy || payload?.value == null) return null
-  const date    = payload?.date
+  const date = payload?.date
   const hasNote = date && notesByDate?.has(date)
   return (
     <g>
@@ -1331,7 +1932,16 @@ function NoteDot({ cx, cy, payload, notesByDate }) {
       {hasNote && (
         <>
           <circle cx={cx + 5} cy={cy - 5} r={5} fill="#f59e0b" stroke="white" strokeWidth={1.5} />
-          <text x={cx + 5} y={cy - 5 + 3.5} textAnchor="middle" fontSize={7} fontWeight={700} fill="white">N</text>
+          <text
+            x={cx + 5}
+            y={cy - 5 + 3.5}
+            textAnchor="middle"
+            fontSize={7}
+            fontWeight={700}
+            fill="white"
+          >
+            N
+          </text>
         </>
       )}
     </g>
@@ -1340,8 +1950,9 @@ function NoteDot({ cx, cy, payload, notesByDate }) {
 
 // ── Colored line segments: black = increasing, red = decreasing ───────────────
 function ColoredLineSegments({ formattedGraphicalItems, stat }) {
-  const points = (formattedGraphicalItems?.[0]?.props?.points ?? [])
-    .filter(p => p != null && p.value != null && isFinite(p.x) && isFinite(p.y))
+  const points = (formattedGraphicalItems?.[0]?.props?.points ?? []).filter(
+    p => p != null && p.value != null && isFinite(p.x) && isFinite(p.y)
+  )
 
   if (points.length === 0) return null
 
@@ -1352,14 +1963,16 @@ function ColoredLineSegments({ formattedGraphicalItems, stat }) {
         if (i === 0) return null
         const prev = points[i - 1]
         const going = stat?.upside_down
-          ? pt.value <= prev.value   // inverted: lower is "better" so lower = black
-          : pt.value >= prev.value   // normal: higher is better so higher = black
+          ? pt.value <= prev.value // inverted: lower is "better" so lower = black
+          : pt.value >= prev.value // normal: higher is better so higher = black
         const color = going ? '#111111' : '#dc2626'
         return (
           <line
             key={`seg-${i}`}
-            x1={prev.x} y1={prev.y}
-            x2={pt.x}   y2={pt.y}
+            x1={prev.x}
+            y1={prev.y}
+            x2={pt.x}
+            y2={pt.y}
             stroke={color}
             strokeWidth={3.1}
             strokeLinecap="round"
@@ -1370,18 +1983,16 @@ function ColoredLineSegments({ formattedGraphicalItems, stat }) {
       {/* Dots + optional value labels */}
       {points.map((pt, i) => {
         const prev = points[i - 1]
-        const going = prev == null
-          ? true
-          : stat?.upside_down
-            ? pt.value <= prev.value
-            : pt.value >= prev.value
+        const going =
+          prev == null ? true : stat?.upside_down ? pt.value <= prev.value : pt.value >= prev.value
         const dotColor = going ? '#111111' : '#dc2626'
         return (
           <g key={`dot-${i}`}>
             <circle cx={pt.x} cy={pt.y} r={4} fill={dotColor} stroke="#fff" strokeWidth={2} />
             {stat?.show_values && (
               <text
-                x={pt.x} y={pt.y - 10}
+                x={pt.x}
+                y={pt.y - 10}
                 textAnchor="middle"
                 fontSize={12}
                 fill="#374151"
@@ -1398,7 +2009,13 @@ function ColoredLineSegments({ formattedGraphicalItems, stat }) {
 }
 
 // ── Target Line Segments ─────────────────────────────────────────────────────
-function TargetLineSegments({ formattedGraphicalItems, yAxisMap, targetLines, displayChartData, tracking }) {
+function TargetLineSegments({
+  formattedGraphicalItems,
+  yAxisMap,
+  targetLines,
+  displayChartData,
+  tracking,
+}) {
   if (!targetLines?.length || !displayChartData?.length) return null
 
   const yAxis = yAxisMap && Object.values(yAxisMap)[0]
@@ -1416,7 +2033,13 @@ function TargetLineSegments({ formattedGraphicalItems, yAxisMap, targetLines, di
     <g>
       {targetLines.map((tl, i) => {
         if (!tl.start_date) return null
-        const endDate = computeTargetEndDate(tl.start_date, tl.end_mode, tl.end_date, tl.end_periods, tl.end_unit || tracking)
+        const endDate = computeTargetEndDate(
+          tl.start_date,
+          tl.end_mode,
+          tl.end_date,
+          tl.end_periods,
+          tl.end_unit || tracking
+        )
         const sLabel = periodLabel(tl.start_date, tracking)
         const eLabel = periodLabel(endDate, tracking)
         const x1 = labelToX[sLabel]
@@ -1427,9 +2050,17 @@ function TargetLineSegments({ formattedGraphicalItems, yAxisMap, targetLines, di
         if (!isFinite(y1) || !isFinite(y2)) return null
         return (
           <g key={i}>
-            <line x1={x1} y1={y1} x2={x2} y2={y2}
-              stroke="#16a34a" strokeWidth={1.5}
-              strokeDasharray="6 3" strokeLinecap="round" opacity={0.85} />
+            <line
+              x1={x1}
+              y1={y1}
+              x2={x2}
+              y2={y2}
+              stroke="#16a34a"
+              strokeWidth={1.5}
+              strokeDasharray="6 3"
+              strokeLinecap="round"
+              opacity={0.85}
+            />
             <circle cx={x1} cy={y1} r={3} fill="#16a34a" />
             <circle cx={x2} cy={y2} r={3} fill="#16a34a" />
           </g>
@@ -1441,15 +2072,15 @@ function TargetLineSegments({ formattedGraphicalItems, yAxisMap, targetLines, di
 
 // ── Dual-handle Date Range Scrubber ──────────────────────────────────────────
 function DateRangeScrubber({ minDate, maxDate, fromDate, toDate, onFromChange, onToChange }) {
-  const trackRef    = useRef(null)
-  const draggingRef = useRef(null)   // 'from' | 'to'
-  const stateRef    = useRef({})     // always-current values without re-registering listeners
+  const trackRef = useRef(null)
+  const draggingRef = useRef(null) // 'from' | 'to'
+  const stateRef = useRef({}) // always-current values without re-registering listeners
 
-  const toMs  = (d) => new Date(d + 'T00:00:00').getTime()
+  const toMs = d => new Date(d + 'T00:00:00').getTime()
   const minMs = toMs(minDate)
   const maxMs = toMs(maxDate)
-  const span  = Math.max(maxMs - minMs, 1)
-  const pct   = (d) => Math.max(0, Math.min(100, ((toMs(d) - minMs) / span) * 100))
+  const span = Math.max(maxMs - minMs, 1)
+  const pct = d => Math.max(0, Math.min(100, ((toMs(d) - minMs) / span) * 100))
 
   stateRef.current = { fromDate, toDate, onFromChange, onToChange }
 
@@ -1457,47 +2088,60 @@ function DateRangeScrubber({ minDate, maxDate, fromDate, toDate, onFromChange, o
   // pointer x-coordinate is whatever the active event provides; the rest of
   // the math is identical for either input source.
   useEffect(() => {
-    const moveTo = (clientX) => {
+    const moveTo = clientX => {
       if (!draggingRef.current || !trackRef.current) return
-      const rect  = trackRef.current.getBoundingClientRect()
+      const rect = trackRef.current.getBoundingClientRect()
       const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
-      const ms    = minMs + ratio * span
-      const date  = isoDate(new Date(ms))
+      const ms = minMs + ratio * span
+      const date = isoDate(new Date(ms))
       const { fromDate: fd, toDate: td, onFromChange: ofc, onToChange: otc } = stateRef.current
       if (draggingRef.current === 'from' && date < td) ofc(date)
-      if (draggingRef.current === 'to'   && date > fd) otc(date)
+      if (draggingRef.current === 'to' && date > fd) otc(date)
     }
-    const onMouseMove = (e) => moveTo(e.clientX)
-    const onTouchMove = (e) => {
+    const onMouseMove = e => moveTo(e.clientX)
+    const onTouchMove = e => {
       if (!draggingRef.current) return
       // Stop the page from scrolling while the user drags a handle.
       if (e.cancelable) e.preventDefault()
       const t = e.touches[0]
       if (t) moveTo(t.clientX)
     }
-    const onUp = () => { draggingRef.current = null }
+    const onUp = () => {
+      draggingRef.current = null
+    }
     document.addEventListener('mousemove', onMouseMove)
-    document.addEventListener('mouseup',   onUp)
+    document.addEventListener('mouseup', onUp)
     document.addEventListener('touchmove', onTouchMove, { passive: false })
-    document.addEventListener('touchend',  onUp)
+    document.addEventListener('touchend', onUp)
     document.addEventListener('touchcancel', onUp)
     return () => {
       document.removeEventListener('mousemove', onMouseMove)
-      document.removeEventListener('mouseup',   onUp)
+      document.removeEventListener('mouseup', onUp)
       document.removeEventListener('touchmove', onTouchMove)
-      document.removeEventListener('touchend',  onUp)
+      document.removeEventListener('touchend', onUp)
       document.removeEventListener('touchcancel', onUp)
     }
   }, [minMs, span])
 
-  const leftPct  = pct(fromDate)
+  const leftPct = pct(fromDate)
   const rightPct = pct(toDate)
 
-  const fmtLabel = (d) => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const fmtLabel = d =>
+    new Date(d + 'T00:00:00').toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
 
   // Handle drag-start helpers — set the active handle for both mouse + touch.
-  const startFrom = (e) => { e.preventDefault?.(); draggingRef.current = 'from' }
-  const startTo   = (e) => { e.preventDefault?.(); draggingRef.current = 'to'   }
+  const startFrom = e => {
+    e.preventDefault?.()
+    draggingRef.current = 'from'
+  }
+  const startTo = e => {
+    e.preventDefault?.()
+    draggingRef.current = 'to'
+  }
 
   return (
     <div className="px-3 sm:px-6 pt-0 pb-2 sm:py-3 bg-white border-t border-gray-100 flex-shrink-0">
@@ -1517,7 +2161,10 @@ function DateRangeScrubber({ minDate, maxDate, fromDate, toDate, onFromChange, o
         {/* Track */}
         <div className="absolute inset-x-0 h-2 bg-gray-200 rounded-full" />
         {/* Selected range fill — light green to match the flag backdrop. */}
-        <div className="absolute h-2 rounded-full bg-green-100 border border-green-200" style={{ left: `${leftPct}%`, right: `${100 - rightPct}%` }} />
+        <div
+          className="absolute h-2 rounded-full bg-green-100 border border-green-200"
+          style={{ left: `${leftPct}%`, right: `${100 - rightPct}%` }}
+        />
 
         {/* Tiny round dot marking the actual From handle position */}
         <div
@@ -1567,27 +2214,33 @@ function MultipleEntryView({ stats, weekEndingDay }) {
   const { user } = useAuth()
 
   const [entryTracking, setEntryTracking] = useState('weekly')
-  const [periodDate,    setPeriodDate]    = useState(null)
-  const [dbValues,      setDbValues]      = useState([])
-  const [drafts,        setDrafts]        = useState({})   // statId → string
-  const [loading,       setLoading]       = useState(false)
-  const [saving,        setSaving]        = useState(false)
-  const [saveMsg,       setSaveMsg]       = useState('')
+  const [periodDate, setPeriodDate] = useState(null)
+  const [dbValues, setDbValues] = useState([])
+  const [drafts, setDrafts] = useState({}) // statId → string
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveMsg, setSaveMsg] = useState('')
 
   // Stats matching the selected tracking type (non-archived, direct-entry only), sorted A→Z
   const filteredStats = useMemo(
-    () => stats
-      .filter(s => !s.archived && s.tracking === entryTracking && !['equation','overlay','target'].includes(s.stat_category))
-      .sort((a, b) => a.name.localeCompare(b.name)),
+    () =>
+      stats
+        .filter(
+          s =>
+            !s.archived &&
+            s.tracking === entryTracking &&
+            !['equation', 'overlay', 'target'].includes(s.stat_category)
+        )
+        .sort((a, b) => a.name.localeCompare(b.name)),
     [stats, entryTracking]
   )
 
   // ── Period helpers ────────────────────────────────────────────────────────
   function canonicalPeriod(tracking, refDate) {
     const d = refDate ? new Date(refDate + 'T00:00:00') : new Date()
-    if (tracking === 'daily')     return isoDate(d)
-    if (tracking === 'weekly')    return getWeekEndingDate(isoDate(d), weekEndingDay ?? 5)
-    if (tracking === 'monthly')   return isoDate(new Date(d.getFullYear(), d.getMonth() + 1, 0))
+    if (tracking === 'daily') return isoDate(d)
+    if (tracking === 'weekly') return getWeekEndingDate(isoDate(d), weekEndingDay ?? 5)
+    if (tracking === 'monthly') return isoDate(new Date(d.getFullYear(), d.getMonth() + 1, 0))
     if (tracking === 'quarterly') {
       const q = Math.floor(d.getMonth() / 3)
       return isoDate(new Date(d.getFullYear(), q * 3 + 3, 0))
@@ -1597,29 +2250,53 @@ function MultipleEntryView({ stats, weekEndingDay }) {
 
   function navigatePeriod(dir) {
     const d = new Date(periodDate + 'T00:00:00')
-    if (entryTracking === 'daily')     { d.setDate(d.getDate() + dir);                   setPeriodDate(isoDate(d)) }
-    else if (entryTracking === 'weekly')    { d.setDate(d.getDate() + dir * 7);               setPeriodDate(isoDate(d)) }
-    else if (entryTracking === 'monthly')   { setPeriodDate(isoDate(new Date(d.getFullYear(), d.getMonth() + 1 + dir, 0))) }
-    else if (entryTracking === 'quarterly') { setPeriodDate(isoDate(new Date(d.getFullYear(), d.getMonth() + 1 + dir * 3, 0))) }
-    else                                    { setPeriodDate(`${d.getFullYear() + dir}-12-31`) }
+    if (entryTracking === 'daily') {
+      d.setDate(d.getDate() + dir)
+      setPeriodDate(isoDate(d))
+    } else if (entryTracking === 'weekly') {
+      d.setDate(d.getDate() + dir * 7)
+      setPeriodDate(isoDate(d))
+    } else if (entryTracking === 'monthly') {
+      setPeriodDate(isoDate(new Date(d.getFullYear(), d.getMonth() + 1 + dir, 0)))
+    } else if (entryTracking === 'quarterly') {
+      setPeriodDate(isoDate(new Date(d.getFullYear(), d.getMonth() + 1 + dir * 3, 0)))
+    } else {
+      setPeriodDate(`${d.getFullYear() + dir}-12-31`)
+    }
   }
 
   function formatPeriod(dateStr, tracking) {
     if (!dateStr) return '—'
     const d = new Date(dateStr + 'T00:00:00')
-    if (tracking === 'daily')     return d.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' })
-    if (tracking === 'weekly')    return 'W/E ' + d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-    if (tracking === 'monthly')   return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    if (tracking === 'daily')
+      return d.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    if (tracking === 'weekly')
+      return (
+        'W/E ' + d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+      )
+    if (tracking === 'monthly')
+      return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
     if (tracking === 'quarterly') return `Q${Math.floor(d.getMonth() / 3) + 1} ${d.getFullYear()}`
     return String(d.getFullYear())
   }
 
   // Reset period when tracking type changes
-  useEffect(() => { setPeriodDate(canonicalPeriod(entryTracking)) }, [entryTracking, weekEndingDay])
+  useEffect(() => {
+    setPeriodDate(canonicalPeriod(entryTracking))
+  }, [entryTracking, weekEndingDay])
 
   // Load values whenever the stat list or period changes
   useEffect(() => {
-    if (!periodDate || filteredStats.length === 0) { setDbValues([]); setDrafts({}); return }
+    if (!periodDate || filteredStats.length === 0) {
+      setDbValues([])
+      setDrafts({})
+      return
+    }
     loadValues()
   }, [filteredStats.map(s => s.id).join(','), periodDate])
 
@@ -1634,8 +2311,14 @@ function MultipleEntryView({ stats, weekEndingDay }) {
     // might have been stored via the single-stat entry view.
     let q = supabase.from('statistic_values').select('*').in('statistic_id', ids)
     if (entryTracking === 'weekly') {
-      const end   = periodDate
-      const start = isoDate(new Date(new Date(periodDate + 'T00:00:00').setDate(new Date(periodDate + 'T00:00:00').getDate() - 6)))
+      const end = periodDate
+      const start = isoDate(
+        new Date(
+          new Date(periodDate + 'T00:00:00').setDate(
+            new Date(periodDate + 'T00:00:00').getDate() - 6
+          )
+        )
+      )
       q = q.gte('period_date', start).lte('period_date', end)
     } else {
       q = q.eq('period_date', periodDate)
@@ -1648,9 +2331,10 @@ function MultipleEntryView({ stats, weekEndingDay }) {
     // Pre-fill drafts from any value matching this period
     const d = {}
     filteredStats.forEach(s => {
-      const match = rows.find(v =>
-        v.statistic_id === s.id &&
-        matchesPeriod(v.period_date, periodDate, entryTracking, weekEndingDay)
+      const match = rows.find(
+        v =>
+          v.statistic_id === s.id &&
+          matchesPeriod(v.period_date, periodDate, entryTracking, weekEndingDay)
       )
       d[s.id] = match != null ? String(match.value) : ''
     })
@@ -1660,37 +2344,55 @@ function MultipleEntryView({ stats, weekEndingDay }) {
 
   // ── Save ─────────────────────────────────────────────────────────────────
   async function handleSave() {
-    setSaving(true); setSaveMsg('')
+    setSaving(true)
+    setSaveMsg('')
     const toUpsert = []
     const toDelete = []
 
     for (const s of filteredStats) {
-      const draft    = (drafts[s.id] ?? '').trim()
-      const existing = dbValues.find(v =>
-        v.statistic_id === s.id &&
-        matchesPeriod(v.period_date, periodDate, entryTracking, weekEndingDay)
+      const draft = (drafts[s.id] ?? '').trim()
+      const existing = dbValues.find(
+        v =>
+          v.statistic_id === s.id &&
+          matchesPeriod(v.period_date, periodDate, entryTracking, weekEndingDay)
       )
       if (draft !== '') {
         const num = parseFloat(draft)
-        if (!isNaN(num)) toUpsert.push({ statistic_id: s.id, period_date: periodDate, value: num, entered_by: user?.id })
+        if (!isNaN(num))
+          toUpsert.push({
+            statistic_id: s.id,
+            period_date: periodDate,
+            value: num,
+            entered_by: user?.id,
+          })
       } else if (existing) {
         toDelete.push(existing.id)
       }
     }
 
     if (toUpsert.length) {
-      const { error } = await supabase.from('statistic_values')
+      const { error } = await supabase
+        .from('statistic_values')
         .upsert(toUpsert, { onConflict: 'statistic_id,period_date' })
-      if (error) { setSaveMsg('⚠️ ' + error.message); setSaving(false); return }
+      if (error) {
+        setSaveMsg('⚠️ ' + error.message)
+        setSaving(false)
+        return
+      }
     }
     if (toDelete.length) {
       const { error } = await supabase.from('statistic_values').delete().in('id', toDelete)
-      if (error) { setSaveMsg('⚠️ ' + error.message); setSaving(false); return }
+      if (error) {
+        setSaveMsg('⚠️ ' + error.message)
+        setSaving(false)
+        return
+      }
     }
 
     setSaving(false)
-    const count = toUpsert.length + toDelete.length
-    setSaveMsg(`✓ Saved ${toUpsert.length} value${toUpsert.length !== 1 ? 's' : ''}${toDelete.length ? `, cleared ${toDelete.length}` : ''}`)
+    setSaveMsg(
+      `✓ Saved ${toUpsert.length} value${toUpsert.length !== 1 ? 's' : ''}${toDelete.length ? `, cleared ${toDelete.length}` : ''}`
+    )
     await loadValues()
     setTimeout(() => setSaveMsg(''), 4000)
   }
@@ -1698,13 +2400,13 @@ function MultipleEntryView({ stats, weekEndingDay }) {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
-
       {/* ── Controls bar ──────────────────────────────────────────────────── */}
       <div className="bg-white border-b border-gray-200 px-6 py-4 flex-shrink-0 space-y-3">
-
         {/* Tracking type */}
         <div className="flex items-center gap-3">
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide w-20 flex-shrink-0">Type</span>
+          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide w-20 flex-shrink-0">
+            Type
+          </span>
           <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
             {['daily', 'weekly', 'monthly', 'quarterly', 'yearly'].map(t => (
               <button
@@ -1723,7 +2425,9 @@ function MultipleEntryView({ stats, weekEndingDay }) {
 
         {/* Stat group — "All Statistics" is default; more groups to be added later */}
         <div className="flex items-center gap-3">
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide w-20 flex-shrink-0">Group</span>
+          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide w-20 flex-shrink-0">
+            Group
+          </span>
           <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
             <button
               className="px-4 py-1.5 text-xs font-semibold text-white"
@@ -1737,12 +2441,16 @@ function MultipleEntryView({ stats, weekEndingDay }) {
 
         {/* Period navigator */}
         <div className="flex items-center gap-3">
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide w-20 flex-shrink-0">Period</span>
+          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide w-20 flex-shrink-0">
+            Period
+          </span>
           <div className="flex items-center gap-2">
             <button
               onClick={() => navigatePeriod(-1)}
               className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-500 font-bold text-xl leading-none"
-            >‹</button>
+            >
+              ‹
+            </button>
             <div className="min-w-[220px] text-center">
               <span className="text-sm font-bold text-gray-800">
                 {formatPeriod(periodDate, entryTracking)}
@@ -1751,7 +2459,9 @@ function MultipleEntryView({ stats, weekEndingDay }) {
             <button
               onClick={() => navigatePeriod(1)}
               className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-500 font-bold text-xl leading-none"
-            >›</button>
+            >
+              ›
+            </button>
           </div>
           <span className="text-xs text-gray-400">
             {filteredStats.length} stat{filteredStats.length !== 1 ? 's' : ''} in this group
@@ -1769,58 +2479,75 @@ function MultipleEntryView({ stats, weekEndingDay }) {
           <div className="text-center text-gray-400 py-16">
             <div className="text-4xl mb-3">📋</div>
             <p className="text-sm font-medium">No {entryTracking} statistics found.</p>
-            <p className="text-xs mt-1 text-gray-300">Create a {entryTracking} statistic first using the Graphs view.</p>
+            <p className="text-xs mt-1 text-gray-300">
+              Create a {entryTracking} statistic first using the Graphs view.
+            </p>
           </div>
-        ) : (() => {
-          // Distribute stats evenly across 3 columns, maintaining A→Z order
-          const colSize = Math.ceil(filteredStats.length / 3)
-          const columns = [
-            filteredStats.slice(0, colSize),
-            filteredStats.slice(colSize, colSize * 2),
-            filteredStats.slice(colSize * 2),
-          ].filter(col => col.length > 0)
+        ) : (
+          (() => {
+            // Distribute stats evenly across 3 columns, maintaining A→Z order
+            const colSize = Math.ceil(filteredStats.length / 3)
+            const columns = [
+              filteredStats.slice(0, colSize),
+              filteredStats.slice(colSize, colSize * 2),
+              filteredStats.slice(colSize * 2),
+            ].filter(col => col.length > 0)
 
-          return (
-            <div className="flex gap-4 items-start">
-              {columns.map((colStats, ci) => (
-                <div key={ci} className="flex-1 min-w-0 bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-200 bg-gray-50">
-                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Statistic</th>
-                        <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide w-36">Value</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {colStats.map(s => (
-                        <tr key={s.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-2.5">
-                            <div className="font-medium text-gray-900 text-sm leading-tight">{s.name}</div>
-                            <div className="text-xs text-gray-400 capitalize mt-0.5">{s.stat_type}</div>
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              type="number"
-                              value={drafts[s.id] ?? ''}
-                              onChange={e => setDrafts(d => ({ ...d, [s.id]: e.target.value }))}
-                              placeholder="—"
-                              className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white placeholder-gray-300"
-                            />
-                          </td>
+            return (
+              <div className="flex gap-4 items-start">
+                {columns.map((colStats, ci) => (
+                  <div
+                    key={ci}
+                    className="flex-1 min-w-0 bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm"
+                  >
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200 bg-gray-50">
+                          <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                            Statistic
+                          </th>
+                          <th className="text-left px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide w-36">
+                            Value
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ))}
-            </div>
-          )
-        })()}
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {colStats.map(s => (
+                          <tr key={s.id} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-4 py-2.5">
+                              <div className="font-medium text-gray-900 text-sm leading-tight">
+                                {s.name}
+                              </div>
+                              <div className="text-xs text-gray-400 capitalize mt-0.5">
+                                {s.stat_type}
+                              </div>
+                            </td>
+                            <td className="px-3 py-2">
+                              <input
+                                type="number"
+                                value={drafts[s.id] ?? ''}
+                                onChange={e => setDrafts(d => ({ ...d, [s.id]: e.target.value }))}
+                                placeholder="—"
+                                className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white placeholder-gray-300"
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+              </div>
+            )
+          })()
+        )}
       </div>
 
       {/* ── Save bar ──────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-6 py-3 bg-white border-t border-gray-200 flex-shrink-0">
-        <span className={`text-sm font-medium transition-opacity ${saveMsg ? 'opacity-100' : 'opacity-0'} ${saveMsg.startsWith('⚠️') ? 'text-red-600' : 'text-green-600'}`}>
+        <span
+          className={`text-sm font-medium transition-opacity ${saveMsg ? 'opacity-100' : 'opacity-0'} ${saveMsg.startsWith('⚠️') ? 'text-red-600' : 'text-green-600'}`}
+        >
           {saveMsg || '—'}
         </span>
         <button
@@ -1837,20 +2564,28 @@ function MultipleEntryView({ stats, weekEndingDay }) {
 }
 
 // ── EquationStatForm ──────────────────────────────────────────────────────────
-function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, allStats, onOpenShares }) {
+function EquationStatForm({
+  initialData,
+  profiles,
+  onSave,
+  onClose,
+  onDelete,
+  allStats,
+  onOpenShares,
+}) {
   const { user } = useAuth()
 
   const [form, setForm] = useState({
-    name:                  initialData?.name                  || '',
-    stat_type:             initialData?.stat_type             || 'currency',
-    tracking:              initialData?.tracking              || 'monthly',
-    beginning_date:        initialData?.beginning_date        || daysAgo(90),
-    upside_down:           initialData?.upside_down           || false,
-    show_values:           initialData?.show_values           ?? false,
-    owner_type:            initialData?.owner_type            || 'user',
-    owner_user_id:         initialData?.owner_user_id         || user?.id || '',
-    owner_position_id:     initialData?.owner_position_id     || '',
-    default_periods:       initialData?.default_periods       ?? '',
+    name: initialData?.name || '',
+    stat_type: initialData?.stat_type || 'currency',
+    tracking: initialData?.tracking || 'monthly',
+    beginning_date: initialData?.beginning_date || daysAgo(90),
+    upside_down: initialData?.upside_down || false,
+    show_values: initialData?.show_values ?? false,
+    owner_type: initialData?.owner_type || 'user',
+    owner_user_id: initialData?.owner_user_id || user?.id || '',
+    owner_position_id: initialData?.owner_position_id || '',
+    default_periods: initialData?.default_periods ?? '',
     missing_value_display: initialData?.missing_value_display || 'skip',
   })
 
@@ -1860,14 +2595,14 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
     return [] // start empty — user clicks stats from the list to build the formula
   })
 
-  const [saving,        setSaving]        = useState(false)
-  const [pendingShares,  setPendingShares]  = useState({}) // user_id -> 'view'|'edit', applied to DB after stat insert
-  const [archiving,     setArchiving]     = useState(false)
-  const [deleting,      setDeleting]      = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [pendingShares, setPendingShares] = useState({}) // user_id -> 'view'|'edit', applied to DB after stat insert
+  const [archiving, setArchiving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [err,           setErr]           = useState('')
+  const [err, setErr] = useState('')
 
-  const isEdit     = !!initialData?.id
+  const isEdit = !!initialData?.id
   const isArchived = !!initialData?.archived
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -1885,7 +2620,7 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
     visited.add(numId)
     const st = (all || []).find(s => Number(s.id) === numId)
     if (!st || st.stat_category !== 'equation') return visited
-    for (const part of (st.equation_parts || [])) {
+    for (const part of st.equation_parts || []) {
       if (part.stat_id) collectEquationDeps(Number(part.stat_id), all, visited)
     }
     return visited
@@ -1905,7 +2640,7 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
   // Active stats available as equation operands
   const availableStats = (allStats || []).filter(s => !s.archived && isEligible(s))
   // Archived stats — still usable for historical reference in equations
-  const archivedStats  = (allStats || []).filter(s =>  s.archived && isEligible(s))
+  const archivedStats = (allStats || []).filter(s => s.archived && isEligible(s))
 
   function addPart() {
     setParts(prev => [...prev, { stat_id: '', operator: '+' }])
@@ -1916,58 +2651,76 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
   }
 
   function updatePart(idx, key, val) {
-    setParts(prev => prev.map((p, i) => i === idx ? { ...p, [key]: val } : p))
+    setParts(prev => prev.map((p, i) => (i === idx ? { ...p, [key]: val } : p)))
   }
 
   const handleSave = async () => {
-    if (!form.name.trim())    { setErr('Statistic Name is required.'); return }
+    if (!form.name.trim()) {
+      setErr('Statistic Name is required.')
+      return
+    }
     if (!form.default_periods || parseInt(form.default_periods) < 1) {
       setErr('Default # of Periods to Show is required.')
       return
     }
-    if (!form.beginning_date) { setErr('Beginning Date is required.');  return }
+    if (!form.beginning_date) {
+      setErr('Beginning Date is required.')
+      return
+    }
     if (parts.length === 0) {
-      setErr('Add at least one statistic to the equation using the picker on the left.'); return
+      setErr('Add at least one statistic to the equation using the picker on the left.')
+      return
     }
 
-    setSaving(true); setErr('')
+    setSaving(true)
+    setErr('')
 
     const payload = {
-      name:                  form.name.trim(),
-      stat_type:             form.stat_type,
-      tracking:              form.tracking,
-      beginning_date:        form.beginning_date,
-      upside_down:           form.upside_down,
-      show_values:           form.show_values,
-      owner_type:            form.owner_type,
-      owner_user_id:         form.owner_type === 'user'     ? (form.owner_user_id || user?.id) : null,
-      owner_position_id:     form.owner_type === 'position' ? form.owner_position_id : null,
-      default_periods:       form.default_periods ? parseInt(form.default_periods) : null,
+      name: form.name.trim(),
+      stat_type: form.stat_type,
+      tracking: form.tracking,
+      beginning_date: form.beginning_date,
+      upside_down: form.upside_down,
+      show_values: form.show_values,
+      owner_type: form.owner_type,
+      owner_user_id: form.owner_type === 'user' ? form.owner_user_id || user?.id : null,
+      owner_position_id: form.owner_type === 'position' ? form.owner_position_id : null,
+      default_periods: form.default_periods ? parseInt(form.default_periods) : null,
       missing_value_display: form.missing_value_display,
-      stat_category:         'equation',
-      equation_parts:        parts,
+      stat_category: 'equation',
+      equation_parts: parts,
     }
 
     let savedId, savedName
     if (isEdit) {
       const { error } = await supabase.from('statistics').update(payload).eq('id', initialData.id)
-      if (error) { setErr(error.message); setSaving(false); return }
+      if (error) {
+        setErr(error.message)
+        setSaving(false)
+        return
+      }
       savedId = initialData.id
       savedName = payload.name
     } else {
-      const { data, error } = await supabase.from('statistics')
+      const { data, error } = await supabase
+        .from('statistics')
         .insert({ ...payload, created_by: user?.id, sort_order: 0 })
-        .select().single()
-      if (error) { setErr(error.message); setSaving(false); return }
+        .select()
+        .single()
+      if (error) {
+        setErr(error.message)
+        setSaving(false)
+        return
+      }
       savedId = data.id
       savedName = data.name
     }
     if (!isEdit && savedId && pendingShares && Object.keys(pendingShares).length > 0) {
       const rows = Object.entries(pendingShares).map(([uid, perm]) => ({
         statistic_id: savedId,
-        user_id:      uid,
-        permission:   perm,
-        created_by:   user?.id || null,
+        user_id: uid,
+        permission: perm,
+        created_by: user?.id || null,
       }))
       const { error: shareErr } = await supabase.from('statistic_shares').insert(rows)
       if (shareErr) console.error('[Statistics] failed to write pending shares:', shareErr)
@@ -1991,27 +2744,30 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
   }
 
   const OPERATORS = [
-    { value: '+', label: 'Add (+)'       },
+    { value: '+', label: 'Add (+)' },
     { value: '-', label: 'Subtract (-)' },
     { value: '*', label: 'Multiply (×)' },
-    { value: '/', label: 'Divide (÷)'   },
+    { value: '/', label: 'Divide (÷)' },
   ]
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh]">
-
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
           <h2 className="text-lg font-semibold text-gray-900">
             {isEdit ? 'Edit Equation Statistic' : 'New Equation Statistic'}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+          >
+            ✕
+          </button>
         </div>
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-
           {/* Name */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">
@@ -2032,7 +2788,7 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
               Tracking Period <span className="text-red-500">*</span>
             </label>
             <div className="flex gap-2">
-              {['daily','weekly','monthly','quarterly','yearly'].map(t => (
+              {['daily', 'weekly', 'monthly', 'quarterly', 'yearly'].map(t => (
                 <button
                   key={t}
                   type="button"
@@ -2049,8 +2805,9 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
               ))}
             </div>
             <p className="text-xs text-gray-400 mt-1.5">
-              Only <span className="font-semibold capitalize">{form.tracking}</span> statistics will be available to use in the equation
-              {(availableStats.length + archivedStats.length) > 0
+              Only <span className="font-semibold capitalize">{form.tracking}</span> statistics will
+              be available to use in the equation
+              {availableStats.length + archivedStats.length > 0
                 ? ` — ${availableStats.length} active${archivedStats.length > 0 ? `, ${archivedStats.length} archived` : ''}.`
                 : ' — none found for this period yet.'}
             </p>
@@ -2062,7 +2819,6 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
               Equation <span className="text-red-500">*</span>
             </label>
             <div className="flex gap-3 min-h-[220px]">
-
               {/* ── LEFT: stat picker list ── */}
               <div className="w-[48%] flex-shrink-0 border border-gray-200 rounded-xl overflow-hidden flex flex-col">
                 <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 flex-shrink-0">
@@ -2080,27 +2836,42 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
                       {availableStats.length > 0 && (
                         <>
                           <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Active Stats</span>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">
+                              Active Stats
+                            </span>
                           </div>
                           {availableStats.map(s => {
                             const alreadyIn = parts.some(p => String(p.stat_id) === String(s.id))
                             return (
                               <button
                                 key={s.id}
-                                onClick={() => setParts(prev => [
-                                  ...prev,
-                                  { stat_id: String(s.id), operator: prev.length === 0 ? null : '+' }
-                                ])}
+                                onClick={() =>
+                                  setParts(prev => [
+                                    ...prev,
+                                    {
+                                      stat_id: String(s.id),
+                                      operator: prev.length === 0 ? null : '+',
+                                    },
+                                  ])
+                                }
                                 className="w-full text-left px-3 py-2 border-b border-gray-50 hover:bg-green-50 transition-colors flex items-center justify-between gap-2 group"
                               >
                                 <div className="min-w-0">
                                   <p className="text-xs font-semibold text-gray-800 truncate">
-                                    {s.stat_category === 'equation' && <span className="text-purple-600 mr-1">∑</span>}
+                                    {s.stat_category === 'equation' && (
+                                      <span className="text-purple-600 mr-1">∑</span>
+                                    )}
                                     {s.name}
                                   </p>
-                                  <p className="text-[10px] text-gray-400 capitalize">{s.stat_type}</p>
+                                  <p className="text-[10px] text-gray-400 capitalize">
+                                    {s.stat_type}
+                                  </p>
                                 </div>
-                                <span className={`text-sm flex-shrink-0 font-bold transition-colors ${alreadyIn ? 'text-green-600' : 'text-gray-300 group-hover:text-green-600'}`}>+</span>
+                                <span
+                                  className={`text-sm flex-shrink-0 font-bold transition-colors ${alreadyIn ? 'text-green-600' : 'text-gray-300 group-hover:text-green-600'}`}
+                                >
+                                  +
+                                </span>
                               </button>
                             )
                           })}
@@ -2109,27 +2880,42 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
                       {archivedStats.length > 0 && (
                         <>
                           <div className="px-3 py-1.5 bg-amber-50 border-b border-amber-100 border-t border-t-gray-100">
-                            <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wide">Archived · Historical Reference</span>
+                            <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wide">
+                              Archived · Historical Reference
+                            </span>
                           </div>
                           {archivedStats.map(s => {
                             const alreadyIn = parts.some(p => String(p.stat_id) === String(s.id))
                             return (
                               <button
                                 key={s.id}
-                                onClick={() => setParts(prev => [
-                                  ...prev,
-                                  { stat_id: String(s.id), operator: prev.length === 0 ? null : '+' }
-                                ])}
+                                onClick={() =>
+                                  setParts(prev => [
+                                    ...prev,
+                                    {
+                                      stat_id: String(s.id),
+                                      operator: prev.length === 0 ? null : '+',
+                                    },
+                                  ])
+                                }
                                 className="w-full text-left px-3 py-2 border-b border-gray-50 hover:bg-amber-50 transition-colors flex items-center justify-between gap-2 group"
                               >
                                 <div className="min-w-0">
                                   <p className="text-xs font-semibold text-gray-500 truncate">
-                                    {s.stat_category === 'equation' && <span className="text-purple-400 mr-1">∑</span>}
+                                    {s.stat_category === 'equation' && (
+                                      <span className="text-purple-400 mr-1">∑</span>
+                                    )}
                                     {s.name}
                                   </p>
-                                  <p className="text-[10px] text-amber-500 capitalize">archived · {s.stat_type}</p>
+                                  <p className="text-[10px] text-amber-500 capitalize">
+                                    archived · {s.stat_type}
+                                  </p>
                                 </div>
-                                <span className={`text-sm flex-shrink-0 font-bold transition-colors ${alreadyIn ? 'text-amber-500' : 'text-gray-300 group-hover:text-amber-500'}`}>+</span>
+                                <span
+                                  className={`text-sm flex-shrink-0 font-bold transition-colors ${alreadyIn ? 'text-amber-500' : 'text-gray-300 group-hover:text-amber-500'}`}
+                                >
+                                  +
+                                </span>
                               </button>
                             )
                           })}
@@ -2143,7 +2929,9 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
               {/* ── RIGHT: formula builder ── */}
               <div className="flex-1 border border-gray-200 rounded-xl overflow-hidden flex flex-col">
                 <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 flex-shrink-0">
-                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Formula</p>
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">
+                    Formula
+                  </p>
                 </div>
                 <div className="overflow-y-auto flex-1 p-2 space-y-1">
                   {parts.length === 0 || !parts[0].stat_id ? (
@@ -2152,12 +2940,19 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
                     </p>
                   ) : (
                     parts.map((part, idx) => {
-                      const statName = [...availableStats, ...archivedStats].find(s => String(s.id) === String(part.stat_id))?.name || '—'
-                      const isArchived = archivedStats.some(s => String(s.id) === String(part.stat_id))
+                      const statName =
+                        [...availableStats, ...archivedStats].find(
+                          s => String(s.id) === String(part.stat_id)
+                        )?.name || '—'
+                      const isArchived = archivedStats.some(
+                        s => String(s.id) === String(part.stat_id)
+                      )
                       return (
                         <div key={idx} className="flex items-center gap-1.5">
                           {idx === 0 ? (
-                            <span className="text-[10px] font-bold text-gray-400 uppercase w-24 flex-shrink-0 text-center">Value</span>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase w-24 flex-shrink-0 text-center">
+                              Value
+                            </span>
                           ) : (
                             <select
                               value={part.operator || '+'}
@@ -2165,18 +2960,25 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
                               className="w-24 flex-shrink-0 border border-gray-300 rounded-lg px-1.5 py-1 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-green-600"
                             >
                               {OPERATORS.map(op => (
-                                <option key={op.value} value={op.value}>{op.label}</option>
+                                <option key={op.value} value={op.value}>
+                                  {op.label}
+                                </option>
                               ))}
                             </select>
                           )}
-                          <div className={`flex-1 min-w-0 rounded-lg px-2 py-1.5 text-xs font-semibold truncate ${isArchived ? 'bg-amber-50 text-amber-800' : 'bg-green-50 text-green-900'}`}>
-                            {statName}{isArchived ? ' [archived]' : ''}
+                          <div
+                            className={`flex-1 min-w-0 rounded-lg px-2 py-1.5 text-xs font-semibold truncate ${isArchived ? 'bg-amber-50 text-amber-800' : 'bg-green-50 text-green-900'}`}
+                          >
+                            {statName}
+                            {isArchived ? ' [archived]' : ''}
                           </div>
                           <button
                             onClick={() => removePart(idx)}
                             className="text-red-300 hover:text-red-600 font-bold flex-shrink-0 px-0.5 text-sm leading-none"
                             title="Remove"
-                          >✕</button>
+                          >
+                            ✕
+                          </button>
                         </div>
                       )
                     })
@@ -2185,15 +2987,19 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
               </div>
             </div>
             <p className="text-xs text-gray-400 mt-1.5">
-              Operators are applied in order, top to bottom. Periods where any component has no value are skipped.
+              Operators are applied in order, top to bottom. Periods where any component has no
+              value are skipped.
             </p>
           </div>
 
           {/* Output Format */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">Output Format</label>
-            <select value={form.stat_type} onChange={e => set('stat_type', e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
+            <select
+              value={form.stat_type}
+              onChange={e => set('stat_type', e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+            >
               <option value="currency">Currency ($)</option>
               <option value="numeric">Numeric (#)</option>
               <option value="percentage">Percentage (%)</option>
@@ -2206,22 +3012,38 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
               <label className="block text-sm font-semibold text-gray-700 mb-1">
                 Beginning Date <span className="text-red-500">*</span>
               </label>
-              <input type="date" value={form.beginning_date} onChange={e => set('beginning_date', e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" />
+              <input
+                type="date"
+                value={form.beginning_date}
+                onChange={e => set('beginning_date', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+              />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Default Periods</label>
-              <input type="number" value={form.default_periods} onChange={e => set('default_periods', e.target.value)}
-                placeholder="e.g. 12" min="1"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" />
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Default Periods
+              </label>
+              <input
+                type="number"
+                value={form.default_periods}
+                onChange={e => set('default_periods', e.target.value)}
+                placeholder="e.g. 12"
+                min="1"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+              />
             </div>
           </div>
 
           {/* Missing Value Display */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Missing Period Display</label>
-            <select value={form.missing_value_display} onChange={e => set('missing_value_display', e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Missing Period Display
+            </label>
+            <select
+              value={form.missing_value_display}
+              onChange={e => set('missing_value_display', e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+            >
               <option value="skip">Skip (gap in chart)</option>
               <option value="zero">Show as Zero</option>
             </select>
@@ -2231,7 +3053,7 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
           <div className="flex items-center gap-6">
             {[
               { key: 'upside_down', label: 'Inverted (lower is better)' },
-              { key: 'show_values', label: 'Show Values on Chart'       },
+              { key: 'show_values', label: 'Show Values on Chart' },
             ].map(({ key, label }) => (
               <label key={key} className="flex items-center gap-2 cursor-pointer select-none">
                 <button
@@ -2239,7 +3061,9 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
                   onClick={() => set(key, !form[key])}
                   className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${form[key] ? 'bg-green-600' : 'bg-gray-300'}`}
                 >
-                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form[key] ? 'translate-x-4' : ''}`} />
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form[key] ? 'translate-x-4' : ''}`}
+                  />
                 </button>
                 <span className="text-sm text-gray-700">{label}</span>
               </label>
@@ -2251,9 +3075,14 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
             <label className="block text-sm font-semibold text-gray-700 mb-1">Owner</label>
             <div className="flex gap-2 mb-2">
               {['user', 'position'].map(t => (
-                <button key={t} type="button" onClick={() => set('owner_type', t)}
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => set('owner_type', t)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-colors ${
-                    form.owner_type === t ? 'text-white border-transparent' : 'border-gray-200 text-gray-600 hover:border-green-500'
+                    form.owner_type === t
+                      ? 'text-white border-transparent'
+                      : 'border-gray-200 text-gray-600 hover:border-green-500'
                   }`}
                   style={form.owner_type === t ? { backgroundColor: FG, borderColor: FG } : {}}
                 >
@@ -2262,11 +3091,16 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
               ))}
             </div>
             {form.owner_type === 'user' && (
-              <select value={form.owner_user_id} onChange={e => set('owner_user_id', e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
+              <select
+                value={form.owner_user_id}
+                onChange={e => set('owner_user_id', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+              >
                 <option value="">— select person —</option>
                 {(profiles || []).map(p => (
-                  <option key={p.id} value={p.id}>{p.full_name || p.email}</option>
+                  <option key={p.id} value={p.id}>
+                    {p.full_name || p.email}
+                  </option>
                 ))}
               </select>
             )}
@@ -2280,24 +3114,34 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
           <div className="flex gap-2">
             {isEdit && (
               <>
-                <button onClick={handleArchive} disabled={archiving}
-                  className="px-3 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 disabled:opacity-50 font-medium">
+                <button
+                  onClick={handleArchive}
+                  disabled={archiving}
+                  className="px-3 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 disabled:opacity-50 font-medium"
+                >
                   {archiving ? '…' : isArchived ? 'Unarchive' : 'Archive'}
                 </button>
                 {!confirmDelete ? (
-                  <button onClick={() => setConfirmDelete(true)}
-                    className="px-3 py-2 text-sm rounded-lg border border-red-200 text-red-600 hover:bg-red-50 font-medium">
+                  <button
+                    onClick={() => setConfirmDelete(true)}
+                    className="px-3 py-2 text-sm rounded-lg border border-red-200 text-red-600 hover:bg-red-50 font-medium"
+                  >
                     Delete
                   </button>
                 ) : (
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-red-600 font-medium">Delete permanently?</span>
-                    <button onClick={handleDelete} disabled={deleting}
-                      className="px-2 py-1.5 text-xs rounded-lg bg-red-600 text-white font-bold disabled:opacity-50">
+                    <button
+                      onClick={handleDelete}
+                      disabled={deleting}
+                      className="px-2 py-1.5 text-xs rounded-lg bg-red-600 text-white font-bold disabled:opacity-50"
+                    >
                       {deleting ? '…' : 'Yes, delete'}
                     </button>
-                    <button onClick={() => setConfirmDelete(false)}
-                      className="px-2 py-1.5 text-xs rounded-lg bg-gray-200 text-gray-700 font-bold">
+                    <button
+                      onClick={() => setConfirmDelete(false)}
+                      className="px-2 py-1.5 text-xs rounded-lg bg-gray-200 text-gray-700 font-bold"
+                    >
                       Cancel
                     </button>
                   </div>
@@ -2307,29 +3151,39 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
           </div>
           <div className="flex gap-2">
             {onOpenShares && (
-              <button type="button"
+              <button
+                type="button"
                 onClick={() => {
                   if (initialData?.id) {
                     onOpenShares(initialData.id, initialData.name)
                   } else {
                     onOpenShares(null, form.name?.trim() || 'New Stat', {
                       initialShares: pendingShares,
-                      onLocalSave:   (m) => setPendingShares(m),
+                      onLocalSave: m => setPendingShares(m),
                     })
                   }
                 }}
                 className="px-4 py-2 text-sm rounded-lg border border-purple-200 text-purple-700 hover:bg-purple-50 font-medium"
-                title="Manage who else can view or edit this statistic">
-                🔒 Shared Permissions{!initialData?.id && Object.keys(pendingShares).length > 0 ? ` (${Object.keys(pendingShares).length})` : ''}
+                title="Manage who else can view or edit this statistic"
+              >
+                🔒 Shared Permissions
+                {!initialData?.id && Object.keys(pendingShares).length > 0
+                  ? ` (${Object.keys(pendingShares).length})`
+                  : ''}
               </button>
             )}
-            <button onClick={onClose}
-              className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 font-medium">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 font-medium"
+            >
               Cancel
             </button>
-            <button onClick={handleSave} disabled={saving}
+            <button
+              onClick={handleSave}
+              disabled={saving}
               className="px-5 py-2 text-sm rounded-xl font-bold text-white disabled:opacity-50"
-              style={{ backgroundColor: FG }}>
+              style={{ backgroundColor: FG }}
+            >
               {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Equation Stat'}
             </button>
           </div>
@@ -2340,21 +3194,29 @@ function EquationStatForm({ initialData, profiles, onSave, onClose, onDelete, al
 }
 
 // ── OverlayStatForm ───────────────────────────────────────────────────────────
-function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, allStats, onOpenShares }) {
+function OverlayStatForm({
+  initialData,
+  profiles,
+  onSave,
+  onClose,
+  onDelete,
+  allStats,
+  onOpenShares,
+}) {
   const { user } = useAuth()
   const MAX_PARTS = 3
 
   const [form, setForm] = useState({
-    name:                  initialData?.name                  || '',
-    stat_type:             initialData?.stat_type             || 'currency',
-    tracking:              initialData?.tracking              || 'monthly',
-    beginning_date:        initialData?.beginning_date        || daysAgo(90),
-    upside_down:           initialData?.upside_down           || false,
-    show_values:           initialData?.show_values           ?? false,
-    owner_type:            initialData?.owner_type            || 'user',
-    owner_user_id:         initialData?.owner_user_id         || user?.id || '',
-    owner_position_id:     initialData?.owner_position_id     || '',
-    default_periods:       initialData?.default_periods       ?? '',
+    name: initialData?.name || '',
+    stat_type: initialData?.stat_type || 'currency',
+    tracking: initialData?.tracking || 'monthly',
+    beginning_date: initialData?.beginning_date || daysAgo(90),
+    upside_down: initialData?.upside_down || false,
+    show_values: initialData?.show_values ?? false,
+    owner_type: initialData?.owner_type || 'user',
+    owner_user_id: initialData?.owner_user_id || user?.id || '',
+    owner_position_id: initialData?.owner_position_id || '',
+    default_periods: initialData?.default_periods ?? '',
     missing_value_display: initialData?.missing_value_display || 'skip',
   })
 
@@ -2367,14 +3229,14 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
   // statRanges: { [stat_id]: { min, max } } — actual data range fetched on stat select
   const [statRanges, setStatRanges] = useState({})
 
-  const [saving,        setSaving]        = useState(false)
-  const [pendingShares,  setPendingShares]  = useState({}) // user_id -> 'view'|'edit', applied to DB after stat insert
-  const [archiving,     setArchiving]     = useState(false)
-  const [deleting,      setDeleting]      = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [pendingShares, setPendingShares] = useState({}) // user_id -> 'view'|'edit', applied to DB after stat insert
+  const [archiving, setArchiving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [err,           setErr]           = useState('')
+  const [err, setErr] = useState('')
 
-  const isEdit     = !!initialData?.id
+  const isEdit = !!initialData?.id
   const isArchived = !!initialData?.archived
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -2386,9 +3248,11 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
 
   // Stats available for selection (match tracking, not overlay type, not self)
   const availableStats = (allStats || []).filter(
-    s => !s.archived && s.stat_category !== 'overlay' &&
-         s.tracking === form.tracking &&
-         (!isEdit || s.id !== initialData?.id)
+    s =>
+      !s.archived &&
+      s.stat_category !== 'overlay' &&
+      s.tracking === form.tracking &&
+      (!isEdit || s.id !== initialData?.id)
   )
 
   // On mount, fetch ranges for any pre-filled parts (edit mode)
@@ -2400,7 +3264,10 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
 
   async function loadRange(statId) {
     if (!statId || statRanges[statId]) return
-    const { data } = await supabase.from('statistic_values').select('value').eq('statistic_id', statId)
+    const { data } = await supabase
+      .from('statistic_values')
+      .select('value')
+      .eq('statistic_id', statId)
     const vals = (data || []).map(v => Number(v.value)).filter(v => isFinite(v))
     if (!vals.length) return
     setStatRanges(prev => ({
@@ -2411,13 +3278,15 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
 
   // When a stat is chosen in a slot: reset range fields and pre-fill from actual data
   async function handlePartStatChange(idx, statId) {
-    setParts(prev => prev.map((p, i) => i === idx
-      ? { ...p, stat_id: statId, y_min: '', y_max: '' }
-      : p
-    ))
+    setParts(prev =>
+      prev.map((p, i) => (i === idx ? { ...p, stat_id: statId, y_min: '', y_max: '' } : p))
+    )
     if (!statId) return
 
-    const { data } = await supabase.from('statistic_values').select('value').eq('statistic_id', statId)
+    const { data } = await supabase
+      .from('statistic_values')
+      .select('value')
+      .eq('statistic_id', statId)
     const vals = (data || []).map(v => Number(v.value)).filter(v => isFinite(v))
     if (!vals.length) return
 
@@ -2426,18 +3295,20 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
     setStatRanges(prev => ({ ...prev, [statId]: { min: rangeMin, max: rangeMax } }))
 
     // Pre-fill y_min / y_max (only if still blank — user might have typed something)
-    setParts(prev => prev.map((p, i) => {
-      if (i !== idx || p.stat_id !== statId) return p
-      return {
-        ...p,
-        y_min: p.y_min === '' ? String(rangeMin) : p.y_min,
-        y_max: p.y_max === '' ? String(rangeMax) : p.y_max,
-      }
-    }))
+    setParts(prev =>
+      prev.map((p, i) => {
+        if (i !== idx || p.stat_id !== statId) return p
+        return {
+          ...p,
+          y_min: p.y_min === '' ? String(rangeMin) : p.y_min,
+          y_max: p.y_max === '' ? String(rangeMax) : p.y_max,
+        }
+      })
+    )
   }
 
   function updatePart(idx, key, val) {
-    setParts(prev => prev.map((p, i) => i === idx ? { ...p, [key]: val } : p))
+    setParts(prev => prev.map((p, i) => (i === idx ? { ...p, [key]: val } : p)))
   }
 
   function addPart() {
@@ -2450,55 +3321,80 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
   }
 
   const handleSave = async () => {
-    if (!form.name.trim())    { setErr('Statistic Name is required.'); return }
+    if (!form.name.trim()) {
+      setErr('Statistic Name is required.')
+      return
+    }
     if (!form.default_periods || parseInt(form.default_periods) < 1) {
       setErr('Default # of Periods to Show is required.')
       return
     }
-    if (!form.beginning_date) { setErr('Beginning Date is required.');  return }
-    if (!parts[0]?.stat_id)   { setErr('At least one statistic is required.'); return }
-    if (parts.some(p => !p.stat_id)) { setErr('All slots must have a statistic selected.'); return }
+    if (!form.beginning_date) {
+      setErr('Beginning Date is required.')
+      return
+    }
+    if (!parts[0]?.stat_id) {
+      setErr('At least one statistic is required.')
+      return
+    }
+    if (parts.some(p => !p.stat_id)) {
+      setErr('All slots must have a statistic selected.')
+      return
+    }
 
-    setSaving(true); setErr('')
+    setSaving(true)
+    setErr('')
 
     const payload = {
-      name:                  form.name.trim(),
-      stat_type:             form.stat_type,
-      tracking:              form.tracking,
-      beginning_date:        form.beginning_date,
-      upside_down:           form.upside_down,
-      show_values:           form.show_values,
-      owner_type:            form.owner_type,
-      owner_user_id:         form.owner_type === 'user'     ? (form.owner_user_id || user?.id) : null,
-      owner_position_id:     form.owner_type === 'position' ? form.owner_position_id : null,
-      default_periods:       form.default_periods ? parseInt(form.default_periods) : null,
+      name: form.name.trim(),
+      stat_type: form.stat_type,
+      tracking: form.tracking,
+      beginning_date: form.beginning_date,
+      upside_down: form.upside_down,
+      show_values: form.show_values,
+      owner_type: form.owner_type,
+      owner_user_id: form.owner_type === 'user' ? form.owner_user_id || user?.id : null,
+      owner_position_id: form.owner_type === 'position' ? form.owner_position_id : null,
+      default_periods: form.default_periods ? parseInt(form.default_periods) : null,
       missing_value_display: form.missing_value_display,
-      stat_category:         'overlay',
-      overlay_parts:         parts.map(p => ({
+      stat_category: 'overlay',
+      overlay_parts: parts.map(p => ({
         stat_id: p.stat_id,
-        y_min:   p.y_min !== '' && p.y_min != null ? Number(p.y_min) : null,
-        y_max:   p.y_max !== '' && p.y_max != null ? Number(p.y_max) : null,
+        y_min: p.y_min !== '' && p.y_min != null ? Number(p.y_min) : null,
+        y_max: p.y_max !== '' && p.y_max != null ? Number(p.y_max) : null,
       })),
     }
 
     let savedId, savedName
     if (isEdit) {
       const { error } = await supabase.from('statistics').update(payload).eq('id', initialData.id)
-      if (error) { setErr(error.message); setSaving(false); return }
-      savedId = initialData.id; savedName = payload.name
+      if (error) {
+        setErr(error.message)
+        setSaving(false)
+        return
+      }
+      savedId = initialData.id
+      savedName = payload.name
     } else {
-      const { data, error } = await supabase.from('statistics')
+      const { data, error } = await supabase
+        .from('statistics')
         .insert({ ...payload, created_by: user?.id, sort_order: 0 })
-        .select().single()
-      if (error) { setErr(error.message); setSaving(false); return }
-      savedId = data.id; savedName = data.name
+        .select()
+        .single()
+      if (error) {
+        setErr(error.message)
+        setSaving(false)
+        return
+      }
+      savedId = data.id
+      savedName = data.name
     }
     if (!isEdit && savedId && pendingShares && Object.keys(pendingShares).length > 0) {
       const rows = Object.entries(pendingShares).map(([uid, perm]) => ({
         statistic_id: savedId,
-        user_id:      uid,
-        permission:   perm,
-        created_by:   user?.id || null,
+        user_id: uid,
+        permission: perm,
+        created_by: user?.id || null,
       }))
       const { error: shareErr } = await supabase.from('statistic_shares').insert(rows)
       if (shareErr) console.error('[Statistics] failed to write pending shares:', shareErr)
@@ -2526,26 +3422,33 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh]">
-
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
           <h2 className="text-lg font-semibold text-gray-900">
             {isEdit ? 'Edit Overlay Statistic' : 'New Overlay Statistic'}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+          >
+            ✕
+          </button>
         </div>
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-
           {/* Name */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">
               Statistic Name <span className="text-red-500">*</span>
             </label>
-            <input type="text" value={form.name} onChange={e => set('name', e.target.value)}
+            <input
+              type="text"
+              value={form.name}
+              onChange={e => set('name', e.target.value)}
               placeholder="e.g., Revenue vs. Costs"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" />
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+            />
           </div>
 
           {/* Tracking period — first, so stat list is filtered */}
@@ -2554,8 +3457,11 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
               Tracking Period <span className="text-red-500">*</span>
             </label>
             <div className="flex gap-2">
-              {['daily','weekly','monthly','quarterly','yearly'].map(t => (
-                <button key={t} type="button" onClick={() => setTracking(t)}
+              {['daily', 'weekly', 'monthly', 'quarterly', 'yearly'].map(t => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTracking(t)}
                   className={`flex-1 py-2 rounded-lg text-xs font-semibold border-2 capitalize transition-colors ${
                     form.tracking === t
                       ? 'text-white border-transparent'
@@ -2568,8 +3474,11 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
               ))}
             </div>
             <p className="text-xs text-gray-400 mt-1.5">
-              Only <span className="font-semibold capitalize">{form.tracking}</span> statistics are shown below
-              {availableStats.length > 0 ? ` — ${availableStats.length} available.` : ' — none found yet.'}
+              Only <span className="font-semibold capitalize">{form.tracking}</span> statistics are
+              shown below
+              {availableStats.length > 0
+                ? ` — ${availableStats.length} available.`
+                : ' — none found yet.'}
             </p>
           </div>
 
@@ -2577,25 +3486,37 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Statistics to Overlay <span className="text-red-500">*</span>
-              <span className="ml-2 text-xs font-normal text-gray-400">({parts.length} of {MAX_PARTS} slots used)</span>
+              <span className="ml-2 text-xs font-normal text-gray-400">
+                ({parts.length} of {MAX_PARTS} slots used)
+              </span>
             </label>
 
             <div className="space-y-3">
               {parts.map((part, idx) => {
-                const range   = statRanges[part.stat_id]
-                const color   = OVERLAY_COLORS[idx]
+                const range = statRanges[part.stat_id]
+                const color = OVERLAY_COLORS[idx]
                 const colName = COLOR_NAMES[idx]
                 return (
-                  <div key={idx} className="rounded-xl border border-gray-200 p-4 space-y-3 bg-gray-50">
+                  <div
+                    key={idx}
+                    className="rounded-xl border border-gray-200 p-4 space-y-3 bg-gray-50"
+                  >
                     {/* Slot header with color swatch */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                        <span className="text-xs font-semibold text-gray-600">Stat {idx + 1} — {colName} line</span>
+                        <div
+                          className="w-3 h-3 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: color }}
+                        />
+                        <span className="text-xs font-semibold text-gray-600">
+                          Stat {idx + 1} — {colName} line
+                        </span>
                       </div>
                       {parts.length > 1 && (
-                        <button onClick={() => removePart(idx)}
-                          className="text-red-400 hover:text-red-600 text-xs font-bold">
+                        <button
+                          onClick={() => removePart(idx)}
+                          className="text-red-400 hover:text-red-600 text-xs font-bold"
+                        >
                           Remove
                         </button>
                       )}
@@ -2614,7 +3535,9 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
                           : '— select statistic —'}
                       </option>
                       {availableStats.map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
                       ))}
                     </select>
 
@@ -2623,7 +3546,9 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
                       <div className="space-y-1.5">
                         <div className="flex items-center gap-3">
                           <div className="flex-1">
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Y Min</label>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">
+                              Y Min
+                            </label>
                             <input
                               type="number"
                               value={part.y_min}
@@ -2633,7 +3558,9 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
                             />
                           </div>
                           <div className="flex-1">
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Y Max</label>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">
+                              Y Max
+                            </label>
                             <input
                               type="number"
                               value={part.y_max}
@@ -2645,8 +3572,8 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
                         </div>
                         {range && (
                           <p className="text-xs text-gray-400">
-                            Actual data range: <span className="font-medium">{range.min?.toLocaleString()}</span>
-                            {' '}–{' '}
+                            Actual data range:{' '}
+                            <span className="font-medium">{range.min?.toLocaleString()}</span> –{' '}
                             <span className="font-medium">{range.max?.toLocaleString()}</span>
                           </p>
                         )}
@@ -2658,8 +3585,11 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
             </div>
 
             {parts.length < MAX_PARTS && (
-              <button onClick={addPart} disabled={availableStats.length === 0}
-                className="mt-2 text-sm font-semibold text-green-700 hover:text-green-900 flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed">
+              <button
+                onClick={addPart}
+                disabled={availableStats.length === 0}
+                className="mt-2 text-sm font-semibold text-green-700 hover:text-green-900 flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
                 + Add Another Stat
               </button>
             )}
@@ -2668,8 +3598,11 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
           {/* Output Format */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">Y Axis Format</label>
-            <select value={form.stat_type} onChange={e => set('stat_type', e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
+            <select
+              value={form.stat_type}
+              onChange={e => set('stat_type', e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+            >
               <option value="currency">Currency ($)</option>
               <option value="numeric">Numeric (#)</option>
               <option value="percentage">Percentage (%)</option>
@@ -2682,14 +3615,25 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
               <label className="block text-sm font-semibold text-gray-700 mb-1">
                 Beginning Date <span className="text-red-500">*</span>
               </label>
-              <input type="date" value={form.beginning_date} onChange={e => set('beginning_date', e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" />
+              <input
+                type="date"
+                value={form.beginning_date}
+                onChange={e => set('beginning_date', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+              />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Default Periods</label>
-              <input type="number" value={form.default_periods} onChange={e => set('default_periods', e.target.value)}
-                placeholder="e.g. 12" min="1"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" />
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Default Periods
+              </label>
+              <input
+                type="number"
+                value={form.default_periods}
+                onChange={e => set('default_periods', e.target.value)}
+                placeholder="e.g. 12"
+                min="1"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+              />
             </div>
           </div>
 
@@ -2697,12 +3641,17 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
           <div className="flex items-center gap-6">
             {[
               { key: 'upside_down', label: 'Inverted (lower is better)' },
-              { key: 'show_values', label: 'Show Values on Chart'       },
+              { key: 'show_values', label: 'Show Values on Chart' },
             ].map(({ key, label }) => (
               <label key={key} className="flex items-center gap-2 cursor-pointer select-none">
-                <button type="button" onClick={() => set(key, !form[key])}
-                  className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${form[key] ? 'bg-green-600' : 'bg-gray-300'}`}>
-                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form[key] ? 'translate-x-4' : ''}`} />
+                <button
+                  type="button"
+                  onClick={() => set(key, !form[key])}
+                  className={`relative w-9 h-5 rounded-full transition-colors flex-shrink-0 ${form[key] ? 'bg-green-600' : 'bg-gray-300'}`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form[key] ? 'translate-x-4' : ''}`}
+                  />
                 </button>
                 <span className="text-sm text-gray-700">{label}</span>
               </label>
@@ -2714,21 +3663,32 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
             <label className="block text-sm font-semibold text-gray-700 mb-1">Owner</label>
             <div className="flex gap-2 mb-2">
               {['user', 'position'].map(t => (
-                <button key={t} type="button" onClick={() => set('owner_type', t)}
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => set('owner_type', t)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-colors ${
-                    form.owner_type === t ? 'text-white border-transparent' : 'border-gray-200 text-gray-600 hover:border-green-500'
+                    form.owner_type === t
+                      ? 'text-white border-transparent'
+                      : 'border-gray-200 text-gray-600 hover:border-green-500'
                   }`}
-                  style={form.owner_type === t ? { backgroundColor: FG, borderColor: FG } : {}}>
+                  style={form.owner_type === t ? { backgroundColor: FG, borderColor: FG } : {}}
+                >
                   {t === 'user' ? 'Person' : 'Position'}
                 </button>
               ))}
             </div>
             {form.owner_type === 'user' && (
-              <select value={form.owner_user_id} onChange={e => set('owner_user_id', e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600">
+              <select
+                value={form.owner_user_id}
+                onChange={e => set('owner_user_id', e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+              >
                 <option value="">— select person —</option>
                 {(profiles || []).map(p => (
-                  <option key={p.id} value={p.id}>{p.full_name || p.email}</option>
+                  <option key={p.id} value={p.id}>
+                    {p.full_name || p.email}
+                  </option>
                 ))}
               </select>
             )}
@@ -2742,24 +3702,34 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
           <div className="flex gap-2">
             {isEdit && (
               <>
-                <button onClick={handleArchive} disabled={archiving}
-                  className="px-3 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 disabled:opacity-50 font-medium">
+                <button
+                  onClick={handleArchive}
+                  disabled={archiving}
+                  className="px-3 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 disabled:opacity-50 font-medium"
+                >
                   {archiving ? '…' : isArchived ? 'Unarchive' : 'Archive'}
                 </button>
                 {!confirmDelete ? (
-                  <button onClick={() => setConfirmDelete(true)}
-                    className="px-3 py-2 text-sm rounded-lg border border-red-200 text-red-600 hover:bg-red-50 font-medium">
+                  <button
+                    onClick={() => setConfirmDelete(true)}
+                    className="px-3 py-2 text-sm rounded-lg border border-red-200 text-red-600 hover:bg-red-50 font-medium"
+                  >
                     Delete
                   </button>
                 ) : (
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-red-600 font-medium">Delete permanently?</span>
-                    <button onClick={handleDelete} disabled={deleting}
-                      className="px-2 py-1.5 text-xs rounded-lg bg-red-600 text-white font-bold disabled:opacity-50">
+                    <button
+                      onClick={handleDelete}
+                      disabled={deleting}
+                      className="px-2 py-1.5 text-xs rounded-lg bg-red-600 text-white font-bold disabled:opacity-50"
+                    >
                       {deleting ? '…' : 'Yes, delete'}
                     </button>
-                    <button onClick={() => setConfirmDelete(false)}
-                      className="px-2 py-1.5 text-xs rounded-lg bg-gray-200 text-gray-700 font-bold">
+                    <button
+                      onClick={() => setConfirmDelete(false)}
+                      className="px-2 py-1.5 text-xs rounded-lg bg-gray-200 text-gray-700 font-bold"
+                    >
                       Cancel
                     </button>
                   </div>
@@ -2769,29 +3739,39 @@ function OverlayStatForm({ initialData, profiles, onSave, onClose, onDelete, all
           </div>
           <div className="flex gap-2">
             {onOpenShares && (
-              <button type="button"
+              <button
+                type="button"
                 onClick={() => {
                   if (initialData?.id) {
                     onOpenShares(initialData.id, initialData.name)
                   } else {
                     onOpenShares(null, form.name?.trim() || 'New Stat', {
                       initialShares: pendingShares,
-                      onLocalSave:   (m) => setPendingShares(m),
+                      onLocalSave: m => setPendingShares(m),
                     })
                   }
                 }}
                 className="px-4 py-2 text-sm rounded-lg border border-purple-200 text-purple-700 hover:bg-purple-50 font-medium"
-                title="Manage who else can view or edit this statistic">
-                🔒 Shared Permissions{!initialData?.id && Object.keys(pendingShares).length > 0 ? ` (${Object.keys(pendingShares).length})` : ''}
+                title="Manage who else can view or edit this statistic"
+              >
+                🔒 Shared Permissions
+                {!initialData?.id && Object.keys(pendingShares).length > 0
+                  ? ` (${Object.keys(pendingShares).length})`
+                  : ''}
               </button>
             )}
-            <button onClick={onClose}
-              className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 font-medium">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 font-medium"
+            >
               Cancel
             </button>
-            <button onClick={handleSave} disabled={saving}
+            <button
+              onClick={handleSave}
+              disabled={saving}
               className="px-5 py-2 text-sm rounded-xl font-bold text-white disabled:opacity-50"
-              style={{ backgroundColor: FG }}>
+              style={{ backgroundColor: FG }}
+            >
               {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Overlay Stat'}
             </button>
           </div>
@@ -2809,7 +3789,7 @@ function loadXLSX() {
     xlsxPromise = new Promise((resolve, reject) => {
       const s = document.createElement('script')
       s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js'
-      s.onload  = () => resolve(window.XLSX)
+      s.onload = () => resolve(window.XLSX)
       s.onerror = () => reject(new Error('Failed to load SheetJS'))
       document.head.appendChild(s)
     })
@@ -2819,9 +3799,11 @@ function loadXLSX() {
 
 function downloadBlob(content, filename, mimeType) {
   const blob = new Blob([content], { type: mimeType })
-  const url  = URL.createObjectURL(blob)
-  const a    = document.createElement('a')
-  a.href = url; a.download = filename; a.click()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
   URL.revokeObjectURL(url)
 }
 
@@ -2832,12 +3814,13 @@ const SEC_PERIOD_ORDER = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly']
 // Map a source period_date into its output-period bucket (returns YYYY-MM-DD string)
 function getOutputPeriodKey(dateStr, outputTracking) {
   const d = new Date(dateStr + 'T00:00:00')
-  if (outputTracking === 'monthly')   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+  if (outputTracking === 'monthly')
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
   if (outputTracking === 'quarterly') {
     const q = Math.floor(d.getMonth() / 3)
     return `${d.getFullYear()}-${String(q * 3 + 1).padStart(2, '0')}-01`
   }
-  if (outputTracking === 'yearly')    return `${d.getFullYear()}-01-01`
+  if (outputTracking === 'yearly') return `${d.getFullYear()}-01-01`
   if (outputTracking === 'weekly') {
     // ISO week Monday
     const day = d.getDay() || 7
@@ -2858,41 +3841,41 @@ function aggregateValues(sourceValues, outputTracking, method) {
   const result = []
   for (const [period_date, vals] of buckets) {
     let value
-    if      (method === 'sum')     value = vals.reduce((a, b) => a + b, 0)
+    if (method === 'sum') value = vals.reduce((a, b) => a + b, 0)
     else if (method === 'average') value = vals.reduce((a, b) => a + b, 0) / vals.length
-    else if (method === 'last')    value = vals[vals.length - 1]
-    else if (method === 'first')   value = vals[0]
+    else if (method === 'last') value = vals[vals.length - 1]
+    else if (method === 'first') value = vals[0]
     result.push({ period_date, value })
   }
   return result.sort((a, b) => a.period_date.localeCompare(b.period_date))
 }
 
-function SecondaryStatForm({ initialData, profiles, allStats, onSave, onClose, onDelete, onOpenShares }) {
+function SecondaryStatForm({ initialData, allStats, onSave, onClose, onDelete, onOpenShares }) {
   const { user } = useAuth()
 
   // Eligible source stats: basic stats only (not secondary/equation/overlay/target)
-  const eligibleSources = (allStats || []).filter(s =>
-    !s.archived && !['equation', 'overlay', 'target', 'secondary'].includes(s.stat_category)
+  const eligibleSources = (allStats || []).filter(
+    s => !s.archived && !['equation', 'overlay', 'target', 'secondary'].includes(s.stat_category)
   )
 
   const isEdit = !!initialData?.id
 
   const [form, setForm] = useState({
-    name:             initialData?.name || '',
-    source_stat_id:   initialData?.source_stat_id || '',
-    tracking:         initialData?.tracking || 'monthly',
+    name: initialData?.name || '',
+    source_stat_id: initialData?.source_stat_id || '',
+    tracking: initialData?.tracking || 'monthly',
     aggregation_method: initialData?.aggregation_method || 'sum',
-    stat_type:        initialData?.stat_type || 'currency',
-    owner_type:       initialData?.owner_type || 'user',
-    owner_user_id:    initialData?.owner_user_id || user?.id || '',
-    default_periods:  initialData?.default_periods ?? 12,
+    stat_type: initialData?.stat_type || 'currency',
+    owner_type: initialData?.owner_type || 'user',
+    owner_user_id: initialData?.owner_user_id || user?.id || '',
+    default_periods: initialData?.default_periods ?? 12,
   })
 
-  const [saving,        setSaving]        = useState(false)
-  const [pendingShares,  setPendingShares]  = useState({}) // user_id -> 'view'|'edit', applied to DB after stat insert
-  const [deleting,      setDeleting]      = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [pendingShares, setPendingShares] = useState({}) // user_id -> 'view'|'edit', applied to DB after stat insert
+  const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [err,           setErr]           = useState('')
+  const [err, setErr] = useState('')
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -2916,47 +3899,72 @@ function SecondaryStatForm({ initialData, profiles, allStats, onSave, onClose, o
   const validOutputPeriods = SEC_PERIOD_ORDER.filter((_, i) => i > sourceIdx)
 
   const handleSave = async () => {
-    if (!form.name.trim())          { setErr('Name is required.'); return }
-    if (!form.source_stat_id)       { setErr('Please select a source statistic.'); return }
-    if (!validOutputPeriods.includes(form.tracking)) {
-      setErr('Output period must be a longer interval than the source statistic.'); return
+    if (!form.name.trim()) {
+      setErr('Name is required.')
+      return
     }
-    setSaving(true); setErr('')
+    if (!form.source_stat_id) {
+      setErr('Please select a source statistic.')
+      return
+    }
+    if (!validOutputPeriods.includes(form.tracking)) {
+      setErr('Output period must be a longer interval than the source statistic.')
+      return
+    }
+    setSaving(true)
+    setErr('')
     try {
       const payload = {
-        name:               form.name.trim(),
-        stat_type:          form.stat_type,
-        tracking:           form.tracking,
-        stat_category:      'secondary',
-        source_stat_id:     Number(form.source_stat_id),
+        name: form.name.trim(),
+        stat_type: form.stat_type,
+        tracking: form.tracking,
+        stat_category: 'secondary',
+        source_stat_id: Number(form.source_stat_id),
         aggregation_method: form.aggregation_method,
-        owner_type:         form.owner_type,
-        owner_user_id:      form.owner_type === 'user' ? (form.owner_user_id || user?.id) : null,
-        default_periods:    form.default_periods ? parseInt(form.default_periods) : 12,
-        beginning_date:     today(),
+        owner_type: form.owner_type,
+        owner_user_id: form.owner_type === 'user' ? form.owner_user_id || user?.id : null,
+        default_periods: form.default_periods ? parseInt(form.default_periods) : 12,
+        beginning_date: today(),
         missing_value_display: 'skip',
-        created_by:         user?.id || null,
+        created_by: user?.id || null,
       }
       let savedId, savedName
       if (isEdit) {
         const { error } = await supabase.from('statistics').update(payload).eq('id', initialData.id)
         if (error) throw error
-        savedId = initialData.id; savedName = payload.name
+        savedId = initialData.id
+        savedName = payload.name
       } else {
-        const { data, error } = await supabase.from('statistics').insert({ ...payload, sort_order: 0 }).select().single()
+        const { data, error } = await supabase
+          .from('statistics')
+          .insert({ ...payload, sort_order: 0 })
+          .select()
+          .single()
         if (error) throw error
-        savedId = data.id; savedName = data.name
+        savedId = data.id
+        savedName = data.name
 
         // Seed values from source stat
-        const { data: srcVals } = await supabase.from('statistic_values')
-          .select('period_date, value').eq('statistic_id', Number(form.source_stat_id)).order('period_date')
+        const { data: srcVals } = await supabase
+          .from('statistic_values')
+          .select('period_date, value')
+          .eq('statistic_id', Number(form.source_stat_id))
+          .order('period_date')
         if (srcVals?.length) {
           const computed = aggregateValues(srcVals, form.tracking, form.aggregation_method)
           if (computed.length) {
             // Backdate beginning_date to the earliest computed value so the scrubber has full range
-            await supabase.from('statistics').update({ beginning_date: computed[0].period_date }).eq('id', savedId)
+            await supabase
+              .from('statistics')
+              .update({ beginning_date: computed[0].period_date })
+              .eq('id', savedId)
             await supabase.from('statistic_values').insert(
-              computed.map(r => ({ statistic_id: savedId, period_date: r.period_date, value: r.value, entered_by: user?.id }))
+              computed.map(r => ({
+                statistic_id: savedId,
+                period_date: r.period_date,
+                value: r.value,
+                entered_by: user?.id,
+              }))
             )
           }
         }
@@ -2964,9 +3972,9 @@ function SecondaryStatForm({ initialData, profiles, allStats, onSave, onClose, o
       if (!isEdit && savedId && pendingShares && Object.keys(pendingShares).length > 0) {
         const rows = Object.entries(pendingShares).map(([uid, perm]) => ({
           statistic_id: savedId,
-          user_id:      uid,
-          permission:   perm,
-          created_by:   user?.id || null,
+          user_id: uid,
+          permission: perm,
+          created_by: user?.id || null,
         }))
         const { error: shareErr } = await supabase.from('statistic_shares').insert(rows)
         if (shareErr) console.error('[Statistics] failed to write pending shares:', shareErr)
@@ -2987,44 +3995,54 @@ function SecondaryStatForm({ initialData, profiles, allStats, onSave, onClose, o
   }
 
   const AGG_METHODS = [
-    { key: 'sum',     label: 'Sum',     desc: 'Add all values in the period (best for revenue, counts)' },
+    { key: 'sum', label: 'Sum', desc: 'Add all values in the period (best for revenue, counts)' },
     { key: 'average', label: 'Average', desc: 'Mean of all values (best for rates, percentages)' },
-    { key: 'last',    label: 'Last',    desc: 'Use the final value in the period' },
-    { key: 'first',   label: 'First',   desc: 'Use the first value in the period' },
+    { key: 'last', label: 'Last', desc: 'Use the final value in the period' },
+    { key: 'first', label: 'First', desc: 'Use the first value in the period' },
   ]
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
-
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
           <h2 className="text-lg font-semibold text-gray-900">
             {isEdit ? 'Edit Secondary Statistic' : 'New Secondary Statistic'}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+          >
+            ✕
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-
           {/* Source stat */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">
               Source Statistic <span className="text-red-500">*</span>
             </label>
-            <p className="text-xs text-gray-500 mb-2">Pick the existing stat whose values you want to aggregate into a longer period.</p>
+            <p className="text-xs text-gray-500 mb-2">
+              Pick the existing stat whose values you want to aggregate into a longer period.
+            </p>
             <select
               value={form.source_stat_id}
-              onChange={e => { set('source_stat_id', e.target.value) }}
+              onChange={e => {
+                set('source_stat_id', e.target.value)
+              }}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
             >
               <option value="">— Select a statistic —</option>
               {eligibleSources.map(s => (
-                <option key={s.id} value={s.id}>{s.name} ({s.tracking})</option>
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.tracking})
+                </option>
               ))}
             </select>
             {sourceStat && (
               <p className="text-xs text-green-700 mt-1.5 font-medium">
-                Source tracks <span className="capitalize">{sourceStat.tracking}</span> · {sourceStat.stat_type}
+                Source tracks <span className="capitalize">{sourceStat.tracking}</span> ·{' '}
+                {sourceStat.stat_type}
               </p>
             )}
           </div>
@@ -3039,7 +4057,9 @@ function SecondaryStatForm({ initialData, profiles, allStats, onSave, onClose, o
               {SEC_PERIOD_ORDER.map(t => {
                 const disabled = !validOutputPeriods.includes(t)
                 return (
-                  <button key={t} type="button"
+                  <button
+                    key={t}
+                    type="button"
                     disabled={disabled}
                     onClick={() => !disabled && set('tracking', t)}
                     className={`flex-1 min-w-[70px] py-2 rounded-lg text-xs font-semibold border-2 capitalize transition-colors ${
@@ -3049,7 +4069,11 @@ function SecondaryStatForm({ initialData, profiles, allStats, onSave, onClose, o
                           ? 'border-gray-100 text-gray-300 bg-gray-50 cursor-not-allowed'
                           : 'border-gray-200 text-gray-600 hover:border-green-500 hover:text-green-700'
                     }`}
-                    style={form.tracking === t && !disabled ? { backgroundColor: FG, borderColor: FG } : {}}
+                    style={
+                      form.tracking === t && !disabled
+                        ? { backgroundColor: FG, borderColor: FG }
+                        : {}
+                    }
                   >
                     {t}
                   </button>
@@ -3060,14 +4084,27 @@ function SecondaryStatForm({ initialData, profiles, allStats, onSave, onClose, o
 
           {/* Aggregation method */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Aggregation Method</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Aggregation Method
+            </label>
             <div className="space-y-2">
               {AGG_METHODS.map(m => (
-                <label key={m.key} className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-colors ${
-                  form.aggregation_method === m.key ? 'border-green-600 bg-green-50' : 'border-gray-200 hover:border-gray-300'
-                }`}>
-                  <input type="radio" name="agg" value={m.key} checked={form.aggregation_method === m.key}
-                    onChange={() => set('aggregation_method', m.key)} className="mt-0.5 accent-green-700" />
+                <label
+                  key={m.key}
+                  className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-colors ${
+                    form.aggregation_method === m.key
+                      ? 'border-green-600 bg-green-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="agg"
+                    value={m.key}
+                    checked={form.aggregation_method === m.key}
+                    onChange={() => set('aggregation_method', m.key)}
+                    className="mt-0.5 accent-green-700"
+                  />
                   <div>
                     <p className="text-sm font-semibold text-gray-800">{m.label}</p>
                     <p className="text-xs text-gray-500 mt-0.5">{m.desc}</p>
@@ -3082,37 +4119,56 @@ function SecondaryStatForm({ initialData, profiles, allStats, onSave, onClose, o
             <label className="block text-sm font-semibold text-gray-700 mb-1">
               Statistic Name <span className="text-red-500">*</span>
             </label>
-            <input type="text" value={form.name} onChange={e => set('name', e.target.value)}
+            <input
+              type="text"
+              value={form.name}
+              onChange={e => set('name', e.target.value)}
               placeholder="e.g., Gross Income (Monthly)"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" />
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+            />
           </div>
 
           {/* Default periods */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Default Periods to Show</label>
-            <input type="number" min={1} max={120} value={form.default_periods}
+            <label className="block text-sm font-semibold text-gray-700 mb-1">
+              Default Periods to Show
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={120}
+              value={form.default_periods}
               onChange={e => set('default_periods', e.target.value)}
-              className="w-32 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" />
+              className="w-32 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+            />
           </div>
 
           {err && <p className="text-sm text-red-600 font-medium">{err}</p>}
         </div>
 
         <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0 flex gap-2">
-          <button onClick={handleSave} disabled={saving}
+          <button
+            onClick={handleSave}
+            disabled={saving}
             className="flex-1 py-2.5 text-sm font-semibold text-white rounded-xl transition-colors disabled:opacity-50"
-            style={{ backgroundColor: FG }}>
+            style={{ backgroundColor: FG }}
+          >
             {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Secondary Stat'}
           </button>
           {isEdit && !confirmDelete && (
-            <button onClick={() => setConfirmDelete(true)}
-              className="px-4 py-2.5 border border-red-200 text-red-600 text-sm font-semibold rounded-xl hover:bg-red-50 transition-colors">
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="px-4 py-2.5 border border-red-200 text-red-600 text-sm font-semibold rounded-xl hover:bg-red-50 transition-colors"
+            >
               Delete
             </button>
           )}
           {isEdit && confirmDelete && (
-            <button onClick={handleDelete} disabled={deleting}
-              className="px-4 py-2.5 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 disabled:opacity-50 transition-colors">
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="px-4 py-2.5 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 disabled:opacity-50 transition-colors"
+            >
               {deleting ? 'Deleting…' : 'Confirm Delete'}
             </button>
           )}
@@ -3124,17 +4180,23 @@ function SecondaryStatForm({ initialData, profiles, allStats, onSave, onClose, o
                 } else {
                   onOpenShares(null, form.name?.trim() || 'New Stat', {
                     initialShares: pendingShares,
-                    onLocalSave:   (m) => setPendingShares(m),
+                    onLocalSave: m => setPendingShares(m),
                   })
                 }
               }}
               className="px-4 py-2.5 border border-purple-200 text-purple-700 text-sm rounded-xl hover:bg-purple-50 transition-colors"
-              title="Manage who else can view or edit this statistic">
-              🔒 Shared Permissions{!initialData?.id && Object.keys(pendingShares).length > 0 ? ` (${Object.keys(pendingShares).length})` : ''}
+              title="Manage who else can view or edit this statistic"
+            >
+              🔒 Shared Permissions
+              {!initialData?.id && Object.keys(pendingShares).length > 0
+                ? ` (${Object.keys(pendingShares).length})`
+                : ''}
             </button>
           )}
-          <button onClick={onClose}
-            className="px-4 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50 transition-colors">
+          <button
+            onClick={onClose}
+            className="px-4 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50 transition-colors"
+          >
             Cancel
           </button>
         </div>
@@ -3157,42 +4219,58 @@ const AUTO_SOURCES = [
       {
         key: 'jobs_sold_count',
         label: 'Jobs Sold — Count',
-        table: 'jobs', date_column: 'sold_date', metric: 'count',
+        table: 'jobs',
+        date_column: 'sold_date',
+        metric: 'count',
         stat_type: 'numeric',
         desc: 'Number of jobs marked as sold/active per period.',
       },
       {
         key: 'jobs_revenue',
         label: 'Jobs Revenue (Total Price)',
-        table: 'jobs', date_column: 'sold_date', metric: 'sum', field: 'total_price',
+        table: 'jobs',
+        date_column: 'sold_date',
+        metric: 'sum',
+        field: 'total_price',
         stat_type: 'currency',
         desc: 'Sum of total job price for jobs sold in the period.',
       },
       {
         key: 'jobs_gross_profit',
         label: 'Jobs Gross Profit',
-        table: 'jobs', date_column: 'sold_date', metric: 'sum', field: 'gross_profit',
+        table: 'jobs',
+        date_column: 'sold_date',
+        metric: 'sum',
+        field: 'gross_profit',
         stat_type: 'currency',
         desc: 'Sum of gross profit for jobs sold in the period.',
       },
       {
         key: 'jobs_avg_gpmd',
         label: 'Jobs Avg GPMD %',
-        table: 'jobs', date_column: 'sold_date', metric: 'avg', field: 'gpmd',
+        table: 'jobs',
+        date_column: 'sold_date',
+        metric: 'avg',
+        field: 'gpmd',
         stat_type: 'percentage',
         desc: 'Average gross profit margin % across jobs sold in the period.',
       },
       {
         key: 'jobs_avg_price',
         label: 'Jobs Avg Price',
-        table: 'jobs', date_column: 'sold_date', metric: 'avg', field: 'total_price',
+        table: 'jobs',
+        date_column: 'sold_date',
+        metric: 'avg',
+        field: 'total_price',
         stat_type: 'currency',
         desc: 'Average job price for jobs sold in the period.',
       },
       {
         key: 'jobs_created_count',
         label: 'Jobs Created — Count',
-        table: 'jobs', date_column: 'created_at', metric: 'count',
+        table: 'jobs',
+        date_column: 'created_at',
+        metric: 'count',
         stat_type: 'numeric',
         desc: 'Number of job records created in the period.',
       },
@@ -3205,42 +4283,58 @@ const AUTO_SOURCES = [
       {
         key: 'bids_count',
         label: 'Bids Created — Count',
-        table: 'bids', date_column: 'created_at', metric: 'count',
+        table: 'bids',
+        date_column: 'created_at',
+        metric: 'count',
         stat_type: 'numeric',
         desc: 'Number of bids created in the period.',
       },
       {
         key: 'bids_total_value',
         label: 'Bids Total Value',
-        table: 'bids', date_column: 'created_at', metric: 'sum', field: 'total_price',
+        table: 'bids',
+        date_column: 'created_at',
+        metric: 'sum',
+        field: 'total_price',
         stat_type: 'currency',
         desc: 'Sum of all bid values created in the period.',
       },
       {
         key: 'bids_avg_value',
         label: 'Bids Avg Value',
-        table: 'bids', date_column: 'created_at', metric: 'avg', field: 'total_price',
+        table: 'bids',
+        date_column: 'created_at',
+        metric: 'avg',
+        field: 'total_price',
         stat_type: 'currency',
         desc: 'Average bid value created in the period.',
       },
       {
         key: 'bids_gross_profit',
         label: 'Bids Gross Profit',
-        table: 'bids', date_column: 'created_at', metric: 'sum', field: 'gross_profit',
+        table: 'bids',
+        date_column: 'created_at',
+        metric: 'sum',
+        field: 'gross_profit',
         stat_type: 'currency',
         desc: 'Sum of gross profit on bids created in the period.',
       },
       {
         key: 'bids_sold_count',
         label: 'Bids Won (Sold) — Count',
-        table: 'bids', date_column: 'sold_date', metric: 'count',
+        table: 'bids',
+        date_column: 'sold_date',
+        metric: 'count',
         stat_type: 'numeric',
         desc: 'Number of bids marked as sold in the period.',
       },
       {
         key: 'bids_sold_value',
         label: 'Bids Won — Total Value',
-        table: 'bids', date_column: 'sold_date', metric: 'sum', field: 'total_price',
+        table: 'bids',
+        date_column: 'sold_date',
+        metric: 'sum',
+        field: 'total_price',
         stat_type: 'currency',
         desc: 'Sum of total price for bids marked as sold in the period.',
       },
@@ -3253,14 +4347,18 @@ const AUTO_SOURCES = [
       {
         key: 'schedule_items_count',
         label: 'Schedule Items — Total',
-        table: 'schedule_items', date_column: 'work_date', metric: 'count',
+        table: 'schedule_items',
+        date_column: 'work_date',
+        metric: 'count',
         stat_type: 'numeric',
         desc: 'Total number of scheduled items (any type) in the period.',
       },
       {
         key: 'schedule_job_count',
         label: 'Schedule Items — Jobs Only',
-        table: 'schedule_items', date_column: 'work_date', metric: 'count',
+        table: 'schedule_items',
+        date_column: 'work_date',
+        metric: 'count',
         filter: { scheduling_type: 'job' },
         stat_type: 'numeric',
         desc: 'Scheduled job appearances in the period.',
@@ -3268,7 +4366,9 @@ const AUTO_SOURCES = [
       {
         key: 'schedule_yard_check_count',
         label: 'Schedule Items — Yard Checks',
-        table: 'schedule_items', date_column: 'work_date', metric: 'count',
+        table: 'schedule_items',
+        date_column: 'work_date',
+        metric: 'count',
         filter: { scheduling_type: 'yard_check' },
         stat_type: 'numeric',
         desc: 'Number of yard check visits scheduled in the period.',
@@ -3282,21 +4382,29 @@ const AUTO_SOURCES = [
       {
         key: 'collections_invoiced',
         label: 'Collections — Invoiced Amount',
-        table: 'collections', date_column: 'invoice_date', metric: 'sum', field: 'amount',
+        table: 'collections',
+        date_column: 'invoice_date',
+        metric: 'sum',
+        field: 'amount',
         stat_type: 'currency',
         desc: 'Total dollar amount invoiced in the period.',
       },
       {
         key: 'collections_paid',
         label: 'Collections — Paid Amount',
-        table: 'collections', date_column: 'paid_date', metric: 'sum', field: 'amount_paid',
+        table: 'collections',
+        date_column: 'paid_date',
+        metric: 'sum',
+        field: 'amount_paid',
         stat_type: 'currency',
         desc: 'Total dollar amount collected (paid) in the period.',
       },
       {
         key: 'collections_invoice_count',
         label: 'Collections — Invoice Count',
-        table: 'collections', date_column: 'invoice_date', metric: 'count',
+        table: 'collections',
+        date_column: 'invoice_date',
+        metric: 'count',
         stat_type: 'numeric',
         desc: 'Number of invoices created in the period.',
       },
@@ -3309,7 +4417,9 @@ const AUTO_SOURCES = [
       {
         key: 'work_orders_count',
         label: 'Work Orders Created — Count',
-        table: 'work_orders', date_column: 'created_at', metric: 'count',
+        table: 'work_orders',
+        date_column: 'created_at',
+        metric: 'count',
         stat_type: 'numeric',
         desc: 'Number of work orders created in the period.',
       },
@@ -3322,7 +4432,9 @@ const AUTO_SOURCES = [
       {
         key: 'clients_count',
         label: 'New Opportunities — Count',
-        table: 'clients', date_column: 'created_at', metric: 'count',
+        table: 'clients',
+        date_column: 'created_at',
+        metric: 'count',
         stat_type: 'numeric',
         desc: 'Number of opportunity records created in the period.',
       },
@@ -3356,7 +4468,11 @@ function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete, onOpen
 
   // Parse existing data_source if editing
   const existingDs = (() => {
-    try { return JSON.parse(initialData?.data_source || '{}') } catch { return {} }
+    try {
+      return JSON.parse(initialData?.data_source || '{}')
+    } catch {
+      return {}
+    }
   })()
 
   const [selectedCategory, setSelectedCategory] = useState(
@@ -3364,24 +4480,24 @@ function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete, onOpen
   )
   const [selectedKey, setSelectedKey] = useState(existingDs.key || '')
   const [form, setForm] = useState({
-    name:           initialData?.name || '',
-    tracking:       initialData?.tracking || 'monthly',
-    stat_type:      initialData?.stat_type || 'numeric',
-    owner_type:     initialData?.owner_type || 'user',
-    owner_user_id:  initialData?.owner_user_id || user?.id || '',
+    name: initialData?.name || '',
+    tracking: initialData?.tracking || 'monthly',
+    stat_type: initialData?.stat_type || 'numeric',
+    owner_type: initialData?.owner_type || 'user',
+    owner_user_id: initialData?.owner_user_id || user?.id || '',
     default_periods: initialData?.default_periods ?? 12,
   })
 
-  const [saving,        setSaving]        = useState(false)
-  const [pendingShares,  setPendingShares]  = useState({}) // user_id -> 'view'|'edit', applied to DB after stat insert
-  const [deleting,      setDeleting]      = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [pendingShares, setPendingShares] = useState({}) // user_id -> 'view'|'edit', applied to DB after stat insert
+  const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [err,           setErr]           = useState('')
+  const [err, setErr] = useState('')
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const categoryObj = AUTO_SOURCES.find(c => c.category === selectedCategory) || AUTO_SOURCES[0]
-  const sourceDef   = AUTO_SOURCE_MAP[selectedKey] || null
+  const sourceDef = AUTO_SOURCE_MAP[selectedKey] || null
 
   // When source changes, inherit stat_type / tracking and suggest name
   useEffect(() => {
@@ -3393,9 +4509,16 @@ function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete, onOpen
   }, [selectedKey])
 
   async function handleSave() {
-    if (!selectedKey) { setErr('Please select a data source.'); return }
-    if (!form.name.trim()) { setErr('Please enter a name.'); return }
-    setErr(''); setSaving(true)
+    if (!selectedKey) {
+      setErr('Please select a data source.')
+      return
+    }
+    if (!form.name.trim()) {
+      setErr('Please enter a name.')
+      return
+    }
+    setErr('')
+    setSaving(true)
 
     const ds = JSON.stringify({ key: selectedKey, category: selectedCategory, ...sourceDef })
 
@@ -3414,20 +4537,32 @@ function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete, onOpen
     let savedId = null
     if (isEdit) {
       const { error } = await supabase.from('statistics').update(payload).eq('id', initialData.id)
-      if (error) { setErr(error.message); setSaving(false); return }
+      if (error) {
+        setErr(error.message)
+        setSaving(false)
+        return
+      }
       savedId = initialData.id
     } else {
-      const { data, error } = await supabase.from('statistics').insert({ ...payload, sort_order: 9999 }).select().single()
-      if (error) { setErr(error.message); setSaving(false); return }
+      const { data, error } = await supabase
+        .from('statistics')
+        .insert({ ...payload, sort_order: 9999 })
+        .select()
+        .single()
+      if (error) {
+        setErr(error.message)
+        setSaving(false)
+        return
+      }
       savedId = data.id
     }
 
     if (!isEdit && savedId && pendingShares && Object.keys(pendingShares).length > 0) {
       const rows = Object.entries(pendingShares).map(([uid, perm]) => ({
         statistic_id: savedId,
-        user_id:      uid,
-        permission:   perm,
-        created_by:   user?.id || null,
+        user_id: uid,
+        permission: perm,
+        created_by: user?.id || null,
       }))
       const { error: shareErr } = await supabase.from('statistic_shares').insert(rows)
       if (shareErr) console.error('[Statistics] failed to write pending shares:', shareErr)
@@ -3447,28 +4582,38 @@ function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete, onOpen
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl flex flex-col max-h-[90vh] overflow-hidden">
-
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-3.5 border-b border-gray-100 flex-shrink-0"
-             style={{ backgroundColor: '#1e40af' }}>
+        <div
+          className="flex items-center justify-between px-6 py-3.5 border-b border-gray-100 flex-shrink-0"
+          style={{ backgroundColor: '#1e40af' }}
+        >
           <h2 className="text-base font-bold text-white">⚡ Auto Statistic</h2>
-          <button onClick={onClose} className="text-white/70 hover:text-white text-xl leading-none">✕</button>
+          <button onClick={onClose} className="text-white/70 hover:text-white text-xl leading-none">
+            ✕
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-
           {/* Category picker */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">Data Category</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              Data Category
+            </label>
             <div className="flex flex-wrap gap-2">
               {AUTO_SOURCES.map(cat => (
-                <button key={cat.category} type="button"
-                  onClick={() => { setSelectedCategory(cat.category); setSelectedKey('') }}
+                <button
+                  key={cat.category}
+                  type="button"
+                  onClick={() => {
+                    setSelectedCategory(cat.category)
+                    setSelectedKey('')
+                  }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
                     selectedCategory === cat.category
                       ? 'bg-blue-700 text-white border-blue-700'
                       : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
-                  }`}>
+                  }`}
+                >
                   {cat.icon} {cat.category}
                 </button>
               ))}
@@ -3480,13 +4625,16 @@ function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete, onOpen
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">Data Source</label>
             <div className="space-y-1.5">
               {categoryObj.sources.map(src => (
-                <button key={src.key} type="button"
+                <button
+                  key={src.key}
+                  type="button"
                   onClick={() => setSelectedKey(src.key)}
                   className={`w-full text-left px-4 py-2.5 rounded-xl border-2 transition-colors ${
                     selectedKey === src.key
                       ? 'border-blue-600 bg-blue-50'
                       : 'border-gray-200 hover:border-gray-300'
-                  }`}>
+                  }`}
+                >
                   <div className="text-sm font-semibold text-gray-800">{src.label}</div>
                   <div className="text-xs text-gray-500 mt-0.5">{src.desc}</div>
                 </button>
@@ -3499,41 +4647,70 @@ function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete, onOpen
               {/* Push-model info banner */}
               {sourceDef.source_type === 'push' && (
                 <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-800">
-                  <span className="font-semibold">⚡ Auto-push stat</span> — values are automatically recorded when you view a Finance week. No manual entry needed. Tracking is fixed to <span className="font-semibold">Weekly</span>.
+                  <span className="font-semibold">⚡ Auto-push stat</span> — values are
+                  automatically recorded when you view a Finance week. No manual entry needed.
+                  Tracking is fixed to <span className="font-semibold">Weekly</span>.
                 </div>
               )}
 
               {/* Tracking period */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Tracking Period</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  Tracking Period
+                </label>
                 {sourceDef.source_type === 'push' ? (
-                  <div className="px-3 py-1.5 rounded-lg text-xs font-semibold border capitalize inline-block text-white" style={{ backgroundColor: '#1e40af', borderColor: '#1e40af' }}>
+                  <div
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold border capitalize inline-block text-white"
+                    style={{ backgroundColor: '#1e40af', borderColor: '#1e40af' }}
+                  >
                     weekly (fixed)
                   </div>
                 ) : (
-                <div className="flex flex-wrap gap-1.5">
-                  {['daily','weekly','monthly','quarterly','yearly'].map(t => (
-                    <button key={t} type="button" onClick={() => set('tracking', t)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border capitalize transition-colors ${
-                        form.tracking === t ? 'text-white border-transparent' : 'border-gray-200 text-gray-600 hover:border-blue-400'
-                      }`}
-                      style={form.tracking === t ? { backgroundColor: '#1e40af', borderColor: '#1e40af' } : {}}>
-                      {t}
-                    </button>
-                  ))}
-                </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {['daily', 'weekly', 'monthly', 'quarterly', 'yearly'].map(t => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => set('tracking', t)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border capitalize transition-colors ${
+                          form.tracking === t
+                            ? 'text-white border-transparent'
+                            : 'border-gray-200 text-gray-600 hover:border-blue-400'
+                        }`}
+                        style={
+                          form.tracking === t
+                            ? { backgroundColor: '#1e40af', borderColor: '#1e40af' }
+                            : {}
+                        }
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
 
               {/* Stat type */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Value Format</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  Value Format
+                </label>
                 <div className="flex gap-2">
-                  {[['currency','($) Currency'],['numeric','(#) Numeric'],['percentage','(%) Percentage']].map(([val,lab]) => (
-                    <button key={val} type="button" onClick={() => set('stat_type', val)}
+                  {[
+                    ['currency', '($) Currency'],
+                    ['numeric', '(#) Numeric'],
+                    ['percentage', '(%) Percentage'],
+                  ].map(([val, lab]) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => set('stat_type', val)}
                       className={`flex-1 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${
-                        form.stat_type === val ? 'bg-blue-700 text-white border-blue-700' : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
-                      }`}>
+                        form.stat_type === val
+                          ? 'bg-blue-700 text-white border-blue-700'
+                          : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                      }`}
+                    >
                       {lab}
                     </button>
                   ))}
@@ -3545,26 +4722,44 @@ function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete, onOpen
                 <label className="block text-sm font-semibold text-gray-700 mb-1">
                   Statistic Name <span className="text-red-500">*</span>
                 </label>
-                <input type="text" value={form.name} onChange={e => set('name', e.target.value)}
+                <input
+                  type="text"
+                  value={form.name}
+                  onChange={e => set('name', e.target.value)}
                   placeholder="e.g., Monthly Jobs Sold"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600" />
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                />
               </div>
 
               {/* Default periods + Owner */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Default Periods</label>
-                  <input type="number" min={1} max={120} value={form.default_periods}
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Default Periods
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={120}
+                    value={form.default_periods}
                     onChange={e => set('default_periods', e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600" />
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Assigned To</label>
-                  <select value={form.owner_user_id} onChange={e => set('owner_user_id', e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Assigned To
+                  </label>
+                  <select
+                    value={form.owner_user_id}
+                    onChange={e => set('owner_user_id', e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  >
                     <option value="">— Anyone —</option>
                     {profiles.map(p => (
-                      <option key={p.id} value={p.id}>{p.full_name || p.email}</option>
+                      <option key={p.id} value={p.id}>
+                        {p.full_name || p.email}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -3576,20 +4771,28 @@ function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete, onOpen
         </div>
 
         <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0 flex gap-2">
-          <button onClick={handleSave} disabled={saving}
+          <button
+            onClick={handleSave}
+            disabled={saving}
             className="flex-1 py-2.5 text-sm font-semibold text-white rounded-xl transition-colors disabled:opacity-50"
-            style={{ backgroundColor: '#1e40af' }}>
+            style={{ backgroundColor: '#1e40af' }}
+          >
             {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Auto Stat'}
           </button>
           {isEdit && !confirmDelete && (
-            <button onClick={() => setConfirmDelete(true)}
-              className="px-4 py-2.5 border border-red-200 text-red-600 text-sm font-semibold rounded-xl hover:bg-red-50 transition-colors">
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="px-4 py-2.5 border border-red-200 text-red-600 text-sm font-semibold rounded-xl hover:bg-red-50 transition-colors"
+            >
               Delete
             </button>
           )}
           {isEdit && confirmDelete && (
-            <button onClick={handleDelete} disabled={deleting}
-              className="px-4 py-2.5 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 disabled:opacity-50 transition-colors">
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="px-4 py-2.5 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 disabled:opacity-50 transition-colors"
+            >
               {deleting ? 'Deleting…' : 'Confirm Delete'}
             </button>
           )}
@@ -3601,17 +4804,23 @@ function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete, onOpen
                 } else {
                   onOpenShares(null, form.name?.trim() || 'New Stat', {
                     initialShares: pendingShares,
-                    onLocalSave:   (m) => setPendingShares(m),
+                    onLocalSave: m => setPendingShares(m),
                   })
                 }
               }}
               className="px-4 py-2.5 border border-purple-200 text-purple-700 text-sm rounded-xl hover:bg-purple-50 transition-colors"
-              title="Manage who else can view or edit this statistic">
-              🔒 Shared Permissions{!initialData?.id && Object.keys(pendingShares).length > 0 ? ` (${Object.keys(pendingShares).length})` : ''}
+              title="Manage who else can view or edit this statistic"
+            >
+              🔒 Shared Permissions
+              {!initialData?.id && Object.keys(pendingShares).length > 0
+                ? ` (${Object.keys(pendingShares).length})`
+                : ''}
             </button>
           )}
-          <button onClick={onClose}
-            className="px-4 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50 transition-colors">
+          <button
+            onClick={onClose}
+            className="px-4 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50 transition-colors"
+          >
             Cancel
           </button>
         </div>
@@ -3629,8 +4838,18 @@ const EXTERNAL_APPS = [
     textColor: 'white',
     icon: (
       <svg viewBox="0 0 32 32" className="w-6 h-6">
-        <rect width="32" height="32" rx="6" fill="#2CA01C"/>
-        <text x="16" y="23" textAnchor="middle" fontSize="18" fontWeight="900" fill="white" fontFamily="serif">Q</text>
+        <rect width="32" height="32" rx="6" fill="#2CA01C" />
+        <text
+          x="16"
+          y="23"
+          textAnchor="middle"
+          fontSize="18"
+          fontWeight="900"
+          fill="white"
+          fontFamily="serif"
+        >
+          Q
+        </text>
       </svg>
     ),
   },
@@ -3641,10 +4860,30 @@ const EXTERNAL_APPS = [
     textColor: 'white',
     icon: (
       <svg viewBox="0 0 32 32" className="w-6 h-6">
-        <rect width="32" height="32" rx="6" fill="#1a6e10"/>
-        <text x="16" y="23" textAnchor="middle" fontSize="18" fontWeight="900" fill="white" fontFamily="serif">Q</text>
-        <rect x="20" y="18" width="10" height="10" rx="2" fill="#0d4a08"/>
-        <text x="25" y="26" textAnchor="middle" fontSize="8" fontWeight="700" fill="#4ade80" fontFamily="sans-serif">D</text>
+        <rect width="32" height="32" rx="6" fill="#1a6e10" />
+        <text
+          x="16"
+          y="23"
+          textAnchor="middle"
+          fontSize="18"
+          fontWeight="900"
+          fill="white"
+          fontFamily="serif"
+        >
+          Q
+        </text>
+        <rect x="20" y="18" width="10" height="10" rx="2" fill="#0d4a08" />
+        <text
+          x="25"
+          y="26"
+          textAnchor="middle"
+          fontSize="8"
+          fontWeight="700"
+          fill="#4ade80"
+          fontFamily="sans-serif"
+        >
+          D
+        </text>
       </svg>
     ),
   },
@@ -3656,10 +4895,20 @@ const EXTERNAL_APPS = [
     icon: (
       <svg viewBox="0 0 32 32" className="w-6 h-6">
         {/* Salesforce cloud shape */}
-        <ellipse cx="16" cy="15" rx="14" ry="10" fill="#00A1E0"/>
-        <ellipse cx="8"  cy="19" rx="7"  ry="6"  fill="#00A1E0"/>
-        <ellipse cx="24" cy="19" rx="7"  ry="6"  fill="#00A1E0"/>
-        <text x="16" y="20" textAnchor="middle" fontSize="9" fontWeight="800" fill="white" fontFamily="sans-serif">SF</text>
+        <ellipse cx="16" cy="15" rx="14" ry="10" fill="#00A1E0" />
+        <ellipse cx="8" cy="19" rx="7" ry="6" fill="#00A1E0" />
+        <ellipse cx="24" cy="19" rx="7" ry="6" fill="#00A1E0" />
+        <text
+          x="16"
+          y="20"
+          textAnchor="middle"
+          fontSize="9"
+          fontWeight="800"
+          fill="white"
+          fontFamily="sans-serif"
+        >
+          SF
+        </text>
       </svg>
     ),
   },
@@ -3670,9 +4919,29 @@ const EXTERNAL_APPS = [
     textColor: '#f97316',
     icon: (
       <svg viewBox="0 0 32 32" className="w-6 h-6">
-        <rect width="32" height="32" rx="6" fill="#1a1f36"/>
-        <text x="16" y="14" textAnchor="middle" fontSize="7" fontWeight="800" fill="#f97316" fontFamily="sans-serif">GO</text>
-        <text x="16" y="23" textAnchor="middle" fontSize="7" fontWeight="800" fill="#f97316" fontFamily="sans-serif">HIGH</text>
+        <rect width="32" height="32" rx="6" fill="#1a1f36" />
+        <text
+          x="16"
+          y="14"
+          textAnchor="middle"
+          fontSize="7"
+          fontWeight="800"
+          fill="#f97316"
+          fontFamily="sans-serif"
+        >
+          GO
+        </text>
+        <text
+          x="16"
+          y="23"
+          textAnchor="middle"
+          fontSize="7"
+          fontWeight="800"
+          fill="#f97316"
+          fontFamily="sans-serif"
+        >
+          HIGH
+        </text>
       </svg>
     ),
   },
@@ -3682,12 +4951,15 @@ function AutoExternalStatForm({ onClose }) {
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden">
-
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-3.5 border-b border-gray-100 flex-shrink-0"
-             style={{ background: 'linear-gradient(135deg, #1a1f36 0%, #2CA01C 50%, #00A1E0 100%)' }}>
+        <div
+          className="flex items-center justify-between px-6 py-3.5 border-b border-gray-100 flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg, #1a1f36 0%, #2CA01C 50%, #00A1E0 100%)' }}
+        >
           <h2 className="text-base font-bold text-white">🔗 Auto External Stats</h2>
-          <button onClick={onClose} className="text-white/70 hover:text-white text-xl leading-none">✕</button>
+          <button onClick={onClose} className="text-white/70 hover:text-white text-xl leading-none">
+            ✕
+          </button>
         </div>
 
         <div className="px-6 py-5 space-y-5">
@@ -3699,8 +4971,10 @@ function AutoExternalStatForm({ onClose }) {
           {/* App grid */}
           <div className="grid grid-cols-2 gap-3">
             {EXTERNAL_APPS.map(app => (
-              <div key={app.key}
-                className="flex items-center gap-3 p-3 rounded-xl border-2 border-gray-100 bg-gray-50 opacity-70">
+              <div
+                key={app.key}
+                className="flex items-center gap-3 p-3 rounded-xl border-2 border-gray-100 bg-gray-50 opacity-70"
+              >
                 <div className="flex-shrink-0">{app.icon}</div>
                 <div>
                   <p className="text-sm font-semibold text-gray-700">{app.label}</p>
@@ -3718,16 +4992,19 @@ function AutoExternalStatForm({ onClose }) {
             <div>
               <p className="text-sm font-semibold text-blue-800">Set up integrations first</p>
               <p className="text-xs text-blue-700 mt-0.5 leading-snug">
-                Go to <strong>Admin → Integrations</strong> to configure your QuickBooks, Salesforce,
-                or GoHighLevel connection. Once connected, return here to create stats from their live data.
+                Go to <strong>Admin → Integrations</strong> to configure your QuickBooks,
+                Salesforce, or GoHighLevel connection. Once connected, return here to create stats
+                from their live data.
               </p>
             </div>
           </div>
         </div>
 
         <div className="px-6 py-4 border-t border-gray-100 flex justify-end">
-          <button onClick={onClose}
-            className="px-5 py-2 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50 transition-colors">
+          <button
+            onClick={onClose}
+            className="px-5 py-2 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50 transition-colors"
+          >
             Close
           </button>
         </div>
@@ -3739,22 +5016,42 @@ function AutoExternalStatForm({ onClose }) {
 // ── ImportExportView ──────────────────────────────────────────────────────────
 // Required fields for import
 const IMPORT_FIELDS = [
-  { key: 'stat_name',   label: 'Stat Name',   required: true,  desc: 'The name of the statistic'         },
-  { key: 'period_date', label: 'Period Date',  required: true,  desc: 'Date of the value (YYYY-MM-DD)'    },
-  { key: 'value',       label: 'Value',        required: true,  desc: 'Numeric value'                     },
-  { key: 'tracking',    label: 'Tracking',     required: false, desc: 'daily/weekly/monthly/quarterly/yearly' },
-  { key: 'stat_type',   label: 'Stat Type',    required: false, desc: 'numeric/currency/percentage'       },
+  { key: 'stat_name', label: 'Stat Name', required: true, desc: 'The name of the statistic' },
+  {
+    key: 'period_date',
+    label: 'Period Date',
+    required: true,
+    desc: 'Date of the value (YYYY-MM-DD)',
+  },
+  { key: 'value', label: 'Value', required: true, desc: 'Numeric value' },
+  {
+    key: 'tracking',
+    label: 'Tracking',
+    required: false,
+    desc: 'daily/weekly/monthly/quarterly/yearly',
+  },
+  { key: 'stat_type', label: 'Stat Type', required: false, desc: 'numeric/currency/percentage' },
 ]
 
 // Auto-detect mapping: try to match file headers to our field keys by name similarity
 function autoDetectMapping(headers) {
   const map = {}
   const aliases = {
-    stat_name:   ['stat_name', 'name', 'statistic', 'stat', 'metric', 'kpi', 'title'],
-    period_date: ['period_date', 'date', 'period', 'week_ending', 'week', 'month', 'day', 'timestamp', 'time'],
-    value:       ['value', 'amount', 'total', 'number', 'val', 'data', 'result', 'count'],
-    tracking:    ['tracking', 'frequency', 'interval', 'period_type', 'type', 'cadence'],
-    stat_type:   ['stat_type', 'format', 'unit', 'data_type', 'kind'],
+    stat_name: ['stat_name', 'name', 'statistic', 'stat', 'metric', 'kpi', 'title'],
+    period_date: [
+      'period_date',
+      'date',
+      'period',
+      'week_ending',
+      'week',
+      'month',
+      'day',
+      'timestamp',
+      'time',
+    ],
+    value: ['value', 'amount', 'total', 'number', 'val', 'data', 'result', 'count'],
+    tracking: ['tracking', 'frequency', 'interval', 'period_type', 'type', 'cadence'],
+    stat_type: ['stat_type', 'format', 'unit', 'data_type', 'kind'],
   }
   for (const [field, names] of Object.entries(aliases)) {
     const match = headers.find(h => names.includes(h.toLowerCase().trim().replace(/\s+/g, '_')))
@@ -3770,48 +5067,67 @@ function ImportExportView({ stats, user, onImported }) {
   const [panel, setPanel] = useState(null)
 
   // ── Export state ──────────────────────────────────────────────────────────
-  const [selected,   setSelected]   = useState(new Set())
-  const [exporting,  setExporting]  = useState(false)
-  const [exportMsg,  setExportMsg]  = useState(null)
+  const [selected, setSelected] = useState(new Set())
+  const [exporting, setExporting] = useState(false)
+  const [exportMsg, setExportMsg] = useState(null)
 
   // ── History state ─────────────────────────────────────────────────────────
-  const [history,        setHistory]        = useState([])
+  const [history, setHistory] = useState([])
   const [historyLoading, setHistoryLoading] = useState(true)
-  const [expandedLogs,   setExpandedLogs]   = useState(new Set())
+  const [expandedLogs, setExpandedLogs] = useState(new Set())
 
   // ── Import state ──────────────────────────────────────────────────────────
   // importStep: 'upload' | 'mapping' | 'preview'
-  const [importStep,     setImportStep]     = useState('upload')
-  const [importFile,     setImportFile]     = useState(null)
-  const [fileHeaders,    setFileHeaders]    = useState([])   // column names from file
-  const [rawFileRows,    setRawFileRows]    = useState([])   // parsed rows (original keys)
-  const [mapping,        setMapping]        = useState({})   // { stat_name: 'col_A', period_date: 'col_B', ... }
-  const [trackingDef,    setTrackingDef]    = useState('monthly')   // default when no tracking column
-  const [statTypeDef,    setStatTypeDef]    = useState('numeric')   // default when no stat_type column
-  const [importPreview,  setImportPreview]  = useState(null) // [{ name, tracking, stat_type, count }]
-  const [mappedRows,     setMappedRows]     = useState([])   // rows after mapping applied
-  const [importing,      setImporting]      = useState(false)
-  const [importMsg,      setImportMsg]      = useState(null)
+  const [importStep, setImportStep] = useState('upload')
+  const [importFile, setImportFile] = useState(null)
+  const [fileHeaders, setFileHeaders] = useState([]) // column names from file
+  const [rawFileRows, setRawFileRows] = useState([]) // parsed rows (original keys)
+  const [mapping, setMapping] = useState({}) // { stat_name: 'col_A', period_date: 'col_B', ... }
+  const [trackingDef, setTrackingDef] = useState('monthly') // default when no tracking column
+  const [statTypeDef, setStatTypeDef] = useState('numeric') // default when no stat_type column
+  const [importPreview, setImportPreview] = useState(null) // [{ name, tracking, stat_type, count }]
+  const [mappedRows, setMappedRows] = useState([]) // rows after mapping applied
+  const [importing, setImporting] = useState(false)
+  const [importMsg, setImportMsg] = useState(null)
   const fileRef = useRef(null)
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   function toggleStat(id) {
-    setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+    setSelected(prev => {
+      const n = new Set(prev)
+      n.has(id) ? n.delete(id) : n.add(id)
+      return n
+    })
   }
-  function selectAll()   { setSelected(new Set(activeStats.map(s => s.id))) }
-  function deselectAll() { setSelected(new Set()) }
+  function selectAll() {
+    setSelected(new Set(activeStats.map(s => s.id)))
+  }
+  function deselectAll() {
+    setSelected(new Set())
+  }
 
-  const Msg = ({ m }) => m ? (
-    <div className={`text-sm mt-3 rounded-lg px-3 py-2.5 whitespace-pre-line ${
-      m.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
-    }`}>
-      {m.text}
-    </div>
-  ) : null
+  const Msg = ({ m }) =>
+    m ? (
+      <div
+        className={`text-sm mt-3 rounded-lg px-3 py-2.5 whitespace-pre-line ${
+          m.type === 'success'
+            ? 'bg-green-50 text-green-700 border border-green-200'
+            : 'bg-red-50 text-red-700 border border-red-200'
+        }`}
+      >
+        {m.text}
+      </div>
+    ) : null
 
   function resetImport() {
-    setImportStep('upload'); setImportFile(null); setFileHeaders([]); setRawFileRows([])
-    setMapping({}); setImportPreview(null); setMappedRows([]); setImportMsg(null)
+    setImportStep('upload')
+    setImportFile(null)
+    setFileHeaders([])
+    setRawFileRows([])
+    setMapping({})
+    setImportPreview(null)
+    setMappedRows([])
+    setImportMsg(null)
     if (fileRef.current) fileRef.current.value = ''
   }
 
@@ -3827,61 +5143,86 @@ function ImportExportView({ stats, user, onImported }) {
   }
 
   // Load history on mount
-  useEffect(() => { loadHistory() }, [])
+  useEffect(() => {
+    loadHistory()
+  }, [])
 
   // ── Export ────────────────────────────────────────────────────────────────
   async function handleExport(format) {
     if (selected.size === 0) {
-      setExportMsg({ type: 'error', text: 'Select at least one statistic to export.' }); return
+      setExportMsg({ type: 'error', text: 'Select at least one statistic to export.' })
+      return
     }
-    setExporting(true); setExportMsg(null)
+    setExporting(true)
+    setExportMsg(null)
 
     const picks = activeStats.filter(s => selected.has(s.id))
 
     const { data: vals } = await supabase
       .from('statistic_values')
       .select('statistic_id, period_date, value')
-      .in('statistic_id', picks.map(s => s.id))
+      .in(
+        'statistic_id',
+        picks.map(s => s.id)
+      )
       .order('period_date')
 
     const rows = []
     for (const stat of picks) {
       const statVals = (vals || []).filter(v => v.statistic_id === stat.id)
       for (const v of statVals) {
-        rows.push({ stat_name: stat.name, tracking: stat.tracking, stat_type: stat.stat_type, period_date: v.period_date, value: Number(v.value) })
+        rows.push({
+          stat_name: stat.name,
+          tracking: stat.tracking,
+          stat_type: stat.stat_type,
+          period_date: v.period_date,
+          value: Number(v.value),
+        })
       }
     }
 
     if (rows.length === 0) {
       setExportMsg({ type: 'error', text: 'No values found for the selected statistics.' })
-      setExporting(false); return
+      setExporting(false)
+      return
     }
 
     if (format === 'csv') {
       const header = 'stat_name,tracking,stat_type,period_date,value'
-      const lines  = rows.map(r => `"${r.stat_name.replace(/"/g, '""')}",${r.tracking},${r.stat_type},${r.period_date},${r.value}`)
-      downloadBlob([header, ...lines].join('\n'), 'statistics-export.csv', 'text/csv;charset=utf-8;')
+      const lines = rows.map(
+        r =>
+          `"${r.stat_name.replace(/"/g, '""')}",${r.tracking},${r.stat_type},${r.period_date},${r.value}`
+      )
+      downloadBlob(
+        [header, ...lines].join('\n'),
+        'statistics-export.csv',
+        'text/csv;charset=utf-8;'
+      )
     } else {
       try {
         const XLSX = await loadXLSX()
-        const ws   = XLSX.utils.json_to_sheet(rows)
-        const wb   = XLSX.utils.book_new()
+        const ws = XLSX.utils.json_to_sheet(rows)
+        const wb = XLSX.utils.book_new()
         XLSX.utils.book_append_sheet(wb, ws, 'Statistics')
         XLSX.writeFile(wb, 'statistics-export.xlsx')
       } catch {
         setExportMsg({ type: 'error', text: 'Could not load Excel library. Try CSV instead.' })
-        setExporting(false); return
+        setExporting(false)
+        return
       }
     }
 
-    setExportMsg({ type: 'success', text: `Exported ${rows.length} value${rows.length !== 1 ? 's' : ''} across ${picks.length} stat${picks.length !== 1 ? 's' : ''}.` })
+    setExportMsg({
+      type: 'success',
+      text: `Exported ${rows.length} value${rows.length !== 1 ? 's' : ''} across ${picks.length} stat${picks.length !== 1 ? 's' : ''}.`,
+    })
     // Log the export
     const fileName = format === 'csv' ? 'statistics-export.csv' : 'statistics-export.xlsx'
     await supabase.from('stat_import_export_log').insert({
-      type:        'export',
-      file_name:   fileName,
-      stat_names:  picks.map(s => s.name),
-      stat_count:  picks.length,
+      type: 'export',
+      file_name: fileName,
+      stat_names: picks.map(s => s.name),
+      stat_count: picks.length,
       value_count: rows.length,
       performed_by: user?.id,
     })
@@ -3915,24 +5256,32 @@ function ImportExportView({ stats, user, onImported }) {
     const isExcel = /\.(xlsx|xls)$/i.test(file.name)
     if (isExcel) {
       const XLSX = await loadXLSX()
-      const buf  = await file.arrayBuffer()
+      const buf = await file.arrayBuffer()
       // cellDates:true → date cells come back as JS Date objects instead of serials
-      const wb   = XLSX.read(buf, { cellDates: true })
-      const ws   = wb.Sheets[wb.SheetNames[0]]
+      const wb = XLSX.read(buf, { cellDates: true })
+      const ws = wb.Sheets[wb.SheetNames[0]]
       return XLSX.utils.sheet_to_json(ws, { defval: '' })
     }
-    const text    = await file.text()
-    const lines   = text.trim().split(/\r?\n/)
+    const text = await file.text()
+    const lines = text.trim().split(/\r?\n/)
     const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''))
-    return lines.slice(1).filter(l => l.trim()).map(line => {
-      const vals = []; let cur = ''; let inQ = false
-      for (const ch of line + ',') {
-        if (ch === '"') { inQ = !inQ }
-        else if (ch === ',' && !inQ) { vals.push(cur.trim()); cur = '' }
-        else cur += ch
-      }
-      return Object.fromEntries(headers.map((h, i) => [h, (vals[i] ?? '').replace(/^"|"$/g, '')]))
-    })
+    return lines
+      .slice(1)
+      .filter(l => l.trim())
+      .map(line => {
+        const vals = []
+        let cur = ''
+        let inQ = false
+        for (const ch of line + ',') {
+          if (ch === '"') {
+            inQ = !inQ
+          } else if (ch === ',' && !inQ) {
+            vals.push(cur.trim())
+            cur = ''
+          } else cur += ch
+        }
+        return Object.fromEntries(headers.map((h, i) => [h, (vals[i] ?? '').replace(/^"|"$/g, '')]))
+      })
   }
 
   // Normalize any date representation → YYYY-MM-DD
@@ -3958,9 +5307,22 @@ function ImportExportView({ stats, user, onImported }) {
     // DD-Mon-YYYY  e.g. 15-Apr-2026
     const dmy = s.match(/^(\d{1,2})[- ]([A-Za-z]{3,9})[- ](\d{2,4})$/)
     if (dmy) {
-      const months = { jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12 }
-      const mo = months[dmy[2].slice(0,3).toLowerCase()]
-      if (mo) return `${dmy[3]}-${String(mo).padStart(2,'0')}-${dmy[1].padStart(2,'0')}`
+      const months = {
+        jan: 1,
+        feb: 2,
+        mar: 3,
+        apr: 4,
+        may: 5,
+        jun: 6,
+        jul: 7,
+        aug: 8,
+        sep: 9,
+        oct: 10,
+        nov: 11,
+        dec: 12,
+      }
+      const mo = months[dmy[2].slice(0, 3).toLowerCase()]
+      if (mo) return `${dmy[3]}-${String(mo).padStart(2, '0')}-${dmy[1].padStart(2, '0')}`
     }
     // Last resort: native Date parse
     const d = new Date(s)
@@ -3972,13 +5334,17 @@ function ImportExportView({ stats, user, onImported }) {
     const required = IMPORT_FIELDS.filter(f => f.required)
     for (const f of required) {
       if (!mapping[f.key]) {
-        setImportMsg({ type: 'error', text: `"${f.label}" is required — please map it to a column.` }); return
+        setImportMsg({
+          type: 'error',
+          text: `"${f.label}" is required — please map it to a column.`,
+        })
+        return
       }
     }
     setImportMsg(null)
 
-    const VALID_TRACKING  = ['daily','weekly','monthly','quarterly','yearly']
-    const VALID_STAT_TYPE = ['numeric','currency','percentage']
+    const VALID_TRACKING = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly']
+    const VALID_STAT_TYPE = ['numeric', 'currency', 'percentage']
 
     // Apply mapping to each raw row
     const resolved = rawFileRows.map(row => {
@@ -4010,12 +5376,22 @@ function ImportExportView({ stats, user, onImported }) {
     for (const r of resolved) {
       const name = r.stat_name
       if (!name || !r.period_date || r.value === '') continue
-      if (!map.has(name)) map.set(name, { name, tracking: r.tracking || trackingDef, stat_type: r.stat_type || statTypeDef, count: 0 })
+      if (!map.has(name))
+        map.set(name, {
+          name,
+          tracking: r.tracking || trackingDef,
+          stat_type: r.stat_type || statTypeDef,
+          count: 0,
+        })
       map.get(name).count++
     }
 
     if (map.size === 0) {
-      setImportMsg({ type: 'error', text: 'No valid rows found after applying the mapping. Check that the right columns are selected.' }); return
+      setImportMsg({
+        type: 'error',
+        text: 'No valid rows found after applying the mapping. Check that the right columns are selected.',
+      })
+      return
     }
 
     setMappedRows(resolved)
@@ -4026,34 +5402,39 @@ function ImportExportView({ stats, user, onImported }) {
   // ── Import Step 3: commit ──────────────────────────────────────────────
   async function handleImport() {
     if (!importPreview || !mappedRows.length) return
-    setImporting(true); setImportMsg(null)
+    setImporting(true)
+    setImportMsg(null)
 
-    const statNames   = [...new Set(mappedRows.map(r => r.stat_name).filter(Boolean))]
+    const statNames = [...new Set(mappedRows.map(r => r.stat_name).filter(Boolean))]
     let totalUpserted = 0
-    const errors      = []    // real failures: stat creation / upsert DB errors
-    const warnings    = []    // soft issues: skipped rows with bad data
+    const errors = [] // real failures: stat creation / upsert DB errors
+    const warnings = [] // soft issues: skipped rows with bad data
 
     for (const name of statNames) {
       let stat = stats.find(s => s.name.toLowerCase() === name.toLowerCase())
 
       if (!stat) {
-        const firstRow  = mappedRows.find(r => r.stat_name.toLowerCase() === name.toLowerCase())
-        const statRows  = mappedRows.filter(r => r.stat_name.toLowerCase() === name.toLowerCase())
-        const dates     = statRows.map(r => r.period_date).filter(Boolean).sort()
+        const firstRow = mappedRows.find(r => r.stat_name.toLowerCase() === name.toLowerCase())
+        const statRows = mappedRows.filter(r => r.stat_name.toLowerCase() === name.toLowerCase())
+        const dates = statRows
+          .map(r => r.period_date)
+          .filter(Boolean)
+          .sort()
         const beginDate = dates[0] || today()
         const { data: newStat, error } = await supabase
           .from('statistics')
           .insert({
             name,
-            tracking:       firstRow?.tracking  || trackingDef,
-            stat_type:      firstRow?.stat_type  || statTypeDef,
+            tracking: firstRow?.tracking || trackingDef,
+            stat_type: firstRow?.stat_type || statTypeDef,
             beginning_date: beginDate,
-            owner_type:     'user',
-            owner_user_id:  user?.id,
-            created_by:     user?.id,
-            sort_order:     0,
+            owner_type: 'user',
+            owner_user_id: user?.id,
+            created_by: user?.id,
+            sort_order: 0,
           })
-          .select().single()
+          .select()
+          .single()
         if (error) {
           errors.push({ name, message: error.message || 'Failed to create statistic' })
           continue
@@ -4061,10 +5442,15 @@ function ImportExportView({ stats, user, onImported }) {
         stat = newStat
       }
 
-      const rows       = mappedRows.filter(r => r.stat_name.toLowerCase() === name.toLowerCase())
+      const rows = mappedRows.filter(r => r.stat_name.toLowerCase() === name.toLowerCase())
       const rawUpserts = rows
         .filter(r => r.period_date && r.value !== '')
-        .map(r => ({ statistic_id: stat.id, period_date: r.period_date, value: parseFloat(r.value), entered_by: user?.id }))
+        .map(r => ({
+          statistic_id: stat.id,
+          period_date: r.period_date,
+          value: parseFloat(r.value),
+          entered_by: user?.id,
+        }))
         .filter(r => !isNaN(r.value))
 
       // Deduplicate by period_date — keep last occurrence if file has duplicates
@@ -4074,7 +5460,10 @@ function ImportExportView({ stats, user, onImported }) {
 
       // Track skipped rows as warnings (not blocking errors)
       const skipped = rows.length - rawUpserts.length
-      if (skipped > 0) warnings.push(`${name}: ${skipped} row${skipped > 1 ? 's' : ''} skipped (missing date or invalid value)`)
+      if (skipped > 0)
+        warnings.push(
+          `${name}: ${skipped} row${skipped > 1 ? 's' : ''} skipped (missing date or invalid value)`
+        )
 
       if (upserts.length) {
         const { error } = await supabase
@@ -4091,15 +5480,15 @@ function ImportExportView({ stats, user, onImported }) {
     // Always log and navigate if anything was successfully imported
     if (totalUpserted > 0) {
       await supabase.from('stat_import_export_log').insert({
-        type:         'import',
-        file_name:    importFile?.name || 'unknown',
-        stat_names:   statNames,
-        stat_count:   statNames.length,
-        value_count:  totalUpserted,
+        type: 'import',
+        file_name: importFile?.name || 'unknown',
+        stat_names: statNames,
+        stat_count: statNames.length,
+        value_count: totalUpserted,
         performed_by: user?.id,
       })
       loadHistory()
-      onImported?.()  // refresh stats list and navigate to My Stats
+      onImported?.() // refresh stats list and navigate to My Stats
     }
 
     // Show result message
@@ -4114,12 +5503,16 @@ function ImportExportView({ stats, user, onImported }) {
       // Soft warnings only — still a success, show what was skipped
       setImportMsg({
         type: 'success',
-        text: `Imported ${totalUpserted} value${totalUpserted !== 1 ? 's' : ''} across ${statNames.length} stat${statNames.length !== 1 ? 's' : ''}.` +
-              `\n\nNote — some rows were skipped:\n${warnings.map(w => `• ${w}`).join('\n')}`,
+        text:
+          `Imported ${totalUpserted} value${totalUpserted !== 1 ? 's' : ''} across ${statNames.length} stat${statNames.length !== 1 ? 's' : ''}.` +
+          `\n\nNote — some rows were skipped:\n${warnings.map(w => `• ${w}`).join('\n')}`,
       })
       if (totalUpserted > 0) resetImport()
     } else {
-      setImportMsg({ type: 'success', text: `Successfully imported ${totalUpserted} value${totalUpserted !== 1 ? 's' : ''} across ${statNames.length} stat${statNames.length !== 1 ? 's' : ''}.` })
+      setImportMsg({
+        type: 'success',
+        text: `Successfully imported ${totalUpserted} value${totalUpserted !== 1 ? 's' : ''} across ${statNames.length} stat${statNames.length !== 1 ? 's' : ''}.`,
+      })
       resetImport()
     }
 
@@ -4128,27 +5521,42 @@ function ImportExportView({ stats, user, onImported }) {
 
   // ── Render ────────────────────────────────────────────────────────────────
   // Breadcrumb steps for import
-  const importStepLabels = { upload: 'Upload File', mapping: 'Map Fields', preview: 'Preview & Import' }
+  const importStepLabels = {
+    upload: 'Upload File',
+    mapping: 'Map Fields',
+    preview: 'Preview & Import',
+  }
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
-
       {/* Top action bar */}
       <div className="flex items-center gap-3 px-6 py-4 bg-white border-b border-gray-200 flex-shrink-0">
         <h2 className="text-base font-semibold text-gray-800 mr-2">Import / Export</h2>
         <button
-          onClick={() => { setPanel(panel === 'import' ? null : 'import'); resetImport(); setExportMsg(null) }}
+          onClick={() => {
+            setPanel(panel === 'import' ? null : 'import')
+            resetImport()
+            setExportMsg(null)
+          }}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border-2 transition-colors ${
-            panel === 'import' ? 'border-green-700 text-white' : 'border-gray-300 text-gray-700 hover:border-green-600 hover:text-green-700'
+            panel === 'import'
+              ? 'border-green-700 text-white'
+              : 'border-gray-300 text-gray-700 hover:border-green-600 hover:text-green-700'
           }`}
           style={panel === 'import' ? { backgroundColor: FG, borderColor: FG } : {}}
         >
           ⬆ Import Statistics
         </button>
         <button
-          onClick={() => { setPanel(panel === 'export' ? null : 'export'); resetImport(); setExportMsg(null) }}
+          onClick={() => {
+            setPanel(panel === 'export' ? null : 'export')
+            resetImport()
+            setExportMsg(null)
+          }}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border-2 transition-colors ${
-            panel === 'export' ? 'border-green-700 text-white' : 'border-gray-300 text-gray-700 hover:border-green-600 hover:text-green-700'
+            panel === 'export'
+              ? 'border-green-700 text-white'
+              : 'border-gray-300 text-gray-700 hover:border-green-600 hover:text-green-700'
           }`}
           style={panel === 'export' ? { backgroundColor: FG, borderColor: FG } : {}}
         >
@@ -4158,19 +5566,22 @@ function ImportExportView({ stats, user, onImported }) {
 
       {/* Panel content */}
       <div className="flex-1 overflow-y-auto px-6 py-5">
-
         {/* ── History (always visible when no panel open) ── */}
         {!panel && (
           <div className="max-w-3xl">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="font-semibold text-gray-800">Import / Export History</h3>
-                <p className="text-xs text-gray-400 mt-0.5">Every file imported or exported from this module.</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Every file imported or exported from this module.
+                </p>
               </div>
               <button
                 onClick={loadHistory}
                 className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1.5 rounded border border-gray-200 hover:border-gray-300 transition-colors"
-              >↻ Refresh</button>
+              >
+                ↻ Refresh
+              </button>
             </div>
 
             {historyLoading ? (
@@ -4181,53 +5592,80 @@ function ImportExportView({ stats, user, onImported }) {
               <div className="card flex flex-col items-center justify-center py-14 text-center">
                 <div className="text-4xl mb-3">📂</div>
                 <p className="text-sm font-medium text-gray-500">No history yet</p>
-                <p className="text-xs text-gray-400 mt-1">Files will appear here after your first import or export.</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Files will appear here after your first import or export.
+                </p>
               </div>
             ) : (
               <div className="card p-0 overflow-hidden">
                 <div className="divide-y divide-gray-100">
                   {history.map(entry => {
-                    const isImport  = entry.type === 'import'
-                    const expanded  = expandedLogs.has(entry.id)
+                    const isImport = entry.type === 'import'
+                    const expanded = expandedLogs.has(entry.id)
                     const dateLabel = new Date(entry.performed_at).toLocaleString('en-US', {
-                      month: 'short', day: 'numeric', year: 'numeric',
-                      hour: 'numeric', minute: '2-digit',
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit',
                     })
                     return (
                       <div key={entry.id}>
                         <button
-                          onClick={() => setExpandedLogs(prev => {
-                            const n = new Set(prev); n.has(entry.id) ? n.delete(entry.id) : n.add(entry.id); return n
-                          })}
+                          onClick={() =>
+                            setExpandedLogs(prev => {
+                              const n = new Set(prev)
+                              n.has(entry.id) ? n.delete(entry.id) : n.add(entry.id)
+                              return n
+                            })
+                          }
                           className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left transition-colors"
                         >
-                          <span className="text-gray-400 text-xs w-3 flex-shrink-0">{expanded ? '▾' : '▸'}</span>
+                          <span className="text-gray-400 text-xs w-3 flex-shrink-0">
+                            {expanded ? '▾' : '▸'}
+                          </span>
                           {/* Badge */}
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
-                            isImport ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
-                          }`}>
+                          <span
+                            className={`text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
+                              isImport ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+                            }`}
+                          >
                             {isImport ? '⬆ Import' : '⬇ Export'}
                           </span>
                           {/* File name */}
-                          <span className="flex-1 text-sm font-medium text-gray-800 truncate">{entry.file_name || '—'}</span>
+                          <span className="flex-1 text-sm font-medium text-gray-800 truncate">
+                            {entry.file_name || '—'}
+                          </span>
                           {/* Counts */}
                           <span className="text-xs text-gray-400 flex-shrink-0 w-28 text-right">
-                            {entry.stat_count} stat{entry.stat_count !== 1 ? 's' : ''} · {entry.value_count} value{entry.value_count !== 1 ? 's' : ''}
+                            {entry.stat_count} stat{entry.stat_count !== 1 ? 's' : ''} ·{' '}
+                            {entry.value_count} value{entry.value_count !== 1 ? 's' : ''}
                           </span>
                           {/* Date */}
-                          <span className="text-xs text-gray-400 flex-shrink-0 w-40 text-right">{dateLabel}</span>
+                          <span className="text-xs text-gray-400 flex-shrink-0 w-40 text-right">
+                            {dateLabel}
+                          </span>
                         </button>
 
                         {/* Expanded: stat list */}
                         {expanded && (
                           <div className="px-10 py-3 bg-gray-50 border-t border-gray-100">
-                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Statistics included</p>
+                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                              Statistics included
+                            </p>
                             {(entry.stat_names || []).length === 0 ? (
-                              <p className="text-xs text-gray-400 italic">No stat names recorded.</p>
+                              <p className="text-xs text-gray-400 italic">
+                                No stat names recorded.
+                              </p>
                             ) : (
                               <div className="flex flex-wrap gap-1.5">
                                 {entry.stat_names.map((name, i) => (
-                                  <span key={i} className="text-xs bg-white border border-gray-200 text-gray-600 px-2 py-0.5 rounded-full">{name}</span>
+                                  <span
+                                    key={i}
+                                    className="text-xs bg-white border border-gray-200 text-gray-600 px-2 py-0.5 rounded-full"
+                                  >
+                                    {name}
+                                  </span>
                                 ))}
                               </div>
                             )}
@@ -4248,12 +5686,24 @@ function ImportExportView({ stats, user, onImported }) {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="font-semibold text-gray-800">Select Statistics to Export</h3>
-                <p className="text-xs text-gray-400 mt-0.5">Values for all selected stats will be included in the file.</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Values for all selected stats will be included in the file.
+                </p>
               </div>
               <div className="flex gap-2">
-                <button onClick={selectAll}   className="text-xs text-green-700 hover:text-green-900 font-medium underline underline-offset-2">Select All</button>
+                <button
+                  onClick={selectAll}
+                  className="text-xs text-green-700 hover:text-green-900 font-medium underline underline-offset-2"
+                >
+                  Select All
+                </button>
                 <span className="text-gray-300">|</span>
-                <button onClick={deselectAll} className="text-xs text-gray-500 hover:text-gray-700 font-medium underline underline-offset-2">Deselect All</button>
+                <button
+                  onClick={deselectAll}
+                  className="text-xs text-gray-500 hover:text-gray-700 font-medium underline underline-offset-2"
+                >
+                  Deselect All
+                </button>
               </div>
             </div>
             <div className="card p-0 overflow-hidden mb-4">
@@ -4262,8 +5712,16 @@ function ImportExportView({ stats, user, onImported }) {
               ) : (
                 <div className="divide-y divide-gray-100">
                   {activeStats.map(s => (
-                    <label key={s.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer">
-                      <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggleStat(s.id)} className="w-4 h-4 rounded accent-green-700 flex-shrink-0" />
+                    <label
+                      key={s.id}
+                      className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected.has(s.id)}
+                        onChange={() => toggleStat(s.id)}
+                        className="w-4 h-4 rounded accent-green-700 flex-shrink-0"
+                      />
                       <span className="flex-1 text-sm font-medium text-gray-800">{s.name}</span>
                       <span className="text-xs text-gray-400 capitalize">{s.tracking}</span>
                       <span className="text-xs text-gray-400 capitalize">{s.stat_type}</span>
@@ -4273,10 +5731,21 @@ function ImportExportView({ stats, user, onImported }) {
               )}
             </div>
             <div className="flex items-center gap-3">
-              <button onClick={() => handleExport('csv')} disabled={exporting || selected.size === 0} className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-40 transition-opacity" style={{ backgroundColor: FG }}>
-                {exporting ? 'Exporting…' : `Export as CSV${selected.size > 0 ? ` (${selected.size})` : ''}`}
+              <button
+                onClick={() => handleExport('csv')}
+                disabled={exporting || selected.size === 0}
+                className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-40 transition-opacity"
+                style={{ backgroundColor: FG }}
+              >
+                {exporting
+                  ? 'Exporting…'
+                  : `Export as CSV${selected.size > 0 ? ` (${selected.size})` : ''}`}
               </button>
-              <button onClick={() => handleExport('excel')} disabled={exporting || selected.size === 0} className="px-4 py-2 rounded-lg text-sm font-semibold border-2 border-gray-300 text-gray-700 hover:border-green-600 hover:text-green-700 disabled:opacity-40 transition-colors">
+              <button
+                onClick={() => handleExport('excel')}
+                disabled={exporting || selected.size === 0}
+                className="px-4 py-2 rounded-lg text-sm font-semibold border-2 border-gray-300 text-gray-700 hover:border-green-600 hover:text-green-700 disabled:opacity-40 transition-colors"
+              >
                 Export as Excel
               </button>
             </div>
@@ -4287,19 +5756,21 @@ function ImportExportView({ stats, user, onImported }) {
         {/* ── IMPORT PANEL ── */}
         {panel === 'import' && (
           <div className="max-w-2xl">
-
             {/* Step breadcrumb */}
             <div className="flex items-center gap-2 mb-5">
               {['upload', 'mapping', 'preview'].map((step, i) => (
                 <div key={step} className="flex items-center gap-2">
                   {i > 0 && <span className="text-gray-300 text-sm">›</span>}
-                  <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
-                    importStep === step
-                      ? 'text-white'
-                      : ['upload','mapping','preview'].indexOf(importStep) > i
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-gray-100 text-gray-400'
-                  }`} style={importStep === step ? { backgroundColor: FG } : {}}>
+                  <div
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
+                      importStep === step
+                        ? 'text-white'
+                        : ['upload', 'mapping', 'preview'].indexOf(importStep) > i
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-100 text-gray-400'
+                    }`}
+                    style={importStep === step ? { backgroundColor: FG } : {}}
+                  >
                     <span>{i + 1}</span>
                     <span>{importStepLabels[step]}</span>
                   </div>
@@ -4317,9 +5788,18 @@ function ImportExportView({ stats, user, onImported }) {
                   <div className="text-4xl mb-3">📂</div>
                   <p className="text-sm font-medium text-gray-600">Click to choose a file</p>
                   <p className="text-xs text-gray-400 mt-1">CSV or Excel (.xlsx / .xls)</p>
-                  <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleFileChange} />
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept=".csv,.xlsx,.xls"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
                 </div>
-                <p className="text-xs text-gray-400 text-center">You'll map your file's columns to the right fields in the next step — any column names work.</p>
+                <p className="text-xs text-gray-400 text-center">
+                  You'll map your file's columns to the right fields in the next step — any column
+                  names work.
+                </p>
                 <Msg m={importMsg} />
               </>
             )}
@@ -4330,15 +5810,27 @@ function ImportExportView({ stats, user, onImported }) {
                 <div className="flex items-center justify-between mb-3">
                   <div>
                     <p className="text-sm font-semibold text-gray-800">📄 {importFile?.name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{rawFileRows.length} rows · {fileHeaders.length} columns detected</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {rawFileRows.length} rows · {fileHeaders.length} columns detected
+                    </p>
                   </div>
-                  <button onClick={resetImport} className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2">Choose different file</button>
+                  <button
+                    onClick={resetImport}
+                    className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2"
+                  >
+                    Choose different file
+                  </button>
                 </div>
 
                 <div className="card p-0 overflow-hidden mb-4">
                   <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Map Your File's Columns</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Match each field below to a column in your file. Required fields must be mapped.</p>
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                      Map Your File's Columns
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Match each field below to a column in your file. Required fields must be
+                      mapped.
+                    </p>
                   </div>
                   <div className="divide-y divide-gray-100">
                     {IMPORT_FIELDS.map(field => (
@@ -4346,8 +5838,12 @@ function ImportExportView({ stats, user, onImported }) {
                         {/* Field info */}
                         <div className="w-36 flex-shrink-0">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-sm font-semibold text-gray-800">{field.label}</span>
-                            {field.required && <span className="text-red-500 text-xs font-bold">*</span>}
+                            <span className="text-sm font-semibold text-gray-800">
+                              {field.label}
+                            </span>
+                            {field.required && (
+                              <span className="text-red-500 text-xs font-bold">*</span>
+                            )}
                           </div>
                           <p className="text-xs text-gray-400 mt-0.5 leading-snug">{field.desc}</p>
                         </div>
@@ -4359,22 +5855,32 @@ function ImportExportView({ stats, user, onImported }) {
                         <div className="flex-1">
                           <select
                             value={mapping[field.key] || ''}
-                            onChange={e => setMapping(prev => ({ ...prev, [field.key]: e.target.value }))}
+                            onChange={e =>
+                              setMapping(prev => ({ ...prev, [field.key]: e.target.value }))
+                            }
                             className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
                           >
-                            <option value="">{field.required ? '— select column —' : '— not in file —'}</option>
+                            <option value="">
+                              {field.required ? '— select column —' : '— not in file —'}
+                            </option>
                             {fileHeaders.map(h => (
-                              <option key={h} value={h}>{h}</option>
+                              <option key={h} value={h}>
+                                {h}
+                              </option>
                             ))}
                           </select>
                         </div>
 
                         {/* Sample value preview */}
                         <div className="w-32 flex-shrink-0 text-xs text-gray-400 truncate">
-                          {mapping[field.key] && rawFileRows[0]?.[mapping[field.key]] !== undefined
-                            ? <span className="font-mono bg-gray-50 px-1.5 py-0.5 rounded text-gray-600 border border-gray-200">{String(rawFileRows[0][mapping[field.key]]).slice(0, 20)}</span>
-                            : <span className="italic text-gray-300">no preview</span>
-                          }
+                          {mapping[field.key] &&
+                          rawFileRows[0]?.[mapping[field.key]] !== undefined ? (
+                            <span className="font-mono bg-gray-50 px-1.5 py-0.5 rounded text-gray-600 border border-gray-200">
+                              {String(rawFileRows[0][mapping[field.key]]).slice(0, 20)}
+                            </span>
+                          ) : (
+                            <span className="italic text-gray-300">no preview</span>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -4383,21 +5889,43 @@ function ImportExportView({ stats, user, onImported }) {
                   {/* Defaults for optional fields not mapped */}
                   {(!mapping.tracking || !mapping.stat_type) && (
                     <div className="px-4 py-3 bg-amber-50 border-t border-amber-100">
-                      <p className="text-xs font-semibold text-amber-700 mb-2">Default values for unmapped optional fields</p>
+                      <p className="text-xs font-semibold text-amber-700 mb-2">
+                        Default values for unmapped optional fields
+                      </p>
                       <div className="flex items-center gap-6">
                         {!mapping.tracking && (
                           <div className="flex items-center gap-2">
-                            <label className="text-xs text-gray-600 font-medium whitespace-nowrap">Tracking:</label>
-                            <select value={trackingDef} onChange={e => setTrackingDef(e.target.value)} className="text-xs border border-gray-200 rounded px-2 py-1 bg-white">
-                              {['daily','weekly','monthly','quarterly','yearly'].map(t => <option key={t} value={t}>{t}</option>)}
+                            <label className="text-xs text-gray-600 font-medium whitespace-nowrap">
+                              Tracking:
+                            </label>
+                            <select
+                              value={trackingDef}
+                              onChange={e => setTrackingDef(e.target.value)}
+                              className="text-xs border border-gray-200 rounded px-2 py-1 bg-white"
+                            >
+                              {['daily', 'weekly', 'monthly', 'quarterly', 'yearly'].map(t => (
+                                <option key={t} value={t}>
+                                  {t}
+                                </option>
+                              ))}
                             </select>
                           </div>
                         )}
                         {!mapping.stat_type && (
                           <div className="flex items-center gap-2">
-                            <label className="text-xs text-gray-600 font-medium whitespace-nowrap">Stat Type:</label>
-                            <select value={statTypeDef} onChange={e => setStatTypeDef(e.target.value)} className="text-xs border border-gray-200 rounded px-2 py-1 bg-white">
-                              {['numeric','currency','percentage'].map(t => <option key={t} value={t}>{t}</option>)}
+                            <label className="text-xs text-gray-600 font-medium whitespace-nowrap">
+                              Stat Type:
+                            </label>
+                            <select
+                              value={statTypeDef}
+                              onChange={e => setStatTypeDef(e.target.value)}
+                              className="text-xs border border-gray-200 rounded px-2 py-1 bg-white"
+                            >
+                              {['numeric', 'currency', 'percentage'].map(t => (
+                                <option key={t} value={t}>
+                                  {t}
+                                </option>
+                              ))}
                             </select>
                           </div>
                         )}
@@ -4409,20 +5937,35 @@ function ImportExportView({ stats, user, onImported }) {
                 {/* Sample data preview */}
                 {rawFileRows.length > 0 && (
                   <div className="mb-4">
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">File Preview (first 3 rows)</p>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5">
+                      File Preview (first 3 rows)
+                    </p>
                     <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
                       <table className="text-xs w-full">
                         <thead className="bg-gray-50 border-b border-gray-200">
                           <tr>
                             {fileHeaders.map(h => (
-                              <th key={h} className={`px-3 py-2 text-left font-semibold whitespace-nowrap ${
-                                Object.values(mapping).includes(h) ? 'text-green-700 bg-green-50' : 'text-gray-500'
-                              }`}>
+                              <th
+                                key={h}
+                                className={`px-3 py-2 text-left font-semibold whitespace-nowrap ${
+                                  Object.values(mapping).includes(h)
+                                    ? 'text-green-700 bg-green-50'
+                                    : 'text-gray-500'
+                                }`}
+                              >
                                 {h}
-                                {Object.entries(mapping).find(([, v]) => v === h)
-                                  ? <span className="ml-1 text-green-600 font-normal">↳ {IMPORT_FIELDS.find(f => f.key === Object.entries(mapping).find(([, v]) => v === h)?.[0])?.label}</span>
-                                  : null
-                                }
+                                {Object.entries(mapping).find(([, v]) => v === h) ? (
+                                  <span className="ml-1 text-green-600 font-normal">
+                                    ↳{' '}
+                                    {
+                                      IMPORT_FIELDS.find(
+                                        f =>
+                                          f.key ===
+                                          Object.entries(mapping).find(([, v]) => v === h)?.[0]
+                                      )?.label
+                                    }
+                                  </span>
+                                ) : null}
                               </th>
                             ))}
                           </tr>
@@ -4431,7 +5974,10 @@ function ImportExportView({ stats, user, onImported }) {
                           {rawFileRows.slice(0, 3).map((row, i) => (
                             <tr key={i} className="hover:bg-gray-50">
                               {fileHeaders.map(h => (
-                                <td key={h} className={`px-3 py-1.5 font-mono whitespace-nowrap ${Object.values(mapping).includes(h) ? 'text-gray-800' : 'text-gray-400'}`}>
+                                <td
+                                  key={h}
+                                  className={`px-3 py-1.5 font-mono whitespace-nowrap ${Object.values(mapping).includes(h) ? 'text-gray-800' : 'text-gray-400'}`}
+                                >
                                   {String(row[h]).slice(0, 30)}
                                 </td>
                               ))}
@@ -4461,33 +6007,60 @@ function ImportExportView({ stats, user, onImported }) {
                 <div className="flex items-center justify-between mb-3">
                   <div>
                     <p className="text-sm font-semibold text-gray-800">Ready to import</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{importPreview.length} stat{importPreview.length !== 1 ? 's' : ''} · {importPreview.reduce((s, p) => s + p.count, 0)} values</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {importPreview.length} stat{importPreview.length !== 1 ? 's' : ''} ·{' '}
+                      {importPreview.reduce((s, p) => s + p.count, 0)} values
+                    </p>
                   </div>
-                  <button onClick={() => { setImportStep('mapping'); setImportMsg(null) }} className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2">← Back to mapping</button>
+                  <button
+                    onClick={() => {
+                      setImportStep('mapping')
+                      setImportMsg(null)
+                    }}
+                    className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2"
+                  >
+                    ← Back to mapping
+                  </button>
                 </div>
 
                 <div className="card p-0 overflow-hidden mb-4">
                   <table className="w-full text-sm">
                     <thead className="bg-gray-50">
                       <tr className="border-b border-gray-200">
-                        <th className="text-left px-4 py-2.5 font-semibold text-gray-500 text-xs uppercase tracking-wide">Stat Name</th>
-                        <th className="text-left px-4 py-2.5 font-semibold text-gray-500 text-xs uppercase tracking-wide">Tracking</th>
-                        <th className="text-left px-4 py-2.5 font-semibold text-gray-500 text-xs uppercase tracking-wide">Type</th>
-                        <th className="text-right px-4 py-2.5 font-semibold text-gray-500 text-xs uppercase tracking-wide">Values</th>
-                        <th className="text-right px-4 py-2.5 font-semibold text-gray-500 text-xs uppercase tracking-wide">Status</th>
+                        <th className="text-left px-4 py-2.5 font-semibold text-gray-500 text-xs uppercase tracking-wide">
+                          Stat Name
+                        </th>
+                        <th className="text-left px-4 py-2.5 font-semibold text-gray-500 text-xs uppercase tracking-wide">
+                          Tracking
+                        </th>
+                        <th className="text-left px-4 py-2.5 font-semibold text-gray-500 text-xs uppercase tracking-wide">
+                          Type
+                        </th>
+                        <th className="text-right px-4 py-2.5 font-semibold text-gray-500 text-xs uppercase tracking-wide">
+                          Values
+                        </th>
+                        <th className="text-right px-4 py-2.5 font-semibold text-gray-500 text-xs uppercase tracking-wide">
+                          Status
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {importPreview.map(p => {
-                        const exists = stats.some(s => s.name.toLowerCase() === p.name.toLowerCase())
+                        const exists = stats.some(
+                          s => s.name.toLowerCase() === p.name.toLowerCase()
+                        )
                         return (
                           <tr key={p.name} className="hover:bg-gray-50">
                             <td className="px-4 py-2.5 font-medium text-gray-800">{p.name}</td>
                             <td className="px-4 py-2.5 text-gray-500 capitalize">{p.tracking}</td>
                             <td className="px-4 py-2.5 text-gray-500 capitalize">{p.stat_type}</td>
-                            <td className="px-4 py-2.5 text-right text-gray-700 font-medium">{p.count}</td>
+                            <td className="px-4 py-2.5 text-right text-gray-700 font-medium">
+                              {p.count}
+                            </td>
                             <td className="px-4 py-2.5 text-right">
-                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${exists ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                              <span
+                                className={`text-xs font-semibold px-2 py-0.5 rounded-full ${exists ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}
+                              >
                                 {exists ? 'Update' : 'New'}
                               </span>
                             </td>
@@ -4504,19 +6077,21 @@ function ImportExportView({ stats, user, onImported }) {
                   className="px-5 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50"
                   style={{ backgroundColor: FG }}
                 >
-                  {importing
-                    ? <span className="flex items-center gap-2"><span className="animate-spin inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full"></span>Importing…</span>
-                    : `Import ${importPreview.reduce((s, p) => s + p.count, 0)} Values`
-                  }
+                  {importing ? (
+                    <span className="flex items-center gap-2">
+                      <span className="animate-spin inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full"></span>
+                      Importing…
+                    </span>
+                  ) : (
+                    `Import ${importPreview.reduce((s, p) => s + p.count, 0)} Values`
+                  )}
                 </button>
 
                 <Msg m={importMsg} />
               </>
             )}
-
           </div>
         )}
-
       </div>
     </div>
   )
@@ -4528,15 +6103,16 @@ function fmtShort(v, statType) {
   if (v == null) return ''
   const n = Number(v)
   const abs = Math.abs(n)
-  if (abs >= 1_000_000) return (statType === 'currency' ? '$' : '') + (n / 1_000_000).toFixed(1) + 'M'
-  if (abs >= 1_000)     return (statType === 'currency' ? '$' : '') + (n / 1_000).toFixed(0) + 'k'
-  if (statType === 'currency')   return '$' + n.toFixed(0)
+  if (abs >= 1_000_000)
+    return (statType === 'currency' ? '$' : '') + (n / 1_000_000).toFixed(1) + 'M'
+  if (abs >= 1_000) return (statType === 'currency' ? '$' : '') + (n / 1_000).toFixed(0) + 'k'
+  if (statType === 'currency') return '$' + n.toFixed(0)
   if (statType === 'percentage') return n.toFixed(1) + '%'
   return n.toLocaleString('en-US', { maximumFractionDigits: 1 })
 }
 
 function getRecentPeriodOptions(tracking, weekEndingDay, count = 16) {
-  const now  = new Date()
+  const now = new Date()
   let anchor
   if (tracking === 'daily') {
     anchor = isoDate(now)
@@ -4556,39 +6132,44 @@ function getRecentPeriodOptions(tracking, weekEndingDay, count = 16) {
   const opts = []
   for (let i = 0; i < count; i++) {
     const d = new Date(anchor + 'T00:00:00')
-    if      (tracking === 'daily')     d.setDate(d.getDate() - i)
-    else if (tracking === 'weekly')    d.setDate(d.getDate() - i * 7)
-    else if (tracking === 'monthly')   d.setMonth(d.getMonth() - i)
+    if (tracking === 'daily') d.setDate(d.getDate() - i)
+    else if (tracking === 'weekly') d.setDate(d.getDate() - i * 7)
+    else if (tracking === 'monthly') d.setMonth(d.getMonth() - i)
     else if (tracking === 'quarterly') d.setMonth(d.getMonth() - i * 3)
-    else                               d.setFullYear(d.getFullYear() - i)
+    else d.setFullYear(d.getFullYear() - i)
     opts.push({ date: isoDate(d), label: periodLabel(isoDate(d), tracking) })
   }
   return opts
 }
 
 function buildPrintChartSVG(chartData, statType) {
-  const W = 760, H = 300
+  const W = 760,
+    H = 300
   const PAD = { top: 28, right: 24, bottom: 62, left: 72 }
-  const CW  = W - PAD.left - PAD.right
-  const CH  = H - PAD.top  - PAD.bottom
-  const FG  = '#3A5038'
+  const CW = W - PAD.left - PAD.right
+  const CH = H - PAD.top - PAD.bottom
+  const FG = '#3A5038'
 
   const vals = chartData.filter(d => d.value != null)
   if (vals.length === 0) {
     return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
       <rect width="${W}" height="${H}" fill="white"/>
-      <text x="${W/2}" y="${H/2}" text-anchor="middle" font-size="13" font-family="sans-serif" fill="#9ca3af">No data for this period</text>
+      <text x="${W / 2}" y="${H / 2}" text-anchor="middle" font-size="13" font-family="sans-serif" fill="#9ca3af">No data for this period</text>
     </svg>`
   }
 
   const allVals = vals.map(d => d.value)
   let minV = Math.min(...allVals)
   let maxV = Math.max(...allVals)
-  if (minV === maxV) { minV = minV === 0 ? -1 : minV * 0.9; maxV = maxV === 0 ? 1 : maxV * 1.1 }
+  if (minV === maxV) {
+    minV = minV === 0 ? -1 : minV * 0.9
+    maxV = maxV === 0 ? 1 : maxV * 1.1
+  }
   const span = maxV - minV
-  minV -= span * 0.05; maxV += span * 0.08
+  minV -= span * 0.05
+  maxV += span * 0.08
 
-  const n   = chartData.length
+  const n = chartData.length
   const xPos = i => PAD.left + (n > 1 ? (i / (n - 1)) * CW : CW / 2)
   const yPos = v => PAD.top + CH - ((v - minV) / (maxV - minV)) * CH
 
@@ -4602,37 +6183,56 @@ function buildPrintChartSVG(chartData, statType) {
   const maxXLabels = 10
   const step = Math.max(1, Math.ceil(n / maxXLabels))
 
-  const gridLines = yTicks.map(t =>
-    `<line x1="${PAD.left}" y1="${t.y.toFixed(1)}" x2="${W - PAD.right}" y2="${t.y.toFixed(1)}" stroke="#e5e7eb" stroke-width="1"/>`
-  ).join('')
+  const gridLines = yTicks
+    .map(
+      t =>
+        `<line x1="${PAD.left}" y1="${t.y.toFixed(1)}" x2="${W - PAD.right}" y2="${t.y.toFixed(1)}" stroke="#e5e7eb" stroke-width="1"/>`
+    )
+    .join('')
 
-  const yLabels = yTicks.map(t =>
-    `<text x="${PAD.left - 7}" y="${(t.y + 4).toFixed(1)}" text-anchor="end" font-size="9" font-family="sans-serif" fill="#6b7280">${t.label}</text>`
-  ).join('')
+  const yLabels = yTicks
+    .map(
+      t =>
+        `<text x="${PAD.left - 7}" y="${(t.y + 4).toFixed(1)}" text-anchor="end" font-size="9" font-family="sans-serif" fill="#6b7280">${t.label}</text>`
+    )
+    .join('')
 
-  const xLabels = chartData.map((d, i) => {
-    if (i % step !== 0 && i !== n - 1) return ''
-    const x = xPos(i).toFixed(1)
-    const y = (PAD.top + CH + 14).toFixed(1)
-    return `<text x="${x}" y="${y}" text-anchor="end" font-size="8" font-family="sans-serif" fill="#374151" transform="rotate(-40 ${x} ${y})">${d.label}</text>`
-  }).join('')
+  const xLabels = chartData
+    .map((d, i) => {
+      if (i % step !== 0 && i !== n - 1) return ''
+      const x = xPos(i).toFixed(1)
+      const y = (PAD.top + CH + 14).toFixed(1)
+      return `<text x="${x}" y="${y}" text-anchor="end" font-size="8" font-family="sans-serif" fill="#374151" transform="rotate(-40 ${x} ${y})">${d.label}</text>`
+    })
+    .join('')
 
   // Line path segments (break on null)
   let pathStr = ''
-  let inPath  = false
+  let inPath = false
   chartData.forEach((d, i) => {
-    if (d.value == null) { inPath = false; return }
-    const x = xPos(i).toFixed(1); const y = yPos(d.value).toFixed(1)
+    if (d.value == null) {
+      inPath = false
+      return
+    }
+    const x = xPos(i).toFixed(1)
+    const y = yPos(d.value).toFixed(1)
     pathStr += inPath ? `L${x},${y}` : `M${x},${y}`
     inPath = true
   })
-  const linePath = pathStr ? `<path d="${pathStr}" stroke="${FG}" stroke-width="3.3" fill="none" stroke-linejoin="round"/>` : ''
+  const linePath = pathStr
+    ? `<path d="${pathStr}" stroke="${FG}" stroke-width="3.3" fill="none" stroke-linejoin="round"/>`
+    : ''
 
   // Dots (only when sparse)
-  const dots = n <= 36 ? vals.map(d => {
-    const i = chartData.indexOf(d)
-    return `<circle cx="${xPos(i).toFixed(1)}" cy="${yPos(d.value).toFixed(1)}" r="4.5" fill="${FG}" stroke="white" stroke-width="1.5"/>`
-  }).join('') : ''
+  const dots =
+    n <= 36
+      ? vals
+          .map(d => {
+            const i = chartData.indexOf(d)
+            return `<circle cx="${xPos(i).toFixed(1)}" cy="${yPos(d.value).toFixed(1)}" r="4.5" fill="${FG}" stroke="white" stroke-width="1.5"/>`
+          })
+          .join('')
+      : ''
 
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" style="display:block">
   <rect width="${W}" height="${H}" fill="white"/>
@@ -4649,33 +6249,39 @@ function buildPrintChartSVG(chartData, statType) {
 // ── PrintMultipleView ─────────────────────────────────────────────────────────
 function PrintMultipleView({ stats, weekEndingDay }) {
   const TRACKING_OPTIONS = [
-    { value: 'daily',     label: 'Daily'     },
-    { value: 'weekly',    label: 'Weekly'    },
-    { value: 'monthly',   label: 'Monthly'   },
+    { value: 'daily', label: 'Daily' },
+    { value: 'weekly', label: 'Weekly' },
+    { value: 'monthly', label: 'Monthly' },
     { value: 'quarterly', label: 'Quarterly' },
-    { value: 'yearly',    label: 'Yearly'    },
+    { value: 'yearly', label: 'Yearly' },
   ]
   const NUM_PERIOD_OPTIONS = [6, 8, 10, 12, 16, 20, 24, 36, 52]
 
   const activeStats = useMemo(() => (stats || []).filter(s => !s.archived), [stats])
 
   // ── Config state ─────────────────────────────────────────────────────────
-  const [tracking,        setTracking]        = useState('weekly')
-  const [groups,          setGroups]          = useState([])
-  const [selectedGroupId, setSelectedGroupId] = useState(null)   // null = All
-  const [selectedIds,     setSelectedIds]     = useState(new Set())
-  const [periodOpts,      setPeriodOpts]      = useState([])
-  const [periodEndDate,   setPeriodEndDate]   = useState('')
-  const [numPeriods,      setNumPeriods]      = useState(12)
-  const [orientation,     setOrientation]     = useState('landscape')
-  const [printing,        setPrinting]        = useState(false)
-  const [dataCoverage,    setDataCoverage]    = useState({})  // statId → {found,total}
+  const [tracking, setTracking] = useState('weekly')
+  const [groups, setGroups] = useState([])
+  const [selectedGroupId, setSelectedGroupId] = useState(null) // null = All
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [periodOpts, setPeriodOpts] = useState([])
+  const [periodEndDate, setPeriodEndDate] = useState('')
+  const [numPeriods, setNumPeriods] = useState(12)
+  const [orientation, setOrientation] = useState('landscape')
+  const [printing, setPrinting] = useState(false)
+  const [dataCoverage, setDataCoverage] = useState({}) // statId → {found,total}
   const [loadingCoverage, setLoadingCoverage] = useState(false)
 
-  useEffect(() => { loadGroups() }, [])
+  useEffect(() => {
+    loadGroups()
+  }, [])
 
   async function loadGroups() {
-    const { data } = await supabase.from('stat_groups').select('*').order('sort_order').order('name')
+    const { data } = await supabase
+      .from('stat_groups')
+      .select('*')
+      .order('sort_order')
+      .order('name')
     setGroups(data || [])
   }
 
@@ -4718,10 +6324,14 @@ function PrintMultipleView({ stats, weekEndingDay }) {
   }, [activeStats, tracking, selectedGroupId, groups])
 
   const statsToPrint = matchingStats.filter(s => selectedIds.has(s.id))
-  const allSelected  = matchingStats.length > 0 && matchingStats.every(s => selectedIds.has(s.id))
+  const allSelected = matchingStats.length > 0 && matchingStats.every(s => selectedIds.has(s.id))
 
   function toggleStat(id) {
-    setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+    setSelectedIds(prev => {
+      const n = new Set(prev)
+      n.has(id) ? n.delete(id) : n.add(id)
+      return n
+    })
   }
 
   function toggleSelectAll() {
@@ -4733,19 +6343,23 @@ function PrintMultipleView({ stats, weekEndingDay }) {
     if (!matchingStats.length) {
       const opts = getRecentPeriodOptions(tracking, weekEndingDay)
       setPeriodOpts(opts)
-      setPeriodEndDate(prev => opts.find(o => o.date === prev) ? prev : (opts[0]?.date ?? ''))
+      setPeriodEndDate(prev => (opts.find(o => o.date === prev) ? prev : (opts[0]?.date ?? '')))
       return
     }
     // For equation stats, look up their component stat IDs instead of the equation's own ID
-    const queryIds = [...new Set(matchingStats.flatMap(s =>
-      s.stat_category === 'equation'
-        ? (s.equation_parts || []).map(p => p.stat_id).filter(Boolean)
-        : [s.id]
-    ))]
+    const queryIds = [
+      ...new Set(
+        matchingStats.flatMap(s =>
+          s.stat_category === 'equation'
+            ? (s.equation_parts || []).map(p => p.stat_id).filter(Boolean)
+            : [s.id]
+        )
+      ),
+    ]
     if (!queryIds.length) {
       const opts = getRecentPeriodOptions(tracking, weekEndingDay)
       setPeriodOpts(opts)
-      setPeriodEndDate(prev => opts.find(o => o.date === prev) ? prev : (opts[0]?.date ?? ''))
+      setPeriodEndDate(prev => (opts.find(o => o.date === prev) ? prev : (opts[0]?.date ?? '')))
       return
     }
     supabase
@@ -4760,7 +6374,7 @@ function PrintMultipleView({ stats, weekEndingDay }) {
         if (!earliest || !anchor) {
           const opts = getRecentPeriodOptions(tracking, weekEndingDay)
           setPeriodOpts(opts)
-          setPeriodEndDate(prev => opts.find(o => o.date === prev) ? prev : (opts[0]?.date ?? ''))
+          setPeriodEndDate(prev => (opts.find(o => o.date === prev) ? prev : (opts[0]?.date ?? '')))
           return
         }
         // Build options stepping back from anchor to earliest
@@ -4771,15 +6385,15 @@ function PrintMultipleView({ stats, weekEndingDay }) {
         while (d >= fromD && safety < 600) {
           const ds = isoDate(d)
           opts.push({ date: ds, label: periodLabel(ds, tracking) })
-          if      (tracking === 'daily')     d.setDate(d.getDate() - 1)
-          else if (tracking === 'weekly')    d.setDate(d.getDate() - 7)
-          else if (tracking === 'monthly')   d.setMonth(d.getMonth() - 1)
+          if (tracking === 'daily') d.setDate(d.getDate() - 1)
+          else if (tracking === 'weekly') d.setDate(d.getDate() - 7)
+          else if (tracking === 'monthly') d.setMonth(d.getMonth() - 1)
           else if (tracking === 'quarterly') d.setMonth(d.getMonth() - 3)
-          else                               d.setFullYear(d.getFullYear() - 1)
+          else d.setFullYear(d.getFullYear() - 1)
           safety++
         }
         setPeriodOpts(opts)
-        setPeriodEndDate(prev => opts.find(o => o.date === prev) ? prev : (opts[0]?.date ?? ''))
+        setPeriodEndDate(prev => (opts.find(o => o.date === prev) ? prev : (opts[0]?.date ?? '')))
       })
   }, [matchingStats, tracking, weekEndingDay])
 
@@ -4787,39 +6401,47 @@ function PrintMultipleView({ stats, weekEndingDay }) {
   useEffect(() => {
     let cancelled = false
 
-    if (!matchingStats.length || !periodEndDate) { setDataCoverage({}); return }
+    if (!matchingStats.length || !periodEndDate) {
+      setDataCoverage({})
+      return
+    }
 
     // Snapshot closure values so a stale response can never overwrite a newer one
-    const snapStats      = matchingStats
+    const snapStats = matchingStats
     const snapNumPeriods = numPeriods
-    const snapTracking   = tracking
-    const snapWed        = weekEndingDay ?? 5
-    const snapEnd        = periodEndDate
+    const snapTracking = tracking
+    const snapWed = weekEndingDay ?? 5
+    const snapEnd = periodEndDate
 
     // Build the periods array for the current window
     const endD = new Date(snapEnd + 'T00:00:00')
     const periods = []
     for (let i = snapNumPeriods - 1; i >= 0; i--) {
       const d = new Date(endD)
-      if      (snapTracking === 'daily')     d.setDate(d.getDate() - i)
-      else if (snapTracking === 'weekly')    d.setDate(d.getDate() - i * 7)
-      else if (snapTracking === 'monthly')   d.setMonth(endD.getMonth() - i)
+      if (snapTracking === 'daily') d.setDate(d.getDate() - i)
+      else if (snapTracking === 'weekly') d.setDate(d.getDate() - i * 7)
+      else if (snapTracking === 'monthly') d.setMonth(endD.getMonth() - i)
       else if (snapTracking === 'quarterly') d.setMonth(endD.getMonth() - i * 3)
-      else                                   d.setFullYear(endD.getFullYear() - i)
+      else d.setFullYear(endD.getFullYear() - i)
       periods.push(isoDate(d))
     }
     const startDate = periods[0]
 
     // Separate equation stats; for them, look up component stat IDs instead of their own
     const equationStats = snapStats.filter(s => s.stat_category === 'equation')
-    const regularStats  = snapStats.filter(s => s.stat_category !== 'equation')
-    const eqComponentIds = [...new Set(
-      equationStats.flatMap(s => (s.equation_parts || []).map(p => p.stat_id).filter(Boolean))
-    )]
+    const regularStats = snapStats.filter(s => s.stat_category !== 'equation')
+    const eqComponentIds = [
+      ...new Set(
+        equationStats.flatMap(s => (s.equation_parts || []).map(p => p.stat_id).filter(Boolean))
+      ),
+    ]
     const regularIds = regularStats.map(s => s.id)
     const allQueryIds = [...new Set([...regularIds, ...eqComponentIds])]
 
-    if (!allQueryIds.length) { setDataCoverage({}); return }
+    if (!allQueryIds.length) {
+      setDataCoverage({})
+      return
+    }
 
     setLoadingCoverage(true)
     supabase
@@ -4844,7 +6466,10 @@ function PrintMultipleView({ stats, weekEndingDay }) {
         // Equation stats: a period counts if ALL component stats have a value
         for (const s of equationStats) {
           const compIds = (s.equation_parts || []).map(p => p.stat_id).filter(Boolean)
-          if (!compIds.length) { coverage[s.id] = { found: 0, total: snapNumPeriods }; continue }
+          if (!compIds.length) {
+            coverage[s.id] = { found: 0, total: snapNumPeriods }
+            continue
+          }
           const found = periods.filter(p =>
             compIds.every(cid => {
               const cv = (vals || []).filter(v => v.statistic_id === cid)
@@ -4858,7 +6483,9 @@ function PrintMultipleView({ stats, weekEndingDay }) {
         setLoadingCoverage(false)
       })
 
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [matchingStats, periodEndDate, numPeriods, tracking, weekEndingDay])
 
   // ── Period label for header ───────────────────────────────────────────────
@@ -4879,7 +6506,7 @@ function PrintMultipleView({ stats, weekEndingDay }) {
         .order('period_date')
 
       const valuesByStatId = {}
-      for (const v of (allValues || [])) {
+      for (const v of allValues || []) {
         if (!valuesByStatId[v.statistic_id]) valuesByStatId[v.statistic_id] = []
         valuesByStatId[v.statistic_id].push(v)
       }
@@ -4889,19 +6516,19 @@ function PrintMultipleView({ stats, weekEndingDay }) {
       const periods = []
       for (let i = numPeriods - 1; i >= 0; i--) {
         const d = new Date(endD)
-        if      (tracking === 'daily')     d.setDate(d.getDate() - i)
-        else if (tracking === 'weekly')    d.setDate(d.getDate() - i * 7)
-        else if (tracking === 'monthly')   d.setMonth(endD.getMonth() - i)
+        if (tracking === 'daily') d.setDate(d.getDate() - i)
+        else if (tracking === 'weekly') d.setDate(d.getDate() - i * 7)
+        else if (tracking === 'monthly') d.setMonth(endD.getMonth() - i)
         else if (tracking === 'quarterly') d.setMonth(endD.getMonth() - i * 3)
-        else                               d.setFullYear(endD.getFullYear() - i)
+        else d.setFullYear(endD.getFullYear() - i)
         const ds = isoDate(d)
         periods.push({ date: ds, label: periodLabel(ds, tracking) })
       }
 
       // For each stat, build chart data + SVG
       const pages = statsToPrint.map(stat => {
-        const vals   = valuesByStatId[stat.id] || []
-        const wed    = weekEndingDay ?? 5
+        const vals = valuesByStatId[stat.id] || []
+        const wed = weekEndingDay ?? 5
         const chartData = periods.map(p => {
           const match = vals.find(v => matchesPeriod(v.period_date, p.date, tracking, wed))
           return { label: p.label, value: match ? Number(match.value) : null }
@@ -4914,9 +6541,11 @@ function PrintMultipleView({ stats, weekEndingDay }) {
 
       const isLandscape = orientation === 'landscape'
       const winW = isLandscape ? 1120 : 860
-      const winH = isLandscape ? 720  : 980
+      const winH = isLandscape ? 720 : 980
 
-      const pagesHTML = pages.map((p, idx) => `
+      const pagesHTML = pages
+        .map(
+          (p, idx) => `
         <div class="stat-page" ${idx === pages.length - 1 ? 'style="page-break-after:avoid"' : ''}>
           <div class="stat-header">
             <h2>${p.stat.name}</h2>
@@ -4924,7 +6553,8 @@ function PrintMultipleView({ stats, weekEndingDay }) {
           </div>
           <div class="chart-wrap">${p.svgHTML}</div>
         </div>`
-      ).join('')
+        )
+        .join('')
 
       const win = window.open('', '_blank', `width=${winW},height=${winH}`)
       win.document.write(`<!DOCTYPE html>
@@ -4969,7 +6599,7 @@ function PrintMultipleView({ stats, weekEndingDay }) {
 </head>
 <body>
   ${pagesHTML}
-  <script>window.onload = () => { window.print(); window.close(); }<\/script>
+  <script>window.onload = () => { window.print(); window.close(); }</script>
 </body>
 </html>`)
       win.document.close()
@@ -4978,12 +6608,12 @@ function PrintMultipleView({ stats, weekEndingDay }) {
     }
   }
 
-  const inputCls = 'w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-600'
+  const inputCls =
+    'w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-600'
   const labelCls = 'block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2.5'
 
   return (
     <div className="flex-1 flex overflow-hidden bg-gray-50">
-
       {/* ── Left: config panel (25% wider: 288px → 360px) ───────────────── */}
       <div className="w-[22.5rem] flex-shrink-0 flex flex-col bg-white border-r border-gray-200 overflow-y-auto">
         <div className="px-6 py-5 border-b border-gray-100 flex-shrink-0">
@@ -4992,7 +6622,6 @@ function PrintMultipleView({ stats, weekEndingDay }) {
         </div>
 
         <div className="px-6 py-6 flex-1 space-y-7">
-
           {/* Tracking type */}
           <div>
             <p className={labelCls}>Tracking Type</p>
@@ -5030,8 +6659,11 @@ function PrintMultipleView({ stats, weekEndingDay }) {
                 All
               </button>
               {groups.map(g => {
-                const cnt = (g.stat_ids || []).map(Number)
-                  .filter(id => activeStats.some(s => s.tracking === tracking && Number(s.id) === id)).length
+                const cnt = (g.stat_ids || [])
+                  .map(Number)
+                  .filter(id =>
+                    activeStats.some(s => s.tracking === tracking && Number(s.id) === id)
+                  ).length
                 return (
                   <button
                     key={g.id}
@@ -5060,17 +6692,29 @@ function PrintMultipleView({ stats, weekEndingDay }) {
             <div className="space-y-3">
               <div>
                 <label className="block text-xs text-gray-500 mb-1.5">Period Ending</label>
-                <select value={periodEndDate} onChange={e => setPeriodEndDate(e.target.value)} className={inputCls}>
+                <select
+                  value={periodEndDate}
+                  onChange={e => setPeriodEndDate(e.target.value)}
+                  className={inputCls}
+                >
                   {periodOpts.map(o => (
-                    <option key={o.date} value={o.date}>{o.label}</option>
+                    <option key={o.date} value={o.date}>
+                      {o.label}
+                    </option>
                   ))}
                 </select>
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1.5">Number of Periods</label>
-                <select value={numPeriods} onChange={e => setNumPeriods(Number(e.target.value))} className={inputCls}>
+                <select
+                  value={numPeriods}
+                  onChange={e => setNumPeriods(Number(e.target.value))}
+                  className={inputCls}
+                >
                   {NUM_PERIOD_OPTIONS.map(n => (
-                    <option key={n} value={n}>{n} periods</option>
+                    <option key={n} value={n}>
+                      {n} periods
+                    </option>
                   ))}
                 </select>
               </div>
@@ -5081,12 +6725,17 @@ function PrintMultipleView({ stats, weekEndingDay }) {
           <div>
             <p className={labelCls}>Orientation</p>
             <div className="grid grid-cols-2 gap-2.5">
-              {[['landscape', '⬛ Landscape'], ['portrait', '⬜ Portrait']].map(([val, lbl]) => (
+              {[
+                ['landscape', '⬛ Landscape'],
+                ['portrait', '⬜ Portrait'],
+              ].map(([val, lbl]) => (
                 <button
                   key={val}
                   onClick={() => setOrientation(val)}
                   className={`py-3 rounded-lg text-sm font-semibold border-2 transition-colors ${
-                    orientation === val ? 'text-white border-transparent' : 'text-gray-500 border-gray-200 hover:border-green-400'
+                    orientation === val
+                      ? 'text-white border-transparent'
+                      : 'text-gray-500 border-gray-200 hover:border-green-400'
                   }`}
                   style={orientation === val ? { backgroundColor: FG, borderColor: FG } : {}}
                 >
@@ -5095,13 +6744,11 @@ function PrintMultipleView({ stats, weekEndingDay }) {
               ))}
             </div>
           </div>
-
         </div>
       </div>
 
       {/* ── Right: stat checklist ────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden">
-
         {/* Header bar with Select All + Print button */}
         <div className="flex items-center justify-between px-6 py-3 bg-white border-b border-gray-200 flex-shrink-0">
           <div className="flex items-center gap-3">
@@ -5113,7 +6760,8 @@ function PrintMultipleView({ stats, weekEndingDay }) {
               {allSelected ? 'Deselect All' : 'Select All'}
             </button>
             <span className="text-xs text-gray-400">
-              {selectedIds.size} of {matchingStats.length} selected · {numPeriods} {tracking} periods ending {periodEndLabel} · {orientation}
+              {selectedIds.size} of {matchingStats.length} selected · {numPeriods} {tracking}{' '}
+              periods ending {periodEndLabel} · {orientation}
             </span>
           </div>
           <button
@@ -5123,7 +6771,9 @@ function PrintMultipleView({ stats, weekEndingDay }) {
             style={{ backgroundColor: FG }}
           >
             {printing ? (
-              <><span className="animate-spin">⏳</span> Preparing…</>
+              <>
+                <span className="animate-spin">⏳</span> Preparing…
+              </>
             ) : (
               `🖨️ Print ${statsToPrint.length} Chart${statsToPrint.length !== 1 ? 's' : ''}`
             )}
@@ -5143,13 +6793,16 @@ function PrintMultipleView({ stats, weekEndingDay }) {
               {/* Legend */}
               <div className="flex items-center gap-4 mb-3 text-xs text-gray-400">
                 <span className="flex items-center gap-1">
-                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-500"/>Complete
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-500" />
+                  Complete
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-400"/>Partial data
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-amber-400" />
+                  Partial data
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-400"/>No data
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-400" />
+                  No data
                 </span>
                 {loadingCoverage && <span className="text-gray-300 italic">checking…</span>}
               </div>
@@ -5158,13 +6811,16 @@ function PrintMultipleView({ stats, weekEndingDay }) {
                 {matchingStats.map(s => {
                   const cov = dataCoverage[s.id]
                   const isComplete = cov && cov.found === cov.total
-                  const isPartial  = cov && cov.found > 0 && cov.found < cov.total
-                  const isEmpty    = cov && cov.found === 0
+                  const isPartial = cov && cov.found > 0 && cov.found < cov.total
                   return (
                     <label
                       key={s.id}
                       className="flex items-center gap-3 px-4 py-3 bg-white rounded-xl border-2 cursor-pointer transition-colors"
-                      style={selectedIds.has(s.id) ? { borderColor: FG, backgroundColor: '#f0f7f0' } : { borderColor: '#e5e7eb' }}
+                      style={
+                        selectedIds.has(s.id)
+                          ? { borderColor: FG, backgroundColor: '#f0f7f0' }
+                          : { borderColor: '#e5e7eb' }
+                      }
                     >
                       <input
                         type="checkbox"
@@ -5172,18 +6828,26 @@ function PrintMultipleView({ stats, weekEndingDay }) {
                         onChange={() => toggleStat(s.id)}
                         className="w-4 h-4 rounded accent-green-700 flex-shrink-0"
                       />
-                      <span className="text-sm font-semibold text-gray-800 flex-1 min-w-0 truncate">{s.name}</span>
-                      <span className="text-xs text-gray-400 capitalize flex-shrink-0">{s.stat_type}</span>
+                      <span className="text-sm font-semibold text-gray-800 flex-1 min-w-0 truncate">
+                        {s.name}
+                      </span>
+                      <span className="text-xs text-gray-400 capitalize flex-shrink-0">
+                        {s.stat_type}
+                      </span>
                       {cov ? (
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${
-                          isComplete ? 'bg-green-100 text-green-700'
-                          : isPartial ? 'bg-amber-100 text-amber-700'
-                          : 'bg-red-100 text-red-700'
-                        }`}>
+                        <span
+                          className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${
+                            isComplete
+                              ? 'bg-green-100 text-green-700'
+                              : isPartial
+                                ? 'bg-amber-100 text-amber-700'
+                                : 'bg-red-100 text-red-700'
+                          }`}
+                        >
                           {isComplete ? '✓' : `${cov.found}/${cov.total}`}
                         </span>
                       ) : (
-                        <span className="w-10 flex-shrink-0"/>
+                        <span className="w-10 flex-shrink-0" />
                       )}
                     </label>
                   )
@@ -5201,17 +6865,19 @@ function PrintMultipleView({ stats, weekEndingDay }) {
 function StatGroups({ stats }) {
   const activeStats = (stats || []).filter(s => !s.archived)
 
-  const [groups,      setGroups]      = useState([])
-  const [loading,     setLoading]     = useState(true)
-  const [expandedId,  setExpandedId]  = useState(null)   // null | id | 'new'
-  const [editName,    setEditName]    = useState('')
-  const [editIds,     setEditIds]     = useState([])      // bigint ids as numbers
-  const [saving,      setSaving]      = useState(false)
-  const [deleting,    setDeleting]    = useState(null)
-  const [msg,         setMsg]         = useState(null)
-  const [search,      setSearch]      = useState('')
+  const [groups, setGroups] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [expandedId, setExpandedId] = useState(null) // null | id | 'new'
+  const [editName, setEditName] = useState('')
+  const [editIds, setEditIds] = useState([]) // bigint ids as numbers
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(null)
+  const [msg, setMsg] = useState(null)
+  const [search, setSearch] = useState('')
 
-  useEffect(() => { loadGroups() }, [])
+  useEffect(() => {
+    loadGroups()
+  }, [])
 
   async function loadGroups() {
     setLoading(true)
@@ -5244,20 +6910,22 @@ function StatGroups({ stats }) {
   }
 
   function toggleStat(id) {
-    setEditIds(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    )
+    setEditIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]))
   }
 
   async function save() {
-    if (!editName.trim()) { setMsg({ type: 'error', text: 'Group name is required.' }); return }
-    setSaving(true); setMsg(null)
+    if (!editName.trim()) {
+      setMsg({ type: 'error', text: 'Group name is required.' })
+      return
+    }
+    setSaving(true)
+    setMsg(null)
 
     if (expandedId === 'new') {
       const { data: row } = await supabase.from('company_settings').select('id').single()
       const { error } = await supabase.from('stat_groups').insert({
-        name:      editName.trim(),
-        stat_ids:  editIds,
+        name: editName.trim(),
+        stat_ids: editIds,
         sort_order: groups.length,
       })
       if (error) {
@@ -5268,7 +6936,8 @@ function StatGroups({ stats }) {
         setExpandedId(null)
       }
     } else {
-      const { error } = await supabase.from('stat_groups')
+      const { error } = await supabase
+        .from('stat_groups')
         .update({ name: editName.trim(), stat_ids: editIds })
         .eq('id', expandedId)
       if (error) {
@@ -5291,10 +6960,11 @@ function StatGroups({ stats }) {
     await loadGroups()
   }
 
-  const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600'
+  const inputCls =
+    'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600'
 
-  const filteredStats = activeStats.filter(s =>
-    !search || s.name.toLowerCase().includes(search.toLowerCase())
+  const filteredStats = activeStats.filter(
+    s => !search || s.name.toLowerCase().includes(search.toLowerCase())
   )
 
   return (
@@ -5302,7 +6972,9 @@ function StatGroups({ stats }) {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="font-semibold text-gray-800">Stat Groups</h3>
-          <p className="text-xs text-gray-400 mt-0.5">Create named groups to organize your statistics.</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Create named groups to organize your statistics.
+          </p>
         </div>
         {expandedId !== 'new' && (
           <button
@@ -5316,9 +6988,13 @@ function StatGroups({ stats }) {
       </div>
 
       {msg && (
-        <div className={`text-sm mb-4 rounded-lg px-3 py-2.5 ${
-          msg.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
-        }`}>
+        <div
+          className={`text-sm mb-4 rounded-lg px-3 py-2.5 ${
+            msg.type === 'success'
+              ? 'bg-green-50 text-green-700 border border-green-200'
+              : 'bg-red-50 text-red-700 border border-red-200'
+          }`}
+        >
           {msg.text}
         </div>
       )}
@@ -5339,7 +7015,8 @@ function StatGroups({ stats }) {
           </div>
           <div className="mb-4">
             <label className="block text-xs font-semibold text-gray-600 mb-2">
-              Statistics in this group <span className="text-gray-400 font-normal">({editIds.length} selected)</span>
+              Statistics in this group{' '}
+              <span className="text-gray-400 font-normal">({editIds.length} selected)</span>
             </label>
             <input
               type="text"
@@ -5351,30 +7028,42 @@ function StatGroups({ stats }) {
             <div className="border border-gray-200 rounded-lg bg-white max-h-52 overflow-y-auto divide-y divide-gray-50">
               {filteredStats.length === 0 ? (
                 <p className="px-3 py-3 text-sm text-gray-400 text-center">No stats match.</p>
-              ) : filteredStats.map(s => (
-                <label key={s.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50">
-                  <input
-                    type="checkbox"
-                    checked={editIds.includes(Number(s.id))}
-                    onChange={() => toggleStat(Number(s.id))}
-                    className="w-4 h-4 rounded accent-green-700 flex-shrink-0"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-gray-800 truncate">{s.name}</div>
-                    <div className="text-xs text-gray-400 capitalize">{s.tracking} · {s.stat_type}</div>
-                  </div>
-                </label>
-              ))}
+              ) : (
+                filteredStats.map(s => (
+                  <label
+                    key={s.id}
+                    className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={editIds.includes(Number(s.id))}
+                      onChange={() => toggleStat(Number(s.id))}
+                      className="w-4 h-4 rounded accent-green-700 flex-shrink-0"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-gray-800 truncate">{s.name}</div>
+                      <div className="text-xs text-gray-400 capitalize">
+                        {s.tracking} · {s.stat_type}
+                      </div>
+                    </div>
+                  </label>
+                ))
+              )}
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={save} disabled={saving}
+            <button
+              onClick={save}
+              disabled={saving}
               className="px-4 py-2 rounded-lg text-sm font-bold text-white disabled:opacity-50"
-              style={{ backgroundColor: FG }}>
+              style={{ backgroundColor: FG }}
+            >
               {saving ? 'Saving…' : 'Create Group'}
             </button>
-            <button onClick={cancelEdit}
-              className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-600 hover:bg-gray-50">
+            <button
+              onClick={cancelEdit}
+              className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-600 hover:bg-gray-50"
+            >
               Cancel
             </button>
           </div>
@@ -5389,25 +7078,34 @@ function StatGroups({ stats }) {
       ) : groups.length === 0 && expandedId !== 'new' ? (
         <div className="card text-center py-10">
           <div className="text-3xl mb-2">📂</div>
-          <p className="text-sm text-gray-500">No groups yet — click <strong>+ New Group</strong> to create one.</p>
+          <p className="text-sm text-gray-500">
+            No groups yet — click <strong>+ New Group</strong> to create one.
+          </p>
         </div>
       ) : (
         <div className="card p-0 overflow-hidden">
-          {groups.map((g, gi) => {
-            const memberStats = activeStats.filter(s => (g.stat_ids || []).map(Number).includes(Number(s.id)))
-            const isEditing   = expandedId === g.id
+          {groups.map(g => {
+            const memberStats = activeStats.filter(s =>
+              (g.stat_ids || []).map(Number).includes(Number(s.id))
+            )
+            const isEditing = expandedId === g.id
             return (
-              <div key={g.id} className={`border-b border-gray-100 last:border-0 ${isEditing ? 'bg-green-50/20' : ''}`}>
+              <div
+                key={g.id}
+                className={`border-b border-gray-100 last:border-0 ${isEditing ? 'bg-green-50/20' : ''}`}
+              >
                 {/* Row header */}
                 <div className="flex items-center gap-3 px-4 py-3">
                   <button
-                    onClick={() => isEditing ? cancelEdit() : openEdit(g)}
+                    onClick={() => (isEditing ? cancelEdit() : openEdit(g))}
                     className="flex-1 text-left flex items-center gap-3"
                   >
                     <span className="text-gray-400 text-xs w-3">{isEditing ? '▾' : '▸'}</span>
                     <div>
                       <div className="font-semibold text-gray-800 text-sm">{g.name}</div>
-                      <div className="text-xs text-gray-400">{memberStats.length} stat{memberStats.length !== 1 ? 's' : ''}</div>
+                      <div className="text-xs text-gray-400">
+                        {memberStats.length} stat{memberStats.length !== 1 ? 's' : ''}
+                      </div>
                     </div>
                   </button>
                   {!isEditing && (
@@ -5426,7 +7124,9 @@ function StatGroups({ stats }) {
                 {isEditing && (
                   <div className="px-4 pb-4 space-y-3">
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 mb-1">Group Name</label>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">
+                        Group Name
+                      </label>
                       <input
                         className={inputCls}
                         value={editName}
@@ -5436,7 +7136,10 @@ function StatGroups({ stats }) {
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-600 mb-2">
-                        Statistics <span className="text-gray-400 font-normal">({editIds.length} selected)</span>
+                        Statistics{' '}
+                        <span className="text-gray-400 font-normal">
+                          ({editIds.length} selected)
+                        </span>
                       </label>
                       <input
                         type="text"
@@ -5447,40 +7150,65 @@ function StatGroups({ stats }) {
                       />
                       <div className="border border-gray-200 rounded-lg bg-white max-h-52 overflow-y-auto divide-y divide-gray-50">
                         {filteredStats.length === 0 ? (
-                          <p className="px-3 py-3 text-sm text-gray-400 text-center">No stats match.</p>
-                        ) : filteredStats.map(s => (
-                          <label key={s.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50">
-                            <input
-                              type="checkbox"
-                              checked={editIds.includes(Number(s.id))}
-                              onChange={() => toggleStat(Number(s.id))}
-                              className="w-4 h-4 rounded accent-green-700 flex-shrink-0"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <div className="text-sm font-medium text-gray-800 truncate">{s.name}</div>
-                              <div className="text-xs text-gray-400 capitalize">{s.tracking} · {s.stat_type}</div>
-                            </div>
-                          </label>
-                        ))}
+                          <p className="px-3 py-3 text-sm text-gray-400 text-center">
+                            No stats match.
+                          </p>
+                        ) : (
+                          filteredStats.map(s => (
+                            <label
+                              key={s.id}
+                              className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={editIds.includes(Number(s.id))}
+                                onChange={() => toggleStat(Number(s.id))}
+                                className="w-4 h-4 rounded accent-green-700 flex-shrink-0"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="text-sm font-medium text-gray-800 truncate">
+                                  {s.name}
+                                </div>
+                                <div className="text-xs text-gray-400 capitalize">
+                                  {s.tracking} · {s.stat_type}
+                                </div>
+                              </div>
+                            </label>
+                          ))
+                        )}
                       </div>
                     </div>
                     {msg && expandedId === g.id && (
-                      <div className={`text-sm rounded-lg px-3 py-2 ${
-                        msg.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
-                      }`}>{msg.text}</div>
+                      <div
+                        className={`text-sm rounded-lg px-3 py-2 ${
+                          msg.type === 'success'
+                            ? 'bg-green-50 text-green-700 border border-green-200'
+                            : 'bg-red-50 text-red-700 border border-red-200'
+                        }`}
+                      >
+                        {msg.text}
+                      </div>
                     )}
                     <div className="flex gap-2">
-                      <button onClick={save} disabled={saving}
+                      <button
+                        onClick={save}
+                        disabled={saving}
                         className="px-4 py-2 rounded-lg text-sm font-bold text-white disabled:opacity-50"
-                        style={{ backgroundColor: FG }}>
+                        style={{ backgroundColor: FG }}
+                      >
                         {saving ? 'Saving…' : 'Save'}
                       </button>
-                      <button onClick={cancelEdit}
-                        className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-600 hover:bg-gray-50">
+                      <button
+                        onClick={cancelEdit}
+                        className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-600 hover:bg-gray-50"
+                      >
                         Cancel
                       </button>
-                      <button onClick={() => deleteGroup(g.id)} disabled={deleting === g.id}
-                        className="ml-auto px-4 py-2 rounded-lg border border-red-200 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-40">
+                      <button
+                        onClick={() => deleteGroup(g.id)}
+                        disabled={deleting === g.id}
+                        className="ml-auto px-4 py-2 rounded-lg border border-red-200 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-40"
+                      >
                         {deleting === g.id ? 'Deleting…' : 'Delete Group'}
                       </button>
                     </div>
@@ -5497,29 +7225,46 @@ function StatGroups({ stats }) {
 
 // ── StatisticsSettingsView ────────────────────────────────────────────────────
 const WEEK_DAYS = [
-  { value: 0, label: 'Sunday'    },
-  { value: 1, label: 'Monday'    },
-  { value: 2, label: 'Tuesday'   },
+  { value: 0, label: 'Sunday' },
+  { value: 1, label: 'Monday' },
+  { value: 2, label: 'Tuesday' },
   { value: 3, label: 'Wednesday' },
-  { value: 4, label: 'Thursday'  },
-  { value: 5, label: 'Friday'    },
-  { value: 6, label: 'Saturday'  },
+  { value: 4, label: 'Thursday' },
+  { value: 5, label: 'Friday' },
+  { value: 6, label: 'Saturday' },
 ]
 
-function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, profiles, isAdmin, onEditStat, onRestored, showStatArchiveFolder, onShowStatArchiveFolderChange }) {
+function StatisticsSettingsView({
+  weekEndingDay,
+  onWeekEndingDayChange,
+  stats,
+  profiles,
+  isAdmin,
+  onEditStat,
+  onRestored,
+  showStatArchiveFolder,
+  onShowStatArchiveFolderChange,
+}) {
   const [settingsSubTab, setSettingsSubTab] = useState('tracking')
 
-  const [wedDay,   setWedDay]   = useState(weekEndingDay ?? 5)
-  const [saving,   setSaving]   = useState(false)
-  const [msg,      setMsg]      = useState(null)
+  const [wedDay, setWedDay] = useState(weekEndingDay ?? 5)
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState(null)
 
   // Keep local state in sync if parent changes
-  useEffect(() => { if (weekEndingDay !== null) setWedDay(weekEndingDay) }, [weekEndingDay])
+  useEffect(() => {
+    if (weekEndingDay !== null) setWedDay(weekEndingDay)
+  }, [weekEndingDay])
 
   async function handleSave() {
-    setSaving(true); setMsg(null)
+    setSaving(true)
+    setMsg(null)
     const { data: row } = await supabase.from('company_settings').select('id').single()
-    if (!row?.id) { setMsg({ type: 'error', text: 'Could not find company settings record.' }); setSaving(false); return }
+    if (!row?.id) {
+      setMsg({ type: 'error', text: 'Could not find company settings record.' })
+      setSaving(false)
+      return
+    }
     const { error } = await supabase
       .from('company_settings')
       .update({ week_ending_day: wedDay, updated_at: new Date().toISOString() })
@@ -5535,17 +7280,18 @@ function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, p
   }
 
   const SUB_TABS = [
-    { key: 'tracking',   label: '📅 Tracking' },
-    { key: 'general',    label: '📖 General' },
-    { key: 'groups',     label: '📂 Stat Groups' },
+    { key: 'tracking', label: '📅 Tracking' },
+    { key: 'general', label: '📖 General' },
+    { key: 'groups', label: '📂 Stat Groups' },
     ...(isAdmin ? [{ key: 'reminders', label: '🔔 Reminders' }] : []),
-    ...(isAdmin ? [{ key: 'master',    label: '👑 Master' }] : []),
-    ...(isAdmin ? [{ key: 'archive',   label: '📦 Archive' }] : []),
+    ...(isAdmin ? [{ key: 'master', label: '👑 Master' }] : []),
+    ...(isAdmin ? [{ key: 'archive', label: '📦 Archive' }] : []),
   ]
 
   // Helper for the Master tab: turn a stat's owner_user_id into a display name.
   function ownerLabel(stat) {
-    if (stat?.owner_type === 'position' && stat.owner_position_id) return 'Position #' + stat.owner_position_id
+    if (stat?.owner_type === 'position' && stat.owner_position_id)
+      return 'Position #' + stat.owner_position_id
     if (!stat?.owner_user_id) return '—'
     const p = (profiles || []).find(x => x.id === stat.owner_user_id)
     return p?.full_name || (p?.email ? p.email.split('@')[0] : '—')
@@ -5560,18 +7306,23 @@ function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, p
     []
   )
   const masterCurrent = useMemo(
-    () => (stats || []).filter(s => !s.archived).sort((a, b) => masterCollator.compare(a.name || '', b.name || '')),
+    () =>
+      (stats || [])
+        .filter(s => !s.archived)
+        .sort((a, b) => masterCollator.compare(a.name || '', b.name || '')),
     [stats, masterCollator]
   )
   const masterArchive = useMemo(
-    () => (stats || []).filter(s =>  s.archived).sort((a, b) => masterCollator.compare(a.name || '', b.name || '')),
+    () =>
+      (stats || [])
+        .filter(s => s.archived)
+        .sort((a, b) => masterCollator.compare(a.name || '', b.name || '')),
     [stats, masterCollator]
   )
   const masterStats = masterSubTab === 'archive' ? masterArchive : masterCurrent
 
   return (
     <div className="flex-1 overflow-y-auto bg-gray-50">
-
       {/* Sub-tab bar */}
       <div className="flex border-b border-gray-200 bg-white px-6">
         {SUB_TABS.map(t => (
@@ -5590,220 +7341,282 @@ function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, p
       </div>
 
       <div className="px-6 py-6">
-      {/* The Master sub-tab needs the full width — its table has 5 columns
+        {/* The Master sub-tab needs the full width — its table has 5 columns
           and gets clipped by the narrow max-w-xl that's used for the
           settings forms. */}
-      <div className={settingsSubTab === 'master' || settingsSubTab === 'reminders' ? '' : 'max-w-xl'}>
+        <div
+          className={
+            settingsSubTab === 'master' || settingsSubTab === 'reminders' ? '' : 'max-w-xl'
+          }
+        >
+          {/* ── TRACKING SUB-TAB ── */}
+          {settingsSubTab === 'tracking' && (
+            <>
+              {/* Weekly Settings */}
+              <div className="card mb-5">
+                <h3 className="font-semibold text-gray-800 mb-0.5">Weekly Tracking</h3>
+                <p className="text-xs text-gray-400 mb-4">
+                  Choose which day of the week your week-ending date falls on. This affects how
+                  weekly stat values are grouped and displayed on charts.
+                </p>
 
-        {/* ── TRACKING SUB-TAB ── */}
-        {settingsSubTab === 'tracking' && (
-          <>
-            {/* Weekly Settings */}
-            <div className="card mb-5">
-              <h3 className="font-semibold text-gray-800 mb-0.5">Weekly Tracking</h3>
-              <p className="text-xs text-gray-400 mb-4">Choose which day of the week your week-ending date falls on. This affects how weekly stat values are grouped and displayed on charts.</p>
+                <label className="label">Week Ending Day</label>
+                <div className="grid grid-cols-7 gap-1 mb-4">
+                  {WEEK_DAYS.map(d => (
+                    <button
+                      key={d.value}
+                      onClick={() => setWedDay(d.value)}
+                      className={`py-2 rounded-lg text-xs font-semibold text-center transition-colors border-2 ${
+                        wedDay === d.value
+                          ? 'text-white border-transparent'
+                          : 'text-gray-500 border-gray-200 hover:border-green-400 hover:text-green-700'
+                      }`}
+                      style={wedDay === d.value ? { backgroundColor: FG, borderColor: FG } : {}}
+                    >
+                      {d.label.slice(0, 3)}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400">
+                  Currently set to:{' '}
+                  <strong>{WEEK_DAYS.find(d => d.value === wedDay)?.label ?? '—'}</strong>
+                  &nbsp;· Week-ending dates will be labeled "W/E{' '}
+                  {WEEK_DAYS.find(d => d.value === wedDay)?.label ?? '…'}"
+                </p>
+              </div>
 
-              <label className="label">Week Ending Day</label>
-              <div className="grid grid-cols-7 gap-1 mb-4">
-                {WEEK_DAYS.map(d => (
+              {/* How periods work */}
+              <div className="card bg-green-50 border-green-200 mb-5">
+                <h3 className="font-semibold text-green-900 mb-2">How Tracking Periods Work</h3>
+                <div className="text-xs text-green-800 space-y-1.5">
+                  <p>
+                    <strong>Daily</strong> — one value per calendar day (YYYY-MM-DD)
+                  </p>
+                  <p>
+                    <strong>Weekly</strong> — one value per week, keyed to the week-ending day
+                    selected above
+                  </p>
+                  <p>
+                    <strong>Monthly</strong> — one value per calendar month (first day of month)
+                  </p>
+                  <p>
+                    <strong>Quarterly</strong> — one value per quarter (Jan 1, Apr 1, Jul 1, Oct 1)
+                  </p>
+                  <p>
+                    <strong>Yearly</strong> — one value per year (Jan 1)
+                  </p>
+                  <hr className="border-green-200 my-2" />
+                  <p>
+                    <strong>Default Periods</strong> — set per stat in Edit Statistic → controls how
+                    many periods show on the chart by default when you switch to that stat.
+                  </p>
+                </div>
+              </div>
+
+              {/* Save */}
+              {msg && (
+                <div
+                  className={`text-sm mb-4 rounded-lg px-3 py-2.5 ${
+                    msg.type === 'success'
+                      ? 'bg-green-50 text-green-700 border border-green-200'
+                      : 'bg-red-50 text-red-700 border border-red-200'
+                  }`}
+                >
+                  {msg.text}
+                </div>
+              )}
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="btn-primary px-6 disabled:opacity-50"
+              >
+                {saving ? 'Saving…' : 'Save Settings'}
+              </button>
+            </>
+          )}
+
+          {/* ── GENERAL SUB-TAB ── */}
+          {settingsSubTab === 'general' && (
+            <>
+              {/* Stat Types */}
+              <div className="card bg-blue-50 border-blue-200 mb-6">
+                <h3 className="font-semibold text-blue-900 mb-2">Stat Type Reference</h3>
+                <div className="text-xs text-blue-800 space-y-1.5">
+                  <p>
+                    <strong>Currency ($)</strong> — displayed as dollars with 2 decimal places (e.g.
+                    $48,500.00)
+                  </p>
+                  <p>
+                    <strong>Numeric (#)</strong> — plain number with up to 2 decimal places (e.g.
+                    1,240.5)
+                  </p>
+                  <p>
+                    <strong>Percentage (%)</strong> — displayed with a % suffix (e.g. 94.30%)
+                  </p>
+                  <hr className="border-blue-200 my-2" />
+                  <p>
+                    <strong>Inverted (↕)</strong> — reverses the good/bad color coding on the chart.
+                    Useful for stats where a lower number is better (e.g. defect rate, days
+                    overdue).
+                  </p>
+                </div>
+              </div>
+
+              {/* Sidebar archive folder toggle (admin-only) */}
+              {isAdmin && (
+                <div className="card mb-6">
+                  <h3 className="font-semibold text-gray-800 mb-1">Statistics Sidebar Folders</h3>
+                  <p className="text-xs text-gray-400 mb-3">
+                    When ON, the left sidebar shows two folder buttons (<strong>All Stats</strong> +{' '}
+                    <strong>Archived</strong>). When OFF, archived stats are hidden and the sidebar
+                    shows a single flat list — no folder buttons at all.
+                  </p>
+                  <label className="flex items-center gap-3 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={!!showStatArchiveFolder}
+                      onChange={async e => {
+                        const v = e.target.checked
+                        onShowStatArchiveFolderChange?.(v)
+                        const { data: row } = await supabase
+                          .from('company_settings')
+                          .select('id')
+                          .single()
+                        if (row?.id) {
+                          await supabase
+                            .from('company_settings')
+                            .update({
+                              show_stat_archive_folder: v,
+                              updated_at: new Date().toISOString(),
+                            })
+                            .eq('id', row.id)
+                        }
+                      }}
+                      className="w-4 h-4 rounded accent-green-700"
+                    />
+                    <span className="text-sm text-gray-700">
+                      Show <strong>Archived</strong> folder in the stats sidebar
+                    </span>
+                  </label>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── STAT GROUPS SUB-TAB ── */}
+          {settingsSubTab === 'groups' && <StatGroups stats={stats} />}
+
+          {/* ── MASTER SUB-TAB — admin-only listing of every stat ── */}
+          {settingsSubTab === 'master' && isAdmin && (
+            <div className="p-6">
+              {/* Current / Archive switch */}
+              <div className="flex items-center gap-2 mb-4">
+                {[
+                  { key: 'current', label: `Current (${masterCurrent.length})` },
+                  { key: 'archive', label: `Archive (${masterArchive.length})` },
+                ].map(t => (
                   <button
-                    key={d.value}
-                    onClick={() => setWedDay(d.value)}
-                    className={`py-2 rounded-lg text-xs font-semibold text-center transition-colors border-2 ${
-                      wedDay === d.value
-                        ? 'text-white border-transparent'
-                        : 'text-gray-500 border-gray-200 hover:border-green-400 hover:text-green-700'
+                    key={t.key}
+                    onClick={() => setMasterSubTab(t.key)}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-lg border-2 transition-colors ${
+                      masterSubTab === t.key
+                        ? 'bg-green-700 text-white border-green-700'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-green-500'
                     }`}
-                    style={wedDay === d.value ? { backgroundColor: FG, borderColor: FG } : {}}
                   >
-                    {d.label.slice(0, 3)}
+                    {t.label}
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-gray-400">
-                Currently set to: <strong>{WEEK_DAYS.find(d => d.value === wedDay)?.label ?? '—'}</strong>
-                &nbsp;· Week-ending dates will be labeled "W/E {WEEK_DAYS.find(d => d.value === wedDay)?.label ?? '…'}"
-              </p>
-            </div>
-
-            {/* How periods work */}
-            <div className="card bg-green-50 border-green-200 mb-5">
-              <h3 className="font-semibold text-green-900 mb-2">How Tracking Periods Work</h3>
-              <div className="text-xs text-green-800 space-y-1.5">
-                <p><strong>Daily</strong> — one value per calendar day (YYYY-MM-DD)</p>
-                <p><strong>Weekly</strong> — one value per week, keyed to the week-ending day selected above</p>
-                <p><strong>Monthly</strong> — one value per calendar month (first day of month)</p>
-                <p><strong>Quarterly</strong> — one value per quarter (Jan 1, Apr 1, Jul 1, Oct 1)</p>
-                <p><strong>Yearly</strong> — one value per year (Jan 1)</p>
-                <hr className="border-green-200 my-2" />
-                <p><strong>Default Periods</strong> — set per stat in Edit Statistic → controls how many periods show on the chart by default when you switch to that stat.</p>
-              </div>
-            </div>
-
-            {/* Save */}
-            {msg && (
-              <div className={`text-sm mb-4 rounded-lg px-3 py-2.5 ${
-                msg.type === 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
-              }`}>
-                {msg.text}
-              </div>
-            )}
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="btn-primary px-6 disabled:opacity-50"
-            >
-              {saving ? 'Saving…' : 'Save Settings'}
-            </button>
-          </>
-        )}
-
-        {/* ── GENERAL SUB-TAB ── */}
-        {settingsSubTab === 'general' && (
-          <>
-            {/* Stat Types */}
-            <div className="card bg-blue-50 border-blue-200 mb-6">
-              <h3 className="font-semibold text-blue-900 mb-2">Stat Type Reference</h3>
-              <div className="text-xs text-blue-800 space-y-1.5">
-                <p><strong>Currency ($)</strong> — displayed as dollars with 2 decimal places (e.g. $48,500.00)</p>
-                <p><strong>Numeric (#)</strong> — plain number with up to 2 decimal places (e.g. 1,240.5)</p>
-                <p><strong>Percentage (%)</strong> — displayed with a % suffix (e.g. 94.30%)</p>
-                <hr className="border-blue-200 my-2" />
-                <p><strong>Inverted (↕)</strong> — reverses the good/bad color coding on the chart. Useful for stats where a lower number is better (e.g. defect rate, days overdue).</p>
-              </div>
-            </div>
-
-            {/* Sidebar archive folder toggle (admin-only) */}
-            {isAdmin && (
-              <div className="card mb-6">
-                <h3 className="font-semibold text-gray-800 mb-1">Statistics Sidebar Folders</h3>
-                <p className="text-xs text-gray-400 mb-3">
-                  When ON, the left sidebar shows two folder buttons (<strong>All Stats</strong> + <strong>Archived</strong>).
-                  When OFF, archived stats are hidden and the sidebar shows a single flat list — no folder buttons at all.
-                </p>
-                <label className="flex items-center gap-3 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={!!showStatArchiveFolder}
-                    onChange={async (e) => {
-                      const v = e.target.checked
-                      onShowStatArchiveFolderChange?.(v)
-                      const { data: row } = await supabase.from('company_settings').select('id').single()
-                      if (row?.id) {
-                        await supabase.from('company_settings')
-                          .update({ show_stat_archive_folder: v, updated_at: new Date().toISOString() })
-                          .eq('id', row.id)
-                      }
-                    }}
-                    className="w-4 h-4 rounded accent-green-700"
-                  />
-                  <span className="text-sm text-gray-700">Show <strong>Archived</strong> folder in the stats sidebar</span>
-                </label>
-              </div>
-            )}
-
-          </>
-        )}
-
-        {/* ── STAT GROUPS SUB-TAB ── */}
-        {settingsSubTab === 'groups' && (
-          <StatGroups stats={stats} />
-        )}
-
-        {/* ── MASTER SUB-TAB — admin-only listing of every stat ── */}
-        {settingsSubTab === 'master' && isAdmin && (
-          <div className="p-6">
-            {/* Current / Archive switch */}
-            <div className="flex items-center gap-2 mb-4">
-              {[
-                { key: 'current', label: `Current (${masterCurrent.length})` },
-                { key: 'archive', label: `Archive (${masterArchive.length})` },
-              ].map(t => (
-                <button
-                  key={t.key}
-                  onClick={() => setMasterSubTab(t.key)}
-                  className={`px-4 py-1.5 text-sm font-medium rounded-lg border-2 transition-colors ${
-                    masterSubTab === t.key
-                      ? 'bg-green-700 text-white border-green-700'
-                      : 'bg-white text-gray-600 border-gray-200 hover:border-green-500'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-            {/* Master tab breaks out of the settings max-w-xl wrapper so the
+              {/* Master tab breaks out of the settings max-w-xl wrapper so the
                 table can use the full panel width. overflow-x-auto still
                 allows scrolling on very narrow viewports. */}
-            <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-              <table className="text-sm w-full min-w-[60rem]">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr className="text-xs uppercase tracking-wide text-gray-500">
-                    {/* Name column is ~50% wider than the default auto-fit and
+              <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+                <table className="text-sm w-full min-w-[60rem]">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr className="text-xs uppercase tracking-wide text-gray-500">
+                      {/* Name column is ~50% wider than the default auto-fit and
                         allows long stat names to wrap onto multiple lines. */}
-                    <th className="text-left px-4 py-2 font-semibold w-[42%] min-w-[20rem]">Name</th>
-                    <th className="text-left px-3 py-2 font-semibold">Category</th>
-                    <th className="text-left px-3 py-2 font-semibold">Tracking</th>
-                    <th className="text-left px-3 py-2 font-semibold">Owner</th>
-                    <th className="text-center px-3 py-2 font-semibold">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {masterStats.length === 0 && (
-                    <tr><td colSpan={5} className="text-center py-12 text-gray-400">
-                      {masterSubTab === 'archive' ? 'No archived statistics.' : 'No statistics defined.'}
-                    </td></tr>
-                  )}
-                  {masterStats.map(s => (
-                    <tr
-                      key={s.id}
-                      onClick={() => onEditStat?.(s)}
-                      className="hover:bg-green-50/40 cursor-pointer transition-colors"
-                      title="Click to edit"
-                    >
-                      <td className="px-4 py-2 font-medium text-gray-900 break-words whitespace-normal">
-                        {s.name}
-                        {s.stat_category === 'equation' && (
-                          <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-semibold">∑</span>
-                        )}
-                        {s.stat_category === 'overlay' && (
-                          <span className="ml-2 text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-semibold">⊕</span>
-                        )}
-                        {s.stat_category === 'auto_internal' && (
-                          <span className="ml-2 text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-semibold">⚡ Auto</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-gray-600 capitalize">{s.stat_category || s.stat_type || '—'}</td>
-                      <td className="px-3 py-2 text-gray-600 capitalize">{s.tracking || '—'}</td>
-                      <td className="px-3 py-2 text-gray-600">{ownerLabel(s)}</td>
-                      <td className="px-3 py-2 text-center">
-                        {s.archived ? (
-                          <span className="text-[11px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">Archived</span>
-                        ) : (
-                          <span className="text-[11px] bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-medium">Active</span>
-                        )}
-                      </td>
+                      <th className="text-left px-4 py-2 font-semibold w-[42%] min-w-[20rem]">
+                        Name
+                      </th>
+                      <th className="text-left px-3 py-2 font-semibold">Category</th>
+                      <th className="text-left px-3 py-2 font-semibold">Tracking</th>
+                      <th className="text-left px-3 py-2 font-semibold">Owner</th>
+                      <th className="text-center px-3 py-2 font-semibold">Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {masterStats.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="text-center py-12 text-gray-400">
+                          {masterSubTab === 'archive'
+                            ? 'No archived statistics.'
+                            : 'No statistics defined.'}
+                        </td>
+                      </tr>
+                    )}
+                    {masterStats.map(s => (
+                      <tr
+                        key={s.id}
+                        onClick={() => onEditStat?.(s)}
+                        className="hover:bg-green-50/40 cursor-pointer transition-colors"
+                        title="Click to edit"
+                      >
+                        <td className="px-4 py-2 font-medium text-gray-900 break-words whitespace-normal">
+                          {s.name}
+                          {s.stat_category === 'equation' && (
+                            <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-semibold">
+                              ∑
+                            </span>
+                          )}
+                          {s.stat_category === 'overlay' && (
+                            <span className="ml-2 text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-semibold">
+                              ⊕
+                            </span>
+                          )}
+                          {s.stat_category === 'auto_internal' && (
+                            <span className="ml-2 text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-semibold">
+                              ⚡ Auto
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-gray-600 capitalize">
+                          {s.stat_category || s.stat_type || '—'}
+                        </td>
+                        <td className="px-3 py-2 text-gray-600 capitalize">{s.tracking || '—'}</td>
+                        <td className="px-3 py-2 text-gray-600">{ownerLabel(s)}</td>
+                        <td className="px-3 py-2 text-center">
+                          {s.archived ? (
+                            <span className="text-[11px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
+                              Archived
+                            </span>
+                          ) : (
+                            <span className="text-[11px] bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                              Active
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-gray-400 mt-3">
+                Showing {masterStats.length} {masterSubTab === 'archive' ? 'archived' : 'current'}{' '}
+                statistic{masterStats.length === 1 ? '' : 's'}, sorted alphabetically. Click any row
+                to open its edit modal.
+              </p>
             </div>
-            <p className="text-xs text-gray-400 mt-3">
-              Showing {masterStats.length} {masterSubTab === 'archive' ? 'archived' : 'current'} statistic{masterStats.length === 1 ? '' : 's'}, sorted alphabetically. Click any row to open its edit modal.
-            </p>
-          </div>
-        )}
+          )}
 
-        {/* ── ARCHIVE SUB-TAB — admin-only archived-stats list ── */}
-        {settingsSubTab === 'reminders' && isAdmin && (
-          <RemindersSettingsTab stats={stats} profiles={profiles} />
-        )}
+          {/* ── ARCHIVE SUB-TAB — admin-only archived-stats list ── */}
+          {settingsSubTab === 'reminders' && isAdmin && (
+            <RemindersSettingsTab stats={stats} profiles={profiles} />
+          )}
 
-        {settingsSubTab === 'archive' && isAdmin && (
-          <ArchivedView onRestored={onRestored} />
-        )}
-
-      </div>
+          {settingsSubTab === 'archive' && isAdmin && <ArchivedView onRestored={onRestored} />}
+        </div>
       </div>
     </div>
   )
@@ -5811,39 +7624,51 @@ function StatisticsSettingsView({ weekEndingDay, onWeekEndingDayChange, stats, p
 
 // ── RemindersSettingsTab ──────────────────────────────────────────────────────
 function RemindersSettingsTab({ stats, profiles }) {
-  const [reminders, setReminders] = useState({})   // { [statistic_id]: row }
-  const [saving,    setSaving]    = useState({})    // { [statistic_id]: bool }
-  const [msg,       setMsg]       = useState({})    // { [statistic_id]: 'ok'|'error' }
-  const [loading,   setLoading]   = useState(true)
+  const [reminders, setReminders] = useState({}) // { [statistic_id]: row }
+  const [saving, setSaving] = useState({}) // { [statistic_id]: bool }
+  const [msg, setMsg] = useState({}) // { [statistic_id]: 'ok'|'error' }
+  const [loading, setLoading] = useState(true)
 
   const manualStats = useMemo(
-    () => (stats || []).filter(s => !s.archived).sort((a, b) => (a.name || '').localeCompare(b.name || '')),
+    () =>
+      (stats || [])
+        .filter(s => !s.archived)
+        .sort((a, b) => (a.name || '').localeCompare(b.name || '')),
     [stats]
   )
 
-  useEffect(() => { loadReminders() }, [manualStats])
+  useEffect(() => {
+    loadReminders()
+  }, [manualStats])
 
   async function loadReminders() {
-    if (!manualStats.length) { setLoading(false); return }
+    if (!manualStats.length) {
+      setLoading(false)
+      return
+    }
     const ids = manualStats.map(s => s.id)
     const { data } = await supabase.from('stat_reminders').select('*').in('statistic_id', ids)
     const map = {}
-    ;(data || []).forEach(r => { map[r.statistic_id] = r })
+    ;(data || []).forEach(r => {
+      map[r.statistic_id] = r
+    })
     setReminders(map)
     setLoading(false)
   }
 
   function getReminder(statId) {
-    return reminders[statId] || {
-      statistic_id:   statId,
-      enabled:        false,
-      delay_days:     3,
-      notify_email:   true,
-      notify_sms:     false,
-      repeat_enabled: false,
-      repeat_value:   1,
-      repeat_unit:    'weeks',
-    }
+    return (
+      reminders[statId] || {
+        statistic_id: statId,
+        enabled: false,
+        delay_days: 3,
+        notify_email: true,
+        notify_sms: false,
+        repeat_enabled: false,
+        repeat_value: 1,
+        repeat_unit: 'weeks',
+      }
+    )
   }
 
   function update(statId, patch) {
@@ -5858,28 +7683,34 @@ function RemindersSettingsTab({ stats, profiles }) {
     // If a patch is provided (e.g. from toggle), apply it to the current row
     // synchronously so we don't depend on state having flushed yet.
     const base = reminders[statId] || {
-      statistic_id:   statId,
-      enabled:        false,
-      delay_days:     3,
-      notify_email:   true,
-      notify_sms:     false,
+      statistic_id: statId,
+      enabled: false,
+      delay_days: 3,
+      notify_email: true,
+      notify_sms: false,
       repeat_enabled: false,
-      repeat_value:   1,
-      repeat_unit:    'weeks',
+      repeat_value: 1,
+      repeat_unit: 'weeks',
     }
     const row = patch ? { ...base, ...patch } : base
     // Optimistically update local state
     if (patch) setReminders(prev => ({ ...prev, [statId]: row }))
 
-    const { error } = await supabase.from('stat_reminders').upsert(
-      { ...row, statistic_id: statId, updated_at: new Date().toISOString() },
-      { onConflict: 'statistic_id' }
-    )
+    const { error } = await supabase
+      .from('stat_reminders')
+      .upsert(
+        { ...row, statistic_id: statId, updated_at: new Date().toISOString() },
+        { onConflict: 'statistic_id' }
+      )
     setSaving(s => ({ ...s, [statId]: false }))
     setMsg(m => ({ ...m, [statId]: error ? 'error' : 'ok' }))
     setTimeout(() => setMsg(m => ({ ...m, [statId]: null })), 2500)
     if (!error) {
-      const { data: fresh } = await supabase.from('stat_reminders').select('*').eq('statistic_id', statId).single()
+      const { data: fresh } = await supabase
+        .from('stat_reminders')
+        .select('*')
+        .eq('statistic_id', statId)
+        .single()
       if (fresh) setReminders(prev => ({ ...prev, [statId]: fresh }))
     }
   }
@@ -5890,29 +7721,33 @@ function RemindersSettingsTab({ stats, profiles }) {
     return p?.full_name || (p?.email ? p.email.split('@')[0] : '—')
   }
 
-  if (loading) return (
-    <div className="flex items-center justify-center py-16">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700" />
-    </div>
-  )
+  if (loading)
+    return (
+      <div className="flex items-center justify-center py-16">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700" />
+      </div>
+    )
 
-  if (!manualStats.length) return (
-    <div className="text-center py-12 text-gray-400">
-      <p className="text-3xl mb-2">📊</p>
-      <p className="text-sm">No active statistics found.</p>
-    </div>
-  )
+  if (!manualStats.length)
+    return (
+      <div className="text-center py-12 text-gray-400">
+        <p className="text-3xl mb-2">📊</p>
+        <p className="text-sm">No active statistics found.</p>
+      </div>
+    )
 
   return (
     <div className="space-y-3">
       <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-800">
-        <strong>How reminders work:</strong> After a period ends, if no value has been entered and the delay passes, the stat owner receives a notification. Repeat reminders continue on the configured interval until a value is entered.
+        <strong>How reminders work:</strong> After a period ends, if no value has been entered and
+        the delay passes, the stat owner receives a notification. Repeat reminders continue on the
+        configured interval until a value is entered.
       </div>
 
       {manualStats.map(stat => {
         const r = getReminder(stat.id)
         const isSaving = saving[stat.id]
-        const status   = msg[stat.id]
+        const status = msg[stat.id]
 
         return (
           <div key={stat.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -5920,19 +7755,29 @@ function RemindersSettingsTab({ stats, profiles }) {
             <div className="flex items-center justify-between px-4 py-3 gap-3">
               <div className="min-w-0 flex-1">
                 <p className="font-semibold text-gray-900 text-sm truncate">{stat.name}</p>
-                <p className="text-xs text-gray-400">{stat.tracking} · Owner: {ownerName(stat)}</p>
+                <p className="text-xs text-gray-400">
+                  {stat.tracking} · Owner: {ownerName(stat)}
+                </p>
               </div>
               <div className="flex items-center gap-3 flex-shrink-0">
-                {status === 'ok'    && <span className="text-xs text-green-600 font-medium">Saved ✓</span>}
-                {status === 'error' && <span className="text-xs text-red-500 font-medium">Error saving</span>}
+                {status === 'ok' && (
+                  <span className="text-xs text-green-600 font-medium">Saved ✓</span>
+                )}
+                {status === 'error' && (
+                  <span className="text-xs text-red-500 font-medium">Error saving</span>
+                )}
                 {/* Enable toggle */}
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <span className="text-xs text-gray-500 font-medium">{r.enabled ? 'On' : 'Off'}</span>
+                  <span className="text-xs text-gray-500 font-medium">
+                    {r.enabled ? 'On' : 'Off'}
+                  </span>
                   <div
                     onClick={() => save(stat.id, { enabled: !r.enabled })}
                     className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${r.enabled ? 'bg-green-600' : 'bg-gray-300'}`}
                   >
-                    <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${r.enabled ? 'translate-x-5' : ''}`} />
+                    <div
+                      className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${r.enabled ? 'translate-x-5' : ''}`}
+                    />
                   </div>
                 </label>
               </div>
@@ -5942,15 +7787,22 @@ function RemindersSettingsTab({ stats, profiles }) {
             {r.enabled && (
               <div className="border-t border-gray-100 bg-gray-50 px-4 py-4 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-
                   {/* Delay */}
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">Delay after period ends</label>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                      Delay after period ends
+                    </label>
                     <div className="flex items-center gap-2">
                       <input
-                        type="number" min={1} max={60}
+                        type="number"
+                        min={1}
+                        max={60}
                         value={r.delay_days}
-                        onChange={e => update(stat.id, { delay_days: Math.min(60, Math.max(1, parseInt(e.target.value) || 1)) })}
+                        onChange={e =>
+                          update(stat.id, {
+                            delay_days: Math.min(60, Math.max(1, parseInt(e.target.value) || 1)),
+                          })
+                        }
                         className="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-green-600"
                       />
                       <span className="text-sm text-gray-500">days</span>
@@ -5959,18 +7811,26 @@ function RemindersSettingsTab({ stats, profiles }) {
 
                   {/* Notify via */}
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">Notify via</label>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                      Notify via
+                    </label>
                     <div className="flex gap-3">
                       <label className="flex items-center gap-1.5 cursor-pointer">
-                        <input type="checkbox" checked={r.notify_email}
+                        <input
+                          type="checkbox"
+                          checked={r.notify_email}
                           onChange={e => update(stat.id, { notify_email: e.target.checked })}
-                          className="accent-green-700 w-3.5 h-3.5" />
+                          className="accent-green-700 w-3.5 h-3.5"
+                        />
                         <span className="text-sm text-gray-700">✉️ Email</span>
                       </label>
                       <label className="flex items-center gap-1.5 cursor-pointer">
-                        <input type="checkbox" checked={r.notify_sms}
+                        <input
+                          type="checkbox"
+                          checked={r.notify_sms}
                           onChange={e => update(stat.id, { notify_sms: e.target.checked })}
-                          className="accent-green-700 w-3.5 h-3.5" />
+                          className="accent-green-700 w-3.5 h-3.5"
+                        />
                         <span className="text-sm text-gray-700">📱 Text</span>
                       </label>
                     </div>
@@ -5978,20 +7838,30 @@ function RemindersSettingsTab({ stats, profiles }) {
 
                   {/* Repeat */}
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">Repeat reminder</label>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                      Repeat reminder
+                    </label>
                     <label className="flex items-center gap-2 cursor-pointer mb-2">
-                      <input type="checkbox" checked={r.repeat_enabled}
+                      <input
+                        type="checkbox"
+                        checked={r.repeat_enabled}
                         onChange={e => update(stat.id, { repeat_enabled: e.target.checked })}
-                        className="accent-green-700 w-3.5 h-3.5" />
+                        className="accent-green-700 w-3.5 h-3.5"
+                      />
                       <span className="text-sm text-gray-700">Repeat until value entered</span>
                     </label>
                     {r.repeat_enabled && (
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-gray-500">Every</span>
                         <input
-                          type="number" min={1}
+                          type="number"
+                          min={1}
                           value={r.repeat_value}
-                          onChange={e => update(stat.id, { repeat_value: Math.max(1, parseInt(e.target.value) || 1) })}
+                          onChange={e =>
+                            update(stat.id, {
+                              repeat_value: Math.max(1, parseInt(e.target.value) || 1),
+                            })
+                          }
                           className="w-14 border border-gray-300 rounded-lg px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-green-600"
                         />
                         <select
@@ -6027,12 +7897,14 @@ function RemindersSettingsTab({ stats, profiles }) {
 
 // ── ArchivedView ──────────────────────────────────────────────────────────────
 function ArchivedView({ onRestored }) {
-  const [stats,       setStats]       = useState([])
-  const [loading,     setLoading]     = useState(true)
+  const [stats, setStats] = useState([])
+  const [loading, setLoading] = useState(true)
   const [unarchiving, setUnarchiving] = useState(null)
-  const [search,      setSearch]      = useState('')
+  const [search, setSearch] = useState('')
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+  }, [])
 
   async function load() {
     setLoading(true)
@@ -6096,10 +7968,18 @@ function ArchivedView({ onRestored }) {
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-gray-50">
               <tr className="border-b border-gray-200">
-                <th className="text-left px-6 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Name</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Tracking</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Type</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">Last Updated</th>
+                <th className="text-left px-6 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">
+                  Name
+                </th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">
+                  Tracking
+                </th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">
+                  Type
+                </th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wide">
+                  Last Updated
+                </th>
                 <th className="px-4 py-3 w-28"></th>
               </tr>
             </thead>
@@ -6110,7 +7990,13 @@ function ArchivedView({ onRestored }) {
                   <td className="px-4 py-3 text-gray-500 capitalize">{s.tracking}</td>
                   <td className="px-4 py-3 text-gray-500 capitalize">{s.stat_type}</td>
                   <td className="px-4 py-3 text-gray-400 text-xs">
-                    {s.updated_at ? new Date(s.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                    {s.updated_at
+                      ? new Date(s.updated_at).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })
+                      : '—'}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
@@ -6137,20 +8023,22 @@ export default function Statistics() {
   const { user } = useAuth()
 
   // Data state
-  const [stats,        setStats]        = useState([])
-  const [values,       setValues]       = useState([])   // values for selectedStat
+  const [stats, setStats] = useState([])
+  const [values, setValues] = useState([]) // values for selectedStat
   const [valuesStatId, setValuesStatId] = useState(null) // which stat id the values belong to
-  const [profiles,     setProfiles]     = useState([])
+  const [profiles, setProfiles] = useState([])
   // Admin flag derived from profiles.role for the current user. Used to
   // gate admin-only UI like the Master tab in Settings.
-  const isCurrentUserAdmin = (profiles || []).some(p => p.id === user?.id && (p.role === 'admin' || p.role === 'super_admin'))
-  const [loading,      setLoading]      = useState(true)
-  const prevDisplayRef  = useRef([])   // frozen frame — last rendered displayChartData
-  const chartPrintRef   = useRef(null) // ref to chart area for printing
+  const isCurrentUserAdmin = (profiles || []).some(
+    p => p.id === user?.id && (p.role === 'admin' || p.role === 'super_admin')
+  )
+  const [loading, setLoading] = useState(true)
+  const prevDisplayRef = useRef([]) // frozen frame — last rendered displayChartData
+  const chartPrintRef = useRef(null) // ref to chart area for printing
 
   // ── Mobile breakpoint (used to tighten Recharts chart margins/Y-axis on phones) ──
-  const [isMobile, setIsMobile] = useState(() =>
-    typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches
   )
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -6165,75 +8053,75 @@ export default function Statistics() {
   }, [])
 
   // UI state
-  const [viewMode,       setViewMode]       = useState('graphs')  // 'graphs'|'multiple-entry'|'print-multiple'|'comparison'|'import-export'|'archive'
-  const [selectedId,     setSelectedId]     = useState(null)
-  const [viewPeriod,     setViewPeriod]     = useState('weekly')
-  const [chartStyle,     setChartStyle]     = useState('line')  // 'line' | 'bar'
-  const [fromDate,       setFromDate]       = useState(daysAgo(90))
-  const [toDate,         setToDate]         = useState(today())
-  const [autoMin,        setAutoMin]        = useState(true)
-  const [autoMax,        setAutoMax]        = useState(true)
-  const [openFolder,     setOpenFolder]     = useState('all')  // 'all'|'archived'
+  const [viewMode, setViewMode] = useState('graphs') // 'graphs'|'multiple-entry'|'print-multiple'|'comparison'|'import-export'|'archive'
+  const [selectedId, setSelectedId] = useState(null)
+  const [viewPeriod, setViewPeriod] = useState('weekly')
+  const [chartStyle, setChartStyle] = useState('line') // 'line' | 'bar'
+  const [fromDate, setFromDate] = useState(daysAgo(90))
+  const [toDate, setToDate] = useState(today())
+  const [autoMin, setAutoMin] = useState(true)
+  const [autoMax, setAutoMax] = useState(true)
+  const [openFolder, setOpenFolder] = useState('all') // 'all'|'archived'
   // Stat groups (defined in Settings → Stat Groups). When a filter is active,
   // the sidebar list only shows stats whose id is in that group's stat_ids.
-  const [statGroups,     setStatGroups]     = useState([])
-  const [filterGroupId,  setFilterGroupId]  = useState(null)   // null = no filter
-  const [showShares,     setShowShares]     = useState(false)
-  const [userShares,     setUserShares]     = useState({}) // statId -> 'view'|'edit' for the current user
+  const [statGroups, setStatGroups] = useState([])
+  const [filterGroupId, setFilterGroupId] = useState(null) // null = no filter
+  const [showShares, setShowShares] = useState(false)
+  const [userShares, setUserShares] = useState({}) // statId -> 'view'|'edit' for the current user
   // When the Shared Permissions button is clicked from inside a stat-edit
   // modal, we capture which stat the modal is for so StatSharesModal
   // doesn't have to rely on selectedStat (the user might be editing a
   // stat they don't currently have selected on the chart).
-  const [sharesTarget,   setSharesTarget]   = useState(null) // { id, name } or null
-  const [search,         setSearch]         = useState('')
-  const [showN,          setShowN]          = useState(25)
+  const [sharesTarget, setSharesTarget] = useState(null) // { id, name } or null
+  const [search] = useState('')
+  const [showN] = useState(25)
 
   // Drag-and-drop state
-  const [dragId,     setDragId]     = useState(null)
+  const [dragId, setDragId] = useState(null)
   const [dragOverId, setDragOverId] = useState(null)
 
   // Quick value entry
-  const [quickValue,   setQuickValue]   = useState('')
-  const [quickSaving,  setQuickSaving]  = useState(false)
+  const [quickValue, setQuickValue] = useState('')
+  const [quickSaving, setQuickSaving] = useState(false)
   const [quickSaveMsg, setQuickSaveMsg] = useState('')
 
   // Company settings
   const [weekEndingDay, setWeekEndingDay] = useState(null)
   // Whether to show "All Stats" / "Archived" folder buttons in the sidebar.
   // Loaded from company_settings.show_stat_archive_folder; admin can toggle in Settings → General.
-  const [showStatArchiveFolder, setShowStatArchiveFolder] = useState(true)  // null = not configured, 0-6 = day
+  const [showStatArchiveFolder, setShowStatArchiveFolder] = useState(true) // null = not configured, 0-6 = day
 
   // Modal state
-  const [showTypeSelector,    setShowTypeSelector]    = useState(false)
+  const [showTypeSelector, setShowTypeSelector] = useState(false)
   // Mobile-only: bundles "Edit Value History" + "Edit Statistic" into a
   // single Edits button-modal so they don't crowd the module header.
-  const [showMobileEditsModal,  setShowMobileEditsModal]  = useState(false)
+  const [showMobileEditsModal, setShowMobileEditsModal] = useState(false)
   // Mobile-only: small popup for recording the current period's value.
   const [showMobileEntryModal, setShowMobileEntryModal] = useState(false)
-  const [showBasicForm,       setShowBasicForm]       = useState(false)
-  const [showEquationForm,    setShowEquationForm]    = useState(false)
-  const [showOverlayForm,     setShowOverlayForm]     = useState(false)
-  const [showSecondaryForm,   setShowSecondaryForm]   = useState(false)
-  const [showAutoForm,        setShowAutoForm]        = useState(false)
+  const [showBasicForm, setShowBasicForm] = useState(false)
+  const [showEquationForm, setShowEquationForm] = useState(false)
+  const [showOverlayForm, setShowOverlayForm] = useState(false)
+  const [showSecondaryForm, setShowSecondaryForm] = useState(false)
+  const [showAutoForm, setShowAutoForm] = useState(false)
   const [showAutoExternalForm, setShowAutoExternalForm] = useState(false)
-  const [editingData,         setEditingData]         = useState(null)   // null = new, obj = edit
-  const [showPrintModal,      setShowPrintModal]      = useState(false)
-  const [showTargetPicker,    setShowTargetPicker]    = useState(false)
-  const [targetSourceStat,    setTargetSourceStat]    = useState(null)
+  const [editingData, setEditingData] = useState(null) // null = new, obj = edit
+  const [showPrintModal, setShowPrintModal] = useState(false)
+  const [showTargetPicker, setShowTargetPicker] = useState(false)
+  const [targetSourceStat, setTargetSourceStat] = useState(null)
 
   // Overlay chart data: array of { stat, part, values } for the selected overlay stat
-  const [overlayValues,       setOverlayValues]       = useState([])
+  const [overlayValues, setOverlayValues] = useState([])
   const [showDateRangeSelector, setShowDateRangeSelector] = useState(false)
-  const [showEditHistory,     setShowEditHistory]     = useState(false)
+  const [showEditHistory, setShowEditHistory] = useState(false)
   const [editHistoryFromDate, setEditHistoryFromDate] = useState(null)
-  const [weekEndingError,     setWeekEndingError]     = useState(false)  // show config warning
+  const [weekEndingError, setWeekEndingError] = useState(false) // show config warning
 
   // Stat notes
-  const [statNotes,       setStatNotes]       = useState([])          // notes for selectedStat
-  const [noteModal,       setNoteModal]       = useState(null)        // { date, label } | null
-  const [noteText,        setNoteText]        = useState('')
-  const [noteSaving,      setNoteSaving]      = useState(false)
-  const [showNotesModal,  setShowNotesModal]  = useState(false)
+  const [statNotes, setStatNotes] = useState([]) // notes for selectedStat
+  const [noteModal, setNoteModal] = useState(null) // { date, label } | null
+  const [noteText, setNoteText] = useState('')
+  const [noteSaving, setNoteSaving] = useState(false)
+  const [showNotesModal, setShowNotesModal] = useState(false)
 
   // Ref to auto-select a stat after stats list refreshes
   const pendingSelectName = useRef(null)
@@ -6252,10 +8140,14 @@ export default function Statistics() {
     if (!defaultStatKey || !id) return
     if (String(defaultStatId) === String(id)) {
       setDefaultStatId(null)
-      try { window.localStorage.removeItem(defaultStatKey) } catch {}
+      try {
+        window.localStorage.removeItem(defaultStatKey)
+      } catch {}
     } else {
       setDefaultStatId(id)
-      try { window.localStorage.setItem(defaultStatKey, String(id)) } catch {}
+      try {
+        window.localStorage.setItem(defaultStatKey, String(id))
+      } catch {}
     }
   }
   // Auto-select the default stat on first load. Guarded by a ref so this
@@ -6265,7 +8157,10 @@ export default function Statistics() {
   useEffect(() => {
     if (autoSelectedDefaultRef.current) return
     if (!defaultStatId) return
-    if (selectedId) { autoSelectedDefaultRef.current = true; return }
+    if (selectedId) {
+      autoSelectedDefaultRef.current = true
+      return
+    }
     if (!stats || stats.length === 0) return
     const match = stats.find(s => String(s.id) === String(defaultStatId) && !s.archived)
     if (match) {
@@ -6279,7 +8174,14 @@ export default function Statistics() {
   useEffect(() => {
     if (!pendingSelectName.current || stats.length === 0) return
     const found = stats.find(s => s.name === pendingSelectName.current)
-    console.log('[Statistics] pendingSelect check — looking for:', pendingSelectName.current, 'found:', found, 'in', stats.map(s=>s.name))
+    console.log(
+      '[Statistics] pendingSelect check — looking for:',
+      pendingSelectName.current,
+      'found:',
+      found,
+      'in',
+      stats.map(s => s.name)
+    )
     if (found) {
       setOpenFolder('all')
       selectStat(found.id)
@@ -6296,24 +8198,45 @@ export default function Statistics() {
     setLoading(true)
     const [profRes, stsRes, settingsRes, grpRes] = await Promise.all([
       supabase.from('profiles').select('id, email, full_name, role').order('full_name'),
-      supabase.from('statistics').select('*').order('sort_order', { ascending: true }).order('name'),
-      supabase.from('company_settings').select('week_ending_day, show_stat_archive_folder').maybeSingle(),
-      supabase.from('stat_groups').select('*').order('sort_order', { ascending: true }).order('name'),
+      supabase
+        .from('statistics')
+        .select('*')
+        .order('sort_order', { ascending: true })
+        .order('name'),
+      supabase
+        .from('company_settings')
+        .select('week_ending_day, show_stat_archive_folder')
+        .maybeSingle(),
+      supabase
+        .from('stat_groups')
+        .select('*')
+        .order('sort_order', { ascending: true })
+        .order('name'),
     ])
     setStatGroups(grpRes.data || [])
-    console.log('[Statistics] fetchAll — stats result:', stsRes.data?.length ?? 'null', 'error:', stsRes.error)
+    console.log(
+      '[Statistics] fetchAll — stats result:',
+      stsRes.data?.length ?? 'null',
+      'error:',
+      stsRes.error
+    )
     if (profRes.error) console.error('[Statistics] profiles error:', profRes.error)
     if (stsRes.error) console.error('[Statistics] statistics error:', stsRes.error)
     const freshStats = stsRes.data || []
-    const freshWed   = settingsRes.data?.week_ending_day ?? null
-    const freshArc   = settingsRes.data?.show_stat_archive_folder
+    const freshWed = settingsRes.data?.week_ending_day ?? null
+    const freshArc = settingsRes.data?.show_stat_archive_folder
     // Make sure the signed-in user always appears in the profiles list — RLS
     // or a missing profile row can otherwise cause the current admin to be
     // missing from owner dropdowns ("change owner to me" with no self option).
     let profList = profRes.data || []
     if (user?.id && !profList.some(p => p.id === user.id)) {
       profList = [
-        { id: user.id, email: user.email || '', full_name: user.user_metadata?.full_name || user.email || 'Me', role: 'admin' },
+        {
+          id: user.id,
+          email: user.email || '',
+          full_name: user.user_metadata?.full_name || user.email || 'Me',
+          role: 'admin',
+        },
         ...profList,
       ]
     }
@@ -6328,14 +8251,25 @@ export default function Statistics() {
 
   // ── Fetch notes when selected stat changes ────────────────────────────────
   useEffect(() => {
-    if (!selectedId) { setStatNotes([]); return }
-    supabase.from('stat_notes').select('*').eq('statistic_id', selectedId).order('period_date')
+    if (!selectedId) {
+      setStatNotes([])
+      return
+    }
+    supabase
+      .from('stat_notes')
+      .select('*')
+      .eq('statistic_id', selectedId)
+      .order('period_date')
       .then(({ data }) => setStatNotes(data || []))
   }, [selectedId])
 
   async function fetchNotes() {
     if (!selectedId) return
-    const { data } = await supabase.from('stat_notes').select('*').eq('statistic_id', selectedId).order('period_date')
+    const { data } = await supabase
+      .from('stat_notes')
+      .select('*')
+      .eq('statistic_id', selectedId)
+      .order('period_date')
     setStatNotes(data || [])
   }
 
@@ -6349,7 +8283,12 @@ export default function Statistics() {
     if (!noteModal || !selectedId) return
     setNoteSaving(true)
     await supabase.from('stat_notes').upsert(
-      { statistic_id: selectedId, period_date: noteModal.date, note: noteText, created_by: user?.id },
+      {
+        statistic_id: selectedId,
+        period_date: noteModal.date,
+        note: noteText,
+        created_by: user?.id,
+      },
       { onConflict: 'statistic_id,period_date' }
     )
     await fetchNotes()
@@ -6360,7 +8299,11 @@ export default function Statistics() {
   async function deleteNote() {
     if (!noteModal || !selectedId) return
     setNoteSaving(true)
-    await supabase.from('stat_notes').delete().eq('statistic_id', selectedId).eq('period_date', noteModal.date)
+    await supabase
+      .from('stat_notes')
+      .delete()
+      .eq('statistic_id', selectedId)
+      .eq('period_date', noteModal.date)
     await fetchNotes()
     setNoteSaving(false)
     setNoteModal(null)
@@ -6368,7 +8311,11 @@ export default function Statistics() {
 
   // ── Fetch values when selected stat changes ────────────────────────────────
   useEffect(() => {
-    if (!selectedId) { setValues([]); setOverlayValues([]); return }
+    if (!selectedId) {
+      setValues([])
+      setOverlayValues([])
+      return
+    }
     const stat = stats.find(s => s.id === selectedId)
     if (stat?.stat_category === 'equation') {
       setOverlayValues([])
@@ -6402,8 +8349,11 @@ export default function Statistics() {
 
   async function syncSecondaryValues(stat) {
     if (!stat?.source_stat_id) return null
-    const { data: srcVals } = await supabase.from('statistic_values')
-      .select('period_date, value').eq('statistic_id', stat.source_stat_id).order('period_date')
+    const { data: srcVals } = await supabase
+      .from('statistic_values')
+      .select('period_date, value')
+      .eq('statistic_id', stat.source_stat_id)
+      .order('period_date')
     if (!srcVals?.length) return null
     const computed = aggregateValues(srcVals, stat.tracking, stat.aggregation_method || 'sum')
     if (!computed.length) return null
@@ -6417,24 +8367,24 @@ export default function Statistics() {
       await supabase.from('statistics').update({ beginning_date: earliest }).eq('id', stat.id)
     }
     // Update local stats state so scrubber gets correct minDate immediately (no refetch needed)
-    setStats(prev => prev.map(s =>
-      s.id === stat.id ? { ...s, beginning_date: earliest } : s
-    ))
+    setStats(prev => prev.map(s => (s.id === stat.id ? { ...s, beginning_date: earliest } : s)))
     return earliest
   }
 
   async function syncAutoValues(stat) {
     if (!stat?.data_source) return null
     let ds
-    try { ds = JSON.parse(stat.data_source) } catch { return null }
+    try {
+      ds = JSON.parse(stat.data_source)
+    } catch {
+      return null
+    }
     if (!ds?.table || !ds?.date_column) return null
 
     // Fetch all rows from the source table
-    let query = supabase.from(ds.table).select(
-      ds.metric === 'count'
-        ? `${ds.date_column}`
-        : `${ds.date_column}, ${ds.field}`
-    )
+    let query = supabase
+      .from(ds.table)
+      .select(ds.metric === 'count' ? `${ds.date_column}` : `${ds.date_column}, ${ds.field}`)
     // Apply equality filters
     if (ds.filter) {
       for (const [col, val] of Object.entries(ds.filter)) {
@@ -6452,7 +8402,7 @@ export default function Statistics() {
       const rawDate = row[ds.date_column]
       if (!rawDate) continue
       const dateStr = rawDate.slice(0, 10)
-      const bucket  = getOutputPeriodKey(dateStr, stat.tracking)
+      const bucket = getOutputPeriodKey(dateStr, stat.tracking)
       if (!buckets.has(bucket)) buckets.set(bucket, [])
       if (ds.metric !== 'count') {
         const val = Number(row[ds.field] ?? 0)
@@ -6465,9 +8415,9 @@ export default function Statistics() {
     const computed = []
     for (const [period_date, vals] of buckets) {
       let value
-      if      (ds.metric === 'count') value = vals.length
-      else if (ds.metric === 'sum')   value = vals.reduce((a, b) => a + b, 0)
-      else if (ds.metric === 'avg')   value = vals.reduce((a, b) => a + b, 0) / vals.length
+      if (ds.metric === 'count') value = vals.length
+      else if (ds.metric === 'sum') value = vals.reduce((a, b) => a + b, 0)
+      else if (ds.metric === 'avg') value = vals.reduce((a, b) => a + b, 0) / vals.length
       computed.push({ period_date, value })
     }
     computed.sort((a, b) => a.period_date.localeCompare(b.period_date))
@@ -6481,9 +8431,7 @@ export default function Statistics() {
     if (!stat.beginning_date || stat.beginning_date > earliest) {
       await supabase.from('statistics').update({ beginning_date: earliest }).eq('id', stat.id)
     }
-    setStats(prev => prev.map(s =>
-      s.id === stat.id ? { ...s, beginning_date: earliest } : s
-    ))
+    setStats(prev => prev.map(s => (s.id === stat.id ? { ...s, beginning_date: earliest } : s)))
     return earliest
   }
 
@@ -6506,9 +8454,9 @@ export default function Statistics() {
     if (depth > 10) return new Map() // guard against runaway cycles
     const parts = stat.equation_parts || []
     // Normalise stat_ids to numbers — they may be strings in JSONB
-    const compIds = [...new Set(
-      parts.map(p => p.stat_id ? Number(p.stat_id) : null).filter(Boolean)
-    )]
+    const compIds = [
+      ...new Set(parts.map(p => (p.stat_id ? Number(p.stat_id) : null)).filter(Boolean)),
+    ]
     if (compIds.length === 0) return new Map()
 
     // Split components into regular (has DB rows) vs nested equation stats.
@@ -6565,7 +8513,7 @@ export default function Statistics() {
     // equation stats whose sub-results don't perfectly align).
     const allPeriods = new Set()
     for (const id of compIds) {
-      for (const [period] of (compMaps[id] || new Map())) {
+      for (const [period] of compMaps[id] || new Map()) {
         allPeriods.add(period)
       }
     }
@@ -6580,7 +8528,7 @@ export default function Statistics() {
         if (val === null) {
           val = pv
         } else {
-          if      (part.operator === '+') val += pv
+          if (part.operator === '+') val += pv
           else if (part.operator === '-') val -= pv
           else if (part.operator === '*') val *= pv
           else if (part.operator === '/') val = pv !== 0 ? val / pv : val
@@ -6602,10 +8550,14 @@ export default function Statistics() {
   }
 
   async function fetchOverlayValues(stat) {
-    const parts   = stat.overlay_parts || []
+    const parts = stat.overlay_parts || []
     // stat_id may be stored as a string in JSONB — normalise to number
     const statIds = parts.map(p => Number(p.stat_id)).filter(Boolean)
-    if (!statIds.length) { setOverlayValues([]); setValuesStatId(stat.id); return }
+    if (!statIds.length) {
+      setOverlayValues([])
+      setValuesStatId(stat.id)
+      return
+    }
 
     const { data: rawVals } = await supabase
       .from('statistic_values')
@@ -6618,8 +8570,8 @@ export default function Statistics() {
       .map(p => {
         const numId = Number(p.stat_id)
         return {
-          stat:   stats.find(s => s.id === numId) || null,
-          part:   p,
+          stat: stats.find(s => s.id === numId) || null,
+          part: p,
           values: (rawVals || []).filter(v => v.statistic_id === numId),
         }
       })
@@ -6634,7 +8586,10 @@ export default function Statistics() {
   }
 
   // ── Derived data ───────────────────────────────────────────────────────────
-  const selectedStat = useMemo(() => stats.find(s => s.id === selectedId) || null, [stats, selectedId])
+  const selectedStat = useMemo(
+    () => stats.find(s => s.id === selectedId) || null,
+    [stats, selectedId]
+  )
 
   // ── Print current chart ───────────────────────────────────────────────────
   function handlePrint() {
@@ -6647,8 +8602,8 @@ export default function Statistics() {
     const el = chartPrintRef.current
     if (!el || !selectedStat) return
 
-    const title       = selectedStat.name
-    const dateRange   = `${fromDate} → ${toDate}`
+    const title = selectedStat.name
+    const dateRange = `${fromDate} → ${toDate}`
     const isLandscape = orientation === 'landscape'
 
     // Clone each SVG — preserve its viewBox, set width/height to 100%
@@ -6659,11 +8614,11 @@ export default function Statistics() {
     let svgHTML = ''
     svgEls.forEach(svg => {
       const clone = svg.cloneNode(true)
-      const rect  = svg.getBoundingClientRect()
-      const w     = rect.width  || parseFloat(svg.getAttribute('width'))  || 800
-      const h     = rect.height || parseFloat(svg.getAttribute('height')) || 400
+      const rect = svg.getBoundingClientRect()
+      const w = rect.width || parseFloat(svg.getAttribute('width')) || 800
+      const h = rect.height || parseFloat(svg.getAttribute('height')) || 400
       clone.setAttribute('viewBox', `0 0 ${w} ${h}`)
-      clone.setAttribute('width',  '100%')
+      clone.setAttribute('width', '100%')
       clone.setAttribute('height', '100%')
       clone.setAttribute('preserveAspectRatio', 'none')
       clone.style.cssText = 'display: block;'
@@ -6676,8 +8631,8 @@ export default function Statistics() {
     })
 
     const winW = isLandscape ? 1100 : 850
-    const winH = isLandscape ? 700  : 950
-    const win  = window.open('', '_blank', `width=${winW},height=${winH}`)
+    const winH = isLandscape ? 700 : 950
+    const win = window.open('', '_blank', `width=${winW},height=${winH}`)
     win.document.write(`<!DOCTYPE html>
 <html style="height:100%">
 <head>
@@ -6722,7 +8677,7 @@ export default function Statistics() {
   <h1>${title}</h1>
   <p class="dr">${dateRange}</p>
   <div class="chart-wrap">${svgHTML}</div>
-  <script>window.onload = () => { window.print(); window.close(); }<\/script>
+  <script>window.onload = () => { window.print(); window.close(); }</script>
 </body>
 </html>`)
     win.document.close()
@@ -6737,14 +8692,19 @@ export default function Statistics() {
     if (selectedStat.tracking === 'daily') {
       return {
         label: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-        date:  today(),
+        date: today(),
       }
     }
     if (selectedStat.tracking === 'weekly') {
-      const weekEnd  = new Date(getWeekEndingDate(today(), wed) + 'T00:00:00')
-      const weekStart = new Date(weekEnd); weekStart.setDate(weekStart.getDate() - 6)
+      const weekEnd = new Date(getWeekEndingDate(today(), wed) + 'T00:00:00')
+      const weekStart = new Date(weekEnd)
+      weekStart.setDate(weekStart.getDate() - 6)
       const startLbl = weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      const endLbl   = weekEnd.toLocaleDateString('en-US',   { month: 'short', day: 'numeric', year: 'numeric' })
+      const endLbl = weekEnd.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
       return { label: `${startLbl} – ${endLbl}`, date: isoDate(weekEnd) }
     }
     if (selectedStat.tracking === 'monthly') {
@@ -6752,14 +8712,14 @@ export default function Statistics() {
       const lastMonth = new Date(now.getFullYear(), now.getMonth(), 0)
       return {
         label: lastMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-        date:  isoDate(lastMonth),
+        date: isoDate(lastMonth),
       }
     }
     if (selectedStat.tracking === 'quarterly') {
-      const curQ  = Math.floor(now.getMonth() / 3)          // 0-indexed current quarter
+      const curQ = Math.floor(now.getMonth() / 3) // 0-indexed current quarter
       const lastQ = curQ === 0 ? 3 : curQ - 1
       const lastQYear = curQ === 0 ? now.getFullYear() - 1 : now.getFullYear()
-      const lastQEnd  = new Date(lastQYear, lastQ * 3 + 3, 0)
+      const lastQEnd = new Date(lastQYear, lastQ * 3 + 3, 0)
       return { label: `Q${lastQ + 1} ${lastQYear}`, date: isoDate(lastQEnd) }
     }
     // yearly — most recently completed year
@@ -6769,7 +8729,10 @@ export default function Statistics() {
 
   // Pre-fill quick entry whenever the stat or its loaded values change
   useEffect(() => {
-    if (!selectedStat || !quickPeriod.date) { setQuickValue(''); return }
+    if (!selectedStat || !quickPeriod.date) {
+      setQuickValue('')
+      return
+    }
     const existing = values.find(v =>
       matchesPeriod(v.period_date, quickPeriod.date, selectedStat.tracking, weekEndingDay)
     )
@@ -6780,21 +8743,40 @@ export default function Statistics() {
   // Quick save handler — upsert or delete for the current period
   async function handleQuickSave() {
     if (!selectedStat) return
-    setQuickSaving(true); setQuickSaveMsg('')
+    setQuickSaving(true)
+    setQuickSaveMsg('')
     const trimmed = quickValue.trim()
     const existing = values.find(v =>
       matchesPeriod(v.period_date, quickPeriod.date, selectedStat.tracking, weekEndingDay)
     )
     if (trimmed !== '') {
       const num = parseFloat(trimmed)
-      if (isNaN(num)) { setQuickSaveMsg('⚠️ Invalid number'); setQuickSaving(false); return }
-      const { error } = await supabase.from('statistic_values')
-        .upsert({ statistic_id: selectedStat.id, period_date: quickPeriod.date, value: num, entered_by: user?.id },
-                 { onConflict: 'statistic_id,period_date' })
-      if (error) { setQuickSaveMsg('⚠️ ' + error.message); setQuickSaving(false); return }
+      if (isNaN(num)) {
+        setQuickSaveMsg('⚠️ Invalid number')
+        setQuickSaving(false)
+        return
+      }
+      const { error } = await supabase.from('statistic_values').upsert(
+        {
+          statistic_id: selectedStat.id,
+          period_date: quickPeriod.date,
+          value: num,
+          entered_by: user?.id,
+        },
+        { onConflict: 'statistic_id,period_date' }
+      )
+      if (error) {
+        setQuickSaveMsg('⚠️ ' + error.message)
+        setQuickSaving(false)
+        return
+      }
     } else if (existing) {
       const { error } = await supabase.from('statistic_values').delete().eq('id', existing.id)
-      if (error) { setQuickSaveMsg('⚠️ ' + error.message); setQuickSaving(false); return }
+      if (error) {
+        setQuickSaveMsg('⚠️ ' + error.message)
+        setQuickSaving(false)
+        return
+      }
     }
     setQuickSaving(false)
     setQuickSaveMsg('✓')
@@ -6814,10 +8796,12 @@ export default function Statistics() {
         .eq('user_id', user.id)
       if (cancelled) return
       const map = {}
-      for (const r of (data || [])) map[r.statistic_id] = r.permission
+      for (const r of data || []) map[r.statistic_id] = r.permission
       setUserShares(map)
     })()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [user?.id])
 
   // Stat groupings:
@@ -6825,21 +8809,32 @@ export default function Statistics() {
   //   • sharedStats    = stats explicitly shared with this user (statistic_shares)
   //   • accessibleStats = my + shared (the single flat list shown in the sidebar)
   //   • archivedStats  = archived stats (regardless of ownership) — own folder
-  const myStats         = useMemo(() => stats.filter(s => !s.archived && s.owner_user_id === user?.id), [stats, user])
-  const sharedStats     = useMemo(() => stats.filter(s => !s.archived && s.owner_user_id !== user?.id && userShares[s.id]), [stats, user, userShares])
+  const myStats = useMemo(
+    () => stats.filter(s => !s.archived && s.owner_user_id === user?.id),
+    [stats, user]
+  )
+  const sharedStats = useMemo(
+    () => stats.filter(s => !s.archived && s.owner_user_id !== user?.id && userShares[s.id]),
+    [stats, user, userShares]
+  )
   // Combined list — sorted by the same sort_order the user controls via
   // drag-and-drop. Without this `[...myStats, ...sharedStats]` partition,
   // shared stats always snapped back to the bottom of the sidebar after a
   // reorder because owned stats came first regardless of sort_order.
   // Falling back to name keeps deterministic ordering when sort_order ties.
   const accessibleStats = useMemo(
-    () => [...myStats, ...sharedStats].sort((a, b) =>
-      (a.sort_order ?? 999) - (b.sort_order ?? 999)
-      || (a.name || '').localeCompare(b.name || '', undefined, { numeric: true, sensitivity: 'base' })
-    ),
+    () =>
+      [...myStats, ...sharedStats].sort(
+        (a, b) =>
+          (a.sort_order ?? 999) - (b.sort_order ?? 999) ||
+          (a.name || '').localeCompare(b.name || '', undefined, {
+            numeric: true,
+            sensitivity: 'base',
+          })
+      ),
     [myStats, sharedStats]
   )
-  const archivedStats   = useMemo(() => stats.filter(s => s.archived), [stats])
+  const archivedStats = useMemo(() => stats.filter(s => s.archived), [stats])
 
   // Flat searchable list — folders collapsed to All vs Archived, plus an
   // optional stat-group filter that further restricts the list to members
@@ -6856,7 +8851,15 @@ export default function Statistics() {
     if (!search.trim()) return base
     const q = search.toLowerCase()
     return base.filter(s => s.name.toLowerCase().includes(q))
-  }, [openFolder, accessibleStats, archivedStats, search, showStatArchiveFolder, filterGroupId, statGroups])
+  }, [
+    openFolder,
+    accessibleStats,
+    archivedStats,
+    search,
+    showStatArchiveFolder,
+    filterGroupId,
+    statGroups,
+  ])
 
   // Period hierarchy — used to determine valid aggregation options
   const PERIOD_ORDER = ['daily', 'weekly', 'monthly', 'quarterly', 'yearly']
@@ -6866,14 +8869,17 @@ export default function Statistics() {
   function defaultRangeFor(stat, wed) {
     if (!stat?.default_periods) return null
     const count = stat.default_periods
-    const wday  = wed ?? 5
-    const now   = new Date()
+    const wday = wed ?? 5
+    const now = new Date()
     let from
     if (stat.tracking === 'daily') {
-      const d = new Date(); d.setDate(d.getDate() - (count - 1)); from = isoDate(d)
+      const d = new Date()
+      d.setDate(d.getDate() - (count - 1))
+      from = isoDate(d)
     } else if (stat.tracking === 'weekly') {
       const we = new Date(getWeekEndingDate(today(), wday) + 'T00:00:00')
-      we.setDate(we.getDate() - (count - 1) * 7); from = isoDate(we)
+      we.setDate(we.getDate() - (count - 1) * 7)
+      from = isoDate(we)
     } else if (stat.tracking === 'monthly') {
       from = isoDate(new Date(now.getFullYear(), now.getMonth() - (count - 1), 1))
     } else if (stat.tracking === 'quarterly') {
@@ -6887,7 +8893,7 @@ export default function Statistics() {
   // Select a stat — sets id, clears stale values, and applies date range all
   // in one React batch so the chart never renders with mismatched data (no flash).
   function selectStat(id) {
-    const stat  = stats.find(s => s.id === id) ?? null
+    const stat = stats.find(s => s.id === id) ?? null
     const range = defaultRangeFor(stat, weekEndingDay)
     setSelectedId(id)
     // Do NOT clear values here — we hold the previous frame until new data arrives
@@ -6907,9 +8913,9 @@ export default function Statistics() {
   // Apply default_periods date range whenever the selected stat or its settings change
   useEffect(() => {
     if (!selectedStat) return
-    if (selectedStat.stat_category === 'target') return    // target stats: date locked to target line
+    if (selectedStat.stat_category === 'target') return // target stats: date locked to target line
     if (selectedStat.stat_category === 'secondary') return // secondary stats: date set from sync
-    if (selectedStat.stat_category === 'auto_internal') return  // auto stats: date set from sync
+    if (selectedStat.stat_category === 'auto_internal') return // auto stats: date set from sync
     const range = defaultRangeFor(selectedStat, weekEndingDay)
     if (range) {
       setFromDate(range.from)
@@ -6923,12 +8929,20 @@ export default function Statistics() {
     const tls = selectedStat.target_lines || []
     if (!tls.length) return
     const startDates = tls.map(tl => tl.start_date).filter(Boolean)
-    const endDates = tls.map(tl =>
-      computeTargetEndDate(tl.start_date, tl.end_mode, tl.end_date, tl.end_periods, tl.end_unit || selectedStat.tracking)
-    ).filter(Boolean)
+    const endDates = tls
+      .map(tl =>
+        computeTargetEndDate(
+          tl.start_date,
+          tl.end_mode,
+          tl.end_date,
+          tl.end_periods,
+          tl.end_unit || selectedStat.tracking
+        )
+      )
+      .filter(Boolean)
     if (!startDates.length) return
-    const from = startDates.reduce((a, b) => a < b ? a : b)
-    const to   = endDates.reduce((a, b) => a > b ? a : b, from)
+    const from = startDates.reduce((a, b) => (a < b ? a : b))
+    const to = endDates.reduce((a, b) => (a > b ? a : b), from)
     setFromDate(from)
     setToDate(to)
   }, [selectedStat?.id, selectedStat?.stat_category, selectedStat?.target_lines])
@@ -6943,9 +8957,10 @@ export default function Statistics() {
     values
       .filter(v => v.period_date >= fromDate && v.period_date <= toDate)
       .forEach(v => {
-        const displayDate = (selectedStat.tracking === 'weekly' && weekEndingDay !== null)
-          ? getWeekEndingDate(v.period_date, weekEndingDay)
-          : v.period_date
+        const displayDate =
+          selectedStat.tracking === 'weekly' && weekEndingDay !== null
+            ? getWeekEndingDate(v.period_date, weekEndingDay)
+            : v.period_date
         entered.set(displayDate, Number(v.value))
       })
 
@@ -6955,7 +8970,7 @@ export default function Statistics() {
       return allPeriods.map(p => ({
         label: periodLabel(p, selectedStat.tracking),
         value: entered.has(p) ? entered.get(p) : 0,
-        date:  p,
+        date: p,
       }))
     }
 
@@ -6978,7 +8993,7 @@ export default function Statistics() {
       result = chartData
     } else {
       const nativeIdx = PERIOD_ORDER.indexOf(selectedStat.tracking)
-      const viewIdx   = PERIOD_ORDER.indexOf(viewPeriod)
+      const viewIdx = PERIOD_ORDER.indexOf(viewPeriod)
       const isPercentage = selectedStat.stat_type === 'percentage'
 
       if (viewIdx <= nativeIdx) {
@@ -6992,8 +9007,14 @@ export default function Statistics() {
 
           if (viewPeriod === 'weekly') {
             const we = getWeekEndingDate(pt.date, weekEndingDay ?? 5)
-            key = we; sortKey = we
-            label = 'W/E ' + new Date(we + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+            key = we
+            sortKey = we
+            label =
+              'W/E ' +
+              new Date(we + 'T00:00:00').toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+              })
           } else if (viewPeriod === 'monthly') {
             key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
             sortKey = key
@@ -7004,7 +9025,9 @@ export default function Statistics() {
             sortKey = `${d.getFullYear()}-${String(q * 3).padStart(2, '0')}`
             label = `Q${q} ${d.getFullYear()}`
           } else {
-            key = String(d.getFullYear()); sortKey = key; label = key
+            key = String(d.getFullYear())
+            sortKey = key
+            label = key
           }
 
           if (!buckets.has(key)) buckets.set(key, { label, total: 0, count: 0, sortKey })
@@ -7018,7 +9041,7 @@ export default function Statistics() {
           .map(b => ({
             label: b.label,
             value: isPercentage ? b.total / b.count : b.total,
-            date:  b.sortKey,
+            date: b.sortKey,
           }))
       }
     }
@@ -7036,7 +9059,13 @@ export default function Statistics() {
     const extraLabels = new Set()
     tls.forEach(tl => {
       if (!tl.start_date) return
-      const endDate = computeTargetEndDate(tl.start_date, tl.end_mode, tl.end_date, tl.end_periods, tl.end_unit || tracking)
+      const endDate = computeTargetEndDate(
+        tl.start_date,
+        tl.end_mode,
+        tl.end_date,
+        tl.end_periods,
+        tl.end_unit || tracking
+      )
       extraLabels.add(periodLabel(tl.start_date, tracking))
       extraLabels.add(periodLabel(endDate, tracking))
     })
@@ -7046,7 +9075,9 @@ export default function Statistics() {
       if (!existingLabels.has(lbl)) extras.push({ label: lbl, value: null, date: lbl })
     })
     if (!extras.length) return displayChartData
-    return [...displayChartData, ...extras].sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+    return [...displayChartData, ...extras].sort((a, b) =>
+      (a.date || '').localeCompare(b.date || '')
+    )
   }, [displayChartData, selectedStat])
 
   // ── Overlay chart data ─────────────────────────────────────────────────────
@@ -7079,8 +9110,8 @@ export default function Statistics() {
       if (!vals.length) return ['auto', 'auto']
       const dataMin = Math.min(...vals)
       const dataMax = Math.max(...vals)
-      const lo = (part?.y_min != null) ? Number(part.y_min) : dataMin
-      const hi = (part?.y_max != null) ? Number(part.y_max) : dataMax
+      const lo = part?.y_min != null ? Number(part.y_min) : dataMin
+      const hi = part?.y_max != null ? Number(part.y_max) : dataMax
       const range = hi - lo || Math.abs(hi) || 1
       const pad = range * 0.08
       return [lo - pad, hi + pad]
@@ -7089,11 +9120,11 @@ export default function Statistics() {
 
   // Navigation through stats
   const allStatsList = folderStats
-  const currentIdx   = allStatsList.findIndex(s => s.id === selectedId)
-  const hasPrev      = currentIdx > 0
-  const hasNext      = currentIdx < allStatsList.length - 1
+  const currentIdx = allStatsList.findIndex(s => s.id === selectedId)
+  const hasPrev = currentIdx > 0
+  const hasNext = currentIdx < allStatsList.length - 1
 
-  const goTo = (delta) => {
+  const goTo = delta => {
     const next = allStatsList[currentIdx + delta]
     if (next) selectStat(next.id)
   }
@@ -7102,12 +9133,12 @@ export default function Statistics() {
   const { yDomain, yTicks } = useMemo(() => {
     if (!displayChartData.length) return { yDomain: ['auto', 'auto'], yTicks: undefined }
 
-    const vals   = displayChartData.map(d => d.value).filter(v => v != null && isFinite(v))
+    const vals = displayChartData.map(d => d.value).filter(v => v != null && isFinite(v))
     if (!vals.length) return { yDomain: ['auto', 'auto'], yTicks: undefined }
 
     const dataMin = Math.min(...vals)
     const dataMax = Math.max(...vals)
-    const range   = dataMax - dataMin || Math.abs(dataMax) || 1
+    const range = dataMax - dataMin || Math.abs(dataMax) || 1
 
     // Pick a "nice" interval that gives roughly 15 grid lines
     const rawStep = range / 14
@@ -7117,7 +9148,7 @@ export default function Statistics() {
 
     // Floor/ceil to step boundaries, then add one step of headroom above
     const rawBottom = autoMin ? Math.floor(dataMin / step) * step : 0
-    const rawTop    = Math.ceil(dataMax  / step) * step + step
+    const rawTop = Math.ceil(dataMax / step) * step + step
 
     // Build the tick array
     const ticks = []
@@ -7126,7 +9157,7 @@ export default function Statistics() {
     }
 
     const bottom = ticks[0]
-    const top    = ticks[ticks.length - 1]
+    const top = ticks[ticks.length - 1]
 
     if (selectedStat?.upside_down) {
       return { yDomain: [top, bottom], yTicks: [...ticks].reverse() }
@@ -7135,15 +9166,35 @@ export default function Statistics() {
   }, [displayChartData, autoMin, autoMax, selectedStat])
 
   // ── Handlers ───────────────────────────────────────────────────────────────
-  const handleTypeSelect = (type) => {
+  const handleTypeSelect = type => {
     setShowTypeSelector(false)
-    if (type === 'basic')     { setEditingData(null); setShowBasicForm(true)      }
-    if (type === 'equation')  { setEditingData(null); setShowEquationForm(true)   }
-    if (type === 'overlay')   { setEditingData(null); setShowOverlayForm(true)    }
-    if (type === 'secondary') { setEditingData(null); setShowSecondaryForm(true)  }
-    if (type === 'auto_internal') { setEditingData(null); setShowAutoForm(true)         }
-    if (type === 'auto_external') { setEditingData(null); setShowAutoExternalForm(true) }
-    if (type === 'target')    { setShowTargetPicker(true) }
+    if (type === 'basic') {
+      setEditingData(null)
+      setShowBasicForm(true)
+    }
+    if (type === 'equation') {
+      setEditingData(null)
+      setShowEquationForm(true)
+    }
+    if (type === 'overlay') {
+      setEditingData(null)
+      setShowOverlayForm(true)
+    }
+    if (type === 'secondary') {
+      setEditingData(null)
+      setShowSecondaryForm(true)
+    }
+    if (type === 'auto_internal') {
+      setEditingData(null)
+      setShowAutoForm(true)
+    }
+    if (type === 'auto_external') {
+      setEditingData(null)
+      setShowAutoExternalForm(true)
+    }
+    if (type === 'target') {
+      setShowTargetPicker(true)
+    }
   }
 
   const handleSaveForm = async (editedId, savedName) => {
@@ -7161,9 +9212,12 @@ export default function Statistics() {
       const { stats: freshStats, wed: freshWed } = await fetchAll()
       // Now compute the date range from the freshly fetched stat, not the stale closure
       const freshStat = freshStats.find(s => s.id === editedId)
-      const range     = defaultRangeFor(freshStat, freshWed ?? weekEndingDay)
+      const range = defaultRangeFor(freshStat, freshWed ?? weekEndingDay)
       setSelectedId(editedId)
-      if (range) { setFromDate(range.from); setToDate(range.to) }
+      if (range) {
+        setFromDate(range.from)
+        setToDate(range.to)
+      }
     } else {
       // New stat: set pending name, then fetchAll will trigger the useEffect to select it
       pendingSelectName.current = savedName
@@ -7201,7 +9255,7 @@ export default function Statistics() {
   // Open the edit modal for any stat (used by the Master tab in Settings).
   // Mirrors handleEditStat but takes the stat directly instead of relying
   // on the currently-selected stat on the chart.
-  const editStatById = (stat) => {
+  const editStatById = stat => {
     if (!stat) return
     setEditingData(stat)
     if (stat.stat_category === 'equation') {
@@ -7247,9 +9301,9 @@ export default function Statistics() {
     setDragOverId(null)
     if (!sourceId || sourceId === targetId) return
 
-    const list     = [...folderStats]
-    const fromIdx  = list.findIndex(s => s.id === sourceId)
-    const toIdx    = list.findIndex(s => s.id === targetId)
+    const list = [...folderStats]
+    const fromIdx = list.findIndex(s => s.id === sourceId)
+    const toIdx = list.findIndex(s => s.id === targetId)
     if (fromIdx === -1 || toIdx === -1) return
 
     const reordered = [...list]
@@ -7258,7 +9312,9 @@ export default function Statistics() {
 
     // Optimistic local update
     const orderMap = {}
-    reordered.forEach((s, i) => { orderMap[s.id] = i })
+    reordered.forEach((s, i) => {
+      orderMap[s.id] = i
+    })
     setStats(prev =>
       prev
         .map(s => ({ ...s, sort_order: orderMap[s.id] ?? s.sort_order ?? 999 }))
@@ -7267,9 +9323,7 @@ export default function Statistics() {
 
     // Persist to Supabase
     await Promise.all(
-      reordered.map((s, i) =>
-        supabase.from('statistics').update({ sort_order: i }).eq('id', s.id)
-      )
+      reordered.map((s, i) => supabase.from('statistics').update({ sort_order: i }).eq('id', s.id))
     )
   }
 
@@ -7282,7 +9336,9 @@ export default function Statistics() {
     <button
       onClick={() => setOpenFolder(id)}
       className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
-        openFolder === id ? 'bg-green-50 text-green-800 font-semibold' : 'text-gray-600 hover:bg-gray-50'
+        openFolder === id
+          ? 'bg-green-50 text-green-800 font-semibold'
+          : 'text-gray-600 hover:bg-gray-50'
       }`}
     >
       <span className="flex items-center gap-2">
@@ -7294,11 +9350,12 @@ export default function Statistics() {
   )
 
   // ── Render ─────────────────────────────────────────────────────────────────
-  if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-700"></div>
-    </div>
-  )
+  if (loading)
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-700"></div>
+      </div>
+    )
 
   return (
     /* Use 100dvh on mobile so the visible viewport height tracks Safari\'s
@@ -7306,7 +9363,6 @@ export default function Statistics() {
        when scrolling. lg+ sticks with 100vh since desktop browsers don\'t
        have the same dynamic-viewport behavior. */
     <div className="h-[calc(100dvh-2.75rem)] lg:h-[calc(100vh-2.75rem)] -m-4 lg:-m-6 flex flex-col overflow-hidden bg-gray-100">
-
       {/* ── MODE TABS — portalled into the green app header bar ─── */}
       {/* On phones we drop the verbose labels so all six tabs fit; the icons
           are kept (they double as a visual key the user can tap). Tablets and
@@ -7314,12 +9370,26 @@ export default function Statistics() {
       {createPortal(
         <div className="flex items-center gap-0.5 overflow-x-auto max-w-full">
           {[
-            { id: 'graphs',         icon: '📈', label: 'Graphs',          short: 'Graphs'  },
-            { id: 'multiple-entry', icon: '📝', label: 'Multiple Entry',  short: 'Entry'   },
-            { id: 'print-multiple', icon: '🖨️',  label: 'Print Multiple', short: 'Print',   mobileHidden: true },
-            { id: 'comparison',     icon: '⚖️',  label: 'Comparison',     short: 'Compare' },
-            { id: 'import-export',  icon: '↕️',  label: 'Import / Export', short: 'I/E',     mobileHidden: true },
-            ...(isCurrentUserAdmin ? [{ id: 'settings', icon: '⚙️', label: 'Settings', short: 'Settings' }] : []),
+            { id: 'graphs', icon: '📈', label: 'Graphs', short: 'Graphs' },
+            { id: 'multiple-entry', icon: '📝', label: 'Multiple Entry', short: 'Entry' },
+            {
+              id: 'print-multiple',
+              icon: '🖨️',
+              label: 'Print Multiple',
+              short: 'Print',
+              mobileHidden: true,
+            },
+            { id: 'comparison', icon: '⚖️', label: 'Comparison', short: 'Compare' },
+            {
+              id: 'import-export',
+              icon: '↕️',
+              label: 'Import / Export',
+              short: 'I/E',
+              mobileHidden: true,
+            },
+            ...(isCurrentUserAdmin
+              ? [{ id: 'settings', icon: '⚙️', label: 'Settings', short: 'Settings' }]
+              : []),
           ].map(m => (
             <button
               key={m.id}
@@ -7339,7 +9409,6 @@ export default function Statistics() {
         </div>,
         document.getElementById('app-header-center')
       )}
-
       {/* ── COMBINED MODULE HEADER ───────────────────────────────────────── */}
       <div className="flex items-center gap-2 flex-wrap px-3 sm:px-6 pt-3 sm:pt-6 pb-2 sm:pb-4 bg-gray-50 border-b border-gray-200 flex-shrink-0">
         <h1 className="text-base sm:text-xl font-bold text-gray-900 flex-shrink-0">Statistics</h1>
@@ -7352,7 +9421,7 @@ export default function Statistics() {
             >
               ✏️ Edits
             </button>
-            {!['equation','overlay','auto_internal'].includes(selectedStat?.stat_category) && (
+            {!['equation', 'overlay', 'auto_internal'].includes(selectedStat?.stat_category) && (
               <button
                 onClick={() => setShowMobileEntryModal(true)}
                 className="sm:hidden text-xs font-semibold text-green-800 border border-green-600 bg-green-50 rounded-md px-2 py-1 flex-shrink-0"
@@ -7366,18 +9435,21 @@ export default function Statistics() {
                 divider on tablet+; on mobile we drop it so the buttons hug the
                 module title. */}
             <div className="hidden md:block md:w-32 xl:w-40 flex-shrink-0" />
-            {!['equation','overlay'].includes(selectedStat?.stat_category) && (
+            {!['equation', 'overlay'].includes(selectedStat?.stat_category) && (
               <button
                 onClick={() => {
                   if (selectedStat?.tracking === 'weekly' && weekEndingDay === null) {
-                    setWeekEndingError(true); return
+                    setWeekEndingError(true)
+                    return
                   }
                   setWeekEndingError(false)
                   setShowDateRangeSelector(true)
                 }}
                 className="hidden sm:inline-flex text-sm font-medium text-blue-600 hover:text-blue-800 underline underline-offset-2 transition-colors flex-shrink-0"
               >
-                {selectedStat?.stat_category === 'auto_internal' ? 'View Value History' : 'Edit Value History'}
+                {selectedStat?.stat_category === 'auto_internal'
+                  ? 'View Value History'
+                  : 'Edit Value History'}
               </button>
             )}
             <button
@@ -7391,7 +9463,9 @@ export default function Statistics() {
               className="hidden sm:inline-flex text-sm font-medium text-amber-600 hover:text-amber-800 underline underline-offset-2 transition-colors flex-shrink-0 items-center gap-1"
             >
               {statNotes.length > 0 && (
-                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] font-bold">{statNotes.length}</span>
+                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-white text-[10px] font-bold">
+                  {statNotes.length}
+                </span>
               )}
               Notes
             </button>
@@ -7410,24 +9484,21 @@ export default function Statistics() {
           </button>
         )}
       </div>
-
       {/* ── NON-GRAPH VIEWS ─────────────────────────────────────────────── */}
       {viewMode === 'multiple-entry' && (
         <MultipleEntryView stats={stats} weekEndingDay={weekEndingDay} />
       )}
-
       {viewMode === 'import-export' && (
         <ImportExportView
           stats={stats}
           user={user}
           onImported={async () => {
-            await fetchAll()          // refresh the stats list
-            setOpenFolder('all')       // open My Stats folder
-            setViewMode('graphs')     // switch to Graphs so stats are visible
+            await fetchAll() // refresh the stats list
+            setOpenFolder('all') // open My Stats folder
+            setViewMode('graphs') // switch to Graphs so stats are visible
           }}
         />
       )}
-
       {viewMode === 'settings' && (
         <StatisticsSettingsView
           weekEndingDay={weekEndingDay}
@@ -7436,484 +9507,574 @@ export default function Statistics() {
           profiles={profiles}
           isAdmin={isCurrentUserAdmin}
           onEditStat={editStatById}
-          onRestored={() => { fetchAll() }}
+          onRestored={() => {
+            fetchAll()
+          }}
           showStatArchiveFolder={showStatArchiveFolder}
           onShowStatArchiveFolderChange={v => setShowStatArchiveFolder(v)}
         />
       )}
-
       {viewMode === 'print-multiple' && (
         <PrintMultipleView stats={stats} weekEndingDay={weekEndingDay} />
       )}
-
       {viewMode === 'comparison' && (
         <div className="flex-1 flex items-center justify-center bg-gray-100">
           <div className="text-center">
             <div className="text-6xl mb-5">⚖️</div>
             <p className="text-xl font-bold text-gray-700 mb-2">Comparison</p>
-            <p className="text-sm text-gray-400 max-w-xs">Overlay and compare two or more statistics side by side.</p>
+            <p className="text-sm text-gray-400 max-w-xs">
+              Overlay and compare two or more statistics side by side.
+            </p>
             <p className="mt-4 text-xs text-gray-300 italic">Coming soon</p>
           </div>
         </div>
       )}
-
       {/* ── BODY (Graphs mode only) ──────────────────────────────────────── */}
       {viewMode === 'graphs' && (
-      <div className="flex flex-1 overflow-hidden">
-
-        {/* ── LEFT PANEL ─────────────────────────────────────────────────── */}
-        {/* On phones, once a stat is picked the chart takes over the whole
+        <div className="flex flex-1 overflow-hidden">
+          {/* ── LEFT PANEL ─────────────────────────────────────────────────── */}
+          {/* On phones, once a stat is picked the chart takes over the whole
             screen — the list slides out of the way and the user gets back to
             it via the chart-header back arrow. Desktop keeps both visible. */}
-        <aside className={`${selectedStat ? 'hidden md:flex' : 'flex'} w-full md:w-64 xl:w-72 md:flex-shrink-0 flex-col bg-white border-r border-gray-200 overflow-hidden`}>
-
-          {/* Folder rows — hidden entirely when admin disables the archive folder */}
-          {showStatArchiveFolder && (
-            <div className="px-2 py-2 border-b border-gray-100 space-y-0.5">
-              <FolderRow id="all"      label="All Stats"      count={accessibleStats.length} />
-              <FolderRow id="archived" label="Archived"       count={archivedStats.length} />
-            </div>
-          )}
-
-          {/* Stat group filter pills — one button per group, plus an "All"
-              button to clear the filter. Only render when at least one
-              group exists. */}
-          {(statGroups || []).length > 0 && (
-            <div className="px-2 py-2 border-b border-gray-100 flex flex-wrap gap-1">
-              <button
-                onClick={() => setFilterGroupId(null)}
-                className={`px-2 py-0.5 rounded text-[11px] font-medium border transition-colors ${
-                  filterGroupId === null
-                    ? 'bg-green-700 text-white border-green-700'
-                    : 'bg-white text-gray-600 border-gray-200 hover:border-green-500'
-                }`}
-              >
-                All
-              </button>
-              {statGroups.map(g => {
-                const active = filterGroupId === g.id
-                return (
-                  <button
-                    key={g.id}
-                    onClick={() => setFilterGroupId(active ? null : g.id)}
-                    title={g.name}
-                    className={`px-2 py-0.5 rounded text-[11px] font-medium border transition-colors max-w-[10rem] truncate ${
-                      active
-                        ? 'bg-green-700 text-white border-green-700'
-                        : 'bg-white text-gray-600 border-gray-200 hover:border-green-500'
-                    }`}
-                  >
-                    {g.name}
-                  </button>
-                )
-              })}
-            </div>
-          )}
-
-          {/* Flat stat list */}
-          <div className="flex-1 overflow-y-auto">
-            {folderStats.slice(0, showN).map(s => (
-              <div
-                key={s.id}
-                draggable
-                onDragStart={(e) => handleDragStart(e, s.id)}
-                onDragOver={(e)  => handleDragOver(e, s.id)}
-                onDrop={(e)      => handleDrop(e, s.id)}
-                onDragEnd={handleDragEnd}
-                onClick={() => selectStat(s.id)}
-                className={`w-full text-left px-3 py-2.5 text-sm border-b border-gray-50 transition-colors cursor-pointer flex items-center gap-2 ${
-                  s.id === selectedId
-                    ? 'bg-green-50 text-green-800 font-medium'
-                    : 'text-gray-900 hover:bg-gray-50'
-                } ${s.id === dragId ? 'opacity-30' : ''} ${
-                  s.id === dragOverId ? 'border-t-2 border-t-green-500' : ''
-                }`}
-              >
-                {/* Drag handle */}
-                <span
-                  className="text-gray-300 hover:text-gray-500 cursor-grab flex-shrink-0 select-none text-base leading-none"
-                  title="Drag to reorder"
-                >⠿</span>
-                <div className="flex-1 min-w-0">
-                  <div className="truncate flex items-center gap-1">
-                    <span className="font-semibold text-gray-900 truncate">{s.name}</span>
-                    {s.stat_category === 'equation' && (
-                      <span className="text-[8px] bg-purple-100 text-purple-700 px-0.5 py-px rounded font-semibold flex-shrink-0">∑</span>
-                    )}
-                    {s.stat_category === 'overlay' && (
-                      <span className="text-[8px] bg-indigo-100 text-indigo-700 px-0.5 py-px rounded font-semibold flex-shrink-0">⊕</span>
-                    )}
-                    {s.stat_category === 'auto_internal' && (
-                      <span className="text-[7px] bg-blue-100 text-blue-700 px-0.5 py-px rounded font-semibold flex-shrink-0">⚡</span>
-                    )}
-                    {s.owner_user_id === user?.id ? (
-                      <span className="text-[7px] bg-green-100 text-green-700 px-0.5 py-px rounded font-semibold flex-shrink-0" title="You own this stat">Owner</span>
-                    ) : userShares[s.id] ? (
-                      <span className="text-[7px] bg-blue-100 text-blue-700 px-0.5 py-px rounded font-semibold flex-shrink-0" title={`Shared with you (${userShares[s.id]})`}>
-                        Shared
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="text-xs text-gray-400 mt-0.5 capitalize">{s.tracking} · {s.stat_type}</div>
-                </div>
-              </div>
-            ))}
-            {folderStats.length === 0 && (
-              <div className="px-4 py-8 text-center text-sm text-gray-400">
-                {search ? 'No results' : 'No statistics yet'}
+          <aside
+            className={`${selectedStat ? 'hidden md:flex' : 'flex'} w-full md:w-64 xl:w-72 md:flex-shrink-0 flex-col bg-white border-r border-gray-200 overflow-hidden`}
+          >
+            {/* Folder rows — hidden entirely when admin disables the archive folder */}
+            {showStatArchiveFolder && (
+              <div className="px-2 py-2 border-b border-gray-100 space-y-0.5">
+                <FolderRow id="all" label="All Stats" count={accessibleStats.length} />
+                <FolderRow id="archived" label="Archived" count={archivedStats.length} />
               </div>
             )}
-          </div>
 
-        </aside>
-
-        {/* ── RIGHT PANEL ────────────────────────────────────────────────── */}
-        {/* Hidden on phones until a stat is selected (matches the sidebar
-            swap above). Always visible on tablet and up. */}
-        <main className={`${selectedStat ? 'flex' : 'hidden md:flex'} flex-1 flex-col overflow-hidden min-w-0`}>
-
-          {!selectedStat ? (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center text-gray-400">
-                <div className="text-5xl mb-4">📈</div>
-                <p className="text-base font-medium">Select a statistic to view its chart</p>
-                <p className="text-sm mt-1">or create a new one using the + New button above</p>
+            {/* Stat group filter pills — one button per group, plus an "All"
+              button to clear the filter. Only render when at least one
+              group exists. */}
+            {(statGroups || []).length > 0 && (
+              <div className="px-2 py-2 border-b border-gray-100 flex flex-wrap gap-1">
+                <button
+                  onClick={() => setFilterGroupId(null)}
+                  className={`px-2 py-0.5 rounded text-[11px] font-medium border transition-colors ${
+                    filterGroupId === null
+                      ? 'bg-green-700 text-white border-green-700'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-green-500'
+                  }`}
+                >
+                  All
+                </button>
+                {statGroups.map(g => {
+                  const active = filterGroupId === g.id
+                  return (
+                    <button
+                      key={g.id}
+                      onClick={() => setFilterGroupId(active ? null : g.id)}
+                      title={g.name}
+                      className={`px-2 py-0.5 rounded text-[11px] font-medium border transition-colors max-w-[10rem] truncate ${
+                        active
+                          ? 'bg-green-700 text-white border-green-700'
+                          : 'bg-white text-gray-600 border-gray-200 hover:border-green-500'
+                      }`}
+                    >
+                      {g.name}
+                    </button>
+                  )
+                })}
               </div>
+            )}
+
+            {/* Flat stat list */}
+            <div className="flex-1 overflow-y-auto">
+              {folderStats.slice(0, showN).map(s => (
+                <div
+                  key={s.id}
+                  draggable
+                  onDragStart={e => handleDragStart(e, s.id)}
+                  onDragOver={e => handleDragOver(e, s.id)}
+                  onDrop={e => handleDrop(e, s.id)}
+                  onDragEnd={handleDragEnd}
+                  onClick={() => selectStat(s.id)}
+                  className={`w-full text-left px-3 py-2.5 text-sm border-b border-gray-50 transition-colors cursor-pointer flex items-center gap-2 ${
+                    s.id === selectedId
+                      ? 'bg-green-50 text-green-800 font-medium'
+                      : 'text-gray-900 hover:bg-gray-50'
+                  } ${s.id === dragId ? 'opacity-30' : ''} ${
+                    s.id === dragOverId ? 'border-t-2 border-t-green-500' : ''
+                  }`}
+                >
+                  {/* Drag handle */}
+                  <span
+                    className="text-gray-300 hover:text-gray-500 cursor-grab flex-shrink-0 select-none text-base leading-none"
+                    title="Drag to reorder"
+                  >
+                    ⠿
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="truncate flex items-center gap-1">
+                      <span className="font-semibold text-gray-900 truncate">{s.name}</span>
+                      {s.stat_category === 'equation' && (
+                        <span className="text-[8px] bg-purple-100 text-purple-700 px-0.5 py-px rounded font-semibold flex-shrink-0">
+                          ∑
+                        </span>
+                      )}
+                      {s.stat_category === 'overlay' && (
+                        <span className="text-[8px] bg-indigo-100 text-indigo-700 px-0.5 py-px rounded font-semibold flex-shrink-0">
+                          ⊕
+                        </span>
+                      )}
+                      {s.stat_category === 'auto_internal' && (
+                        <span className="text-[7px] bg-blue-100 text-blue-700 px-0.5 py-px rounded font-semibold flex-shrink-0">
+                          ⚡
+                        </span>
+                      )}
+                      {s.owner_user_id === user?.id ? (
+                        <span
+                          className="text-[7px] bg-green-100 text-green-700 px-0.5 py-px rounded font-semibold flex-shrink-0"
+                          title="You own this stat"
+                        >
+                          Owner
+                        </span>
+                      ) : userShares[s.id] ? (
+                        <span
+                          className="text-[7px] bg-blue-100 text-blue-700 px-0.5 py-px rounded font-semibold flex-shrink-0"
+                          title={`Shared with you (${userShares[s.id]})`}
+                        >
+                          Shared
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-0.5 capitalize">
+                      {s.tracking} · {s.stat_type}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {folderStats.length === 0 && (
+                <div className="px-4 py-8 text-center text-sm text-gray-400">
+                  {search ? 'No results' : 'No statistics yet'}
+                </div>
+              )}
             </div>
-          ) : (
-            <>
-              {/* Chart header: on mobile we let the row wrap so the stat name
+          </aside>
+
+          {/* ── RIGHT PANEL ────────────────────────────────────────────────── */}
+          {/* Hidden on phones until a stat is selected (matches the sidebar
+            swap above). Always visible on tablet and up. */}
+          <main
+            className={`${selectedStat ? 'flex' : 'hidden md:flex'} flex-1 flex-col overflow-hidden min-w-0`}
+          >
+            {!selectedStat ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center text-gray-400">
+                  <div className="text-5xl mb-4">📈</div>
+                  <p className="text-base font-medium">Select a statistic to view its chart</p>
+                  <p className="text-sm mt-1">or create a new one using the + New button above</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Chart header: on mobile we let the row wrap so the stat name
                   drops onto its own line below the buttons; on desktop the
                   absolutely-centered layout still works. */}
-              <div className="relative flex flex-wrap items-center px-1 sm:px-6 py-1.5 bg-gray-100 border-b border-gray-200 flex-shrink-0 gap-y-1">
-                {/* Left — back arrow (mobile only), print, share, auto min/max.
+                <div className="relative flex flex-wrap items-center px-1 sm:px-6 py-1.5 bg-gray-100 border-b border-gray-200 flex-shrink-0 gap-y-1">
+                  {/* Left — back arrow (mobile only), print, share, auto min/max.
                     On mobile we shrink to the back-arrow's natural width so the
                     stat-name span (flex-1 on mobile) gets nearly the whole row
                     instead of being squeezed into a third of it. */}
-                <div className="flex-shrink-0 sm:flex-1 flex items-center gap-2">
-                  <button
-                    title="Back to stat list"
-                    onClick={() => setSelectedId(null)}
-                    className="md:hidden px-0.5 py-0 rounded-lg hover:bg-gray-200 text-gray-900 font-black flex-shrink-0 leading-none"
-                  >
-                    <span className="text-3xl leading-none font-black">‹</span>
-                  </button>
-                  <button title="Print" onClick={handlePrint} className="hidden sm:inline-flex p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-xl">🖨️</button>
-                  <button title="Share" className="hidden sm:inline-flex p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-xl">🔗</button>
-                  <div className="hidden sm:flex gap-1 ml-1">
-                    {[['autoMin', autoMin, setAutoMin, 'Auto Min'], ['autoMax', autoMax, setAutoMax, 'Auto Max']].map(([k, val, setter, lbl]) => (
-                      <button
-                        key={k}
-                        onClick={() => setter(v => !v)}
-                        className={`px-2 py-0.5 rounded text-xs font-medium border transition-colors ${
-                          val
-                            ? 'border-green-600 text-green-700 bg-green-50'
-                            : 'border-gray-300 text-gray-400 bg-white hover:bg-gray-50'
-                        }`}
-                      >
-                        {lbl}
-                      </button>
-                    ))}
-                    {/* Default — marks this stat as the user's default view
-                        on next Statistics page load. Per-user, stored in
-                        localStorage. Click again to unset. */}
-                    {(() => {
-                      const isDefault = String(defaultStatId) === String(selectedStat?.id)
-                      return (
+                  <div className="flex-shrink-0 sm:flex-1 flex items-center gap-2">
+                    <button
+                      title="Back to stat list"
+                      onClick={() => setSelectedId(null)}
+                      className="md:hidden px-0.5 py-0 rounded-lg hover:bg-gray-200 text-gray-900 font-black flex-shrink-0 leading-none"
+                    >
+                      <span className="text-3xl leading-none font-black">‹</span>
+                    </button>
+                    <button
+                      title="Print"
+                      onClick={handlePrint}
+                      className="hidden sm:inline-flex p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-xl"
+                    >
+                      🖨️
+                    </button>
+                    <button
+                      title="Share"
+                      className="hidden sm:inline-flex p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-xl"
+                    >
+                      🔗
+                    </button>
+                    <div className="hidden sm:flex gap-1 ml-1">
+                      {[
+                        ['autoMin', autoMin, setAutoMin, 'Auto Min'],
+                        ['autoMax', autoMax, setAutoMax, 'Auto Max'],
+                      ].map(([k, val, setter, lbl]) => (
                         <button
-                          onClick={() => toggleDefaultStat(selectedStat?.id)}
-                          title={isDefault
-                            ? 'This stat opens by default — click to clear'
-                            : 'Make this the stat that opens by default for you'}
-                          className={`px-2 py-0.5 rounded text-xs font-medium border transition-colors flex items-center gap-1 ${
-                            isDefault
-                              ? 'border-amber-500 text-amber-700 bg-amber-50'
+                          key={k}
+                          onClick={() => setter(v => !v)}
+                          className={`px-2 py-0.5 rounded text-xs font-medium border transition-colors ${
+                            val
+                              ? 'border-green-600 text-green-700 bg-green-50'
                               : 'border-gray-300 text-gray-400 bg-white hover:bg-gray-50'
                           }`}
                         >
-                          <span aria-hidden>{isDefault ? '★' : '☆'}</span>
-                          Default
+                          {lbl}
                         </button>
-                      )
-                    })()}
+                      ))}
+                      {/* Default — marks this stat as the user's default view
+                        on next Statistics page load. Per-user, stored in
+                        localStorage. Click again to unset. */}
+                      {(() => {
+                        const isDefault = String(defaultStatId) === String(selectedStat?.id)
+                        return (
+                          <button
+                            onClick={() => toggleDefaultStat(selectedStat?.id)}
+                            title={
+                              isDefault
+                                ? 'This stat opens by default — click to clear'
+                                : 'Make this the stat that opens by default for you'
+                            }
+                            className={`px-2 py-0.5 rounded text-xs font-medium border transition-colors flex items-center gap-1 ${
+                              isDefault
+                                ? 'border-amber-500 text-amber-700 bg-amber-50'
+                                : 'border-gray-300 text-gray-400 bg-white hover:bg-gray-50'
+                            }`}
+                          >
+                            <span aria-hidden>{isDefault ? '★' : '☆'}</span>
+                            Default
+                          </button>
+                        )
+                      })()}
+                    </div>
                   </div>
-                </div>
 
-                {/* Stat name — single-line on every viewport.
+                  {/* Stat name — single-line on every viewport.
                     On mobile the left/right wrappers shrink to natural width,
                     so the title's flex-1 picks up nearly the whole row and
                     the name can display in full without truncation. */}
-                <span className="md:absolute md:left-1/2 md:-translate-x-1/2 flex-1 md:flex-none min-w-0 text-center md:max-w-xs text-sm tracking-tight md:tracking-normal md:text-lg font-bold text-gray-800 truncate whitespace-nowrap px-2 md:px-0 pointer-events-none">
-                  {selectedStat.name}
-                </span>
+                  <span className="md:absolute md:left-1/2 md:-translate-x-1/2 flex-1 md:flex-none min-w-0 text-center md:max-w-xs text-sm tracking-tight md:tracking-normal md:text-lg font-bold text-gray-800 truncate whitespace-nowrap px-2 md:px-0 pointer-events-none">
+                    {selectedStat.name}
+                  </span>
 
-                {/* Right — quick entry (hidden for equation stats) + arrows flush right.
+                  {/* Right — quick entry (hidden for equation stats) + arrows flush right.
                     On mobile the inline entry is hidden — the new Entry popup
                     button (next to the module title) covers the same ground. */}
-                <div className="flex-shrink-0 sm:flex-1 flex items-center justify-end pr-1 sm:pr-2 gap-1 sm:gap-2">
-                  {!['equation','overlay'].includes(selectedStat?.stat_category) && (
-                  <div className="hidden sm:flex items-center gap-1 sm:gap-1.5">
-                    <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white">
-                      <span className="w-20 sm:w-36 flex-shrink-0 text-center px-1 sm:px-2 text-[10px] sm:text-xs text-gray-400 whitespace-nowrap truncate border-r border-gray-200 bg-gray-50 py-1.5 select-none">
-                        {quickPeriod.label}
-                      </span>
-                      <input
-                        type="number"
-                        value={quickValue}
-                        onChange={e => setQuickValue(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && handleQuickSave()}
-                        placeholder="Value"
-                        className="w-14 sm:w-20 px-1.5 sm:px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white"
-                      />
-                    </div>
-                    <button
-                      onClick={handleQuickSave}
-                      disabled={quickSaving}
-                      className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-white disabled:opacity-50"
-                      style={{ backgroundColor: FG }}
-                    >
-                      {quickSaving ? '…' : 'Save'}
-                    </button>
-                    {quickSaveMsg && (
-                      <span className={`text-xs font-semibold ${quickSaveMsg.startsWith('⚠️') ? 'text-red-500' : 'text-green-600'}`}>
-                        {quickSaveMsg}
-                      </span>
+                  <div className="flex-shrink-0 sm:flex-1 flex items-center justify-end pr-1 sm:pr-2 gap-1 sm:gap-2">
+                    {!['equation', 'overlay'].includes(selectedStat?.stat_category) && (
+                      <div className="hidden sm:flex items-center gap-1 sm:gap-1.5">
+                        <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white">
+                          <span className="w-20 sm:w-36 flex-shrink-0 text-center px-1 sm:px-2 text-[10px] sm:text-xs text-gray-400 whitespace-nowrap truncate border-r border-gray-200 bg-gray-50 py-1.5 select-none">
+                            {quickPeriod.label}
+                          </span>
+                          <input
+                            type="number"
+                            value={quickValue}
+                            onChange={e => setQuickValue(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && handleQuickSave()}
+                            placeholder="Value"
+                            className="w-14 sm:w-20 px-1.5 sm:px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white"
+                          />
+                        </div>
+                        <button
+                          onClick={handleQuickSave}
+                          disabled={quickSaving}
+                          className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-white disabled:opacity-50"
+                          style={{ backgroundColor: FG }}
+                        >
+                          {quickSaving ? '…' : 'Save'}
+                        </button>
+                        {quickSaveMsg && (
+                          <span
+                            className={`text-xs font-semibold ${quickSaveMsg.startsWith('⚠️') ? 'text-red-500' : 'text-green-600'}`}
+                          >
+                            {quickSaveMsg}
+                          </span>
+                        )}
+                        <div className="w-px h-5 bg-gray-200 mx-0.5 flex-shrink-0" />
+                      </div>
                     )}
-                    <div className="w-px h-5 bg-gray-200 mx-0.5 flex-shrink-0" />
-                  </div>
-                  )}
-                  <div className="flex items-center gap-2 sm:gap-0 flex-shrink-0">
-                    <button
-                      onClick={() => goTo(-1)}
-                      disabled={!hasPrev}
-                      className="px-1 sm:px-1 py-0.5 rounded text-blue-700 sm:text-blue-500 hover:bg-blue-50 disabled:opacity-30 text-3xl sm:text-xl font-black leading-none"
-                    >
-                      ⬆
-                    </button>
-                    <button
-                      onClick={() => goTo(1)}
-                      disabled={!hasNext}
-                      className="px-1 sm:px-1 py-0.5 rounded text-blue-700 sm:text-blue-500 hover:bg-blue-50 disabled:opacity-30 text-3xl sm:text-xl font-black leading-none"
-                    >
-                      ⬇
-                    </button>
+                    <div className="flex items-center gap-2 sm:gap-0 flex-shrink-0">
+                      <button
+                        onClick={() => goTo(-1)}
+                        disabled={!hasPrev}
+                        className="px-1 sm:px-1 py-0.5 rounded text-blue-700 sm:text-blue-500 hover:bg-blue-50 disabled:opacity-30 text-3xl sm:text-xl font-black leading-none"
+                      >
+                        ⬆
+                      </button>
+                      <button
+                        onClick={() => goTo(1)}
+                        disabled={!hasNext}
+                        className="px-1 sm:px-1 py-0.5 rounded text-blue-700 sm:text-blue-500 hover:bg-blue-50 disabled:opacity-30 text-3xl sm:text-xl font-black leading-none"
+                      >
+                        ⬇
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {selectedStat?.stat_category !== 'target' && (
-                /* Period tabs + FROM/TO + chart style toggle */
-                <div className="flex items-center gap-2 py-2 px-3 bg-white border-b border-gray-100 flex-shrink-0 flex-wrap">
-                  <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
-                    {/* Show-values toggle ("V") — sits inside the period-tabs
+                {selectedStat?.stat_category !== 'target' && (
+                  /* Period tabs + FROM/TO + chart style toggle */
+                  <div className="flex items-center gap-2 py-2 px-3 bg-white border-b border-gray-100 flex-shrink-0 flex-wrap">
+                    <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+                      {/* Show-values toggle ("V") — sits inside the period-tabs
                         bar so it shares the same height. Click flips
                         statistics.show_values for the currently selected stat. */}
-                    {selectedStat && (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          const next = !selectedStat.show_values
-                          // Optimistic update
-                          setStats(prev => prev.map(s => s.id === selectedStat.id ? { ...s, show_values: next } : s))
-                          await supabase.from('statistics').update({ show_values: next }).eq('id', selectedStat.id)
-                        }}
-                        title={selectedStat.show_values ? 'Hide values on chart' : 'Show values on chart'}
-                        className={`px-2.5 py-1.5 text-base font-black border-r border-gray-200 transition-colors ${
-                          selectedStat.show_values
-                            ? 'text-white'
-                            : 'text-gray-400 hover:bg-gray-50'
-                        }`}
-                        style={selectedStat.show_values ? { backgroundColor: FG } : {}}
-                      >
-                        V
-                      </button>
-                    )}
-                    {['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Yearly'].map(p => {
-                      const pid        = p.toLowerCase()
-                      const nativeIdx  = PERIOD_ORDER.indexOf(selectedStat?.tracking ?? 'daily')
-                      const pidIdx     = PERIOD_ORDER.indexOf(pid)
-                      const isDisabled = selectedStat && pidIdx < nativeIdx
-                      const isActive   = viewPeriod === pid
-                      return (
+                      {selectedStat && (
                         <button
-                          key={p}
-                          onClick={() => !isDisabled && setViewPeriod(pid)}
-                          disabled={isDisabled}
-                          title={isDisabled ? `Stat tracks ${selectedStat.tracking} — can't roll up to ${p}` : p}
-                          className={`px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
-                            isActive ? 'text-white' : 'text-gray-600 hover:bg-gray-50'
+                          type="button"
+                          onClick={async () => {
+                            const next = !selectedStat.show_values
+                            // Optimistic update
+                            setStats(prev =>
+                              prev.map(s =>
+                                s.id === selectedStat.id ? { ...s, show_values: next } : s
+                              )
+                            )
+                            await supabase
+                              .from('statistics')
+                              .update({ show_values: next })
+                              .eq('id', selectedStat.id)
+                          }}
+                          title={
+                            selectedStat.show_values
+                              ? 'Hide values on chart'
+                              : 'Show values on chart'
+                          }
+                          className={`px-2.5 py-1.5 text-base font-black border-r border-gray-200 transition-colors ${
+                            selectedStat.show_values
+                              ? 'text-white'
+                              : 'text-gray-400 hover:bg-gray-50'
                           }`}
-                          style={isActive ? { backgroundColor: FG } : {}}
+                          style={selectedStat.show_values ? { backgroundColor: FG } : {}}
                         >
-                          {p}
+                          V
                         </button>
-                      )
-                    })}
-                  </div>
+                      )}
+                      {['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Yearly'].map(p => {
+                        const pid = p.toLowerCase()
+                        const nativeIdx = PERIOD_ORDER.indexOf(selectedStat?.tracking ?? 'daily')
+                        const pidIdx = PERIOD_ORDER.indexOf(pid)
+                        const isDisabled = selectedStat && pidIdx < nativeIdx
+                        const isActive = viewPeriod === pid
+                        return (
+                          <button
+                            key={p}
+                            onClick={() => !isDisabled && setViewPeriod(pid)}
+                            disabled={isDisabled}
+                            title={
+                              isDisabled
+                                ? `Stat tracks ${selectedStat.tracking} — can't roll up to ${p}`
+                                : p
+                            }
+                            className={`px-2.5 py-1.5 text-xs font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+                              isActive ? 'text-white' : 'text-gray-600 hover:bg-gray-50'
+                            }`}
+                            style={isActive ? { backgroundColor: FG } : {}}
+                          >
+                            {p}
+                          </button>
+                        )
+                      })}
+                    </div>
 
-                  {/* Date range + chart-style toggle. We group these into a
+                    {/* Date range + chart-style toggle. We group these into a
                       single flex-nowrap row so on mobile they always sit on
                       the same line — the date inputs are skinnier (w-[88px])
                       with FROM/TO labels hidden, leaving room for the
                       bar/line picker on the right. */}
-                  <div className="flex items-center gap-1 flex-nowrap w-full sm:w-auto sm:contents">
-                  <div className="flex items-center gap-0.5 sm:gap-1">
-                    <span className="hidden sm:inline text-[10px] sm:text-xs text-gray-500 font-medium">FROM</span>
-                    <input
-                      type="date"
-                      value={fromDate}
-                      onChange={e => setFromDate(e.target.value)}
-                      className="border border-gray-300 rounded-md px-1.5 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs w-[108px] sm:w-auto focus:outline-none focus:ring-2 focus:ring-green-600"
-                    />
-                  </div>
-                  <div className="flex items-center gap-0.5 sm:gap-1">
-                    <span className="hidden sm:inline text-[10px] sm:text-xs text-gray-500 font-medium">TO</span>
-                    <input
-                      type="date"
-                      value={toDate}
-                      onChange={e => setToDate(e.target.value)}
-                      className="border border-gray-300 rounded-md px-1.5 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs w-[108px] sm:w-auto focus:outline-none focus:ring-2 focus:ring-green-600"
-                    />
-                  </div>
+                    <div className="flex items-center gap-1 flex-nowrap w-full sm:w-auto sm:contents">
+                      <div className="flex items-center gap-0.5 sm:gap-1">
+                        <span className="hidden sm:inline text-[10px] sm:text-xs text-gray-500 font-medium">
+                          FROM
+                        </span>
+                        <input
+                          type="date"
+                          value={fromDate}
+                          onChange={e => setFromDate(e.target.value)}
+                          className="border border-gray-300 rounded-md px-1.5 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs w-[108px] sm:w-auto focus:outline-none focus:ring-2 focus:ring-green-600"
+                        />
+                      </div>
+                      <div className="flex items-center gap-0.5 sm:gap-1">
+                        <span className="hidden sm:inline text-[10px] sm:text-xs text-gray-500 font-medium">
+                          TO
+                        </span>
+                        <input
+                          type="date"
+                          value={toDate}
+                          onChange={e => setToDate(e.target.value)}
+                          className="border border-gray-300 rounded-md px-1.5 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs w-[108px] sm:w-auto focus:outline-none focus:ring-2 focus:ring-green-600"
+                        />
+                      </div>
 
-                  {/* Bar / Line toggle — sits to the right of the date range
+                      {/* Bar / Line toggle — sits to the right of the date range
                       on every viewport. */}
-                  <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden flex-shrink-0 ml-auto sm:ml-auto">
-                    <button
-                      title="Line chart"
-                      onClick={() => setChartStyle('line')}
-                      className={`px-2 py-1.5 transition-colors ${chartStyle === 'line' ? 'text-white' : 'text-gray-500 hover:bg-gray-50'}`}
-                      style={chartStyle === 'line' ? { backgroundColor: FG } : {}}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <polyline points="1,13 4,8 7,10 10,4 13,6 15,2"
-                          stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                        <circle cx="1"  cy="13" r="1.2" fill="currentColor"/>
-                        <circle cx="4"  cy="8"  r="1.2" fill="currentColor"/>
-                        <circle cx="7"  cy="10" r="1.2" fill="currentColor"/>
-                        <circle cx="10" cy="4"  r="1.2" fill="currentColor"/>
-                        <circle cx="13" cy="6"  r="1.2" fill="currentColor"/>
-                        <circle cx="15" cy="2"  r="1.2" fill="currentColor"/>
-                      </svg>
-                    </button>
-                    <button
-                      title="Bar chart"
-                      onClick={() => setChartStyle('bar')}
-                      className={`px-2 py-1.5 transition-colors ${chartStyle === 'bar' ? 'text-white' : 'text-gray-500 hover:bg-gray-50'}`}
-                      style={chartStyle === 'bar' ? { backgroundColor: FG } : {}}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <rect x="1"  y="9"  width="3" height="6" rx="0.8" fill="currentColor"/>
-                        <rect x="6"  y="5"  width="3" height="10" rx="0.8" fill="currentColor"/>
-                        <rect x="11" y="1"  width="3" height="14" rx="0.8" fill="currentColor"/>
-                      </svg>
-                    </button>
+                      <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden flex-shrink-0 ml-auto sm:ml-auto">
+                        <button
+                          title="Line chart"
+                          onClick={() => setChartStyle('line')}
+                          className={`px-2 py-1.5 transition-colors ${chartStyle === 'line' ? 'text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+                          style={chartStyle === 'line' ? { backgroundColor: FG } : {}}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <polyline
+                              points="1,13 4,8 7,10 10,4 13,6 15,2"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                            <circle cx="1" cy="13" r="1.2" fill="currentColor" />
+                            <circle cx="4" cy="8" r="1.2" fill="currentColor" />
+                            <circle cx="7" cy="10" r="1.2" fill="currentColor" />
+                            <circle cx="10" cy="4" r="1.2" fill="currentColor" />
+                            <circle cx="13" cy="6" r="1.2" fill="currentColor" />
+                            <circle cx="15" cy="2" r="1.2" fill="currentColor" />
+                          </svg>
+                        </button>
+                        <button
+                          title="Bar chart"
+                          onClick={() => setChartStyle('bar')}
+                          className={`px-2 py-1.5 transition-colors ${chartStyle === 'bar' ? 'text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+                          style={chartStyle === 'bar' ? { backgroundColor: FG } : {}}
+                        >
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <rect x="1" y="9" width="3" height="6" rx="0.8" fill="currentColor" />
+                            <rect x="6" y="5" width="3" height="10" rx="0.8" fill="currentColor" />
+                            <rect x="11" y="1" width="3" height="14" rx="0.8" fill="currentColor" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                    {/* /date+chart-style nowrap wrapper */}
                   </div>
-                  </div>{/* /date+chart-style nowrap wrapper */}
-                </div>
-              )}
+                )}
 
-              {/* Chart — minimal horizontal padding on mobile so the Y axis
+                {/* Chart — minimal horizontal padding on mobile so the Y axis
                   sits close to the screen edge. No bottom padding on mobile
                   so the slider scrubber sits flush against the x-axis. */}
-              <div ref={chartPrintRef} className="flex-1 max-h-[50vh] sm:max-h-none px-1 sm:px-4 pt-4 pb-0 sm:pb-4 overflow-hidden relative bg-white">
-
-                {selectedStat.stat_category === 'overlay' ? (
-                  /* ── Overlay chart ─────────────────────────────────────── */
-                  valuesStatId !== selectedId ? (
-                    <div className="h-full flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700" />
-                    </div>
-                  ) : !overlayChartData || overlayChartData.length === 0 ? (
-                    <div className="h-full flex items-center justify-center text-gray-400">
-                      <div className="text-center">
-                        <div className="text-3xl mb-2">📊</div>
-                        <p className="text-sm">No data available for this overlay.</p>
+                <div
+                  ref={chartPrintRef}
+                  className="flex-1 max-h-[50vh] sm:max-h-none px-1 sm:px-4 pt-4 pb-0 sm:pb-4 overflow-hidden relative bg-white"
+                >
+                  {selectedStat.stat_category === 'overlay' ? (
+                    /* ── Overlay chart ─────────────────────────────────────── */
+                    valuesStatId !== selectedId ? (
+                      <div className="h-full flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700" />
                       </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col h-full">
-                      {/* Legend */}
-                      <div className="flex items-center gap-5 mb-2 px-1 flex-shrink-0">
-                        {overlayValues.map(({ stat }, i) => (
-                          <div key={i} className="flex items-center gap-1.5">
-                            <div className="w-8 h-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: OVERLAY_COLORS[i] }} />
-                            <span className="text-xs font-semibold text-gray-700">{stat?.name || '—'}</span>
-                          </div>
-                        ))}
+                    ) : !overlayChartData || overlayChartData.length === 0 ? (
+                      <div className="h-full flex items-center justify-center text-gray-400">
+                        <div className="text-center">
+                          <div className="text-3xl mb-2">📊</div>
+                          <p className="text-sm">No data available for this overlay.</p>
+                        </div>
                       </div>
-                      <div className="flex-1 min-h-0">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={overlayChartData} margin={{ top: 10, right: isMobile ? 6 : 24, left: isMobile ? -8 : 16, bottom: isMobile ? 6 : 20 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                            <XAxis
-                              dataKey="label"
-                              tick={{ fontSize: 11, fill: '#111827', fontWeight: 600, angle: -45, textAnchor: 'end', dx: -4, dy: 4 }}
-                              tickLine={false}
-                              axisLine={{ stroke: '#d1d5db' }}
-                              height={70}
-                              interval="preserveStartEnd"
-                            />
-                            {overlayValues.map(({ stat }, i) => (
-                              <YAxis
-                                key={i}
-                                yAxisId={`y${i}`}
-                                orientation={i === 0 ? 'left' : 'right'}
-                                domain={overlayYDomains[i] ?? ['auto', 'auto']}
-                                tickCount={15}
-                                tick={{ fontSize: 10, fill: OVERLAY_COLORS[i], fontWeight: 700 }}
-                                tickLine={false}
-                                axisLine={false}
-                                tickFormatter={v => {
-                                  if (selectedStat.stat_type === 'currency')   return '$' + Number(v).toLocaleString()
-                                  if (selectedStat.stat_type === 'percentage') return v + '%'
-                                  return Number(v).toLocaleString()
-                                }}
-                                width={isMobile ? 44 : 72}
+                    ) : (
+                      <div className="flex flex-col h-full">
+                        {/* Legend */}
+                        <div className="flex items-center gap-5 mb-2 px-1 flex-shrink-0">
+                          {overlayValues.map(({ stat }, i) => (
+                            <div key={i} className="flex items-center gap-1.5">
+                              <div
+                                className="w-8 h-0.5 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: OVERLAY_COLORS[i] }}
                               />
-                            ))}
-                            <Tooltip
-                              content={({ active, payload, label }) => {
-                                if (!active || !payload?.length) return null
-                                return (
-                                  <div className="bg-white border border-gray-200 rounded-xl shadow-lg px-3 py-2.5 text-xs">
-                                    <p className="font-bold text-gray-500 mb-1.5">{label}</p>
-                                    {overlayValues.map(({ stat }, i) => {
-                                      const entry = payload.find(p => p.dataKey === `v${i}`)
-                                      if (!entry || entry.value == null) return null
-                                      return (
-                                        <div key={i} className="flex items-center gap-2 mb-0.5">
-                                          <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: OVERLAY_COLORS[i] }} />
-                                          <span className="text-gray-600">{stat?.name}:</span>
-                                          <span className="font-bold text-gray-900">{fmt(entry.value, selectedStat.stat_type)}</span>
-                                        </div>
-                                      )
-                                    })}
-                                  </div>
-                                )
+                              <span className="text-xs font-semibold text-gray-700">
+                                {stat?.name || '—'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex-1 min-h-0">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart
+                              data={overlayChartData}
+                              margin={{
+                                top: 10,
+                                right: isMobile ? 6 : 24,
+                                left: isMobile ? -8 : 16,
+                                bottom: isMobile ? 6 : 20,
                               }}
-                            />
-                            {overlayValues.map((_, i) => (
-                              <Line
-                                key={i}
-                                yAxisId={`y${i}`}
-                                type="linear"
-                                dataKey={`v${i}`}
-                                stroke={OVERLAY_COLORS[i]}
-                                strokeWidth={2.5}
-                                dot={false}
-                                activeDot={{ r: 5, fill: OVERLAY_COLORS[i] }}
-                                connectNulls={false}
-                                isAnimationActive={false}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                              <XAxis
+                                dataKey="label"
+                                tick={{
+                                  fontSize: 11,
+                                  fill: '#111827',
+                                  fontWeight: 600,
+                                  angle: -45,
+                                  textAnchor: 'end',
+                                  dx: -4,
+                                  dy: 4,
+                                }}
+                                tickLine={false}
+                                axisLine={{ stroke: '#d1d5db' }}
+                                height={70}
+                                interval="preserveStartEnd"
                               />
-                            ))}
-                          </LineChart>
-                        </ResponsiveContainer>
+                              {overlayValues.map((_, i) => (
+                                <YAxis
+                                  key={i}
+                                  yAxisId={`y${i}`}
+                                  orientation={i === 0 ? 'left' : 'right'}
+                                  domain={overlayYDomains[i] ?? ['auto', 'auto']}
+                                  tickCount={15}
+                                  tick={{ fontSize: 10, fill: OVERLAY_COLORS[i], fontWeight: 700 }}
+                                  tickLine={false}
+                                  axisLine={false}
+                                  tickFormatter={v => {
+                                    if (selectedStat.stat_type === 'currency')
+                                      return '$' + Number(v).toLocaleString()
+                                    if (selectedStat.stat_type === 'percentage') return v + '%'
+                                    return Number(v).toLocaleString()
+                                  }}
+                                  width={isMobile ? 44 : 72}
+                                />
+                              ))}
+                              <Tooltip
+                                content={({ active, payload, label }) => {
+                                  if (!active || !payload?.length) return null
+                                  return (
+                                    <div className="bg-white border border-gray-200 rounded-xl shadow-lg px-3 py-2.5 text-xs">
+                                      <p className="font-bold text-gray-500 mb-1.5">{label}</p>
+                                      {overlayValues.map(({ stat }, i) => {
+                                        const entry = payload.find(p => p.dataKey === `v${i}`)
+                                        if (!entry || entry.value == null) return null
+                                        return (
+                                          <div key={i} className="flex items-center gap-2 mb-0.5">
+                                            <div
+                                              className="w-2 h-2 rounded-full flex-shrink-0"
+                                              style={{ backgroundColor: OVERLAY_COLORS[i] }}
+                                            />
+                                            <span className="text-gray-600">{stat?.name}:</span>
+                                            <span className="font-bold text-gray-900">
+                                              {fmt(entry.value, selectedStat.stat_type)}
+                                            </span>
+                                          </div>
+                                        )
+                                      })}
+                                    </div>
+                                  )
+                                }}
+                              />
+                              {overlayValues.map((_, i) => (
+                                <Line
+                                  key={i}
+                                  yAxisId={`y${i}`}
+                                  type="linear"
+                                  dataKey={`v${i}`}
+                                  stroke={OVERLAY_COLORS[i]}
+                                  strokeWidth={2.5}
+                                  dot={false}
+                                  activeDot={{ r: 5, fill: OVERLAY_COLORS[i] }}
+                                  connectNulls={false}
+                                  isAnimationActive={false}
+                                />
+                              ))}
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
                       </div>
-                    </div>
-                  )
-                ) : (
-                  /* ── Normal single-stat chart ───────────────────────────── */
+                    )
+                  ) : /* ── Normal single-stat chart ───────────────────────────── */
                   valuesStatId !== selectedId && prevDisplayRef.current.length === 0 ? (
                     // First-ever load for this stat — no previous frame to hold
                     <div className="h-full flex items-center justify-center">
@@ -7925,7 +10086,9 @@ export default function Statistics() {
                       <div className="text-center">
                         <div className="text-3xl mb-2">📊</div>
                         <p className="text-sm">No data in this date range.</p>
-                        <p className="text-xs mt-1">Use <strong>Edit Value History</strong> to add entries.</p>
+                        <p className="text-xs mt-1">
+                          Use <strong>Edit Value History</strong> to add entries.
+                        </p>
                       </div>
                     </div>
                   ) : chartStyle === 'bar' ? (
@@ -7934,8 +10097,13 @@ export default function Statistics() {
                       {/* margin/YAxis width shrink on mobile so the chart hugs the screen edge */}
                       <BarChart
                         data={chartDataWithTargets}
-                        margin={{ top: 28, right: isMobile ? 6 : 24, left: isMobile ? -8 : 16, bottom: isMobile ? 6 : 20 }}
-                        onClick={(chartEvent) => {
+                        margin={{
+                          top: 28,
+                          right: isMobile ? 6 : 24,
+                          left: isMobile ? -8 : 16,
+                          bottom: isMobile ? 6 : 20,
+                        }}
+                        onClick={chartEvent => {
                           const pt = chartEvent?.activePayload?.[0]?.payload
                           if (pt?.date) openNoteModal(pt.date, pt.label)
                         }}
@@ -7944,7 +10112,15 @@ export default function Statistics() {
                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                         <XAxis
                           dataKey="label"
-                          tick={{ fontSize: 11, fill: '#111827', fontWeight: 600, angle: -45, textAnchor: 'end', dx: -4, dy: 4 }}
+                          tick={{
+                            fontSize: 11,
+                            fill: '#111827',
+                            fontWeight: 600,
+                            angle: -45,
+                            textAnchor: 'end',
+                            dx: -4,
+                            dy: 4,
+                          }}
                           tickLine={false}
                           axisLine={{ stroke: '#d1d5db' }}
                           height={70}
@@ -7957,7 +10133,8 @@ export default function Statistics() {
                           tickLine={false}
                           axisLine={false}
                           tickFormatter={v => {
-                            if (selectedStat.stat_type === 'currency')   return '$' + Number(v).toLocaleString()
+                            if (selectedStat.stat_type === 'currency')
+                              return '$' + Number(v).toLocaleString()
                             if (selectedStat.stat_type === 'percentage') return v + '%'
                             return Number(v).toLocaleString()
                           }}
@@ -7968,23 +10145,35 @@ export default function Statistics() {
                           content={({ active, payload, label }) => {
                             if (!active || !payload?.length) return null
                             const pt = payload[0]?.payload
-                            const hasNote = pt?.date && statNotes.some(n => n.period_date === pt.date)
+                            const hasNote =
+                              pt?.date && statNotes.some(n => n.period_date === pt.date)
                             return (
                               <div className="bg-white border border-gray-200 rounded-xl shadow-lg px-3 py-2.5 text-xs">
                                 <p className="font-bold text-gray-500 mb-1">{label}</p>
-                                <p className="font-bold text-gray-900">{fmt(payload[0]?.value, selectedStat.stat_type)}</p>
-                                {hasNote && <p className="text-amber-600 mt-1 font-semibold">📝 Has note</p>}
+                                <p className="font-bold text-gray-900">
+                                  {fmt(payload[0]?.value, selectedStat.stat_type)}
+                                </p>
+                                {hasNote && (
+                                  <p className="text-amber-600 mt-1 font-semibold">📝 Has note</p>
+                                )}
                               </div>
                             )
                           }}
                         />
-                        <Bar dataKey="value" radius={[3, 3, 0, 0]} maxBarSize={60} isAnimationActive={false}>
+                        <Bar
+                          dataKey="value"
+                          radius={[3, 3, 0, 0]}
+                          maxBarSize={60}
+                          isAnimationActive={false}
+                        >
                           {chartDataWithTargets.map((entry, index) => {
-                            const prev  = chartDataWithTargets[index - 1]
-                            const isDown = prev != null && entry.value != null && prev.value != null
-                              ? (selectedStat.upside_down ? entry.value > prev.value : entry.value < prev.value)
-                              : false
-                            const hasNote = entry.date && statNotes.some(n => n.period_date === entry.date)
+                            const prev = chartDataWithTargets[index - 1]
+                            const isDown =
+                              prev != null && entry.value != null && prev.value != null
+                                ? selectedStat.upside_down
+                                  ? entry.value > prev.value
+                                  : entry.value < prev.value
+                                : false
                             return (
                               <Cell
                                 key={`cell-${index}`}
@@ -7995,33 +10184,51 @@ export default function Statistics() {
                           })}
                         </Bar>
                         {/* Note dots above bars */}
-                        <Customized component={({ xAxisMap, yAxisMap, data }) => {
-                          const xAxis = Object.values(xAxisMap || {})[0]
-                          const yAxis = Object.values(yAxisMap || {})[0]
-                          if (!xAxis || !yAxis) return null
-                          const noteSet = new Set(statNotes.map(n => n.period_date))
-                          return (
-                            <g>
-                              {(data || []).map((pt, i) => {
-                                if (!pt.date || !noteSet.has(pt.date)) return null
-                                const x = xAxis.scale(pt.label)
-                                const y = pt.value != null ? yAxis.scale(pt.value) : null
-                                if (x == null || y == null) return null
-                                const bw = (xAxis.bandwidth ? xAxis.bandwidth() : 0) / 2
-                                return (
-                                  <g key={i}>
-                                    <circle cx={x + bw} cy={y - 10} r={5} fill="#f59e0b" stroke="white" strokeWidth={1.5}/>
-                                    <text x={x + bw} y={y - 10 + 3.5} textAnchor="middle" fontSize={7} fontWeight={700} fill="white">N</text>
-                                  </g>
-                                )
-                              })}
-                            </g>
-                          )
-                        }} />
+                        <Customized
+                          component={({ xAxisMap, yAxisMap, data }) => {
+                            const xAxis = Object.values(xAxisMap || {})[0]
+                            const yAxis = Object.values(yAxisMap || {})[0]
+                            if (!xAxis || !yAxis) return null
+                            const noteSet = new Set(statNotes.map(n => n.period_date))
+                            return (
+                              <g>
+                                {(data || []).map((pt, i) => {
+                                  if (!pt.date || !noteSet.has(pt.date)) return null
+                                  const x = xAxis.scale(pt.label)
+                                  const y = pt.value != null ? yAxis.scale(pt.value) : null
+                                  if (x == null || y == null) return null
+                                  const bw = (xAxis.bandwidth ? xAxis.bandwidth() : 0) / 2
+                                  return (
+                                    <g key={i}>
+                                      <circle
+                                        cx={x + bw}
+                                        cy={y - 10}
+                                        r={5}
+                                        fill="#f59e0b"
+                                        stroke="white"
+                                        strokeWidth={1.5}
+                                      />
+                                      <text
+                                        x={x + bw}
+                                        y={y - 10 + 3.5}
+                                        textAnchor="middle"
+                                        fontSize={7}
+                                        fontWeight={700}
+                                        fill="white"
+                                      >
+                                        N
+                                      </text>
+                                    </g>
+                                  )
+                                })}
+                              </g>
+                            )
+                          }}
+                        />
                         {/* Target line segments */}
                         {selectedStat?.target_lines?.length > 0 && (
                           <Customized
-                            component={(props) => (
+                            component={props => (
                               <TargetLineSegments
                                 {...props}
                                 targetLines={selectedStat.target_lines}
@@ -8038,8 +10245,13 @@ export default function Statistics() {
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart
                         data={chartDataWithTargets}
-                        margin={{ top: 28, right: isMobile ? 6 : 24, left: isMobile ? -8 : 16, bottom: isMobile ? 6 : 20 }}
-                        onClick={(chartEvent) => {
+                        margin={{
+                          top: 28,
+                          right: isMobile ? 6 : 24,
+                          left: isMobile ? -8 : 16,
+                          bottom: isMobile ? 6 : 20,
+                        }}
+                        onClick={chartEvent => {
                           const pt = chartEvent?.activePayload?.[0]?.payload
                           if (pt?.date) openNoteModal(pt.date, pt.label)
                         }}
@@ -8048,7 +10260,15 @@ export default function Statistics() {
                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                         <XAxis
                           dataKey="label"
-                          tick={{ fontSize: 11, fill: '#111827', fontWeight: 600, angle: -45, textAnchor: 'end', dx: -4, dy: 4 }}
+                          tick={{
+                            fontSize: 11,
+                            fill: '#111827',
+                            fontWeight: 600,
+                            angle: -45,
+                            textAnchor: 'end',
+                            dx: -4,
+                            dy: 4,
+                          }}
                           tickLine={false}
                           axisLine={{ stroke: '#d1d5db' }}
                           height={70}
@@ -8061,8 +10281,9 @@ export default function Statistics() {
                           tickLine={false}
                           axisLine={false}
                           tickFormatter={v => {
-                            if (selectedStat.stat_type === 'currency')    return '$' + Number(v).toLocaleString()
-                            if (selectedStat.stat_type === 'percentage')  return v + '%'
+                            if (selectedStat.stat_type === 'currency')
+                              return '$' + Number(v).toLocaleString()
+                            if (selectedStat.stat_type === 'percentage') return v + '%'
                             return Number(v).toLocaleString()
                           }}
                           width={isMobile ? 48 : 80}
@@ -8076,7 +10297,7 @@ export default function Statistics() {
                           type="linear"
                           dataKey="value"
                           stroke="transparent"
-                          dot={(dotProps) => (
+                          dot={dotProps => (
                             <NoteDot
                               key={dotProps.index}
                               {...dotProps}
@@ -8089,14 +10310,14 @@ export default function Statistics() {
                         />
                         {/* Colored segments: black = up, red = down */}
                         <Customized
-                          component={(props) => (
+                          component={props => (
                             <ColoredLineSegments {...props} stat={selectedStat} />
                           )}
                         />
                         {/* Target line segments — thin dashed green lines */}
                         {selectedStat?.target_lines?.length > 0 && (
                           <Customized
-                            component={(props) => (
+                            component={props => (
                               <TargetLineSegments
                                 {...props}
                                 targetLines={selectedStat.target_lines}
@@ -8108,48 +10329,52 @@ export default function Statistics() {
                         )}
                       </LineChart>
                     </ResponsiveContainer>
-                  )
-                )}
-              </div>
-
-              {/* Date range scrubber */}
-              {selectedStat?.stat_category !== 'target' && (
-                <DateRangeScrubber
-                  minDate={selectedStat.beginning_date}
-                  maxDate={today()}
-                  fromDate={fromDate}
-                  toDate={toDate}
-                  onFromChange={setFromDate}
-                  onToChange={setToDate}
-                />
-              )}
-
-              {/* Week ending not configured warning */}
-              {weekEndingError && selectedStat?.tracking === 'weekly' && (
-                <div className="mx-6 mb-2 mt-2 px-4 py-2.5 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between gap-3 text-sm text-amber-800">
-                  <span>⚠️ <strong>Week ending day not configured.</strong> Go to <strong>Admin → Company Settings</strong> to set it before entering weekly values.</span>
-                  <button onClick={() => setWeekEndingError(false)} className="text-amber-500 hover:text-amber-700 font-bold text-base leading-none flex-shrink-0">✕</button>
+                  )}
                 </div>
-              )}
-            </>
-          )}
-        </main>
-      </div>
-      )} {/* end Graphs body */}
 
+                {/* Date range scrubber */}
+                {selectedStat?.stat_category !== 'target' && (
+                  <DateRangeScrubber
+                    minDate={selectedStat.beginning_date}
+                    maxDate={today()}
+                    fromDate={fromDate}
+                    toDate={toDate}
+                    onFromChange={setFromDate}
+                    onToChange={setToDate}
+                  />
+                )}
+
+                {/* Week ending not configured warning */}
+                {weekEndingError && selectedStat?.tracking === 'weekly' && (
+                  <div className="mx-6 mb-2 mt-2 px-4 py-2.5 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between gap-3 text-sm text-amber-800">
+                    <span>
+                      ⚠️ <strong>Week ending day not configured.</strong> Go to{' '}
+                      <strong>Admin → Company Settings</strong> to set it before entering weekly
+                      values.
+                    </span>
+                    <button
+                      onClick={() => setWeekEndingError(false)}
+                      className="text-amber-500 hover:text-amber-700 font-bold text-base leading-none flex-shrink-0"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </main>
+        </div>
+      )}{' '}
+      {/* end Graphs body */}
       {/* ── MODALS ──────────────────────────────────────────────────────── */}
       {showTypeSelector && (
-        <TypeSelectorModal
-          onSelect={handleTypeSelect}
-          onClose={() => setShowTypeSelector(false)}
-        />
+        <TypeSelectorModal onSelect={handleTypeSelect} onClose={() => setShowTypeSelector(false)} />
       )}
-
       {showTargetPicker && (
         <PickSourceStatModal
           stats={stats}
           onClose={() => setShowTargetPicker(false)}
-          onPick={(sourceStat) => {
+          onPick={sourceStat => {
             setShowTargetPicker(false)
             setTargetSourceStat(sourceStat)
             setEditingData(null)
@@ -8157,19 +10382,21 @@ export default function Statistics() {
           }}
         />
       )}
-
       {showBasicForm && (
         <BasicStatForm
           initialData={editingData}
           profiles={profiles}
           onSave={handleSaveForm}
           onDelete={handleDeleteStat}
-          onClose={() => { setShowBasicForm(false); setEditingData(null); setTargetSourceStat(null) }}
+          onClose={() => {
+            setShowBasicForm(false)
+            setEditingData(null)
+            setTargetSourceStat(null)
+          }}
           targetSource={targetSourceStat}
           onOpenShares={openShares}
         />
       )}
-
       {showEquationForm && (
         <EquationStatForm
           initialData={editingData}
@@ -8177,11 +10404,13 @@ export default function Statistics() {
           allStats={stats}
           onSave={handleSaveForm}
           onDelete={handleDeleteStat}
-          onClose={() => { setShowEquationForm(false); setEditingData(null) }}
+          onClose={() => {
+            setShowEquationForm(false)
+            setEditingData(null)
+          }}
           onOpenShares={openShares}
         />
       )}
-
       {showOverlayForm && (
         <OverlayStatForm
           initialData={editingData}
@@ -8189,11 +10418,13 @@ export default function Statistics() {
           allStats={stats}
           onSave={handleSaveForm}
           onDelete={handleDeleteStat}
-          onClose={() => { setShowOverlayForm(false); setEditingData(null) }}
+          onClose={() => {
+            setShowOverlayForm(false)
+            setEditingData(null)
+          }}
           onOpenShares={openShares}
         />
       )}
-
       {showSecondaryForm && (
         <SecondaryStatForm
           initialData={editingData}
@@ -8201,32 +10432,38 @@ export default function Statistics() {
           allStats={stats}
           onSave={handleSaveForm}
           onDelete={handleDeleteStat}
-          onClose={() => { setShowSecondaryForm(false); setEditingData(null) }}
+          onClose={() => {
+            setShowSecondaryForm(false)
+            setEditingData(null)
+          }}
           onOpenShares={openShares}
         />
       )}
-
       {showAutoForm && (
         <AutoStatForm
           initialData={editingData}
           profiles={profiles}
           onSave={handleSaveForm}
           onDelete={handleDeleteStat}
-          onClose={() => { setShowAutoForm(false); setEditingData(null) }}
+          onClose={() => {
+            setShowAutoForm(false)
+            setEditingData(null)
+          }}
           onOpenShares={openShares}
         />
       )}
-
       {showAutoExternalForm && (
         <AutoExternalStatForm
-          onClose={() => { setShowAutoExternalForm(false); setEditingData(null) }}
+          onClose={() => {
+            setShowAutoExternalForm(false)
+            setEditingData(null)
+          }}
         />
       )}
-
       {showDateRangeSelector && selectedStat && (
         <DateRangeSelectorModal
           stat={selectedStat}
-          onSelect={(from) => {
+          onSelect={from => {
             setEditHistoryFromDate(from)
             setShowDateRangeSelector(false)
             setShowEditHistory(true)
@@ -8234,7 +10471,6 @@ export default function Statistics() {
           onClose={() => setShowDateRangeSelector(false)}
         />
       )}
-
       {showEditHistory && selectedStat && editHistoryFromDate && (
         <EditValueHistoryModal
           stat={selectedStat}
@@ -8246,7 +10482,6 @@ export default function Statistics() {
           readOnly={selectedStat.stat_category === 'auto_internal'}
         />
       )}
-
       {/* Print orientation picker */}
       {showPrintModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -8258,14 +10493,64 @@ export default function Statistics() {
                 onClick={() => executePrint('portrait')}
                 className="flex flex-col items-center gap-2 px-6 py-4 rounded-xl border-2 border-gray-200 hover:border-green-600 hover:bg-green-50 transition-colors group"
               >
-                <svg width="40" height="54" viewBox="0 0 40 54" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="1" y="1" width="38" height="52" rx="3" stroke="currentColor" strokeWidth="2" className="text-gray-400 group-hover:text-green-600" fill="#f9fafb"/>
-                  <line x1="7" y1="14" x2="33" y2="14" stroke="currentColor" strokeWidth="2" className="text-gray-300 group-hover:text-green-400"/>
-                  <line x1="7" y1="21" x2="33" y2="21" stroke="currentColor" strokeWidth="1.5" className="text-gray-300 group-hover:text-green-400"/>
-                  <line x1="7" y1="28" x2="33" y2="28" stroke="currentColor" strokeWidth="1.5" className="text-gray-300 group-hover:text-green-400"/>
-                  <line x1="7" y1="35" x2="22" y2="35" stroke="currentColor" strokeWidth="1.5" className="text-gray-300 group-hover:text-green-400"/>
+                <svg
+                  width="40"
+                  height="54"
+                  viewBox="0 0 40 54"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <rect
+                    x="1"
+                    y="1"
+                    width="38"
+                    height="52"
+                    rx="3"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className="text-gray-400 group-hover:text-green-600"
+                    fill="#f9fafb"
+                  />
+                  <line
+                    x1="7"
+                    y1="14"
+                    x2="33"
+                    y2="14"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className="text-gray-300 group-hover:text-green-400"
+                  />
+                  <line
+                    x1="7"
+                    y1="21"
+                    x2="33"
+                    y2="21"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    className="text-gray-300 group-hover:text-green-400"
+                  />
+                  <line
+                    x1="7"
+                    y1="28"
+                    x2="33"
+                    y2="28"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    className="text-gray-300 group-hover:text-green-400"
+                  />
+                  <line
+                    x1="7"
+                    y1="35"
+                    x2="22"
+                    y2="35"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    className="text-gray-300 group-hover:text-green-400"
+                  />
                 </svg>
-                <span className="text-sm font-semibold text-gray-700 group-hover:text-green-700">Portrait</span>
+                <span className="text-sm font-semibold text-gray-700 group-hover:text-green-700">
+                  Portrait
+                </span>
               </button>
 
               {/* Landscape */}
@@ -8273,14 +10558,64 @@ export default function Statistics() {
                 onClick={() => executePrint('landscape')}
                 className="flex flex-col items-center gap-2 px-6 py-4 rounded-xl border-2 border-gray-200 hover:border-green-600 hover:bg-green-50 transition-colors group"
               >
-                <svg width="54" height="40" viewBox="0 0 54 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="1" y="1" width="52" height="38" rx="3" stroke="currentColor" strokeWidth="2" className="text-gray-400 group-hover:text-green-600" fill="#f9fafb"/>
-                  <line x1="9" y1="10" x2="45" y2="10" stroke="currentColor" strokeWidth="2" className="text-gray-300 group-hover:text-green-400"/>
-                  <line x1="9" y1="17" x2="45" y2="17" stroke="currentColor" strokeWidth="1.5" className="text-gray-300 group-hover:text-green-400"/>
-                  <line x1="9" y1="24" x2="45" y2="24" stroke="currentColor" strokeWidth="1.5" className="text-gray-300 group-hover:text-green-400"/>
-                  <line x1="9" y1="31" x2="30" y2="31" stroke="currentColor" strokeWidth="1.5" className="text-gray-300 group-hover:text-green-400"/>
+                <svg
+                  width="54"
+                  height="40"
+                  viewBox="0 0 54 40"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <rect
+                    x="1"
+                    y="1"
+                    width="52"
+                    height="38"
+                    rx="3"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className="text-gray-400 group-hover:text-green-600"
+                    fill="#f9fafb"
+                  />
+                  <line
+                    x1="9"
+                    y1="10"
+                    x2="45"
+                    y2="10"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className="text-gray-300 group-hover:text-green-400"
+                  />
+                  <line
+                    x1="9"
+                    y1="17"
+                    x2="45"
+                    y2="17"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    className="text-gray-300 group-hover:text-green-400"
+                  />
+                  <line
+                    x1="9"
+                    y1="24"
+                    x2="45"
+                    y2="24"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    className="text-gray-300 group-hover:text-green-400"
+                  />
+                  <line
+                    x1="9"
+                    y1="31"
+                    x2="30"
+                    y2="31"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    className="text-gray-300 group-hover:text-green-400"
+                  />
                 </svg>
-                <span className="text-sm font-semibold text-gray-700 group-hover:text-green-700">Landscape</span>
+                <span className="text-sm font-semibold text-gray-700 group-hover:text-green-700">
+                  Landscape
+                </span>
               </button>
             </div>
             <button
@@ -8292,17 +10627,24 @@ export default function Statistics() {
           </div>
         </div>
       )}
-
       {/* ── Note entry modal ─────────────────────────────────────────────── */}
       {noteModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100" style={{ backgroundColor: '#3A5038' }}>
+            <div
+              className="flex items-center justify-between px-5 py-4 border-b border-gray-100"
+              style={{ backgroundColor: '#3A5038' }}
+            >
               <div>
                 <h2 className="text-sm font-bold text-white">📝 Data Point Note</h2>
                 <p className="text-xs text-green-200 mt-0.5">{noteModal.label}</p>
               </div>
-              <button onClick={() => setNoteModal(null)} className="text-white/70 hover:text-white text-xl leading-none">✕</button>
+              <button
+                onClick={() => setNoteModal(null)}
+                className="text-white/70 hover:text-white text-xl leading-none"
+              >
+                ✕
+              </button>
             </div>
             <div className="px-5 py-4">
               <textarea
@@ -8331,24 +10673,36 @@ export default function Statistics() {
                   Delete
                 </button>
               )}
-              <button onClick={() => setNoteModal(null)} className="px-4 py-2.5 border border-gray-200 text-gray-500 text-sm rounded-xl hover:bg-gray-50 transition-colors">
+              <button
+                onClick={() => setNoteModal(null)}
+                className="px-4 py-2.5 border border-gray-200 text-gray-500 text-sm rounded-xl hover:bg-gray-50 transition-colors"
+              >
                 Cancel
               </button>
             </div>
           </div>
         </div>
       )}
-
       {/* ── Notes list modal ─────────────────────────────────────────────── */}
       {showNotesModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[80vh] overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0" style={{ backgroundColor: '#3A5038' }}>
+            <div
+              className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0"
+              style={{ backgroundColor: '#3A5038' }}
+            >
               <div>
                 <h2 className="text-base font-bold text-white">📝 Notes — {selectedStat?.name}</h2>
-                <p className="text-xs text-green-200 mt-0.5">{statNotes.length} note{statNotes.length !== 1 ? 's' : ''}</p>
+                <p className="text-xs text-green-200 mt-0.5">
+                  {statNotes.length} note{statNotes.length !== 1 ? 's' : ''}
+                </p>
               </div>
-              <button onClick={() => setShowNotesModal(false)} className="text-white/70 hover:text-white text-xl leading-none">✕</button>
+              <button
+                onClick={() => setShowNotesModal(false)}
+                className="text-white/70 hover:text-white text-xl leading-none"
+              >
+                ✕
+              </button>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-4">
               {statNotes.length === 0 ? (
@@ -8369,7 +10723,13 @@ export default function Statistics() {
                           <p className="text-sm text-gray-800 whitespace-pre-wrap">{n.note}</p>
                         </div>
                         <button
-                          onClick={() => { openNoteModal(n.period_date, periodLabel(n.period_date, selectedStat?.tracking)); setShowNotesModal(false) }}
+                          onClick={() => {
+                            openNoteModal(
+                              n.period_date,
+                              periodLabel(n.period_date, selectedStat?.tracking)
+                            )
+                            setShowNotesModal(false)
+                          }}
                           className="text-xs text-blue-600 hover:text-blue-800 underline flex-shrink-0 mt-0.5"
                         >
                           Edit
@@ -8381,126 +10741,166 @@ export default function Statistics() {
               )}
             </div>
             <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
-              <button onClick={() => setShowNotesModal(false)} className="w-full py-2.5 border border-gray-200 text-gray-600 text-sm font-medium rounded-xl hover:bg-gray-50 transition-colors">
+              <button
+                onClick={() => setShowNotesModal(false)}
+                className="w-full py-2.5 border border-gray-200 text-gray-600 text-sm font-medium rounded-xl hover:bg-gray-50 transition-colors"
+              >
                 Close
               </button>
             </div>
           </div>
         </div>
       )}
-    {/* ── Mobile Edits modal (Edit Value History + Edit Statistic) ── */}
-    {showMobileEditsModal && selectedStat && (
-      <div
-        className="fixed inset-0 z-50 bg-black/50 flex items-start sm:items-center justify-center p-3 pt-6 sm:p-4 sm:hidden"
-        onClick={() => setShowMobileEditsModal(false)}
-      >
+      {/* ── Mobile Edits modal (Edit Value History + Edit Statistic) ── */}
+      {showMobileEditsModal && selectedStat && (
         <div
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
-          onClick={e => e.stopPropagation()}
+          className="fixed inset-0 z-50 bg-black/50 flex items-start sm:items-center justify-center p-3 pt-6 sm:p-4 sm:hidden"
+          onClick={() => setShowMobileEditsModal(false)}
         >
-          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-base font-bold text-gray-800">Edits</h2>
-            <button onClick={() => setShowMobileEditsModal(false)} className="text-gray-400 text-xl leading-none px-1">✕</button>
-          </div>
-          <div className="p-3 space-y-2">
-            {!['equation','overlay'].includes(selectedStat?.stat_category) && (
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="text-base font-bold text-gray-800">Edits</h2>
+              <button
+                onClick={() => setShowMobileEditsModal(false)}
+                className="text-gray-400 text-xl leading-none px-1"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-3 space-y-2">
+              {!['equation', 'overlay'].includes(selectedStat?.stat_category) && (
+                <button
+                  onClick={() => {
+                    setShowMobileEditsModal(false)
+                    if (selectedStat?.tracking === 'weekly' && weekEndingDay === null) {
+                      setWeekEndingError(true)
+                      return
+                    }
+                    setWeekEndingError(false)
+                    setShowDateRangeSelector(true)
+                  }}
+                  className="w-full text-left px-3 py-3 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm font-semibold text-blue-700 flex items-center gap-2"
+                >
+                  📅{' '}
+                  {selectedStat?.stat_category === 'auto_internal'
+                    ? 'View Value History'
+                    : 'Edit Value History'}
+                  <span className="text-xs text-gray-400 ml-auto">
+                    {selectedStat?.stat_category === 'auto_internal'
+                      ? 'Auto-filled · read only'
+                      : 'View & tweak past entries'}
+                  </span>
+                </button>
+              )}
               <button
                 onClick={() => {
                   setShowMobileEditsModal(false)
-                  if (selectedStat?.tracking === 'weekly' && weekEndingDay === null) {
-                    setWeekEndingError(true); return
-                  }
-                  setWeekEndingError(false)
-                  setShowDateRangeSelector(true)
+                  handleEditStat()
                 }}
                 className="w-full text-left px-3 py-3 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm font-semibold text-blue-700 flex items-center gap-2"
               >
-                📅 {selectedStat?.stat_category === 'auto_internal' ? 'View Value History' : 'Edit Value History'}
-                <span className="text-xs text-gray-400 ml-auto">
-                  {selectedStat?.stat_category === 'auto_internal' ? 'Auto-filled · read only' : 'View & tweak past entries'}
-                </span>
-              </button>
-            )}
-            <button
-              onClick={() => { setShowMobileEditsModal(false); handleEditStat() }}
-              className="w-full text-left px-3 py-3 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm font-semibold text-blue-700 flex items-center gap-2"
-            >
-              ✏️ Edit Statistic
-              <span className="text-xs text-gray-400 ml-auto">Name, type, sharing</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    )}
-
-    {/* ── Mobile Entry popup (record current period's value) ── */}
-    {showMobileEntryModal && selectedStat && (
-      <div
-        className="fixed inset-0 z-50 bg-black/50 flex items-start sm:items-center justify-center p-3 pt-6 sm:p-4 sm:hidden"
-        onClick={() => setShowMobileEntryModal(false)}
-      >
-        <div
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
-          onClick={e => e.stopPropagation()}
-        >
-          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between" style={{ backgroundColor: FG }}>
-            <h2 className="text-base font-bold text-white">Quick Entry</h2>
-            <button onClick={() => setShowMobileEntryModal(false)} className="text-white/80 text-xl leading-none px-1">✕</button>
-          </div>
-          <div className="p-4 space-y-3">
-            <p className="text-xs text-gray-500 uppercase font-semibold tracking-wide">{quickPeriod.label}</p>
-            <p className="text-sm text-gray-700">Recording <strong>{selectedStat.name}</strong> for the period above.</p>
-            <input
-              type="number"
-              value={quickValue}
-              onChange={e => setQuickValue(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') { handleQuickSave(); setShowMobileEntryModal(false) } }}
-              placeholder="Enter value"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-green-600"
-              autoFocus
-            />
-            {quickSaveMsg && <p className="text-xs text-green-700">{quickSaveMsg}</p>}
-            <div className="flex gap-2 pt-1">
-              <button
-                onClick={() => setShowMobileEntryModal(false)}
-                className="flex-1 py-2.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-600"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={async () => { await handleQuickSave(); setShowMobileEntryModal(false) }}
-                disabled={quickSaving || !quickValue.trim()}
-                className="flex-1 py-2.5 rounded-lg btn-primary text-sm font-semibold disabled:opacity-50"
-              >
-                {quickSaving ? 'Saving…' : 'Save'}
+                ✏️ Edit Statistic
+                <span className="text-xs text-gray-400 ml-auto">Name, type, sharing</span>
               </button>
             </div>
           </div>
         </div>
-      </div>
-    )}
-
-    {/* Shared Permissions modal — sharesTarget wins (set by stat-edit
+      )}
+      {/* ── Mobile Entry popup (record current period's value) ── */}
+      {showMobileEntryModal && selectedStat && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 flex items-start sm:items-center justify-center p-3 pt-6 sm:p-4 sm:hidden"
+          onClick={() => setShowMobileEntryModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div
+              className="px-5 py-3 border-b border-gray-100 flex items-center justify-between"
+              style={{ backgroundColor: FG }}
+            >
+              <h2 className="text-base font-bold text-white">Quick Entry</h2>
+              <button
+                onClick={() => setShowMobileEntryModal(false)}
+                className="text-white/80 text-xl leading-none px-1"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <p className="text-xs text-gray-500 uppercase font-semibold tracking-wide">
+                {quickPeriod.label}
+              </p>
+              <p className="text-sm text-gray-700">
+                Recording <strong>{selectedStat.name}</strong> for the period above.
+              </p>
+              <input
+                type="number"
+                value={quickValue}
+                onChange={e => setQuickValue(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    handleQuickSave()
+                    setShowMobileEntryModal(false)
+                  }
+                }}
+                placeholder="Enter value"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-green-600"
+                autoFocus
+              />
+              {quickSaveMsg && <p className="text-xs text-green-700">{quickSaveMsg}</p>}
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => setShowMobileEntryModal(false)}
+                  className="flex-1 py-2.5 rounded-lg border border-gray-200 text-sm font-medium text-gray-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    await handleQuickSave()
+                    setShowMobileEntryModal(false)
+                  }}
+                  disabled={quickSaving || !quickValue.trim()}
+                  className="flex-1 py-2.5 rounded-lg btn-primary text-sm font-semibold disabled:opacity-50"
+                >
+                  {quickSaving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Shared Permissions modal — sharesTarget wins (set by stat-edit
        modal buttons), falls back to selectedStat (page-header button).
        Look up the actual stat (by id) to get its real owner_user_id —
        sharesTarget only carries { id, name } so without this we'd default
        to the current user as "owner" and accidentally hide them from the
        share list when editing someone else's stat from the Master tab. */}
-    {showShares && (sharesTarget || selectedStat) && (() => {
-      const target = sharesTarget || selectedStat
-      const fullStat = target.id ? (stats || []).find(s => s.id === target.id) : null
-      const realOwner = (fullStat?.owner_user_id) || target.owner_user_id || user?.id
-      return (
-        <StatSharesModal
-          statId={target.id}
-          statName={target.name}
-          ownerUserId={realOwner}
-          initialShares={sharesTarget?.initialShares}
-          onLocalSave={sharesTarget?.onLocalSave}
-          onClose={() => { setShowShares(false); setSharesTarget(null) }}
-        />
-      )
-    })()}
+      {showShares &&
+        (sharesTarget || selectedStat) &&
+        (() => {
+          const target = sharesTarget || selectedStat
+          const fullStat = target.id ? (stats || []).find(s => s.id === target.id) : null
+          const realOwner = fullStat?.owner_user_id || target.owner_user_id || user?.id
+          return (
+            <StatSharesModal
+              statId={target.id}
+              statName={target.name}
+              ownerUserId={realOwner}
+              initialShares={sharesTarget?.initialShares}
+              onLocalSave={sharesTarget?.onLocalSave}
+              onClose={() => {
+                setShowShares(false)
+                setSharesTarget(null)
+              }}
+            />
+          )
+        })()}
     </div>
   )
 }

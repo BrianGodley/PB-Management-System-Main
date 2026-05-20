@@ -52,7 +52,9 @@ export default function OrgChart() {
   const [loading, setLoading] = useState(false)
 
   // Keep nodesRef in sync
-  useEffect(() => { nodesRef.current = nodes }, [nodes])
+  useEffect(() => {
+    nodesRef.current = nodes
+  }, [nodes])
 
   // ── Data fetching ────────────────────────────────────────────────────────
 
@@ -96,14 +98,17 @@ export default function OrgChart() {
     loadChart(id)
   }
 
-  useEffect(() => { loadCharts() }, [])
+  useEffect(() => {
+    loadCharts()
+  }, [])
 
   // ── Chart management ────────────────────────────────────────────────────
 
   async function createNewChart() {
     try {
       setSaving(true)
-      const { data, error } = await supabase.from('org_charts')
+      const { data, error } = await supabase
+        .from('org_charts')
         .insert({ name: `New Org Chart ${new Date().toLocaleDateString()}`, created_by: user?.id })
         .select()
       if (error) throw error
@@ -205,11 +210,14 @@ export default function OrgChart() {
     if (!selectedNodeId) return
     try {
       setSaving(true)
-      await supabase.from('org_nodes').update({
-        label: editLabel,
-        subtitle: editSubtitle,
-        type_id: editTypeId || null,
-      }).eq('id', selectedNodeId)
+      await supabase
+        .from('org_nodes')
+        .update({
+          label: editLabel,
+          subtitle: editSubtitle,
+          type_id: editTypeId || null,
+        })
+        .eq('id', selectedNodeId)
       await loadChart(selectedChartId)
       setSelectedNodeId(null)
     } catch (err) {
@@ -261,11 +269,14 @@ export default function OrgChart() {
     if (!selectedEdgeId) return
     try {
       setSaving(true)
-      await supabase.from('org_edges').update({
-        relationship: editEdgeRel,
-        label: editEdgeLabel,
-        style: editEdgeStyle,
-      }).eq('id', selectedEdgeId)
+      await supabase
+        .from('org_edges')
+        .update({
+          relationship: editEdgeRel,
+          label: editEdgeLabel,
+          style: editEdgeStyle,
+        })
+        .eq('id', selectedEdgeId)
       await loadChart(selectedChartId)
       setSelectedEdgeId(null)
     } catch (err) {
@@ -318,22 +329,25 @@ export default function OrgChart() {
 
   // ── Canvas interaction ───────────────────────────────────────────────────
 
-  const onNodeMouseDown = useCallback((e, nodeId) => {
-    if (connectMode) return
-    e.stopPropagation()
-    const svg = svgRef.current
-    if (!svg) return
-    const pt = svg.createSVGPoint()
-    pt.x = e.clientX
-    pt.y = e.clientY
-    const svgPt = pt.matrixTransform(svg.getScreenCTM().inverse())
-    const node = nodes.find(n => n.id === nodeId)
-    dragRef.current = { nodeId, startMx: svgPt.x, startMy: svgPt.y, origX: node.x, origY: node.y }
-    setSelectedNodeId(nodeId)
-    setSelectedEdgeId(null)
-  }, [connectMode, nodes])
+  const onNodeMouseDown = useCallback(
+    (e, nodeId) => {
+      if (connectMode) return
+      e.stopPropagation()
+      const svg = svgRef.current
+      if (!svg) return
+      const pt = svg.createSVGPoint()
+      pt.x = e.clientX
+      pt.y = e.clientY
+      const svgPt = pt.matrixTransform(svg.getScreenCTM().inverse())
+      const node = nodes.find(n => n.id === nodeId)
+      dragRef.current = { nodeId, startMx: svgPt.x, startMy: svgPt.y, origX: node.x, origY: node.y }
+      setSelectedNodeId(nodeId)
+      setSelectedEdgeId(null)
+    },
+    [connectMode, nodes]
+  )
 
-  const onSvgMouseMove = useCallback((e) => {
+  const onSvgMouseMove = useCallback(e => {
     if (!dragRef.current) return
     const svg = svgRef.current
     if (!svg) return
@@ -344,9 +358,7 @@ export default function OrgChart() {
     const { nodeId, startMx, startMy, origX, origY } = dragRef.current
     const dx = svgPt.x - startMx
     const dy = svgPt.y - startMy
-    setNodes(prev => prev.map(n =>
-      n.id === nodeId ? { ...n, x: origX + dx, y: origY + dy } : n
-    ))
+    setNodes(prev => prev.map(n => (n.id === nodeId ? { ...n, x: origX + dx, y: origY + dy } : n)))
   }, [])
 
   const onSvgMouseUp = useCallback(() => {
@@ -355,7 +367,11 @@ export default function OrgChart() {
     dragRef.current = null
     const node = nodesRef.current.find(n => n.id === nodeId)
     if (node) {
-      supabase.from('org_nodes').update({ x: node.x, y: node.y }).eq('id', nodeId).catch(err => console.error(err))
+      supabase
+        .from('org_nodes')
+        .update({ x: node.x, y: node.y })
+        .eq('id', nodeId)
+        .catch(err => console.error(err))
     }
   }, [])
 
@@ -422,12 +438,11 @@ export default function OrgChart() {
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
-
       {/* TOP BAR: Chart picker + controls */}
       <div className="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-200 flex-shrink-0">
         <select
           value={selectedChartId || ''}
-          onChange={(e) => {
+          onChange={e => {
             const id = e.target.value
             const chart = charts.find(c => c.id === id)
             if (chart) selectChart(id, chart.name)
@@ -445,9 +460,9 @@ export default function OrgChart() {
           <input
             type="text"
             value={chartName}
-            onChange={(e) => setChartName(e.target.value)}
+            onChange={e => setChartName(e.target.value)}
             onBlur={() => updateChartName(chartName)}
-            onKeyDown={(e) => {
+            onKeyDown={e => {
               if (e.key === 'Enter') updateChartName(chartName)
             }}
             autoFocus
@@ -474,14 +489,14 @@ export default function OrgChart() {
 
       {/* BODY: left panel + canvas */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
-
         {/* LEFT PANEL */}
         <div className="w-60 flex-shrink-0 bg-white border-r border-gray-200 overflow-y-auto flex flex-col">
-
           {/* NODE TYPES SECTION */}
           <div className="px-4 py-3 border-b border-gray-100">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Node Types</h3>
+              <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                Node Types
+              </h3>
               <button
                 onClick={() => setShowAddType(!showAddType)}
                 style={{ color: FG }}
@@ -497,14 +512,14 @@ export default function OrgChart() {
                   type="text"
                   placeholder="Type name"
                   value={newTypeName}
-                  onChange={(e) => setNewTypeName(e.target.value)}
+                  onChange={e => setNewTypeName(e.target.value)}
                   className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
                 />
                 <div className="flex items-center gap-2">
                   <input
                     type="color"
                     value={newTypeColor}
-                    onChange={(e) => setNewTypeColor(e.target.value)}
+                    onChange={e => setNewTypeColor(e.target.value)}
                     className="w-8 h-8 rounded border border-gray-300 cursor-pointer"
                   />
                   <span className="text-xs text-gray-600">{newTypeColor}</span>
@@ -556,7 +571,7 @@ export default function OrgChart() {
                   <label className="block text-xs font-semibold text-gray-600 mb-1">Type</label>
                   <select
                     value={newNodeTypeId}
-                    onChange={(e) => setNewNodeTypeId(e.target.value)}
+                    onChange={e => setNewNodeTypeId(e.target.value)}
                     className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
                   >
                     <option value="">No Type</option>
@@ -573,7 +588,7 @@ export default function OrgChart() {
                     type="text"
                     placeholder="Node label"
                     value={newNodeLabel}
-                    onChange={(e) => setNewNodeLabel(e.target.value)}
+                    onChange={e => setNewNodeLabel(e.target.value)}
                     className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
                   />
                 </div>
@@ -583,7 +598,7 @@ export default function OrgChart() {
                     type="text"
                     placeholder="Optional subtitle"
                     value={newNodeSubtitle}
-                    onChange={(e) => setNewNodeSubtitle(e.target.value)}
+                    onChange={e => setNewNodeSubtitle(e.target.value)}
                     className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
                   />
                 </div>
@@ -630,7 +645,7 @@ export default function OrgChart() {
                 <input
                   type="text"
                   value={editLabel}
-                  onChange={(e) => setEditLabel(e.target.value)}
+                  onChange={e => setEditLabel(e.target.value)}
                   className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
                 />
               </div>
@@ -639,7 +654,7 @@ export default function OrgChart() {
                 <input
                   type="text"
                   value={editSubtitle}
-                  onChange={(e) => setEditSubtitle(e.target.value)}
+                  onChange={e => setEditSubtitle(e.target.value)}
                   className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
                 />
               </div>
@@ -647,7 +662,7 @@ export default function OrgChart() {
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Type</label>
                 <select
                   value={editTypeId}
-                  onChange={(e) => setEditTypeId(e.target.value)}
+                  onChange={e => setEditTypeId(e.target.value)}
                   className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
                 >
                   <option value="">No Type</option>
@@ -683,7 +698,9 @@ export default function OrgChart() {
             <div className="px-4 py-3 border-b border-gray-100 space-y-2">
               <h4 className="text-xs font-bold text-gray-700 uppercase">Edit Edge</h4>
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Relationship</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">
+                  Relationship
+                </label>
                 <div className="space-y-1 mb-2">
                   {['reports to', 'peer', 'manages', 'supports', 'dotted line'].map(rel => (
                     <button
@@ -703,7 +720,7 @@ export default function OrgChart() {
                   type="text"
                   placeholder="Custom relationship"
                   value={editEdgeRel}
-                  onChange={(e) => setEditEdgeRel(e.target.value)}
+                  onChange={e => setEditEdgeRel(e.target.value)}
                   className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
                 />
               </div>
@@ -713,7 +730,7 @@ export default function OrgChart() {
                   type="text"
                   placeholder="Optional label"
                   value={editEdgeLabel}
-                  onChange={(e) => setEditEdgeLabel(e.target.value)}
+                  onChange={e => setEditEdgeLabel(e.target.value)}
                   className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
                 />
               </div>
@@ -721,7 +738,7 @@ export default function OrgChart() {
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Style</label>
                 <select
                   value={editEdgeStyle}
-                  onChange={(e) => setEditEdgeStyle(e.target.value)}
+                  onChange={e => setEditEdgeStyle(e.target.value)}
                   className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
                 >
                   <option value="solid">Solid</option>
@@ -828,8 +845,8 @@ export default function OrgChart() {
                   fill={getNodeColor(node)}
                   stroke={selectedNodeId === node.id ? '#16a34a' : 'none'}
                   strokeWidth={2.5}
-                  onMouseDown={(e) => onNodeMouseDown(e, node.id)}
-                  onClick={(e) => onNodeClick(e, node.id)}
+                  onMouseDown={e => onNodeMouseDown(e, node.id)}
+                  onClick={e => onNodeClick(e, node.id)}
                   style={{ cursor: 'pointer' }}
                 />
 
@@ -886,7 +903,10 @@ export default function OrgChart() {
           {/* Loading indicator */}
           {loading && (
             <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: FG }} />
+              <div
+                className="animate-spin rounded-full h-8 w-8 border-b-2"
+                style={{ borderColor: FG }}
+              />
             </div>
           )}
         </div>

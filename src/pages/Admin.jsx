@@ -11,102 +11,114 @@ const FG = '#3A5038'
 function generatePassword(len = 12) {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%'
   return Array.from(crypto.getRandomValues(new Uint8Array(len)))
-    .map(b => chars[b % chars.length]).join('')
+    .map(b => chars[b % chars.length])
+    .join('')
 }
 
 // ── UserEditModal ─────────────────────────────────────────────────────────────
 const PERM_GROUPS = [
   {
     label: 'Statistics',
-    icon:  '📈',
+    icon: '📈',
     perms: [
-      { key: 'can_create_stats',      label: 'Create statistics' },
-      { key: 'can_share_stats',       label: 'Share statistics with other users' },
+      { key: 'can_create_stats', label: 'Create statistics' },
+      { key: 'can_share_stats', label: 'Share statistics with other users' },
       { key: 'can_make_stats_public', label: 'Mark statistics as public' },
     ],
   },
   {
     label: 'Financial',
-    icon:  '💰',
+    icon: '💰',
     perms: [
       { key: 'can_view_financials', label: 'View collections & invoicing' },
-      { key: 'can_view_reports',    label: 'View financial reports' },
+      { key: 'can_view_reports', label: 'View financial reports' },
     ],
   },
   {
     label: 'Jobs & Bids',
-    icon:  '🔨',
+    icon: '🔨',
     perms: [
       { key: 'can_create_jobs', label: 'Create new jobs' },
-      { key: 'can_edit_jobs',   label: 'Edit existing jobs' },
+      { key: 'can_edit_jobs', label: 'Edit existing jobs' },
       { key: 'can_delete_jobs', label: 'Delete jobs' },
       { key: 'can_create_bids', label: 'Create bids' },
-      { key: 'can_edit_bids',   label: 'Edit bids' },
+      { key: 'can_edit_bids', label: 'Edit bids' },
     ],
   },
   {
     label: 'Module Access',
-    icon:  '🗂️',
+    icon: '🗂️',
     perms: [
-      { key: 'access_tracker',      label: 'Tracker' },
-      { key: 'access_collections',  label: 'Collections' },
-      { key: 'access_statistics',   label: 'Statistics' },
+      { key: 'access_tracker', label: 'Tracker' },
+      { key: 'access_collections', label: 'Collections' },
+      { key: 'access_statistics', label: 'Statistics' },
       { key: 'access_master_rates', label: 'Master Rates' },
-      { key: 'access_admin',        label: 'Admin panel' },
+      { key: 'access_admin', label: 'Admin panel' },
     ],
   },
 ]
 
 const DEFAULT_PERMS = {
-  can_create_stats: true,  can_share_stats: false, can_make_stats_public: false,
-  can_view_financials: true, can_view_reports: false,
-  can_create_jobs: true, can_edit_jobs: true, can_delete_jobs: false,
-  can_create_bids: true, can_edit_bids: true,
-  access_tracker: true, access_collections: true, access_statistics: true,
-  access_master_rates: false, access_admin: false,
+  can_create_stats: true,
+  can_share_stats: false,
+  can_make_stats_public: false,
+  can_view_financials: true,
+  can_view_reports: false,
+  can_create_jobs: true,
+  can_edit_jobs: true,
+  can_delete_jobs: false,
+  can_create_bids: true,
+  can_edit_bids: true,
+  access_tracker: true,
+  access_collections: true,
+  access_statistics: true,
+  access_master_rates: false,
+  access_admin: false,
 }
 
 function UserEditModal({ profile, currentUserId, currentUserRole, onClose, onSaved }) {
   const [tab, setTab] = useState('profile')
 
-  const callerIsAdmin      = currentUserRole === 'admin' || currentUserRole === 'super_admin'
+  const callerIsAdmin = currentUserRole === 'admin' || currentUserRole === 'super_admin'
   const callerIsSuperAdmin = currentUserRole === 'super_admin'
 
   // ── Profile state ──────────────────────────────────────────────────────────
   const [form, setForm] = useState({
-    full_name:     profile.full_name     || '',
-    username:      profile.username      || '',
-    email:         profile.email         || '',
-    role:          profile.role          || 'user',
-    phone_cell:    profile.phone_cell    || '',
+    full_name: profile.full_name || '',
+    username: profile.username || '',
+    email: profile.email || '',
+    role: profile.role || 'user',
+    phone_cell: profile.phone_cell || '',
     address_line1: profile.address_line1 || '',
     address_line2: profile.address_line2 || '',
-    city:          profile.city          || '',
-    state:         profile.state         || '',
-    zip_code:      profile.zip_code      || '',
+    city: profile.city || '',
+    state: profile.state || '',
+    zip_code: profile.zip_code || '',
   })
   const [savingProfile, setSavingProfile] = useState(false)
-  const [profileMsg,    setProfileMsg]    = useState('')
+  const [profileMsg, setProfileMsg] = useState('')
 
   // ── Password reset ─────────────────────────────────────────────────────────
-  const [resetSending,     setResetSending]     = useState(false)
-  const [resetMsg,         setResetMsg]         = useState('')
+  const [resetSending, setResetSending] = useState(false)
+  const [resetMsg, setResetMsg] = useState('')
 
   // ── Sam SMS password ───────────────────────────────────────────────────────
-  const [smsSending,       setSmsSending]       = useState(false)
+  const [smsSending, setSmsSending] = useState(false)
   const [resetTextSending, setResetTextSending] = useState(false)
-  const [smsMsg,           setSmsMsg]           = useState('')
+  const [smsMsg, setSmsMsg] = useState('')
 
   // ── Permissions state ──────────────────────────────────────────────────────
-  const [perms,        setPerms]        = useState(DEFAULT_PERMS)
+  const [perms, setPerms] = useState(DEFAULT_PERMS)
   const [loadingPerms, setLoadingPerms] = useState(true)
-  const [savingPerms,  setSavingPerms]  = useState(false)
-  const [permsMsg,     setPermsMsg]     = useState('')
+  const [savingPerms, setSavingPerms] = useState(false)
+  const [permsMsg, setPermsMsg] = useState('')
 
   const isMe = profile.id === currentUserId
-  const set  = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  useEffect(() => { loadPerms() }, [profile.id])
+  useEffect(() => {
+    loadPerms()
+  }, [profile.id])
 
   async function loadPerms() {
     setLoadingPerms(true)
@@ -120,7 +132,8 @@ function UserEditModal({ profile, currentUserId, currentUserRole, onClose, onSav
   }
 
   async function saveProfile() {
-    setSavingProfile(true); setProfileMsg('')
+    setSavingProfile(true)
+    setProfileMsg('')
     const username = form.username.trim().toLowerCase().replace(/\s+/g, '.') || null
 
     // Check username uniqueness if changed
@@ -133,23 +146,24 @@ function UserEditModal({ profile, currentUserId, currentUserRole, onClose, onSav
         .maybeSingle()
       if (taken) {
         setProfileMsg('error:That username is already taken.')
-        setSavingProfile(false); return
+        setSavingProfile(false)
+        return
       }
     }
 
     const { error } = await supabase
       .from('profiles')
       .update({
-        full_name:     form.full_name.trim(),
+        full_name: form.full_name.trim(),
         username,
-        email:         form.email.trim().toLowerCase(),
-        role:          form.role,
-        phone_cell:    form.phone_cell.trim()    || null,
+        email: form.email.trim().toLowerCase(),
+        role: form.role,
+        phone_cell: form.phone_cell.trim() || null,
         address_line1: form.address_line1.trim() || null,
         address_line2: form.address_line2.trim() || null,
-        city:          form.city.trim()          || null,
-        state:         form.state                || null,
-        zip_code:      form.zip_code.trim()      || null,
+        city: form.city.trim() || null,
+        state: form.state || null,
+        zip_code: form.zip_code.trim() || null,
       })
       .eq('id', profile.id)
 
@@ -159,7 +173,8 @@ function UserEditModal({ profile, currentUserId, currentUserRole, onClose, onSav
   }
 
   async function sendPasswordReset() {
-    setResetSending(true); setResetMsg('')
+    setResetSending(true)
+    setResetMsg('')
     const emailToReset = form.email.trim() || profile.email
     const { error } = await supabase.auth.resetPasswordForEmail(emailToReset, {
       redirectTo: window.location.origin + '/reset-password',
@@ -178,7 +193,7 @@ function UserEditModal({ profile, currentUserId, currentUserRole, onClose, onSav
 
   function samMessage(firstName, email, password, isReset = false) {
     const greeting = firstName ? `Hi ${firstName}, ` : 'Hi there, '
-    const action   = isReset ? 'your password has been reset' : 'here are your login credentials'
+    const action = isReset ? 'your password has been reset' : 'here are your login credentials'
     return (
       `${greeting}this is Sam, the AI assistant from the Picture Build System — ${action}.\n\n` +
       `Email: ${email}\n` +
@@ -190,12 +205,19 @@ function UserEditModal({ profile, currentUserId, currentUserRole, onClose, onSav
 
   async function sendPasswordViaSMS() {
     const phone = formatPhone(form.phone_cell || profile.phone_cell || '')
-    if (!phone || phone === '+') { setSmsMsg('error:No cell phone number on file for this user.'); return }
-    if (!profile.temp_password) { setSmsMsg('error:No stored password found. Use "Reset & Text New Password" instead.'); return }
-    setSmsSending(true); setSmsMsg('')
+    if (!phone || phone === '+') {
+      setSmsMsg('error:No cell phone number on file for this user.')
+      return
+    }
+    if (!profile.temp_password) {
+      setSmsMsg('error:No stored password found. Use "Reset & Text New Password" instead.')
+      return
+    }
+    setSmsSending(true)
+    setSmsMsg('')
     const firstName = (profile.full_name || '').split(' ')[0]
     const { error } = await sendSMS({
-      to:      phone,
+      to: phone,
       message: samMessage(firstName, profile.email, profile.temp_password),
     })
     setSmsMsg(error ? 'error:SMS failed — ' + error.message : 'ok:Password texted to ' + phone)
@@ -204,9 +226,18 @@ function UserEditModal({ profile, currentUserId, currentUserRole, onClose, onSav
 
   async function resetAndTextPassword() {
     const phone = formatPhone(form.phone_cell || profile.phone_cell || '')
-    if (!phone || phone === '+') { setSmsMsg('error:No cell phone number on file for this user.'); return }
-    if (!confirm(`Generate a new password for ${profile.full_name || profile.email} and text it to ${phone}?`)) return
-    setResetTextSending(true); setSmsMsg('')
+    if (!phone || phone === '+') {
+      setSmsMsg('error:No cell phone number on file for this user.')
+      return
+    }
+    if (
+      !confirm(
+        `Generate a new password for ${profile.full_name || profile.email} and text it to ${phone}?`
+      )
+    )
+      return
+    setResetTextSending(true)
+    setSmsMsg('')
     const newPw = generatePassword()
 
     // Save new password to profile so it's stored for reference
@@ -214,10 +245,14 @@ function UserEditModal({ profile, currentUserId, currentUserRole, onClose, onSav
 
     // Try Edge Function to reset auth password (optional — may not be deployed)
     try {
-      const { data: resetData, error: resetErr } = await supabase.functions.invoke('reset-user-password', {
-        body: { userId: profile.id, newPassword: newPw },
-      })
-      if (resetErr || resetData?.error) console.warn('Edge Function unavailable:', resetData?.error || resetErr?.message)
+      const { data: resetData, error: resetErr } = await supabase.functions.invoke(
+        'reset-user-password',
+        {
+          body: { userId: profile.id, newPassword: newPw },
+        }
+      )
+      if (resetErr || resetData?.error)
+        console.warn('Edge Function unavailable:', resetData?.error || resetErr?.message)
     } catch (e) {
       console.warn('reset-user-password Edge Function not available:', e)
     }
@@ -225,48 +260,59 @@ function UserEditModal({ profile, currentUserId, currentUserRole, onClose, onSav
     // Text the new password as Sam regardless
     const firstName = (profile.full_name || '').split(' ')[0]
     const { error: smsErr } = await sendSMS({
-      to:      phone,
+      to: phone,
       message: samMessage(firstName, profile.email, newPw, true),
     })
-    setSmsMsg(smsErr
-      ? 'error:SMS failed — ' + smsErr.message
-      : 'ok:New password texted to ' + phone + '. If their login does not work, also send a password reset email.'
+    setSmsMsg(
+      smsErr
+        ? 'error:SMS failed — ' + smsErr.message
+        : 'ok:New password texted to ' +
+            phone +
+            '. If their login does not work, also send a password reset email.'
     )
     setResetTextSending(false)
   }
 
   async function savePerms() {
-    setSavingPerms(true); setPermsMsg('')
+    setSavingPerms(true)
+    setPermsMsg('')
     const { error } = await supabase
       .from('user_permissions')
-      .upsert({ ...perms, user_id: profile.id, updated_by: currentUserId },
-               { onConflict: 'user_id' })
+      .upsert(
+        { ...perms, user_id: profile.id, updated_by: currentUserId },
+        { onConflict: 'user_id' }
+      )
     setPermsMsg(error ? 'error:' + error.message : 'ok:Permissions saved.')
     setSavingPerms(false)
   }
 
-  const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600'
+  const inputCls =
+    'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600'
   const labelCls = 'block text-xs font-semibold text-gray-600 mb-1'
 
-  const Msg = ({ msg }) => msg ? (
-    <div className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg border ${
-      msg.startsWith('ok:')
-        ? 'bg-green-50 border-green-200 text-green-800'
-        : 'bg-red-50 border-red-200 text-red-700'
-    }`}>
-      {msg.startsWith('ok:') ? '✅' : '⚠️'} {msg.slice(3)}
-    </div>
-  ) : null
+  const Msg = ({ msg }) =>
+    msg ? (
+      <div
+        className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg border ${
+          msg.startsWith('ok:')
+            ? 'bg-green-50 border-green-200 text-green-800'
+            : 'bg-red-50 border-red-200 text-red-700'
+        }`}
+      >
+        {msg.startsWith('ok:') ? '✅' : '⚠️'} {msg.slice(3)}
+      </div>
+    ) : null
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
-
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
-                 style={{ backgroundColor: FG }}>
+            <div
+              className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
+              style={{ backgroundColor: FG }}
+            >
               {(profile.full_name || profile.email || '?')[0].toUpperCase()}
             </div>
             <div>
@@ -276,15 +322,20 @@ function UserEditModal({ profile, currentUserId, currentUserRole, onClose, onSav
               <p className="text-xs text-gray-400">{profile.email}</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none ml-4">✕</button>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-xl leading-none ml-4"
+          >
+            ✕
+          </button>
         </div>
 
         {/* Tabs */}
         <div className="flex border-b border-gray-200 px-6 flex-shrink-0">
           {[
-            { key: 'profile',     label: '👤 Profile' },
+            { key: 'profile', label: '👤 Profile' },
             { key: 'permissions', label: '🔐 Permissions' },
-            { key: 'account',     label: '🔑 Access and Roles' },
+            { key: 'account', label: '🔑 Access and Roles' },
             ...(callerIsAdmin ? [{ key: 'danger', label: '⚠️ Danger' }] : []),
           ].map(t => (
             <button
@@ -294,8 +345,8 @@ function UserEditModal({ profile, currentUserId, currentUserRole, onClose, onSav
                 tab === t.key && t.key !== 'danger'
                   ? 'border-green-700 text-green-800'
                   : tab === t.key && t.key === 'danger'
-                  ? 'border-red-500 text-red-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                    ? 'border-red-500 text-red-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
               {t.label}
@@ -305,34 +356,48 @@ function UserEditModal({ profile, currentUserId, currentUserRole, onClose, onSav
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto">
-
           {/* ── PROFILE TAB ─────────────────────────────────────────────── */}
           {tab === 'profile' && (
             <div className="p-6 space-y-4">
-
               {/* Full name */}
               <div>
                 <label className={labelCls}>Full Name</label>
-                <input className={inputCls} value={form.full_name}
-                  onChange={e => set('full_name', e.target.value)} placeholder="Full name" />
+                <input
+                  className={inputCls}
+                  value={form.full_name}
+                  onChange={e => set('full_name', e.target.value)}
+                  placeholder="Full name"
+                />
               </div>
 
               {/* Username */}
               <div>
                 <label className={labelCls}>Username</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">@</span>
-                  <input className={inputCls + ' pl-7'} value={form.username}
-                    onChange={e => set('username', e.target.value.toLowerCase().replace(/\s+/g, '.'))}
-                    placeholder="username" />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+                    @
+                  </span>
+                  <input
+                    className={inputCls + ' pl-7'}
+                    value={form.username}
+                    onChange={e =>
+                      set('username', e.target.value.toLowerCase().replace(/\s+/g, '.'))
+                    }
+                    placeholder="username"
+                  />
                 </div>
               </div>
 
               {/* Email */}
               <div>
                 <label className={labelCls}>Email Address</label>
-                <input type="email" className={inputCls} value={form.email}
-                  onChange={e => set('email', e.target.value)} placeholder="user@company.com" />
+                <input
+                  type="email"
+                  className={inputCls}
+                  value={form.email}
+                  onChange={e => set('email', e.target.value)}
+                  placeholder="user@company.com"
+                />
                 <p className="text-xs text-gray-400 mt-1">
                   Updates the login lookup email. Auth email changes require the Supabase dashboard.
                 </p>
@@ -345,23 +410,42 @@ function UserEditModal({ profile, currentUserId, currentUserRole, onClose, onSav
                   <div className="flex gap-4 flex-wrap">
                     {['user', 'admin', 'super_admin'].map(r => (
                       <label key={r} className="flex items-center gap-2 text-sm cursor-pointer">
-                        <input type="radio" name="edit-role" checked={form.role === r}
+                        <input
+                          type="radio"
+                          name="edit-role"
+                          checked={form.role === r}
                           onChange={() => set('role', r)}
-                          className="accent-green-700" />
-                        {r === 'super_admin' ? '👑 Super Admin' : r === 'admin' ? '🛡️ Admin' : '👤 User'}
+                          className="accent-green-700"
+                        />
+                        {r === 'super_admin'
+                          ? '👑 Super Admin'
+                          : r === 'admin'
+                            ? '🛡️ Admin'
+                            : '👤 User'}
                       </label>
                     ))}
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
-                      form.role === 'super_admin' ? 'bg-purple-100 text-purple-800' :
-                      form.role === 'admin' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
-                    }`}>
-                      {form.role === 'super_admin' ? '👑 Super Admin' : form.role === 'admin' ? '🛡️ Admin' : '👤 User'}
+                    <span
+                      className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+                        form.role === 'super_admin'
+                          ? 'bg-purple-100 text-purple-800'
+                          : form.role === 'admin'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      {form.role === 'super_admin'
+                        ? '👑 Super Admin'
+                        : form.role === 'admin'
+                          ? '🛡️ Admin'
+                          : '👤 User'}
                     </span>
                     <span className="text-xs text-gray-400">
-                      {isMe ? 'You cannot change your own role.' : 'Only the super admin can change roles.'}
+                      {isMe
+                        ? 'You cannot change your own role.'
+                        : 'Only the super admin can change roles.'}
                     </span>
                   </div>
                 )}
@@ -369,37 +453,72 @@ function UserEditModal({ profile, currentUserId, currentUserRole, onClose, onSav
 
               {/* Phone */}
               <div>
-                <label className={labelCls}>Cell Phone <span className="text-gray-400 font-normal">(for texting)</span></label>
-                <input type="tel" className={inputCls} value={form.phone_cell}
-                  onChange={e => set('phone_cell', e.target.value)} placeholder="(555) 867-5309" />
+                <label className={labelCls}>
+                  Cell Phone <span className="text-gray-400 font-normal">(for texting)</span>
+                </label>
+                <input
+                  type="tel"
+                  className={inputCls}
+                  value={form.phone_cell}
+                  onChange={e => set('phone_cell', e.target.value)}
+                  placeholder="(555) 867-5309"
+                />
               </div>
 
               {/* Address */}
               <div className="border-t border-gray-100 pt-4">
                 <p className={labelCls + ' mb-3'}>Address</p>
                 <div className="space-y-3">
-                  <input className={inputCls} value={form.address_line1}
-                    onChange={e => set('address_line1', e.target.value)} placeholder="Address Line 1" />
-                  <input className={inputCls} value={form.address_line2}
-                    onChange={e => set('address_line2', e.target.value)} placeholder="Address Line 2 (apt, suite…)" />
+                  <input
+                    className={inputCls}
+                    value={form.address_line1}
+                    onChange={e => set('address_line1', e.target.value)}
+                    placeholder="Address Line 1"
+                  />
+                  <input
+                    className={inputCls}
+                    value={form.address_line2}
+                    onChange={e => set('address_line2', e.target.value)}
+                    placeholder="Address Line 2 (apt, suite…)"
+                  />
                   <div className="grid grid-cols-3 gap-2">
-                    <input className={inputCls + ' col-span-1'} value={form.city}
-                      onChange={e => set('city', e.target.value)} placeholder="City" />
-                    <select className={inputCls} value={form.state} onChange={e => set('state', e.target.value)}>
+                    <input
+                      className={inputCls + ' col-span-1'}
+                      value={form.city}
+                      onChange={e => set('city', e.target.value)}
+                      placeholder="City"
+                    />
+                    <select
+                      className={inputCls}
+                      value={form.state}
+                      onChange={e => set('state', e.target.value)}
+                    >
                       <option value="">State</option>
-                      {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                      {US_STATES.map(s => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
                     </select>
-                    <input className={inputCls} value={form.zip_code}
-                      onChange={e => set('zip_code', e.target.value)} placeholder="Zip" maxLength={10} />
+                    <input
+                      className={inputCls}
+                      value={form.zip_code}
+                      onChange={e => set('zip_code', e.target.value)}
+                      placeholder="Zip"
+                      maxLength={10}
+                    />
                   </div>
                 </div>
               </div>
 
               {profileMsg && <Msg msg={profileMsg} />}
 
-              <button onClick={saveProfile} disabled={savingProfile}
+              <button
+                onClick={saveProfile}
+                disabled={savingProfile}
                 className="w-full py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-60"
-                style={{ backgroundColor: FG }}>
+                style={{ backgroundColor: FG }}
+              >
                 {savingProfile ? 'Saving…' : 'Save Profile'}
               </button>
             </div>
@@ -409,8 +528,12 @@ function UserEditModal({ profile, currentUserId, currentUserRole, onClose, onSav
           {tab === 'permissions' && (
             <div className="p-6 space-y-5">
               {(profile.role === 'admin' || profile.role === 'super_admin') && (
-                <div className={`border text-sm px-4 py-3 rounded-xl ${profile.role === 'super_admin' ? 'bg-purple-50 border-purple-200 text-purple-800' : 'bg-green-50 border-green-200 text-green-800'}`}>
-                  {profile.role === 'super_admin' ? '👑' : '🛡️'} This user is a <strong>{profile.role === 'super_admin' ? 'Super Admin' : 'Admin'}</strong> — they have full access to everything regardless of these settings.
+                <div
+                  className={`border text-sm px-4 py-3 rounded-xl ${profile.role === 'super_admin' ? 'bg-purple-50 border-purple-200 text-purple-800' : 'bg-green-50 border-green-200 text-green-800'}`}
+                >
+                  {profile.role === 'super_admin' ? '👑' : '🛡️'} This user is a{' '}
+                  <strong>{profile.role === 'super_admin' ? 'Super Admin' : 'Admin'}</strong> — they
+                  have full access to everything regardless of these settings.
                 </div>
               )}
 
@@ -427,14 +550,21 @@ function UserEditModal({ profile, currentUserId, currentUserRole, onClose, onSav
                       </h3>
                       <div className="space-y-2 pl-1">
                         {group.perms.map(p => (
-                          <label key={p.key} className="flex items-center gap-3 cursor-pointer group">
+                          <label
+                            key={p.key}
+                            className="flex items-center gap-3 cursor-pointer group"
+                          >
                             <input
                               type="checkbox"
                               checked={!!perms[p.key]}
-                              onChange={e => setPerms(prev => ({ ...prev, [p.key]: e.target.checked }))}
+                              onChange={e =>
+                                setPerms(prev => ({ ...prev, [p.key]: e.target.checked }))
+                              }
                               className="w-4 h-4 rounded accent-green-700"
                             />
-                            <span className="text-sm text-gray-700 group-hover:text-gray-900">{p.label}</span>
+                            <span className="text-sm text-gray-700 group-hover:text-gray-900">
+                              {p.label}
+                            </span>
                           </label>
                         ))}
                       </div>
@@ -443,9 +573,12 @@ function UserEditModal({ profile, currentUserId, currentUserRole, onClose, onSav
 
                   {permsMsg && <Msg msg={permsMsg} />}
 
-                  <button onClick={savePerms} disabled={savingPerms}
+                  <button
+                    onClick={savePerms}
+                    disabled={savingPerms}
                     className="w-full py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-60"
-                    style={{ backgroundColor: FG }}>
+                    style={{ backgroundColor: FG }}
+                  >
                     {savingPerms ? 'Saving…' : 'Save Permissions'}
                   </button>
                 </>
@@ -456,17 +589,23 @@ function UserEditModal({ profile, currentUserId, currentUserRole, onClose, onSav
           {/* ── ACCOUNT TAB ─────────────────────────────────────────────── */}
           {tab === 'account' && (
             <div className="p-6 space-y-4">
-
               {/* Password Reset */}
               <div>
                 <label className={labelCls}>Password Reset</label>
                 <p className="text-xs text-gray-500 mb-3">
-                  Send a password reset link to <strong>{form.email || profile.email}</strong>.
-                  The user clicks the link to set a new password.
+                  Send a password reset link to <strong>{form.email || profile.email}</strong>. The
+                  user clicks the link to set a new password.
                 </p>
-                {resetMsg && <div className="mb-2"><Msg msg={resetMsg} /></div>}
-                <button onClick={sendPasswordReset} disabled={resetSending}
-                  className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                {resetMsg && (
+                  <div className="mb-2">
+                    <Msg msg={resetMsg} />
+                  </div>
+                )}
+                <button
+                  onClick={sendPasswordReset}
+                  disabled={resetSending}
+                  className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
                   {resetSending ? 'Sending…' : '📧 Send Password Reset Email'}
                 </button>
               </div>
@@ -475,15 +614,24 @@ function UserEditModal({ profile, currentUserId, currentUserRole, onClose, onSav
               <div className="border-t border-gray-100 pt-4">
                 <div className="flex items-center gap-1.5 mb-1">
                   <span className="text-base">🤖</span>
-                  <label className={labelCls} style={{ margin: 0 }}>Text Password via Sam</label>
+                  <label className={labelCls} style={{ margin: 0 }}>
+                    Text Password via Sam
+                  </label>
                 </div>
                 <p className="text-xs text-gray-500 mb-3">
                   Sam, the AI assistant, will text the user their credentials via SMS.
                   {!(form.phone_cell || profile.phone_cell) && (
-                    <span className="text-amber-600 font-medium"> No cell phone number on file — add one in the Profile tab.</span>
+                    <span className="text-amber-600 font-medium">
+                      {' '}
+                      No cell phone number on file — add one in the Profile tab.
+                    </span>
                   )}
                 </p>
-                {smsMsg && <div className="mb-3"><Msg msg={smsMsg} /></div>}
+                {smsMsg && (
+                  <div className="mb-3">
+                    <Msg msg={smsMsg} />
+                  </div>
+                )}
                 <div className="flex flex-wrap gap-2">
                   <button
                     onClick={sendPasswordViaSMS}
@@ -501,8 +649,8 @@ function UserEditModal({ profile, currentUserId, currentUserRole, onClose, onSav
                   </button>
                 </div>
                 <p className="text-xs text-gray-400 mt-2">
-                  "Text Current Password" sends the last admin-set password.
-                  "Reset & Text" generates a new password, resets their account, and texts it.
+                  "Text Current Password" sends the last admin-set password. "Reset & Text"
+                  generates a new password, resets their account, and texts it.
                 </p>
               </div>
             </div>
@@ -526,30 +674,35 @@ function UserEditModal({ profile, currentUserId, currentUserRole, onClose, onSav
 
 // ── DangerZone (used inside UserEditModal) ────────────────────────────────────
 function DangerZone({ profile, currentUserId, currentUserRole, onClose, onSaved }) {
-  const isMe             = profile.id === currentUserId
-  const isArchived       = !!profile.archived_at
-  const targetIsPriv     = profile.role === 'admin' || profile.role === 'super_admin'
+  const isMe = profile.id === currentUserId
+  const isArchived = !!profile.archived_at
+  const targetIsPriv = profile.role === 'admin' || profile.role === 'super_admin'
   const callerIsSuperAdmin = currentUserRole === 'super_admin'
-  const canDelete        = !isMe && (!targetIsPriv || callerIsSuperAdmin)
+  const canDelete = !isMe && (!targetIsPriv || callerIsSuperAdmin)
 
   const [archiving, setArchiving] = useState(false)
-  const [deleting,  setDeleting]  = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [msg, setMsg] = useState('')
 
   async function toggleArchive() {
-    setArchiving(true); setMsg('')
+    setArchiving(true)
+    setMsg('')
     const { error } = await supabase
       .from('profiles')
       .update({ archived_at: isArchived ? null : new Date().toISOString() })
       .eq('id', profile.id)
     if (error) setMsg('error:' + error.message)
-    else { setMsg(isArchived ? 'ok:User restored.' : 'ok:User archived.'); onSaved() }
+    else {
+      setMsg(isArchived ? 'ok:User restored.' : 'ok:User archived.')
+      onSaved()
+    }
     setArchiving(false)
   }
 
   async function deleteUser() {
-    setDeleting(true); setMsg('')
+    setDeleting(true)
+    setMsg('')
     const { data, error } = await supabase.functions.invoke('delete-user', {
       body: { userId: profile.id },
     })
@@ -567,15 +720,18 @@ function DangerZone({ profile, currentUserId, currentUserRole, onClose, onSaved 
     onClose()
   }
 
-  const Msg = ({ msg }) => msg ? (
-    <div className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg border ${
-      msg.startsWith('ok:')
-        ? 'bg-green-50 border-green-200 text-green-800'
-        : 'bg-red-50 border-red-200 text-red-700'
-    }`}>
-      {msg.startsWith('ok:') ? '✅' : '⚠️'} {msg.slice(3)}
-    </div>
-  ) : null
+  const Msg = ({ msg }) =>
+    msg ? (
+      <div
+        className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg border ${
+          msg.startsWith('ok:')
+            ? 'bg-green-50 border-green-200 text-green-800'
+            : 'bg-red-50 border-red-200 text-red-700'
+        }`}
+      >
+        {msg.startsWith('ok:') ? '✅' : '⚠️'} {msg.slice(3)}
+      </div>
+    ) : null
 
   return (
     <div className="p-6 space-y-5">
@@ -630,7 +786,8 @@ function DangerZone({ profile, currentUserId, currentUserRole, onClose, onSaved 
         ) : (
           <div className="space-y-2">
             <p className="text-sm font-semibold text-red-700">
-              Are you sure? This will permanently delete <strong>{profile.full_name || profile.email}</strong>.
+              Are you sure? This will permanently delete{' '}
+              <strong>{profile.full_name || profile.email}</strong>.
             </p>
             <div className="flex gap-2">
               <button
@@ -656,40 +813,88 @@ function DangerZone({ profile, currentUserId, currentUserRole, onClose, onSaved 
 
 // ── AddUserModal ──────────────────────────────────────────────────────────────
 const US_STATES = [
-  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA',
-  'HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
-  'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
-  'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
-  'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY',
+  'AL',
+  'AK',
+  'AZ',
+  'AR',
+  'CA',
+  'CO',
+  'CT',
+  'DE',
+  'FL',
+  'GA',
+  'HI',
+  'ID',
+  'IL',
+  'IN',
+  'IA',
+  'KS',
+  'KY',
+  'LA',
+  'ME',
+  'MD',
+  'MA',
+  'MI',
+  'MN',
+  'MS',
+  'MO',
+  'MT',
+  'NE',
+  'NV',
+  'NH',
+  'NJ',
+  'NM',
+  'NY',
+  'NC',
+  'ND',
+  'OH',
+  'OK',
+  'OR',
+  'PA',
+  'RI',
+  'SC',
+  'SD',
+  'TN',
+  'TX',
+  'UT',
+  'VT',
+  'VA',
+  'WA',
+  'WV',
+  'WI',
+  'WY',
 ]
 
 function AddUserModal({ onClose, onCreated }) {
   const [form, setForm] = useState({
-    full_name:     '',
-    username:      '',
-    email:         '',
-    password:      generatePassword(),
-    role:          'user',
-    phone_cell:    '',
+    full_name: '',
+    username: '',
+    email: '',
+    password: generatePassword(),
+    role: 'user',
+    phone_cell: '',
     address_line1: '',
     address_line2: '',
-    city:          '',
-    state:         '',
-    zip_code:      '',
+    city: '',
+    state: '',
+    zip_code: '',
   })
-  const [showPw,   setShowPw]   = useState(false)
-  const [copied,   setCopied]   = useState(false)
-  const [saving,   setSaving]   = useState(false)
-  const [err,      setErr]      = useState('')
-  const [success,  setSuccess]  = useState('')
+  const [showPw, setShowPw] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+  const [success, setSuccess] = useState('')
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   // Auto-suggest username from full name
   const handleNameBlur = () => {
     if (!form.username && form.full_name.trim()) {
-      const suggested = form.full_name.trim().toLowerCase()
-        .replace(/\s+/g, '.').replace(/[^a-z0-9.]/g, '')
+      const suggested = form.full_name
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, '.')
+        .replace(/[^a-z0-9.]/g, '')
       set('username', suggested)
     }
   }
@@ -702,9 +907,18 @@ function AddUserModal({ onClose, onCreated }) {
 
   const handleCreate = async () => {
     setErr('')
-    if (!form.email.trim())    { setErr('Email is required.');    return }
-    if (!form.password.trim()) { setErr('Password is required.'); return }
-    if (!form.full_name.trim()){ setErr('Full name is required.'); return }
+    if (!form.email.trim()) {
+      setErr('Email is required.')
+      return
+    }
+    if (!form.password.trim()) {
+      setErr('Password is required.')
+      return
+    }
+    if (!form.full_name.trim()) {
+      setErr('Full name is required.')
+      return
+    }
     setSaving(true)
 
     try {
@@ -717,24 +931,33 @@ function AddUserModal({ onClose, onCreated }) {
       )
 
       const { data, error: signUpErr } = await tempClient.auth.signUp({
-        email:    form.email.trim().toLowerCase(),
+        email: form.email.trim().toLowerCase(),
         password: form.password,
-        options:  {
-          data:          { full_name: form.full_name.trim() },
-          emailRedirectTo: null,   // Don't send a confirmation email
+        options: {
+          data: { full_name: form.full_name.trim() },
+          emailRedirectTo: null, // Don't send a confirmation email
         },
       })
 
       if (signUpErr) {
-        if (signUpErr.message?.includes('already registered') || signUpErr.message?.includes('already been registered')) {
+        if (
+          signUpErr.message?.includes('already registered') ||
+          signUpErr.message?.includes('already been registered')
+        ) {
           throw new Error('That email address is already registered.')
         }
-        if (signUpErr.message?.includes('rate limit') || signUpErr.message?.includes('email rate')) {
-          throw new Error('Email rate limit reached. Go to Supabase Dashboard → Authentication → Providers → Email → turn off "Confirm email", then try again.')
+        if (
+          signUpErr.message?.includes('rate limit') ||
+          signUpErr.message?.includes('email rate')
+        ) {
+          throw new Error(
+            'Email rate limit reached. Go to Supabase Dashboard → Authentication → Providers → Email → turn off "Confirm email", then try again.'
+          )
         }
         throw new Error(signUpErr.message || 'Failed to create user in auth system.')
       }
-      if (!data?.user) throw new Error('User creation returned no data — the email may already be registered.')
+      if (!data?.user)
+        throw new Error('User creation returned no data — the email may already be registered.')
 
       const newUserId = data.user.id
 
@@ -742,22 +965,23 @@ function AddUserModal({ onClose, onCreated }) {
       // to guarantee the profile exists even if the trigger failed.
       await new Promise(r => setTimeout(r, 1200))
 
-      const { error: profileErr } = await supabase
-        .from('profiles')
-        .upsert({
-          id:            newUserId,
-          email:         form.email.trim().toLowerCase(),
-          full_name:     form.full_name.trim(),
-          username:      form.username.trim().toLowerCase() || null,
-          role:          form.role,
-          phone_cell:    form.phone_cell.trim()    || null,
+      const { error: profileErr } = await supabase.from('profiles').upsert(
+        {
+          id: newUserId,
+          email: form.email.trim().toLowerCase(),
+          full_name: form.full_name.trim(),
+          username: form.username.trim().toLowerCase() || null,
+          role: form.role,
+          phone_cell: form.phone_cell.trim() || null,
           address_line1: form.address_line1.trim() || null,
           address_line2: form.address_line2.trim() || null,
-          city:          form.city.trim()          || null,
-          state:         form.state                || null,
-          zip_code:      form.zip_code.trim()      || null,
-          temp_password: form.password,            // stored so Sam can text it later
-        }, { onConflict: 'id' })
+          city: form.city.trim() || null,
+          state: form.state || null,
+          zip_code: form.zip_code.trim() || null,
+          temp_password: form.password, // stored so Sam can text it later
+        },
+        { onConflict: 'id' }
+      )
 
       if (profileErr) {
         // Surface the real error so we can diagnose it
@@ -766,7 +990,7 @@ function AddUserModal({ onClose, onCreated }) {
 
       // Send welcome email — non-blocking but surface Resend errors in UI
       const { error: emailErr } = await sendWelcomeEmail({
-        to:       form.email.trim().toLowerCase(),
+        to: form.email.trim().toLowerCase(),
         fullName: form.full_name.trim(),
         username: form.username.trim().toLowerCase(),
         password: form.password,
@@ -776,11 +1000,13 @@ function AddUserModal({ onClose, onCreated }) {
       if (emailErr) {
         setSuccess(
           `✅ User "${form.full_name}" created! ` +
-          `⚠️ Welcome email could not be sent — ${emailErr.message}. ` +
-          `Please share the password manually.`
+            `⚠️ Welcome email could not be sent — ${emailErr.message}. ` +
+            `Please share the password manually.`
         )
       } else {
-        setSuccess(`✅ User "${form.full_name}" created! A welcome email with their credentials has been sent to ${form.email}.`)
+        setSuccess(
+          `✅ User "${form.full_name}" created! A welcome email with their credentials has been sent to ${form.email}.`
+        )
       }
       onCreated()
     } catch (e) {
@@ -789,7 +1015,8 @@ function AddUserModal({ onClose, onCreated }) {
     setSaving(false)
   }
 
-  const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600'
+  const inputCls =
+    'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600'
   const labelCls = 'block text-xs font-semibold text-gray-600 mb-1'
 
   return (
@@ -797,7 +1024,12 @@ function AddUserModal({ onClose, onCreated }) {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h2 className="text-lg font-semibold text-gray-900">Add New User</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+          >
+            ✕
+          </button>
         </div>
 
         {success ? (
@@ -807,12 +1039,23 @@ function AddUserModal({ onClose, onCreated }) {
             </div>
             <div className="bg-gray-50 rounded-xl p-4 text-sm space-y-1">
               <p className="font-semibold text-gray-700 mb-2">Credentials to share:</p>
-              <p><span className="text-gray-500">Email:</span> <span className="font-mono">{form.email}</span></p>
-              {form.username && <p><span className="text-gray-500">Username:</span> <span className="font-mono">@{form.username}</span></p>}
+              <p>
+                <span className="text-gray-500">Email:</span>{' '}
+                <span className="font-mono">{form.email}</span>
+              </p>
+              {form.username && (
+                <p>
+                  <span className="text-gray-500">Username:</span>{' '}
+                  <span className="font-mono">@{form.username}</span>
+                </p>
+              )}
               <p className="flex items-center gap-2">
                 <span className="text-gray-500">Password:</span>
                 <span className="font-mono">{form.password}</span>
-                <button onClick={copyPassword} className="text-xs px-2 py-0.5 rounded bg-gray-200 hover:bg-gray-300">
+                <button
+                  onClick={copyPassword}
+                  className="text-xs px-2 py-0.5 rounded bg-gray-200 hover:bg-gray-300"
+                >
                   {copied ? '✓ Copied' : 'Copy'}
                 </button>
               </p>
@@ -829,7 +1072,9 @@ function AddUserModal({ onClose, onCreated }) {
           <div className="p-6 space-y-4">
             {/* Full name */}
             <div>
-              <label className={labelCls}>Full Name <span className="text-red-400">*</span></label>
+              <label className={labelCls}>
+                Full Name <span className="text-red-400">*</span>
+              </label>
               <input
                 className={inputCls}
                 value={form.full_name}
@@ -842,9 +1087,16 @@ function AddUserModal({ onClose, onCreated }) {
 
             {/* Username */}
             <div>
-              <label className={labelCls}>Username <span className="text-gray-400 font-normal">(optional — auto-suggested from name)</span></label>
+              <label className={labelCls}>
+                Username{' '}
+                <span className="text-gray-400 font-normal">
+                  (optional — auto-suggested from name)
+                </span>
+              </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">@</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+                  @
+                </span>
                 <input
                   className={inputCls + ' pl-7'}
                   value={form.username}
@@ -856,7 +1108,9 @@ function AddUserModal({ onClose, onCreated }) {
 
             {/* Email */}
             <div>
-              <label className={labelCls}>Email Address <span className="text-red-400">*</span></label>
+              <label className={labelCls}>
+                Email Address <span className="text-red-400">*</span>
+              </label>
               <input
                 type="email"
                 className={inputCls}
@@ -868,7 +1122,9 @@ function AddUserModal({ onClose, onCreated }) {
 
             {/* Password */}
             <div>
-              <label className={labelCls}>Temporary Password <span className="text-red-400">*</span></label>
+              <label className={labelCls}>
+                Temporary Password <span className="text-red-400">*</span>
+              </label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <input
@@ -900,7 +1156,9 @@ function AddUserModal({ onClose, onCreated }) {
                   {copied ? '✓' : '📋'}
                 </button>
               </div>
-              <p className="text-xs text-gray-400 mt-1">Share this password with the user — they can change it after logging in.</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Share this password with the user — they can change it after logging in.
+              </p>
             </div>
 
             {/* Role */}
@@ -924,28 +1182,63 @@ function AddUserModal({ onClose, onCreated }) {
 
             {/* Phone */}
             <div>
-              <label className={labelCls}>Cell Phone <span className="text-gray-400 font-normal">(optional — for texting)</span></label>
-              <input type="tel" className={inputCls} value={form.phone_cell}
-                onChange={e => set('phone_cell', e.target.value)} placeholder="(555) 867-5309" />
+              <label className={labelCls}>
+                Cell Phone{' '}
+                <span className="text-gray-400 font-normal">(optional — for texting)</span>
+              </label>
+              <input
+                type="tel"
+                className={inputCls}
+                value={form.phone_cell}
+                onChange={e => set('phone_cell', e.target.value)}
+                placeholder="(555) 867-5309"
+              />
             </div>
 
             {/* Address */}
             <div className="border-t border-gray-100 pt-4">
-              <p className={labelCls + ' mb-3'}>Address <span className="text-gray-400 font-normal">(optional)</span></p>
+              <p className={labelCls + ' mb-3'}>
+                Address <span className="text-gray-400 font-normal">(optional)</span>
+              </p>
               <div className="space-y-3">
-                <input className={inputCls} value={form.address_line1}
-                  onChange={e => set('address_line1', e.target.value)} placeholder="Address Line 1" />
-                <input className={inputCls} value={form.address_line2}
-                  onChange={e => set('address_line2', e.target.value)} placeholder="Address Line 2 (apt, suite…)" />
+                <input
+                  className={inputCls}
+                  value={form.address_line1}
+                  onChange={e => set('address_line1', e.target.value)}
+                  placeholder="Address Line 1"
+                />
+                <input
+                  className={inputCls}
+                  value={form.address_line2}
+                  onChange={e => set('address_line2', e.target.value)}
+                  placeholder="Address Line 2 (apt, suite…)"
+                />
                 <div className="grid grid-cols-3 gap-2">
-                  <input className={inputCls + ' col-span-1'} value={form.city}
-                    onChange={e => set('city', e.target.value)} placeholder="City" />
-                  <select className={inputCls} value={form.state} onChange={e => set('state', e.target.value)}>
+                  <input
+                    className={inputCls + ' col-span-1'}
+                    value={form.city}
+                    onChange={e => set('city', e.target.value)}
+                    placeholder="City"
+                  />
+                  <select
+                    className={inputCls}
+                    value={form.state}
+                    onChange={e => set('state', e.target.value)}
+                  >
                     <option value="">State</option>
-                    {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                    {US_STATES.map(s => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
                   </select>
-                  <input className={inputCls} value={form.zip_code}
-                    onChange={e => set('zip_code', e.target.value)} placeholder="Zip" maxLength={10} />
+                  <input
+                    className={inputCls}
+                    value={form.zip_code}
+                    onChange={e => set('zip_code', e.target.value)}
+                    placeholder="Zip"
+                    maxLength={10}
+                  />
                 </div>
               </div>
             </div>
@@ -957,7 +1250,10 @@ function AddUserModal({ onClose, onCreated }) {
             )}
 
             <div className="flex gap-3 pt-1">
-              <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-300 text-sm text-gray-600 hover:bg-gray-50">
+              <button
+                onClick={onClose}
+                className="flex-1 py-2.5 rounded-xl border border-gray-300 text-sm text-gray-600 hover:bg-gray-50"
+              >
                 Cancel
               </button>
               <button
@@ -966,13 +1262,14 @@ function AddUserModal({ onClose, onCreated }) {
                 className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-60"
                 style={{ backgroundColor: FG }}
               >
-                {saving
-                  ? <span className="flex items-center justify-center gap-2">
-                      <span className="animate-spin inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full"></span>
-                      Creating…
-                    </span>
-                  : 'Create User'
-                }
+                {saving ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="animate-spin inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full"></span>
+                    Creating…
+                  </span>
+                ) : (
+                  'Create User'
+                )}
               </button>
             </div>
           </div>
@@ -984,58 +1281,55 @@ function AddUserModal({ onClose, onCreated }) {
 
 // ── CompanySettings ───────────────────────────────────────────────────────────
 const WEEK_DAYS = [
-  { value: 0, short: 'Sun', label: 'Sunday'    },
-  { value: 1, short: 'Mon', label: 'Monday'    },
-  { value: 2, short: 'Tue', label: 'Tuesday'   },
+  { value: 0, short: 'Sun', label: 'Sunday' },
+  { value: 1, short: 'Mon', label: 'Monday' },
+  { value: 2, short: 'Tue', label: 'Tuesday' },
   { value: 3, short: 'Wed', label: 'Wednesday' },
-  { value: 4, short: 'Thu', label: 'Thursday'  },
-  { value: 5, short: 'Fri', label: 'Friday'    },
-  { value: 6, short: 'Sat', label: 'Saturday'  },
+  { value: 4, short: 'Thu', label: 'Thursday' },
+  { value: 5, short: 'Fri', label: 'Friday' },
+  { value: 6, short: 'Sat', label: 'Saturday' },
 ]
 
 function CompanySettings({ currentUserIsAdmin }) {
-  const { user } = useAuth()
-
   // ── Company info ──────────────────────────────────────────────────────────
   const [companyForm, setCompanyForm] = useState({
-    company_name:           '',
-    license_number:         '',
+    company_name: '',
+    license_number: '',
     labor_rate_per_man_day: '400',
   })
   const [loadingCompany, setLoadingCompany] = useState(true)
-  const [savingCompany,  setSavingCompany]  = useState(false)
-  const [companyMsg,     setCompanyMsg]     = useState('')
+  const [savingCompany, setSavingCompany] = useState(false)
+  const [companyMsg, setCompanyMsg] = useState('')
 
   // ── Week ending day (Statistics) ─────────────────────────────────────────
   const [weekEndingDay, setWeekEndingDay] = useState(null)
-  const [pendingDay,    setPendingDay]    = useState(null)
-  const [savingDay,     setSavingDay]     = useState(false)
-  const [dayMsg,        setDayMsg]        = useState('')
+  const [pendingDay, setPendingDay] = useState(null)
+  const [savingDay, setSavingDay] = useState(false)
+  const [dayMsg, setDayMsg] = useState('')
 
   // ── Company week ending day (Finance) ─────────────────────────────────────
-  const [companyWeekDay,        setCompanyWeekDay]        = useState(null)
+  const [companyWeekDay, setCompanyWeekDay] = useState(null)
   const [pendingCompanyWeekDay, setPendingCompanyWeekDay] = useState(null)
-  const [savingCompanyWeekDay,  setSavingCompanyWeekDay]  = useState(false)
-  const [companyWeekMsg,        setCompanyWeekMsg]        = useState('')
+  const [savingCompanyWeekDay, setSavingCompanyWeekDay] = useState(false)
+  const [companyWeekMsg, setCompanyWeekMsg] = useState('')
 
   // ── Company logo ──────────────────────────────────────────────────────────
-  const [logoUrl,      setLogoUrl]      = useState(null)
+  const [logoUrl, setLogoUrl] = useState(null)
   const [uploadingLogo, setUploadingLogo] = useState(false)
-  const [logoMsg,      setLogoMsg]      = useState('')
+  const [logoMsg, setLogoMsg] = useState('')
   const logoInputRef = useRef(null)
 
-  useEffect(() => { loadSettings() }, [])
+  useEffect(() => {
+    loadSettings()
+  }, [])
 
   async function loadSettings() {
     setLoadingCompany(true)
-    const { data } = await supabase
-      .from('company_settings')
-      .select('*')
-      .maybeSingle()
+    const { data } = await supabase.from('company_settings').select('*').maybeSingle()
     if (data) {
       setCompanyForm({
-        company_name:           data.company_name           || '',
-        license_number:         data.license_number         || '',
+        company_name: data.company_name || '',
+        license_number: data.license_number || '',
         labor_rate_per_man_day: String(data.labor_rate_per_man_day || '400'),
       })
       const val = data.week_ending_day ?? null
@@ -1052,24 +1346,37 @@ function CompanySettings({ currentUserIsAdmin }) {
   async function uploadLogo(file) {
     if (!file) return
     const ext = file.name.split('.').pop().toLowerCase()
-    if (!['png','jpg','jpeg','gif','svg','webp'].includes(ext)) {
+    if (!['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(ext)) {
       setLogoMsg('error:Please upload a PNG, JPG, SVG, or WebP image.')
       return
     }
-    setUploadingLogo(true); setLogoMsg('')
+    setUploadingLogo(true)
+    setLogoMsg('')
     const { error: upErr } = await supabase.storage
       .from('company-assets')
       .upload('logo', file, { upsert: true, contentType: file.type })
-    if (upErr) { setLogoMsg('error:' + upErr.message); setUploadingLogo(false); return }
-    const { data: { publicUrl } } = supabase.storage.from('company-assets').getPublicUrl('logo')
+    if (upErr) {
+      setLogoMsg('error:' + upErr.message)
+      setUploadingLogo(false)
+      return
+    }
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from('company-assets').getPublicUrl('logo')
     // append cache-buster so browser picks up the new image
     const urlWithBust = publicUrl + '?t=' + Date.now()
     const { data: existing } = await supabase.from('company_settings').select('id').maybeSingle()
-    const { error: dbErr } = await supabase.from('company_settings').upsert(
-      { id: existing?.id || 1, logo_url: urlWithBust, updated_at: new Date().toISOString() },
-      { onConflict: 'id' }
-    )
-    if (dbErr) { setLogoMsg('error:' + dbErr.message); setUploadingLogo(false); return }
+    const { error: dbErr } = await supabase
+      .from('company_settings')
+      .upsert(
+        { id: existing?.id || 1, logo_url: urlWithBust, updated_at: new Date().toISOString() },
+        { onConflict: 'id' }
+      )
+    if (dbErr) {
+      setLogoMsg('error:' + dbErr.message)
+      setUploadingLogo(false)
+      return
+    }
     setLogoUrl(urlWithBust)
     window.dispatchEvent(new Event('company-logo-updated'))
     setLogoMsg('ok:Logo uploaded and applied.')
@@ -1084,15 +1391,19 @@ function CompanySettings({ currentUserIsAdmin }) {
       setCompanyMsg('error:Labor rate must be a positive number.')
       return
     }
-    setSavingCompany(true); setCompanyMsg('')
+    setSavingCompany(true)
+    setCompanyMsg('')
     const { data: existing } = await supabase.from('company_settings').select('id').maybeSingle()
-    const { error } = await supabase.from('company_settings').upsert({
-      id:                     existing?.id || 1,
-      company_name:           companyForm.company_name.trim(),
-      license_number:         companyForm.license_number.trim(),
-      labor_rate_per_man_day: rate,
-      updated_at:             new Date().toISOString(),
-    }, { onConflict: 'id' })
+    const { error } = await supabase.from('company_settings').upsert(
+      {
+        id: existing?.id || 1,
+        company_name: companyForm.company_name.trim(),
+        license_number: companyForm.license_number.trim(),
+        labor_rate_per_man_day: rate,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'id' }
+    )
     setCompanyMsg(error ? 'error:' + error.message : 'ok:Settings saved.')
     setSavingCompany(false)
     setTimeout(() => setCompanyMsg(''), 4000)
@@ -1100,12 +1411,12 @@ function CompanySettings({ currentUserIsAdmin }) {
 
   async function saveWeekDay() {
     if (pendingDay === null) return
-    setSavingDay(true); setDayMsg('')
+    setSavingDay(true)
+    setDayMsg('')
     const { data: existing } = await supabase.from('company_settings').select('id').maybeSingle()
-    const { error } = await supabase.from('company_settings').upsert(
-      { id: existing?.id || 1, week_ending_day: pendingDay },
-      { onConflict: 'id' }
-    )
+    const { error } = await supabase
+      .from('company_settings')
+      .upsert({ id: existing?.id || 1, week_ending_day: pendingDay }, { onConflict: 'id' })
     if (error) {
       setDayMsg('error:' + error.message)
     } else {
@@ -1118,12 +1429,15 @@ function CompanySettings({ currentUserIsAdmin }) {
 
   async function saveCompanyWeekDay() {
     if (pendingCompanyWeekDay === null) return
-    setSavingCompanyWeekDay(true); setCompanyWeekMsg('')
+    setSavingCompanyWeekDay(true)
+    setCompanyWeekMsg('')
     const { data: existing } = await supabase.from('company_settings').select('id').maybeSingle()
-    const { error } = await supabase.from('company_settings').upsert(
-      { id: existing?.id || 1, company_week_ending_day: pendingCompanyWeekDay },
-      { onConflict: 'id' }
-    )
+    const { error } = await supabase
+      .from('company_settings')
+      .upsert(
+        { id: existing?.id || 1, company_week_ending_day: pendingCompanyWeekDay },
+        { onConflict: 'id' }
+      )
     if (error) {
       setCompanyWeekMsg('error:' + error.message)
     } else {
@@ -1134,29 +1448,33 @@ function CompanySettings({ currentUserIsAdmin }) {
     setTimeout(() => setCompanyWeekMsg(''), 4000)
   }
 
-  const Msg = ({ m }) => m ? (
-    <div className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg border ${
-      m.startsWith('ok:')
-        ? 'bg-green-50 border-green-200 text-green-800'
-        : 'bg-red-50 border-red-200 text-red-700'
-    }`}>
-      {m.startsWith('ok:') ? '✅' : '⚠️'} {m.slice(3)}
-    </div>
-  ) : null
+  const Msg = ({ m }) =>
+    m ? (
+      <div
+        className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg border ${
+          m.startsWith('ok:')
+            ? 'bg-green-50 border-green-200 text-green-800'
+            : 'bg-red-50 border-red-200 text-red-700'
+        }`}
+      >
+        {m.startsWith('ok:') ? '✅' : '⚠️'} {m.slice(3)}
+      </div>
+    ) : null
 
-  const inputCls = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600'
+  const inputCls =
+    'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600'
   const labelCls = 'block text-xs font-semibold text-gray-600 mb-1'
   const rate = parseFloat(companyForm.labor_rate_per_man_day || 0)
 
-  if (loadingCompany) return (
-    <div className="flex items-center justify-center py-20">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700"></div>
-    </div>
-  )
+  if (loadingCompany)
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700"></div>
+      </div>
+    )
 
   return (
     <div className="max-w-xl space-y-4">
-
       {!currentUserIsAdmin && (
         <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm px-4 py-3 rounded-xl">
           ⚠️ Only admins can change these settings.
@@ -1169,15 +1487,23 @@ function CompanySettings({ currentUserIsAdmin }) {
         <form onSubmit={saveCompany} className="space-y-4">
           <div>
             <label className={labelCls}>Company Name</label>
-            <input className={inputCls} value={companyForm.company_name}
+            <input
+              className={inputCls}
+              value={companyForm.company_name}
               onChange={e => setCompanyForm(p => ({ ...p, company_name: e.target.value }))}
-              placeholder="Your Company Name" disabled={!currentUserIsAdmin} />
+              placeholder="Your Company Name"
+              disabled={!currentUserIsAdmin}
+            />
           </div>
           <div>
             <label className={labelCls}>License Number</label>
-            <input className={inputCls} value={companyForm.license_number}
+            <input
+              className={inputCls}
+              value={companyForm.license_number}
               onChange={e => setCompanyForm(p => ({ ...p, license_number: e.target.value }))}
-              placeholder="e.g. CA-12345" disabled={!currentUserIsAdmin} />
+              placeholder="e.g. CA-12345"
+              disabled={!currentUserIsAdmin}
+            />
           </div>
           <div>
             <label className={labelCls}>Labor Rate — Per Man Day (1 MD = 8 hrs)</label>
@@ -1185,10 +1511,15 @@ function CompanySettings({ currentUserIsAdmin }) {
               <span className="absolute left-3 top-2 text-gray-400 text-sm">$</span>
               <input
                 className={inputCls + ' pl-7'}
-                type="number" min="1" step="0.01"
+                type="number"
+                min="1"
+                step="0.01"
                 value={companyForm.labor_rate_per_man_day}
-                onChange={e => setCompanyForm(p => ({ ...p, labor_rate_per_man_day: e.target.value }))}
-                placeholder="400.00" disabled={!currentUserIsAdmin}
+                onChange={e =>
+                  setCompanyForm(p => ({ ...p, labor_rate_per_man_day: e.target.value }))
+                }
+                placeholder="400.00"
+                disabled={!currentUserIsAdmin}
               />
             </div>
             {rate > 0 && (
@@ -1201,9 +1532,12 @@ function CompanySettings({ currentUserIsAdmin }) {
           {companyMsg && <Msg m={companyMsg} />}
 
           {currentUserIsAdmin && (
-            <button type="submit" disabled={savingCompany}
+            <button
+              type="submit"
+              disabled={savingCompany}
               className="w-full py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50"
-              style={{ backgroundColor: FG }}>
+              style={{ backgroundColor: FG }}
+            >
               {savingCompany ? 'Saving…' : 'Save Company Settings'}
             </button>
           )}
@@ -1214,14 +1548,25 @@ function CompanySettings({ currentUserIsAdmin }) {
       <div className="card bg-green-50 border-green-200">
         <h3 className="font-semibold text-green-900 mb-2">📊 How GP is Calculated</h3>
         <div className="text-sm text-green-800 space-y-1.5">
-          <p><b>Revenue</b> = Contract Price + Change Order Prices</p>
-          <p><b>Labor Cost</b> = Total Man Days × Rate per Man Day</p>
-          <p><b>Total Cost</b> = Labor Cost + Material Cost</p>
-          <p><b>Gross Profit</b> = Revenue − Total Cost</p>
-          <p><b>GP %</b> = Gross Profit ÷ Revenue × 100</p>
+          <p>
+            <b>Revenue</b> = Contract Price + Change Order Prices
+          </p>
+          <p>
+            <b>Labor Cost</b> = Total Man Days × Rate per Man Day
+          </p>
+          <p>
+            <b>Total Cost</b> = Labor Cost + Material Cost
+          </p>
+          <p>
+            <b>Gross Profit</b> = Revenue − Total Cost
+          </p>
+          <p>
+            <b>GP %</b> = Gross Profit ÷ Revenue × 100
+          </p>
           <hr className="border-green-200 my-2" />
           <p className="text-xs text-green-700">
-            1 Man Day = 8 hours. A module with 3 man days at ${rate > 0 ? rate.toFixed(0) : 400}/MD = ${(3 * (rate > 0 ? rate : 400)).toLocaleString()} labor cost.
+            1 Man Day = 8 hours. A module with 3 man days at ${rate > 0 ? rate.toFixed(0) : 400}/MD
+            = ${(3 * (rate > 0 ? rate : 400)).toLocaleString()} labor cost.
           </p>
         </div>
       </div>
@@ -1230,13 +1575,19 @@ function CompanySettings({ currentUserIsAdmin }) {
       <div className="card">
         <div className="flex items-start justify-between mb-1">
           <h3 className="font-semibold text-gray-800">📅 Company Week — Week Ending Day</h3>
-          {companyWeekDay === null
-            ? <span className="text-xs font-semibold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Not configured</span>
-            : <span className="text-xs font-semibold bg-green-100 text-green-800 px-2 py-0.5 rounded-full">{WEEK_DAYS[companyWeekDay]?.label}</span>
-          }
+          {companyWeekDay === null ? (
+            <span className="text-xs font-semibold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+              Not configured
+            </span>
+          ) : (
+            <span className="text-xs font-semibold bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
+              {WEEK_DAYS[companyWeekDay]?.label}
+            </span>
+          )}
         </div>
         <p className="text-sm text-gray-500 mb-4">
-          Sets the last day of the company work week. Used by the Finance module to determine week-ending dates for collections and payables tracking.
+          Sets the last day of the company work week. Used by the Finance module to determine
+          week-ending dates for collections and payables tracking.
         </p>
 
         <div className="grid grid-cols-7 gap-1.5 mb-4">
@@ -1252,39 +1603,58 @@ function CompanySettings({ currentUserIsAdmin }) {
                     ? 'border-gray-200 text-gray-600 hover:border-green-400 hover:text-green-700'
                     : 'border-gray-100 text-gray-400 cursor-not-allowed'
               }`}
-              style={pendingCompanyWeekDay === d.value ? { backgroundColor: FG, borderColor: FG } : {}}
+              style={
+                pendingCompanyWeekDay === d.value ? { backgroundColor: FG, borderColor: FG } : {}
+              }
             >
               {d.short}
             </button>
           ))}
         </div>
 
-        {companyWeekMsg && <div className="mb-3"><Msg m={companyWeekMsg} /></div>}
+        {companyWeekMsg && (
+          <div className="mb-3">
+            <Msg m={companyWeekMsg} />
+          </div>
+        )}
 
         {currentUserIsAdmin && (
           <button
             onClick={saveCompanyWeekDay}
-            disabled={savingCompanyWeekDay || pendingCompanyWeekDay === null || pendingCompanyWeekDay === companyWeekDay}
+            disabled={
+              savingCompanyWeekDay ||
+              pendingCompanyWeekDay === null ||
+              pendingCompanyWeekDay === companyWeekDay
+            }
             className="px-5 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-40"
             style={{ backgroundColor: FG }}
           >
             {savingCompanyWeekDay ? 'Saving…' : 'Save Setting'}
           </button>
         )}
-        {currentUserIsAdmin && pendingCompanyWeekDay !== null && pendingCompanyWeekDay === companyWeekDay && !companyWeekMsg && (
-          <p className="text-xs text-gray-400 mt-2">No changes to save.</p>
-        )}
+        {currentUserIsAdmin &&
+          pendingCompanyWeekDay !== null &&
+          pendingCompanyWeekDay === companyWeekDay &&
+          !companyWeekMsg && <p className="text-xs text-gray-400 mt-2">No changes to save.</p>}
       </div>
 
       {/* ── Company Logo ─────────────────────────────────────────────────── */}
       <div className="card">
         <h3 className="font-semibold text-gray-800 mb-1">🖼️ Company Logo</h3>
-        <p className="text-sm text-gray-500 mb-4">Used as the app icon (favicon) in the browser tab. PNG, JPG, SVG or WebP recommended.</p>
+        <p className="text-sm text-gray-500 mb-4">
+          Used as the app icon (favicon) in the browser tab. PNG, JPG, SVG or WebP recommended.
+        </p>
         <div className="flex items-center gap-4">
           {logoUrl ? (
-            <img src={logoUrl} alt="Company logo" className="h-16 w-16 object-contain rounded-lg border border-gray-200 bg-gray-50 p-1" />
+            <img
+              src={logoUrl}
+              alt="Company logo"
+              className="h-16 w-16 object-contain rounded-lg border border-gray-200 bg-gray-50 p-1"
+            />
           ) : (
-            <div className="h-16 w-16 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-300 text-2xl">🖼️</div>
+            <div className="h-16 w-16 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-300 text-2xl">
+              🖼️
+            </div>
           )}
           <div className="flex-1">
             <input
@@ -1305,21 +1675,32 @@ function CompanySettings({ currentUserIsAdmin }) {
                 {uploadingLogo ? 'Uploading…' : logoUrl ? 'Replace Logo' : 'Upload Logo'}
               </button>
             )}
-            {logoMsg && <div className="mt-2"><Msg m={logoMsg} /></div>}
+            {logoMsg && (
+              <div className="mt-2">
+                <Msg m={logoMsg} />
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* ── Period reference ──────────────────────────────────────────────── */}
       <div className="card bg-gray-50 border-gray-200">
-        <h3 className="font-semibold text-gray-700 mb-3 text-sm">📋 Period Reference (read-only)</h3>
+        <h3 className="font-semibold text-gray-700 mb-3 text-sm">
+          📋 Period Reference (read-only)
+        </h3>
         <div className="space-y-2 text-sm text-gray-600">
           {[
-            ['Daily',     'Every calendar day'],
-            ['Weekly',    weekEndingDay !== null ? `Week ending ${WEEK_DAYS[weekEndingDay]?.label}` : 'Not configured — set above'],
-            ['Monthly',   'Last day of each calendar month'],
+            ['Daily', 'Every calendar day'],
+            [
+              'Weekly',
+              weekEndingDay !== null
+                ? `Week ending ${WEEK_DAYS[weekEndingDay]?.label}`
+                : 'Not configured — set above',
+            ],
+            ['Monthly', 'Last day of each calendar month'],
             ['Quarterly', 'Mar 31 · Jun 30 · Sep 30 · Dec 31'],
-            ['Yearly',    'Dec 31 of each year'],
+            ['Yearly', 'Dec 31 of each year'],
           ].map(([label, val]) => (
             <div key={label} className="flex justify-between">
               <span className="font-medium">{label}</span>
@@ -1331,7 +1712,6 @@ function CompanySettings({ currentUserIsAdmin }) {
 
       {/* ── Schedule Assistant: Start Locations ──────────────────────── */}
       <StartLocationsCard currentUserIsAdmin={currentUserIsAdmin} />
-
     </div>
   )
 }
@@ -1347,8 +1727,18 @@ const EMAIL_PROVIDERS = [
     logo: '📨',
     url: 'https://resend.com',
     fields: [
-      { key: 'api_key',    label: 'API Key',    type: 'password', placeholder: 're_••••••••••••••••••••••••' },
-      { key: 'from_email', label: 'From Email', type: 'text',     placeholder: 'noreply@yourdomain.com' },
+      {
+        key: 'api_key',
+        label: 'API Key',
+        type: 'password',
+        placeholder: 're_••••••••••••••••••••••••',
+      },
+      {
+        key: 'from_email',
+        label: 'From Email',
+        type: 'text',
+        placeholder: 'noreply@yourdomain.com',
+      },
     ],
   },
   {
@@ -1357,8 +1747,18 @@ const EMAIL_PROVIDERS = [
     logo: '📧',
     url: 'https://app.sendgrid.com',
     fields: [
-      { key: 'api_key',    label: 'API Key',    type: 'password', placeholder: 'SG.••••••••••••••••••••••••' },
-      { key: 'from_email', label: 'From Email', type: 'text',     placeholder: 'noreply@yourdomain.com' },
+      {
+        key: 'api_key',
+        label: 'API Key',
+        type: 'password',
+        placeholder: 'SG.••••••••••••••••••••••••',
+      },
+      {
+        key: 'from_email',
+        label: 'From Email',
+        type: 'text',
+        placeholder: 'noreply@yourdomain.com',
+      },
     ],
   },
   {
@@ -1367,9 +1767,19 @@ const EMAIL_PROVIDERS = [
     logo: '🔫',
     url: 'https://app.mailgun.com',
     fields: [
-      { key: 'api_key',    label: 'API Key',    type: 'password', placeholder: '••••••••••••••••••••••••••••••••' },
-      { key: 'domain',     label: 'Domain',     type: 'text',     placeholder: 'mg.yourdomain.com' },
-      { key: 'from_email', label: 'From Email', type: 'text',     placeholder: 'noreply@mg.yourdomain.com' },
+      {
+        key: 'api_key',
+        label: 'API Key',
+        type: 'password',
+        placeholder: '••••••••••••••••••••••••••••••••',
+      },
+      { key: 'domain', label: 'Domain', type: 'text', placeholder: 'mg.yourdomain.com' },
+      {
+        key: 'from_email',
+        label: 'From Email',
+        type: 'text',
+        placeholder: 'noreply@mg.yourdomain.com',
+      },
     ],
   },
   {
@@ -1378,8 +1788,18 @@ const EMAIL_PROVIDERS = [
     logo: '📮',
     url: 'https://account.postmarkapp.com',
     fields: [
-      { key: 'server_token', label: 'Server Token', type: 'password', placeholder: '••••••••-••••-••••-••••-••••••••••••' },
-      { key: 'from_email',   label: 'From Email',   type: 'text',     placeholder: 'noreply@yourdomain.com' },
+      {
+        key: 'server_token',
+        label: 'Server Token',
+        type: 'password',
+        placeholder: '••••••••-••••-••••-••••-••••••••••••',
+      },
+      {
+        key: 'from_email',
+        label: 'From Email',
+        type: 'text',
+        placeholder: 'noreply@yourdomain.com',
+      },
     ],
   },
   {
@@ -1388,27 +1808,34 @@ const EMAIL_PROVIDERS = [
     logo: '🌐',
     url: '',
     fields: [
-      { key: 'host',       label: 'SMTP Host',  type: 'text',     placeholder: 'smtp.yourdomain.com' },
-      { key: 'port',       label: 'Port',       type: 'text',     placeholder: '587' },
-      { key: 'username',   label: 'Username',   type: 'text',     placeholder: 'user@yourdomain.com' },
-      { key: 'password',   label: 'Password',   type: 'password', placeholder: '••••••••••••••••' },
-      { key: 'from_email', label: 'From Email', type: 'text',     placeholder: 'noreply@yourdomain.com' },
+      { key: 'host', label: 'SMTP Host', type: 'text', placeholder: 'smtp.yourdomain.com' },
+      { key: 'port', label: 'Port', type: 'text', placeholder: '587' },
+      { key: 'username', label: 'Username', type: 'text', placeholder: 'user@yourdomain.com' },
+      { key: 'password', label: 'Password', type: 'password', placeholder: '••••••••••••••••' },
+      {
+        key: 'from_email',
+        label: 'From Email',
+        type: 'text',
+        placeholder: 'noreply@yourdomain.com',
+      },
     ],
   },
 ]
 
 function EmailSettings() {
-  const [activeKey,   setActiveKey]   = useState('resend')
+  const [activeKey, setActiveKey] = useState('resend')
   const [credentials, setCredentials] = useState({})
-  const [testTo,      setTestTo]      = useState('')
-  const [loading,     setLoading]     = useState(true)
-  const [saving,      setSaving]      = useState(false)
-  const [testing,     setTesting]     = useState(false)
-  const [saveMsg,     setSaveMsg]     = useState('')
-  const [testResult,  setTestResult]  = useState('')
+  const [testTo, setTestTo] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [saveMsg, setSaveMsg] = useState('')
+  const [testResult, setTestResult] = useState('')
   const [showSecrets, setShowSecrets] = useState({})
 
-  useEffect(() => { loadConfig() }, [])
+  useEffect(() => {
+    loadConfig()
+  }, [])
 
   async function loadConfig() {
     setLoading(true)
@@ -1422,14 +1849,18 @@ function EmailSettings() {
   }
 
   async function handleSave() {
-    setSaving(true); setSaveMsg('')
+    setSaving(true)
+    setSaveMsg('')
     const cfg = { active_provider: activeKey, providers: credentials }
     const { data: existing } = await supabase.from('company_settings').select('id').maybeSingle()
     let error
     if (existing?.id) {
-      ({ error } = await supabase.from('company_settings').update({ email_config: cfg }).eq('id', existing.id))
+      ;({ error } = await supabase
+        .from('company_settings')
+        .update({ email_config: cfg })
+        .eq('id', existing.id))
     } else {
-      ({ error } = await supabase.from('company_settings').insert({ email_config: cfg }))
+      ;({ error } = await supabase.from('company_settings').insert({ email_config: cfg }))
     }
     setSaving(false)
     setSaveMsg(error ? '⚠️ ' + error.message : '✓ Email settings saved')
@@ -1437,8 +1868,12 @@ function EmailSettings() {
   }
 
   async function handleTest() {
-    if (!testTo.trim()) { setTestResult('⚠️ Enter an email address first.'); return }
-    setTesting(true); setTestResult('')
+    if (!testTo.trim()) {
+      setTestResult('⚠️ Enter an email address first.')
+      return
+    }
+    setTesting(true)
+    setTestResult('')
     try {
       const { sendEmail } = await import('../lib/notify')
       const { error } = await sendEmail({
@@ -1468,13 +1903,17 @@ function EmailSettings() {
 
   const activeProvider = EMAIL_PROVIDERS.find(p => p.key === activeKey)
 
-  if (loading) return <div className="text-gray-400 text-sm py-8 text-center">Loading email settings…</div>
+  if (loading)
+    return <div className="text-gray-400 text-sm py-8 text-center">Loading email settings…</div>
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold text-gray-800">Email Provider</h2>
-        <p className="text-sm text-gray-500 mt-0.5">Choose your email sending service and enter credentials. Currently active: <strong>{activeProvider?.label}</strong></p>
+        <p className="text-sm text-gray-500 mt-0.5">
+          Choose your email sending service and enter credentials. Currently active:{' '}
+          <strong>{activeProvider?.label}</strong>
+        </p>
       </div>
 
       {/* Active provider credentials */}
@@ -1484,10 +1923,19 @@ function EmailSettings() {
           <div>
             <p className="font-semibold text-gray-800">{activeProvider?.label}</p>
             {activeProvider?.url && (
-              <a href={activeProvider.url} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline">{activeProvider.url}</a>
+              <a
+                href={activeProvider.url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-blue-500 hover:underline"
+              >
+                {activeProvider.url}
+              </a>
             )}
           </div>
-          <span className="ml-auto text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">Active</span>
+          <span className="ml-auto text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
+            Active
+          </span>
         </div>
         <div className="space-y-3">
           {activeProvider?.fields.map(f => {
@@ -1506,8 +1954,10 @@ function EmailSettings() {
                     onChange={e => setCred(activeKey, f.key, e.target.value)}
                   />
                   {isSecret && (
-                    <button onClick={() => toggleShow(activeKey, f.key)}
-                      className="px-3 py-2 text-xs border border-gray-300 rounded-lg text-gray-500 hover:bg-gray-50">
+                    <button
+                      onClick={() => toggleShow(activeKey, f.key)}
+                      className="px-3 py-2 text-xs border border-gray-300 rounded-lg text-gray-500 hover:bg-gray-50"
+                    >
                       {showing ? 'Hide' : 'Show'}
                     </button>
                   )}
@@ -1517,11 +1967,20 @@ function EmailSettings() {
           })}
         </div>
         <div className="mt-4 flex items-center gap-3">
-          <button onClick={handleSave} disabled={saving}
-            className="px-4 py-2 bg-green-700 text-white text-sm font-medium rounded-lg hover:bg-green-800 disabled:opacity-50">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-4 py-2 bg-green-700 text-white text-sm font-medium rounded-lg hover:bg-green-800 disabled:opacity-50"
+          >
             {saving ? 'Saving…' : 'Save Settings'}
           </button>
-          {saveMsg && <span className={`text-sm font-medium ${saveMsg.startsWith('⚠️') ? 'text-red-600' : 'text-green-600'}`}>{saveMsg}</span>}
+          {saveMsg && (
+            <span
+              className={`text-sm font-medium ${saveMsg.startsWith('⚠️') ? 'text-red-600' : 'text-green-600'}`}
+            >
+              {saveMsg}
+            </span>
+          )}
         </div>
       </div>
 
@@ -1536,13 +1995,20 @@ function EmailSettings() {
             value={testTo}
             onChange={e => setTestTo(e.target.value)}
           />
-          <button onClick={handleTest} disabled={testing}
-            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50">
+          <button
+            onClick={handleTest}
+            disabled={testing}
+            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          >
             {testing ? 'Sending…' : 'Send Test'}
           </button>
         </div>
         {testResult && (
-          <p className={`text-sm mt-2 font-medium ${testResult.startsWith('⚠️') ? 'text-red-600' : 'text-green-600'}`}>{testResult}</p>
+          <p
+            className={`text-sm mt-2 font-medium ${testResult.startsWith('⚠️') ? 'text-red-600' : 'text-green-600'}`}
+          >
+            {testResult}
+          </p>
         )}
       </div>
 
@@ -1551,15 +2017,19 @@ function EmailSettings() {
         <p className="text-sm font-semibold text-gray-700 mb-3">Switch Provider</p>
         <div className="grid grid-cols-2 gap-2">
           {EMAIL_PROVIDERS.filter(p => p.key !== activeKey).map(p => (
-            <button key={p.key}
+            <button
+              key={p.key}
               onClick={() => setActiveKey(p.key)}
-              className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 text-left">
+              className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 text-left"
+            >
               <span className="text-xl">{p.logo}</span>
               <span className="text-sm text-gray-700 font-medium">{p.label}</span>
             </button>
           ))}
         </div>
-        <p className="text-xs text-gray-400 mt-3">Switching providers here changes the active sender. Save after switching to apply.</p>
+        <p className="text-xs text-gray-400 mt-3">
+          Switching providers here changes the active sender. Save after switching to apply.
+        </p>
       </div>
     </div>
   )
@@ -1573,9 +2043,19 @@ const SMS_PROVIDERS = [
     logo: '🟥',
     url: 'https://console.twilio.com',
     fields: [
-      { key: 'account_sid',  label: 'Account SID',  type: 'text',     placeholder: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' },
-      { key: 'auth_token',   label: 'Auth Token',   type: 'password', placeholder: '••••••••••••••••••••••••••••••••' },
-      { key: 'from_number',  label: 'From Number',  type: 'text',     placeholder: '+15551234567' },
+      {
+        key: 'account_sid',
+        label: 'Account SID',
+        type: 'text',
+        placeholder: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      },
+      {
+        key: 'auth_token',
+        label: 'Auth Token',
+        type: 'password',
+        placeholder: '••••••••••••••••••••••••••••••••',
+      },
+      { key: 'from_number', label: 'From Number', type: 'text', placeholder: '+15551234567' },
     ],
   },
   {
@@ -1584,8 +2064,8 @@ const SMS_PROVIDERS = [
     logo: '🟦',
     url: 'https://portal.telnyx.com',
     fields: [
-      { key: 'api_key',      label: 'API Key',      type: 'password', placeholder: 'KEY••••••••••••••••••' },
-      { key: 'from_number',  label: 'From Number',  type: 'text',     placeholder: '+15551234567' },
+      { key: 'api_key', label: 'API Key', type: 'password', placeholder: 'KEY••••••••••••••••••' },
+      { key: 'from_number', label: 'From Number', type: 'text', placeholder: '+15551234567' },
     ],
   },
   {
@@ -1594,9 +2074,14 @@ const SMS_PROVIDERS = [
     logo: '🟪',
     url: 'https://dashboard.nexmo.com',
     fields: [
-      { key: 'api_key',      label: 'API Key',      type: 'text',     placeholder: 'a1b2c3d4' },
-      { key: 'api_secret',   label: 'API Secret',   type: 'password', placeholder: '••••••••••••••••' },
-      { key: 'from_number',  label: 'From / Sender', type: 'text',    placeholder: '+15551234567 or MyBrand' },
+      { key: 'api_key', label: 'API Key', type: 'text', placeholder: 'a1b2c3d4' },
+      { key: 'api_secret', label: 'API Secret', type: 'password', placeholder: '••••••••••••••••' },
+      {
+        key: 'from_number',
+        label: 'From / Sender',
+        type: 'text',
+        placeholder: '+15551234567 or MyBrand',
+      },
     ],
   },
   {
@@ -1605,9 +2090,19 @@ const SMS_PROVIDERS = [
     logo: '🟧',
     url: 'https://dashboard.sinch.com',
     fields: [
-      { key: 'service_plan_id', label: 'Service Plan ID', type: 'text',     placeholder: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' },
-      { key: 'api_token',       label: 'API Token',       type: 'password', placeholder: '••••••••••••••••••••••••••••••••' },
-      { key: 'from_number',     label: 'From Number',     type: 'text',     placeholder: '+15551234567' },
+      {
+        key: 'service_plan_id',
+        label: 'Service Plan ID',
+        type: 'text',
+        placeholder: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      },
+      {
+        key: 'api_token',
+        label: 'API Token',
+        type: 'password',
+        placeholder: '••••••••••••••••••••••••••••••••',
+      },
+      { key: 'from_number', label: 'From Number', type: 'text', placeholder: '+15551234567' },
     ],
   },
   {
@@ -1616,8 +2111,18 @@ const SMS_PROVIDERS = [
     logo: '🐦',
     url: 'https://dashboard.messagebird.com',
     fields: [
-      { key: 'api_key',      label: 'API Key',            type: 'password', placeholder: 'live_••••••••••••••••••••' },
-      { key: 'from_number',  label: 'Originator (From)',  type: 'text',     placeholder: '+15551234567 or MyBrand' },
+      {
+        key: 'api_key',
+        label: 'API Key',
+        type: 'password',
+        placeholder: 'live_••••••••••••••••••••',
+      },
+      {
+        key: 'from_number',
+        label: 'Originator (From)',
+        type: 'text',
+        placeholder: '+15551234567 or MyBrand',
+      },
     ],
   },
   {
@@ -1626,26 +2131,32 @@ const SMS_PROVIDERS = [
     logo: '💬',
     url: 'https://app.simpletexting.com',
     fields: [
-      { key: 'api_key',      label: 'API Key',      type: 'password', placeholder: '••••••••••••••••••••••••••••••••' },
-      { key: 'from_number',  label: 'From Number',  type: 'text',     placeholder: '+15551234567' },
+      {
+        key: 'api_key',
+        label: 'API Key',
+        type: 'password',
+        placeholder: '••••••••••••••••••••••••••••••••',
+      },
+      { key: 'from_number', label: 'From Number', type: 'text', placeholder: '+15551234567' },
     ],
   },
 ]
 
 function SmsSettings() {
-  const [config,        setConfig]        = useState(null)   // loaded from DB
-  const [activeKey,     setActiveKey]     = useState('simpletexting')
-  const [credentials,   setCredentials]   = useState({})     // { [providerKey]: { [field]: value } }
-  const [testNumber,    setTestNumber]    = useState('')
-  const [testMsg,       setTestMsg]       = useState('This is a test SMS from Picture Build System.')
-  const [loading,       setLoading]       = useState(true)
-  const [saving,        setSaving]        = useState(false)
-  const [testing,       setTesting]       = useState(false)
-  const [saveMsg,       setSaveMsg]       = useState('')
-  const [testResult,    setTestResult]    = useState('')
-  const [showSecrets,   setShowSecrets]   = useState({})     // { [providerKey+field]: bool }
+  const [activeKey, setActiveKey] = useState('simpletexting')
+  const [credentials, setCredentials] = useState({}) // { [providerKey]: { [field]: value } }
+  const [testNumber, setTestNumber] = useState('')
+  const [testMsg, setTestMsg] = useState('This is a test SMS from Picture Build System.')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [saveMsg, setSaveMsg] = useState('')
+  const [testResult, setTestResult] = useState('')
+  const [showSecrets, setShowSecrets] = useState({}) // { [providerKey+field]: bool }
 
-  useEffect(() => { loadConfig() }, [])
+  useEffect(() => {
+    loadConfig()
+  }, [])
 
   async function loadConfig() {
     setLoading(true)
@@ -1659,14 +2170,18 @@ function SmsSettings() {
   }
 
   async function handleSave() {
-    setSaving(true); setSaveMsg('')
+    setSaving(true)
+    setSaveMsg('')
     const cfg = { active_provider: activeKey, providers: credentials }
     const { data: existing } = await supabase.from('company_settings').select('id').maybeSingle()
     let error
     if (existing?.id) {
-      ({ error } = await supabase.from('company_settings').update({ sms_config: cfg }).eq('id', existing.id))
+      ;({ error } = await supabase
+        .from('company_settings')
+        .update({ sms_config: cfg })
+        .eq('id', existing.id))
     } else {
-      ({ error } = await supabase.from('company_settings').insert({ sms_config: cfg }))
+      ;({ error } = await supabase.from('company_settings').insert({ sms_config: cfg }))
     }
     setSaving(false)
     setSaveMsg(error ? '⚠️ ' + error.message : '✓ SMS settings saved')
@@ -1674,13 +2189,17 @@ function SmsSettings() {
   }
 
   async function handleTest() {
-    if (!testNumber.trim()) { setTestResult('⚠️ Enter a phone number first.'); return }
-    setTesting(true); setTestResult('')
+    if (!testNumber.trim()) {
+      setTestResult('⚠️ Enter a phone number first.')
+      return
+    }
+    setTesting(true)
+    setTestResult('')
     try {
       const { sendSMS } = await import('../lib/notify')
       const { data, error } = await sendSMS({ to: testNumber.trim(), message: testMsg })
       if (error) {
-        const raw  = data?.raw  ? ' raw:'  + JSON.stringify(data.raw)  : ''
+        const raw = data?.raw ? ' raw:' + JSON.stringify(data.raw) : ''
         const sent = data?.sent ? ' sent:' + JSON.stringify(data.sent) : ''
         setTestResult('⚠️ ' + error.message + raw + sent)
       } else {
@@ -1706,25 +2225,37 @@ function SmsSettings() {
   }
 
   const activeProvider = SMS_PROVIDERS.find(p => p.key === activeKey)
-  const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white font-mono'
+  const inp =
+    'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white font-mono'
 
-  if (loading) return <div className="flex justify-center py-16"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700" /></div>
+  if (loading)
+    return (
+      <div className="flex justify-center py-16">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700" />
+      </div>
+    )
 
   return (
     <div className="space-y-6 max-w-2xl">
-
       {/* Current provider banner */}
       <div className="bg-green-50 border border-green-200 rounded-xl px-5 py-3 flex items-center gap-3">
         <span className="text-xl">{activeProvider?.logo}</span>
         <div>
-          <p className="text-sm font-bold text-green-800">Active SMS Provider: {activeProvider?.label}</p>
-          <p className="text-xs text-green-700">Messages are sent through this service. Save credentials below, then update your Edge Function to use them.</p>
+          <p className="text-sm font-bold text-green-800">
+            Active SMS Provider: {activeProvider?.label}
+          </p>
+          <p className="text-xs text-green-700">
+            Messages are sent through this service. Save credentials below, then update your Edge
+            Function to use them.
+          </p>
         </div>
       </div>
 
       {/* Provider selector */}
       <div>
-        <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-3">Select Provider</h3>
+        <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-3">
+          Select Provider
+        </h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {SMS_PROVIDERS.map(p => (
             <button
@@ -1737,7 +2268,9 @@ function SmsSettings() {
               }`}
             >
               <span className="text-lg leading-none">{p.logo}</span>
-              <span className={`text-sm font-semibold ${activeKey === p.key ? 'text-green-800' : 'text-gray-700'}`}>
+              <span
+                className={`text-sm font-semibold ${activeKey === p.key ? 'text-green-800' : 'text-gray-700'}`}
+              >
                 {p.label}
               </span>
             </button>
@@ -1752,16 +2285,21 @@ function SmsSettings() {
             <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">
               {activeProvider.logo} {activeProvider.label} Credentials
             </h3>
-            <a href={activeProvider.url} target="_blank" rel="noopener noreferrer"
-              className="text-xs text-blue-600 hover:text-blue-800 underline">
+            <a
+              href={activeProvider.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-blue-600 hover:text-blue-800 underline"
+            >
               Open Dashboard ↗
             </a>
           </div>
           {/* SimpleTexting-specific setup hint */}
           {activeProvider.key === 'simpletexting' && (
             <div className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 leading-relaxed">
-              Find your <strong>API Key</strong> in SimpleTexting → Settings → API (top right).
-              Your <strong>From Number</strong> is the 10-digit number on your account (e.g. <code>+15551234567</code>).
+              Find your <strong>API Key</strong> in SimpleTexting → Settings → API (top right). Your{' '}
+              <strong>From Number</strong> is the 10-digit number on your account (e.g.{' '}
+              <code>+15551234567</code>).
             </div>
           )}
           {activeProvider.fields.map(f => {
@@ -1805,7 +2343,9 @@ function SmsSettings() {
         <div className="px-5 pb-5 space-y-5 border-t border-gray-100 pt-4">
           {SMS_PROVIDERS.filter(p => p.key !== activeKey).map(p => (
             <div key={p.key}>
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">{p.logo} {p.label}</p>
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+                {p.logo} {p.label}
+              </p>
               {p.fields.map(f => {
                 const showKey = p.key + '_' + f.key
                 const isSecret = f.type === 'password'
@@ -1822,8 +2362,11 @@ function SmsSettings() {
                         className={inp + ' text-xs'}
                       />
                       {isSecret && (
-                        <button type="button" onClick={() => toggleShow(p.key, f.key)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600">
+                        <button
+                          type="button"
+                          onClick={() => toggleShow(p.key, f.key)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600"
+                        >
                           {showSecrets[showKey] ? 'Hide' : 'Show'}
                         </button>
                       )}
@@ -1838,13 +2381,18 @@ function SmsSettings() {
 
       {/* Save */}
       <div className="flex items-center gap-4">
-        <button onClick={handleSave} disabled={saving}
+        <button
+          onClick={handleSave}
+          disabled={saving}
           className="px-6 py-2 rounded-lg text-sm font-bold text-white disabled:opacity-50"
-          style={{ backgroundColor: FG }}>
+          style={{ backgroundColor: FG }}
+        >
           {saving ? 'Saving…' : 'Save SMS Settings'}
         </button>
         {saveMsg && (
-          <span className={`text-sm font-medium ${saveMsg.startsWith('⚠️') ? 'text-red-600' : 'text-green-700'}`}>
+          <span
+            className={`text-sm font-medium ${saveMsg.startsWith('⚠️') ? 'text-red-600' : 'text-green-700'}`}
+          >
             {saveMsg}
           </span>
         )}
@@ -1854,29 +2402,47 @@ function SmsSettings() {
       <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
         <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Test SMS</h3>
         <p className="text-xs text-gray-400">
-          Sends a real SMS via the <strong>send-sms</strong> Edge Function (currently wired to Twilio).
-          To activate a different provider, update the Edge Function to read <code className="bg-gray-100 px-1 rounded">sms_config</code> from company settings.
+          Sends a real SMS via the <strong>send-sms</strong> Edge Function (currently wired to
+          Twilio). To activate a different provider, update the Edge Function to read{' '}
+          <code className="bg-gray-100 px-1 rounded">sms_config</code> from company settings.
         </p>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">To Phone Number</label>
-            <input type="tel" value={testNumber} onChange={e => setTestNumber(e.target.value)}
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+              To Phone Number
+            </label>
+            <input
+              type="tel"
+              value={testNumber}
+              onChange={e => setTestNumber(e.target.value)}
               placeholder="+15551234567"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 font-mono" />
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 font-mono"
+            />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Message</label>
-            <input type="text" value={testMsg} onChange={e => setTestMsg(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600" />
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+              Message
+            </label>
+            <input
+              type="text"
+              value={testMsg}
+              onChange={e => setTestMsg(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+            />
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <button onClick={handleTest} disabled={testing}
-            className="px-5 py-2 rounded-lg text-sm font-bold border border-green-700 text-green-800 hover:bg-green-50 disabled:opacity-50">
+          <button
+            onClick={handleTest}
+            disabled={testing}
+            className="px-5 py-2 rounded-lg text-sm font-bold border border-green-700 text-green-800 hover:bg-green-50 disabled:opacity-50"
+          >
             {testing ? 'Sending…' : '📱 Send Test SMS'}
           </button>
           {testResult && (
-            <span className={`text-sm font-medium ${testResult.startsWith('⚠️') ? 'text-red-600' : 'text-green-700'}`}>
+            <span
+              className={`text-sm font-medium ${testResult.startsWith('⚠️') ? 'text-red-600' : 'text-green-700'}`}
+            >
               {testResult}
             </span>
           )}
@@ -1888,70 +2454,82 @@ function SmsSettings() {
         <p className="font-bold">📋 To activate a new provider in production:</p>
         <ol className="list-decimal list-inside space-y-1 text-xs text-amber-700">
           <li>Save credentials above</li>
-          <li>Open your Supabase project → Edge Functions → <code className="bg-amber-100 px-1 rounded">send-sms</code></li>
-          <li>Update the function to read <code className="bg-amber-100 px-1 rounded">sms_config</code> from <code className="bg-amber-100 px-1 rounded">company_settings</code> and route to the active provider's API</li>
+          <li>
+            Open your Supabase project → Edge Functions →{' '}
+            <code className="bg-amber-100 px-1 rounded">send-sms</code>
+          </li>
+          <li>
+            Update the function to read{' '}
+            <code className="bg-amber-100 px-1 rounded">sms_config</code> from{' '}
+            <code className="bg-amber-100 px-1 rounded">company_settings</code> and route to the
+            active provider's API
+          </li>
           <li>Redeploy the function</li>
         </ol>
       </div>
-
     </div>
   )
 }
 
 // ── IntegrationsSettings ───────────────────────────────────────────────────────
 function IntegrationsSettings() {
-  const [loading,  setLoading]  = useState(true)
-  const [saving,   setSaving]   = useState(false)
-  const [saveMsg,  setSaveMsg]  = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saveMsg, setSaveMsg] = useState('')
   const [activeTab, setActiveTab] = useState('qbo') // 'qbo' | 'qbd' | 'ghl'
 
   // QuickBooks Online
   const [qbo, setQbo] = useState({
-    enabled:       false,
-    environment:   'sandbox',
-    client_id:     '',
+    enabled: false,
+    environment: 'sandbox',
+    client_id: '',
     client_secret: '',
-    realm_id:      '',
-    oauth_status:  'not_connected',
+    realm_id: '',
+    oauth_status: 'not_connected',
   })
 
   // QuickBooks Desktop
   const [qbd, setQbd] = useState({
-    enabled:         false,
-    connector_url:   '',
-    username:        '',
-    password:        '',
-    company_file:    '',
+    enabled: false,
+    connector_url: '',
+    username: '',
+    password: '',
+    company_file: '',
   })
 
   // GoHighLevel — separate from QBO/QBD because it lives in its own
   // tables (ghl_connections, ghl_sync_state) and is gated by an admin
   // role check on the server side.
   const [ghl, setGhl] = useState({
-    connected:    false,
-    location_id:  '',
-    company_id:   '',
-    contacts_enabled:      true,
+    connected: false,
+    location_id: '',
+    company_id: '',
+    contacts_enabled: true,
     opportunities_enabled: true,
-    appointments_enabled:  true,
-    notes_enabled:         true,
+    appointments_enabled: true,
+    notes_enabled: true,
   })
   // The Private Integration Token is never read back from the server
   // for security; user re-enters it only when they want to (re)connect.
-  const [ghlToken,    setGhlToken]    = useState('')
+  const [ghlToken, setGhlToken] = useState('')
   const [ghlLocation, setGhlLocation] = useState('')
-  const [ghlBusy,     setGhlBusy]     = useState(false)
-  const [ghlMsg,      setGhlMsg]      = useState('')
+  const [ghlBusy, setGhlBusy] = useState(false)
+  const [ghlMsg, setGhlMsg] = useState('')
   const [ghlMsgError, setGhlMsgError] = useState(false)
-  const [ghlSyncState, setGhlSyncState] = useState([])  // rows from ghl_sync_state
+  const [ghlSyncState, setGhlSyncState] = useState([]) // rows from ghl_sync_state
 
   const [showSecrets, setShowSecrets] = useState({}) // { field: bool }
 
-  useEffect(() => { loadConfig() }, [])
+  useEffect(() => {
+    loadConfig()
+  }, [])
 
   async function loadConfig() {
     setLoading(true)
-    const { data } = await supabase.from('company_settings').select('integrations_config').maybeSingle()
+    const { data } = await supabase
+      .from('company_settings')
+      .select('integrations_config')
+      .maybeSingle()
     if (data?.integrations_config) {
       const cfg = data.integrations_config
       if (cfg.qbo) setQbo(q => ({ ...q, ...cfg.qbo }))
@@ -1963,23 +2541,28 @@ function IntegrationsSettings() {
   // Load GHL connection metadata + sync state. Note: we do NOT fetch
   // the access_token — the column is admin-only and the token never
   // round-trips through the browser after the initial save.
-  useEffect(() => { loadGhl() }, [])
+  useEffect(() => {
+    loadGhl()
+  }, [])
   async function loadGhl() {
     const [{ data: conn }, { data: syncRows }] = await Promise.all([
-      supabase.from('ghl_connections')
-        .select('location_id, company_id, contacts_enabled, opportunities_enabled, appointments_enabled, notes_enabled, created_at')
+      supabase
+        .from('ghl_connections')
+        .select(
+          'location_id, company_id, contacts_enabled, opportunities_enabled, appointments_enabled, notes_enabled, created_at'
+        )
         .maybeSingle(),
       supabase.from('ghl_sync_state').select('*'),
     ])
     if (conn) {
       setGhl({
-        connected:             true,
-        location_id:           conn.location_id || '',
-        company_id:            conn.company_id  || '',
-        contacts_enabled:      !!conn.contacts_enabled,
+        connected: true,
+        location_id: conn.location_id || '',
+        company_id: conn.company_id || '',
+        contacts_enabled: !!conn.contacts_enabled,
         opportunities_enabled: !!conn.opportunities_enabled,
-        appointments_enabled:  !!conn.appointments_enabled,
-        notes_enabled:         !!conn.notes_enabled,
+        appointments_enabled: !!conn.appointments_enabled,
+        notes_enabled: !!conn.notes_enabled,
       })
       setGhlLocation(conn.location_id || '')
     }
@@ -1995,25 +2578,30 @@ function IntegrationsSettings() {
   // Test the pasted token + location_id and save the connection on success.
   async function connectGhl() {
     if (!ghlToken.trim() || !ghlLocation.trim()) {
-      setGhlMsgError(true); setGhlMsg('Token and Location ID are both required.')
+      setGhlMsgError(true)
+      setGhlMsg('Token and Location ID are both required.')
       return
     }
-    setGhlBusy(true); setGhlMsg(''); setGhlMsgError(false)
+    setGhlBusy(true)
+    setGhlMsg('')
+    setGhlMsgError(false)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
       const jwt = session?.access_token
       const res = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ghl-test-connection`,
         {
           method: 'POST',
           headers: {
-            'Content-Type':  'application/json',
-            'Authorization': `Bearer ${jwt}`,
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${jwt}`,
           },
           body: JSON.stringify({
             access_token: ghlToken.trim(),
-            location_id:  ghlLocation.trim(),
-            save:         true,
+            location_id: ghlLocation.trim(),
+            save: true,
           }),
         }
       )
@@ -2028,7 +2616,8 @@ function IntegrationsSettings() {
         await loadGhl()
       }
     } catch (e) {
-      setGhlMsgError(true); setGhlMsg(e?.message || 'Connection failed.')
+      setGhlMsgError(true)
+      setGhlMsg(e?.message || 'Connection failed.')
     } finally {
       setGhlBusy(false)
     }
@@ -2038,7 +2627,8 @@ function IntegrationsSettings() {
     if (!confirm('Disconnect GoHighLevel? Sync will stop. Local data is preserved.')) return
     await supabase.from('ghl_connections').delete().eq('singleton', true)
     setGhl(g => ({ ...g, connected: false, location_id: '', company_id: '' }))
-    setGhlMsg('Disconnected.'); setGhlMsgError(false)
+    setGhlMsg('Disconnected.')
+    setGhlMsgError(false)
     setGhlLocation('')
   }
 
@@ -2053,7 +2643,9 @@ function IntegrationsSettings() {
   const ghlPushAbortRef = useRef(false)
   // Live progress for the push loop, keyed by objectType.
   const [ghlPushProgress, setGhlPushProgress] = useState({})
-  function stopGhlPush() { ghlPushAbortRef.current = true }
+  function stopGhlPush() {
+    ghlPushAbortRef.current = true
+  }
 
   async function resumePull() {
     if (!ghlResumeNext) return
@@ -2062,74 +2654,84 @@ function IntegrationsSettings() {
     setGhlSyncing(s => ({ ...s, [objectType]: true }))
     ghlPushAbortRef.current = false
     let totalPulled = alreadyPulled
-    let remaining   = 1
-    let nextPg      = nextPage
-    let loopError   = false
+    let remaining = 1
+    let nextPg = nextPage
+    let loopError = false
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
       const jwt = session?.access_token
       let safety = 500
       while (remaining > 0 && !ghlPushAbortRef.current && safety-- > 0) {
         setGhlMsg(`${objectType} pull: ${totalPulled} pulled… (resuming)`)
-        const r2 = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnSlug}`,
-          { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwt}` },
-            body: JSON.stringify(nextPg ? { start_page: nextPg } : {}) }
-        )
+        const r2 = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnSlug}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
+          body: JSON.stringify(nextPg ? { start_page: nextPg } : {}),
+        })
         const b2 = await r2.json().catch(() => ({}))
         if (!r2.ok || b2.ok === false) {
           loopError = true
           setGhlMsgError(true)
-          setGhlMsg(`${objectType} pull: ${b2.error || b2.message || `HTTP ${r2.status}`} (after ${totalPulled} pulled)`)
+          setGhlMsg(
+            `${objectType} pull: ${b2.error || b2.message || `HTTP ${r2.status}`} (after ${totalPulled} pulled)`
+          )
           break
         }
         totalPulled += b2.records_synced || 0
-        remaining    = b2.remaining || 0
-        nextPg       = b2.next_page  || null
+        remaining = b2.remaining || 0
+        nextPg = b2.next_page || null
         setGhlMsg(`${objectType} pull: ${totalPulled} pulled…`)
       }
       if (!loopError) {
         const paused = !ghlPushAbortRef.current && remaining > 0
-        setGhlMsg(`${objectType} pull: ${totalPulled} pulled${paused ? ' (paused — resume to finish)' : ' (done)'}`)
-        if (paused && nextPg) setGhlResumeNext({ objectType, nextPage: nextPg, fnSlug, totalPulled })
+        setGhlMsg(
+          `${objectType} pull: ${totalPulled} pulled${paused ? ' (paused — resume to finish)' : ' (done)'}`
+        )
+        if (paused && nextPg)
+          setGhlResumeNext({ objectType, nextPage: nextPg, fnSlug, totalPulled })
       }
       await loadGhl()
     } catch (e) {
-      setGhlMsgError(true); setGhlMsg(e?.message || 'Resume failed.')
+      setGhlMsgError(true)
+      setGhlMsg(e?.message || 'Resume failed.')
     } finally {
       setGhlSyncing(s => ({ ...s, [objectType]: false }))
     }
   }
 
   async function runSyncNow(objectType, opts = {}) {
-    const dryRun    = !!opts.dryRun
-    const direction = opts.direction || 'pull'   // 'pull' | 'push'
+    const dryRun = !!opts.dryRun
+    const direction = opts.direction || 'pull' // 'pull' | 'push'
     const slugByDir = {
       contacts: { pull: 'ghl-sync-contacts', push: 'ghl-push-contacts' },
       // pull/push for the rest land in Phase 6
       opportunities: { pull: 'ghl-sync-opportunities', push: 'ghl-push-opportunities' },
-      appointments:  { pull: 'ghl-sync-appointments',  push: 'ghl-push-appointments'  },
-      notes:         { pull: 'ghl-sync-notes',         push: 'ghl-push-notes'         },
+      appointments: { pull: 'ghl-sync-appointments', push: 'ghl-push-appointments' },
+      notes: { pull: 'ghl-sync-notes', push: 'ghl-push-notes' },
     }
     const fnSlug = slugByDir[objectType]?.[direction]
     if (!fnSlug) return
     setGhlSyncing(s => ({ ...s, [objectType]: true }))
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
       const jwt = session?.access_token
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnSlug}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type':  'application/json',
-            'Authorization': `Bearer ${jwt}`,
-          },
-          // For pull, always send full:true on the initial call so it uses
-          // stable id-sorted bulk pagination regardless of any stale watermark.
-          body: JSON.stringify({ dry_run: dryRun, ...(direction === 'pull' && !dryRun ? { full: true } : {}) }),
-        }
-      )
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnSlug}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${jwt}`,
+        },
+        // For pull, always send full:true on the initial call so it uses
+        // stable id-sorted bulk pagination regardless of any stale watermark.
+        body: JSON.stringify({
+          dry_run: dryRun,
+          ...(direction === 'pull' && !dryRun ? { full: true } : {}),
+        }),
+      })
       const body = await res.json().catch(() => ({}))
       if (!res.ok || body.ok === false) {
         setGhlMsgError(true)
@@ -2143,55 +2745,75 @@ function IntegrationsSettings() {
         // user clicks Stop. We accumulate totals across batches so the
         // message reflects the whole push, not just the last batch.
         ghlPushAbortRef.current = false
-        let totalPushed   = body.pushed   || 0
-        let totalCreated  = body.created  || 0
-        let totalUpdated  = body.updated  || 0
-        let totalErrors   = body.errors   || 0
-        let remaining     = body.remaining || 0
-        const totalEligible = (body.total_eligible ?? totalPushed + remaining)
-        setGhlPushProgress(p => ({ ...p, [objectType]: { pushed: totalPushed, total: totalEligible, errors: totalErrors } }))
+        let totalPushed = body.pushed || 0
+        let totalCreated = body.created || 0
+        let totalUpdated = body.updated || 0
+        let totalErrors = body.errors || 0
+        let remaining = body.remaining || 0
+        const totalEligible = body.total_eligible ?? totalPushed + remaining
+        setGhlPushProgress(p => ({
+          ...p,
+          [objectType]: { pushed: totalPushed, total: totalEligible, errors: totalErrors },
+        }))
         setGhlMsgError(false)
         setGhlMsg(`${objectType} push: ${totalPushed}/${totalEligible} sent…`)
         // Loop until done or aborted.
-        let safety = 200  // 200 batches × 200/batch = 40,000 records max per session
+        let safety = 200 // 200 batches × 200/batch = 40,000 records max per session
         while (remaining > 0 && !ghlPushAbortRef.current && safety-- > 0) {
-          const r2 = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnSlug}`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type':  'application/json',
-                'Authorization': `Bearer ${jwt}`,
-              },
-              body: JSON.stringify({ dry_run: false }),
-            }
-          )
+          const r2 = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnSlug}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${jwt}`,
+            },
+            body: JSON.stringify({ dry_run: false }),
+          })
           const b2 = await r2.json().catch(() => ({}))
           if (!r2.ok || b2.ok === false) {
             setGhlMsgError(true)
-            setGhlMsg(`${objectType} push: ${b2.error || b2.message || `HTTP ${r2.status}`} (after ${totalPushed} sent)`)
+            setGhlMsg(
+              `${objectType} push: ${b2.error || b2.message || `HTTP ${r2.status}`} (after ${totalPushed} sent)`
+            )
             break
           }
-          totalPushed  += b2.pushed  || 0
+          totalPushed += b2.pushed || 0
           totalCreated += b2.created || 0
           totalUpdated += b2.updated || 0
-          totalErrors  += b2.errors  || 0
-          remaining     = b2.remaining || 0
-          setGhlPushProgress(p => ({ ...p, [objectType]: { pushed: totalPushed, total: totalEligible, errors: totalErrors } }))
+          totalErrors += b2.errors || 0
+          remaining = b2.remaining || 0
+          setGhlPushProgress(p => ({
+            ...p,
+            [objectType]: { pushed: totalPushed, total: totalEligible, errors: totalErrors },
+          }))
           setGhlMsg(`${objectType} push: ${totalPushed}/${totalEligible} sent…`)
         }
         // Final message.
         const tail = ghlPushAbortRef.current
           ? ' (stopped)'
-          : (remaining > 0 ? ` (paused — ${remaining} still remaining)` : ' (done)')
+          : remaining > 0
+            ? ` (paused — ${remaining} still remaining)`
+            : ' (done)'
         setGhlMsg(
           `${objectType} push: ${totalPushed} sent — ${totalCreated} new, ${totalUpdated} updated` +
-          (totalErrors ? `, ${totalErrors} errors` : '') + tail
+            (totalErrors ? `, ${totalErrors} errors` : '') +
+            tail
         )
         setGhlMsgError(totalErrors > 0)
-        setGhlPreview(p => { const n = { ...p }; delete n[`${objectType}:${direction}`]; return n })
+        setGhlPreview(p => {
+          const n = { ...p }
+          delete n[`${objectType}:${direction}`]
+          return n
+        })
         // Clear progress after a beat so the row's status text takes over.
-        setTimeout(() => setGhlPushProgress(p => { const n = { ...p }; delete n[objectType]; return n }), 4000)
+        setTimeout(
+          () =>
+            setGhlPushProgress(p => {
+              const n = { ...p }
+              delete n[objectType]
+              return n
+            }),
+          4000
+        )
         await loadGhl()
       } else {
         // Auto-loop the pull just like the push: keep calling until
@@ -2201,65 +2823,91 @@ function IntegrationsSettings() {
         ghlPushAbortRef.current = false
         setGhlResumeNext(null)
         let totalPulled = body.records_synced || 0
-        let remaining   = body.remaining || 0
-        const totalEligible = (body.total_eligible ?? totalPulled + remaining)
-        setGhlPushProgress(p => ({ ...p, [objectType]: { pushed: totalPulled, total: totalEligible, errors: 0 } }))
+        let remaining = body.remaining || 0
+        const totalEligible = body.total_eligible ?? totalPulled + remaining
+        setGhlPushProgress(p => ({
+          ...p,
+          [objectType]: { pushed: totalPulled, total: totalEligible, errors: 0 },
+        }))
         setGhlMsgError(false)
         setGhlMsg(`${objectType} pull: ${totalPulled}/${totalEligible} pulled…`)
-        let safety    = 500   // up to 500 pages × 400/page = 200k contacts max
-        let nextPage  = body.next_page || null
+        let safety = 500 // up to 500 pages × 400/page = 200k contacts max
+        let nextPage = body.next_page || null
         let loopError = false
         while (remaining > 0 && !ghlPushAbortRef.current && safety-- > 0) {
-          const r2 = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnSlug}`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type':  'application/json',
-                'Authorization': `Bearer ${jwt}`,
-              },
-              // Pass next_page so the edge function resumes from the right page
-              // rather than restarting the bulk load from page 1.
-              body: JSON.stringify(nextPage ? { start_page: nextPage } : {}),
-            }
-          )
+          const r2 = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fnSlug}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${jwt}`,
+            },
+            // Pass next_page so the edge function resumes from the right page
+            // rather than restarting the bulk load from page 1.
+            body: JSON.stringify(nextPage ? { start_page: nextPage } : {}),
+          })
           const b2 = await r2.json().catch(() => ({}))
           if (!r2.ok || b2.ok === false) {
             loopError = true
             setGhlMsgError(true)
-            setGhlMsg(`${objectType} pull: ${b2.error || b2.message || `HTTP ${r2.status}`} (after ${totalPulled} pulled)`)
+            setGhlMsg(
+              `${objectType} pull: ${b2.error || b2.message || `HTTP ${r2.status}`} (after ${totalPulled} pulled)`
+            )
             break
           }
           totalPulled += b2.records_synced || 0
-          remaining    = b2.remaining || 0
-          nextPage     = b2.next_page  || null
-          setGhlPushProgress(p => ({ ...p, [objectType]: { pushed: totalPulled, total: totalEligible, errors: 0 } }))
+          remaining = b2.remaining || 0
+          nextPage = b2.next_page || null
+          setGhlPushProgress(p => ({
+            ...p,
+            [objectType]: { pushed: totalPulled, total: totalEligible, errors: 0 },
+          }))
           setGhlMsg(`${objectType} pull: ${totalPulled}/${totalEligible} pulled…`)
         }
         if (!loopError) {
           const paused = !ghlPushAbortRef.current && remaining > 0
-          const tail = ghlPushAbortRef.current ? ' (stopped)' : (paused ? ` (paused — resume to finish)` : ' (done)')
+          const tail = ghlPushAbortRef.current
+            ? ' (stopped)'
+            : paused
+              ? ` (paused — resume to finish)`
+              : ' (done)'
           setGhlMsg(`${objectType} pull: ${totalPulled} pulled${tail}`)
           if (paused && nextPage) setGhlResumeNext({ objectType, nextPage, fnSlug, totalPulled })
         }
-        setGhlPreview(p => { const n = { ...p }; delete n[`${objectType}:${direction}`]; return n })
-        setTimeout(() => setGhlPushProgress(p => { const n = { ...p }; delete n[objectType]; return n }), 4000)
+        setGhlPreview(p => {
+          const n = { ...p }
+          delete n[`${objectType}:${direction}`]
+          return n
+        })
+        setTimeout(
+          () =>
+            setGhlPushProgress(p => {
+              const n = { ...p }
+              delete n[objectType]
+              return n
+            }),
+          4000
+        )
         await loadGhl()
       }
     } catch (e) {
-      setGhlMsgError(true); setGhlMsg(e?.message || 'Sync failed.')
+      setGhlMsgError(true)
+      setGhlMsg(e?.message || 'Sync failed.')
     } finally {
       setGhlSyncing(s => ({ ...s, [objectType]: false }))
     }
   }
 
   async function handleSave() {
-    setSaving(true); setSaveMsg('')
+    setSaving(true)
+    setSaveMsg('')
     const cfg = { qbo, qbd }
     const { data: existing } = await supabase.from('company_settings').select('id').maybeSingle()
     let error
     if (existing?.id) {
-      ;({ error } = await supabase.from('company_settings').update({ integrations_config: cfg }).eq('id', existing.id))
+      ;({ error } = await supabase
+        .from('company_settings')
+        .update({ integrations_config: cfg })
+        .eq('id', existing.id))
     } else {
       ;({ error } = await supabase.from('company_settings').insert({ integrations_config: cfg }))
     }
@@ -2268,7 +2916,7 @@ function IntegrationsSettings() {
     setTimeout(() => setSaveMsg(''), 4000)
   }
 
-  const toggleSecret = (k) => setShowSecrets(s => ({ ...s, [k]: !s[k] }))
+  const toggleSecret = k => setShowSecrets(s => ({ ...s, [k]: !s[k] }))
   const secretInput = (val, onChange, field, placeholder) => (
     <div className="relative">
       <input
@@ -2278,31 +2926,42 @@ function IntegrationsSettings() {
         placeholder={placeholder}
         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm pr-16 focus:outline-none focus:ring-2 focus:ring-green-600"
       />
-      <button type="button" onClick={() => toggleSecret(field)}
-        className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-700 font-medium">
+      <button
+        type="button"
+        onClick={() => toggleSecret(field)}
+        className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-700 font-medium"
+      >
         {showSecrets[field] ? 'Hide' : 'Show'}
       </button>
     </div>
   )
 
-  if (loading) return (
-    <div className="flex items-center justify-center py-20">
-      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-700"></div>
-    </div>
-  )
+  if (loading)
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-700"></div>
+      </div>
+    )
 
-  const tabBtnCls = (k) => `px-5 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
-    activeTab === k ? 'border-green-700 text-green-800' : 'border-transparent text-gray-500 hover:text-gray-800'
-  }`
+  const tabBtnCls = k =>
+    `px-5 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${
+      activeTab === k
+        ? 'border-green-700 text-green-800'
+        : 'border-transparent text-gray-500 hover:text-gray-800'
+    }`
 
   const lbl = 'block text-xs font-semibold text-gray-600 mb-1'
-  const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600'
+  const inp =
+    'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600'
 
   return (
     <div className="max-w-2xl">
       <div className="mb-6">
         <h2 className="text-lg font-bold text-gray-900">Integrations</h2>
-        <p className="text-sm text-gray-500 mt-0.5">Connect external apps. Configuration only — actual sync will be enabled in a future release.</p>
+        <p className="text-sm text-gray-500 mt-0.5">
+          Connect external apps. Configuration only — actual sync will be enabled in a future
+          release.
+        </p>
       </div>
 
       {/* Sub-tabs */}
@@ -2324,26 +2983,34 @@ function IntegrationsSettings() {
           <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
             <div>
               <p className="text-sm font-semibold text-gray-800">Enable QuickBooks Online</p>
-              <p className="text-xs text-gray-500 mt-0.5">Connect via OAuth 2.0 to sync jobs, invoices, and payments.</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Connect via OAuth 2.0 to sync jobs, invoices, and payments.
+              </p>
             </div>
-            <button type="button"
+            <button
+              type="button"
               onClick={() => setQbo(q => ({ ...q, enabled: !q.enabled }))}
               className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
                 qbo.enabled ? 'bg-green-600' : 'bg-gray-300'
-              }`}>
-              <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                qbo.enabled ? 'translate-x-5' : 'translate-x-0'
-              }`} />
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  qbo.enabled ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
             </button>
           </div>
 
           {/* OAuth status badge */}
           <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-200 bg-white">
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-              qbo.oauth_status === 'connected'
-                ? 'bg-green-100 text-green-800'
-                : 'bg-amber-100 text-amber-800'
-            }`}>
+            <span
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                qbo.oauth_status === 'connected'
+                  ? 'bg-green-100 text-green-800'
+                  : 'bg-amber-100 text-amber-800'
+              }`}
+            >
               {qbo.oauth_status === 'connected' ? '● Connected' : '○ Not Connected'}
             </span>
             <span className="text-xs text-gray-500">
@@ -2355,7 +3022,11 @@ function IntegrationsSettings() {
 
           <div>
             <label className={lbl}>Environment</label>
-            <select value={qbo.environment} onChange={e => setQbo(q => ({ ...q, environment: e.target.value }))} className={inp}>
+            <select
+              value={qbo.environment}
+              onChange={e => setQbo(q => ({ ...q, environment: e.target.value }))}
+              className={inp}
+            >
               <option value="sandbox">Sandbox (Testing)</option>
               <option value="production">Production</option>
             </select>
@@ -2363,10 +3034,13 @@ function IntegrationsSettings() {
 
           <div>
             <label className={lbl}>Client ID</label>
-            <input type="text" value={qbo.client_id}
+            <input
+              type="text"
+              value={qbo.client_id}
               onChange={e => setQbo(q => ({ ...q, client_id: e.target.value }))}
               placeholder="From your Intuit Developer app"
-              className={inp} />
+              className={inp}
+            />
           </div>
 
           <div>
@@ -2381,19 +3055,36 @@ function IntegrationsSettings() {
 
           <div>
             <label className={lbl}>Realm ID (Company ID)</label>
-            <input type="text" value={qbo.realm_id}
+            <input
+              type="text"
+              value={qbo.realm_id}
               onChange={e => setQbo(q => ({ ...q, realm_id: e.target.value }))}
               placeholder="Found in QuickBooks Online URL after login"
-              className={inp} />
+              className={inp}
+            />
           </div>
 
           <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-800 space-y-1">
             <p className="font-semibold">How to get your credentials:</p>
             <ol className="list-decimal list-inside space-y-0.5 text-blue-700">
-              <li>Go to <a href="https://developer.intuit.com" target="_blank" rel="noopener noreferrer" className="underline">developer.intuit.com</a> and sign in</li>
+              <li>
+                Go to{' '}
+                <a
+                  href="https://developer.intuit.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                >
+                  developer.intuit.com
+                </a>{' '}
+                and sign in
+              </li>
               <li>Create an app → select "Accounting" scope</li>
               <li>Copy the Client ID and Client Secret from "Keys & credentials"</li>
-              <li>Your Realm ID appears in your QBO URL: quickbooks.intuit.com/app/qbo?&realmid=<strong>XXXXXXXXX</strong></li>
+              <li>
+                Your Realm ID appears in your QBO URL: quickbooks.intuit.com/app/qbo?&realmid=
+                <strong>XXXXXXXXX</strong>
+              </li>
             </ol>
           </div>
         </div>
@@ -2405,33 +3096,45 @@ function IntegrationsSettings() {
           <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
             <div>
               <p className="text-sm font-semibold text-gray-800">Enable QuickBooks Desktop</p>
-              <p className="text-xs text-gray-500 mt-0.5">Connect via QuickBooks Web Connector (QBWC) to sync with a local QB file.</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Connect via QuickBooks Web Connector (QBWC) to sync with a local QB file.
+              </p>
             </div>
-            <button type="button"
+            <button
+              type="button"
               onClick={() => setQbd(q => ({ ...q, enabled: !q.enabled }))}
               className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
                 qbd.enabled ? 'bg-green-600' : 'bg-gray-300'
-              }`}>
-              <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                qbd.enabled ? 'translate-x-5' : 'translate-x-0'
-              }`} />
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  qbd.enabled ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
             </button>
           </div>
 
           <div>
             <label className={lbl}>Web Connector Endpoint URL</label>
-            <input type="url" value={qbd.connector_url}
+            <input
+              type="url"
+              value={qbd.connector_url}
               onChange={e => setQbd(q => ({ ...q, connector_url: e.target.value }))}
               placeholder="https://yourdomain.com/qbwc"
-              className={inp} />
+              className={inp}
+            />
           </div>
 
           <div>
             <label className={lbl}>Web Connector Username</label>
-            <input type="text" value={qbd.username}
+            <input
+              type="text"
+              value={qbd.username}
               onChange={e => setQbd(q => ({ ...q, username: e.target.value }))}
               placeholder="Username configured in QBWC"
-              className={inp} />
+              className={inp}
+            />
           </div>
 
           <div>
@@ -2446,16 +3149,21 @@ function IntegrationsSettings() {
 
           <div>
             <label className={lbl}>Company File Path (optional)</label>
-            <input type="text" value={qbd.company_file}
+            <input
+              type="text"
+              value={qbd.company_file}
               onChange={e => setQbd(q => ({ ...q, company_file: e.target.value }))}
               placeholder="C:\Users\...\Company.qbw"
-              className={inp} />
+              className={inp}
+            />
           </div>
 
           <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-800 space-y-1">
             <p className="font-semibold">Setup instructions:</p>
             <ol className="list-decimal list-inside space-y-0.5 text-blue-700">
-              <li>Download and install the QuickBooks Web Connector on the computer running QB Desktop</li>
+              <li>
+                Download and install the QuickBooks Web Connector on the computer running QB Desktop
+              </li>
               <li>Enter the endpoint URL above (provided by your Picture Build server admin)</li>
               <li>Open QBWC, add a new application, and paste this URL</li>
               <li>Enter the username and password configured here</li>
@@ -2472,16 +3180,18 @@ function IntegrationsSettings() {
             <div>
               <p className="text-sm font-semibold text-gray-800">GoHighLevel Connection</p>
               <p className="text-xs text-gray-500 mt-0.5">
-                Two-way sync of contacts, opportunities, appointments, and notes.
-                Uses a Private Integration Token — generate one in GHL under
+                Two-way sync of contacts, opportunities, appointments, and notes. Uses a Private
+                Integration Token — generate one in GHL under
                 <em> Settings → Private Integrations</em>.
               </p>
             </div>
-            <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${
-              ghl.connected
-                ? 'bg-green-100 text-green-700 border border-green-300'
-                : 'bg-gray-100 text-gray-500 border border-gray-300'
-            }`}>
+            <span
+              className={`text-xs px-2.5 py-1 rounded-full font-semibold ${
+                ghl.connected
+                  ? 'bg-green-100 text-green-700 border border-green-300'
+                  : 'bg-gray-100 text-gray-500 border border-gray-300'
+              }`}
+            >
               {ghl.connected ? 'Connected' : 'Not connected'}
             </span>
           </div>
@@ -2492,7 +3202,7 @@ function IntegrationsSettings() {
               ghlToken,
               e => setGhlToken(e.target.value),
               'ghl_token',
-              ghl.connected ? '••• saved … paste a new token to replace' : 'pit-xxxxxxxxxxxxxxxx',
+              ghl.connected ? '••• saved … paste a new token to replace' : 'pit-xxxxxxxxxxxxxxxx'
             )}
             <p className="text-[11px] text-gray-400 mt-1">
               The token is verified against GHL before saving and never echoed back to the browser.
@@ -2501,33 +3211,52 @@ function IntegrationsSettings() {
 
           <div>
             <label className={lbl}>Location ID</label>
-            <input type="text" value={ghlLocation}
+            <input
+              type="text"
+              value={ghlLocation}
               onChange={e => setGhlLocation(e.target.value)}
               placeholder="e.g. abc1234DefGhi5678JKL"
-              className={inp} />
+              className={inp}
+            />
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
-            <button type="button" onClick={connectGhl} disabled={ghlBusy}
+            <button
+              type="button"
+              onClick={connectGhl}
+              disabled={ghlBusy}
               className="px-5 py-2 text-sm font-bold text-white rounded-lg disabled:opacity-50"
-              style={{ backgroundColor: FG }}>
-              {ghlBusy ? 'Testing…' : (ghl.connected ? 'Replace Connection' : 'Test & Save Connection')}
+              style={{ backgroundColor: FG }}
+            >
+              {ghlBusy
+                ? 'Testing…'
+                : ghl.connected
+                  ? 'Replace Connection'
+                  : 'Test & Save Connection'}
             </button>
             {ghl.connected && (
-              <button type="button" onClick={disconnectGhl}
-                className="px-4 py-2 text-sm font-medium rounded-lg border border-red-200 text-red-600 hover:bg-red-50">
+              <button
+                type="button"
+                onClick={disconnectGhl}
+                className="px-4 py-2 text-sm font-medium rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
+              >
                 Disconnect
               </button>
             )}
             {ghlResumeNext && (
-              <button type="button" onClick={resumePull}
+              <button
+                type="button"
+                onClick={resumePull}
                 disabled={!!ghlSyncing[ghlResumeNext.objectType]}
-                className="px-3 py-1.5 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg disabled:opacity-50">
+                className="px-3 py-1.5 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg disabled:opacity-50"
+              >
                 Resume Pull
               </button>
             )}
             {ghlMsg && (
-              <span className={`text-sm font-medium ${ghlMsgError ? 'text-red-600' : 'text-green-700'}`}>
+              <span
+                className={`text-sm font-medium ${ghlMsgError ? 'text-red-600' : 'text-green-700'}`}
+              >
                 {ghlMsg}
               </span>
             )}
@@ -2538,148 +3267,200 @@ function IntegrationsSettings() {
             <div className="mt-4 p-4 bg-white border border-gray-200 rounded-xl space-y-3">
               <p className="text-sm font-semibold text-gray-800">What to sync</p>
               {[
-                ['contacts_enabled',      'Contacts',     'contacts'],
-                ['opportunities_enabled', 'Opportunities','opportunities'],
-                ['appointments_enabled',  'Appointments', 'appointments'],
-                ['notes_enabled',         'Notes',        'notes'],
+                ['contacts_enabled', 'Contacts', 'contacts'],
+                ['opportunities_enabled', 'Opportunities', 'opportunities'],
+                ['appointments_enabled', 'Appointments', 'appointments'],
+                ['notes_enabled', 'Notes', 'notes'],
               ].map(([key, label, objType]) => {
                 const state = ghlSyncState.find(s => s.object_type === objType)
                 return (
                   <div key={key}>
                     <div className="flex items-center justify-between">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm text-gray-800">{label}</p>
-                      <p className="text-[11px] text-gray-400">
-                        Last run: {state?.last_run_at ? new Date(state.last_run_at).toLocaleString() : 'never'}
-                        {state?.last_run_status && ` · ${state.last_run_status}`}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
-                      <button type="button"
-                        onClick={() => runSyncNow(objType, { dryRun: true, direction: 'pull' })}
-                        disabled={!ghl[key] || !!ghlSyncing[objType]}
-                        title="Preview pull (GHL → PBS) without writing"
-                        className="text-xs font-semibold text-blue-700 border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-md px-2 py-1 disabled:opacity-40"
-                      >
-                        Pull preview
-                      </button>
-                      <button type="button"
-                        onClick={() => runSyncNow(objType, { direction: 'pull' })}
-                        disabled={!ghl[key] || !!ghlSyncing[objType]}
-                        title="Pull GHL → PBS now"
-                        className="text-xs font-semibold text-green-700 border border-green-200 bg-green-50 hover:bg-green-100 rounded-md px-2 py-1 disabled:opacity-40"
-                      >
-                        {ghlSyncing[objType] ? 'Syncing…' : 'Pull'}
-                      </button>
-                      <button type="button"
-                        onClick={() => runSyncNow(objType, { dryRun: true, direction: 'push' })}
-                        disabled={!ghl[key] || !!ghlSyncing[objType] || objType !== 'contacts'}
-                        title={objType === 'contacts' ? 'Preview push (PBS → GHL) without writing' : 'Push for this object type lands in Phase 6'}
-                        className="text-xs font-semibold text-amber-700 border border-amber-200 bg-amber-50 hover:bg-amber-100 rounded-md px-2 py-1 disabled:opacity-40"
-                      >
-                        Push preview
-                      </button>
-                      <button type="button"
-                        onClick={() => runSyncNow(objType, { direction: 'push' })}
-                        disabled={!ghl[key] || !!ghlSyncing[objType] || objType !== 'contacts'}
-                        title={objType === 'contacts' ? 'Push PBS → GHL — batches of 200, auto-continues until done' : 'Push for this object type lands in Phase 6'}
-                        className="text-xs font-semibold text-white border border-amber-600 bg-amber-600 hover:bg-amber-700 rounded-md px-2 py-1 disabled:opacity-40"
-                      >
-                        {ghlSyncing[objType] && ghlPushProgress[objType]
-                          ? `Pushing ${ghlPushProgress[objType].pushed}/${ghlPushProgress[objType].total}…`
-                          : 'Push'}
-                      </button>
-                      {ghlSyncing[objType] && ghlPushProgress[objType] && (
-                        <button type="button"
-                          onClick={stopGhlPush}
-                          title="Stop the running push loop after the current batch"
-                          className="text-xs font-semibold text-red-700 border border-red-200 bg-red-50 hover:bg-red-100 rounded-md px-2 py-1"
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-gray-800">{label}</p>
+                        <p className="text-[11px] text-gray-400">
+                          Last run:{' '}
+                          {state?.last_run_at
+                            ? new Date(state.last_run_at).toLocaleString()
+                            : 'never'}
+                          {state?.last_run_status && ` · ${state.last_run_status}`}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
+                        <button
+                          type="button"
+                          onClick={() => runSyncNow(objType, { dryRun: true, direction: 'pull' })}
+                          disabled={!ghl[key] || !!ghlSyncing[objType]}
+                          title="Preview pull (GHL → PBS) without writing"
+                          className="text-xs font-semibold text-blue-700 border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-md px-2 py-1 disabled:opacity-40"
                         >
-                          Stop
+                          Pull preview
                         </button>
-                      )}
-                      <button type="button"
-                        onClick={() => saveGhlToggles({ [key]: !ghl[key] })}
-                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${
-                          ghl[key] ? 'bg-green-600' : 'bg-gray-300'
-                        }`}>
-                        <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                          ghl[key] ? 'translate-x-5' : 'translate-x-0'
-                        }`} />
-                      </button>
-                    </div>
+                        <button
+                          type="button"
+                          onClick={() => runSyncNow(objType, { direction: 'pull' })}
+                          disabled={!ghl[key] || !!ghlSyncing[objType]}
+                          title="Pull GHL → PBS now"
+                          className="text-xs font-semibold text-green-700 border border-green-200 bg-green-50 hover:bg-green-100 rounded-md px-2 py-1 disabled:opacity-40"
+                        >
+                          {ghlSyncing[objType] ? 'Syncing…' : 'Pull'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => runSyncNow(objType, { dryRun: true, direction: 'push' })}
+                          disabled={!ghl[key] || !!ghlSyncing[objType] || objType !== 'contacts'}
+                          title={
+                            objType === 'contacts'
+                              ? 'Preview push (PBS → GHL) without writing'
+                              : 'Push for this object type lands in Phase 6'
+                          }
+                          className="text-xs font-semibold text-amber-700 border border-amber-200 bg-amber-50 hover:bg-amber-100 rounded-md px-2 py-1 disabled:opacity-40"
+                        >
+                          Push preview
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => runSyncNow(objType, { direction: 'push' })}
+                          disabled={!ghl[key] || !!ghlSyncing[objType] || objType !== 'contacts'}
+                          title={
+                            objType === 'contacts'
+                              ? 'Push PBS → GHL — batches of 200, auto-continues until done'
+                              : 'Push for this object type lands in Phase 6'
+                          }
+                          className="text-xs font-semibold text-white border border-amber-600 bg-amber-600 hover:bg-amber-700 rounded-md px-2 py-1 disabled:opacity-40"
+                        >
+                          {ghlSyncing[objType] && ghlPushProgress[objType]
+                            ? `Pushing ${ghlPushProgress[objType].pushed}/${ghlPushProgress[objType].total}…`
+                            : 'Push'}
+                        </button>
+                        {ghlSyncing[objType] && ghlPushProgress[objType] && (
+                          <button
+                            type="button"
+                            onClick={stopGhlPush}
+                            title="Stop the running push loop after the current batch"
+                            className="text-xs font-semibold text-red-700 border border-red-200 bg-red-50 hover:bg-red-100 rounded-md px-2 py-1"
+                          >
+                            Stop
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => saveGhlToggles({ [key]: !ghl[key] })}
+                          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${
+                            ghl[key] ? 'bg-green-600' : 'bg-gray-300'
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              ghl[key] ? 'translate-x-5' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
                     </div>
                     {/* Dry-run preview panels (pull and push). */}
-                    {ghlPreview[`${objType}:pull`] && (() => {
-                      const pv = ghlPreview[`${objType}:pull`]
-                      const upd = (pv.would_update_by_ghl_id || 0)
-                              + (pv.would_update_by_email || 0)
-                              + (pv.would_update_by_phone || 0)
-                              + (pv.would_update_by_name_zip || 0)
-                      return (
-                        <div className="mt-2 px-3 py-2 rounded-md bg-blue-50 border border-blue-200 text-xs text-blue-900 space-y-1">
-                          <p className="font-semibold">Pull preview ({label.toLowerCase()}) — no changes were written.</p>
-                          <p>
-                            <span className="font-medium">Would update:</span> {upd}{' '}
-                            {`(ghl_id:${pv.would_update_by_ghl_id || 0}, email:${pv.would_update_by_email || 0}, phone:${pv.would_update_by_phone || 0}, name+zip:${pv.would_update_by_name_zip || 0})`}
-                          </p>
-                          <p><span className="font-medium">Would insert (new):</span> {pv.would_insert || 0}</p>
-                          {pv.custom_fields_mapped != null && !pv.custom_fields_error && (
-                            <p className="text-blue-700 text-[11px]">✓ {pv.custom_fields_mapped} GHL custom field definitions mapped (e.g. "How Did You Hear")</p>
-                          )}
-                          {pv.custom_fields_error && (
-                            <p className="text-amber-700 text-[11px]">⚠ Custom fields unavailable: {pv.custom_fields_error}</p>
-                          )}
-                          {Array.isArray(pv.samples) && pv.samples.length > 0 && (
-                            <details className="text-[11px] text-blue-800">
-                              <summary className="cursor-pointer select-none">Show {pv.samples.length} samples</summary>
-                              <ul className="mt-1 space-y-0.5">
-                                {pv.samples.map((s, i) => {
-                                  // Build a display name with fallbacks for company-only contacts
-                                  const name = [s.ghl?.firstName, s.ghl?.lastName].filter(Boolean).join(' ')
-                                    || s.ghl?.contactName
-                                    || s.ghl?.companyName
-                                    || '(no name)'
-                                  const contact = s.ghl?.email || s.ghl?.phone || ''
-                                  return (
+                    {ghlPreview[`${objType}:pull`] &&
+                      (() => {
+                        const pv = ghlPreview[`${objType}:pull`]
+                        const upd =
+                          (pv.would_update_by_ghl_id || 0) +
+                          (pv.would_update_by_email || 0) +
+                          (pv.would_update_by_phone || 0) +
+                          (pv.would_update_by_name_zip || 0)
+                        return (
+                          <div className="mt-2 px-3 py-2 rounded-md bg-blue-50 border border-blue-200 text-xs text-blue-900 space-y-1">
+                            <p className="font-semibold">
+                              Pull preview ({label.toLowerCase()}) — no changes were written.
+                            </p>
+                            <p>
+                              <span className="font-medium">Would update:</span> {upd}{' '}
+                              {`(ghl_id:${pv.would_update_by_ghl_id || 0}, email:${pv.would_update_by_email || 0}, phone:${pv.would_update_by_phone || 0}, name+zip:${pv.would_update_by_name_zip || 0})`}
+                            </p>
+                            <p>
+                              <span className="font-medium">Would insert (new):</span>{' '}
+                              {pv.would_insert || 0}
+                            </p>
+                            {pv.custom_fields_mapped != null && !pv.custom_fields_error && (
+                              <p className="text-blue-700 text-[11px]">
+                                ✓ {pv.custom_fields_mapped} GHL custom field definitions mapped
+                                (e.g. "How Did You Hear")
+                              </p>
+                            )}
+                            {pv.custom_fields_error && (
+                              <p className="text-amber-700 text-[11px]">
+                                ⚠ Custom fields unavailable: {pv.custom_fields_error}
+                              </p>
+                            )}
+                            {Array.isArray(pv.samples) && pv.samples.length > 0 && (
+                              <details className="text-[11px] text-blue-800">
+                                <summary className="cursor-pointer select-none">
+                                  Show {pv.samples.length} samples
+                                </summary>
+                                <ul className="mt-1 space-y-0.5">
+                                  {pv.samples.map((s, i) => {
+                                    // Build a display name with fallbacks for company-only contacts
+                                    const name =
+                                      [s.ghl?.firstName, s.ghl?.lastName]
+                                        .filter(Boolean)
+                                        .join(' ') ||
+                                      s.ghl?.contactName ||
+                                      s.ghl?.companyName ||
+                                      '(no name)'
+                                    const contact = s.ghl?.email || s.ghl?.phone || ''
+                                    return (
+                                      <li key={i} className="font-mono">
+                                        <span className="text-blue-600">{s.reason}</span>: {name}
+                                        {contact ? ` <${contact}>` : ''}{' '}
+                                        {s.pbs ? `→ pbs#${s.pbs.id?.slice(0, 8)}` : '→ NEW'}
+                                      </li>
+                                    )
+                                  })}
+                                </ul>
+                              </details>
+                            )}
+                          </div>
+                        )
+                      })()}
+                    {ghlPreview[`${objType}:push`] &&
+                      (() => {
+                        const pv = ghlPreview[`${objType}:push`]
+                        return (
+                          <div className="mt-2 px-3 py-2 rounded-md bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1">
+                            <p className="font-semibold">
+                              Push preview ({label.toLowerCase()}) — no changes were written.
+                            </p>
+                            <p>
+                              <span className="font-medium">Would create (new in GHL):</span>{' '}
+                              {pv.would_create || 0}
+                            </p>
+                            <p>
+                              <span className="font-medium">Would update (existing in GHL):</span>{' '}
+                              {pv.would_update || 0}
+                            </p>
+                            <p>
+                              <span className="font-medium">Total eligible:</span>{' '}
+                              {pv.total_eligible || 0}
+                              {pv.next_batch_size ? ` (next batch: ${pv.next_batch_size})` : ''}
+                            </p>
+                            {Array.isArray(pv.samples) && pv.samples.length > 0 && (
+                              <details className="text-[11px] text-amber-800">
+                                <summary className="cursor-pointer select-none">
+                                  Show {pv.samples.length} samples
+                                </summary>
+                                <ul className="mt-1 space-y-0.5">
+                                  {pv.samples.map((s, i) => (
                                     <li key={i} className="font-mono">
-                                      <span className="text-blue-600">{s.reason}</span>:{' '}
-                                      {name}{contact ? ` <${contact}>` : ''}{' '}
-                                      {s.pbs ? `→ pbs#${s.pbs.id?.slice(0,8)}` : '→ NEW'}
+                                      <span className="text-amber-700">{s.kind}</span>:{' '}
+                                      {(s.first_name || '') + ' ' + (s.last_name || '')}{' '}
+                                      {s.email ? `<${s.email}>` : ''}
                                     </li>
-                                  )
-                                })}
-                              </ul>
-                            </details>
-                          )}
-                        </div>
-                      )
-                    })()}
-                    {ghlPreview[`${objType}:push`] && (() => {
-                      const pv = ghlPreview[`${objType}:push`]
-                      return (
-                        <div className="mt-2 px-3 py-2 rounded-md bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1">
-                          <p className="font-semibold">Push preview ({label.toLowerCase()}) — no changes were written.</p>
-                          <p><span className="font-medium">Would create (new in GHL):</span> {pv.would_create || 0}</p>
-                          <p><span className="font-medium">Would update (existing in GHL):</span> {pv.would_update || 0}</p>
-                          <p><span className="font-medium">Total eligible:</span> {pv.total_eligible || 0}{pv.next_batch_size ? ` (next batch: ${pv.next_batch_size})` : ''}</p>
-                          {Array.isArray(pv.samples) && pv.samples.length > 0 && (
-                            <details className="text-[11px] text-amber-800">
-                              <summary className="cursor-pointer select-none">Show {pv.samples.length} samples</summary>
-                              <ul className="mt-1 space-y-0.5">
-                                {pv.samples.map((s, i) => (
-                                  <li key={i} className="font-mono">
-                                    <span className="text-amber-700">{s.kind}</span>:{' '}
-                                    {(s.first_name || '') + ' ' + (s.last_name || '')}{' '}
-                                    {s.email ? `<${s.email}>` : ''}
-                                  </li>
-                                ))}
-                              </ul>
-                            </details>
-                          )}
-                        </div>
-                      )
-                    })()}
+                                  ))}
+                                </ul>
+                              </details>
+                            )}
+                          </div>
+                        )
+                      })()}
                   </div>
                 )
               })}
@@ -2693,13 +3474,18 @@ function IntegrationsSettings() {
 
       {/* Save */}
       <div className="mt-6 flex items-center gap-4">
-        <button onClick={handleSave} disabled={saving}
+        <button
+          onClick={handleSave}
+          disabled={saving}
           className="px-6 py-2.5 text-sm font-bold text-white rounded-lg disabled:opacity-50 transition-colors"
-          style={{ backgroundColor: FG }}>
+          style={{ backgroundColor: FG }}
+        >
           {saving ? 'Saving…' : 'Save Integration Settings'}
         </button>
         {saveMsg && (
-          <span className={`text-sm font-medium ${saveMsg.startsWith('⚠️') ? 'text-red-600' : 'text-green-700'}`}>
+          <span
+            className={`text-sm font-medium ${saveMsg.startsWith('⚠️') ? 'text-red-600' : 'text-green-700'}`}
+          >
             {saveMsg}
           </span>
         )}
@@ -2713,44 +3499,51 @@ function IntegrationsSettings() {
 // expand details, change status/priority, add admin notes. RLS lets only
 // admins see all rows; Sam logs them under each user's own JWT.
 const CATEGORY_STYLE = {
-  feature:     'bg-blue-50   text-blue-800   border-blue-200',
-  bug:         'bg-red-50    text-red-800    border-red-200',
+  feature: 'bg-blue-50   text-blue-800   border-blue-200',
+  bug: 'bg-red-50    text-red-800    border-red-200',
   enhancement: 'bg-purple-50 text-purple-800 border-purple-200',
-  other:       'bg-gray-50   text-gray-700   border-gray-200',
+  other: 'bg-gray-50   text-gray-700   border-gray-200',
 }
 const STATUS_STYLE = {
-  new:         'bg-yellow-50 text-yellow-800 border-yellow-200',
-  triaged:     'bg-blue-50   text-blue-800   border-blue-200',
+  new: 'bg-yellow-50 text-yellow-800 border-yellow-200',
+  triaged: 'bg-blue-50   text-blue-800   border-blue-200',
   in_progress: 'bg-purple-50 text-purple-800 border-purple-200',
-  done:        'bg-green-50  text-green-800  border-green-200',
-  declined:    'bg-gray-100  text-gray-600   border-gray-300',
+  done: 'bg-green-50  text-green-800  border-green-200',
+  declined: 'bg-gray-100  text-gray-600   border-gray-300',
 }
 const PRIORITY_STYLE = {
-  low:    'text-gray-500',
+  low: 'text-gray-500',
   medium: 'text-gray-700',
-  high:   'text-red-700 font-bold',
+  high: 'text-red-700 font-bold',
 }
 
 function FeedbackInbox() {
-  const [requests,  setRequests]  = useState([])
-  const [loading,   setLoading]   = useState(true)
-  const [filter,    setFilter]    = useState('open') // 'open' | 'all' | 'done'
-  const [expanded,  setExpanded]  = useState(null)   // id of expanded row
-  const [userMap,   setUserMap]   = useState({})
+  const [requests, setRequests] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState('open') // 'open' | 'all' | 'done'
+  const [expanded, setExpanded] = useState(null) // id of expanded row
+  const [userMap, setUserMap] = useState({})
 
-  useEffect(() => { fetchAll() }, [])
+  useEffect(() => {
+    fetchAll()
+  }, [])
 
   async function fetchAll() {
     setLoading(true)
-    const { data } = await supabase.from('feature_requests')
-      .select('*').order('created_at', { ascending: false }).limit(500)
+    const { data } = await supabase
+      .from('feature_requests')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(500)
     const rows = data || []
     setRequests(rows)
     // Hydrate user names
     const ids = [...new Set(rows.map(r => r.user_id).filter(Boolean))]
     if (ids.length) {
-      const { data: profs } = await supabase.from('profiles')
-        .select('id, full_name, email').in('id', ids)
+      const { data: profs } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', ids)
       setUserMap(Object.fromEntries((profs || []).map(p => [p.id, p])))
     }
     setLoading(false)
@@ -2760,7 +3553,7 @@ function FeedbackInbox() {
     // Capture previous row BEFORE we mutate local state so we can detect a
     // real status transition and grab the latest admin_notes for the email.
     const prevRow = requests.find(r => r.id === id)
-    setRequests(prev => prev.map(r => r.id === id ? { ...r, ...fields } : r))
+    setRequests(prev => prev.map(r => (r.id === id ? { ...r, ...fields } : r)))
     await supabase.from('feature_requests').update(fields).eq('id', id)
 
     // ── Notify user when status flips to in_progress or done ────────────────
@@ -2771,7 +3564,7 @@ function FeedbackInbox() {
       const newStatus = fields.status
       if (!newStatus) return
       if (!['in_progress', 'done'].includes(newStatus)) return
-      if (prevRow && prevRow.status === newStatus) return  // no real change
+      if (prevRow && prevRow.status === newStatus) return // no real change
 
       // Resolve reporter email. userMap may already have it; otherwise fetch.
       const reporterId = prevRow?.user_id
@@ -2779,7 +3572,10 @@ function FeedbackInbox() {
       let toEmail = userMap[reporterId]?.email
       if (!toEmail) {
         const { data: prof } = await supabase
-          .from('profiles').select('email').eq('id', reporterId).maybeSingle()
+          .from('profiles')
+          .select('email')
+          .eq('id', reporterId)
+          .maybeSingle()
         toEmail = prof?.email
       }
       if (!toEmail) return
@@ -2790,9 +3586,9 @@ function FeedbackInbox() {
       const helpUrl = `${window.location.origin}/help`
 
       await sendFeedbackStatusEmail({
-        to:      toEmail,
-        title:   prevRow?.title || 'your request',
-        status:  newStatus,
+        to: toEmail,
+        title: prevRow?.title || 'your request',
+        status: newStatus,
         notes,
         helpUrl,
       })
@@ -2815,9 +3611,9 @@ function FeedbackInbox() {
   })
 
   const counts = {
-    open: requests.filter(r => !['done','declined'].includes(r.status)).length,
-    all:  requests.length,
-    done: requests.filter(r => ['done','declined'].includes(r.status)).length,
+    open: requests.filter(r => !['done', 'declined'].includes(r.status)).length,
+    all: requests.length,
+    done: requests.filter(r => ['done', 'declined'].includes(r.status)).length,
   }
 
   return (
@@ -2826,24 +3622,31 @@ function FeedbackInbox() {
       <div className="flex items-center gap-2 mb-4">
         {[
           { key: 'open', label: `Open (${counts.open})` },
-          { key: 'all',  label: `All (${counts.all})`   },
+          { key: 'all', label: `All (${counts.all})` },
           { key: 'done', label: `Done (${counts.done})` },
         ].map(f => (
-          <button key={f.key} onClick={() => setFilter(f.key)}
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
             className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ${
               filter === f.key
                 ? 'bg-green-700 text-white border-green-700'
                 : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-            }`}>
+            }`}
+          >
             {f.label}
           </button>
         ))}
         <div className="flex-1" />
-        <button onClick={fetchAll} className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1">↻ Refresh</button>
+        <button onClick={fetchAll} className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1">
+          ↻ Refresh
+        </button>
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700" /></div>
+        <div className="flex justify-center py-16">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700" />
+        </div>
       ) : visible.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <p className="text-4xl mb-3">📭</p>
@@ -2867,27 +3670,42 @@ function FeedbackInbox() {
             <tbody>
               {visible.map(r => {
                 const user = userMap[r.user_id]
-                const userName = user?.full_name || user?.email || (r.user_id ? r.user_id.slice(0, 8) : '—')
-                const dateStr = new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
+                const userName =
+                  user?.full_name || user?.email || (r.user_id ? r.user_id.slice(0, 8) : '—')
+                const dateStr = new Date(r.created_at).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: '2-digit',
+                })
                 const isOpen = expanded === r.id
                 return (
                   <>
-                    <tr key={r.id}
-                        className={`border-b border-gray-100 hover:bg-gray-50/70 cursor-pointer ${isOpen ? 'bg-gray-50' : ''}`}
-                        onClick={() => setExpanded(isOpen ? null : r.id)}>
+                    <tr
+                      key={r.id}
+                      className={`border-b border-gray-100 hover:bg-gray-50/70 cursor-pointer ${isOpen ? 'bg-gray-50' : ''}`}
+                      onClick={() => setExpanded(isOpen ? null : r.id)}
+                    >
                       <td className="px-3 py-2 text-xs text-gray-500">{dateStr}</td>
                       <td className="px-3 py-2 text-xs text-gray-700 truncate">{userName}</td>
                       <td className="px-3 py-2">
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold uppercase ${CATEGORY_STYLE[r.category] || CATEGORY_STYLE.other}`}>
+                        <span
+                          className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold uppercase ${CATEGORY_STYLE[r.category] || CATEGORY_STYLE.other}`}
+                        >
                           {r.category}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-sm font-medium text-gray-800 truncate">{r.title}</td>
+                      <td className="px-3 py-2 text-sm font-medium text-gray-800 truncate">
+                        {r.title}
+                      </td>
                       <td className="px-3 py-2 text-xs">
-                        <span className={PRIORITY_STYLE[r.priority] || PRIORITY_STYLE.medium}>{r.priority}</span>
+                        <span className={PRIORITY_STYLE[r.priority] || PRIORITY_STYLE.medium}>
+                          {r.priority}
+                        </span>
                       </td>
                       <td className="px-3 py-2">
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold uppercase ${STATUS_STYLE[r.status] || STATUS_STYLE.new}`}>
+                        <span
+                          className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold uppercase ${STATUS_STYLE[r.status] || STATUS_STYLE.new}`}
+                        >
                           {r.status.replace('_', ' ')}
                         </span>
                       </td>
@@ -2901,10 +3719,16 @@ function FeedbackInbox() {
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             {/* Body */}
                             <div className="md:col-span-2">
-                              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Description</p>
-                              <p className="text-sm text-gray-800 whitespace-pre-wrap bg-white border border-gray-200 rounded-lg p-3">{r.body}</p>
+                              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                                Description
+                              </p>
+                              <p className="text-sm text-gray-800 whitespace-pre-wrap bg-white border border-gray-200 rounded-lg p-3">
+                                {r.body}
+                              </p>
 
-                              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-4 mb-1">Admin notes</p>
+                              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-4 mb-1">
+                                Admin notes
+                              </p>
                               <textarea
                                 defaultValue={r.admin_notes || ''}
                                 onBlur={e => {
@@ -2920,46 +3744,66 @@ function FeedbackInbox() {
                             {/* Right column: controls */}
                             <div className="space-y-3">
                               <div>
-                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Status</p>
+                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                                  Status
+                                </p>
                                 <select
                                   value={r.status}
                                   onChange={e => patch(r.id, { status: e.target.value })}
                                   className="w-full text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white"
                                 >
-                                  {['new','triaged','in_progress','done','declined'].map(s =>
-                                    <option key={s} value={s}>{s.replace('_',' ')}</option>
-                                  )}
+                                  {['new', 'triaged', 'in_progress', 'done', 'declined'].map(s => (
+                                    <option key={s} value={s}>
+                                      {s.replace('_', ' ')}
+                                    </option>
+                                  ))}
                                 </select>
                               </div>
                               <div>
-                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Priority</p>
+                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                                  Priority
+                                </p>
                                 <select
                                   value={r.priority}
                                   onChange={e => patch(r.id, { priority: e.target.value })}
                                   className="w-full text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white"
                                 >
-                                  {['low','medium','high'].map(p => <option key={p} value={p}>{p}</option>)}
+                                  {['low', 'medium', 'high'].map(p => (
+                                    <option key={p} value={p}>
+                                      {p}
+                                    </option>
+                                  ))}
                                 </select>
                               </div>
                               <div>
-                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Category</p>
+                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                                  Category
+                                </p>
                                 <select
                                   value={r.category}
                                   onChange={e => patch(r.id, { category: e.target.value })}
                                   className="w-full text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-white"
                                 >
-                                  {['feature','bug','enhancement','other'].map(c => <option key={c} value={c}>{c}</option>)}
+                                  {['feature', 'bug', 'enhancement', 'other'].map(c => (
+                                    <option key={c} value={c}>
+                                      {c}
+                                    </option>
+                                  ))}
                                 </select>
                               </div>
                               <div className="text-[11px] text-gray-400 pt-2 border-t border-gray-200">
                                 <p>Source: {r.source}</p>
                                 <p>Logged: {new Date(r.created_at).toLocaleString()}</p>
-                                {r.updated_at !== r.created_at && <p>Updated: {new Date(r.updated_at).toLocaleString()}</p>}
+                                {r.updated_at !== r.created_at && (
+                                  <p>Updated: {new Date(r.updated_at).toLocaleString()}</p>
+                                )}
                                 {user?.email && <p>Reporter: {user.email}</p>}
                                 <p className="font-mono text-[10px] mt-1">id: {r.id}</p>
                               </div>
-                              <button onClick={() => remove(r.id)}
-                                className="w-full text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 hover:text-red-700 transition-colors">
+                              <button
+                                onClick={() => remove(r.id)}
+                                className="w-full text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 hover:text-red-700 transition-colors"
+                              >
                                 Delete request
                               </button>
                             </div>
@@ -2983,36 +3827,50 @@ export default function Admin() {
   const [tab, setTab] = useState('overview')
 
   // ── Overview state ─────────────────────────────────────────────────────────
-  const [counts,  setCounts]  = useState({ jobs: 0, clients: 0, bids: 0, collections: 0, statistics: 0 })
+  const [counts, setCounts] = useState({
+    jobs: 0,
+    clients: 0,
+    bids: 0,
+    collections: 0,
+    statistics: 0,
+  })
   const [loadingOverview, setLoadingOverview] = useState(true)
 
   const [currentUserRole, setCurrentUserRole] = useState('user')
 
   // ── Fetch on mount ─────────────────────────────────────────────────────────
-  useEffect(() => { fetchOverview() }, [])
+  useEffect(() => {
+    fetchOverview()
+  }, [])
 
   // Track current user's full role
   useEffect(() => {
     if (!user?.id) return
-    supabase.from('profiles').select('role').eq('id', user.id).single()
-      .then(({ data }) => { if (data) setCurrentUserRole(data.role || 'user') })
+    supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+      .then(({ data }) => {
+        if (data) setCurrentUserRole(data.role || 'user')
+      })
   }, [user?.id])
 
   async function fetchOverview() {
     setLoadingOverview(true)
     const [jobs, clients, bids, collections, stats] = await Promise.all([
-      supabase.from('jobs').select('id',        { count: 'exact', head: true }),
-      supabase.from('clients').select('id',     { count: 'exact', head: true }),
-      supabase.from('bids').select('id',        { count: 'exact', head: true }),
+      supabase.from('jobs').select('id', { count: 'exact', head: true }),
+      supabase.from('clients').select('id', { count: 'exact', head: true }),
+      supabase.from('bids').select('id', { count: 'exact', head: true }),
       supabase.from('collections').select('id', { count: 'exact', head: true }),
-      supabase.from('statistics').select('id',  { count: 'exact', head: true }),
+      supabase.from('statistics').select('id', { count: 'exact', head: true }),
     ])
     setCounts({
-      jobs:        jobs.count        || 0,
-      clients:     clients.count     || 0,
-      bids:        bids.count        || 0,
+      jobs: jobs.count || 0,
+      clients: clients.count || 0,
+      bids: bids.count || 0,
       collections: collections.count || 0,
-      statistics:  stats.count       || 0,
+      statistics: stats.count || 0,
     })
     setLoadingOverview(false)
   }
@@ -3021,25 +3879,44 @@ export default function Admin() {
   const currentUserIsAdmin = currentUserRole === 'admin' || currentUserRole === 'super_admin'
 
   const tabs = [
-    { key: 'overview',      label: 'Overview' },
-    { key: 'settings',      label: 'Company Settings' },
-    { key: 'feedback',      label: '📬 Feedback Inbox' },
-    { key: 'sms',           label: '📱 SMS Settings' },
-    { key: 'email',         label: '✉️ Email Settings' },
-    { key: 'integrations',  label: '🔗 Integrations' },
+    { key: 'overview', label: 'Overview' },
+    { key: 'settings', label: 'Company Settings' },
+    { key: 'feedback', label: '📬 Feedback Inbox' },
+    { key: 'sms', label: '📱 SMS Settings' },
+    { key: 'email', label: '✉️ Email Settings' },
+    { key: 'integrations', label: '🔗 Integrations' },
   ]
 
   const statCards = [
-    { label: 'Total Jobs',       value: counts.jobs,        icon: '🔨', color: 'bg-green-50  border-green-200'  },
-    { label: 'Total Clients',    value: counts.clients,     icon: '👥', color: 'bg-blue-50   border-blue-200'   },
-    { label: 'Total Bids',       value: counts.bids,        icon: '📋', color: 'bg-yellow-50 border-yellow-200' },
-    { label: 'Total Invoices',   value: counts.collections, icon: '💰', color: 'bg-purple-50 border-purple-200' },
-    { label: 'Total Statistics', value: counts.statistics,  icon: '📈', color: 'bg-teal-50   border-teal-200'   },
+    { label: 'Total Jobs', value: counts.jobs, icon: '🔨', color: 'bg-green-50  border-green-200' },
+    {
+      label: 'Total Clients',
+      value: counts.clients,
+      icon: '👥',
+      color: 'bg-blue-50   border-blue-200',
+    },
+    {
+      label: 'Total Bids',
+      value: counts.bids,
+      icon: '📋',
+      color: 'bg-yellow-50 border-yellow-200',
+    },
+    {
+      label: 'Total Invoices',
+      value: counts.collections,
+      icon: '💰',
+      color: 'bg-purple-50 border-purple-200',
+    },
+    {
+      label: 'Total Statistics',
+      value: counts.statistics,
+      icon: '📈',
+      color: 'bg-teal-50   border-teal-200',
+    },
   ]
 
   return (
     <div className="max-w-5xl mx-auto">
-
       {/* Page header */}
       <div className="mb-5">
         <h1 className="text-2xl font-bold text-gray-900">Admin</h1>
@@ -3064,80 +3941,80 @@ export default function Admin() {
       </div>
 
       {/* ── OVERVIEW TAB ──────────────────────────────────────────────────── */}
-      {tab === 'overview' && (
-        loadingOverview
-          ? <div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-700"></div></div>
-          : (
-            <>
-              {/* Stat cards */}
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-                {statCards.map(s => (
-                  <div key={s.label} className={`card border ${s.color} text-center`}>
-                    <p className="text-3xl mb-2">{s.icon}</p>
-                    <p className="text-2xl font-bold text-gray-900">{s.value}</p>
-                    <p className="text-xs text-gray-500 mt-1">{s.label}</p>
-                  </div>
-                ))}
+      {tab === 'overview' &&
+        (loadingOverview ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-700"></div>
+          </div>
+        ) : (
+          <>
+            {/* Stat cards */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+              {statCards.map(s => (
+                <div key={s.label} className={`card border ${s.color} text-center`}>
+                  <p className="text-3xl mb-2">{s.icon}</p>
+                  <p className="text-2xl font-bold text-gray-900">{s.value}</p>
+                  <p className="text-xs text-gray-500 mt-1">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Quick links */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div className="card">
+                <h2 className="font-semibold text-gray-900 mb-2">Supabase Dashboard</h2>
+                <p className="text-sm text-gray-500 mb-4">
+                  Manage auth users, view raw tables, and run SQL queries.
+                </p>
+                <a
+                  href="https://supabase.com/dashboard/project/jjlnpywpmoukgwmwczbz/auth/users"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-primary inline-flex items-center gap-2"
+                >
+                  👤 Auth Users
+                </a>
+                <a
+                  href="https://supabase.com/dashboard/project/jjlnpywpmoukgwmwczbz/editor"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-secondary inline-flex items-center gap-2 ml-2"
+                >
+                  🗄️ SQL Editor
+                </a>
               </div>
 
-              {/* Quick links */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div className="card">
-                  <h2 className="font-semibold text-gray-900 mb-2">Supabase Dashboard</h2>
-                  <p className="text-sm text-gray-500 mb-4">Manage auth users, view raw tables, and run SQL queries.</p>
-                  <a
-                    href="https://supabase.com/dashboard/project/jjlnpywpmoukgwmwczbz/auth/users"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn-primary inline-flex items-center gap-2"
-                  >
-                    👤 Auth Users
-                  </a>
-                  <a
-                    href="https://supabase.com/dashboard/project/jjlnpywpmoukgwmwczbz/editor"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn-secondary inline-flex items-center gap-2 ml-2"
-                  >
-                    🗄️ SQL Editor
-                  </a>
-                </div>
-
-                <div className="card bg-gray-50 border-gray-200">
-                  <h2 className="font-semibold text-gray-900 mb-3">App Info</h2>
-                  <div className="text-sm text-gray-600 space-y-1">
-                    <p><span className="font-medium">Supabase Project:</span> jjlnpywpmoukgwmwczbz</p>
-                    <p><span className="font-medium">Version:</span> 1.0.0</p>
-                    <p><span className="font-medium">Stack:</span> React + Vite + Supabase + Tailwind</p>
-                    <p><span className="font-medium">Logged in as:</span> {user?.email}</p>
-                  </div>
+              <div className="card bg-gray-50 border-gray-200">
+                <h2 className="font-semibold text-gray-900 mb-3">App Info</h2>
+                <div className="text-sm text-gray-600 space-y-1">
+                  <p>
+                    <span className="font-medium">Supabase Project:</span> jjlnpywpmoukgwmwczbz
+                  </p>
+                  <p>
+                    <span className="font-medium">Version:</span> 1.0.0
+                  </p>
+                  <p>
+                    <span className="font-medium">Stack:</span> React + Vite + Supabase + Tailwind
+                  </p>
+                  <p>
+                    <span className="font-medium">Logged in as:</span> {user?.email}
+                  </p>
                 </div>
               </div>
-            </>
-          )
-      )}
+            </div>
+          </>
+        ))}
 
       {/* ── SETTINGS TAB ──────────────────────────────────────────────────── */}
-      {tab === 'settings' && (
-        <CompanySettings currentUserIsAdmin={currentUserIsAdmin} />
-      )}
+      {tab === 'settings' && <CompanySettings currentUserIsAdmin={currentUserIsAdmin} />}
 
-      {tab === 'feedback' && (
-        <FeedbackInbox />
-      )}
+      {tab === 'feedback' && <FeedbackInbox />}
 
-      {tab === 'sms' && (
-        <SmsSettings />
-      )}
+      {tab === 'sms' && <SmsSettings />}
 
-      {tab === 'email' && (
-        <EmailSettings />
-      )}
+      {tab === 'email' && <EmailSettings />}
 
-      {tab === 'integrations' && (
-        <IntegrationsSettings />
-      )}
-
+      {tab === 'integrations' && <IntegrationsSettings />}
     </div>
   )
 }

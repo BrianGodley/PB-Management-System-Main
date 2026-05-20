@@ -5,11 +5,11 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 
 const FIELD_TYPES = [
-  { value: 'rating',  label: 'Star Rating',     icon: '⭐', desc: '1–5 star scale'            },
-  { value: 'text',    label: 'Text Response',   icon: '📝', desc: 'Open text answer'           },
-  { value: 'yesno',  label: 'Yes / No',         icon: '✅', desc: 'Simple yes or no'           },
-  { value: 'number',  label: 'Number',           icon: '🔢', desc: 'Numeric value'              },
-  { value: 'header',  label: 'Section Header',  icon: '📌', desc: 'Divider between sections'   },
+  { value: 'rating', label: 'Star Rating', icon: '⭐', desc: '1–5 star scale' },
+  { value: 'text', label: 'Text Response', icon: '📝', desc: 'Open text answer' },
+  { value: 'yesno', label: 'Yes / No', icon: '✅', desc: 'Simple yes or no' },
+  { value: 'number', label: 'Number', icon: '🔢', desc: 'Numeric value' },
+  { value: 'header', label: 'Section Header', icon: '📌', desc: 'Divider between sections' },
 ]
 
 function newField() {
@@ -17,12 +17,12 @@ function newField() {
 }
 
 export default function ReviewBuilder({ form, onSave, onClose }) {
-  const [title,    setTitle]    = useState(form?.title       || '')
-  const [desc,     setDesc]     = useState(form?.description || '')
-  const [fields,   setFields]   = useState([])
-  const [loading,  setLoading]  = useState(!!form)
-  const [saving,   setSaving]   = useState(false)
-  const [error,    setError]    = useState('')
+  const [title, setTitle] = useState(form?.title || '')
+  const [desc, setDesc] = useState(form?.description || '')
+  const [fields, setFields] = useState([])
+  const [loading, setLoading] = useState(!!form)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     if (form) {
@@ -33,9 +33,10 @@ export default function ReviewBuilder({ form, onSave, onClose }) {
     }
   }, [form?.id])
 
-  const addField   = ()          => setFields(prev => [...prev, newField()])
-  const removeField = id         => setFields(prev => prev.filter(f => f.id !== id))
-  const updateField = (id, patch) => setFields(prev => prev.map(f => f.id === id ? { ...f, ...patch } : f))
+  const addField = () => setFields(prev => [...prev, newField()])
+  const removeField = id => setFields(prev => prev.filter(f => f.id !== id))
+  const updateField = (id, patch) =>
+    setFields(prev => prev.map(f => (f.id === id ? { ...f, ...patch } : f)))
 
   function moveField(idx, dir) {
     setFields(prev => {
@@ -48,14 +49,17 @@ export default function ReviewBuilder({ form, onSave, onClose }) {
   }
 
   async function handleSave() {
-    if (!title.trim()) { setError('Form title is required'); return }
+    if (!title.trim()) {
+      setError('Form title is required')
+      return
+    }
     setSaving(true)
     setError('')
     const payload = {
-      title:       title.trim(),
+      title: title.trim(),
       description: desc.trim() || null,
       fields,
-      updated_at:  new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     }
 
     if (form?.id) {
@@ -70,14 +74,16 @@ export default function ReviewBuilder({ form, onSave, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex">
       <div className="flex-1 flex flex-col bg-gray-50 max-w-2xl mx-auto w-full shadow-2xl overflow-hidden">
-
         {/* Header */}
         <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
           <h2 className="text-lg font-bold text-gray-900">
             {form ? 'Edit Review Form' : 'New Review Form'}
           </h2>
           <div className="flex gap-2">
-            <button onClick={onClose} className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50"
+            >
               Cancel
             </button>
             <button
@@ -91,7 +97,9 @@ export default function ReviewBuilder({ form, onSave, onClose }) {
         </div>
 
         {error && (
-          <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
+          <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            {error}
+          </div>
         )}
 
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
@@ -109,7 +117,9 @@ export default function ReviewBuilder({ form, onSave, onClose }) {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Description (optional)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Description (optional)
+              </label>
               <textarea
                 value={desc}
                 onChange={e => setDesc(e.target.value)}
@@ -138,12 +148,31 @@ export default function ReviewBuilder({ form, onSave, onClose }) {
                     type="text"
                     value={field.label}
                     onChange={e => updateField(field.id, { label: e.target.value })}
-                    placeholder={field.type === 'header' ? 'Section title…' : 'Field label / question…'}
+                    placeholder={
+                      field.type === 'header' ? 'Section title…' : 'Field label / question…'
+                    }
                     className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-medium focus:outline-none focus:border-green-500"
                   />
-                  <button onClick={() => moveField(idx, -1)} disabled={idx === 0}           className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 text-sm">↑</button>
-                  <button onClick={() => moveField(idx, 1)}  disabled={idx === fields.length - 1} className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 text-sm">↓</button>
-                  <button onClick={() => removeField(field.id)} className="p-1 text-red-400 hover:text-red-600 text-sm">✕</button>
+                  <button
+                    onClick={() => moveField(idx, -1)}
+                    disabled={idx === 0}
+                    className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 text-sm"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    onClick={() => moveField(idx, 1)}
+                    disabled={idx === fields.length - 1}
+                    className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 text-sm"
+                  >
+                    ↓
+                  </button>
+                  <button
+                    onClick={() => removeField(field.id)}
+                    className="p-1 text-red-400 hover:text-red-600 text-sm"
+                  >
+                    ✕
+                  </button>
                 </div>
 
                 <div className="flex gap-2 flex-wrap">
@@ -176,7 +205,11 @@ export default function ReviewBuilder({ form, onSave, onClose }) {
                 {/* Preview of field type */}
                 {field.type === 'rating' && (
                   <div className="mt-3 flex gap-1">
-                    {[1,2,3,4,5].map(n => <span key={n} className="text-gray-300 text-xl">★</span>)}
+                    {[1, 2, 3, 4, 5].map(n => (
+                      <span key={n} className="text-gray-300 text-xl">
+                        ★
+                      </span>
+                    ))}
                   </div>
                 )}
                 {field.type === 'text' && (
@@ -184,13 +217,15 @@ export default function ReviewBuilder({ form, onSave, onClose }) {
                 )}
                 {field.type === 'yesno' && (
                   <div className="mt-3 flex gap-3">
-                    <div className="px-4 py-1 border border-gray-200 rounded-lg text-sm text-gray-400">Yes</div>
-                    <div className="px-4 py-1 border border-gray-200 rounded-lg text-sm text-gray-400">No</div>
+                    <div className="px-4 py-1 border border-gray-200 rounded-lg text-sm text-gray-400">
+                      Yes
+                    </div>
+                    <div className="px-4 py-1 border border-gray-200 rounded-lg text-sm text-gray-400">
+                      No
+                    </div>
                   </div>
                 )}
-                {field.type === 'header' && (
-                  <div className="mt-3 border-t-2 border-gray-200" />
-                )}
+                {field.type === 'header' && <div className="mt-3 border-t-2 border-gray-200" />}
               </div>
             ))}
 

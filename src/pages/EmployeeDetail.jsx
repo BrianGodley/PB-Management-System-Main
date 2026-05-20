@@ -13,11 +13,12 @@ import { sendSMS } from '../lib/notify'
 function generatePassword(len = 12) {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%'
   return Array.from(crypto.getRandomValues(new Uint8Array(len)))
-    .map(b => chars[b % chars.length]).join('')
+    .map(b => chars[b % chars.length])
+    .join('')
 }
 
 const DEPARTMENTS = ['Operations', 'Landscaping', 'Pool', 'Admin', 'Sales', 'Other']
-const LANGUAGES   = [
+const LANGUAGES = [
   { value: 'en', label: 'English' },
   { value: 'es', label: 'Español (Spanish)' },
 ]
@@ -27,125 +28,166 @@ const LANGUAGES   = [
 // Admins/super_admins always have full access regardless of these flags.
 const MODULES = [
   {
-    key: 'contacts', label: 'Contacts', icon: '📇',
+    key: 'contacts',
+    label: 'Contacts',
+    icon: '📇',
     accessKey: 'access_contacts',
     perms: [
-      { key: 'contacts_add',  label: 'Add new contacts' },
+      { key: 'contacts_add', label: 'Add new contacts' },
       { key: 'contacts_edit', label: 'Edit existing contacts' },
     ],
   },
   {
     // Internal key + accessKey stay as 'clients' / 'access_clients' for backward
     // compat with the existing user_permissions DB columns; only labels change.
-    key: 'clients', label: 'Opportunities', icon: '🤝',
+    key: 'clients',
+    label: 'Opportunities',
+    icon: '🤝',
     accessKey: 'access_clients',
     perms: [
-      { key: 'clients_add',                  label: 'Add new opportunities' },
-      { key: 'clients_edit',                 label: 'Edit existing opportunities' },
-      { key: 'clients_add_estimate',         label: 'Add new estimates' },
+      { key: 'clients_add', label: 'Add new opportunities' },
+      { key: 'clients_edit', label: 'Edit existing opportunities' },
+      { key: 'clients_add_estimate', label: 'Add new estimates' },
       { key: 'clients_edit_other_estimates', label: "Edit other users' estimates" },
-      { key: 'clients_create_bids',          label: 'Create bids' },
-      { key: 'clients_access_edit_rates',    label: 'Access/Edit Rates (show inline rate-edit toggle in estimate modules)' },
+      { key: 'clients_create_bids', label: 'Create bids' },
+      {
+        key: 'clients_access_edit_rates',
+        label: 'Access/Edit Rates (show inline rate-edit toggle in estimate modules)',
+      },
     ],
   },
   {
-    key: 'design', label: 'Design', icon: '✏️',
+    key: 'design',
+    label: 'Design',
+    icon: '✏️',
     accessKey: 'access_design',
     perms: [
       { key: 'design_add_project', label: 'Add new projects' },
-      { key: 'design_edit_other',  label: "Edit other users' projects" },
+      { key: 'design_edit_other', label: "Edit other users' projects" },
     ],
   },
   {
-    key: 'bids', label: 'Bids', icon: '📋',
+    key: 'bids',
+    label: 'Bids',
+    icon: '📋',
     accessKey: 'access_bids',
     perms: [
       { key: 'bids_update_other_status', label: "Update status of other users' bids" },
-      { key: 'bids_delete_any',          label: 'Delete any bid' },
+      { key: 'bids_delete_any', label: 'Delete any bid' },
     ],
   },
   {
-    key: 'jobs', label: 'Jobs', icon: '🏗️',
+    key: 'jobs',
+    label: 'Jobs',
+    icon: '🏗️',
     accessKey: 'access_jobs',
     perms: [
-      { key: 'jobs_add_schedule',          label: 'Add schedule items',                      group: 'Schedule' },
-      { key: 'jobs_edit_schedule',         label: 'Edit schedule items',                     group: 'Schedule' },
-      { key: 'jobs_delete_schedule',       label: 'Delete schedule items',                   group: 'Schedule' },
-      { key: 'jobs_edit',                  label: 'Edit job details (pencil modal)',          group: 'General' },
-      { key: 'jobs_view_work_orders',      label: 'View Work Orders',                        group: 'General' },
-      { key: 'jobs_view_tracking',         label: 'View Tracking',                           group: 'General' },
-      { key: 'jobs_time_clock',            label: 'Add / Edit / Delete Time Clock items',    group: 'Time Clock' },
-      { key: 'jobs_daily_log',             label: 'Daily Log',                               group: 'Daily Log' },
-      { key: 'jobs_edit_other_daily_logs', label: "Edit other users' Daily Logs",            group: 'Daily Log' },
-      { key: 'jobs_tasks',                 label: 'View Tasks',                              group: 'Tasks' },
-      { key: 'jobs_assign_tasks',          label: 'Assign tasks to other users',             group: 'Tasks' },
-      { key: 'jobs_manage_tasks',          label: 'Add / Edit / Delete tasks',              group: 'Tasks' },
-      { key: 'jobs_change_orders',         label: 'View Change Orders',                      group: 'Change Orders' },
-      { key: 'jobs_manage_co',             label: 'Add / Edit / Delete own Change Orders',  group: 'Change Orders' },
-      { key: 'jobs_co_other_users',        label: "Add / Edit / Delete other users' COs",   group: 'Change Orders' },
-      { key: 'jobs_files_other_users',     label: "Edit or Delete other users' Files",      group: 'Files' },
+      { key: 'jobs_add_schedule', label: 'Add schedule items', group: 'Schedule' },
+      { key: 'jobs_edit_schedule', label: 'Edit schedule items', group: 'Schedule' },
+      { key: 'jobs_delete_schedule', label: 'Delete schedule items', group: 'Schedule' },
+      { key: 'jobs_edit', label: 'Edit job details (pencil modal)', group: 'General' },
+      { key: 'jobs_view_work_orders', label: 'View Work Orders', group: 'General' },
+      { key: 'jobs_view_tracking', label: 'View Tracking', group: 'General' },
+      {
+        key: 'jobs_time_clock',
+        label: 'Add / Edit / Delete Time Clock items',
+        group: 'Time Clock',
+      },
+      { key: 'jobs_daily_log', label: 'Daily Log', group: 'Daily Log' },
+      {
+        key: 'jobs_edit_other_daily_logs',
+        label: "Edit other users' Daily Logs",
+        group: 'Daily Log',
+      },
+      { key: 'jobs_tasks', label: 'View Tasks', group: 'Tasks' },
+      { key: 'jobs_assign_tasks', label: 'Assign tasks to other users', group: 'Tasks' },
+      { key: 'jobs_manage_tasks', label: 'Add / Edit / Delete tasks', group: 'Tasks' },
+      { key: 'jobs_change_orders', label: 'View Change Orders', group: 'Change Orders' },
+      {
+        key: 'jobs_manage_co',
+        label: 'Add / Edit / Delete own Change Orders',
+        group: 'Change Orders',
+      },
+      {
+        key: 'jobs_co_other_users',
+        label: "Add / Edit / Delete other users' COs",
+        group: 'Change Orders',
+      },
+      { key: 'jobs_files_other_users', label: "Edit or Delete other users' Files", group: 'Files' },
     ],
   },
   {
-    key: 'equipment', label: 'Equipment', icon: '🚜',
+    key: 'equipment',
+    label: 'Equipment',
+    icon: '🚜',
     accessKey: 'access_equipment',
     perms: [
-      { key: 'equipment_add',    label: 'Add equipment' },
-      { key: 'equipment_edit',   label: 'Edit equipment' },
+      { key: 'equipment_add', label: 'Add equipment' },
+      { key: 'equipment_edit', label: 'Edit equipment' },
       { key: 'equipment_delete', label: 'Delete equipment' },
     ],
   },
   {
-    key: 'finance', label: 'Finance', icon: '💰',
+    key: 'finance',
+    label: 'Finance',
+    icon: '💰',
     accessKey: 'access_finance',
     perms: [
-      { key: 'finance_add_week',         label: 'Add a new week' },
+      { key: 'finance_add_week', label: 'Add a new week' },
       { key: 'finance_edit_collections', label: 'Edit Collections fields' },
-      { key: 'finance_edit_planning',    label: 'Edit Financial Planning fields' },
+      { key: 'finance_edit_planning', label: 'Edit Financial Planning fields' },
     ],
   },
   {
-    key: 'statistics', label: 'Statistics', icon: '📈',
+    key: 'statistics',
+    label: 'Statistics',
+    icon: '📈',
     accessKey: 'access_statistics',
     perms: [
       { key: 'stats_multiple_entry', label: 'Multiple Entry' },
       { key: 'stats_print_multiple', label: 'Print Multiple' },
-      { key: 'stats_comparison',     label: 'Comparison' },
-      { key: 'stats_import_export',  label: 'Import / Export' },
+      { key: 'stats_comparison', label: 'Comparison' },
+      { key: 'stats_import_export', label: 'Import / Export' },
     ],
     adminNote: 'Settings tab is visible to Admins and Super Admins only.',
   },
   {
-    key: 'org_chart', label: 'Org Chart', icon: '🏢',
+    key: 'org_chart',
+    label: 'Org Chart',
+    icon: '🏢',
     accessKey: 'access_org_chart',
-    perms: [
-      { key: 'org_chart_manage', label: 'Add / Edit / Delete charts' },
-    ],
+    perms: [{ key: 'org_chart_manage', label: 'Add / Edit / Delete charts' }],
   },
   {
-    key: 'subs_vendors', label: 'Subs & Vendors', icon: '🔧',
+    key: 'subs_vendors',
+    label: 'Subs & Vendors',
+    icon: '🔧',
     accessKey: 'access_subs_vendors',
-    perms: [
-      { key: 'subs_vendors_manage', label: 'Add / Edit / Delete subs or vendors' },
-    ],
+    perms: [{ key: 'subs_vendors_manage', label: 'Add / Edit / Delete subs or vendors' }],
   },
   {
-    key: 'training', label: 'Training', icon: '🎓',
+    key: 'training',
+    label: 'Training',
+    icon: '🎓',
     accessKey: 'access_training',
     perms: [],
     adminNote: 'Settings is visible to Admins and Super Admins only.',
   },
   {
-    key: 'hr', label: 'HR', icon: '👥',
+    key: 'hr',
+    label: 'HR',
+    icon: '👥',
     accessKey: 'access_hr',
     perms: [
       { key: 'hr_add_edit_employee', label: 'Add / Edit employees' },
-      { key: 'hr_delete_employee',   label: 'Delete employees' },
+      { key: 'hr_delete_employee', label: 'Delete employees' },
     ],
     adminNote: 'Access & Roles management is Admin / Super Admin only.',
   },
   {
-    key: 'accounting', label: 'Accounting', icon: '🧾',
+    key: 'accounting',
+    label: 'Accounting',
+    icon: '🧾',
     accessKey: 'access_accounting',
     perms: [],
     comingSoon: true,
@@ -154,56 +196,101 @@ const MODULES = [
 
 const DEFAULT_PERMS = {
   // Legacy columns (kept for backward compat)
-  can_create_stats: true, can_share_stats: false, can_make_stats_public: false,
-  can_view_financials: true, can_view_reports: false,
-  can_create_jobs: true, can_edit_jobs: true, can_delete_jobs: false,
-  can_create_bids: true, can_edit_bids: true,
-  access_tracker: true, access_collections: true, access_master_rates: false, access_admin: false,
+  can_create_stats: true,
+  can_share_stats: false,
+  can_make_stats_public: false,
+  can_view_financials: true,
+  can_view_reports: false,
+  can_create_jobs: true,
+  can_edit_jobs: true,
+  can_delete_jobs: false,
+  can_create_bids: true,
+  can_edit_bids: true,
+  access_tracker: true,
+  access_collections: true,
+  access_master_rates: false,
+  access_admin: false,
   // Module access toggles
-  access_contacts: true, access_clients: true, access_design: true, access_bids: true,
-  access_jobs: true, access_equipment: true, access_finance: true, access_statistics: true,
-  access_org_chart: true, access_subs_vendors: true, access_training: true,
-  access_hr: true, access_accounting: true,
+  access_contacts: true,
+  access_clients: true,
+  access_design: true,
+  access_bids: true,
+  access_jobs: true,
+  access_equipment: true,
+  access_finance: true,
+  access_statistics: true,
+  access_org_chart: true,
+  access_subs_vendors: true,
+  access_training: true,
+  access_hr: true,
+  access_accounting: true,
   // Contacts
-  contacts_add: true, contacts_edit: true,
+  contacts_add: true,
+  contacts_edit: true,
   // Opportunities (internally still keyed as 'clients' in user_permissions)
-  clients_add: true, clients_edit: true, clients_add_estimate: true,
-  clients_edit_other_estimates: false, clients_create_bids: true,
-  clients_access_edit_rates: false,  // off by default — only admins/estimators get the rate-edit toggle
+  clients_add: true,
+  clients_edit: true,
+  clients_add_estimate: true,
+  clients_edit_other_estimates: false,
+  clients_create_bids: true,
+  clients_access_edit_rates: false, // off by default — only admins/estimators get the rate-edit toggle
   // Design
-  design_add_project: true, design_edit_other: false,
+  design_add_project: true,
+  design_edit_other: false,
   // Bids
-  bids_update_other_status: false, bids_delete_any: false,
+  bids_update_other_status: false,
+  bids_delete_any: false,
   // Jobs
-  jobs_add_schedule: true, jobs_edit_schedule: true, jobs_delete_schedule: false,
-  jobs_edit: true, jobs_view_work_orders: true, jobs_view_tracking: true,
-  jobs_time_clock: true, jobs_daily_log: true, jobs_edit_other_daily_logs: false,
-  jobs_tasks: true, jobs_assign_tasks: false, jobs_manage_tasks: true,
-  jobs_change_orders: true, jobs_manage_co: true, jobs_co_other_users: false,
+  jobs_add_schedule: true,
+  jobs_edit_schedule: true,
+  jobs_delete_schedule: false,
+  jobs_edit: true,
+  jobs_view_work_orders: true,
+  jobs_view_tracking: true,
+  jobs_time_clock: true,
+  jobs_daily_log: true,
+  jobs_edit_other_daily_logs: false,
+  jobs_tasks: true,
+  jobs_assign_tasks: false,
+  jobs_manage_tasks: true,
+  jobs_change_orders: true,
+  jobs_manage_co: true,
+  jobs_co_other_users: false,
   jobs_files_other_users: false,
   // Equipment
-  equipment_add: true, equipment_edit: true, equipment_delete: false,
+  equipment_add: true,
+  equipment_edit: true,
+  equipment_delete: false,
   // Finance
-  finance_add_week: true, finance_edit_collections: true, finance_edit_planning: true,
+  finance_add_week: true,
+  finance_edit_collections: true,
+  finance_edit_planning: true,
   // Statistics
-  stats_multiple_entry: true, stats_print_multiple: true, stats_comparison: true,
+  stats_multiple_entry: true,
+  stats_print_multiple: true,
+  stats_comparison: true,
   stats_import_export: false,
   // Org Chart
   org_chart_manage: true,
   // Subs & Vendors
   subs_vendors_manage: true,
   // HR
-  hr_add_edit_employee: true, hr_delete_employee: false,
+  hr_add_edit_employee: true,
+  hr_delete_employee: false,
 }
 const DOC_CATEGORIES = [
   { key: 'records', label: 'Personnel Records', icon: '📁' },
-  { key: 'id',      label: 'ID Documents',      icon: '🪪' },
-  { key: 'other',   label: 'Other',             icon: '📎' },
+  { key: 'id', label: 'ID Documents', icon: '🪪' },
+  { key: 'other', label: 'Other', icon: '📎' },
 ]
 
 function formatDate(d) {
   if (!d) return '—'
-  return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+  return new Date(d).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
 }
 
 function isExpired(date) {
@@ -226,66 +313,72 @@ export default function EmployeeDetail() {
   const navigate = useNavigate()
   const { user } = useAuth()
 
-  const [employee,      setEmployee]      = useState(null)
+  const [employee, setEmployee] = useState(null)
   const [linkedProfile, setLinkedProfile] = useState(null)
   // Sam's per-user greeting signoff (e.g. "Go Rams!"). Stored on profiles.
   const [greetingTagline, setGreetingTagline] = useState('')
-  const [docs,          setDocs]          = useState([])
-  const [certs,         setCerts]         = useState([])
-  const [training,      setTraining]      = useState([])  // lms_assignments with steps
-  const [reviews,       setReviews]       = useState([])
-  const [reviewForms,   setReviewForms]   = useState([])
-  const [loading,       setLoading]       = useState(true)
-  const [tab,           setTab]           = useState('profile')
+  const [docs, setDocs] = useState([])
+  const [certs, setCerts] = useState([])
+  const [training, setTraining] = useState([]) // lms_assignments with steps
+  const [reviews, setReviews] = useState([])
+  const [reviewForms, setReviewForms] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [tab, setTab] = useState('profile')
 
   // Profile edit state
-  const [editing,   setEditing]   = useState(false)
-  const [draft,     setDraft]     = useState({})
-  const [saving,    setSaving]    = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState({})
+  const [saving, setSaving] = useState(false)
 
   // Doc state
-  const [showDocAdd,   setShowDocAdd]   = useState(false)
-  const [docCategory,  setDocCategory]  = useState('records')
-  const [docName,      setDocName]      = useState('')
-  const [docUrl,       setDocUrl]       = useState('')
-  const [docFile,      setDocFile]      = useState(null)
-  const [docSaving,    setDocSaving]    = useState(false)
+  const [showDocAdd, setShowDocAdd] = useState(false)
+  const [docCategory, setDocCategory] = useState('records')
+  const [docName, setDocName] = useState('')
+  const [docUrl, setDocUrl] = useState('')
+  const [docFile, setDocFile] = useState(null)
+  const [docSaving, setDocSaving] = useState(false)
   const docFileRef = useRef()
 
   // Cert state
-  const [showCertAdd, setShowCertAdd]  = useState(false)
-  const [certDraft,   setCertDraft]    = useState({ cert_name: '', cert_number: '', issued_date: '', expiry_date: '', file_url: '' })
-  const [certSaving,  setCertSaving]   = useState(false)
+  const [showCertAdd, setShowCertAdd] = useState(false)
+  const [certDraft, setCertDraft] = useState({
+    cert_name: '',
+    cert_number: '',
+    issued_date: '',
+    expiry_date: '',
+    file_url: '',
+  })
+  const [certSaving, setCertSaving] = useState(false)
 
   // Review state
-  const [showReview,  setShowReview]   = useState(false)
+  const [showReview, setShowReview] = useState(false)
 
   // Positions (for Job Title dropdown)
-  const [positions,   setPositions]    = useState([])
+  const [positions, setPositions] = useState([])
 
   // User tab state
-  const [userRole,         setUserRole]         = useState('user')
-  const [savingRole,       setSavingRole]       = useState(false)
-  const [roleMsg,          setRoleMsg]          = useState('')
-  const [resetSending,     setResetSending]     = useState(false)
-  const [resetMsg,         setResetMsg]         = useState('')
-  const [smsSending,       setSmsSending]       = useState(false)
+  const [userRole, setUserRole] = useState('user')
+  const [savingRole, setSavingRole] = useState(false)
+  const [roleMsg, setRoleMsg] = useState('')
+  const [resetSending, setResetSending] = useState(false)
+  const [resetMsg, setResetMsg] = useState('')
+  const [smsSending, setSmsSending] = useState(false)
   const [resetTextSending, setResetTextSending] = useState(false)
-  const [smsMsg,           setSmsMsg]           = useState('')
+  const [smsMsg, setSmsMsg] = useState('')
 
   // Create system account state (used when no linkedProfile)
-  const [createEmail,    setCreateEmail]    = useState('')
+  const [createEmail, setCreateEmail] = useState('')
   const [createPassword, setCreatePassword] = useState(() => generatePassword())
-  const [createRole,     setCreateRole]     = useState('user')
-  const [showCreatePw,   setShowCreatePw]   = useState(false)
-  const [creating,       setCreating]       = useState(false)
-  const [createError,    setCreateError]    = useState('')
+  const [createRole, setCreateRole] = useState('user')
+  const [showCreatePw, setShowCreatePw] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState('')
 
   // Permissions tab state
-  const [perms,              setPerms]              = useState(DEFAULT_PERMS)
-  const [loadingPerms,       setLoadingPerms]       = useState(true)
-  const [savingPerms,        setSavingPerms]        = useState(false)
-  const [permsMsg,           setPermsMsg]           = useState('')
+  const [perms, setPerms] = useState(DEFAULT_PERMS)
+  const [loadingPerms, setLoadingPerms] = useState(true)
+  const [savingPerms, setSavingPerms] = useState(false)
+  const [permsMsg, setPermsMsg] = useState('')
   const [currentUserIsAdmin, setCurrentUserIsAdmin] = useState(false)
 
   // Avatar
@@ -301,7 +394,7 @@ export default function EmployeeDetail() {
 
   function samMessage(firstName, email, password, isReset = false) {
     const greeting = firstName ? `Hi ${firstName}, ` : 'Hi there, '
-    const action   = isReset ? 'your password has been reset' : 'here are your login credentials'
+    const action = isReset ? 'your password has been reset' : 'here are your login credentials'
     return (
       `${greeting}this is Sam, the AI assistant from the Picture Build System - ${action}.\n\n` +
       `Email: ${email}\n` +
@@ -314,8 +407,14 @@ export default function EmployeeDetail() {
   // ── Create a new system account for an employee who doesn't have one ────────
   async function createSystemAccount() {
     const email = createEmail.trim().toLowerCase()
-    if (!email) { setCreateError('Email is required.'); return }
-    if (!createPassword) { setCreateError('Password is required.'); return }
+    if (!email) {
+      setCreateError('Email is required.')
+      return
+    }
+    if (!createPassword) {
+      setCreateError('Password is required.')
+      return
+    }
 
     setCreating(true)
     setCreateError('')
@@ -330,11 +429,17 @@ export default function EmployeeDetail() {
       const { data, error: signUpErr } = await tempClient.auth.signUp({
         email,
         password: createPassword,
-        options:  { data: { full_name: `${employee.first_name} ${employee.last_name}` }, emailRedirectTo: null },
+        options: {
+          data: { full_name: `${employee.first_name} ${employee.last_name}` },
+          emailRedirectTo: null,
+        },
       })
 
       if (signUpErr) {
-        if (signUpErr.message?.includes('already registered') || signUpErr.message?.includes('already been registered')) {
+        if (
+          signUpErr.message?.includes('already registered') ||
+          signUpErr.message?.includes('already been registered')
+        ) {
           // Account exists — find and link the existing profile
           const { data: existingProf } = await supabase
             .from('profiles')
@@ -342,20 +447,29 @@ export default function EmployeeDetail() {
             .eq('email', email)
             .maybeSingle()
           if (existingProf) {
-            await supabase.from('employees').update({ user_id: existingProf.id }).eq('id', employee.id)
+            await supabase
+              .from('employees')
+              .update({ user_id: existingProf.id })
+              .eq('id', employee.id)
             setLinkedProfile(existingProf)
             setUserRole(existingProf.role || 'user')
             setCreating(false)
             return
           }
-          setCreateError('That email already has an account but no matching profile was found. Contact a super admin.')
+          setCreateError(
+            'That email already has an account but no matching profile was found. Contact a super admin.'
+          )
         } else {
           setCreateError(signUpErr.message || 'Failed to create account.')
         }
         setCreating(false)
         return
       }
-      if (!data?.user) { setCreateError('Account creation returned no data.'); setCreating(false); return }
+      if (!data?.user) {
+        setCreateError('Account creation returned no data.')
+        setCreating(false)
+        return
+      }
 
       const newUserId = data.user.id
 
@@ -363,20 +477,30 @@ export default function EmployeeDetail() {
       await new Promise(r => setTimeout(r, 1200))
 
       // Upsert profile with correct name/role and store temp password
-      await supabase.from('profiles').upsert({
-        id:            newUserId,
-        email,
-        full_name:     `${employee.first_name} ${employee.last_name}`,
-        role:          createRole,
-        temp_password: createPassword,
-      }, { onConflict: 'id' })
+      await supabase.from('profiles').upsert(
+        {
+          id: newUserId,
+          email,
+          full_name: `${employee.first_name} ${employee.last_name}`,
+          role: createRole,
+          temp_password: createPassword,
+        },
+        { onConflict: 'id' }
+      )
 
       // Link employee row to the new auth user
       await supabase.from('employees').update({ user_id: newUserId }).eq('id', employee.id)
 
       // Reload the linked profile so the tab switches to the full account view
-      const { data: prof } = await supabase.from('profiles').select('*').eq('id', newUserId).single()
-      if (prof) { setLinkedProfile(prof); setUserRole(prof.role || 'user') }
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', newUserId)
+        .single()
+      if (prof) {
+        setLinkedProfile(prof)
+        setUserRole(prof.role || 'user')
+      }
     } catch (e) {
       setCreateError(e.message || 'Unexpected error.')
     }
@@ -386,8 +510,12 @@ export default function EmployeeDetail() {
   // ── Link an existing system account to this employee by email ────────────────
   async function linkExistingAccount() {
     const email = createEmail.trim().toLowerCase()
-    if (!email) { setCreateError('Enter the email address of the existing account.'); return }
-    setCreating(true); setCreateError('')
+    if (!email) {
+      setCreateError('Enter the email address of the existing account.')
+      return
+    }
+    setCreating(true)
+    setCreateError('')
     const { data: existingProf } = await supabase
       .from('profiles')
       .select('*')
@@ -406,7 +534,8 @@ export default function EmployeeDetail() {
 
   async function sendPasswordReset() {
     if (!linkedProfile) return
-    setResetSending(true); setResetMsg('')
+    setResetSending(true)
+    setResetMsg('')
     const emailToReset = linkedProfile.email || employee?.email || ''
     const { error } = await supabase.auth.resetPasswordForEmail(emailToReset, {
       redirectTo: window.location.origin + '/reset-password',
@@ -425,13 +554,27 @@ export default function EmployeeDetail() {
   async function sendPasswordViaSMS() {
     if (!linkedProfile) return
     const phone = formatPhone(employee?.cell_phone || linkedProfile.phone_cell || '')
-    if (!phone || phone === '+') { setSmsMsg('error:No cell phone number on file for this employee.'); return }
-    if (!validateSmsPhone(phone)) { setSmsMsg('error:Phone number "' + (employee?.cell_phone || '') + '" is not a valid 10-digit US number. Please update the phone number in the Profile tab.'); return }
-    if (!linkedProfile.temp_password) { setSmsMsg('error:No stored password found. Use "Reset & Text New Password" instead.'); return }
-    setSmsSending(true); setSmsMsg('')
+    if (!phone || phone === '+') {
+      setSmsMsg('error:No cell phone number on file for this employee.')
+      return
+    }
+    if (!validateSmsPhone(phone)) {
+      setSmsMsg(
+        'error:Phone number "' +
+          (employee?.cell_phone || '') +
+          '" is not a valid 10-digit US number. Please update the phone number in the Profile tab.'
+      )
+      return
+    }
+    if (!linkedProfile.temp_password) {
+      setSmsMsg('error:No stored password found. Use "Reset & Text New Password" instead.')
+      return
+    }
+    setSmsSending(true)
+    setSmsMsg('')
     const firstName = employee?.first_name || (linkedProfile.full_name || '').split(' ')[0]
     const { data: smsData, error } = await sendSMS({
-      to:      phone,
+      to: phone,
       message: samMessage(firstName, linkedProfile.email, linkedProfile.temp_password),
     })
     if (error) {
@@ -446,39 +589,73 @@ export default function EmployeeDetail() {
   async function resetAndTextPassword() {
     if (!linkedProfile) return
     const phone = formatPhone(employee?.cell_phone || linkedProfile.phone_cell || '')
-    if (!phone || phone === '+') { setSmsMsg('error:No cell phone number on file for this employee.'); return }
-    if (!validateSmsPhone(phone)) { setSmsMsg('error:Phone number "' + (employee?.cell_phone || '') + '" is not a valid 10-digit US number. Please update the phone number in the Profile tab.'); return }
-    if (!confirm(`Generate a new password for ${employee?.first_name || linkedProfile.full_name} and text it to ${phone}?`)) return
-    setResetTextSending(true); setSmsMsg('')
+    if (!phone || phone === '+') {
+      setSmsMsg('error:No cell phone number on file for this employee.')
+      return
+    }
+    if (!validateSmsPhone(phone)) {
+      setSmsMsg(
+        'error:Phone number "' +
+          (employee?.cell_phone || '') +
+          '" is not a valid 10-digit US number. Please update the phone number in the Profile tab.'
+      )
+      return
+    }
+    if (
+      !confirm(
+        `Generate a new password for ${employee?.first_name || linkedProfile.full_name} and text it to ${phone}?`
+      )
+    )
+      return
+    setResetTextSending(true)
+    setSmsMsg('')
     const newPw = generatePassword()
     await supabase.from('profiles').update({ temp_password: newPw }).eq('id', linkedProfile.id)
     try {
-      const { data: resetData, error: resetErr } = await supabase.functions.invoke('reset-user-password', {
-        body: { userId: linkedProfile.id, newPassword: newPw },
-      })
-      if (resetErr || resetData?.error) console.warn('Edge Function unavailable:', resetData?.error || resetErr?.message)
+      const { data: resetData, error: resetErr } = await supabase.functions.invoke(
+        'reset-user-password',
+        {
+          body: { userId: linkedProfile.id, newPassword: newPw },
+        }
+      )
+      if (resetErr || resetData?.error)
+        console.warn('Edge Function unavailable:', resetData?.error || resetErr?.message)
     } catch (e) {
       console.warn('reset-user-password Edge Function not available:', e)
     }
     const firstName = employee?.first_name || (linkedProfile.full_name || '').split(' ')[0]
     const { data: smsData2, error: smsErr } = await sendSMS({
-      to:      phone,
+      to: phone,
       message: samMessage(firstName, linkedProfile.email, newPw, true),
     })
-    setSmsMsg(smsErr
-      ? 'error:SMS failed — ' + smsErr.message + (smsData2?.raw?.details ? ' — ' + smsData2.raw.details : '') + ' (sent to ' + phone + ')'
-      : 'ok:New password texted to ' + phone + '. If their login does not work, also send a password reset email.'
+    setSmsMsg(
+      smsErr
+        ? 'error:SMS failed — ' +
+            smsErr.message +
+            (smsData2?.raw?.details ? ' — ' + smsData2.raw.details : '') +
+            ' (sent to ' +
+            phone +
+            ')'
+        : 'ok:New password texted to ' +
+            phone +
+            '. If their login does not work, also send a password reset email.'
     )
     setResetTextSending(false)
   }
 
-  useEffect(() => { fetchAll() }, [id])
+  useEffect(() => {
+    fetchAll()
+  }, [id])
 
   // Check whether the currently signed-in user is an admin/super_admin
   // (determines whether the Permissions tab is visible at all)
   useEffect(() => {
     if (!user?.id) return
-    supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+    supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle()
       .then(({ data }) => {
         setCurrentUserIsAdmin(data?.role === 'admin' || data?.role === 'super_admin')
       })
@@ -496,10 +673,25 @@ export default function EmployeeDetail() {
       { data: posData },
     ] = await Promise.all([
       supabase.from('employees').select('*').eq('id', id).single(),
-      supabase.from('employee_documents').select('*').eq('employee_id', id).order('created_at', { ascending: false }),
-      supabase.from('employee_certifications').select('*').eq('employee_id', id).order('expiry_date'),
-      supabase.from('lms_assignments').select('*, lms_courses(title, category), lms_step_completions(id)').eq('employee_id', id),
-      supabase.from('hr_reviews').select('*, hr_review_forms(title)').eq('employee_id', id).order('review_date', { ascending: false }),
+      supabase
+        .from('employee_documents')
+        .select('*')
+        .eq('employee_id', id)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('employee_certifications')
+        .select('*')
+        .eq('employee_id', id)
+        .order('expiry_date'),
+      supabase
+        .from('lms_assignments')
+        .select('*, lms_courses(title, category), lms_step_completions(id)')
+        .eq('employee_id', id),
+      supabase
+        .from('hr_reviews')
+        .select('*, hr_review_forms(title)')
+        .eq('employee_id', id)
+        .order('review_date', { ascending: false }),
       supabase.from('hr_review_forms').select('*').order('title'),
       supabase.from('positions').select('id, title').order('title'),
     ])
@@ -516,11 +708,19 @@ export default function EmployeeDetail() {
     // Fetch linked profile — by user_id first (definitive), then email as fallback
     let prof = null
     if (emp?.user_id) {
-      const { data } = await supabase.from('profiles').select('*').eq('id', emp.user_id).maybeSingle()
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', emp.user_id)
+        .maybeSingle()
       prof = data
     }
     if (!prof && emp?.email) {
-      const { data } = await supabase.from('profiles').select('*').eq('email', emp.email.toLowerCase()).maybeSingle()
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('email', emp.email.toLowerCase())
+        .maybeSingle()
       prof = data
       // If found by email, persist the user_id link so future loads use the fast path
       if (prof) {
@@ -532,7 +732,10 @@ export default function EmployeeDetail() {
       setUserRole(prof.role || 'user')
       setGreetingTagline(prof.greeting_tagline || '')
       const { data: permsData } = await supabase
-        .from('user_permissions').select('*').eq('user_id', prof.id).single()
+        .from('user_permissions')
+        .select('*')
+        .eq('user_id', prof.id)
+        .single()
       if (permsData) setPerms(prev => ({ ...prev, ...permsData }))
     }
 
@@ -543,11 +746,18 @@ export default function EmployeeDetail() {
   // ── Avatar upload ─────────────────────────────────────────────────────────
   async function handleAvatarUpload(file) {
     if (!file) return
-    const ext  = file.name.split('.').pop()
+    const ext = file.name.split('.').pop()
     const path = `avatars/${id}.${ext}`
-    const { error: upErr } = await supabase.storage.from('employee-files').upload(path, file, { upsert: true })
-    if (upErr) { alert('Upload failed: ' + upErr.message); return }
-    const { data: { publicUrl } } = supabase.storage.from('employee-files').getPublicUrl(path)
+    const { error: upErr } = await supabase.storage
+      .from('employee-files')
+      .upload(path, file, { upsert: true })
+    if (upErr) {
+      alert('Upload failed: ' + upErr.message)
+      return
+    }
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from('employee-files').getPublicUrl(path)
     await supabase.from('employees').update({ avatar_url: publicUrl }).eq('id', id)
     fetchAll()
   }
@@ -560,45 +770,55 @@ export default function EmployeeDetail() {
     // employee has a linked auth account, we'll need to propagate the new
     // address to auth.users + profiles so password reset uses the new email.
     const oldEmail = (employee?.email || '').trim().toLowerCase()
-    const newEmail = (draft.email   || '').trim().toLowerCase()
+    const newEmail = (draft.email || '').trim().toLowerCase()
     const emailChanged = newEmail && newEmail !== oldEmail
 
-    const { error: err } = await supabase.from('employees').update({
-      ...draft,
-      pay_rate:   draft.pay_rate   ? parseFloat(draft.pay_rate)   : null,
-      start_date: draft.start_date || null,
-      updated_at: new Date().toISOString(),
-    }).eq('id', id)
-    if (err) { setSaving(false); alert(err.message); return }
+    const { error: err } = await supabase
+      .from('employees')
+      .update({
+        ...draft,
+        pay_rate: draft.pay_rate ? parseFloat(draft.pay_rate) : null,
+        start_date: draft.start_date || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+    if (err) {
+      setSaving(false)
+      alert(err.message)
+      return
+    }
 
     // Sync the email into auth.users + profiles via the admin RPC so
     // password reset, username login, and Supabase Auth all use the new
     // address (employees.email alone isn't enough — Supabase Auth has its
     // own copy of the email and that's what receives the reset link).
     if (emailChanged && linkedProfile?.id) {
-      const { data: syncResult, error: syncErr } = await supabase.rpc(
-        'admin_sync_employee_email',
-        { p_employee_id: id, p_new_email: newEmail }
-      )
+      const { data: syncResult, error: syncErr } = await supabase.rpc('admin_sync_employee_email', {
+        p_employee_id: id,
+        p_new_email: newEmail,
+      })
       const status = syncErr ? syncErr.message : syncResult
       if (status !== 'ok') {
-        const friendly = ({
-          forbidden:            'You need admin access to change another user\'s login email.',
-          invalid_email:        'The new email is empty or invalid.',
-          no_linked_account:    'No auth account is linked to this employee — login email not changed.',
-          email_already_in_use: 'That email is already used by another account.',
-        })[status] || `Login email sync failed: ${status}`
+        const friendly =
+          {
+            forbidden: "You need admin access to change another user's login email.",
+            invalid_email: 'The new email is empty or invalid.',
+            no_linked_account:
+              'No auth account is linked to this employee — login email not changed.',
+            email_already_in_use: 'That email is already used by another account.',
+          }[status] || `Login email sync failed: ${status}`
         alert(
           'Profile saved, but the LOGIN email could not be updated:\n\n' +
-          friendly +
-          '\n\nPassword reset will continue to use the previous address until this is resolved.'
+            friendly +
+            '\n\nPassword reset will continue to use the previous address until this is resolved.'
         )
       }
     }
 
     // Sync preferred_language to the linked auth profile so the UI updates
     if (linkedProfile?.id && draft.preferred_language) {
-      await supabase.from('profiles')
+      await supabase
+        .from('profiles')
         .update({ preferred_language: draft.preferred_language })
         .eq('id', linkedProfile.id)
     }
@@ -606,7 +826,8 @@ export default function EmployeeDetail() {
     // Sync the Sam greeting tagline. Empty string clears it (NULL in DB).
     if (linkedProfile?.id) {
       const tail = (greetingTagline || '').trim()
-      await supabase.from('profiles')
+      await supabase
+        .from('profiles')
         .update({ greeting_tagline: tail || null })
         .eq('id', linkedProfile.id)
     }
@@ -640,20 +861,31 @@ export default function EmployeeDetail() {
       const path = `docs/${id}/${Date.now()}_${docFile.name}`
       const { error: upErr } = await supabase.storage.from('employee-files').upload(path, docFile)
       if (!upErr) {
-        const { data: { publicUrl } } = supabase.storage.from('employee-files').getPublicUrl(path)
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from('employee-files').getPublicUrl(path)
         url = publicUrl
       }
     }
 
-    if (!url) { alert('Provide a file or URL'); setDocSaving(false); return }
+    if (!url) {
+      alert('Provide a file or URL')
+      setDocSaving(false)
+      return
+    }
 
     await supabase.from('employee_documents').insert({
-      employee_id: id, doc_name: docName.trim(), doc_url: url,
-      category: docCategory, file_type: docFile?.type || 'link',
+      employee_id: id,
+      doc_name: docName.trim(),
+      doc_url: url,
+      category: docCategory,
+      file_type: docFile?.type || 'link',
     })
     setDocSaving(false)
     setShowDocAdd(false)
-    setDocName(''); setDocUrl(''); setDocFile(null)
+    setDocName('')
+    setDocUrl('')
+    setDocFile(null)
     fetchAll()
   }
 
@@ -687,22 +919,30 @@ export default function EmployeeDetail() {
 
   const set = (k, v) => setDraft(prev => ({ ...prev, [k]: v }))
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-full text-gray-400">Loading…</div>
-  )
-  if (!employee) return (
-    <div className="flex items-center justify-center h-full text-gray-400">Employee not found</div>
-  )
+  if (loading)
+    return <div className="flex items-center justify-center h-full text-gray-400">Loading…</div>
+  if (!employee)
+    return (
+      <div className="flex items-center justify-center h-full text-gray-400">
+        Employee not found
+      </div>
+    )
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="h-full flex flex-col">
-
       {/* ── Top bar ── */}
       <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-3 flex-shrink-0">
-        <button onClick={() => navigate('/hr')} className="text-sm text-gray-500 hover:text-gray-700">← HR</button>
+        <button
+          onClick={() => navigate('/hr')}
+          className="text-sm text-gray-500 hover:text-gray-700"
+        >
+          ← HR
+        </button>
         <span className="text-gray-300">/</span>
-        <span className="text-sm font-medium text-gray-800">{employee.first_name} {employee.last_name}</span>
+        <span className="text-sm font-medium text-gray-800">
+          {employee.first_name} {employee.last_name}
+        </span>
       </div>
 
       {/* ── Hero section ── */}
@@ -717,37 +957,53 @@ export default function EmployeeDetail() {
               <img src={employee.avatar_url} alt="" className="w-full h-full object-cover" />
             ) : (
               <span className="text-3xl font-bold text-green-700">
-                {employee.first_name?.[0]}{employee.last_name?.[0]}
+                {employee.first_name?.[0]}
+                {employee.last_name?.[0]}
               </span>
             )}
             <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
               <span className="text-white text-xs font-medium">📷 Change</span>
             </div>
           </div>
-          <input ref={avatarInputRef} type="file" accept="image/*" className="sr-only"
-            onChange={e => handleAvatarUpload(e.target.files?.[0])} />
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            onChange={e => handleAvatarUpload(e.target.files?.[0])}
+          />
         </div>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-2xl font-bold text-gray-900">{employee.first_name} {employee.last_name}</h1>
-            <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${employee.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {employee.first_name} {employee.last_name}
+            </h1>
+            <span
+              className={`text-xs font-medium px-2.5 py-1 rounded-full ${employee.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
+            >
               {employee.status === 'active' ? 'Active' : 'Archived'}
             </span>
           </div>
           <p className="text-gray-600">{employee.job_title || '—'}</p>
           {employee.department && <p className="text-sm text-gray-400">{employee.department}</p>}
-          {employee.start_date && <p className="text-sm text-gray-400 mt-1">📅 Since {formatDate(employee.start_date)}</p>}
+          {employee.start_date && (
+            <p className="text-sm text-gray-400 mt-1">📅 Since {formatDate(employee.start_date)}</p>
+          )}
         </div>
 
         {/* Archive + Delete buttons */}
         <div className="flex gap-2 flex-shrink-0">
-          <button onClick={toggleArchive}
-            className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+          <button
+            onClick={toggleArchive}
+            className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+          >
             {employee.status === 'active' ? '📦 Archive' : '✅ Restore'}
           </button>
-          <button onClick={handleDelete}
-            className="px-4 py-2 border border-red-200 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">
+          <button
+            onClick={handleDelete}
+            className="px-4 py-2 border border-red-200 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+          >
             🗑️ Delete
           </button>
         </div>
@@ -756,20 +1012,22 @@ export default function EmployeeDetail() {
       {/* ── Tab bar ── */}
       <div className="bg-white border-b border-gray-200 px-6 flex gap-0 flex-shrink-0 overflow-x-auto">
         {[
-          { key: 'profile',      label: 'Profile',       icon: '👤' },
-          ...(currentUserIsAdmin ? [{ key: 'user',        label: 'Access and Roles', icon: '🛡️' }] : []),
-          ...(currentUserIsAdmin ? [{ key: 'permissions', label: 'Permissions',      icon: '🔑' }] : []),
-          { key: 'docs',         label: `Documents (${docs.length})`,       icon: '📁' },
-          { key: 'certs',        label: `Certifications (${certs.length})`, icon: '🏅' },
-          { key: 'training',     label: `Training (${training.length})`,    icon: '🎓' },
-          { key: 'reviews',      label: `Reviews (${reviews.length})`,      icon: '⭐' },
-          { key: 'testing',      label: 'Testing',                          icon: '🔬' },
+          { key: 'profile', label: 'Profile', icon: '👤' },
+          ...(currentUserIsAdmin ? [{ key: 'user', label: 'Access and Roles', icon: '🛡️' }] : []),
+          ...(currentUserIsAdmin ? [{ key: 'permissions', label: 'Permissions', icon: '🔑' }] : []),
+          { key: 'docs', label: `Documents (${docs.length})`, icon: '📁' },
+          { key: 'certs', label: `Certifications (${certs.length})`, icon: '🏅' },
+          { key: 'training', label: `Training (${training.length})`, icon: '🎓' },
+          { key: 'reviews', label: `Reviews (${reviews.length})`, icon: '⭐' },
+          { key: 'testing', label: 'Testing', icon: '🔬' },
         ].map(t => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
             className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-              tab === t.key ? 'border-green-700 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'
+              tab === t.key
+                ? 'border-green-700 text-green-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
             {t.icon} {t.label}
@@ -779,7 +1037,6 @@ export default function EmployeeDetail() {
 
       {/* ── Tab content ── */}
       <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
-
         {/* ── PROFILE ── */}
         {tab === 'profile' && (
           <div className="max-w-6xl space-y-3">
@@ -787,15 +1044,29 @@ export default function EmployeeDetail() {
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-gray-800 text-sm">Employee Info</h3>
                 {!editing ? (
-                  <button onClick={() => setEditing(true)} className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50">
+                  <button
+                    onClick={() => setEditing(true)}
+                    className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50"
+                  >
                     ✏️ Edit
                   </button>
                 ) : (
                   <div className="flex gap-2">
-                    <button onClick={() => { setEditing(false); setDraft(employee); setGreetingTagline(linkedProfile?.greeting_tagline || '') }} className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50">
+                    <button
+                      onClick={() => {
+                        setEditing(false)
+                        setDraft(employee)
+                        setGreetingTagline(linkedProfile?.greeting_tagline || '')
+                      }}
+                      className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50"
+                    >
                       Cancel
                     </button>
-                    <button onClick={handleProfileSave} disabled={saving} className="px-3 py-1.5 bg-green-700 text-white rounded-lg text-xs font-semibold hover:bg-green-800 disabled:opacity-50">
+                    <button
+                      onClick={handleProfileSave}
+                      disabled={saving}
+                      className="px-3 py-1.5 bg-green-700 text-white rounded-lg text-xs font-semibold hover:bg-green-800 disabled:opacity-50"
+                    >
                       {saving ? 'Saving…' : '💾 Save'}
                     </button>
                   </div>
@@ -805,35 +1076,75 @@ export default function EmployeeDetail() {
               <div className="space-y-3">
                 {/* Personal */}
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Personal</p>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+                    Personal
+                  </p>
                   <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
                     {[
-                      ['first_name', 'First Name'], ['last_name', 'Last Name'],
-                      ['email', 'Email'], ['phone', 'Phone (Home/Work)'], ['cell_phone', 'Cell Phone'],
+                      ['first_name', 'First Name'],
+                      ['last_name', 'Last Name'],
+                      ['email', 'Email'],
+                      ['phone', 'Phone (Home/Work)'],
+                      ['cell_phone', 'Cell Phone'],
                     ].map(([key, label]) => (
-                      <Field key={key} label={label} value={draft[key]} editing={editing} onChange={v => set(key, v)} />
+                      <Field
+                        key={key}
+                        label={label}
+                        value={draft[key]}
+                        editing={editing}
+                        onChange={v => set(key, v)}
+                      />
                     ))}
                     <div className="col-span-2">
-                      <Field label="Nickname (used on crew schedule labels)" value={draft.nickname} editing={editing} onChange={v => set('nickname', v)} />
+                      <Field
+                        label="Nickname (used on crew schedule labels)"
+                        value={draft.nickname}
+                        editing={editing}
+                        onChange={v => set('nickname', v)}
+                      />
                     </div>
                     <div className="col-span-2">
-                      <Field label="Address" value={draft.address} editing={editing} onChange={v => set('address', v)} />
+                      <Field
+                        label="Address"
+                        value={draft.address}
+                        editing={editing}
+                        onChange={v => set('address', v)}
+                      />
                     </div>
-                    <Field label="City" value={draft.city} editing={editing} onChange={v => set('city', v)} />
+                    <Field
+                      label="City"
+                      value={draft.city}
+                      editing={editing}
+                      onChange={v => set('city', v)}
+                    />
                     <div className="grid grid-cols-2 gap-2">
-                      <Field label="State" value={draft.state} editing={editing} onChange={v => set('state', v)} />
-                      <Field label="Zip" value={draft.zip} editing={editing} onChange={v => set('zip', v)} />
+                      <Field
+                        label="State"
+                        value={draft.state}
+                        editing={editing}
+                        onChange={v => set('state', v)}
+                      />
+                      <Field
+                        label="Zip"
+                        value={draft.zip}
+                        editing={editing}
+                        onChange={v => set('zip', v)}
+                      />
                     </div>
                   </div>
                 </div>
 
                 {/* Employment */}
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Employment</p>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+                    Employment
+                  </p>
                   <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
                     {/* Position — same select in both modes, disabled when read */}
                     <div>
-                      <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Position</label>
+                      <label className="block text-[11px] font-medium text-gray-600 mb-0.5">
+                        Position
+                      </label>
                       <select
                         value={draft.job_title || ''}
                         onChange={e => set('job_title', e.target.value)}
@@ -843,12 +1154,18 @@ export default function EmployeeDetail() {
                         }`}
                       >
                         <option value="">Select position…</option>
-                        {positions.map(p => <option key={p.id} value={p.title}>{p.title}</option>)}
+                        {positions.map(p => (
+                          <option key={p.id} value={p.title}>
+                            {p.title}
+                          </option>
+                        ))}
                       </select>
                     </div>
                     {/* Department */}
                     <div>
-                      <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Department</label>
+                      <label className="block text-[11px] font-medium text-gray-600 mb-0.5">
+                        Department
+                      </label>
                       <select
                         value={draft.department || ''}
                         onChange={e => set('department', e.target.value)}
@@ -858,12 +1175,18 @@ export default function EmployeeDetail() {
                         }`}
                       >
                         <option value="">Select…</option>
-                        {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                        {DEPARTMENTS.map(d => (
+                          <option key={d} value={d}>
+                            {d}
+                          </option>
+                        ))}
                       </select>
                     </div>
                     {/* Preferred Language */}
                     <div>
-                      <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Preferred Language</label>
+                      <label className="block text-[11px] font-medium text-gray-600 mb-0.5">
+                        Preferred Language
+                      </label>
                       <select
                         value={draft.preferred_language || 'en'}
                         onChange={e => set('preferred_language', e.target.value)}
@@ -872,12 +1195,18 @@ export default function EmployeeDetail() {
                           !editing ? 'bg-gray-50 text-gray-700 cursor-default appearance-none' : ''
                         }`}
                       >
-                        {LANGUAGES.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+                        {LANGUAGES.map(l => (
+                          <option key={l.value} value={l.value}>
+                            {l.label}
+                          </option>
+                        ))}
                       </select>
                     </div>
                     {/* Start Date */}
                     <div>
-                      <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Start Date</label>
+                      <label className="block text-[11px] font-medium text-gray-600 mb-0.5">
+                        Start Date
+                      </label>
                       <input
                         type="date"
                         value={draft.start_date || ''}
@@ -890,7 +1219,9 @@ export default function EmployeeDetail() {
                     </div>
                     {/* Pay Rate */}
                     <div>
-                      <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Pay Rate</label>
+                      <label className="block text-[11px] font-medium text-gray-600 mb-0.5">
+                        Pay Rate
+                      </label>
                       <div className="flex gap-2">
                         <input
                           type="number"
@@ -907,7 +1238,9 @@ export default function EmployeeDetail() {
                           onChange={e => set('pay_type', e.target.value)}
                           disabled={!editing}
                           className={`border border-gray-200 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:border-green-500 ${
-                            !editing ? 'bg-gray-50 text-gray-700 cursor-default appearance-none' : ''
+                            !editing
+                              ? 'bg-gray-50 text-gray-700 cursor-default appearance-none'
+                              : ''
                           }`}
                         >
                           <option value="hourly">hr</option>
@@ -922,7 +1255,10 @@ export default function EmployeeDetail() {
                 {linkedProfile?.id && (
                   <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mb-3">
                     <div className="col-span-2">
-                      <label className="block text-[11px] font-medium text-gray-600 mb-0.5">Sam Greeting Tagline (e.g. "Go Steelers!" — appears after the chat-panel hello)</label>
+                      <label className="block text-[11px] font-medium text-gray-600 mb-0.5">
+                        Sam Greeting Tagline (e.g. "Go Steelers!" — appears after the chat-panel
+                        hello)
+                      </label>
                       <input
                         type="text"
                         value={greetingTagline}
@@ -939,19 +1275,38 @@ export default function EmployeeDetail() {
 
                 {/* Emergency Contact */}
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Emergency Contact</p>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+                    Emergency Contact
+                  </p>
                   <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-                    <Field label="Name" value={draft.emergency_contact_name} editing={editing} onChange={v => set('emergency_contact_name', v)} />
-                    <Field label="Relationship" value={draft.emergency_contact_relation} editing={editing} onChange={v => set('emergency_contact_relation', v)} />
+                    <Field
+                      label="Name"
+                      value={draft.emergency_contact_name}
+                      editing={editing}
+                      onChange={v => set('emergency_contact_name', v)}
+                    />
+                    <Field
+                      label="Relationship"
+                      value={draft.emergency_contact_relation}
+                      editing={editing}
+                      onChange={v => set('emergency_contact_relation', v)}
+                    />
                     <div className="col-span-2">
-                      <Field label="Phone" value={draft.emergency_contact_phone} editing={editing} onChange={v => set('emergency_contact_phone', v)} />
+                      <Field
+                        label="Phone"
+                        value={draft.emergency_contact_phone}
+                        editing={editing}
+                        onChange={v => set('emergency_contact_phone', v)}
+                      />
                     </div>
                   </div>
                 </div>
 
                 {/* Notes */}
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Notes</p>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+                    Notes
+                  </p>
                   <textarea
                     value={draft.notes || ''}
                     onChange={e => set('notes', e.target.value)}
@@ -977,24 +1332,35 @@ export default function EmployeeDetail() {
 
                 {/* Current role */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 uppercase mb-2">Current Role</label>
-                  <div className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold" style={{
-                    backgroundColor: userRole === 'admin' ? '#dcfce7' : '#f3f4f6',
-                    color: userRole === 'admin' ? '#166534' : '#374151',
-                  }}>
+                  <label className="block text-xs font-semibold text-gray-600 uppercase mb-2">
+                    Current Role
+                  </label>
+                  <div
+                    className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold"
+                    style={{
+                      backgroundColor: userRole === 'admin' ? '#dcfce7' : '#f3f4f6',
+                      color: userRole === 'admin' ? '#166534' : '#374151',
+                    }}
+                  >
                     {userRole === 'admin' ? '🛡️ Admin' : '👤 User'}
                   </div>
                 </div>
 
                 {/* Role change */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 uppercase mb-3">Change Role</label>
+                  <label className="block text-xs font-semibold text-gray-600 uppercase mb-3">
+                    Change Role
+                  </label>
                   <div className="flex gap-3">
                     {['user', 'admin'].map(r => (
                       <label key={r} className="flex items-center gap-2 text-sm cursor-pointer">
-                        <input type="radio" name="user-role" checked={userRole === r}
+                        <input
+                          type="radio"
+                          name="user-role"
+                          checked={userRole === r}
                           onChange={() => setUserRole(r)}
-                          className="accent-green-700" />
+                          className="accent-green-700"
+                        />
                         {r === 'admin' ? '🛡️ Admin' : '👤 User'}
                       </label>
                     ))}
@@ -1002,46 +1368,62 @@ export default function EmployeeDetail() {
                 </div>
 
                 {roleMsg && (
-                  <div className={`text-sm px-3 py-2.5 rounded-lg border ${
-                    roleMsg.startsWith('ok:')
-                      ? 'bg-green-50 border-green-200 text-green-800'
-                      : 'bg-red-50 border-red-200 text-red-700'
-                  }`}>
+                  <div
+                    className={`text-sm px-3 py-2.5 rounded-lg border ${
+                      roleMsg.startsWith('ok:')
+                        ? 'bg-green-50 border-green-200 text-green-800'
+                        : 'bg-red-50 border-red-200 text-red-700'
+                    }`}
+                  >
                     {roleMsg.startsWith('ok:') ? '✅' : '⚠️'} {roleMsg.slice(3)}
                   </div>
                 )}
 
                 {userRole !== linkedProfile.role && (
-                  <button onClick={async () => {
-                    setSavingRole(true)
-                    setRoleMsg('')
-                    const { error } = await supabase.from('profiles').update({ role: userRole }).eq('id', linkedProfile.id)
-                    if (error) {
-                      setRoleMsg('error:' + error.message)
-                    } else {
-                      setRoleMsg('ok:Role updated.')
-                      setLinkedProfile(p => ({ ...p, role: userRole }))
-                    }
-                    setSavingRole(false)
-                  }} disabled={savingRole}
-                    className="px-4 py-2.5 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-50">
+                  <button
+                    onClick={async () => {
+                      setSavingRole(true)
+                      setRoleMsg('')
+                      const { error } = await supabase
+                        .from('profiles')
+                        .update({ role: userRole })
+                        .eq('id', linkedProfile.id)
+                      if (error) {
+                        setRoleMsg('error:' + error.message)
+                      } else {
+                        setRoleMsg('ok:Role updated.')
+                        setLinkedProfile(p => ({ ...p, role: userRole }))
+                      }
+                      setSavingRole(false)
+                    }}
+                    disabled={savingRole}
+                    className="px-4 py-2.5 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-50"
+                  >
                     {savingRole ? 'Saving…' : 'Save Role'}
                   </button>
                 )}
 
                 {/* ── Password Reset ── */}
                 <div className="border-t border-gray-100 pt-5">
-                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Password Reset</p>
+                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">
+                    Password Reset
+                  </p>
                   <p className="text-xs text-gray-500 mb-3">
-                    Send a password reset link to <strong>{linkedProfile.email}</strong>. The user clicks the link to set a new password.
+                    Send a password reset link to <strong>{linkedProfile.email}</strong>. The user
+                    clicks the link to set a new password.
                   </p>
                   {resetMsg && (
-                    <div className={`text-sm px-3 py-2 rounded-lg border mb-2 ${resetMsg.startsWith('ok:') ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-700'}`}>
+                    <div
+                      className={`text-sm px-3 py-2 rounded-lg border mb-2 ${resetMsg.startsWith('ok:') ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-700'}`}
+                    >
                       {resetMsg.startsWith('ok:') ? '✅' : '⚠️'} {resetMsg.slice(3)}
                     </div>
                   )}
-                  <button onClick={sendPasswordReset} disabled={resetSending}
-                    className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                  <button
+                    onClick={sendPasswordReset}
+                    disabled={resetSending}
+                    className="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  >
                     {resetSending ? 'Sending…' : '📧 Send Password Reset Email'}
                   </button>
                 </div>
@@ -1050,36 +1432,47 @@ export default function EmployeeDetail() {
                 <div className="border-t border-gray-100 pt-5">
                   <div className="flex items-center gap-1.5 mb-1">
                     <span className="text-base">🤖</span>
-                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Text Password via Sam</p>
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      Text Password via Sam
+                    </p>
                   </div>
                   <p className="text-xs text-gray-500 mb-3">
                     Sam, the AI assistant, will text the employee their credentials via SMS.
                     {!employee?.cell_phone && (
-                      <span className="text-amber-600 font-medium"> No cell phone on file — add one in the Profile tab.</span>
+                      <span className="text-amber-600 font-medium">
+                        {' '}
+                        No cell phone on file — add one in the Profile tab.
+                      </span>
                     )}
                   </p>
                   {smsMsg && (
-                    <div className={`text-sm px-3 py-2 rounded-lg border mb-3 ${smsMsg.startsWith('ok:') ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-700'}`}>
+                    <div
+                      className={`text-sm px-3 py-2 rounded-lg border mb-3 ${smsMsg.startsWith('ok:') ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-700'}`}
+                    >
                       {smsMsg.startsWith('ok:') ? '✅' : '⚠️'} {smsMsg.slice(3)}
                     </div>
                   )}
                   <div className="flex flex-wrap gap-2">
-                    <button onClick={sendPasswordViaSMS}
+                    <button
+                      onClick={sendPasswordViaSMS}
                       disabled={smsSending || !employee?.cell_phone}
-                      className="px-4 py-2 rounded-lg border border-blue-200 text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-40">
+                      className="px-4 py-2 rounded-lg border border-blue-200 text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-40"
+                    >
                       {smsSending ? 'Sending…' : '📱 Text Current Password'}
                     </button>
-                    <button onClick={resetAndTextPassword}
+                    <button
+                      onClick={resetAndTextPassword}
                       disabled={resetTextSending || !employee?.cell_phone}
-                      className="px-4 py-2 rounded-lg border border-green-200 text-sm font-medium text-green-700 hover:bg-green-50 disabled:opacity-40">
+                      className="px-4 py-2 rounded-lg border border-green-200 text-sm font-medium text-green-700 hover:bg-green-50 disabled:opacity-40"
+                    >
                       {resetTextSending ? 'Resetting…' : '🔄 Reset & Text New Password'}
                     </button>
                   </div>
                   <p className="text-xs text-gray-400 mt-2">
-                    "Text Current Password" sends the last admin-set password. "Reset &amp; Text" generates a new password and texts it.
+                    "Text Current Password" sends the last admin-set password. "Reset &amp; Text"
+                    generates a new password and texts it.
                   </p>
                 </div>
-
               </div>
             ) : (
               <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
@@ -1098,7 +1491,9 @@ export default function EmployeeDetail() {
 
                 {/* Email */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 uppercase mb-1.5">Email Address</label>
+                  <label className="block text-xs font-semibold text-gray-600 uppercase mb-1.5">
+                    Email Address
+                  </label>
                   <input
                     type="email"
                     value={createEmail}
@@ -1118,7 +1513,9 @@ export default function EmployeeDetail() {
 
                 {/* Password */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 uppercase mb-1.5">Initial Password</label>
+                  <label className="block text-xs font-semibold text-gray-600 uppercase mb-1.5">
+                    Initial Password
+                  </label>
                   <div className="flex gap-2">
                     <div className="relative flex-1">
                       <input
@@ -1156,7 +1553,9 @@ export default function EmployeeDetail() {
 
                 {/* Role */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 uppercase mb-2">Role</label>
+                  <label className="block text-xs font-semibold text-gray-600 uppercase mb-2">
+                    Role
+                  </label>
                   <div className="flex gap-4">
                     {['user', 'admin'].map(r => (
                       <label key={r} className="flex items-center gap-2 text-sm cursor-pointer">
@@ -1190,7 +1589,8 @@ export default function EmployeeDetail() {
                     🔗 Link Existing Account by Email
                   </button>
                   <p className="text-xs text-gray-400 text-center">
-                    Use "Link" if this employee already has a login — it connects their existing account without creating a new one.
+                    Use "Link" if this employee already has a login — it connects their existing
+                    account without creating a new one.
                   </p>
                 </div>
               </div>
@@ -1206,7 +1606,11 @@ export default function EmployeeDetail() {
                 {/* Admin override banner */}
                 {(linkedProfile.role === 'admin' || linkedProfile.role === 'super_admin') && (
                   <div className="mb-4 bg-green-50 border border-green-200 text-green-800 text-sm px-4 py-3 rounded-xl">
-                    🛡️ This user is an <strong>{linkedProfile.role === 'super_admin' ? 'Super Admin' : 'Admin'}</strong> — they have full access to everything regardless of these settings.
+                    🛡️ This user is an{' '}
+                    <strong>
+                      {linkedProfile.role === 'super_admin' ? 'Super Admin' : 'Admin'}
+                    </strong>{' '}
+                    — they have full access to everything regardless of these settings.
                   </div>
                 )}
 
@@ -1225,56 +1629,90 @@ export default function EmployeeDetail() {
                         const seen = new Set()
                         for (const p of mod.perms) {
                           const g = p.group || ''
-                          if (!seen.has(g)) { seen.add(g); groups.push(g) }
+                          if (!seen.has(g)) {
+                            seen.add(g)
+                            groups.push(g)
+                          }
                         }
                         return (
-                          <div key={mod.key} className={`bg-white rounded-xl border transition-colors ${
-                            hasAccess ? 'border-gray-200' : 'border-gray-100 opacity-70'
-                          }`}>
+                          <div
+                            key={mod.key}
+                            className={`bg-white rounded-xl border transition-colors ${
+                              hasAccess ? 'border-gray-200' : 'border-gray-100 opacity-70'
+                            }`}
+                          >
                             {/* Module header */}
                             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
                               <div className="flex items-center gap-2">
                                 <span className="text-lg">{mod.icon}</span>
-                                <span className="font-semibold text-gray-800 text-sm">{mod.label}</span>
+                                <span className="font-semibold text-gray-800 text-sm">
+                                  {mod.label}
+                                </span>
                                 {mod.comingSoon && (
-                                  <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold">Coming Soon</span>
+                                  <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold">
+                                    Coming Soon
+                                  </span>
                                 )}
                               </div>
                               {/* Access toggle */}
                               <button
                                 type="button"
-                                onClick={() => setPerms(p => ({ ...p, [mod.accessKey]: !p[mod.accessKey] }))}
+                                onClick={() =>
+                                  setPerms(p => ({ ...p, [mod.accessKey]: !p[mod.accessKey] }))
+                                }
                                 className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                                   hasAccess ? 'bg-green-600' : 'bg-gray-300'
                                 }`}
-                                title={hasAccess ? 'Has Access — click to revoke' : 'No Access — click to grant'}
+                                title={
+                                  hasAccess
+                                    ? 'Has Access — click to revoke'
+                                    : 'No Access — click to grant'
+                                }
                               >
-                                <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                                  hasAccess ? 'translate-x-5' : 'translate-x-0'
-                                }`} />
+                                <span
+                                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                    hasAccess ? 'translate-x-5' : 'translate-x-0'
+                                  }`}
+                                />
                               </button>
                             </div>
 
                             {/* Sub-permissions (shown when module has access) */}
                             {mod.perms.length > 0 && (
-                              <div className={`px-4 py-3 space-y-3 transition-opacity ${hasAccess ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+                              <div
+                                className={`px-4 py-3 space-y-3 transition-opacity ${hasAccess ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}
+                              >
                                 {groups.map(grp => (
                                   <div key={grp}>
                                     {grp && (
-                                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">{grp}</p>
+                                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5">
+                                        {grp}
+                                      </p>
                                     )}
                                     <div className="space-y-1.5">
-                                      {mod.perms.filter(p => (p.group || '') === grp).map(p => (
-                                        <label key={p.key} className="flex items-center gap-2.5 cursor-pointer group">
-                                          <input
-                                            type="checkbox"
-                                            checked={!!perms[p.key]}
-                                            onChange={e => setPerms(prev => ({ ...prev, [p.key]: e.target.checked }))}
-                                            className="w-3.5 h-3.5 rounded accent-green-700 flex-shrink-0"
-                                          />
-                                          <span className="text-xs text-gray-700 group-hover:text-gray-900">{p.label}</span>
-                                        </label>
-                                      ))}
+                                      {mod.perms
+                                        .filter(p => (p.group || '') === grp)
+                                        .map(p => (
+                                          <label
+                                            key={p.key}
+                                            className="flex items-center gap-2.5 cursor-pointer group"
+                                          >
+                                            <input
+                                              type="checkbox"
+                                              checked={!!perms[p.key]}
+                                              onChange={e =>
+                                                setPerms(prev => ({
+                                                  ...prev,
+                                                  [p.key]: e.target.checked,
+                                                }))
+                                              }
+                                              className="w-3.5 h-3.5 rounded accent-green-700 flex-shrink-0"
+                                            />
+                                            <span className="text-xs text-gray-700 group-hover:text-gray-900">
+                                              {p.label}
+                                            </span>
+                                          </label>
+                                        ))}
                                     </div>
                                   </div>
                                 ))}
@@ -1293,21 +1731,27 @@ export default function EmployeeDetail() {
                     </div>
 
                     {permsMsg && (
-                      <div className={`text-sm px-3 py-2.5 rounded-lg border mb-4 ${
-                        permsMsg.startsWith('ok:')
-                          ? 'bg-green-50 border-green-200 text-green-800'
-                          : 'bg-red-50 border-red-200 text-red-700'
-                      }`}>
+                      <div
+                        className={`text-sm px-3 py-2.5 rounded-lg border mb-4 ${
+                          permsMsg.startsWith('ok:')
+                            ? 'bg-green-50 border-green-200 text-green-800'
+                            : 'bg-red-50 border-red-200 text-red-700'
+                        }`}
+                      >
                         {permsMsg.startsWith('ok:') ? '✅' : '⚠️'} {permsMsg.slice(3)}
                       </div>
                     )}
 
                     <button
                       onClick={async () => {
-                        setSavingPerms(true); setPermsMsg('')
+                        setSavingPerms(true)
+                        setPermsMsg('')
                         const { error } = await supabase
                           .from('user_permissions')
-                          .upsert({ ...perms, user_id: linkedProfile.id }, { onConflict: 'user_id' })
+                          .upsert(
+                            { ...perms, user_id: linkedProfile.id },
+                            { onConflict: 'user_id' }
+                          )
                         setPermsMsg(error ? 'error:' + error.message : 'ok:Permissions saved.')
                         setSavingPerms(false)
                       }}
@@ -1322,7 +1766,9 @@ export default function EmployeeDetail() {
             ) : (
               <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
                 <p className="text-gray-600 mb-3">This employee does not have a system account</p>
-                <p className="text-sm text-gray-500">Add one from the Admin panel to manage permissions.</p>
+                <p className="text-sm text-gray-500">
+                  Add one from the Admin panel to manage permissions.
+                </p>
               </div>
             )}
           </div>
@@ -1334,35 +1780,54 @@ export default function EmployeeDetail() {
             {DOC_CATEGORIES.map(cat => {
               const catDocs = docs.filter(d => d.category === cat.key)
               return (
-                <div key={cat.key} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div
+                  key={cat.key}
+                  className="bg-white rounded-xl border border-gray-200 overflow-hidden"
+                >
                   <div className="flex items-center justify-between px-5 py-3 bg-gray-50 border-b border-gray-100">
                     <h3 className="font-semibold text-gray-800 flex items-center gap-2">
                       {cat.icon} {cat.label}
                       <span className="text-xs text-gray-400 font-normal">({catDocs.length})</span>
                     </h3>
                     <button
-                      onClick={() => { setDocCategory(cat.key); setShowDocAdd(true) }}
+                      onClick={() => {
+                        setDocCategory(cat.key)
+                        setShowDocAdd(true)
+                      }}
                       className="text-xs font-medium text-green-700 hover:underline"
                     >
                       + Add
                     </button>
                   </div>
                   {catDocs.length === 0 ? (
-                    <div className="px-5 py-6 text-center text-sm text-gray-400">No documents in this folder</div>
+                    <div className="px-5 py-6 text-center text-sm text-gray-400">
+                      No documents in this folder
+                    </div>
                   ) : (
                     <div className="divide-y divide-gray-100">
                       {catDocs.map(doc => (
                         <div key={doc.id} className="flex items-center gap-3 px-5 py-3">
                           <span className="text-lg">📄</span>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-800 truncate">{doc.doc_name}</p>
+                            <p className="text-sm font-medium text-gray-800 truncate">
+                              {doc.doc_name}
+                            </p>
                             <p className="text-xs text-gray-400">{formatDate(doc.created_at)}</p>
                           </div>
-                          <a href={doc.doc_url} target="_blank" rel="noopener noreferrer"
-                            className="text-xs font-medium text-blue-600 hover:underline flex-shrink-0">
+                          <a
+                            href={doc.doc_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs font-medium text-blue-600 hover:underline flex-shrink-0"
+                          >
                             Open ↗
                           </a>
-                          <button onClick={() => deleteDoc(doc.id)} className="text-xs text-red-400 hover:text-red-600 flex-shrink-0">✕</button>
+                          <button
+                            onClick={() => deleteDoc(doc.id)}
+                            className="text-xs text-red-400 hover:text-red-600 flex-shrink-0"
+                          >
+                            ✕
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -1378,24 +1843,53 @@ export default function EmployeeDetail() {
                   <h3 className="text-lg font-bold text-gray-900 mb-4">Add Document</h3>
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Document Name *</label>
-                      <input value={docName} onChange={e => setDocName(e.target.value)} placeholder="e.g. W-4 Form 2024"
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Document Name *
+                      </label>
+                      <input
+                        value={docName}
+                        onChange={e => setDocName(e.target.value)}
+                        placeholder="e.g. W-4 Form 2024"
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500"
+                      />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Category</label>
-                      <select value={docCategory} onChange={e => setDocCategory(e.target.value)}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500">
-                        {DOC_CATEGORIES.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Category
+                      </label>
+                      <select
+                        value={docCategory}
+                        onChange={e => setDocCategory(e.target.value)}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500"
+                      >
+                        {DOC_CATEGORIES.map(c => (
+                          <option key={c.key} value={c.key}>
+                            {c.label}
+                          </option>
+                        ))}
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Upload File</label>
-                      <div onClick={() => docFileRef.current?.click()}
-                        className="flex items-center gap-2 h-12 border-2 border-dashed border-gray-300 rounded-lg px-3 cursor-pointer hover:border-green-400 hover:bg-green-50 transition-colors">
-                        <span className="text-gray-400 text-sm">{docFile ? `📎 ${docFile.name}` : '📁 Click to upload'}</span>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Upload File
+                      </label>
+                      <div
+                        onClick={() => docFileRef.current?.click()}
+                        className="flex items-center gap-2 h-12 border-2 border-dashed border-gray-300 rounded-lg px-3 cursor-pointer hover:border-green-400 hover:bg-green-50 transition-colors"
+                      >
+                        <span className="text-gray-400 text-sm">
+                          {docFile ? `📎 ${docFile.name}` : '📁 Click to upload'}
+                        </span>
                       </div>
-                      <input ref={docFileRef} type="file" className="sr-only" onChange={e => { setDocFile(e.target.files?.[0] || null); setDocUrl('') }} />
+                      <input
+                        ref={docFileRef}
+                        type="file"
+                        className="sr-only"
+                        onChange={e => {
+                          setDocFile(e.target.files?.[0] || null)
+                          setDocUrl('')
+                        }}
+                      />
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="flex-1 border-t border-gray-200" />
@@ -1403,15 +1897,34 @@ export default function EmployeeDetail() {
                       <div className="flex-1 border-t border-gray-200" />
                     </div>
                     <div>
-                      <input value={docUrl} onChange={e => { setDocUrl(e.target.value); setDocFile(null) }}
+                      <input
+                        value={docUrl}
+                        onChange={e => {
+                          setDocUrl(e.target.value)
+                          setDocFile(null)
+                        }}
                         placeholder="https://drive.google.com/…"
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500"
+                      />
                     </div>
                   </div>
                   <div className="flex gap-3 mt-5">
-                    <button onClick={() => { setShowDocAdd(false); setDocName(''); setDocUrl(''); setDocFile(null) }}
-                      className="flex-1 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50">Cancel</button>
-                    <button onClick={handleDocAdd} disabled={docSaving} className="flex-1 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-50">
+                    <button
+                      onClick={() => {
+                        setShowDocAdd(false)
+                        setDocName('')
+                        setDocUrl('')
+                        setDocFile(null)
+                      }}
+                      className="flex-1 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleDocAdd}
+                      disabled={docSaving}
+                      className="flex-1 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-50"
+                    >
                       {docSaving ? 'Saving…' : 'Add Document'}
                     </button>
                   </div>
@@ -1425,7 +1938,10 @@ export default function EmployeeDetail() {
         {tab === 'certs' && (
           <div className="max-w-2xl">
             <div className="flex justify-end mb-4">
-              <button onClick={() => setShowCertAdd(true)} className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800">
+              <button
+                onClick={() => setShowCertAdd(true)}
+                className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800"
+              >
                 + Add Certification
               </button>
             </div>
@@ -1439,29 +1955,61 @@ export default function EmployeeDetail() {
               <div className="space-y-3">
                 {certs.map(cert => {
                   const expired = isExpired(cert.expiry_date)
-                  const expiringSoon = !expired && cert.expiry_date &&
+                  const expiringSoon =
+                    !expired &&
+                    cert.expiry_date &&
                     new Date(cert.expiry_date) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
                   return (
-                    <div key={cert.id} className={`bg-white rounded-xl border p-5 ${expired ? 'border-red-300 bg-red-50' : expiringSoon ? 'border-orange-300 bg-orange-50' : 'border-gray-200'}`}>
+                    <div
+                      key={cert.id}
+                      className={`bg-white rounded-xl border p-5 ${expired ? 'border-red-300 bg-red-50' : expiringSoon ? 'border-orange-300 bg-orange-50' : 'border-gray-200'}`}
+                    >
                       <div className="flex items-start justify-between">
                         <div>
                           <div className="flex items-center gap-2">
                             <p className="font-semibold text-gray-900">{cert.cert_name}</p>
-                            {expired && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">Expired</span>}
-                            {expiringSoon && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium">Expiring Soon</span>}
+                            {expired && (
+                              <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">
+                                Expired
+                              </span>
+                            )}
+                            {expiringSoon && (
+                              <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium">
+                                Expiring Soon
+                              </span>
+                            )}
                           </div>
-                          {cert.cert_number && <p className="text-sm text-gray-500 mt-0.5">#{cert.cert_number}</p>}
+                          {cert.cert_number && (
+                            <p className="text-sm text-gray-500 mt-0.5">#{cert.cert_number}</p>
+                          )}
                           <div className="flex gap-4 mt-2 text-xs text-gray-500">
-                            {cert.issued_date && <span>Issued: {formatDate(cert.issued_date)}</span>}
-                            {cert.expiry_date && <span className={expired ? 'text-red-600 font-medium' : ''}>Expires: {formatDate(cert.expiry_date)}</span>}
+                            {cert.issued_date && (
+                              <span>Issued: {formatDate(cert.issued_date)}</span>
+                            )}
+                            {cert.expiry_date && (
+                              <span className={expired ? 'text-red-600 font-medium' : ''}>
+                                Expires: {formatDate(cert.expiry_date)}
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="flex gap-2">
                           {cert.file_url && (
-                            <a href={cert.file_url} target="_blank" rel="noopener noreferrer"
-                              className="text-xs font-medium text-blue-600 hover:underline">View ↗</a>
+                            <a
+                              href={cert.file_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs font-medium text-blue-600 hover:underline"
+                            >
+                              View ↗
+                            </a>
                           )}
-                          <button onClick={() => deleteCert(cert.id)} className="text-xs text-red-400 hover:text-red-600">✕</button>
+                          <button
+                            onClick={() => deleteCert(cert.id)}
+                            className="text-xs text-red-400 hover:text-red-600"
+                          >
+                            ✕
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -1476,38 +2024,74 @@ export default function EmployeeDetail() {
                   <h3 className="text-lg font-bold text-gray-900 mb-4">Add Certification</h3>
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Certification Name *</label>
-                      <input value={certDraft.cert_name} onChange={e => setCertDraft(p => ({...p, cert_name: e.target.value}))}
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Certification Name *
+                      </label>
+                      <input
+                        value={certDraft.cert_name}
+                        onChange={e => setCertDraft(p => ({ ...p, cert_name: e.target.value }))}
                         placeholder="e.g. OSHA 10 Card"
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500"
+                      />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Cert Number / ID</label>
-                      <input value={certDraft.cert_number} onChange={e => setCertDraft(p => ({...p, cert_number: e.target.value}))}
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Cert Number / ID
+                      </label>
+                      <input
+                        value={certDraft.cert_number}
+                        onChange={e => setCertDraft(p => ({ ...p, cert_number: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500"
+                      />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Issued Date</label>
-                        <input type="date" value={certDraft.issued_date} onChange={e => setCertDraft(p => ({...p, issued_date: e.target.value}))}
-                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Issued Date
+                        </label>
+                        <input
+                          type="date"
+                          value={certDraft.issued_date}
+                          onChange={e => setCertDraft(p => ({ ...p, issued_date: e.target.value }))}
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500"
+                        />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Expiry Date</label>
-                        <input type="date" value={certDraft.expiry_date} onChange={e => setCertDraft(p => ({...p, expiry_date: e.target.value}))}
-                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Expiry Date
+                        </label>
+                        <input
+                          type="date"
+                          value={certDraft.expiry_date}
+                          onChange={e => setCertDraft(p => ({ ...p, expiry_date: e.target.value }))}
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500"
+                        />
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">File URL (optional)</label>
-                      <input value={certDraft.file_url} onChange={e => setCertDraft(p => ({...p, file_url: e.target.value}))}
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        File URL (optional)
+                      </label>
+                      <input
+                        value={certDraft.file_url}
+                        onChange={e => setCertDraft(p => ({ ...p, file_url: e.target.value }))}
                         placeholder="Link to certificate document"
-                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500"
+                      />
                     </div>
                   </div>
                   <div className="flex gap-3 mt-5">
-                    <button onClick={() => setShowCertAdd(false)} className="flex-1 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50">Cancel</button>
-                    <button onClick={handleCertAdd} disabled={certSaving} className="flex-1 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-50">
+                    <button
+                      onClick={() => setShowCertAdd(false)}
+                      className="flex-1 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleCertAdd}
+                      disabled={certSaving}
+                      className="flex-1 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-50"
+                    >
                       {certSaving ? 'Saving…' : 'Add Certification'}
                     </button>
                   </div>
@@ -1524,23 +2108,34 @@ export default function EmployeeDetail() {
               <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400">
                 <p className="text-3xl mb-2">🎓</p>
                 <p>No training courses assigned</p>
-                <p className="text-sm mt-1">Assign courses in the <a href="/training" className="text-green-700 underline">Training module</a></p>
+                <p className="text-sm mt-1">
+                  Assign courses in the{' '}
+                  <a href="/training" className="text-green-700 underline">
+                    Training module
+                  </a>
+                </p>
               </div>
             ) : (
               <div className="space-y-3">
                 {training.map(a => {
-                  const stepsDone  = (a.lms_step_completions || []).length
-                  const course     = a.lms_courses
-                  const isDone     = false // Would need total steps count — simplified here
+                  const stepsDone = (a.lms_step_completions || []).length
+                  const course = a.lms_courses
                   return (
-                    <div key={a.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-4">
+                    <div
+                      key={a.id}
+                      className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-4"
+                    >
                       <div className="flex-1">
-                        <p className="font-medium text-gray-800">{course?.title || 'Unknown Course'}</p>
+                        <p className="font-medium text-gray-800">
+                          {course?.title || 'Unknown Course'}
+                        </p>
                         <p className="text-xs text-gray-400">{course?.category}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-medium text-gray-700">{stepsDone} steps done</p>
-                        <p className="text-xs text-gray-400">Assigned {formatDate(a.assigned_at)}</p>
+                        <p className="text-xs text-gray-400">
+                          Assigned {formatDate(a.assigned_at)}
+                        </p>
                       </div>
                     </div>
                   )
@@ -1558,14 +2153,19 @@ export default function EmployeeDetail() {
                 onClick={() => setShowReview(true)}
                 disabled={reviewForms.length === 0}
                 className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-50"
-                title={reviewForms.length === 0 ? 'Create a review form first in HR → Review Forms' : ''}
+                title={
+                  reviewForms.length === 0 ? 'Create a review form first in HR → Review Forms' : ''
+                }
               >
                 + New Review
               </button>
             </div>
             {reviewForms.length === 0 && (
               <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-700">
-                No review forms yet. <a href="/hr" className="underline font-medium">Create one in HR → Review Forms tab</a>
+                No review forms yet.{' '}
+                <a href="/hr" className="underline font-medium">
+                  Create one in HR → Review Forms tab
+                </a>
               </div>
             )}
             {reviews.length === 0 ? (
@@ -1579,12 +2179,18 @@ export default function EmployeeDetail() {
                   <div key={r.id} className="bg-white rounded-xl border border-gray-200 p-5">
                     <div className="flex items-start justify-between mb-2">
                       <div>
-                        <p className="font-semibold text-gray-900">{r.hr_review_forms?.title || 'Review'}</p>
-                        <p className="text-xs text-gray-500">By {r.reviewer_name} · {formatDate(r.review_date)}</p>
+                        <p className="font-semibold text-gray-900">
+                          {r.hr_review_forms?.title || 'Review'}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          By {r.reviewer_name} · {formatDate(r.review_date)}
+                        </p>
                       </div>
                       {r.overall_rating && <StarDisplay value={r.overall_rating} />}
                     </div>
-                    {r.notes && <p className="text-sm text-gray-600 mt-2 whitespace-pre-wrap">{r.notes}</p>}
+                    {r.notes && (
+                      <p className="text-sm text-gray-600 mt-2 whitespace-pre-wrap">{r.notes}</p>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1598,11 +2204,12 @@ export default function EmployeeDetail() {
             <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400">
               <p className="text-5xl mb-4">🔬</p>
               <h3 className="text-lg font-semibold text-gray-600 mb-2">Testing — Coming Soon</h3>
-              <p className="text-sm">Testing links and assessments will be added here in a future update.</p>
+              <p className="text-sm">
+                Testing links and assessments will be added here in a future update.
+              </p>
             </div>
           </div>
         )}
-
       </div>
 
       {/* Review modal */}
@@ -1610,11 +2217,13 @@ export default function EmployeeDetail() {
         <ReviewModal
           employee={employee}
           reviewForms={reviewForms}
-          onSave={() => { setShowReview(false); fetchAll() }}
+          onSave={() => {
+            setShowReview(false)
+            fetchAll()
+          }}
           onClose={() => setShowReview(false)}
         />
       )}
-
     </div>
   )
 }

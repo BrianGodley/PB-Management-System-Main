@@ -13,26 +13,26 @@ import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../
 
 // dbName must match the name column in material_rates exactly
 const PIPE_TYPES = {
-  '4" SDR 35':      { laborPerLF: 0.0495, costPerLF: 2.26, dbName: '4" SDR 35 Pipe'      },
-  '3" SDR 35':      { laborPerLF: 0.045,  costPerLF: 1.48, dbName: '3" SDR 35 Pipe'      },
-  '6" SDR 35':      { laborPerLF: 0.06,   costPerLF: 3.72, dbName: '6" SDR 35 Pipe'      },
-  '4" Triple Wall': { laborPerLF: 0.05,   costPerLF: 1.03, dbName: '4" Triple Wall Pipe' },
-  '3" Triple Wall': { laborPerLF: 0.045,  costPerLF: 0.86, dbName: '3" Triple Wall Pipe' },
-  '4" Perforated':  { laborPerLF: 0.05,   costPerLF: 2.26, dbName: '4" Perforated Pipe'  },
-  '3" Perforated':  { laborPerLF: 0.045,  costPerLF: 1.48, dbName: '3" Perforated Pipe'  },
+  '4" SDR 35': { laborPerLF: 0.0495, costPerLF: 2.26, dbName: '4" SDR 35 Pipe' },
+  '3" SDR 35': { laborPerLF: 0.045, costPerLF: 1.48, dbName: '3" SDR 35 Pipe' },
+  '6" SDR 35': { laborPerLF: 0.06, costPerLF: 3.72, dbName: '6" SDR 35 Pipe' },
+  '4" Triple Wall': { laborPerLF: 0.05, costPerLF: 1.03, dbName: '4" Triple Wall Pipe' },
+  '3" Triple Wall': { laborPerLF: 0.045, costPerLF: 0.86, dbName: '3" Triple Wall Pipe' },
+  '4" Perforated': { laborPerLF: 0.05, costPerLF: 2.26, dbName: '4" Perforated Pipe' },
+  '3" Perforated': { laborPerLF: 0.045, costPerLF: 1.48, dbName: '3" Perforated Pipe' },
 }
 
 const FIXTURE_TYPES = {
-  '3" Area Drain':         { laborHrs: 0.495, cost: 3.27,  dbName: '3" Area Drain'         },
-  '4" Area Drain':         { laborHrs: 0.495, cost: 1.90,  dbName: '4" Area Drain'         },
-  '3" Atrium Drain':       { laborHrs: 0.495, cost: 9.59,  dbName: '3" Atrium Drain'       },
-  '4" Atrium Drain':       { laborHrs: 0.495, cost: 7.19,  dbName: '4" Atrium Drain'       },
-  '4" Brass Area Drain':   { laborHrs: 0.495, cost: 16.36, dbName: '4" Brass Area Drain'   },
-  '3" Brass Area Drain':   { laborHrs: 0.495, cost: 16.36, dbName: '3" Brass Area Drain'   },
-  'Downspout Connector':   { laborHrs: 0.495, cost: 7.01,  dbName: 'Downspout Connector'   },
-  '4" Paver Top Inlet':    { laborHrs: 0.75,  cost: 23.63, dbName: '4" Paver Top Inlet'    },
-  '9" x 9" Catch Basin':   { laborHrs: 0.495, cost: 16.90, dbName: '9" x 9" Catch Basin'   },
-  '12" x 12" Catch Basin': { laborHrs: 0.495, cost: 21.60, dbName: '12" x 12" Catch Basin' },
+  '3" Area Drain': { laborHrs: 0.495, cost: 3.27, dbName: '3" Area Drain' },
+  '4" Area Drain': { laborHrs: 0.495, cost: 1.9, dbName: '4" Area Drain' },
+  '3" Atrium Drain': { laborHrs: 0.495, cost: 9.59, dbName: '3" Atrium Drain' },
+  '4" Atrium Drain': { laborHrs: 0.495, cost: 7.19, dbName: '4" Atrium Drain' },
+  '4" Brass Area Drain': { laborHrs: 0.495, cost: 16.36, dbName: '4" Brass Area Drain' },
+  '3" Brass Area Drain': { laborHrs: 0.495, cost: 16.36, dbName: '3" Brass Area Drain' },
+  'Downspout Connector': { laborHrs: 0.495, cost: 7.01, dbName: 'Downspout Connector' },
+  '4" Paver Top Inlet': { laborHrs: 0.75, cost: 23.63, dbName: '4" Paver Top Inlet' },
+  '9" x 9" Catch Basin': { laborHrs: 0.495, cost: 16.9, dbName: '9" x 9" Catch Basin' },
+  '12" x 12" Catch Basin': { laborHrs: 0.495, cost: 21.6, dbName: '12" x 12" Catch Basin' },
 }
 
 // minutes per cubic foot by equipment type
@@ -45,45 +45,50 @@ const TRENCH_MINS_PER_CF = { Trench: 10, Hand: 12.5 }
 // these exactly.
 const TRENCH_LABOR_RATE_NAME = {
   Trench: 'Drainage Trench Excavation',
-  Hand:   'Drainage Hand Excavation',
+  Hand: 'Drainage Hand Excavation',
 }
 const PIPE_LABOR_RATE_NAME = {
-  '4" SDR 35':      'Drainage 4" SDR 35 Pipe Labor',
-  '3" SDR 35':      'Drainage 3" SDR 35 Pipe Labor',
-  '6" SDR 35':      'Drainage 6" SDR 35 Pipe Labor',
+  '4" SDR 35': 'Drainage 4" SDR 35 Pipe Labor',
+  '3" SDR 35': 'Drainage 3" SDR 35 Pipe Labor',
+  '6" SDR 35': 'Drainage 6" SDR 35 Pipe Labor',
   '4" Triple Wall': 'Drainage 4" Triple Wall Pipe Labor',
   '3" Triple Wall': 'Drainage 3" Triple Wall Pipe Labor',
-  '4" Perforated':  'Drainage 4" Perforated Pipe Labor',
-  '3" Perforated':  'Drainage 3" Perforated Pipe Labor',
+  '4" Perforated': 'Drainage 4" Perforated Pipe Labor',
+  '3" Perforated': 'Drainage 3" Perforated Pipe Labor',
 }
 const FIXTURE_LABOR_RATE_NAME = {
-  '3" Area Drain':         'Drainage 3" Area Drain Labor',
-  '4" Area Drain':         'Drainage 4" Area Drain Labor',
-  '3" Atrium Drain':       'Drainage 3" Atrium Drain Labor',
-  '4" Atrium Drain':       'Drainage 4" Atrium Drain Labor',
-  '4" Brass Area Drain':   'Drainage 4" Brass Area Drain Labor',
-  '3" Brass Area Drain':   'Drainage 3" Brass Area Drain Labor',
-  'Downspout Connector':   'Drainage Downspout Connector Labor',
-  '4" Paver Top Inlet':    'Drainage 4" Paver Top Inlet Labor',
-  '9" x 9" Catch Basin':   'Drainage 9" x 9" Catch Basin Labor',
+  '3" Area Drain': 'Drainage 3" Area Drain Labor',
+  '4" Area Drain': 'Drainage 4" Area Drain Labor',
+  '3" Atrium Drain': 'Drainage 3" Atrium Drain Labor',
+  '4" Atrium Drain': 'Drainage 4" Atrium Drain Labor',
+  '4" Brass Area Drain': 'Drainage 4" Brass Area Drain Labor',
+  '3" Brass Area Drain': 'Drainage 3" Brass Area Drain Labor',
+  'Downspout Connector': 'Drainage Downspout Connector Labor',
+  '4" Paver Top Inlet': 'Drainage 4" Paver Top Inlet Labor',
+  '9" x 9" Catch Basin': 'Drainage 9" x 9" Catch Basin Labor',
   '12" x 12" Catch Basin': 'Drainage 12" x 12" Catch Basin Labor',
 }
 
 // Additional item rates — qty drives both labor hours AND material cost
 const ADD_ITEM_RATES = {
-  pumpVault: { laborHrs: 5, matCost: 275,  label: 'Pump Vault',                 dbName: 'Pump Vault'               },
-  sumpPump:  { laborHrs: 3, matCost: 650,  label: 'Sump Pump',                  dbName: 'Sump Pump'                },
-  curbCore:  { laborHrs: 2, matCost: 250,  label: 'Curb Core *',                dbName: 'Curb Core'                },
-  hydrocut:  { laborHrs: 2, matCost: 50,   label: 'Hydrocut Under Hardscape *', dbName: 'Hydrocut Under Hardscape' },
+  pumpVault: { laborHrs: 5, matCost: 275, label: 'Pump Vault', dbName: 'Pump Vault' },
+  sumpPump: { laborHrs: 3, matCost: 650, label: 'Sump Pump', dbName: 'Sump Pump' },
+  curbCore: { laborHrs: 2, matCost: 250, label: 'Curb Core *', dbName: 'Curb Core' },
+  hydrocut: {
+    laborHrs: 2,
+    matCost: 50,
+    label: 'Hydrocut Under Hardscape *',
+    dbName: 'Hydrocut Under Hardscape',
+  },
 }
 
 // Labor-coefficient lookup for Additional Items — matches names seeded in
 // supabase-drainage-labor-coefficients.sql so the popover edits the right row.
 const ADD_ITEM_LABOR_RATE_NAME = {
   pumpVault: 'Drainage Pump Vault Labor',
-  sumpPump:  'Drainage Sump Pump Labor',
-  curbCore:  'Drainage Curb Core Labor',
-  hydrocut:  'Drainage Hydrocut Under Hardscape Labor',
+  sumpPump: 'Drainage Sump Pump Labor',
+  curbCore: 'Drainage Curb Core Labor',
+  hydrocut: 'Drainage Hydrocut Under Hardscape Labor',
 }
 
 // Default fitting fee per drain unit — overridden by 'Drain Fitting Fee' in material_rates
@@ -91,25 +96,39 @@ const DRAIN_FITTING_FEE = 10
 
 const DEFAULTS = {
   laborRatePerHour: 35,
-  laborBurdenPct:   0.29,
-  gpmd:             425,
-  commissionRate:   0.12,
+  laborBurdenPct: 0.29,
+  gpmd: 425,
+  commissionRate: 0.12,
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const n = (v) => parseFloat(v) || 0
+const n = v => parseFloat(v) || 0
 
 // materialPrices — { 'dbName': unit_cost, ... } fetched from material_rates
-function calcDrainage(state, laborRatePerHour = DEFAULTS.laborRatePerHour, materialPrices = {}, gpmd = DEFAULTS.gpmd, walkAccess = null) {
-  const _pace = (parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN)
-  const { difficulty, hoursAdj, trenchRows, pipeRows, fixtureRows, additionalItems, manualRows } = state
+function calcDrainage(
+  state,
+  laborRatePerHour = DEFAULTS.laborRatePerHour,
+  materialPrices = {},
+  gpmd = DEFAULTS.gpmd,
+  walkAccess = null
+) {
+  const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
+  const { difficulty, hoursAdj, trenchRows, pipeRows, fixtureRows, additionalItems, manualRows } =
+    state
 
-  let trenchHrs = 0, pipeHrs = 0, pipeMat = 0
-  let fixHrs = 0, fixMat = 0
-  let manHrs = 0, manMat = 0, manSub = 0
+  let trenchHrs = 0,
+    pipeHrs = 0,
+    pipeMat = 0
+  let fixHrs = 0,
+    fixMat = 0
+  let manHrs = 0,
+    manMat = 0,
+    manSub = 0
 
   trenchRows.forEach(r => {
-    const lf = n(r.lf), w = n(r.width), d = n(r.depth)
+    const lf = n(r.lf),
+      w = n(r.width),
+      d = n(r.depth)
     if (lf > 0 && w > 0 && d > 0) {
       const cf = lf * (w / 12) * (d / 12)
       trenchHrs += (cf * (TRENCH_MINS_PER_CF[r.equipment] || 10)) / 60
@@ -117,7 +136,7 @@ function calcDrainage(state, laborRatePerHour = DEFAULTS.laborRatePerHour, mater
   })
 
   pipeRows.forEach(r => {
-    const lf   = n(r.lf)
+    const lf = n(r.lf)
     const rate = PIPE_TYPES[r.type]
     if (lf > 0 && rate) {
       const costPerLF = materialPrices[rate.dbName] ?? rate.costPerLF
@@ -128,7 +147,7 @@ function calcDrainage(state, laborRatePerHour = DEFAULTS.laborRatePerHour, mater
 
   let totalFixQty = 0
   fixtureRows.forEach(r => {
-    const qty  = n(r.qty)
+    const qty = n(r.qty)
     const rate = FIXTURE_TYPES[r.type]
     if (qty > 0 && rate) {
       const cost = materialPrices[rate.dbName] ?? rate.cost
@@ -138,10 +157,11 @@ function calcDrainage(state, laborRatePerHour = DEFAULTS.laborRatePerHour, mater
     }
   })
 
-  const fittingFeeEa   = materialPrices['Drain Fitting Fee'] ?? DRAIN_FITTING_FEE
+  const fittingFeeEa = materialPrices['Drain Fitting Fee'] ?? DRAIN_FITTING_FEE
   const drainFittingFee = totalFixQty * fittingFeeEa
 
-  let addHrs = 0, addMat = 0
+  let addHrs = 0,
+    addMat = 0
   Object.entries(ADD_ITEM_RATES).forEach(([key, rate]) => {
     const qty = n(additionalItems[`${key}Qty`])
     if (qty > 0) {
@@ -152,25 +172,41 @@ function calcDrainage(state, laborRatePerHour = DEFAULTS.laborRatePerHour, mater
   })
 
   manualRows.forEach(r => {
-    manHrs += n(r.hours); manMat += n(r.materials); manSub += n(r.subCost)
+    manHrs += n(r.hours)
+    manMat += n(r.materials)
+    manSub += n(r.subCost)
   })
 
-  const baseHrs  = trenchHrs + pipeHrs + fixHrs + addHrs + manHrs
-  const diffMod  = 1 + (n(difficulty) / 100)
+  const baseHrs = trenchHrs + pipeHrs + fixHrs + addHrs + manHrs
+  const diffMod = 1 + n(difficulty) / 100
   const _preWalkHrs = baseHrs * diffMod + (parseFloat(hoursAdj) || 0)
-  const walkHrs     = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
-  const totalHrs    = _preWalkHrs + walkHrs
-  const manDays  = totalHrs / 8
+  const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
+  const totalHrs = _preWalkHrs + walkHrs
+  const manDays = totalHrs / 8
   const totalMat = pipeMat + fixMat + drainFittingFee + addMat + manMat
   const laborCost = totalHrs * laborRatePerHour
-  const burden     = laborCost * DEFAULTS.laborBurdenPct
-  const gp         = manDays * gpmd
+  const burden = laborCost * DEFAULTS.laborBurdenPct
+  const gp = manDays * gpmd
   const commission = gp * DEFAULTS.commissionRate
-  const subCost    = manSub
-  const price      = totalMat + laborCost + burden + gp + commission + subCost
+  const subCost = manSub
+  const price = totalMat + laborCost + burden + gp + commission + subCost
 
-  return { totalHrs, manDays, totalMat, laborCost, burden, gp, commission, subCost, price, walkHrs,
-           drainFittingFee, fittingFeeEa, addHrs, addMat }
+  return {
+    totalHrs,
+    manDays,
+    totalMat,
+    laborCost,
+    burden,
+    gp,
+    commission,
+    subCost,
+    price,
+    walkHrs,
+    drainFittingFee,
+    fittingFeeEa,
+    addHrs,
+    addMat,
+  }
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -185,7 +221,8 @@ function SectionHeader({ title }) {
 function NumInput({ value, onChange, placeholder = '0', className = '' }) {
   return (
     <input
-      type="number" step="any"
+      type="number"
+      step="any"
       className={`input text-sm py-1.5 ${className}`}
       placeholder={placeholder}
       value={value}
@@ -198,7 +235,7 @@ function NumInput({ value, onChange, placeholder = '0', className = '' }) {
 const DEFAULT_TRENCH_ROWS = [
   { equipment: 'Trench', lf: '', width: '', depth: '' },
   { equipment: 'Trench', lf: '', width: '', depth: '' },
-  { equipment: 'Hand',   lf: '', width: '', depth: '' },
+  { equipment: 'Hand', lf: '', width: '', depth: '' },
   { equipment: 'Trench', lf: '', width: '', depth: '' },
 ]
 const DEFAULT_PIPE_ROWS = [
@@ -208,16 +245,16 @@ const DEFAULT_PIPE_ROWS = [
   { type: '4" SDR 35', lf: '' },
 ]
 const DEFAULT_FIXTURE_ROWS = [
-  { type: '3" Area Drain',   qty: '' },
-  { type: '3" Area Drain',   qty: '' },
-  { type: '3" Area Drain',   qty: '' },
+  { type: '3" Area Drain', qty: '' },
+  { type: '3" Area Drain', qty: '' },
+  { type: '3" Area Drain', qty: '' },
   { type: '3" Atrium Drain', qty: '' },
 ]
 const DEFAULT_ADDITIONAL = {
   pumpVaultQty: '',
-  sumpPumpQty:  '',
-  curbCoreQty:  '',
-  hydrocutQty:  '',
+  sumpPumpQty: '',
+  curbCoreQty: '',
+  hydrocutQty: '',
   permitRequired: false,
 }
 const DEFAULT_MANUAL_ROWS = [
@@ -228,19 +265,19 @@ const DEFAULT_MANUAL_ROWS = [
 ]
 
 // ── Main Component ─────────────────────────────────────────────────────────────
-export default function DrainageModule({ projectName, onSave, onBack, saving, initialData }) {
+export default function DrainageModule({ onSave, onBack, saving, initialData }) {
   const [laborRatePerHour, setLaborRatePerHour] = useState(
     initialData?.laborRatePerHour ?? DEFAULTS.laborRatePerHour
   )
   const [distanceLF, setDistanceLF] = useState(initialData?.distanceLF ?? '')
-  const [walkAccess, setWalkAccess] = useState(initialData?.walkAccess ?? {
-    paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
-  })
+  const [walkAccess, setWalkAccess] = useState(
+    initialData?.walkAccess ?? {
+      paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+    }
+  )
   // Live material prices from material_rates table (category='Drainage')
   // When editing, use the snapshot saved at the time the module was created
-  const [materialPrices, setMaterialPrices] = useState(
-    initialData?.materialPrices ?? {}
-  )
+  const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
   const [pricesLoading, setPricesLoading] = useState(!initialData?.materialPrices)
 
   // Pulled out so RateEditPopover can call it after the user saves a new
@@ -252,7 +289,9 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
       .eq('category', 'Drainage')
     if (data) {
       const prices = {}
-      data.forEach(r => { prices[r.name] = parseFloat(r.unit_cost) || 0 })
+      data.forEach(r => {
+        prices[r.name] = parseFloat(r.unit_cost) || 0
+      })
       setMaterialPrices(prices)
     }
     setPricesLoading(false)
@@ -267,10 +306,16 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
         .single()
         .then(({ data }) => {
           if (!data) return
-          if (data.labor_rate_per_hour != null) setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
+          if (data.labor_rate_per_hour != null)
+            setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
           if (data.walk_access_pace_lf_per_min != null) {
             const _wpace = parseFloat(data.walk_access_pace_lf_per_min)
-            setWalkAccess({ paceLfPerMin: Number.isFinite(_wpace) && _wpace > 0 ? _wpace : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN })
+            setWalkAccess({
+              paceLfPerMin:
+                Number.isFinite(_wpace) && _wpace > 0
+                  ? _wpace
+                  : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+            })
           }
         })
     }
@@ -282,16 +327,18 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
   }, [])
 
   const gpmd = initialData?.gpmd ?? DEFAULTS.gpmd
-  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
+  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
 
-  const [difficulty,      setDifficulty]     = useState(initialData?.difficulty      ?? '')
-  const [hoursAdj,    setHoursAdj]   = useState(initialData?.hoursAdj    ?? '')
+  const [difficulty, setDifficulty] = useState(initialData?.difficulty ?? '')
+  const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Demo')
-  const [trenchRows,      setTrenchRows]     = useState(initialData?.trenchRows      ?? DEFAULT_TRENCH_ROWS)
-  const [pipeRows,        setPipeRows]       = useState(initialData?.pipeRows        ?? DEFAULT_PIPE_ROWS)
-  const [fixtureRows,     setFixtureRows]    = useState(initialData?.fixtureRows     ?? DEFAULT_FIXTURE_ROWS)
-  const [additionalItems, setAdditionalItems]= useState(initialData?.additionalItems ?? DEFAULT_ADDITIONAL)
-  const [manualRows,      setManualRows]     = useState(initialData?.manualRows      ?? DEFAULT_MANUAL_ROWS)
+  const [trenchRows, setTrenchRows] = useState(initialData?.trenchRows ?? DEFAULT_TRENCH_ROWS)
+  const [pipeRows, setPipeRows] = useState(initialData?.pipeRows ?? DEFAULT_PIPE_ROWS)
+  const [fixtureRows, setFixtureRows] = useState(initialData?.fixtureRows ?? DEFAULT_FIXTURE_ROWS)
+  const [additionalItems, setAdditionalItems] = useState(
+    initialData?.additionalItems ?? DEFAULT_ADDITIONAL
+  )
+  const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
 
   // ── Sales tax — applied to totalMat across every module so the bid
   //    reflects supplier-invoiced material cost. Sourced from
@@ -300,54 +347,72 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
   const [salesTaxRate, setSalesTaxRate] = useState(0)
   useEffect(() => {
     let alive = true
-    fetchSalesTaxRate().then(r => { if (alive) setSalesTaxRate(r) })
-    return () => { alive = false }
+    fetchSalesTaxRate().then(r => {
+      if (alive) setSalesTaxRate(r)
+    })
+    return () => {
+      alive = false
+    }
   }, [])
 
-
   const calcRaw = calcDrainage(
-    { difficulty, hoursAdj, trenchRows, pipeRows, fixtureRows, additionalItems, manualRows, distanceLF },
+    {
+      difficulty,
+      hoursAdj,
+      trenchRows,
+      pipeRows,
+      fixtureRows,
+      additionalItems,
+      manualRows,
+      distanceLF,
+    },
     laborRatePerHour,
     materialPrices,
     gpmd,
-    walkAccess,
+    walkAccess
   )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
   // material_cost (saved with the module) ends up tax-inclusive too,
   // so bid totals add up to GpmdBar's displayed price.
   const _salesTaxAmt = (calcRaw.totalMat || 0) * (salesTaxRate || 0)
-  const calc = _salesTaxAmt > 0
-    ? {
-        ...calcRaw,
-        totalMat: (calcRaw.totalMat || 0) + _salesTaxAmt,
-        price:    (calcRaw.price    || 0) + _salesTaxAmt,
-        salesTax: _salesTaxAmt,
-      }
-    : calcRaw
-
+  const calc =
+    _salesTaxAmt > 0
+      ? {
+          ...calcRaw,
+          totalMat: (calcRaw.totalMat || 0) + _salesTaxAmt,
+          price: (calcRaw.price || 0) + _salesTaxAmt,
+          salesTax: _salesTaxAmt,
+        }
+      : calcRaw
 
   function updateTrench(i, field, val) {
-    setTrenchRows(rows => rows.map((r, idx) => idx === i ? { ...r, [field]: val } : r))
+    setTrenchRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
   function updatePipe(i, field, val) {
-    setPipeRows(rows => rows.map((r, idx) => idx === i ? { ...r, [field]: val } : r))
+    setPipeRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
   function updateFixture(i, field, val) {
-    setFixtureRows(rows => rows.map((r, idx) => idx === i ? { ...r, [field]: val } : r))
+    setFixtureRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
   function updateManual(i, field, val) {
-    setManualRows(rows => rows.map((r, idx) => idx === i ? { ...r, [field]: val } : r))
+    setManualRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
 
   function handleSave() {
     onSave({
-      man_days:      parseFloat(calc.manDays.toFixed(2)),
+      man_days: parseFloat(calc.manDays.toFixed(2)),
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
       data: {
-        difficulty, trenchRows, pipeRows, fixtureRows, additionalItems, manualRows,
-        laborRatePerHour, gpmd,
-        materialPrices,   // snapshot of prices used — so the summary always reflects save-time costs
+        difficulty,
+        trenchRows,
+        pipeRows,
+        fixtureRows,
+        additionalItems,
+        manualRows,
+        laborRatePerHour,
+        gpmd,
+        materialPrices, // snapshot of prices used — so the summary always reflects save-time costs
         calc,
       },
     })
@@ -357,28 +422,32 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
     <div className="space-y-5">
       {/* ── Sticky GPMD bar ── */}
       <div className="sticky top-0 z-20 -mx-6 px-6 pt-2 pb-2 bg-gray-900 shadow-lg">
-      {/* GPMD summary bar */}
-      <GpmdBar
+        {/* GPMD summary bar */}
+        <GpmdBar
           sticky
-        totalMat={calc.totalMat}
-        totalHrs={calc.totalHrs}
-        manDays={calc.manDays}
-        laborCost={calc.laborCost}
-        laborRatePerHour={laborRatePerHour}
-        burden={calc.burden}
-        gp={calc.gp}
-        commission={calc.commission}
-        subCost={calc.subCost}
-        gpmd={gpmd}
-        price={calc.price}
-        subMarkupRate={subGpMarkupRate}
-      />
+          totalMat={calc.totalMat}
+          totalHrs={calc.totalHrs}
+          manDays={calc.manDays}
+          laborCost={calc.laborCost}
+          laborRatePerHour={laborRatePerHour}
+          burden={calc.burden}
+          gp={calc.gp}
+          commission={calc.commission}
+          subCost={calc.subCost}
+          gpmd={gpmd}
+          price={calc.price}
+          subMarkupRate={subGpMarkupRate}
+        />
       </div>
 
       {/* Crew Type */}
       <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
         <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
-        <select value={crewType} onChange={e => setCrewType(e.target.value)} className="input text-sm py-1 w-36">
+        <select
+          value={crewType}
+          onChange={e => setCrewType(e.target.value)}
+          className="input text-sm py-1 w-36"
+        >
           <option value="Demo">Demo</option>
           <option value="Landscape">Landscape</option>
           <option value="Masonry">Masonry</option>
@@ -402,10 +471,17 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
           <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
         </div>
         <div>
-          <p className="text-xs text-gray-500 mb-0.5" title="Average Distance from Truck to Work Area">Truck → Work Area (Avg LF)</p>
+          <p
+            className="text-xs text-gray-500 mb-0.5"
+            title="Average Distance from Truck to Work Area"
+          >
+            Truck → Work Area (Avg LF)
+          </p>
           <NumInput value={distanceLF} onChange={setDistanceLF} placeholder="0" />
           {calc.walkHrs > 0 && (
-            <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">+{calc.walkHrs.toFixed(2)} hrs walk-access</p>
+            <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">
+              +{calc.walkHrs.toFixed(2)} hrs walk-access
+            </p>
           )}
         </div>
         <div>
@@ -430,15 +506,21 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
             </thead>
             <tbody>
               {trenchRows.map((row, i) => {
-                const lf = n(row.lf), w = n(row.width), d = n(row.depth)
-                const cf  = lf > 0 && w > 0 && d > 0 ? lf * (w / 12) * (d / 12) : 0
+                const lf = n(row.lf),
+                  w = n(row.width),
+                  d = n(row.depth)
+                const cf = lf > 0 && w > 0 && d > 0 ? lf * (w / 12) * (d / 12) : 0
                 const hrs = cf > 0 ? (cf * (TRENCH_MINS_PER_CF[row.equipment] || 10)) / 60 : 0
                 const laborName = TRENCH_LABOR_RATE_NAME[row.equipment]
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-2">
                       <div className="flex items-center gap-1">
-                        <select className="input text-sm py-1 flex-1 min-w-0" value={row.equipment} onChange={e => updateTrench(i, 'equipment', e.target.value)}>
+                        <select
+                          className="input text-sm py-1 flex-1 min-w-0"
+                          value={row.equipment}
+                          onChange={e => updateTrench(i, 'equipment', e.target.value)}
+                        >
                           <option>Trench</option>
                           <option>Hand</option>
                         </select>
@@ -454,10 +536,19 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
                         )}
                       </div>
                     </td>
-                    <td className="py-1 pr-2"><NumInput value={row.lf}    onChange={v => updateTrench(i, 'lf', v)} /></td>
-                    <td className="py-1 pr-2"><NumInput value={row.width} onChange={v => updateTrench(i, 'width', v)} /></td>
-                    <td className="py-1">    <NumInput value={row.depth} onChange={v => updateTrench(i, 'depth', v)} /></td>
-                    <td className="py-1 text-right text-gray-500 text-xs pl-2">{hrs > 0 ? hrs.toFixed(2) : '—'}</td>
+                    <td className="py-1 pr-2">
+                      <NumInput value={row.lf} onChange={v => updateTrench(i, 'lf', v)} />
+                    </td>
+                    <td className="py-1 pr-2">
+                      <NumInput value={row.width} onChange={v => updateTrench(i, 'width', v)} />
+                    </td>
+                    <td className="py-1">
+                      {' '}
+                      <NumInput value={row.depth} onChange={v => updateTrench(i, 'depth', v)} />
+                    </td>
+                    <td className="py-1 text-right text-gray-500 text-xs pl-2">
+                      {hrs > 0 ? hrs.toFixed(2) : '—'}
+                    </td>
                   </tr>
                 )
               })}
@@ -481,15 +572,21 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
             </thead>
             <tbody>
               {pipeRows.map((row, i) => {
-                const rate      = PIPE_TYPES[row.type]
+                const rate = PIPE_TYPES[row.type]
                 const costPerLF = materialPrices[rate?.dbName] ?? rate?.costPerLF ?? 0
-                const mat       = n(row.lf) * costPerLF
+                const mat = n(row.lf) * costPerLF
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-2">
                       <div className="flex items-center gap-1">
-                        <select className="input text-sm py-1 flex-1 min-w-0" value={row.type} onChange={e => updatePipe(i, 'type', e.target.value)}>
-                          {Object.keys(PIPE_TYPES).map(t => <option key={t}>{t}</option>)}
+                        <select
+                          className="input text-sm py-1 flex-1 min-w-0"
+                          value={row.type}
+                          onChange={e => updatePipe(i, 'type', e.target.value)}
+                        >
+                          {Object.keys(PIPE_TYPES).map(t => (
+                            <option key={t}>{t}</option>
+                          ))}
                         </select>
                         {PIPE_LABOR_RATE_NAME[row.type] && (
                           <RateEditPopover
@@ -503,7 +600,9 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
                         )}
                       </div>
                     </td>
-                    <td className="py-1 pr-2"><NumInput value={row.lf} onChange={v => updatePipe(i, 'lf', v)} /></td>
+                    <td className="py-1 pr-2">
+                      <NumInput value={row.lf} onChange={v => updatePipe(i, 'lf', v)} />
+                    </td>
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
                       <span className="inline-flex items-center justify-end">
                         ${costPerLF.toFixed(2)}
@@ -517,7 +616,9 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
                         />
                       </span>
                     </td>
-                    <td className="py-1 text-right text-gray-600 text-xs">{mat > 0 ? `$${mat.toFixed(2)}` : '—'}</td>
+                    <td className="py-1 text-right text-gray-600 text-xs">
+                      {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
+                    </td>
                   </tr>
                 )
               })}
@@ -543,14 +644,20 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
               {fixtureRows.map((row, i) => {
                 const rate = FIXTURE_TYPES[row.type]
                 const cost = materialPrices[rate?.dbName] ?? rate?.cost ?? 0
-                const mat  = n(row.qty) * cost
+                const mat = n(row.qty) * cost
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-2">
                       <div className="flex items-center gap-1">
-                        <select className="input text-sm py-1 flex-1 min-w-0" value={row.type} onChange={e => updateFixture(i, 'type', e.target.value)}>
+                        <select
+                          className="input text-sm py-1 flex-1 min-w-0"
+                          value={row.type}
+                          onChange={e => updateFixture(i, 'type', e.target.value)}
+                        >
                           <option value="">-- Select --</option>
-                          {Object.keys(FIXTURE_TYPES).map(t => <option key={t}>{t}</option>)}
+                          {Object.keys(FIXTURE_TYPES).map(t => (
+                            <option key={t}>{t}</option>
+                          ))}
                         </select>
                         {FIXTURE_LABOR_RATE_NAME[row.type] && (
                           <RateEditPopover
@@ -564,7 +671,9 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
                         )}
                       </div>
                     </td>
-                    <td className="py-1 pr-2"><NumInput value={row.qty} onChange={v => updateFixture(i, 'qty', v)} /></td>
+                    <td className="py-1 pr-2">
+                      <NumInput value={row.qty} onChange={v => updateFixture(i, 'qty', v)} />
+                    </td>
                     <td className="py-1 text-right text-gray-400 text-xs pr-2">
                       <span className="inline-flex items-center justify-end">
                         {rate ? `$${cost.toFixed(2)}` : '—'}
@@ -578,7 +687,9 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
                         />
                       </span>
                     </td>
-                    <td className="py-1 text-right text-gray-600 text-xs">{mat > 0 ? `$${mat.toFixed(2)}` : '—'}</td>
+                    <td className="py-1 text-right text-gray-600 text-xs">
+                      {mat > 0 ? `$${mat.toFixed(2)}` : '—'}
+                    </td>
                   </tr>
                 )
               })}
@@ -602,19 +713,22 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
             </thead>
             <tbody>
               {Object.entries(ADD_ITEM_RATES).map(([key, rate]) => {
-                const qty       = n(additionalItems[`${key}Qty`])
-                const matCost   = materialPrices[rate.dbName] ?? rate.matCost
+                const qty = n(additionalItems[`${key}Qty`])
+                const matCost = materialPrices[rate.dbName] ?? rate.matCost
                 const laborName = ADD_ITEM_LABOR_RATE_NAME[key]
                 return (
                   <tr key={key} className="border-b border-gray-100">
                     <td className="py-1.5 pr-2 text-xs text-gray-700">{rate.label}</td>
                     <td className="py-1.5 pr-2">
                       <input
-                        type="number" step="1"
+                        type="number"
+                        step="1"
                         className="input text-sm py-1 w-20"
                         placeholder="0"
                         value={additionalItems[`${key}Qty`]}
-                        onChange={e => setAdditionalItems(p => ({ ...p, [`${key}Qty`]: e.target.value }))}
+                        onChange={e =>
+                          setAdditionalItems(p => ({ ...p, [`${key}Qty`]: e.target.value }))
+                        }
                       />
                     </td>
                     <td className="py-1.5 text-right text-gray-400 text-xs pr-2">
@@ -681,11 +795,25 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
               {manualRows.map((row, i) => (
                 <tr key={i} className="border-b border-gray-100">
                   <td className="py-1 pr-2">
-                    <input className="input text-sm py-1" value={row.label} onChange={e => updateManual(i, 'label', e.target.value)} />
+                    <input
+                      className="input text-sm py-1"
+                      value={row.label}
+                      onChange={e => updateManual(i, 'label', e.target.value)}
+                    />
                   </td>
-                  <td className="py-1 pr-2"><NumInput value={row.hours}     onChange={v => updateManual(i, 'hours', v)} /></td>
-                  <td className="py-1 pr-2"><NumInput value={row.materials} onChange={v => updateManual(i, 'materials', v)} /></td>
-                  <td className="py-1">     <NumInput value={row.subCost}   onChange={v => updateManual(i, 'subCost', v)} /></td>
+                  <td className="py-1 pr-2">
+                    <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} />
+                  </td>
+                  <td className="py-1 pr-2">
+                    <NumInput
+                      value={row.materials}
+                      onChange={v => updateManual(i, 'materials', v)}
+                    />
+                  </td>
+                  <td className="py-1">
+                    {' '}
+                    <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} />
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -693,10 +821,11 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
         </div>
       </div>
 
-
       {/* ── Actions ── */}
       <div className="flex gap-3 pt-2">
-        <button onClick={onBack} className="btn-secondary flex-1">← Back</button>
+        <button onClick={onBack} className="btn-secondary flex-1">
+          ← Back
+        </button>
         <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">
           {saving ? 'Saving...' : 'Add Module'}
         </button>

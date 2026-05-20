@@ -4,7 +4,6 @@
 // XX placeholders remain for the estimator to fill in when reviewing the generated doc.
 
 export const MODULE_VERBIAGE = {
-
   // ── Demo modules (all share the same demolition/grading section) ────────────
   'Skid Steer Demo': {
     title: 'DEMOLITION AND GRADING',
@@ -20,7 +19,7 @@ export const MODULE_VERBIAGE = {
     notes: [
       'This concrete removal is priced out at a standard 4 inch thickness. Upon demolition it may be discovered that the concrete is thicker and would require an additional change order to cover costs.',
       'Site conditions can vary the total scope of the demolition or grading. This can require a change to final cost of the work.',
-      'Picture Build makes every effort to protect in place all existing elements on a job site, including structures, piping, equipment etc. However, some conditions may not be known to the company and could result in some damage requiring a repair. The repairs needed, when Picture Build has taken reasonable precautions, will be at the homeowner\'s expense.',
+      "Picture Build makes every effort to protect in place all existing elements on a job site, including structures, piping, equipment etc. However, some conditions may not be known to the company and could result in some damage requiring a repair. The repairs needed, when Picture Build has taken reasonable precautions, will be at the homeowner's expense.",
     ],
   },
 
@@ -60,7 +59,7 @@ export const MODULE_VERBIAGE = {
   },
 
   // ── Pool ────────────────────────────────────────────────────────────────────
-  'Pool': {
+  Pool: {
     title: 'NEW POOL',
     scope: [
       'Excavate for pool and/or spa according to plan set and engineering.',
@@ -71,22 +70,22 @@ export const MODULE_VERBIAGE = {
       'Install autofill and water leveling device.',
       'Install new skimmer.',
       'Install Shotcrete for shell.',
-      'Install new \'XX\' brand \'XX\' pool coping, approx. XX linear feet (color: \'XX\')',
+      "Install new 'XX' brand 'XX' pool coping, approx. XX linear feet (color: 'XX')",
       'Install waterproofing to raised surfaces as needed, approx. XX square feet',
       'Install new 6" waterline tile, approx. XX linear feet (material allowance: $XX.XX/sf)',
       'Install new tile spillway, approx. XX linear feet (material allowance: $XX.XX/sf)',
       'Install XX (qty) of XX (brand) water features.',
       'Install (XX qty.) new nichless color changing lights',
       'Install 1 new pool and 1 new spa XX (brand) main lights.',
-      'Install (XX qty.) new XX brand \'XX\' Horsepower pump(s).',
-      'Install (XX qty.) new \'XX\' brand cartridge filter',
-      'Install new \'XX\' brand \'XX (model)\' 400k btu heat pump.',
+      "Install (XX qty.) new XX brand 'XX' Horsepower pump(s).",
+      "Install (XX qty.) new 'XX' brand cartridge filter",
+      "Install new 'XX' brand 'XX (model)' 400k btu heat pump.",
       'Install new "XX" brand spa blower.',
-      'Install \'XX\' brand salt chlorination system',
-      'Install \'XX\' brand automation system',
+      "Install 'XX' brand salt chlorination system",
+      "Install 'XX' brand automation system",
     ],
     notes: [
-      'Pricing does not include the pool start up which can be done by either the client\'s pool maintenance provider or by Picture Build subcontractors.',
+      "Pricing does not include the pool start up which can be done by either the client's pool maintenance provider or by Picture Build subcontractors.",
       'City inspectors may require additional elements with the new pool that are not delineated in the pool plan set.',
       'This price does not include engineering and permits.',
       'City required setbacks and other planning requirements may affect where the pool will eventually be installed.',
@@ -94,7 +93,7 @@ export const MODULE_VERBIAGE = {
   },
 
   // ── Utilities ───────────────────────────────────────────────────────────────
-  'Utilities': {
+  Utilities: {
     title: 'UTILITIES - ELECTRIC',
     scope: [
       'Trench and run electrical from XX to XX, approx. XX linear feet',
@@ -110,7 +109,7 @@ export const MODULE_VERBIAGE = {
   },
 
   // ── Drainage ────────────────────────────────────────────────────────────────
-  'Drainage': {
+  Drainage: {
     title: 'DRAINAGE',
     scope: [
       'Trench for XX linear feet of drainage',
@@ -127,7 +126,7 @@ export const MODULE_VERBIAGE = {
   },
 
   // ── Walls ───────────────────────────────────────────────────────────────────
-  'Walls': {
+  Walls: {
     title: 'WALLS',
     scope: [
       'Layout new wall per plan',
@@ -137,7 +136,7 @@ export const MODULE_VERBIAGE = {
       'Wet lay first course of CMU block, approx. XX linear feet',
       'Install additional courses to reach finish height of XX"',
       'Grout cells',
-      'Install \'XX\' wall cap, approx. XX linear feet',
+      "Install 'XX' wall cap, approx. XX linear feet",
       'Apply XX finish to front side of wall',
       'Apply XX waterproofing to back side of wall if needed.',
       'Install burrito style french drain for wall.',
@@ -150,7 +149,7 @@ export const MODULE_VERBIAGE = {
   },
 
   // ── Concrete ────────────────────────────────────────────────────────────────
-  'Concrete': {
+  Concrete: {
     title: 'CONCRETE',
     scope: [
       'After demolition, Install 2" of class II roadbase.',
@@ -170,15 +169,15 @@ export const MODULE_VERBIAGE = {
   },
 
   // ── Pavers ──────────────────────────────────────────────────────────────────
-  'Pavers': {
+  Pavers: {
     title: 'CONCRETE PAVERS',
     scope: [
       'Layout pavers per plan',
       'Excavate paver area to 7" below finish grade if not included in the demolition/grading phase.',
       'Install 3" sleeves as needed',
       'Install 4" of class II roadbase and 1" of washed leveling sand',
-      'Install \'XX\' brand \'XX\' pavers, approx. XX square feet (color: \'XX\')',
-      'Install \'XX\' paver border',
+      "Install 'XX' brand 'XX' pavers, approx. XX square feet (color: 'XX')",
+      "Install 'XX' paver border",
       'Dig trenches for border paver area and wet lay XX linear feet of border in concrete.',
       'Compact pavers.',
       'Install joint/polymeric sand',
@@ -192,7 +191,7 @@ export const MODULE_VERBIAGE = {
   },
 
   // ── Finishes (Flagstone) ────────────────────────────────────────────────────
-  'Finishes': {
+  Finishes: {
     title: 'FLAGSTONE PAVING',
     scope: [
       'Layout flagstone paving per plan',
@@ -200,7 +199,7 @@ export const MODULE_VERBIAGE = {
       'Set rebar',
       'Set forms',
       'Pour 4" thick natural gray concrete subbase, approx. XX square feet',
-      'Install \'XX\' type flagstone over concrete base, approx. XX square feet',
+      "Install 'XX' type flagstone over concrete base, approx. XX square feet",
       'Mortar joints',
     ],
     notes: [
@@ -211,7 +210,7 @@ export const MODULE_VERBIAGE = {
   },
 
   // ── Columns ─────────────────────────────────────────────────────────────────
-  'Columns': {
+  Columns: {
     title: 'COLUMNS',
     scope: [
       'Layout new columns per plan',
@@ -219,7 +218,7 @@ export const MODULE_VERBIAGE = {
       'Set steel',
       'Pour concrete footings',
       'Create (XX qty.) columns out of CMU block, approx. XX" wide x XX" height',
-      'Install \'XX\' cap',
+      "Install 'XX' cap",
       'Apply XX to exterior of columns, approx. XX square feet',
     ],
     notes: [],
@@ -293,13 +292,13 @@ export const MODULE_VERBIAGE = {
       'Layout dry stream bed per plan',
       'Excavate stream bed area as needed',
       'Lay weed barrier fabric',
-      'Create stream bed using \'XX\' gravel bed and XX plus XX sized rocks and boulders',
+      "Create stream bed using 'XX' gravel bed and XX plus XX sized rocks and boulders",
       'Install XX linear feet of XX edging. Stake roughly every 3 feet.',
       'Layout decomposed granite area per plan',
       'Excavate area to 3"-4" depth',
       'Import and install tan, stabilized d.g. per plan, approx. XX square feet',
       'Lay weed barrier fabric in approx XX square feet.',
-      'Install \'XX\' gravel, approx. XX square feet',
+      "Install 'XX' gravel, approx. XX square feet",
       'Install 3 inch layer of XX mulch in approx. XX square feet.',
       'Layout artificial turf area per plan',
       'Excavate turf area to 3"-4" below finish grade',
@@ -322,7 +321,7 @@ export const MODULE_VERBIAGE = {
   },
 
   // ── Planting ────────────────────────────────────────────────────────────────
-  'Planting': {
+  Planting: {
     title: 'PLANTING',
     scope: [
       'Till and amend planting area soil, approx. XX square feet',
@@ -353,7 +352,7 @@ export const MODULE_VERBIAGE = {
   },
 
   // ── Irrigation ──────────────────────────────────────────────────────────────
-  'Irrigation': {
+  Irrigation: {
     title: 'IRRIGATION',
     scope: [
       'Dig XX linear feet of trenches for mainline supply.',
@@ -364,7 +363,7 @@ export const MODULE_VERBIAGE = {
       'Install (XX qty.) anti-siphon valves for spray irrigation',
       'Install (XX qty.) of planter irrigation zones including drip tubing and plant specific emitters.',
       'Install (XX qty.) of spray irrigation including roughly XX spray heads.',
-      'Install new \'Rachio\' brand smart irrigation controller',
+      "Install new 'Rachio' brand smart irrigation controller",
       'Connect valves to timer',
       'Adjust plants once irrigation system is in place',
     ],
@@ -378,7 +377,7 @@ export const MODULE_VERBIAGE = {
   },
 
   // ── Lighting ────────────────────────────────────────────────────────────────
-  'Lighting': {
+  Lighting: {
     title: 'LIGHTING',
     scope: [
       'Layout lighting locations based upon planting and site conditions.',

@@ -26,7 +26,9 @@ export const DEFAULT_ESTIMATE_GPMD = 425
 export async function fetchGlobalGpmd() {
   try {
     const { data } = await supabase
-      .from('company_settings').select('estimate_gpmd_default').maybeSingle()
+      .from('company_settings')
+      .select('estimate_gpmd_default')
+      .maybeSingle()
     const n = parseFloat(data?.estimate_gpmd_default)
     return Number.isFinite(n) && n > 0 ? n : DEFAULT_ESTIMATE_GPMD
   } catch {
@@ -50,8 +52,7 @@ export const DEFAULT_SALES_TAX_RATE = 0
  */
 export async function fetchSalesTaxRate() {
   try {
-    const { data } = await supabase
-      .from('company_settings').select('sales_tax_rate').maybeSingle()
+    const { data } = await supabase.from('company_settings').select('sales_tax_rate').maybeSingle()
     const n = parseFloat(data?.sales_tax_rate)
     return Number.isFinite(n) && n >= 0 ? n : DEFAULT_SALES_TAX_RATE
   } catch {

@@ -22,79 +22,83 @@ import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../
 
 // Hardcoded fallbacks (used when DB row not present yet)
 const SMALL_PLANT_DEFAULTS = {
-  'Flats of Groundcover': { perDay: 25,  price: 18.00 },
-  'Flats of 4" pots':     { perDay: 20,  price: 20.00 },
-  '4" pots standard':     { perDay: 280, price: 0.00  },
-  '4" pots succulents':   { perDay: 280, price: 7.00  },
-  '6" pots standard':     { perDay: 180, price: 0.00  },
-  '6" pots succulents':   { perDay: 180, price: 12.00 },
-  '1 gallon standard':    { perDay: 70,  price: 6.50  },
-  '1 gallon premium':     { perDay: 70,  price: 8.00  },
-  '1 gallon succulents':  { perDay: 70,  price: 18.00 },
-  '3 gallon standard':    { perDay: 70,  price: 7.00  },
-  '5 gallon standard':    { perDay: 40,  price: 17.00 },
-  '5 gallon premium':     { perDay: 40,  price: 35.00 },
-  '5 gallon succulents':  { perDay: 40,  price: 39.00 },
-  '5 gallon bamboo':      { perDay: 40,  price: 40.00 },
-  '5 gallon palm':        { perDay: 40,  price: 50.00 },
+  'Flats of Groundcover': { perDay: 25, price: 18.0 },
+  'Flats of 4" pots': { perDay: 20, price: 20.0 },
+  '4" pots standard': { perDay: 280, price: 0.0 },
+  '4" pots succulents': { perDay: 280, price: 7.0 },
+  '6" pots standard': { perDay: 180, price: 0.0 },
+  '6" pots succulents': { perDay: 180, price: 12.0 },
+  '1 gallon standard': { perDay: 70, price: 6.5 },
+  '1 gallon premium': { perDay: 70, price: 8.0 },
+  '1 gallon succulents': { perDay: 70, price: 18.0 },
+  '3 gallon standard': { perDay: 70, price: 7.0 },
+  '5 gallon standard': { perDay: 40, price: 17.0 },
+  '5 gallon premium': { perDay: 40, price: 35.0 },
+  '5 gallon succulents': { perDay: 40, price: 39.0 },
+  '5 gallon bamboo': { perDay: 40, price: 40.0 },
+  '5 gallon palm': { perDay: 40, price: 50.0 },
 }
 
 const LARGE_PLANT_DEFAULTS = {
-  '15 gallon standard':   { perDay: 15,   price: 52.00  },
-  '15 gallon premium':    { perDay: 15,   price: 90.00  },
-  '15 gallon succulents': { perDay: 15,   price: 225.00 },
-  '15 gallon fruit':      { perDay: 15,   price: 145.00 },
-  '15 gallon palms':      { perDay: 15,   price: 175.00 },
-  '24" box standard':     { perDay: 4,    price: 185.00 },
-  '24" box premium':      { perDay: 4,    price: 250.00 },
-  '24" box fruit':        { perDay: 4,    price: 0.00   },
-  '24" box palm':         { perDay: 4,    price: 0.00   },
-  '36" box standard':     { perDay: 0.75, price: 450.00 },
-  '36" box premium':      { perDay: 0.75, price: 600.00 },
-  '36" box fruit':        { perDay: 0.75, price: 0.00   },
-  '36" box palm':         { perDay: 0.75, price: 0.00   },
-  '48" box standard':     { perDay: 0.3,  price: 800.00 },
-  '48" box premium':      { perDay: 0.3,  price: 0.00   },
-  '48" box fruit':        { perDay: 0.3,  price: 0.00   },
-  '48" box palm':         { perDay: 0.3,  price: 0.00   },
+  '15 gallon standard': { perDay: 15, price: 52.0 },
+  '15 gallon premium': { perDay: 15, price: 90.0 },
+  '15 gallon succulents': { perDay: 15, price: 225.0 },
+  '15 gallon fruit': { perDay: 15, price: 145.0 },
+  '15 gallon palms': { perDay: 15, price: 175.0 },
+  '24" box standard': { perDay: 4, price: 185.0 },
+  '24" box premium': { perDay: 4, price: 250.0 },
+  '24" box fruit': { perDay: 4, price: 0.0 },
+  '24" box palm': { perDay: 4, price: 0.0 },
+  '36" box standard': { perDay: 0.75, price: 450.0 },
+  '36" box premium': { perDay: 0.75, price: 600.0 },
+  '36" box fruit': { perDay: 0.75, price: 0.0 },
+  '36" box palm': { perDay: 0.75, price: 0.0 },
+  '48" box standard': { perDay: 0.3, price: 800.0 },
+  '48" box premium': { perDay: 0.3, price: 0.0 },
+  '48" box fruit': { perDay: 0.3, price: 0.0 },
+  '48" box palm': { perDay: 0.3, price: 0.0 },
 }
 
 // Fallback labor rate defaults for add-ons and till
 const LABOR_DEFAULTS = {
-  'Till - Soil Move Rate':        39,    // CY/day
-  'Till - Tilling Rate':          3600,  // sqft/day
-  'Till - Amend Rate':            900,   // sqft/day
-  'Tree Stakes - Install Rate':   24,    // stakes/day
-  'Root Barrier - Install Rate':  20,    // min/LF
-  'Gopher Basket - Install Rate': 2,     // min/basket
-  'Mesh Flat - Install Rate':     0.7,   // min/sqft
-  'Jute Fabric - Install Rate':   1.1,   // min/sqft
+  'Till - Soil Move Rate': 39, // CY/day
+  'Till - Tilling Rate': 3600, // sqft/day
+  'Till - Amend Rate': 900, // sqft/day
+  'Tree Stakes - Install Rate': 24, // stakes/day
+  'Root Barrier - Install Rate': 20, // min/LF
+  'Gopher Basket - Install Rate': 2, // min/basket
+  'Mesh Flat - Install Rate': 0.7, // min/sqft
+  'Jute Fabric - Install Rate': 1.1, // min/sqft
 }
 
 // Add-on material fallback prices
 const ADDON_MAT_DEFAULTS = {
-  'Tree Stake':           8.50,
-  'Root Barrier 12in':    5.00,
-  'Root Barrier 24in':    7.00,
-  'Gopher Basket 1 Gal':  3.42,
-  'Gopher Basket 5 Gal':  7.78,
-  'Gopher Basket 15 Gal': 10.50,
-  'Mesh Flat':            1.00,
-  'Jute Fabric':          0.40,
+  'Tree Stake': 8.5,
+  'Root Barrier 12in': 5.0,
+  'Root Barrier 24in': 7.0,
+  'Gopher Basket 1 Gal': 3.42,
+  'Gopher Basket 5 Gal': 7.78,
+  'Gopher Basket 15 Gal': 10.5,
+  'Mesh Flat': 1.0,
+  'Jute Fabric': 0.4,
 }
 
 const WORKER_DEFAULTS = {
   laborRatePerHour: 35,
-  laborBurdenPct:   0.29,
-  gpmd:             425,
-  commissionRate:   0.12,
+  laborBurdenPct: 0.29,
+  gpmd: 425,
+  commissionRate: 0.12,
 }
 
-const n = (v) => parseFloat(v) || 0
+const n = v => parseFloat(v) || 0
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function lr(laborRates, key)   { return laborRates[key]   ?? LABOR_DEFAULTS[key]   ?? 0 }
-function mp(materialPrices, key) { return materialPrices[key] ?? ADDON_MAT_DEFAULTS[key] ?? 0 }
+function lr(laborRates, key) {
+  return laborRates[key] ?? LABOR_DEFAULTS[key] ?? 0
+}
+function mp(materialPrices, key) {
+  return materialPrices[key] ?? ADDON_MAT_DEFAULTS[key] ?? 0
+}
 
 function getSmallPerDay(laborRates, type) {
   return laborRates[type] ?? SMALL_PLANT_DEFAULTS[type]?.perDay ?? 25
@@ -104,23 +108,33 @@ function getLargePerDay(laborRates, type) {
 }
 
 // ── Calc ──────────────────────────────────────────────────────────────────────
-function calcPlanting(state, laborRatePerHour, gpmd, materialPrices, laborRates, walkAccess = null) {
-  const _pace = (parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN)
-  const { tillSqft, difficulty, hoursAdj, smallPlantRows, largePlantRows, addons, manualRows } = state
+function calcPlanting(
+  state,
+  laborRatePerHour,
+  gpmd,
+  materialPrices,
+  laborRates,
+  walkAccess = null
+) {
+  const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
+  const { tillSqft, difficulty, hoursAdj, smallPlantRows, largePlantRows, addons, manualRows } =
+    state
 
   // Till and Amend
   const sqft = n(tillSqft)
   const soilCY = (sqft * 0.167) / 27
   const soilMoveRate = lr(laborRates, 'Till - Soil Move Rate')
-  const tillingRate  = lr(laborRates, 'Till - Tilling Rate')
-  const amendRate    = lr(laborRates, 'Till - Amend Rate')
-  const tillManDays  = sqft > 0 && soilMoveRate > 0 && tillingRate > 0 && amendRate > 0
-    ? (soilCY / soilMoveRate) + (sqft / tillingRate) + (sqft / amendRate)
-    : 0
+  const tillingRate = lr(laborRates, 'Till - Tilling Rate')
+  const amendRate = lr(laborRates, 'Till - Amend Rate')
+  const tillManDays =
+    sqft > 0 && soilMoveRate > 0 && tillingRate > 0 && amendRate > 0
+      ? soilCY / soilMoveRate + sqft / tillingRate + sqft / amendRate
+      : 0
   const tillHrs = tillManDays * 8
 
   // Small plants
-  let smallHrs = 0, smallMat = 0
+  let smallHrs = 0,
+    smallMat = 0
   smallPlantRows.forEach(r => {
     const qty = n(r.qty)
     if (qty <= 0) return
@@ -131,7 +145,8 @@ function calcPlanting(state, laborRatePerHour, gpmd, materialPrices, laborRates,
   })
 
   // Large plants
-  let largeHrs = 0, largeMat = 0
+  let largeHrs = 0,
+    largeMat = 0
   largePlantRows.forEach(r => {
     const qty = n(r.qty)
     if (qty <= 0) return
@@ -144,10 +159,11 @@ function calcPlanting(state, laborRatePerHour, gpmd, materialPrices, laborRates,
   const plantHrs = tillHrs + smallHrs + largeHrs
 
   // Add-on labor (all times in hours)
-  let addonHrs = 0, addonMat = 0
+  let addonHrs = 0,
+    addonMat = 0
   const craneSub = n(addons.craneCost)
 
-  const stakePerDay  = lr(laborRates, 'Tree Stakes - Install Rate')
+  const stakePerDay = lr(laborRates, 'Tree Stakes - Install Rate')
   addonHrs += stakePerDay > 0 ? (n(addons.treeStakes) / stakePerDay) * 8 : 0
   addonMat += n(addons.treeStakes) * mp(materialPrices, 'Tree Stake')
 
@@ -158,11 +174,11 @@ function calcPlanting(state, laborRatePerHour, gpmd, materialPrices, laborRates,
   addonMat += n(addons.rootBarrier24) * mp(materialPrices, 'Root Barrier 24in')
 
   const gopherRate = lr(laborRates, 'Gopher Basket - Install Rate') // min/basket
-  addonHrs += (n(addons.gopherBaskets1)  * gopherRate) / 60
-  addonHrs += (n(addons.gopherBaskets5)  * gopherRate) / 60
+  addonHrs += (n(addons.gopherBaskets1) * gopherRate) / 60
+  addonHrs += (n(addons.gopherBaskets5) * gopherRate) / 60
   addonHrs += (n(addons.gopherBaskets15) * gopherRate) / 60
-  addonMat += n(addons.gopherBaskets1)  * mp(materialPrices, 'Gopher Basket 1 Gal')
-  addonMat += n(addons.gopherBaskets5)  * mp(materialPrices, 'Gopher Basket 5 Gal')
+  addonMat += n(addons.gopherBaskets1) * mp(materialPrices, 'Gopher Basket 1 Gal')
+  addonMat += n(addons.gopherBaskets5) * mp(materialPrices, 'Gopher Basket 5 Gal')
   addonMat += n(addons.gopherBaskets15) * mp(materialPrices, 'Gopher Basket 15 Gal')
 
   const meshRate = lr(laborRates, 'Mesh Flat - Install Rate') // min/sqft
@@ -182,7 +198,9 @@ function calcPlanting(state, laborRatePerHour, gpmd, materialPrices, laborRates,
   const diffHrs = (plantHrs + addonHrs) * diffPct
 
   // Manual entry
-  let manHrs = 0, manMat = 0, manSub = 0
+  let manHrs = 0,
+    manMat = 0,
+    manSub = 0
   manualRows.forEach(r => {
     manHrs += n(r.hours)
     manMat += n(r.materials)
@@ -190,19 +208,34 @@ function calcPlanting(state, laborRatePerHour, gpmd, materialPrices, laborRates,
   })
 
   const _preWalkHrs = plantHrs + addonHrs + diffHrs + manHrs + (parseFloat(hoursAdj) || 0)
-  const walkHrs     = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
-  const totalHrs    = _preWalkHrs + walkHrs
-  const manDays   = totalHrs / 8
-  const totalMat  = smallMat + largeMat + addonMat + manMat
+  const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
+  const totalHrs = _preWalkHrs + walkHrs
+  const manDays = totalHrs / 8
+  const totalMat = smallMat + largeMat + addonMat + manMat
   const laborCost = totalHrs * laborRatePerHour
-  const burden    = laborCost * WORKER_DEFAULTS.laborBurdenPct
-  const subCost   = craneSub + manSub
-  const gp        = manDays * gpmd
+  const burden = laborCost * WORKER_DEFAULTS.laborBurdenPct
+  const subCost = craneSub + manSub
+  const gp = manDays * gpmd
   const commission = gp * WORKER_DEFAULTS.commissionRate
-  const price     = totalMat + laborCost + burden + gp + commission + subCost
+  const price = totalMat + laborCost + burden + gp + commission + subCost
 
-  return { totalHrs, manDays, totalMat, laborCost, burden, subCost, gp, commission, price, walkHrs,
-           tillHrs, smallHrs, largeHrs, addonHrs, diffHrs }
+  return {
+    totalHrs,
+    manDays,
+    totalMat,
+    laborCost,
+    burden,
+    subCost,
+    gp,
+    commission,
+    price,
+    walkHrs,
+    tillHrs,
+    smallHrs,
+    largeHrs,
+    addonHrs,
+    diffHrs,
+  }
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -217,7 +250,8 @@ function SectionHeader({ title }) {
 function NumInput({ value, onChange, placeholder = '0', className = '' }) {
   return (
     <input
-      type="number" step="any"
+      type="number"
+      step="any"
       className={`input text-sm py-1.5 ${className}`}
       placeholder={placeholder}
       value={value}
@@ -237,10 +271,26 @@ function newLargeRow(type = '15 gallon standard', materialPrices = {}) {
 }
 
 const DEFAULT_SMALL_ROWS = () => [
-  { type: 'Flats of Groundcover', qty: '', price: SMALL_PLANT_DEFAULTS['Flats of Groundcover'].price },
-  { type: 'Flats of Groundcover', qty: '', price: SMALL_PLANT_DEFAULTS['Flats of Groundcover'].price },
-  { type: 'Flats of Groundcover', qty: '', price: SMALL_PLANT_DEFAULTS['Flats of Groundcover'].price },
-  { type: 'Flats of Groundcover', qty: '', price: SMALL_PLANT_DEFAULTS['Flats of Groundcover'].price },
+  {
+    type: 'Flats of Groundcover',
+    qty: '',
+    price: SMALL_PLANT_DEFAULTS['Flats of Groundcover'].price,
+  },
+  {
+    type: 'Flats of Groundcover',
+    qty: '',
+    price: SMALL_PLANT_DEFAULTS['Flats of Groundcover'].price,
+  },
+  {
+    type: 'Flats of Groundcover',
+    qty: '',
+    price: SMALL_PLANT_DEFAULTS['Flats of Groundcover'].price,
+  },
+  {
+    type: 'Flats of Groundcover',
+    qty: '',
+    price: SMALL_PLANT_DEFAULTS['Flats of Groundcover'].price,
+  },
 ]
 const DEFAULT_LARGE_ROWS = () => [
   { type: '15 gallon standard', qty: '', price: LARGE_PLANT_DEFAULTS['15 gallon standard'].price },
@@ -249,11 +299,18 @@ const DEFAULT_LARGE_ROWS = () => [
   { type: '15 gallon standard', qty: '', price: LARGE_PLANT_DEFAULTS['15 gallon standard'].price },
 ]
 const DEFAULT_ADDONS = {
-  craneCost: '', treeStakes: '',
-  rootBarrier12: '', rootBarrier24: '',
-  addonHours: '', addonMaterials: '',
-  gopherBaskets1: '', gopherBaskets5: '', gopherBaskets15: '',
-  meshFlat: '', juteFabric: '', deliveryCharges: '',
+  craneCost: '',
+  treeStakes: '',
+  rootBarrier12: '',
+  rootBarrier24: '',
+  addonHours: '',
+  addonMaterials: '',
+  gopherBaskets1: '',
+  gopherBaskets5: '',
+  gopherBaskets15: '',
+  meshFlat: '',
+  juteFabric: '',
+  deliveryCharges: '',
 }
 const DEFAULT_MANUAL_ROWS = [
   { label: 'Misc 1', hours: '', materials: '', subCost: '' },
@@ -263,18 +320,20 @@ const DEFAULT_MANUAL_ROWS = [
 ]
 
 // ── Main Component ─────────────────────────────────────────────────────────────
-export default function PlantingModule({ projectName, onSave, onBack, saving, initialData }) {
+export default function PlantingModule({ onSave, onBack, saving, initialData }) {
   const [laborRatePerHour, setLaborRatePerHour] = useState(
     initialData?.laborRatePerHour ?? WORKER_DEFAULTS.laborRatePerHour
   )
-  const [walkAccess, setWalkAccess] = useState(initialData?.walkAccess ?? {
-    paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
-  })
+  const [walkAccess] = useState(
+    initialData?.walkAccess ?? {
+      paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+    }
+  )
   // materialPrices: { 'Plant Name': unit_cost, ... }
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices ?? {})
   // laborRates: { 'Plant Name or Rate Key': rate_value, ... }
-  const [laborRates,     setLaborRates]     = useState(initialData?.laborRates     ?? {})
-  const [pricesLoading,  setPricesLoading]  = useState(!initialData?.materialPrices)
+  const [laborRates, setLaborRates] = useState(initialData?.laborRates ?? {})
+  const [pricesLoading, setPricesLoading] = useState(!initialData?.materialPrices)
 
   // Re-fetch Planting master-rate maps. Called once on mount and again after
   // any RateEditPopover save so the calc reflects edits immediately.
@@ -285,12 +344,16 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
     ])
     if (matRes.data) {
       const mp = {}
-      matRes.data.forEach(r => { mp[r.name] = parseFloat(r.unit_cost) || 0 })
+      matRes.data.forEach(r => {
+        mp[r.name] = parseFloat(r.unit_cost) || 0
+      })
       setMaterialPrices(mp)
     }
     if (labRes.data) {
       const lr = {}
-      labRes.data.forEach(r => { lr[r.name] = parseFloat(r.rate) || 0 })
+      labRes.data.forEach(r => {
+        lr[r.name] = parseFloat(r.rate) || 0
+      })
       setLaborRates(lr)
     }
   }, [])
@@ -302,7 +365,10 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
         .select('labor_rate_per_hour, walk_access_pace_lf_per_min')
         .single()
         .then(({ data }) => {
-          if (data) setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || WORKER_DEFAULTS.laborRatePerHour)
+          if (data)
+            setLaborRatePerHour(
+              parseFloat(data.labor_rate_per_hour) || WORKER_DEFAULTS.laborRatePerHour
+            )
         })
     }
 
@@ -313,17 +379,21 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
   }, [refreshAllRates])
 
   const gpmd = initialData?.gpmd ?? WORKER_DEFAULTS.gpmd
-  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
+  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
 
-  const [tillSqft,       setTillSqft]       = useState(initialData?.tillSqft       ?? '')
-  const [difficulty,     setDifficulty]     = useState(initialData?.difficulty     ?? '')
-  const [hoursAdj,       setHoursAdj]     = useState(initialData?.hoursAdj       ?? '')
+  const [tillSqft, setTillSqft] = useState(initialData?.tillSqft ?? '')
+  const [difficulty, setDifficulty] = useState(initialData?.difficulty ?? '')
+  const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Landscape')
-  const [smallPlantRows, setSmallPlantRows] = useState(initialData?.smallPlantRows ?? DEFAULT_SMALL_ROWS())
-  const [largePlantRows, setLargePlantRows] = useState(initialData?.largePlantRows ?? DEFAULT_LARGE_ROWS())
-  const [addons,         setAddons]         = useState(initialData?.addons         ?? DEFAULT_ADDONS)
-  const [manualRows,     setManualRows]     = useState(initialData?.manualRows     ?? DEFAULT_MANUAL_ROWS)
-  const [distanceLF,     setDistanceLF]     = useState(initialData?.distanceLF     ?? '')
+  const [smallPlantRows, setSmallPlantRows] = useState(
+    initialData?.smallPlantRows ?? DEFAULT_SMALL_ROWS()
+  )
+  const [largePlantRows, setLargePlantRows] = useState(
+    initialData?.largePlantRows ?? DEFAULT_LARGE_ROWS()
+  )
+  const [addons, setAddons] = useState(initialData?.addons ?? DEFAULT_ADDONS)
+  const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
+  const [distanceLF, setDistanceLF] = useState(initialData?.distanceLF ?? '')
 
   // ── Sales tax — applied to totalMat across every module so the bid
   //    reflects supplier-invoiced material cost. Sourced from
@@ -332,98 +402,128 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
   const [salesTaxRate, setSalesTaxRate] = useState(0)
   useEffect(() => {
     let alive = true
-    fetchSalesTaxRate().then(r => { if (alive) setSalesTaxRate(r) })
-    return () => { alive = false }
+    fetchSalesTaxRate().then(r => {
+      if (alive) setSalesTaxRate(r)
+    })
+    return () => {
+      alive = false
+    }
   }, [])
 
-
   const calcRaw = calcPlanting(
-    { tillSqft, difficulty, hoursAdj, smallPlantRows, largePlantRows, addons, manualRows, distanceLF },
-    laborRatePerHour, gpmd, materialPrices, laborRates, walkAccess,
+    {
+      tillSqft,
+      difficulty,
+      hoursAdj,
+      smallPlantRows,
+      largePlantRows,
+      addons,
+      manualRows,
+      distanceLF,
+    },
+    laborRatePerHour,
+    gpmd,
+    materialPrices,
+    laborRates,
+    walkAccess
   )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
   // material_cost (saved with the module) ends up tax-inclusive too,
   // so bid totals add up to GpmdBar's displayed price.
   const _salesTaxAmt = (calcRaw.totalMat || 0) * (salesTaxRate || 0)
-  const calc = _salesTaxAmt > 0
-    ? {
-        ...calcRaw,
-        totalMat: (calcRaw.totalMat || 0) + _salesTaxAmt,
-        price:    (calcRaw.price    || 0) + _salesTaxAmt,
-        salesTax: _salesTaxAmt,
-      }
-    : calcRaw
-
+  const calc =
+    _salesTaxAmt > 0
+      ? {
+          ...calcRaw,
+          totalMat: (calcRaw.totalMat || 0) + _salesTaxAmt,
+          price: (calcRaw.price || 0) + _salesTaxAmt,
+          salesTax: _salesTaxAmt,
+        }
+      : calcRaw
 
   function updateSmall(i, field, val) {
-    setSmallPlantRows(rows => rows.map((r, idx) => {
-      if (idx !== i) return r
-      if (field === 'type') {
-        const fallback = SMALL_PLANT_DEFAULTS[val]?.price ?? 0
-        return { ...r, type: val, price: materialPrices[val] ?? fallback }
-      }
-      return { ...r, [field]: val }
-    }))
+    setSmallPlantRows(rows =>
+      rows.map((r, idx) => {
+        if (idx !== i) return r
+        if (field === 'type') {
+          const fallback = SMALL_PLANT_DEFAULTS[val]?.price ?? 0
+          return { ...r, type: val, price: materialPrices[val] ?? fallback }
+        }
+        return { ...r, [field]: val }
+      })
+    )
   }
   function updateLarge(i, field, val) {
-    setLargePlantRows(rows => rows.map((r, idx) => {
-      if (idx !== i) return r
-      if (field === 'type') {
-        const fallback = LARGE_PLANT_DEFAULTS[val]?.price ?? 0
-        return { ...r, type: val, price: materialPrices[val] ?? fallback }
-      }
-      return { ...r, [field]: val }
-    }))
+    setLargePlantRows(rows =>
+      rows.map((r, idx) => {
+        if (idx !== i) return r
+        if (field === 'type') {
+          const fallback = LARGE_PLANT_DEFAULTS[val]?.price ?? 0
+          return { ...r, type: val, price: materialPrices[val] ?? fallback }
+        }
+        return { ...r, [field]: val }
+      })
+    )
   }
   function updateManual(i, field, val) {
-    setManualRows(rows => rows.map((r, idx) => idx === i ? { ...r, [field]: val } : r))
+    setManualRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
 
   function handleSave() {
     onSave({
-      man_days:      parseFloat(calc.manDays.toFixed(2)),
+      man_days: parseFloat(calc.manDays.toFixed(2)),
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
       data: {
-        tillSqft, difficulty, smallPlantRows, largePlantRows, addons, manualRows,
-        laborRatePerHour, gpmd,
-        materialPrices,   // snapshot so summary always reflects save-time prices
-        laborRates,       // snapshot so summary always reflects save-time rates
+        tillSqft,
+        difficulty,
+        smallPlantRows,
+        largePlantRows,
+        addons,
+        manualRows,
+        laborRatePerHour,
+        gpmd,
+        materialPrices, // snapshot so summary always reflects save-time prices
+        laborRates, // snapshot so summary always reflects save-time rates
         calc,
       },
     })
   }
 
   // Helper: display the live per-day rate for a plant type
-  const smallPerDay = (type) => getSmallPerDay(laborRates, type)
-  const largePerDay = (type) => getLargePerDay(laborRates, type)
+  const smallPerDay = type => getSmallPerDay(laborRates, type)
+  const largePerDay = type => getLargePerDay(laborRates, type)
 
   return (
     <div className="space-y-5">
       {/* ── Sticky GPMD bar ── */}
       <div className="sticky top-0 z-20 -mx-6 px-6 pt-2 pb-2 bg-gray-900 shadow-lg">
-      {/* GPMD summary bar */}
-      <GpmdBar
+        {/* GPMD summary bar */}
+        <GpmdBar
           sticky
-        totalMat={calc.totalMat}
-        totalHrs={calc.totalHrs}
-        manDays={calc.manDays}
-        laborCost={calc.laborCost}
-        laborRatePerHour={laborRatePerHour}
-        burden={calc.burden}
-        gp={calc.gp}
-        commission={calc.commission}
-        subCost={calc.subCost}
-        gpmd={gpmd}
-        price={calc.price}
-        subMarkupRate={subGpMarkupRate}
-      />
+          totalMat={calc.totalMat}
+          totalHrs={calc.totalHrs}
+          manDays={calc.manDays}
+          laborCost={calc.laborCost}
+          laborRatePerHour={laborRatePerHour}
+          burden={calc.burden}
+          gp={calc.gp}
+          commission={calc.commission}
+          subCost={calc.subCost}
+          gpmd={gpmd}
+          price={calc.price}
+          subMarkupRate={subGpMarkupRate}
+        />
       </div>
 
       {/* Crew Type */}
       <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
         <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
-        <select value={crewType} onChange={e => setCrewType(e.target.value)} className="input text-sm py-1 w-36">
+        <select
+          value={crewType}
+          onChange={e => setCrewType(e.target.value)}
+          className="input text-sm py-1 w-36"
+        >
           <option value="Demo">Demo</option>
           <option value="Landscape">Landscape</option>
           <option value="Masonry">Masonry</option>
@@ -446,10 +546,17 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
           <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
         </div>
         <div>
-          <p className="text-xs text-gray-500 mb-0.5" title="Average Distance from Truck to Work Area">Truck → Work Area (Avg LF)</p>
+          <p
+            className="text-xs text-gray-500 mb-0.5"
+            title="Average Distance from Truck to Work Area"
+          >
+            Truck → Work Area (Avg LF)
+          </p>
           <NumInput value={distanceLF} onChange={setDistanceLF} placeholder="0" />
           {calc.walkHrs > 0 && (
-            <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">+{calc.walkHrs.toFixed(2)} hrs walk-access</p>
+            <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">
+              +{calc.walkHrs.toFixed(2)} hrs walk-access
+            </p>
           )}
         </div>
         <div>
@@ -462,15 +569,36 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
       <SectionHeader title="Till & Amend Soil" />
       <div>
         <div className="flex items-center flex-wrap gap-2 text-xs text-gray-400 mb-1">
-          <span>{lr(laborRates,'Till - Soil Move Rate')} CY/d</span>
-          <RateEditPopover table="labor_rates" name="Till - Soil Move Rate" category="Planting"
-            mode="coefficient" unitLabel="CY/day" currentValue={lr(laborRates,'Till - Soil Move Rate')} onSaved={refreshAllRates} />
-          <span>· {lr(laborRates,'Till - Tilling Rate')} SF/d</span>
-          <RateEditPopover table="labor_rates" name="Till - Tilling Rate" category="Planting"
-            mode="coefficient" unitLabel="SF/day" currentValue={lr(laborRates,'Till - Tilling Rate')} onSaved={refreshAllRates} />
-          <span>· {lr(laborRates,'Till - Amend Rate')} SF/d</span>
-          <RateEditPopover table="labor_rates" name="Till - Amend Rate" category="Planting"
-            mode="coefficient" unitLabel="SF/day" currentValue={lr(laborRates,'Till - Amend Rate')} onSaved={refreshAllRates} />
+          <span>{lr(laborRates, 'Till - Soil Move Rate')} CY/d</span>
+          <RateEditPopover
+            table="labor_rates"
+            name="Till - Soil Move Rate"
+            category="Planting"
+            mode="coefficient"
+            unitLabel="CY/day"
+            currentValue={lr(laborRates, 'Till - Soil Move Rate')}
+            onSaved={refreshAllRates}
+          />
+          <span>· {lr(laborRates, 'Till - Tilling Rate')} SF/d</span>
+          <RateEditPopover
+            table="labor_rates"
+            name="Till - Tilling Rate"
+            category="Planting"
+            mode="coefficient"
+            unitLabel="SF/day"
+            currentValue={lr(laborRates, 'Till - Tilling Rate')}
+            onSaved={refreshAllRates}
+          />
+          <span>· {lr(laborRates, 'Till - Amend Rate')} SF/d</span>
+          <RateEditPopover
+            table="labor_rates"
+            name="Till - Amend Rate"
+            category="Planting"
+            mode="coefficient"
+            unitLabel="SF/day"
+            currentValue={lr(laborRates, 'Till - Amend Rate')}
+            onSaved={refreshAllRates}
+          />
         </div>
         <p className="text-xs text-gray-500 mb-0.5">Sqft</p>
         <NumInput value={tillSqft} onChange={setTillSqft} placeholder="0" />
@@ -495,10 +623,11 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
             </thead>
             <tbody>
               {smallPlantRows.map((row, i) => {
-                const qty    = n(row.qty)
+                const qty = n(row.qty)
                 const perDay = smallPerDay(row.type)
-                const hrs    = qty > 0 && perDay > 0 ? (qty / perDay) * 8 : 0
-                const masterPrice = materialPrices[row.type] ?? SMALL_PLANT_DEFAULTS[row.type]?.price ?? 0
+                const hrs = qty > 0 && perDay > 0 ? (qty / perDay) * 8 : 0
+                const masterPrice =
+                  materialPrices[row.type] ?? SMALL_PLANT_DEFAULTS[row.type]?.price ?? 0
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-2">
@@ -507,7 +636,9 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
                         value={row.type}
                         onChange={e => updateSmall(i, 'type', e.target.value)}
                       >
-                        {Object.keys(SMALL_PLANT_DEFAULTS).map(t => <option key={t}>{t}</option>)}
+                        {Object.keys(SMALL_PLANT_DEFAULTS).map(t => (
+                          <option key={t}>{t}</option>
+                        ))}
                       </select>
                     </td>
                     <td className="py-1 pr-2">
@@ -516,23 +647,39 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
                     <td className="py-1 pr-2">
                       <div className="flex items-center gap-1">
                         <div className="relative flex-1">
-                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                            $
+                          </span>
                           <input
-                            type="number" step="any"
+                            type="number"
+                            step="any"
                             className="input text-sm py-1.5 pl-5 w-full"
                             value={row.price}
                             onChange={e => updateSmall(i, 'price', e.target.value)}
                           />
                         </div>
-                        <RateEditPopover table="material_rates" name={row.type} category="Planting"
-                          unitLabel="ea" currentValue={masterPrice} onSaved={refreshAllRates} />
+                        <RateEditPopover
+                          table="material_rates"
+                          name={row.type}
+                          category="Planting"
+                          unitLabel="ea"
+                          currentValue={masterPrice}
+                          onSaved={refreshAllRates}
+                        />
                       </div>
                     </td>
                     <td className="py-1 text-right text-gray-400 text-xs">
                       <span className="inline-flex items-center justify-end gap-1">
                         {perDay.toLocaleString()}
-                        <RateEditPopover table="labor_rates" name={row.type} category="Planting"
-                          mode="coefficient" unitLabel="per day" currentValue={perDay} onSaved={refreshAllRates} />
+                        <RateEditPopover
+                          table="labor_rates"
+                          name={row.type}
+                          category="Planting"
+                          mode="coefficient"
+                          unitLabel="per day"
+                          currentValue={perDay}
+                          onSaved={refreshAllRates}
+                        />
                       </span>
                     </td>
                     <td className="py-1 text-right text-gray-600 text-xs pl-2">
@@ -547,7 +694,12 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
         <button
           type="button"
           className="mt-2 text-xs text-green-700 hover:text-green-900 font-medium"
-          onClick={() => setSmallPlantRows(rows => [...rows, newSmallRow('Flats of Groundcover', materialPrices)])}
+          onClick={() =>
+            setSmallPlantRows(rows => [
+              ...rows,
+              newSmallRow('Flats of Groundcover', materialPrices),
+            ])
+          }
         >
           + Add Row
         </button>
@@ -569,10 +721,11 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
             </thead>
             <tbody>
               {largePlantRows.map((row, i) => {
-                const qty    = n(row.qty)
+                const qty = n(row.qty)
                 const perDay = largePerDay(row.type)
-                const hrs    = qty > 0 && perDay > 0 ? (qty / perDay) * 8 : 0
-                const masterPrice = materialPrices[row.type] ?? LARGE_PLANT_DEFAULTS[row.type]?.price ?? 0
+                const hrs = qty > 0 && perDay > 0 ? (qty / perDay) * 8 : 0
+                const masterPrice =
+                  materialPrices[row.type] ?? LARGE_PLANT_DEFAULTS[row.type]?.price ?? 0
                 return (
                   <tr key={i} className="border-b border-gray-100">
                     <td className="py-1 pr-2">
@@ -581,7 +734,9 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
                         value={row.type}
                         onChange={e => updateLarge(i, 'type', e.target.value)}
                       >
-                        {Object.keys(LARGE_PLANT_DEFAULTS).map(t => <option key={t}>{t}</option>)}
+                        {Object.keys(LARGE_PLANT_DEFAULTS).map(t => (
+                          <option key={t}>{t}</option>
+                        ))}
                       </select>
                     </td>
                     <td className="py-1 pr-2">
@@ -590,23 +745,39 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
                     <td className="py-1 pr-2">
                       <div className="flex items-center gap-1">
                         <div className="relative flex-1">
-                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                            $
+                          </span>
                           <input
-                            type="number" step="any"
+                            type="number"
+                            step="any"
                             className="input text-sm py-1.5 pl-5 w-full"
                             value={row.price}
                             onChange={e => updateLarge(i, 'price', e.target.value)}
                           />
                         </div>
-                        <RateEditPopover table="material_rates" name={row.type} category="Planting"
-                          unitLabel="ea" currentValue={masterPrice} onSaved={refreshAllRates} />
+                        <RateEditPopover
+                          table="material_rates"
+                          name={row.type}
+                          category="Planting"
+                          unitLabel="ea"
+                          currentValue={masterPrice}
+                          onSaved={refreshAllRates}
+                        />
                       </div>
                     </td>
                     <td className="py-1 text-right text-gray-400 text-xs">
                       <span className="inline-flex items-center justify-end gap-1">
                         {perDay < 1 ? perDay.toFixed(2) : perDay.toLocaleString()}
-                        <RateEditPopover table="labor_rates" name={row.type} category="Planting"
-                          mode="coefficient" unitLabel="per day" currentValue={perDay} onSaved={refreshAllRates} />
+                        <RateEditPopover
+                          table="labor_rates"
+                          name={row.type}
+                          category="Planting"
+                          mode="coefficient"
+                          unitLabel="per day"
+                          currentValue={perDay}
+                          onSaved={refreshAllRates}
+                        />
                       </span>
                     </td>
                     <td className="py-1 text-right text-gray-600 text-xs pl-2">
@@ -621,7 +792,9 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
         <button
           type="button"
           className="mt-2 text-xs text-green-700 hover:text-green-900 font-medium"
-          onClick={() => setLargePlantRows(rows => [...rows, newLargeRow('15 gallon standard', materialPrices)])}
+          onClick={() =>
+            setLargePlantRows(rows => [...rows, newLargeRow('15 gallon standard', materialPrices)])
+          }
         >
           + Add Row
         </button>
@@ -631,12 +804,17 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
       <div>
         <SectionHeader title="Planting Add-Ons" />
         <div className="space-y-2">
-
           <div className="flex items-center gap-3">
             <label className="text-sm text-gray-700 w-52 shrink-0">Crane (hiring cost $)</label>
             <div className="relative w-36">
-              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-              <NumInput value={addons.craneCost} onChange={v => setAddons(p => ({ ...p, craneCost: v }))} className="pl-5" />
+              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                $
+              </span>
+              <NumInput
+                value={addons.craneCost}
+                onChange={v => setAddons(p => ({ ...p, craneCost: v }))}
+                className="pl-5"
+              />
             </div>
             <span className="text-xs text-gray-400">Sub cost</span>
           </div>
@@ -644,16 +822,36 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
           <div className="flex items-center gap-3 flex-wrap">
             <label className="text-sm text-gray-700 w-52 shrink-0 inline-flex items-center gap-1">
               Tree Stakes (qty)
-              <RateEditPopover table="labor_rates" name="Tree Stakes - Install Rate" category="Planting"
-                mode="coefficient" unitLabel="stakes/day" currentValue={lr(laborRates,'Tree Stakes - Install Rate')} onSaved={refreshAllRates} />
-              <RateEditPopover table="material_rates" name="Tree Stake" category="Planting"
-                unitLabel="ea" currentValue={mp(materialPrices,'Tree Stake')} onSaved={refreshAllRates} />
+              <RateEditPopover
+                table="labor_rates"
+                name="Tree Stakes - Install Rate"
+                category="Planting"
+                mode="coefficient"
+                unitLabel="stakes/day"
+                currentValue={lr(laborRates, 'Tree Stakes - Install Rate')}
+                onSaved={refreshAllRates}
+              />
+              <RateEditPopover
+                table="material_rates"
+                name="Tree Stake"
+                category="Planting"
+                unitLabel="ea"
+                currentValue={mp(materialPrices, 'Tree Stake')}
+                onSaved={refreshAllRates}
+              />
             </label>
-            <NumInput value={addons.treeStakes} onChange={v => setAddons(p => ({ ...p, treeStakes: v }))} className="w-36" />
+            <NumInput
+              value={addons.treeStakes}
+              onChange={v => setAddons(p => ({ ...p, treeStakes: v }))}
+              className="w-36"
+            />
             {n(addons.treeStakes) > 0 && (
               <span className="text-xs text-gray-400">
-                {((n(addons.treeStakes) / (lr(laborRates,'Tree Stakes - Install Rate'))) * 8).toFixed(2)} hrs
-                · ${(n(addons.treeStakes) * mp(materialPrices,'Tree Stake')).toFixed(2)} mat
+                {(
+                  (n(addons.treeStakes) / lr(laborRates, 'Tree Stakes - Install Rate')) *
+                  8
+                ).toFixed(2)}{' '}
+                hrs · ${(n(addons.treeStakes) * mp(materialPrices, 'Tree Stake')).toFixed(2)} mat
               </span>
             )}
           </div>
@@ -661,16 +859,37 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
           <div className="flex items-center gap-3 flex-wrap">
             <label className="text-sm text-gray-700 w-52 shrink-0 inline-flex items-center gap-1">
               Root Barrier 12" (LF)
-              <RateEditPopover table="labor_rates" name="Root Barrier - Install Rate" category="Planting"
-                mode="coefficient" unitLabel="min/LF" currentValue={lr(laborRates,'Root Barrier - Install Rate')} onSaved={refreshAllRates} />
-              <RateEditPopover table="material_rates" name="Root Barrier 12in" category="Planting"
-                unitLabel="LF" currentValue={mp(materialPrices,'Root Barrier 12in')} onSaved={refreshAllRates} />
+              <RateEditPopover
+                table="labor_rates"
+                name="Root Barrier - Install Rate"
+                category="Planting"
+                mode="coefficient"
+                unitLabel="min/LF"
+                currentValue={lr(laborRates, 'Root Barrier - Install Rate')}
+                onSaved={refreshAllRates}
+              />
+              <RateEditPopover
+                table="material_rates"
+                name="Root Barrier 12in"
+                category="Planting"
+                unitLabel="LF"
+                currentValue={mp(materialPrices, 'Root Barrier 12in')}
+                onSaved={refreshAllRates}
+              />
             </label>
-            <NumInput value={addons.rootBarrier12} onChange={v => setAddons(p => ({ ...p, rootBarrier12: v }))} className="w-36" />
+            <NumInput
+              value={addons.rootBarrier12}
+              onChange={v => setAddons(p => ({ ...p, rootBarrier12: v }))}
+              className="w-36"
+            />
             {n(addons.rootBarrier12) > 0 && (
               <span className="text-xs text-gray-400">
-                {((n(addons.rootBarrier12) * lr(laborRates,'Root Barrier - Install Rate')) / 60).toFixed(2)} hrs
-                · ${(n(addons.rootBarrier12) * mp(materialPrices,'Root Barrier 12in')).toFixed(2)} mat
+                {(
+                  (n(addons.rootBarrier12) * lr(laborRates, 'Root Barrier - Install Rate')) /
+                  60
+                ).toFixed(2)}{' '}
+                hrs · $
+                {(n(addons.rootBarrier12) * mp(materialPrices, 'Root Barrier 12in')).toFixed(2)} mat
               </span>
             )}
           </div>
@@ -678,14 +897,28 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
           <div className="flex items-center gap-3 flex-wrap">
             <label className="text-sm text-gray-700 w-52 shrink-0 inline-flex items-center gap-1">
               Root Barrier 24" (LF)
-              <RateEditPopover table="material_rates" name="Root Barrier 24in" category="Planting"
-                unitLabel="LF" currentValue={mp(materialPrices,'Root Barrier 24in')} onSaved={refreshAllRates} />
+              <RateEditPopover
+                table="material_rates"
+                name="Root Barrier 24in"
+                category="Planting"
+                unitLabel="LF"
+                currentValue={mp(materialPrices, 'Root Barrier 24in')}
+                onSaved={refreshAllRates}
+              />
             </label>
-            <NumInput value={addons.rootBarrier24} onChange={v => setAddons(p => ({ ...p, rootBarrier24: v }))} className="w-36" />
+            <NumInput
+              value={addons.rootBarrier24}
+              onChange={v => setAddons(p => ({ ...p, rootBarrier24: v }))}
+              className="w-36"
+            />
             {n(addons.rootBarrier24) > 0 && (
               <span className="text-xs text-gray-400">
-                {((n(addons.rootBarrier24) * lr(laborRates,'Root Barrier - Install Rate')) / 60).toFixed(2)} hrs
-                · ${(n(addons.rootBarrier24) * mp(materialPrices,'Root Barrier 24in')).toFixed(2)} mat
+                {(
+                  (n(addons.rootBarrier24) * lr(laborRates, 'Root Barrier - Install Rate')) /
+                  60
+                ).toFixed(2)}{' '}
+                hrs · $
+                {(n(addons.rootBarrier24) * mp(materialPrices, 'Root Barrier 24in')).toFixed(2)} mat
               </span>
             )}
           </div>
@@ -693,54 +926,122 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
           <div className="flex items-center gap-3 flex-wrap">
             <label className="text-sm text-gray-700 w-52 shrink-0 inline-flex items-center gap-1">
               Gopher Baskets — 1 gal (qty)
-              <RateEditPopover table="labor_rates" name="Gopher Basket - Install Rate" category="Planting"
-                mode="coefficient" unitLabel="min/ea" currentValue={lr(laborRates,'Gopher Basket - Install Rate')} onSaved={refreshAllRates} />
-              <RateEditPopover table="material_rates" name="Gopher Basket 1 Gal" category="Planting"
-                unitLabel="ea" currentValue={mp(materialPrices,'Gopher Basket 1 Gal')} onSaved={refreshAllRates} />
+              <RateEditPopover
+                table="labor_rates"
+                name="Gopher Basket - Install Rate"
+                category="Planting"
+                mode="coefficient"
+                unitLabel="min/ea"
+                currentValue={lr(laborRates, 'Gopher Basket - Install Rate')}
+                onSaved={refreshAllRates}
+              />
+              <RateEditPopover
+                table="material_rates"
+                name="Gopher Basket 1 Gal"
+                category="Planting"
+                unitLabel="ea"
+                currentValue={mp(materialPrices, 'Gopher Basket 1 Gal')}
+                onSaved={refreshAllRates}
+              />
             </label>
-            <NumInput value={addons.gopherBaskets1} onChange={v => setAddons(p => ({ ...p, gopherBaskets1: v }))} className="w-36" />
+            <NumInput
+              value={addons.gopherBaskets1}
+              onChange={v => setAddons(p => ({ ...p, gopherBaskets1: v }))}
+              className="w-36"
+            />
             {n(addons.gopherBaskets1) > 0 && (
-              <span className="text-xs text-gray-400">${(n(addons.gopherBaskets1) * mp(materialPrices,'Gopher Basket 1 Gal')).toFixed(2)} mat</span>
+              <span className="text-xs text-gray-400">
+                ${(n(addons.gopherBaskets1) * mp(materialPrices, 'Gopher Basket 1 Gal')).toFixed(2)}{' '}
+                mat
+              </span>
             )}
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
             <label className="text-sm text-gray-700 w-52 shrink-0 inline-flex items-center gap-1">
               Gopher Baskets — 5 gal (qty)
-              <RateEditPopover table="material_rates" name="Gopher Basket 5 Gal" category="Planting"
-                unitLabel="ea" currentValue={mp(materialPrices,'Gopher Basket 5 Gal')} onSaved={refreshAllRates} />
+              <RateEditPopover
+                table="material_rates"
+                name="Gopher Basket 5 Gal"
+                category="Planting"
+                unitLabel="ea"
+                currentValue={mp(materialPrices, 'Gopher Basket 5 Gal')}
+                onSaved={refreshAllRates}
+              />
             </label>
-            <NumInput value={addons.gopherBaskets5} onChange={v => setAddons(p => ({ ...p, gopherBaskets5: v }))} className="w-36" />
+            <NumInput
+              value={addons.gopherBaskets5}
+              onChange={v => setAddons(p => ({ ...p, gopherBaskets5: v }))}
+              className="w-36"
+            />
             {n(addons.gopherBaskets5) > 0 && (
-              <span className="text-xs text-gray-400">${(n(addons.gopherBaskets5) * mp(materialPrices,'Gopher Basket 5 Gal')).toFixed(2)} mat</span>
+              <span className="text-xs text-gray-400">
+                ${(n(addons.gopherBaskets5) * mp(materialPrices, 'Gopher Basket 5 Gal')).toFixed(2)}{' '}
+                mat
+              </span>
             )}
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
             <label className="text-sm text-gray-700 w-52 shrink-0 inline-flex items-center gap-1">
               Gopher Baskets — 15 gal (qty)
-              <RateEditPopover table="material_rates" name="Gopher Basket 15 Gal" category="Planting"
-                unitLabel="ea" currentValue={mp(materialPrices,'Gopher Basket 15 Gal')} onSaved={refreshAllRates} />
+              <RateEditPopover
+                table="material_rates"
+                name="Gopher Basket 15 Gal"
+                category="Planting"
+                unitLabel="ea"
+                currentValue={mp(materialPrices, 'Gopher Basket 15 Gal')}
+                onSaved={refreshAllRates}
+              />
             </label>
-            <NumInput value={addons.gopherBaskets15} onChange={v => setAddons(p => ({ ...p, gopherBaskets15: v }))} className="w-36" />
+            <NumInput
+              value={addons.gopherBaskets15}
+              onChange={v => setAddons(p => ({ ...p, gopherBaskets15: v }))}
+              className="w-36"
+            />
             {n(addons.gopherBaskets15) > 0 && (
-              <span className="text-xs text-gray-400">${(n(addons.gopherBaskets15) * mp(materialPrices,'Gopher Basket 15 Gal')).toFixed(2)} mat</span>
+              <span className="text-xs text-gray-400">
+                $
+                {(n(addons.gopherBaskets15) * mp(materialPrices, 'Gopher Basket 15 Gal')).toFixed(
+                  2
+                )}{' '}
+                mat
+              </span>
             )}
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
             <label className="text-sm text-gray-700 w-52 shrink-0 inline-flex items-center gap-1">
               Mesh Flat (sqft)
-              <RateEditPopover table="labor_rates" name="Mesh Flat - Install Rate" category="Planting"
-                mode="coefficient" unitLabel="min/SF" currentValue={lr(laborRates,'Mesh Flat - Install Rate')} onSaved={refreshAllRates} />
-              <RateEditPopover table="material_rates" name="Mesh Flat" category="Planting"
-                unitLabel="SF" currentValue={mp(materialPrices,'Mesh Flat')} onSaved={refreshAllRates} />
+              <RateEditPopover
+                table="labor_rates"
+                name="Mesh Flat - Install Rate"
+                category="Planting"
+                mode="coefficient"
+                unitLabel="min/SF"
+                currentValue={lr(laborRates, 'Mesh Flat - Install Rate')}
+                onSaved={refreshAllRates}
+              />
+              <RateEditPopover
+                table="material_rates"
+                name="Mesh Flat"
+                category="Planting"
+                unitLabel="SF"
+                currentValue={mp(materialPrices, 'Mesh Flat')}
+                onSaved={refreshAllRates}
+              />
             </label>
-            <NumInput value={addons.meshFlat} onChange={v => setAddons(p => ({ ...p, meshFlat: v }))} className="w-36" />
+            <NumInput
+              value={addons.meshFlat}
+              onChange={v => setAddons(p => ({ ...p, meshFlat: v }))}
+              className="w-36"
+            />
             {n(addons.meshFlat) > 0 && (
               <span className="text-xs text-gray-400">
-                {((n(addons.meshFlat) * lr(laborRates,'Mesh Flat - Install Rate')) / 60).toFixed(2)} hrs
-                · ${(n(addons.meshFlat) * mp(materialPrices,'Mesh Flat')).toFixed(2)} mat
+                {((n(addons.meshFlat) * lr(laborRates, 'Mesh Flat - Install Rate')) / 60).toFixed(
+                  2
+                )}{' '}
+                hrs · ${(n(addons.meshFlat) * mp(materialPrices, 'Mesh Flat')).toFixed(2)} mat
               </span>
             )}
           </div>
@@ -748,34 +1049,71 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
           <div className="flex items-center gap-3 flex-wrap">
             <label className="text-sm text-gray-700 w-52 shrink-0 inline-flex items-center gap-1">
               Jute Fabric (sqft)
-              <RateEditPopover table="labor_rates" name="Jute Fabric - Install Rate" category="Planting"
-                mode="coefficient" unitLabel="min/SF" currentValue={lr(laborRates,'Jute Fabric - Install Rate')} onSaved={refreshAllRates} />
-              <RateEditPopover table="material_rates" name="Jute Fabric" category="Planting"
-                unitLabel="SF" currentValue={mp(materialPrices,'Jute Fabric')} onSaved={refreshAllRates} />
+              <RateEditPopover
+                table="labor_rates"
+                name="Jute Fabric - Install Rate"
+                category="Planting"
+                mode="coefficient"
+                unitLabel="min/SF"
+                currentValue={lr(laborRates, 'Jute Fabric - Install Rate')}
+                onSaved={refreshAllRates}
+              />
+              <RateEditPopover
+                table="material_rates"
+                name="Jute Fabric"
+                category="Planting"
+                unitLabel="SF"
+                currentValue={mp(materialPrices, 'Jute Fabric')}
+                onSaved={refreshAllRates}
+              />
             </label>
-            <NumInput value={addons.juteFabric} onChange={v => setAddons(p => ({ ...p, juteFabric: v }))} className="w-36" />
+            <NumInput
+              value={addons.juteFabric}
+              onChange={v => setAddons(p => ({ ...p, juteFabric: v }))}
+              className="w-36"
+            />
             {n(addons.juteFabric) > 0 && (
               <span className="text-xs text-gray-400">
-                {((n(addons.juteFabric) * lr(laborRates,'Jute Fabric - Install Rate')) / 60).toFixed(2)} hrs
-                · ${(n(addons.juteFabric) * mp(materialPrices,'Jute Fabric')).toFixed(2)} mat
+                {(
+                  (n(addons.juteFabric) * lr(laborRates, 'Jute Fabric - Install Rate')) /
+                  60
+                ).toFixed(2)}{' '}
+                hrs · ${(n(addons.juteFabric) * mp(materialPrices, 'Jute Fabric')).toFixed(2)} mat
               </span>
             )}
           </div>
 
           <div className="flex items-center gap-3">
             <label className="text-sm text-gray-700 w-52 shrink-0">Manual Add-On (hrs)</label>
-            <NumInput value={addons.addonHours} onChange={v => setAddons(p => ({ ...p, addonHours: v }))} className="w-36" />
+            <NumInput
+              value={addons.addonHours}
+              onChange={v => setAddons(p => ({ ...p, addonHours: v }))}
+              className="w-36"
+            />
             <div className="relative w-36">
-              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-              <NumInput value={addons.addonMaterials} onChange={v => setAddons(p => ({ ...p, addonMaterials: v }))} className="pl-5" placeholder="Mat $" />
+              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                $
+              </span>
+              <NumInput
+                value={addons.addonMaterials}
+                onChange={v => setAddons(p => ({ ...p, addonMaterials: v }))}
+                className="pl-5"
+                placeholder="Mat $"
+              />
             </div>
           </div>
 
           <div className="flex items-center gap-3">
             <label className="text-sm text-gray-700 w-52 shrink-0">Delivery Charges ($)</label>
             <div className="relative w-36">
-              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-              <NumInput value={addons.deliveryCharges} onChange={v => setAddons(p => ({ ...p, deliveryCharges: v }))} className="pl-5" />
+              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                $
+              </span>
+              <NumInput
+                value={addons.deliveryCharges}
+                onChange={v => setAddons(p => ({ ...p, deliveryCharges: v }))}
+                className="pl-5"
+              />
             </div>
           </div>
         </div>
@@ -805,13 +1143,16 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
                     />
                   </td>
                   <td className="py-1 pr-2">
-                    <NumInput value={row.hours}     onChange={v => updateManual(i, 'hours', v)} />
+                    <NumInput value={row.hours} onChange={v => updateManual(i, 'hours', v)} />
                   </td>
                   <td className="py-1 pr-2">
-                    <NumInput value={row.materials} onChange={v => updateManual(i, 'materials', v)} />
+                    <NumInput
+                      value={row.materials}
+                      onChange={v => updateManual(i, 'materials', v)}
+                    />
                   </td>
                   <td className="py-1">
-                    <NumInput value={row.subCost}   onChange={v => updateManual(i, 'subCost', v)} />
+                    <NumInput value={row.subCost} onChange={v => updateManual(i, 'subCost', v)} />
                   </td>
                 </tr>
               ))}
@@ -820,9 +1161,10 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
         </div>
       </div>
 
-
       <div className="flex gap-3 pt-2">
-        <button onClick={onBack} className="btn-secondary flex-1">← Back</button>
+        <button onClick={onBack} className="btn-secondary flex-1">
+          ← Back
+        </button>
         <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">
           {saving ? 'Saving...' : 'Add Module'}
         </button>

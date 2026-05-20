@@ -14,7 +14,7 @@
 const PAGE_SIZE = 1000
 
 export async function fetchAllPaginated(buildQuery, opts = {}) {
-  const max = opts.max ?? 100000  // safety cap so we don't accidentally pull millions
+  const max = opts.max ?? 100000 // safety cap so we don't accidentally pull millions
   let all = []
   for (let offset = 0; offset < max; offset += PAGE_SIZE) {
     const { data, error } = await buildQuery().range(offset, offset + PAGE_SIZE - 1)

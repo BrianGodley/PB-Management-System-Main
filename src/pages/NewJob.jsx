@@ -4,10 +4,26 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 
 const CREW_TYPES = ['General', 'Demo', 'Concrete', 'Irrigation', 'Planting']
-const PROJECT_TYPES = ['Landscaping', 'Concrete/Hardscape', 'Wall', 'Pool', 'Irrigation', 'Planting', 'Demo', 'Drainage', 'Lighting', 'Other']
+const PROJECT_TYPES = [
+  'Landscaping',
+  'Concrete/Hardscape',
+  'Wall',
+  'Pool',
+  'Irrigation',
+  'Planting',
+  'Demo',
+  'Drainage',
+  'Lighting',
+  'Other',
+]
 
 function newModule() {
-  return { module_name: '', crew_type: 'General', estimated_man_days: '', estimated_material_cost: '' }
+  return {
+    module_name: '',
+    crew_type: 'General',
+    estimated_man_days: '',
+    estimated_material_cost: '',
+  }
 }
 
 function newProject() {
@@ -39,17 +55,19 @@ export default function NewJob() {
   }
 
   function updateProject(pi, field, value) {
-    setProjects(prev => prev.map((p, i) => i === pi ? { ...p, [field]: value } : p))
+    setProjects(prev => prev.map((p, i) => (i === pi ? { ...p, [field]: value } : p)))
   }
 
   function updateModule(pi, mi, field, value) {
-    setProjects(prev => prev.map((p, i) => {
-      if (i !== pi) return p
-      return {
-        ...p,
-        modules: p.modules.map((m, j) => j === mi ? { ...m, [field]: value } : m)
-      }
-    }))
+    setProjects(prev =>
+      prev.map((p, i) => {
+        if (i !== pi) return p
+        return {
+          ...p,
+          modules: p.modules.map((m, j) => (j === mi ? { ...m, [field]: value } : m)),
+        }
+      })
+    )
   }
 
   function addProject() {
@@ -61,14 +79,18 @@ export default function NewJob() {
   }
 
   function addModule(pi) {
-    setProjects(prev => prev.map((p, i) => i === pi ? { ...p, modules: [...p.modules, newModule()] } : p))
+    setProjects(prev =>
+      prev.map((p, i) => (i === pi ? { ...p, modules: [...p.modules, newModule()] } : p))
+    )
   }
 
   function removeModule(pi, mi) {
-    setProjects(prev => prev.map((p, i) => {
-      if (i !== pi) return p
-      return { ...p, modules: p.modules.filter((_, j) => j !== mi) }
-    }))
+    setProjects(prev =>
+      prev.map((p, i) => {
+        if (i !== pi) return p
+        return { ...p, modules: p.modules.filter((_, j) => j !== mi) }
+      })
+    )
   }
 
   async function handleSubmit(e) {
@@ -76,7 +98,8 @@ export default function NewJob() {
     setError('')
     if (!form.client_name.trim()) return setError('Client name is required.')
     if (!form.job_address.trim()) return setError('Job address is required.')
-    if (!form.contract_price || isNaN(parseFloat(form.contract_price))) return setError('Contract price is required.')
+    if (!form.contract_price || isNaN(parseFloat(form.contract_price)))
+      return setError('Contract price is required.')
 
     setSaving(true)
     try {
@@ -156,38 +179,83 @@ export default function NewJob() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
               <label className="label">Opportunity Name *</label>
-              <input className="input" value={form.client_name} onChange={e => updateForm('client_name', e.target.value)} placeholder="John Smith" required />
+              <input
+                className="input"
+                value={form.client_name}
+                onChange={e => updateForm('client_name', e.target.value)}
+                placeholder="John Smith"
+                required
+              />
             </div>
             <div className="sm:col-span-2">
               <label className="label">Job Address *</label>
-              <input className="input" value={form.job_address} onChange={e => updateForm('job_address', e.target.value)} placeholder="123 Main St, City, State" required />
+              <input
+                className="input"
+                value={form.job_address}
+                onChange={e => updateForm('job_address', e.target.value)}
+                placeholder="123 Main St, City, State"
+                required
+              />
             </div>
             <div>
               <label className="label">Contract Price *</label>
               <div className="relative">
                 <span className="absolute left-3 top-2 text-gray-400">$</span>
-                <input className="input pl-7" type="number" min="0" step="0.01" value={form.contract_price} onChange={e => updateForm('contract_price', e.target.value)} placeholder="0.00" required />
+                <input
+                  className="input pl-7"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.contract_price}
+                  onChange={e => updateForm('contract_price', e.target.value)}
+                  placeholder="0.00"
+                  required
+                />
               </div>
             </div>
             <div>
               <label className="label">Salesperson</label>
-              <input className="input" value={form.salesperson} onChange={e => updateForm('salesperson', e.target.value)} placeholder="Name" />
+              <input
+                className="input"
+                value={form.salesperson}
+                onChange={e => updateForm('salesperson', e.target.value)}
+                placeholder="Name"
+              />
             </div>
             <div>
               <label className="label">Date Sold</label>
-              <input className="input" type="date" value={form.date_sold} onChange={e => updateForm('date_sold', e.target.value)} />
+              <input
+                className="input"
+                type="date"
+                value={form.date_sold}
+                onChange={e => updateForm('date_sold', e.target.value)}
+              />
             </div>
             <div>
               <label className="label">Start Date</label>
-              <input className="input" type="date" value={form.start_date} onChange={e => updateForm('start_date', e.target.value)} />
+              <input
+                className="input"
+                type="date"
+                value={form.start_date}
+                onChange={e => updateForm('start_date', e.target.value)}
+              />
             </div>
             <div>
               <label className="label">Est. Completion</label>
-              <input className="input" type="date" value={form.estimated_completion} onChange={e => updateForm('estimated_completion', e.target.value)} />
+              <input
+                className="input"
+                type="date"
+                value={form.estimated_completion}
+                onChange={e => updateForm('estimated_completion', e.target.value)}
+              />
             </div>
             <div>
               <label className="label">Status</label>
-              <select className="input" value={form.status} onChange={e => updateForm('status', e.target.value)}>
+              <select
+                className="input"
+                value={form.status}
+                onChange={e => updateForm('status', e.target.value)}
+              >
                 <option value="active">Active</option>
                 <option value="on_hold">On Hold</option>
                 <option value="completed">Completed</option>
@@ -196,7 +264,13 @@ export default function NewJob() {
             </div>
             <div className="sm:col-span-2">
               <label className="label">Notes</label>
-              <textarea className="input resize-none" rows={2} value={form.notes} onChange={e => updateForm('notes', e.target.value)} placeholder="Any additional notes..." />
+              <textarea
+                className="input resize-none"
+                rows={2}
+                value={form.notes}
+                onChange={e => updateForm('notes', e.target.value)}
+                placeholder="Any additional notes..."
+              />
             </div>
           </div>
         </div>
@@ -205,7 +279,9 @@ export default function NewJob() {
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold text-gray-900 text-lg">Projects & Modules</h2>
-            <button type="button" onClick={addProject} className="btn-secondary text-sm">+ Add Project</button>
+            <button type="button" onClick={addProject} className="btn-secondary text-sm">
+              + Add Project
+            </button>
           </div>
 
           {projects.map((project, pi) => (
@@ -214,7 +290,11 @@ export default function NewJob() {
               <div className="flex items-start justify-between mb-4">
                 <h3 className="font-semibold text-green-800">Project {pi + 1}</h3>
                 {projects.length > 1 && (
-                  <button type="button" onClick={() => removeProject(pi)} className="text-red-400 hover:text-red-600 text-sm">
+                  <button
+                    type="button"
+                    onClick={() => removeProject(pi)}
+                    className="text-red-400 hover:text-red-600 text-sm"
+                  >
                     Remove
                   </button>
                 )}
@@ -222,12 +302,23 @@ export default function NewJob() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                 <div>
                   <label className="label">Project Name</label>
-                  <input className="input" value={project.project_name} onChange={e => updateProject(pi, 'project_name', e.target.value)} placeholder="e.g. Front Yard Wall" />
+                  <input
+                    className="input"
+                    value={project.project_name}
+                    onChange={e => updateProject(pi, 'project_name', e.target.value)}
+                    placeholder="e.g. Front Yard Wall"
+                  />
                 </div>
                 <div>
                   <label className="label">Project Type</label>
-                  <select className="input" value={project.project_type} onChange={e => updateProject(pi, 'project_type', e.target.value)}>
-                    {PROJECT_TYPES.map(t => <option key={t}>{t}</option>)}
+                  <select
+                    className="input"
+                    value={project.project_type}
+                    onChange={e => updateProject(pi, 'project_type', e.target.value)}
+                  >
+                    {PROJECT_TYPES.map(t => (
+                      <option key={t}>{t}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -236,7 +327,13 @@ export default function NewJob() {
               <div className="border-t border-gray-100 pt-3">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm font-medium text-gray-700">Modules</p>
-                  <button type="button" onClick={() => addModule(pi)} className="text-green-700 text-xs font-medium hover:underline">+ Add Module</button>
+                  <button
+                    type="button"
+                    onClick={() => addModule(pi)}
+                    className="text-green-700 text-xs font-medium hover:underline"
+                  >
+                    + Add Module
+                  </button>
                 </div>
 
                 {project.modules.map((mod, mi) => (
@@ -244,27 +341,62 @@ export default function NewJob() {
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-xs font-medium text-gray-500">Module {mi + 1}</p>
                       {project.modules.length > 1 && (
-                        <button type="button" onClick={() => removeModule(pi, mi)} className="text-red-400 hover:text-red-600 text-xs">Remove</button>
+                        <button
+                          type="button"
+                          onClick={() => removeModule(pi, mi)}
+                          className="text-red-400 hover:text-red-600 text-xs"
+                        >
+                          Remove
+                        </button>
                       )}
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div className="col-span-2">
                         <label className="label text-xs">Module Name</label>
-                        <input className="input text-sm" value={mod.module_name} onChange={e => updateModule(pi, mi, 'module_name', e.target.value)} placeholder="e.g. Demo Work" />
+                        <input
+                          className="input text-sm"
+                          value={mod.module_name}
+                          onChange={e => updateModule(pi, mi, 'module_name', e.target.value)}
+                          placeholder="e.g. Demo Work"
+                        />
                       </div>
                       <div>
                         <label className="label text-xs">Crew Type</label>
-                        <select className="input text-sm" value={mod.crew_type} onChange={e => updateModule(pi, mi, 'crew_type', e.target.value)}>
-                          {CREW_TYPES.map(c => <option key={c}>{c}</option>)}
+                        <select
+                          className="input text-sm"
+                          value={mod.crew_type}
+                          onChange={e => updateModule(pi, mi, 'crew_type', e.target.value)}
+                        >
+                          {CREW_TYPES.map(c => (
+                            <option key={c}>{c}</option>
+                          ))}
                         </select>
                       </div>
                       <div>
                         <label className="label text-xs">Est. Man Days</label>
-                        <input className="input text-sm" type="number" min="0" step="0.25" value={mod.estimated_man_days} onChange={e => updateModule(pi, mi, 'estimated_man_days', e.target.value)} placeholder="0.0" />
+                        <input
+                          className="input text-sm"
+                          type="number"
+                          min="0"
+                          step="0.25"
+                          value={mod.estimated_man_days}
+                          onChange={e => updateModule(pi, mi, 'estimated_man_days', e.target.value)}
+                          placeholder="0.0"
+                        />
                       </div>
                       <div className="col-span-2">
                         <label className="label text-xs">Est. Material Cost ($)</label>
-                        <input className="input text-sm" type="number" min="0" step="0.01" value={mod.estimated_material_cost} onChange={e => updateModule(pi, mi, 'estimated_material_cost', e.target.value)} placeholder="0.00" />
+                        <input
+                          className="input text-sm"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={mod.estimated_material_cost}
+                          onChange={e =>
+                            updateModule(pi, mi, 'estimated_material_cost', e.target.value)
+                          }
+                          placeholder="0.00"
+                        />
                       </div>
                     </div>
                   </div>
@@ -275,7 +407,9 @@ export default function NewJob() {
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{error}</div>
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+            {error}
+          </div>
         )}
 
         <div className="flex gap-3 pb-6">

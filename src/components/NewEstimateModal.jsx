@@ -24,10 +24,11 @@ export default function NewEstimateModal({ client, onClose, onNext }) {
 
       {/* Modal */}
       <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
-
         {/* Header */}
         <div className="mb-5">
-          <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-0.5">New Estimate</p>
+          <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-0.5">
+            New Estimate
+          </p>
           <h2 className="text-xl font-bold text-gray-900">{client.name}</h2>
         </div>
 
@@ -41,7 +42,10 @@ export default function NewEstimateModal({ client, onClose, onNext }) {
               className="input"
               placeholder="e.g. Backyard, Front Yard, Pool Area..."
               value={form.name}
-              onChange={e => { setForm(p => ({ ...p, name: e.target.value })); setError('') }}
+              onChange={e => {
+                setForm(p => ({ ...p, name: e.target.value }))
+                setError('')
+              }}
               autoFocus
             />
           </div>
@@ -53,7 +57,10 @@ export default function NewEstimateModal({ client, onClose, onNext }) {
             <select
               className="input"
               value={form.type}
-              onChange={e => { setForm(p => ({ ...p, type: e.target.value })); setError('') }}
+              onChange={e => {
+                setForm(p => ({ ...p, type: e.target.value }))
+                setError('')
+              }}
             >
               <option value="">-- Select Type --</option>
               <option value="Residential">Residential</option>
@@ -72,18 +79,10 @@ export default function NewEstimateModal({ client, onClose, onNext }) {
 
         {/* Buttons */}
         <div className="flex gap-3 mt-6">
-          <button
-            type="button"
-            onClick={onClose}
-            className="btn-secondary flex-1"
-          >
+          <button type="button" onClick={onClose} className="btn-secondary flex-1">
             Cancel
           </button>
-          <button
-            type="button"
-            onClick={handleNext}
-            className="btn-primary flex-1"
-          >
+          <button type="button" onClick={handleNext} className="btn-primary flex-1">
             Next →
           </button>
         </div>

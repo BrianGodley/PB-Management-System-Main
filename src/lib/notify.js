@@ -10,12 +10,10 @@
  *   await sendSMS({ to: '+15551234567', message: 'Your job is ready.' })
  */
 
-import { supabase } from './supabase'
-
 // ── Low-level senders ─────────────────────────────────────────────────────────
 
 export async function sendEmail({ to, subject, html, text }) {
-  const supabaseUrl  = import.meta.env.VITE_SUPABASE_URL
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
   const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY
   // Use the anon key as Bearer token — newer Supabase projects issue ES256
   // session JWTs which the Edge Function gateway rejects. The anon key is
@@ -23,11 +21,11 @@ export async function sendEmail({ to, subject, html, text }) {
   let raw
   try {
     raw = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
-      method:  'POST',
+      method: 'POST',
       headers: {
-        'Content-Type':  'application/json',
-        'Authorization': `Bearer ${supabaseAnon}`,
-        'apikey':        supabaseAnon,
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${supabaseAnon}`,
+        apikey: supabaseAnon,
       },
       body: JSON.stringify({ to, subject, html, text }),
     })
@@ -37,7 +35,11 @@ export async function sendEmail({ to, subject, html, text }) {
   }
 
   let data
-  try { data = await raw.json() } catch { data = null }
+  try {
+    data = await raw.json()
+  } catch {
+    data = null
+  }
 
   if (!raw.ok) {
     const msg = data?.error || data?.message || `HTTP ${raw.status}`
@@ -55,7 +57,7 @@ export async function sendEmail({ to, subject, html, text }) {
 }
 
 export async function sendSMS({ to, message }) {
-  const supabaseUrl  = import.meta.env.VITE_SUPABASE_URL
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
   const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY
   // Use the anon key as Bearer token — newer Supabase projects issue ES256
   // session JWTs which the Edge Function gateway rejects. The anon key is
@@ -63,11 +65,11 @@ export async function sendSMS({ to, message }) {
   let raw
   try {
     raw = await fetch(`${supabaseUrl}/functions/v1/send-sms`, {
-      method:  'POST',
+      method: 'POST',
       headers: {
-        'Content-Type':  'application/json',
-        'Authorization': `Bearer ${supabaseAnon}`,
-        'apikey':        supabaseAnon,
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${supabaseAnon}`,
+        apikey: supabaseAnon,
       },
       body: JSON.stringify({ to, message }),
     })
@@ -77,7 +79,11 @@ export async function sendSMS({ to, message }) {
   }
 
   let data
-  try { data = await raw.json() } catch { data = null }
+  try {
+    data = await raw.json()
+  } catch {
+    data = null
+  }
 
   if (!raw.ok) {
     const msg = data?.error || data?.message || `HTTP ${raw.status}`
@@ -92,7 +98,14 @@ export async function sendSMS({ to, message }) {
     return { data, error: new Error(msg) }
   }
 
-  console.log('[notify] sendSMS ok — provider:', data?.provider, 'id:', data?.id, 'status:', data?.status)
+  console.log(
+    '[notify] sendSMS ok — provider:',
+    data?.provider,
+    'id:',
+    data?.id,
+    'status:',
+    data?.status
+  )
   return { data, error: null }
 }
 
@@ -129,14 +142,18 @@ function baseTemplate({ title, body, buttonText, buttonUrl }) {
           <td style="padding:32px;">
             <h1 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#111827;">${title}</h1>
             ${body}
-            ${buttonText && buttonUrl ? `
+            ${
+              buttonText && buttonUrl
+                ? `
             <div style="margin-top:28px;text-align:center;">
               <a href="${buttonUrl}"
                  style="display:inline-block;background:${brandColor};color:#ffffff;text-decoration:none;
                         padding:12px 28px;border-radius:10px;font-weight:700;font-size:15px;">
                 ${buttonText}
               </a>
-            </div>` : ''}
+            </div>`
+                : ''
+            }
           </td>
         </tr>
 
@@ -248,9 +265,10 @@ export async function sendJobSMS({ to, jobName, message }) {
  */
 export async function sendFeedbackStatusEmail({ to, title, status, notes, helpUrl }) {
   const niceStatus = status === 'in_progress' ? 'In Progress' : status === 'done' ? 'Done' : status
-  const badgeColor = status === 'done'
-    ? { bg: '#f0fdf4', border: '#bbf7d0', text: '#166534' }
-    : { bg: '#faf5ff', border: '#e9d5ff', text: '#6b21a8' }
+  const badgeColor =
+    status === 'done'
+      ? { bg: '#f0fdf4', border: '#bbf7d0', text: '#166534' }
+      : { bg: '#faf5ff', border: '#e9d5ff', text: '#6b21a8' }
   const subject = `Your request "${title}" is now ${niceStatus}`
   const body = `
     <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 12px;">
@@ -263,13 +281,17 @@ export async function sendFeedbackStatusEmail({ to, title, status, notes, helpUr
                 color:${badgeColor.text};padding:8px 20px;border-radius:8px;font-weight:700;font-size:15px;margin-bottom:16px;">
       ${niceStatus}
     </div>
-    ${notes ? `
+    ${
+      notes
+        ? `
       <p style="color:#6b7280;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;margin:20px 0 6px;">
         Notes from the team
       </p>
       <p style="color:#374151;font-size:14px;line-height:1.6;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:14px;white-space:pre-wrap;margin:0;">
         ${notes.replace(/</g, '&lt;')}
-      </p>` : ''}
+      </p>`
+        : ''
+    }
     <p style="color:#6b7280;font-size:13px;margin:20px 0 0;">
       You can see all your open and resolved requests in the Help section of PBS.
     </p>`

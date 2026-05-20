@@ -14,30 +14,142 @@ import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../
 // labDbName resolves the per-fixture labor coefficient from labor_rates so it can
 // be edited from the inline calculator icon next to the row.
 const FIXTURE_TYPES = [
-  { key: 'spotLights',  label: 'Spot Lights',        dbName: 'Spot Light',        labDbName: 'Lighting - Spot Light Labor',        wattsEa: 4.5,  vaEa: 7.5, laborHrsEa: 0.5,   matCostEa: 99.00,  unit: 'ea' },
-  { key: 'floodLights', label: 'Flood Lights',        dbName: 'Flood Light',       labDbName: 'Lighting - Flood Light Labor',       wattsEa: 4.5,  vaEa: 7.5, laborHrsEa: 0.5,   matCostEa: 99.00,  unit: 'ea' },
-  { key: 'wallWasher',  label: 'Wall Washer Lights',  dbName: 'Wall Washer Light', labDbName: 'Lighting - Wall Washer Light Labor', wattsEa: 4.5,  vaEa: 7.5, laborHrsEa: 0.5,   matCostEa: 99.00,  unit: 'ea' },
-  { key: 'pathLights',  label: 'Path Lights',         dbName: 'Path Light',        labDbName: 'Lighting - Path Light Labor',        wattsEa: 4.1,  vaEa: 5.8, laborHrsEa: 0.5,   matCostEa: 135.45, unit: 'ea' },
-  { key: 'stepLights',  label: 'Step Lights',         dbName: 'Step Light',        labDbName: 'Lighting - Step Light Labor',        wattsEa: 0.75, vaEa: 1.3, laborHrsEa: 0.5,   matCostEa: 67.05,  unit: 'ea' },
-  { key: 'bistro',      label: 'Bistro Lighting',     dbName: 'Bistro Lighting',   labDbName: 'Lighting - Bistro Labor',             wattsEa: 1,    vaEa: 1,   laborHrsEa: 0.125, matCostEa: 11.52,  unit: 'LF' },
+  {
+    key: 'spotLights',
+    label: 'Spot Lights',
+    dbName: 'Spot Light',
+    labDbName: 'Lighting - Spot Light Labor',
+    wattsEa: 4.5,
+    vaEa: 7.5,
+    laborHrsEa: 0.5,
+    matCostEa: 99.0,
+    unit: 'ea',
+  },
+  {
+    key: 'floodLights',
+    label: 'Flood Lights',
+    dbName: 'Flood Light',
+    labDbName: 'Lighting - Flood Light Labor',
+    wattsEa: 4.5,
+    vaEa: 7.5,
+    laborHrsEa: 0.5,
+    matCostEa: 99.0,
+    unit: 'ea',
+  },
+  {
+    key: 'wallWasher',
+    label: 'Wall Washer Lights',
+    dbName: 'Wall Washer Light',
+    labDbName: 'Lighting - Wall Washer Light Labor',
+    wattsEa: 4.5,
+    vaEa: 7.5,
+    laborHrsEa: 0.5,
+    matCostEa: 99.0,
+    unit: 'ea',
+  },
+  {
+    key: 'pathLights',
+    label: 'Path Lights',
+    dbName: 'Path Light',
+    labDbName: 'Lighting - Path Light Labor',
+    wattsEa: 4.1,
+    vaEa: 5.8,
+    laborHrsEa: 0.5,
+    matCostEa: 135.45,
+    unit: 'ea',
+  },
+  {
+    key: 'stepLights',
+    label: 'Step Lights',
+    dbName: 'Step Light',
+    labDbName: 'Lighting - Step Light Labor',
+    wattsEa: 0.75,
+    vaEa: 1.3,
+    laborHrsEa: 0.5,
+    matCostEa: 67.05,
+    unit: 'ea',
+  },
+  {
+    key: 'bistro',
+    label: 'Bistro Lighting',
+    dbName: 'Bistro Lighting',
+    labDbName: 'Lighting - Bistro Labor',
+    wattsEa: 1,
+    vaEa: 1,
+    laborHrsEa: 0.125,
+    matCostEa: 11.52,
+    unit: 'LF',
+  },
 ]
 
 // Transformer types — 0.25 hrs labor each
 const TRANSFORMER_TYPES = [
-  { key: 'xfrm100',  label: '100 Watt',  dbName: 'Transformer 100W',  labDbName: 'Lighting - Transformer 100W Labor',  laborHrs: 0.25, matCost: 205.50 },
-  { key: 'xfrm200',  label: '200 Watt',  dbName: 'Transformer 200W',  labDbName: 'Lighting - Transformer 200W Labor',  laborHrs: 0.25, matCost: 222.00 },
-  { key: 'xfrm300',  label: '300 Watt',  dbName: 'Transformer 300W',  labDbName: 'Lighting - Transformer 300W Labor',  laborHrs: 0.25, matCost: 237.00 },
-  { key: 'xfrm600',  label: '600 Watt',  dbName: 'Transformer 600W',  labDbName: 'Lighting - Transformer 600W Labor',  laborHrs: 0.25, matCost: 367.50 },
-  { key: 'xfrm900',  label: '900 Watt',  dbName: 'Transformer 900W',  labDbName: 'Lighting - Transformer 900W Labor',  laborHrs: 0.25, matCost: 520.50 },
-  { key: 'xfrm1200', label: '1200 Watt', dbName: 'Transformer 1200W', labDbName: 'Lighting - Transformer 1200W Labor', laborHrs: 0.25, matCost: 666.00 },
+  {
+    key: 'xfrm100',
+    label: '100 Watt',
+    dbName: 'Transformer 100W',
+    labDbName: 'Lighting - Transformer 100W Labor',
+    laborHrs: 0.25,
+    matCost: 205.5,
+  },
+  {
+    key: 'xfrm200',
+    label: '200 Watt',
+    dbName: 'Transformer 200W',
+    labDbName: 'Lighting - Transformer 200W Labor',
+    laborHrs: 0.25,
+    matCost: 222.0,
+  },
+  {
+    key: 'xfrm300',
+    label: '300 Watt',
+    dbName: 'Transformer 300W',
+    labDbName: 'Lighting - Transformer 300W Labor',
+    laborHrs: 0.25,
+    matCost: 237.0,
+  },
+  {
+    key: 'xfrm600',
+    label: '600 Watt',
+    dbName: 'Transformer 600W',
+    labDbName: 'Lighting - Transformer 600W Labor',
+    laborHrs: 0.25,
+    matCost: 367.5,
+  },
+  {
+    key: 'xfrm900',
+    label: '900 Watt',
+    dbName: 'Transformer 900W',
+    labDbName: 'Lighting - Transformer 900W Labor',
+    laborHrs: 0.25,
+    matCost: 520.5,
+  },
+  {
+    key: 'xfrm1200',
+    label: '1200 Watt',
+    dbName: 'Transformer 1200W',
+    labDbName: 'Lighting - Transformer 1200W Labor',
+    laborHrs: 0.25,
+    matCost: 666.0,
+  },
 ]
 
 // Wire & other materials
 const WIRE_ITEMS = [
-  { key: 'wire250',    label: "12x2 E. Wiring × 250' roll", dbName: "12x2 E. Wiring 250' Roll", matCostEa: 115.00 },
-  { key: 'wirePerFt',  label: '12x2 E. Wiring (per foot)',   dbName: '12x2 E. Wiring',           matCostEa: 0.35   },
-  { key: 'fxTimer',    label: 'Fx Timer',                    dbName: 'Fx Timer',                  matCostEa: 16.26  },
-  { key: 'bistroWire', label: 'Bistro Wire (per foot)',       dbName: 'Bistro Wire',               matCostEa: 4.00   },
+  {
+    key: 'wire250',
+    label: "12x2 E. Wiring × 250' roll",
+    dbName: "12x2 E. Wiring 250' Roll",
+    matCostEa: 115.0,
+  },
+  {
+    key: 'wirePerFt',
+    label: '12x2 E. Wiring (per foot)',
+    dbName: '12x2 E. Wiring',
+    matCostEa: 0.35,
+  },
+  { key: 'fxTimer', label: 'Fx Timer', dbName: 'Fx Timer', matCostEa: 16.26 },
+  { key: 'bistroWire', label: 'Bistro Wire (per foot)', dbName: 'Bistro Wire', matCostEa: 4.0 },
 ]
 
 // 15% material markup applied to all fixture, transformer, and wire materials
@@ -45,39 +157,50 @@ const MATERIAL_MARKUP = 0.15
 
 const DEFAULTS = {
   laborRatePerHour: 35,
-  laborBurdenPct:   0.29,
-  gpmd:             425,
-  commissionRate:   0.12,
+  laborBurdenPct: 0.29,
+  gpmd: 425,
+  commissionRate: 0.12,
 }
 
-const n = (v) => parseFloat(v) || 0
+const n = v => parseFloat(v) || 0
 
 // ── Calculation ──────────────────────────────────────────────────────────────
 // materialPrices: { [dbName]: unit_cost } — overrides hardcoded defaults when available
 // laborRates:     { [labDbName]: hours_per_unit } — overrides hardcoded labor defaults
-function calcLighting(state, laborRatePerHour = DEFAULTS.laborRatePerHour, materialPrices = {}, laborRates = {}, gpmd = DEFAULTS.gpmd, walkAccess = null) {
-  const _pace = (parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN)
+function calcLighting(
+  state,
+  laborRatePerHour = DEFAULTS.laborRatePerHour,
+  materialPrices = {},
+  laborRates = {},
+  gpmd = DEFAULTS.gpmd,
+  walkAccess = null
+) {
+  const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
   const { difficulty, hoursAdj, fixtureQtys, transformerQtys, wireQtys, manualRows } = state
 
-  let fixHrs = 0, fixMat = 0, totalWatts = 0, totalVA = 0
+  let fixHrs = 0,
+    fixMat = 0,
+    totalWatts = 0,
+    totalVA = 0
   FIXTURE_TYPES.forEach(f => {
     const qty = n(fixtureQtys[f.key])
     if (qty > 0) {
-      const price   = materialPrices[f.dbName]    ?? f.matCostEa
-      const labHrsEa = laborRates[f.labDbName]    ?? f.laborHrsEa
+      const price = materialPrices[f.dbName] ?? f.matCostEa
+      const labHrsEa = laborRates[f.labDbName] ?? f.laborHrsEa
       totalWatts += qty * f.wattsEa
-      totalVA    += qty * f.vaEa
-      fixHrs     += qty * labHrsEa
-      fixMat     += qty * price
+      totalVA += qty * f.vaEa
+      fixHrs += qty * labHrsEa
+      fixMat += qty * price
     }
   })
 
-  let xfrmHrs = 0, xfrmMat = 0
+  let xfrmHrs = 0,
+    xfrmMat = 0
   TRANSFORMER_TYPES.forEach(t => {
     const qty = n(transformerQtys[t.key])
     if (qty > 0) {
-      const price   = materialPrices[t.dbName]    ?? t.matCost
-      const labHrsEa = laborRates[t.labDbName]    ?? t.laborHrs
+      const price = materialPrices[t.dbName] ?? t.matCost
+      const labHrsEa = laborRates[t.labDbName] ?? t.laborHrs
       xfrmHrs += qty * labHrsEa
       xfrmMat += qty * price
     }
@@ -96,34 +219,57 @@ function calcLighting(state, laborRatePerHour = DEFAULTS.laborRatePerHour, mater
   const rawMat = fixMat + xfrmMat + wireMat
   const markedUpMat = rawMat * (1 + MATERIAL_MARKUP)
 
-  let manHrs = 0, manMat = 0, manSub = 0
+  let manHrs = 0,
+    manMat = 0,
+    manSub = 0
   manualRows.forEach(r => {
-    manHrs += n(r.hours); manMat += n(r.materials); manSub += n(r.subCost)
+    manHrs += n(r.hours)
+    manMat += n(r.materials)
+    manSub += n(r.subCost)
   })
 
   const subtotalHrs = fixHrs + xfrmHrs
-  const diffHrs     = subtotalHrs * (n(difficulty) / 100)
+  const diffHrs = subtotalHrs * (n(difficulty) / 100)
   const _preWalkHrs = subtotalHrs + diffHrs + manHrs + (parseFloat(hoursAdj) || 0)
-  const walkHrs     = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
-  const totalHrs    = _preWalkHrs + walkHrs
-  const manDays     = totalHrs / 8
+  const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
+  const totalHrs = _preWalkHrs + walkHrs
+  const manDays = totalHrs / 8
 
-  const totalMat  = markedUpMat + manMat
+  const totalMat = markedUpMat + manMat
   const laborCost = totalHrs * laborRatePerHour
-  const burden     = laborCost * DEFAULTS.laborBurdenPct
-  const gp         = manDays * gpmd
+  const burden = laborCost * DEFAULTS.laborBurdenPct
+  const gp = manDays * gpmd
   const commission = gp * DEFAULTS.commissionRate
-  const subCost    = manSub
-  const price      = totalMat + laborCost + burden + gp + commission + subCost
+  const subCost = manSub
+  const price = totalMat + laborCost + burden + gp + commission + subCost
 
-  return { totalHrs, manDays, totalMat, totalWatts, totalVA,
-           rawMat, markedUpMat, laborCost, burden, gp, commission, subCost, price }
+  return {
+    totalHrs,
+    manDays,
+    totalMat,
+    totalWatts,
+    totalVA,
+    rawMat,
+    markedUpMat,
+    laborCost,
+    burden,
+    gp,
+    commission,
+    subCost,
+    price,
+  }
 }
 
 // ── Default blank state ───────────────────────────────────────────────────────
-function blankFixtureQtys()     { return Object.fromEntries(FIXTURE_TYPES.map(f => [f.key, ''])) }
-function blankTransformerQtys() { return Object.fromEntries(TRANSFORMER_TYPES.map(t => [t.key, ''])) }
-function blankWireQtys()        { return Object.fromEntries(WIRE_ITEMS.map(w => [w.key, ''])) }
+function blankFixtureQtys() {
+  return Object.fromEntries(FIXTURE_TYPES.map(f => [f.key, '']))
+}
+function blankTransformerQtys() {
+  return Object.fromEntries(TRANSFORMER_TYPES.map(t => [t.key, '']))
+}
+function blankWireQtys() {
+  return Object.fromEntries(WIRE_ITEMS.map(w => [w.key, '']))
+}
 const DEFAULT_MANUAL_ROWS = [
   { label: 'Misc 1', hours: '', materials: '', subCost: '' },
   { label: 'Misc 2', hours: '', materials: '', subCost: '' },
@@ -144,7 +290,8 @@ function SectionHeader({ title, sub }) {
 function QtyInput({ value, onChange, step = '1' }) {
   return (
     <input
-      type="number" step={step}
+      type="number"
+      step={step}
       className="input text-sm py-1 w-20"
       placeholder="0"
       value={value}
@@ -159,11 +306,13 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
     initialData?.laborRatePerHour ?? DEFAULTS.laborRatePerHour
   )
   const [distanceLF, setDistanceLF] = useState(initialData?.distanceLF ?? '')
-  const [walkAccess, setWalkAccess] = useState(initialData?.walkAccess ?? {
-    paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
-  })
+  const [walkAccess, setWalkAccess] = useState(
+    initialData?.walkAccess ?? {
+      paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+    }
+  )
   const [materialPrices, setMaterialPrices] = useState({})
-  const [laborRates,     setLaborRates]     = useState({})
+  const [laborRates, setLaborRates] = useState({})
 
   // Re-fetch lighting material + labor rate maps. Used on mount and after edits.
   const refreshAllRates = useCallback(async () => {
@@ -171,20 +320,41 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
       supabase.from('material_rates').select('name, unit_cost').eq('category', 'Lighting'),
       supabase.from('labor_rates').select('name, rate').eq('category', 'Lighting'),
     ])
-    if (matRes.data) { const m = {}; matRes.data.forEach(r => { m[r.name] = parseFloat(r.unit_cost) }); setMaterialPrices(m) }
-    if (labRes.data) { const m = {}; labRes.data.forEach(r => { m[r.name] = parseFloat(r.rate) });      setLaborRates(m) }
+    if (matRes.data) {
+      const m = {}
+      matRes.data.forEach(r => {
+        m[r.name] = parseFloat(r.unit_cost)
+      })
+      setMaterialPrices(m)
+    }
+    if (labRes.data) {
+      const m = {}
+      labRes.data.forEach(r => {
+        m[r.name] = parseFloat(r.rate)
+      })
+      setLaborRates(m)
+    }
   }, [])
 
   useEffect(() => {
     // Fetch labor rate (skip if editing with a saved rate)
     if (!initialData?.laborRatePerHour) {
-      supabase.from('company_settings').select('labor_rate_per_hour, walk_access_pace_lf_per_min').single()
+      supabase
+        .from('company_settings')
+        .select('labor_rate_per_hour, walk_access_pace_lf_per_min')
+        .single()
         .then(({ data }) => {
           if (!data) return
-          if (data.labor_rate_per_hour != null) setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
+          if (data.labor_rate_per_hour != null)
+            setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || DEFAULTS.laborRatePerHour)
           if (data.walk_access_pace_lf_per_min != null) {
             const _wpace = parseFloat(data.walk_access_pace_lf_per_min)
-            setWalkAccess({ paceLfPerMin: Number.isFinite(_wpace) && _wpace > 0 ? _wpace : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN })
+            setWalkAccess({
+              paceLfPerMin:
+                Number.isFinite(_wpace) && _wpace > 0
+                  ? _wpace
+                  : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+            })
           }
         })
     }
@@ -192,15 +362,17 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
   }, [refreshAllRates])
 
   const gpmd = initialData?.gpmd ?? DEFAULTS.gpmd
-  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
+  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
 
-  const [difficulty,      setDifficulty]      = useState(initialData?.difficulty      ?? '')
-  const [hoursAdj,      setHoursAdj]   = useState(initialData?.hoursAdj      ?? '')
+  const [difficulty, setDifficulty] = useState(initialData?.difficulty ?? '')
+  const [hoursAdj, setHoursAdj] = useState(initialData?.hoursAdj ?? '')
   const [crewType, setCrewType] = useState(initialData?.crewType ?? 'Landscape')
-  const [fixtureQtys,     setFixtureQtys]     = useState(initialData?.fixtureQtys     ?? blankFixtureQtys())
-  const [transformerQtys, setTransformerQtys] = useState(initialData?.transformerQtys ?? blankTransformerQtys())
-  const [wireQtys,        setWireQtys]        = useState(initialData?.wireQtys        ?? blankWireQtys())
-  const [manualRows,      setManualRows]       = useState(initialData?.manualRows      ?? DEFAULT_MANUAL_ROWS)
+  const [fixtureQtys, setFixtureQtys] = useState(initialData?.fixtureQtys ?? blankFixtureQtys())
+  const [transformerQtys, setTransformerQtys] = useState(
+    initialData?.transformerQtys ?? blankTransformerQtys()
+  )
+  const [wireQtys, setWireQtys] = useState(initialData?.wireQtys ?? blankWireQtys())
+  const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
 
   // ── Sales tax — applied to totalMat across every module so the bid
   //    reflects supplier-invoiced material cost. Sourced from
@@ -209,66 +381,91 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
   const [salesTaxRate, setSalesTaxRate] = useState(0)
   useEffect(() => {
     let alive = true
-    fetchSalesTaxRate().then(r => { if (alive) setSalesTaxRate(r) })
-    return () => { alive = false }
+    fetchSalesTaxRate().then(r => {
+      if (alive) setSalesTaxRate(r)
+    })
+    return () => {
+      alive = false
+    }
   }, [])
 
-
-  const calcRaw = calcLighting({ difficulty, hoursAdj, fixtureQtys, transformerQtys, wireQtys, manualRows, distanceLF }, laborRatePerHour, materialPrices, laborRates, gpmd, walkAccess)
+  const calcRaw = calcLighting(
+    { difficulty, hoursAdj, fixtureQtys, transformerQtys, wireQtys, manualRows, distanceLF },
+    laborRatePerHour,
+    materialPrices,
+    laborRates,
+    gpmd,
+    walkAccess
+  )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
   // material_cost (saved with the module) ends up tax-inclusive too,
   // so bid totals add up to GpmdBar's displayed price.
   const _salesTaxAmt = (calcRaw.totalMat || 0) * (salesTaxRate || 0)
-  const calc = _salesTaxAmt > 0
-    ? {
-        ...calcRaw,
-        totalMat: (calcRaw.totalMat || 0) + _salesTaxAmt,
-        price:    (calcRaw.price    || 0) + _salesTaxAmt,
-        salesTax: _salesTaxAmt,
-      }
-    : calcRaw
-
+  const calc =
+    _salesTaxAmt > 0
+      ? {
+          ...calcRaw,
+          totalMat: (calcRaw.totalMat || 0) + _salesTaxAmt,
+          price: (calcRaw.price || 0) + _salesTaxAmt,
+          salesTax: _salesTaxAmt,
+        }
+      : calcRaw
 
   function updateManual(i, field, val) {
-    setManualRows(rows => rows.map((r, idx) => idx === i ? { ...r, [field]: val } : r))
+    setManualRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
 
   function handleSave() {
     onSave({
-      man_days:      parseFloat(calc.manDays.toFixed(2)),
+      man_days: parseFloat(calc.manDays.toFixed(2)),
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
-      data: { difficulty, fixtureQtys, transformerQtys, wireQtys, manualRows, laborRatePerHour, gpmd, materialPrices, calc },
+      data: {
+        difficulty,
+        fixtureQtys,
+        transformerQtys,
+        wireQtys,
+        manualRows,
+        laborRatePerHour,
+        gpmd,
+        materialPrices,
+        calc,
+      },
     })
   }
 
-  const fmt2 = (v) => `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const fmt2 = v =>
+    `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   return (
     <div className="space-y-5">
       {/* ── Sticky GPMD bar ── */}
       <div className="sticky top-0 z-20 -mx-6 px-6 pt-2 pb-2 bg-gray-900 shadow-lg">
-      <GpmdBar
+        <GpmdBar
           sticky
-        totalMat={calc.totalMat}
-        totalHrs={calc.totalHrs}
-        manDays={calc.manDays}
-        laborCost={calc.laborCost}
-        laborRatePerHour={laborRatePerHour}
-        burden={calc.burden}
-        gp={calc.gp}
-        commission={calc.commission}
-        subCost={calc.subCost}
-        gpmd={gpmd}
-        price={calc.price}
-        subMarkupRate={subGpMarkupRate}
-      />
+          totalMat={calc.totalMat}
+          totalHrs={calc.totalHrs}
+          manDays={calc.manDays}
+          laborCost={calc.laborCost}
+          laborRatePerHour={laborRatePerHour}
+          burden={calc.burden}
+          gp={calc.gp}
+          commission={calc.commission}
+          subCost={calc.subCost}
+          gpmd={gpmd}
+          price={calc.price}
+          subMarkupRate={subGpMarkupRate}
+        />
       </div>
 
       {/* Crew Type */}
       <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
         <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
-        <select value={crewType} onChange={e => setCrewType(e.target.value)} className="input text-sm py-1 w-36">
+        <select
+          value={crewType}
+          onChange={e => setCrewType(e.target.value)}
+          className="input text-sm py-1 w-36"
+        >
           <option value="Demo">Demo</option>
           <option value="Landscape">Landscape</option>
           <option value="Masonry">Masonry</option>
@@ -282,27 +479,46 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
-          <input type="number" step="5" value={difficulty}
+          <input
+            type="number"
+            step="5"
+            value={difficulty}
             onChange={e => setDifficulty(e.target.value)}
             placeholder="0"
-            className="input text-sm py-1.5 w-full" />
+            className="input text-sm py-1.5 w-full"
+          />
         </div>
         <div>
-          <p className="text-xs text-gray-500 mb-0.5" title="Average Distance from Truck to Work Area">Truck → Work Area (Avg LF)</p>
-          <input type="number" step="5" value={distanceLF}
+          <p
+            className="text-xs text-gray-500 mb-0.5"
+            title="Average Distance from Truck to Work Area"
+          >
+            Truck → Work Area (Avg LF)
+          </p>
+          <input
+            type="number"
+            step="5"
+            value={distanceLF}
             onChange={e => setDistanceLF(e.target.value)}
             placeholder="0"
-            className="input text-sm py-1.5 w-full" />
+            className="input text-sm py-1.5 w-full"
+          />
           {calc.walkHrs > 0 && (
-            <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">+{calc.walkHrs.toFixed(2)} hrs walk-access</p>
+            <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">
+              +{calc.walkHrs.toFixed(2)} hrs walk-access
+            </p>
           )}
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
-          <input type="number" step="0.5" value={hoursAdj}
+          <input
+            type="number"
+            step="0.5"
+            value={hoursAdj}
             onChange={e => setHoursAdj(e.target.value)}
             placeholder="0"
-            className="input text-sm py-1.5 w-full" />
+            className="input text-sm py-1.5 w-full"
+          />
         </div>
       </div>
 
@@ -331,10 +547,23 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
                       <span className="inline-flex items-center gap-1">
                         {f.label}
                         <span className="text-gray-400">({f.unit})</span>
-                        <RateEditPopover table="material_rates" name={f.dbName} category="Lighting"
-                          unitLabel={f.unit} currentValue={matPrice} onSaved={refreshAllRates} />
-                        <RateEditPopover table="labor_rates" name={f.labDbName} category="Lighting"
-                          mode="coefficient" unitLabel={`hrs/${f.unit}`} currentValue={labHrsEa} onSaved={refreshAllRates} />
+                        <RateEditPopover
+                          table="material_rates"
+                          name={f.dbName}
+                          category="Lighting"
+                          unitLabel={f.unit}
+                          currentValue={matPrice}
+                          onSaved={refreshAllRates}
+                        />
+                        <RateEditPopover
+                          table="labor_rates"
+                          name={f.labDbName}
+                          category="Lighting"
+                          mode="coefficient"
+                          unitLabel={`hrs/${f.unit}`}
+                          currentValue={labHrsEa}
+                          onSaved={refreshAllRates}
+                        />
                       </span>
                     </td>
                     <td className="py-1.5 pr-2">
@@ -398,10 +627,23 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
                     <td className="py-1.5 pr-2 text-xs text-gray-700">
                       <span className="inline-flex items-center gap-1">
                         {t.label}
-                        <RateEditPopover table="material_rates" name={t.dbName} category="Lighting"
-                          unitLabel="ea" currentValue={matPrice} onSaved={refreshAllRates} />
-                        <RateEditPopover table="labor_rates" name={t.labDbName} category="Lighting"
-                          mode="coefficient" unitLabel="hrs/ea" currentValue={labHrsEa} onSaved={refreshAllRates} />
+                        <RateEditPopover
+                          table="material_rates"
+                          name={t.dbName}
+                          category="Lighting"
+                          unitLabel="ea"
+                          currentValue={matPrice}
+                          onSaved={refreshAllRates}
+                        />
+                        <RateEditPopover
+                          table="labor_rates"
+                          name={t.labDbName}
+                          category="Lighting"
+                          mode="coefficient"
+                          unitLabel="hrs/ea"
+                          currentValue={labHrsEa}
+                          onSaved={refreshAllRates}
+                        />
                       </span>
                     </td>
                     <td className="py-1.5 pr-2">
@@ -446,8 +688,14 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
                     <td className="py-1.5 pr-2 text-xs text-gray-700">
                       <span className="inline-flex items-center gap-1">
                         {w.label}
-                        <RateEditPopover table="material_rates" name={w.dbName} category="Lighting"
-                          unitLabel="ea" currentValue={matPrice} onSaved={refreshAllRates} />
+                        <RateEditPopover
+                          table="material_rates"
+                          name={w.dbName}
+                          category="Lighting"
+                          unitLabel="ea"
+                          currentValue={matPrice}
+                          onSaved={refreshAllRates}
+                        />
                       </span>
                     </td>
                     <td className="py-1.5 pr-2">
@@ -470,7 +718,8 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
         </div>
         {calc.rawMat > 0 && (
           <p className="text-xs text-gray-400 mt-1.5 px-1">
-            Raw materials {fmt2(calc.rawMat)} + 15% markup = <span className="text-gray-600 font-medium">{fmt2(calc.markedUpMat)}</span>
+            Raw materials {fmt2(calc.rawMat)} + 15% markup ={' '}
+            <span className="text-gray-600 font-medium">{fmt2(calc.markedUpMat)}</span>
           </p>
         )}
       </div>
@@ -492,23 +741,41 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
               {manualRows.map((row, i) => (
                 <tr key={i} className="border-b border-gray-100">
                   <td className="py-1 pr-2">
-                    <input className="input text-sm py-1" value={row.label}
-                      onChange={e => updateManual(i, 'label', e.target.value)} />
+                    <input
+                      className="input text-sm py-1"
+                      value={row.label}
+                      onChange={e => updateManual(i, 'label', e.target.value)}
+                    />
                   </td>
                   <td className="py-1 pr-2">
-                    <input type="number" step="any" className="input text-sm py-1 w-20"
-                      placeholder="0" value={row.hours}
-                      onChange={e => updateManual(i, 'hours', e.target.value)} />
+                    <input
+                      type="number"
+                      step="any"
+                      className="input text-sm py-1 w-20"
+                      placeholder="0"
+                      value={row.hours}
+                      onChange={e => updateManual(i, 'hours', e.target.value)}
+                    />
                   </td>
                   <td className="py-1 pr-2">
-                    <input type="number" step="any" className="input text-sm py-1 w-24"
-                      placeholder="0" value={row.materials}
-                      onChange={e => updateManual(i, 'materials', e.target.value)} />
+                    <input
+                      type="number"
+                      step="any"
+                      className="input text-sm py-1 w-24"
+                      placeholder="0"
+                      value={row.materials}
+                      onChange={e => updateManual(i, 'materials', e.target.value)}
+                    />
                   </td>
                   <td className="py-1">
-                    <input type="number" step="any" className="input text-sm py-1 w-24"
-                      placeholder="0" value={row.subCost}
-                      onChange={e => updateManual(i, 'subCost', e.target.value)} />
+                    <input
+                      type="number"
+                      step="any"
+                      className="input text-sm py-1 w-24"
+                      placeholder="0"
+                      value={row.subCost}
+                      onChange={e => updateManual(i, 'subCost', e.target.value)}
+                    />
                   </td>
                 </tr>
               ))}
@@ -528,12 +795,13 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
 
       {/* ── Actions ── */}
       <div className="flex gap-3 pt-2">
-        <button onClick={onBack} className="btn-secondary flex-1">← Back</button>
+        <button onClick={onBack} className="btn-secondary flex-1">
+          ← Back
+        </button>
         <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">
           {saving ? 'Saving...' : 'Add Module'}
         </button>
       </div>
-
     </div>
   )
 }

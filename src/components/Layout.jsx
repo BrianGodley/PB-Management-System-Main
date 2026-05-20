@@ -7,19 +7,19 @@ import { supabase } from '../lib/supabase'
 import SamChat from './SamChat'
 
 const navItems = [
-  { path: '/contacts',            label: 'Contacts',          icon: '🗂️' },
-  { path: '/clients',             label: 'Opportunities',     icon: '👥' },
-  { path: '/design',              label: 'Design',            icon: '📐' },
-  { path: '/bids',                label: 'Bids',              icon: '📋' },
-  { path: '/jobs',                label: 'Jobs',              icon: '🔨' },
-  { path: '/equipment-tracking',  label: 'Equipment',         icon: '🛠️' },
-  { path: '/collections',         label: 'Finance',           icon: '🏦' },
-  { path: '/statistics',          label: 'Statistics',        icon: '📈' },
-  { path: '/org-chart',           label: 'Org Chart',         icon: '🏗️' },
-  { path: '/portal/subs',         label: 'Subs & Vendors',    icon: '🚜' },
-  { path: '/training',            label: 'Training',          icon: '🎓' },
-  { path: '/hr',                  label: 'HR',                icon: '🏢' },
-  { path: '/accounting',          label: 'Accounting',        icon: '💼' },
+  { path: '/contacts', label: 'Contacts', icon: '🗂️' },
+  { path: '/clients', label: 'Opportunities', icon: '👥' },
+  { path: '/design', label: 'Design', icon: '📐' },
+  { path: '/bids', label: 'Bids', icon: '📋' },
+  { path: '/jobs', label: 'Jobs', icon: '🔨' },
+  { path: '/equipment-tracking', label: 'Equipment', icon: '🛠️' },
+  { path: '/collections', label: 'Finance', icon: '🏦' },
+  { path: '/statistics', label: 'Statistics', icon: '📈' },
+  { path: '/org-chart', label: 'Org Chart', icon: '🏗️' },
+  { path: '/portal/subs', label: 'Subs & Vendors', icon: '🚜' },
+  { path: '/training', label: 'Training', icon: '🎓' },
+  { path: '/hr', label: 'HR', icon: '🏢' },
+  { path: '/accounting', label: 'Accounting', icon: '💼' },
 ]
 
 // Dock and main menu labels are computed inside the component via t()
@@ -43,20 +43,26 @@ export default function Layout() {
   const { t } = useLang()
   const location = useLocation()
   const navigate = useNavigate()
-  const [showUserMenu,   setShowUserMenu]   = useState(false)
-  const [navCollapsed,   setNavCollapsed]   = useState(() => {
-    try { return localStorage.getItem('navCollapsed') === '1' } catch { return false }
+  const [showUserMenu, setShowUserMenu] = useState(false)
+  const [navCollapsed, setNavCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('navCollapsed') === '1'
+    } catch {
+      return false
+    }
   })
   useEffect(() => {
-    try { localStorage.setItem('navCollapsed', navCollapsed ? '1' : '0') } catch {}
+    try {
+      localStorage.setItem('navCollapsed', navCollapsed ? '1' : '0')
+    } catch {}
   }, [navCollapsed])
 
   // /jobs (Schedule view) auto-collapses the nav on entry to free up
   // horizontal space, then restores the user's pre-/jobs state on exit.
   // If the user was already collapsed before /jobs, we DO NOT auto-expand
   // when they leave — they get to keep their preference.
-  const prevPathRef          = useRef(location.pathname)
-  const preJobsCollapsedRef  = useRef(null)
+  const prevPathRef = useRef(location.pathname)
+  const preJobsCollapsedRef = useRef(null)
   useEffect(() => {
     const prev = prevPathRef.current
     const curr = location.pathname
@@ -87,37 +93,41 @@ export default function Layout() {
   // Translated dock + main-menu items (re-computed whenever t() changes)
   const DOCK_ITEMS = [
     { to: '/daily-logs', label: t('dailyLogs'), icon: '📋' },
-    { to: '/timeclock',  label: t('timeClock'), icon: '⏱️' },
-    { to: '/info',       label: t('info'),       icon: 'ℹ️' },
-    { key: 'main',       label: t('main'),       icon: '⊞' },
+    { to: '/timeclock', label: t('timeClock'), icon: '⏱️' },
+    { to: '/info', label: t('info'), icon: 'ℹ️' },
+    { key: 'main', label: t('main'), icon: '⊞' },
   ]
 
-  const [userRole,       setUserRole]       = useState(null)
+  const [userRole, setUserRole] = useState(null)
   const isAdmin = userRole === 'admin' || userRole === 'super_admin'
   const MAIN_MENU_ITEMS = [
-    { path: '/contacts',    label: 'Contacts',       icon: '🗂️' },
-    { path: '/clients',     label: t('clients'),     icon: '👥' },
-    { path: '/design',      label: 'Design',         icon: '📐' },
-    { path: '/bids',        label: 'Bids',           icon: '📋' },
-    { path: '/jobs',        label: t('jobs'),        icon: '🔨' },
-    { path: '/statistics',  label: t('statistics'),  icon: '📈' },
+    { path: '/contacts', label: 'Contacts', icon: '🗂️' },
+    { path: '/clients', label: t('clients'), icon: '👥' },
+    { path: '/design', label: 'Design', icon: '📐' },
+    { path: '/bids', label: 'Bids', icon: '📋' },
+    { path: '/jobs', label: t('jobs'), icon: '🔨' },
+    { path: '/statistics', label: t('statistics'), icon: '📈' },
     { path: '/portal/subs', label: t('subsVendors'), icon: '🚜' },
-    { path: '/hr',          label: t('hr') || 'HR',  icon: '🏢' },
+    { path: '/hr', label: t('hr') || 'HR', icon: '🏢' },
     // Admin tile — only present when the signed-in user is an admin. Lives
     // in the mobile main menu instead of the desktop top bar so phones get
     // a single, consistent place to find every admin tool.
     ...(isAdmin ? [{ path: '/admin', label: 'Admin', icon: '🛡️' }] : []),
   ]
-  const [showMainMenu,   setShowMainMenu]   = useState(false)
-  const [avatarUrl,      setAvatarUrl]      = useState(null)
+  const [showMainMenu, setShowMainMenu] = useState(false)
+  const [avatarUrl, setAvatarUrl] = useState(null)
   const [companyLogoUrl, setCompanyLogoUrl] = useState(null)
-  const userMenuRef  = useRef(null)
-  const mainMenuRef  = useRef(null)
+  const userMenuRef = useRef(null)
+  const mainMenuRef = useRef(null)
 
   // Fetch profile (admin status + avatar)
   const fetchProfile = () => {
     if (!user?.id) return
-    supabase.from('profiles').select('role, avatar_url').eq('id', user.id).single()
+    supabase
+      .from('profiles')
+      .select('role, avatar_url')
+      .eq('id', user.id)
+      .single()
       .then(({ data }) => {
         if (data) {
           setAvatarUrl(data.avatar_url || null)
@@ -128,7 +138,10 @@ export default function Layout() {
 
   // Fetch company logo and apply as favicon
   const fetchCompanyLogo = () => {
-    supabase.from('company_settings').select('logo_url').maybeSingle()
+    supabase
+      .from('company_settings')
+      .select('logo_url')
+      .maybeSingle()
       .then(({ data }) => {
         if (data?.logo_url) {
           setCompanyLogoUrl(data.logo_url)
@@ -173,20 +186,22 @@ export default function Layout() {
   }, [showMainMenu])
 
   // Close main menu on route change
-  useEffect(() => { setShowMainMenu(false) }, [location.pathname])
+  useEffect(() => {
+    setShowMainMenu(false)
+  }, [location.pathname])
 
   const handleSignOut = async () => {
     await signOut()
     navigate('/login')
   }
 
-  const isActive = (path) => {
+  const isActive = path => {
     if (path === '/') return location.pathname === '/'
     return location.pathname.startsWith(path)
   }
 
   // Dock active state
-  const dockActive = (to) => {
+  const dockActive = to => {
     if (!to) return false
     if (to === '/jobs') return location.pathname === '/jobs'
     return location.pathname === to
@@ -194,25 +209,26 @@ export default function Layout() {
 
   return (
     <div className="h-screen flex flex-col bg-gray-100">
-
       {/* Floating tooltip portal — attached to <body> so the sidebar's
           overflow-y-auto can't clip it. Driven by hover on each collapsed
           nav item. left: 56 = w-12 sidebar (48px) + 8px margin. */}
-      {navTip && navCollapsed && createPortal(
-        <div
-          style={{
-            position:  'fixed',
-            left:       56,
-            top:        navTip.top,
-            transform: 'translateY(-50%)',
-            zIndex:     9999,
-          }}
-          className="px-2 py-1 rounded-md bg-gray-900 text-white text-[11px] font-semibold whitespace-nowrap shadow-lg pointer-events-none"
-        >
-          {navTip.label}
-        </div>,
-        document.body
-      )}
+      {navTip &&
+        navCollapsed &&
+        createPortal(
+          <div
+            style={{
+              position: 'fixed',
+              left: 56,
+              top: navTip.top,
+              transform: 'translateY(-50%)',
+              zIndex: 9999,
+            }}
+            className="px-2 py-1 rounded-md bg-gray-900 text-white text-[11px] font-semibold whitespace-nowrap shadow-lg pointer-events-none"
+          >
+            {navTip.label}
+          </div>,
+          document.body
+        )}
 
       {/* ── TOP BAR ── */}
       <header
@@ -220,14 +236,15 @@ export default function Layout() {
         className="w-full sticky top-0 z-50 shadow-md"
       >
         <div className="flex items-center h-11 px-4 gap-4">
-
           {/* Logo + system name */}
           <Link to="/" className="flex items-center gap-2.5 flex-shrink-0">
             <img
               src={companyLogoUrl || '/logo.png'}
               alt="Logo"
               className="h-6 w-6 object-contain rounded"
-              onError={e => { e.target.style.display = 'none' }}
+              onError={e => {
+                e.target.style.display = 'none'
+              }}
             />
             <span className="text-white font-semibold text-sm tracking-wide hidden sm:inline">
               Picture Build System
@@ -260,7 +277,10 @@ export default function Layout() {
             </Link>
 
             {/* User avatar dropdown — desktop only */}
-            <div ref={userMenuRef} className="relative hidden md:block pl-3 ml-1 border-l border-white/20">
+            <div
+              ref={userMenuRef}
+              className="relative hidden md:block pl-3 ml-1 border-l border-white/20"
+            >
               <button
                 onClick={() => setShowUserMenu(v => !v)}
                 className="flex items-center gap-2 hover:opacity-80 transition-opacity"
@@ -269,10 +289,11 @@ export default function Layout() {
                   style={!avatarUrl ? { backgroundColor: forestGreenDark } : {}}
                   className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white overflow-hidden flex-shrink-0"
                 >
-                  {avatarUrl
-                    ? <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover" />
-                    : (user?.email?.[0]?.toUpperCase() || 'U')
-                  }
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    user?.email?.[0]?.toUpperCase() || 'U'
+                  )}
                 </div>
                 <span className="text-white/60 text-xs truncate max-w-[140px]">{user?.email}</span>
                 <span className="text-white/40 text-xs">▾</span>
@@ -280,13 +301,19 @@ export default function Layout() {
 
               {showUserMenu && (
                 <div className="absolute right-0 top-full mt-2 w-44 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
-                  <Link to="/profile" onClick={() => setShowUserMenu(false)}
-                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
+                  <Link
+                    to="/profile"
+                    onClick={() => setShowUserMenu(false)}
+                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                  >
                     👤 Profile
                   </Link>
                   <div className="border-t border-gray-100 my-1" />
                   <button
-                    onClick={() => { setShowUserMenu(false); handleSignOut() }}
+                    onClick={() => {
+                      setShowUserMenu(false)
+                      handleSignOut()
+                    }}
                     className="w-full text-left flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
                   >
                     🚪 Log Out
@@ -300,7 +327,6 @@ export default function Layout() {
 
       {/* ── BODY: sidebar + content ── */}
       <div className="flex flex-1 min-h-0">
-
         {/* LEFT SIDEBAR — desktop only */}
         <aside
           className={`hidden lg:flex flex-col bg-white border-r border-gray-200 sticky top-11 h-[calc(100vh-2.75rem)] overflow-y-auto transition-[width] duration-200 ${
@@ -315,9 +341,19 @@ export default function Layout() {
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               {navCollapsed ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
               ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
               )}
             </svg>
           </button>
@@ -392,7 +428,9 @@ export default function Layout() {
               key={item.to}
               to={item.to}
               className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-xs font-medium transition-colors ${
-                dockActive(item.to) ? 'text-green-700 bg-green-50' : 'text-gray-500 hover:text-gray-800'
+                dockActive(item.to)
+                  ? 'text-green-700 bg-green-50'
+                  : 'text-gray-500 hover:text-gray-800'
               }`}
             >
               <span className="text-xl leading-none">{item.icon}</span>
@@ -420,7 +458,9 @@ export default function Layout() {
             style={{ marginBottom: 'env(safe-area-inset-bottom)' }}
           >
             <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 px-1">{t('mainMenu')}</p>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 px-1">
+              {t('mainMenu')}
+            </p>
 
             <div className="grid grid-cols-3 gap-3">
               {MAIN_MENU_ITEMS.map(item => (
@@ -442,7 +482,10 @@ export default function Layout() {
 
             {/* Sign out at bottom of sheet */}
             <button
-              onClick={() => { setShowMainMenu(false); handleSignOut() }}
+              onClick={() => {
+                setShowMainMenu(false)
+                handleSignOut()
+              }}
               className="w-full mt-4 py-3 rounded-xl border border-red-100 text-sm font-medium text-red-500 hover:bg-red-50 transition-colors"
             >
               🚪 {t('signOut')}

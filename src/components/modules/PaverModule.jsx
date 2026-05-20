@@ -48,82 +48,90 @@ const BASE_METHODS = ['Skid Good', 'Skid OK', 'Mini Skid', 'Hand']
 // icon next to the method dropdown edits the correct t/hr rate.
 const BASE_METHOD_LABOR_NAME = {
   'Skid Good': 'Paver - Base Skid Steer Good',
-  'Skid OK':   'Paver - Base Skid Steer OK',
+  'Skid OK': 'Paver - Base Skid Steer OK',
   'Mini Skid': 'Paver - Base Mini Skid Steer',
-  'Hand':      'Paver - Base Hand',
+  Hand: 'Paver - Base Hand',
 }
 
 // ── Fallback constants (matched to seed SQL) ──────────────────────────────────
 const LABOR_DEFAULTS = {
-  install:        20,
-  straightCut:    70,
-  curvedCut:      30,
-  restraints:     22,
-  sleeves:        10,
-  vertSoldier:     8,
-  sealer:        200,
-  add80mm:        0.15,
-  addStone:       0.05,
-  addColor:       0.05,
+  install: 20,
+  straightCut: 70,
+  curvedCut: 30,
+  restraints: 22,
+  sleeves: 10,
+  vertSoldier: 8,
+  sealer: 200,
+  add80mm: 0.15,
+  addStone: 0.05,
+  addColor: 0.05,
   polySandSpread: 0.004,
   baseBobcatGood: 10,
-  baseBobcatOK:   7.5,
+  baseBobcatOK: 7.5,
   baseMiniBobcat: 5,
-  baseHand:       2.5,
+  baseHand: 2.5,
 }
 
 const MAT_DEFAULTS = {
-  baseRock:        7.50,
-  beddingSand:    25.30,
-  jointSand:       0.05,
-  polySandMat:     0.56,
-  sealerMat:       0.63,
-  restraintConcr:  1.38,
-  sleevesMat:      0.46,
-  palletCharge:   51.75,
-  delivery:      442.75,
+  baseRock: 7.5,
+  beddingSand: 25.3,
+  jointSand: 0.05,
+  polySandMat: 0.56,
+  sealerMat: 0.63,
+  restraintConcr: 1.38,
+  sleevesMat: 0.46,
+  palletCharge: 51.75,
+  delivery: 442.75,
 }
 
 // ── Calculation engine ────────────────────────────────────────────────────────
-function calcPaver(state, laborRatePerHour, laborRates, materialRates, paverPrices, gpmd = 425, walkAccess = null) {
-  const _pace = (parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN)
-  const lr = laborRates   || {}
+function calcPaver(
+  state,
+  laborRatePerHour,
+  laborRates,
+  materialRates,
+  paverPrices,
+  gpmd = 425,
+  walkAccess = null
+) {
+  const _pace = parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
+  const lr = laborRates || {}
   const mr = materialRates || {}
-  const pp = paverPrices   || []
+  const pp = paverPrices || []
 
   // Labor rates
-  const installRate      = lr['Paver - Install']          ?? LABOR_DEFAULTS.install
-  const straightCutRate  = lr['Paver - Straight Cut']     ?? LABOR_DEFAULTS.straightCut
-  const curvedCutRate    = lr['Paver - Curved Cut']       ?? LABOR_DEFAULTS.curvedCut
-  const restraintRate    = lr['Paver - Restraints']       ?? LABOR_DEFAULTS.restraints
-  const sleevesRate      = lr['Paver - Sleeves']          ?? LABOR_DEFAULTS.sleeves
-  const vertSoldierRate  = lr['Paver - Vertical Soldier'] ?? LABOR_DEFAULTS.vertSoldier
-  const sealerRate       = lr['Paver - Sealer']           ?? LABOR_DEFAULTS.sealer
-  const add80mmMult      = lr['Paver - 80mm Add']         ?? LABOR_DEFAULTS.add80mm
-  const addStonePer      = lr['Paver - Stone Add']        ?? LABOR_DEFAULTS.addStone
-  const addColorPer      = lr['Paver - Color Add']        ?? LABOR_DEFAULTS.addColor
-  const polySandSpread   = lr['Paver - Poly Sand Spread'] ?? LABOR_DEFAULTS.polySandSpread
-  const baseBobcatGood   = lr['Paver - Base Skid Steer Good'] ?? LABOR_DEFAULTS.baseBobcatGood
-  const baseBobcatOK     = lr['Paver - Base Skid Steer OK']   ?? LABOR_DEFAULTS.baseBobcatOK
-  const baseMiniBobcat   = lr['Paver - Base Mini Skid Steer'] ?? LABOR_DEFAULTS.baseMiniBobcat
-  const baseHand         = lr['Paver - Base Hand']        ?? LABOR_DEFAULTS.baseHand
+  const installRate = lr['Paver - Install'] ?? LABOR_DEFAULTS.install
+  const straightCutRate = lr['Paver - Straight Cut'] ?? LABOR_DEFAULTS.straightCut
+  const curvedCutRate = lr['Paver - Curved Cut'] ?? LABOR_DEFAULTS.curvedCut
+  const restraintRate = lr['Paver - Restraints'] ?? LABOR_DEFAULTS.restraints
+  const sleevesRate = lr['Paver - Sleeves'] ?? LABOR_DEFAULTS.sleeves
+  const vertSoldierRate = lr['Paver - Vertical Soldier'] ?? LABOR_DEFAULTS.vertSoldier
+  const sealerRate = lr['Paver - Sealer'] ?? LABOR_DEFAULTS.sealer
+  const add80mmMult = lr['Paver - 80mm Add'] ?? LABOR_DEFAULTS.add80mm
+  const addStonePer = lr['Paver - Stone Add'] ?? LABOR_DEFAULTS.addStone
+  const addColorPer = lr['Paver - Color Add'] ?? LABOR_DEFAULTS.addColor
+  const polySandSpread = lr['Paver - Poly Sand Spread'] ?? LABOR_DEFAULTS.polySandSpread
+  const baseBobcatGood = lr['Paver - Base Skid Steer Good'] ?? LABOR_DEFAULTS.baseBobcatGood
+  const baseBobcatOK = lr['Paver - Base Skid Steer OK'] ?? LABOR_DEFAULTS.baseBobcatOK
+  const baseMiniBobcat = lr['Paver - Base Mini Skid Steer'] ?? LABOR_DEFAULTS.baseMiniBobcat
+  const baseHand = lr['Paver - Base Hand'] ?? LABOR_DEFAULTS.baseHand
 
   // Material rates
-  const baseRockPerTon    = mr['Paver - Base Rock']           ?? MAT_DEFAULTS.baseRock
-  const beddingSandPerTon = mr['Paver - Bedding Sand']        ?? MAT_DEFAULTS.beddingSand
-  const jointSandPerSF    = mr['Paver - Joint Sand']          ?? MAT_DEFAULTS.jointSand
-  const polySandPerSF     = mr['Paver - Poly Sand']           ?? MAT_DEFAULTS.polySandMat
-  const sealerMatPerSF    = mr['Paver - Sealer']              ?? MAT_DEFAULTS.sealerMat
-  const restraintConcrLF  = mr['Paver - Restraint Concrete']  ?? MAT_DEFAULTS.restraintConcr
-  const sleevesMatLF      = mr['Paver - Sleeves']             ?? MAT_DEFAULTS.sleevesMat
-  const palletCharge      = mr['Paver - Pallet Charge']       ?? MAT_DEFAULTS.palletCharge
-  const deliveryFlat      = mr['Paver - Delivery']            ?? MAT_DEFAULTS.delivery
+  const baseRockPerTon = mr['Paver - Base Rock'] ?? MAT_DEFAULTS.baseRock
+  const beddingSandPerTon = mr['Paver - Bedding Sand'] ?? MAT_DEFAULTS.beddingSand
+  const jointSandPerSF = mr['Paver - Joint Sand'] ?? MAT_DEFAULTS.jointSand
+  const polySandPerSF = mr['Paver - Poly Sand'] ?? MAT_DEFAULTS.polySandMat
+  const sealerMatPerSF = mr['Paver - Sealer'] ?? MAT_DEFAULTS.sealerMat
+  const restraintConcrLF = mr['Paver - Restraint Concrete'] ?? MAT_DEFAULTS.restraintConcr
+  const sleevesMatLF = mr['Paver - Sleeves'] ?? MAT_DEFAULTS.sleevesMat
+  const palletCharge = mr['Paver - Pallet Charge'] ?? MAT_DEFAULTS.palletCharge
+  const deliveryFlat = mr['Paver - Delivery'] ?? MAT_DEFAULTS.delivery
 
   const BASE_RATE_MAP = {
     'Skid Good': baseBobcatGood,
-    'Skid OK':   baseBobcatOK,
+    'Skid OK': baseBobcatOK,
     'Mini Skid': baseMiniBobcat,
-    'Hand':      baseHand,
+    Hand: baseHand,
   }
 
   // ── Paver areas ─────────────────────────────────────────────────────────────
@@ -132,118 +140,187 @@ function calcPaver(state, laborRatePerHour, laborRates, materialRates, paverPric
     const depthIn = n(row.depth) || 6
     const baseTons = sfToTons(sf, depthIn)
     const baseRate = BASE_RATE_MAP[row.method] ?? baseBobcatOK
-    const baseHrs  = baseTons > 0 ? baseTons / baseRate : 0
+    const baseHrs = baseTons > 0 ? baseTons / baseRate : 0
 
-    const paverData  = pp.find(p => p.brand === row.paverBrand && p.name === row.paverName)
-    const pricePerSF = paverData?.price_per_sf  || 0
-    const sfPerPallet= paverData?.sf_per_pallet || 0
-    const pallets    = sf > 0 && sfPerPallet > 0 ? Math.ceil(sf / sfPerPallet) : 0
-    const paverCost  = sf * pricePerSF
+    const paverData = pp.find(p => p.brand === row.paverBrand && p.name === row.paverName)
+    const pricePerSF = paverData?.price_per_sf || 0
+    const sfPerPallet = paverData?.sf_per_pallet || 0
+    const pallets = sf > 0 && sfPerPallet > 0 ? Math.ceil(sf / sfPerPallet) : 0
+    const paverCost = sf * pricePerSF
 
     return { sf, depthIn, baseTons, baseHrs, paverCost, pallets, pricePerSF, sfPerPallet }
   })
 
-  const totalInstallSF   = areas.reduce((s, a) => s + a.sf,        0)
-  const totalBaseTons    = areas.reduce((s, a) => s + a.baseTons,   0)
-  const totalBaseHrs     = areas.reduce((s, a) => s + a.baseHrs,    0)
-  const totalPaverCost   = areas.reduce((s, a) => s + a.paverCost,  0)
-  const totalAreaPallets = areas.reduce((s, a) => s + a.pallets,    0)
+  const totalInstallSF = areas.reduce((s, a) => s + a.sf, 0)
+  const totalBaseTons = areas.reduce((s, a) => s + a.baseTons, 0)
+  const totalBaseHrs = areas.reduce((s, a) => s + a.baseHrs, 0)
+  const totalPaverCost = areas.reduce((s, a) => s + a.paverCost, 0)
+  const totalAreaPallets = areas.reduce((s, a) => s + a.pallets, 0)
 
   // ── Install labor hours ──────────────────────────────────────────────────────
-  const installHrs     = totalInstallSF > 0 ? totalInstallSF / installRate : 0
-  const add80mmHrs     = state.is80mm && totalInstallSF > 0
-    ? totalInstallSF * add80mmMult / installRate : 0
+  const installHrs = totalInstallSF > 0 ? totalInstallSF / installRate : 0
+  const add80mmHrs =
+    state.is80mm && totalInstallSF > 0 ? (totalInstallSF * add80mmMult) / installRate : 0
   const straightCutHrs = n(state.straightCutLF) > 0 ? n(state.straightCutLF) / straightCutRate : 0
-  const curvedCutHrs   = n(state.curvedCutLF)   > 0 ? n(state.curvedCutLF)   / curvedCutRate   : 0
-  const restraintsHrs  = n(state.restraintsLF)  > 0 ? n(state.restraintsLF)  / restraintRate   : 0
-  const sleevesHrs     = n(state.sleevesLF)     > 0 ? n(state.sleevesLF)     / sleevesRate     : 0
+  const curvedCutHrs = n(state.curvedCutLF) > 0 ? n(state.curvedCutLF) / curvedCutRate : 0
+  const restraintsHrs = n(state.restraintsLF) > 0 ? n(state.restraintsLF) / restraintRate : 0
+  const sleevesHrs = n(state.sleevesLF) > 0 ? n(state.sleevesLF) / sleevesRate : 0
   const vertSoldierHrs = n(state.vertSoldierLF) > 0 ? n(state.vertSoldierLF) / vertSoldierRate : 0
-  const sealerHrs      = n(state.sealerSF)      > 0 ? n(state.sealerSF)      / sealerRate      : 0
-  const polySandHrs    = state.polySand && totalInstallSF > 0
-    ? totalInstallSF * polySandSpread : 0
-  const addStoneHrs    = n(state.numStones) * addStonePer
-  const addColorHrs    = n(state.numColors) * addColorPer
-
+  const sealerHrs = n(state.sealerSF) > 0 ? n(state.sealerSF) / sealerRate : 0
+  const polySandHrs = state.polySand && totalInstallSF > 0 ? totalInstallSF * polySandSpread : 0
+  const addStoneHrs = n(state.numStones) * addStonePer
+  const addColorHrs = n(state.numColors) * addColorPer
 
   // ── Vertical soldier ─────────────────────────────────────────────────────────
-  const vertPaverData  = pp.find(p => p.brand === state.vertPaverBrand && p.name === state.vertPaverName)
+  const vertPaverData = pp.find(
+    p => p.brand === state.vertPaverBrand && p.name === state.vertPaverName
+  )
   const vertPricePerLF = vertPaverData?.price_per_lf_vert || 0
-  const vertPaverCost  = n(state.vertSoldierLF) * vertPricePerLF
+  const vertPaverCost = n(state.vertSoldierLF) * vertPricePerLF
 
   const totalPallets = totalAreaPallets
 
   // ── Manual rows ──────────────────────────────────────────────────────────────
-  const manualRows = (state.manualRows || []).filter(r =>
-    n(r.hours) > 0 || n(r.materials) > 0 || n(r.subCost) > 0
+  const manualRows = (state.manualRows || []).filter(
+    r => n(r.hours) > 0 || n(r.materials) > 0 || n(r.subCost) > 0
   )
   const manualHrs = manualRows.reduce((s, r) => s + n(r.hours), 0)
   const manualMat = manualRows.reduce((s, r) => s + n(r.materials), 0)
   const manualSub = manualRows.reduce((s, r) => s + n(r.subCost), 0)
 
   // ── Hour totals ───────────────────────────────────────────────────────────────
-  const diff   = 1 + n(state.difficulty) / 100
+  const diff = 1 + n(state.difficulty) / 100
   const hrsAdj = n(state.hoursAdj)
-  const rawInstallHrs = installHrs + add80mmHrs + straightCutHrs + curvedCutHrs +
-    restraintsHrs + sleevesHrs + vertSoldierHrs + sealerHrs + polySandHrs +
-    addStoneHrs + addColorHrs
+  const rawInstallHrs =
+    installHrs +
+    add80mmHrs +
+    straightCutHrs +
+    curvedCutHrs +
+    restraintsHrs +
+    sleevesHrs +
+    vertSoldierHrs +
+    sealerHrs +
+    polySandHrs +
+    addStoneHrs +
+    addColorHrs
   const adjustedInstallHrs = rawInstallHrs * diff + hrsAdj
-  const _preWalkHrs        = adjustedInstallHrs + totalBaseHrs + manualHrs
-  const walkHrs            = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
-  const totalHrs           = _preWalkHrs + walkHrs
+  const _preWalkHrs = adjustedInstallHrs + totalBaseHrs + manualHrs
+  const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
+  const totalHrs = _preWalkHrs + walkHrs
 
   // ── Materials ─────────────────────────────────────────────────────────────────
-  const baseRockCost     = totalBaseTons * baseRockPerTon
-  const beddingSandCost  = sfToTons(totalInstallSF, 1) * beddingSandPerTon
-  const jointSandCost    = totalInstallSF * jointSandPerSF
-  const polySandCost     = state.polySand ? totalInstallSF * polySandPerSF : 0
-  const sealerMatCost    = n(state.sealerSF) * sealerMatPerSF
+  const baseRockCost = totalBaseTons * baseRockPerTon
+  const beddingSandCost = sfToTons(totalInstallSF, 1) * beddingSandPerTon
+  const jointSandCost = totalInstallSF * jointSandPerSF
+  const polySandCost = state.polySand ? totalInstallSF * polySandPerSF : 0
+  const sealerMatCost = n(state.sealerSF) * sealerMatPerSF
   const restraintMatCost = n(state.restraintsLF) * restraintConcrLF
-  const sleevesMatCost   = n(state.sleevesLF) * sleevesMatLF
-  const palletCost       = totalPallets * palletCharge
-  const deliveryCost     = state.includeDelivery ? deliveryFlat : 0
-  const shipping         = n(state.shippingCharge)
-  const salesTaxRate     = n(state.salesTax) / 100
-  const salesTaxCost     = (totalPaverCost + vertPaverCost) * salesTaxRate
+  const sleevesMatCost = n(state.sleevesLF) * sleevesMatLF
+  const palletCost = totalPallets * palletCharge
+  const deliveryCost = state.includeDelivery ? deliveryFlat : 0
+  const shipping = n(state.shippingCharge)
+  const salesTaxRate = n(state.salesTax) / 100
+  const salesTaxCost = (totalPaverCost + vertPaverCost) * salesTaxRate
 
-  const totalMat = totalPaverCost + vertPaverCost +
-    baseRockCost + beddingSandCost + jointSandCost + polySandCost +
-    sealerMatCost + restraintMatCost + sleevesMatCost + palletCost +
-    deliveryCost + shipping + salesTaxCost + manualMat
+  const totalMat =
+    totalPaverCost +
+    vertPaverCost +
+    baseRockCost +
+    beddingSandCost +
+    jointSandCost +
+    polySandCost +
+    sealerMatCost +
+    restraintMatCost +
+    sleevesMatCost +
+    palletCost +
+    deliveryCost +
+    shipping +
+    salesTaxCost +
+    manualMat
 
   // ── Financials ────────────────────────────────────────────────────────────────
-  const manDays   = totalHrs / 8
-  const lrph      = n(laborRatePerHour) || 35
+  const manDays = totalHrs / 8
+  const lrph = n(laborRatePerHour) || 35
   const laborCost = totalHrs * lrph
-  const burden    = laborCost * 0.29
-  const gp        = manDays * gpmd
-  const commission= gp * 0.12
-  const subCost   = manualSub
-  const price     = laborCost + burden + totalMat + gp + commission + subCost
+  const burden = laborCost * 0.29
+  const gp = manDays * gpmd
+  const commission = gp * 0.12
+  const subCost = manualSub
+  const price = laborCost + burden + totalMat + gp + commission + subCost
 
   return {
     walkHrs,
-    totalHrs, adjustedInstallHrs, totalBaseHrs, rawInstallHrs,
-    manDays, laborCost, burden, totalMat, subCost, gp, commission, price,
-    areas, totalInstallSF, totalBaseTons, totalPallets, totalAreaPallets,
-    installHrs, add80mmHrs, straightCutHrs, curvedCutHrs,
-    restraintsHrs, sleevesHrs, vertSoldierHrs, sealerHrs, polySandHrs,
-    addStoneHrs, addColorHrs,
-    baseRockCost, beddingSandCost, jointSandCost, polySandCost,
-    sealerMatCost, restraintMatCost, sleevesMatCost, palletCost,
-    deliveryCost, shipping, salesTaxCost, totalPaverCost, vertPaverCost,
-    manualHrs, manualMat, manualSub,
-    installRate, straightCutRate, curvedCutRate, restraintRate,
-    sleevesRate, vertSoldierRate, sealerRate,
-    baseBobcatGood, baseBobcatOK, baseMiniBobcat, baseHand,
-    baseRockPerTon, beddingSandPerTon, jointSandPerSF, polySandPerSF,
-    sealerMatPerSF, restraintConcrLF, sleevesMatLF, palletCharge, deliveryFlat,
+    totalHrs,
+    adjustedInstallHrs,
+    totalBaseHrs,
+    rawInstallHrs,
+    manDays,
+    laborCost,
+    burden,
+    totalMat,
+    subCost,
+    gp,
+    commission,
+    price,
+    areas,
+    totalInstallSF,
+    totalBaseTons,
+    totalPallets,
+    totalAreaPallets,
+    installHrs,
+    add80mmHrs,
+    straightCutHrs,
+    curvedCutHrs,
+    restraintsHrs,
+    sleevesHrs,
+    vertSoldierHrs,
+    sealerHrs,
+    polySandHrs,
+    addStoneHrs,
+    addColorHrs,
+    baseRockCost,
+    beddingSandCost,
+    jointSandCost,
+    polySandCost,
+    sealerMatCost,
+    restraintMatCost,
+    sleevesMatCost,
+    palletCost,
+    deliveryCost,
+    shipping,
+    salesTaxCost,
+    totalPaverCost,
+    vertPaverCost,
+    manualHrs,
+    manualMat,
+    manualSub,
+    installRate,
+    straightCutRate,
+    curvedCutRate,
+    restraintRate,
+    sleevesRate,
+    vertSoldierRate,
+    sealerRate,
+    baseBobcatGood,
+    baseBobcatOK,
+    baseMiniBobcat,
+    baseHand,
+    baseRockPerTon,
+    beddingSandPerTon,
+    jointSandPerSF,
+    polySandPerSF,
+    sealerMatPerSF,
+    restraintConcrLF,
+    sleevesMatLF,
+    palletCharge,
+    deliveryFlat,
     vertPricePerLF,
   }
 }
 
 // ── Default state ─────────────────────────────────────────────────────────────
 const DEFAULT_STATE = {
-  distanceLF: '',  // Avg truck → work area (LF) for walk-access penalty
+  distanceLF: '', // Avg truck → work area (LF) for walk-access penalty
   difficulty: 0,
   crewType: 'Paver',
   hoursAdj: 0,
@@ -277,23 +354,37 @@ const DEFAULT_STATE = {
 function SecHdr({ title, sub }) {
   return (
     <div className="flex items-center gap-2 col-span-full text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-1">
-      {title}{sub && <span className="ml-2 font-normal normal-case text-gray-400">{sub}</span>}
+      {title}
+      {sub && <span className="ml-2 font-normal normal-case text-gray-400">{sub}</span>}
     </div>
   )
 }
 
 function Inp({ value, onChange, placeholder = '0', type = 'number', step, className = '' }) {
   return (
-    <input type={type} value={value} onChange={onChange} placeholder={placeholder} step={step}
-      className={`w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 ${className}`} />
+    <input
+      type={type}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      step={step}
+      className={`w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 ${className}`}
+    />
   )
 }
 
 function Sel({ value, onChange, options }) {
   return (
-    <select value={value} onChange={onChange}
-      className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
-      {options.map(o => <option key={o} value={o}>{o}</option>)}
+    <select
+      value={value}
+      onChange={onChange}
+      className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+    >
+      {options.map(o => (
+        <option key={o} value={o}>
+          {o}
+        </option>
+      ))}
     </select>
   )
 }
@@ -301,8 +392,12 @@ function Sel({ value, onChange, options }) {
 function Toggle({ checked, onChange, label }) {
   return (
     <label className="flex items-center gap-2 cursor-pointer select-none">
-      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)}
-        className="w-4 h-4 rounded accent-blue-600" />
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={e => onChange(e.target.checked)}
+        className="w-4 h-4 rounded accent-blue-600"
+      />
       <span className="text-sm text-gray-700">{label}</span>
     </label>
   )
@@ -312,7 +407,11 @@ function TH({ cols }) {
   return (
     <thead>
       <tr className="text-left text-gray-400 border-b border-gray-100 text-xs">
-        {cols.map((c, i) => <th key={i} className={`py-1 pr-2 font-medium ${c.w || ''}`}>{c.label}</th>)}
+        {cols.map((c, i) => (
+          <th key={i} className={`py-1 pr-2 font-medium ${c.w || ''}`}>
+            {c.label}
+          </th>
+        ))}
       </tr>
     </thead>
   )
@@ -321,10 +420,12 @@ function TH({ cols }) {
 // Two-part paver picker: brand dropdown + searchable model input
 function PaverPicker({ brand, name, onSelect, paverPrices, showLF = false }) {
   const [search, setSearch] = useState(name || '')
-  const [open,   setOpen]   = useState(false)
+  const [open, setOpen] = useState(false)
 
   // Keep search display in sync when name changes externally (load saved data)
-  useEffect(() => { setSearch(name || '') }, [name])
+  useEffect(() => {
+    setSearch(name || '')
+  }, [name])
 
   const brands = [...new Set(paverPrices.map(p => p.brand))].filter(Boolean).sort()
 
@@ -355,7 +456,11 @@ function PaverPicker({ brand, name, onSelect, paverPrices, showLF = false }) {
         className="border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-400 flex-shrink-0 w-24"
       >
         <option value="">— Brand —</option>
-        {brands.map(b => <option key={b} value={b}>{b}</option>)}
+        {brands.map(b => (
+          <option key={b} value={b}>
+            {b}
+          </option>
+        ))}
       </select>
 
       {/* Searchable model */}
@@ -363,7 +468,10 @@ function PaverPicker({ brand, name, onSelect, paverPrices, showLF = false }) {
         <input
           type="text"
           value={search}
-          onChange={e => { setSearch(e.target.value); setOpen(true) }}
+          onChange={e => {
+            setSearch(e.target.value)
+            setOpen(true)
+          }}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 200)}
           placeholder={brand ? 'Search model…' : 'Select brand first'}
@@ -373,9 +481,10 @@ function PaverPicker({ brand, name, onSelect, paverPrices, showLF = false }) {
         {open && brand && filtered.length > 0 && (
           <div className="absolute z-50 top-full left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-md shadow-lg max-h-52 overflow-y-auto">
             {filtered.map(p => {
-              const price = showLF && p.price_per_lf_vert
-                ? `$${parseFloat(p.price_per_lf_vert).toFixed(2)}/LF`
-                : `$${parseFloat(p.price_per_sf || 0).toFixed(2)}/SF`
+              const price =
+                showLF && p.price_per_lf_vert
+                  ? `$${parseFloat(p.price_per_lf_vert).toFixed(2)}/LF`
+                  : `$${parseFloat(p.price_per_sf || 0).toFixed(2)}/SF`
               const isSelected = p.name === name
               return (
                 <button
@@ -385,11 +494,14 @@ function PaverPicker({ brand, name, onSelect, paverPrices, showLF = false }) {
                     isSelected ? 'bg-blue-50' : ''
                   }`}
                 >
-                  <span className={`block text-xs truncate ${isSelected ? 'font-semibold text-blue-800' : 'text-gray-800'}`}>
+                  <span
+                    className={`block text-xs truncate ${isSelected ? 'font-semibold text-blue-800' : 'text-gray-800'}`}
+                  >
                     {p.name}
                   </span>
                   <span className="text-xs text-gray-400">
-                    {price}{p.sf_per_pallet ? ` · ${p.sf_per_pallet} SF/pallet` : ''}
+                    {price}
+                    {p.sf_per_pallet ? ` · ${p.sf_per_pallet} SF/pallet` : ''}
                   </span>
                 </button>
               )
@@ -408,14 +520,16 @@ function PaverPicker({ brand, name, onSelect, paverPrices, showLF = false }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function PaverModule({ initialData, onSave, onCancel }) {
-  const [state,            setState]            = useState(() => ({ ...DEFAULT_STATE, ...(initialData || {}) }))
-  const [laborRates,       setLaborRates]       = useState(initialData?.laborRates     || {})
-  const [materialRates,    setMaterialRates]    = useState(initialData?.materialRates  || {})
+  const [state, setState] = useState(() => ({ ...DEFAULT_STATE, ...(initialData || {}) }))
+  const [laborRates, setLaborRates] = useState(initialData?.laborRates || {})
+  const [materialRates, setMaterialRates] = useState(initialData?.materialRates || {})
   const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? 35)
-  const [walkAccess, setWalkAccess] = useState(initialData?.walkAccess ?? {
-    paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
-  })
-  const [paverPrices,      setPaverPrices]      = useState(initialData?.paverPrices    || [])
+  const [walkAccess] = useState(
+    initialData?.walkAccess ?? {
+      paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+    }
+  )
+  const [paverPrices, setPaverPrices] = useState(initialData?.paverPrices || [])
 
   // ── Sales tax — applied to totalMat across every module so the bid
   //    reflects supplier-invoiced material cost. Sourced from
@@ -424,11 +538,15 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
   const [salesTaxRate, setSalesTaxRate] = useState(0)
   useEffect(() => {
     let alive = true
-    fetchSalesTaxRate().then(r => { if (alive) setSalesTaxRate(r) })
-    return () => { alive = false }
+    fetchSalesTaxRate().then(r => {
+      if (alive) setSalesTaxRate(r)
+    })
+    return () => {
+      alive = false
+    }
   }, [])
 
-  const [loading,          setLoading]          = useState(true)
+  const [loading, setLoading] = useState(true)
 
   // Re-fetch all Paver rate maps. Called once on mount and again whenever the
   // user saves an edit from a RateEditPopover so the calc picks up the change.
@@ -437,8 +555,20 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       supabase.from('labor_rates').select('name,rate').eq('category', 'Paver'),
       supabase.from('material_rates').select('name,unit_cost').eq('category', 'Paver'),
     ])
-    if (lrRes.data) { const m = {}; lrRes.data.forEach(r => { m[r.name] = parseFloat(r.rate) }); setLaborRates(m) }
-    if (mrRes.data) { const m = {}; mrRes.data.forEach(r => { m[r.name] = parseFloat(r.unit_cost) }); setMaterialRates(m) }
+    if (lrRes.data) {
+      const m = {}
+      lrRes.data.forEach(r => {
+        m[r.name] = parseFloat(r.rate)
+      })
+      setLaborRates(m)
+    }
+    if (mrRes.data) {
+      const m = {}
+      mrRes.data.forEach(r => {
+        m[r.name] = parseFloat(r.unit_cost)
+      })
+      setMaterialRates(m)
+    }
   }, [])
 
   useEffect(() => {
@@ -447,75 +577,104 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       await Promise.all([
         // Company settings
         !initialData?.laborRatePerHour &&
-          supabase.from('company_settings').select('labor_rate_per_hour, walk_access_pace_lf_per_min').single()
+          supabase
+            .from('company_settings')
+            .select('labor_rate_per_hour, walk_access_pace_lf_per_min')
+            .single()
             .then(({ data }) => {
               if (!gone && data?.labor_rate_per_hour != null)
                 setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || 35)
             }),
         refreshAllRates(),
         // Paver prices catalog — always fresh
-        supabase.from('paver_prices').select('brand,name,price_per_sf,sf_per_pallet,price_per_lf_vert')
-          .order('brand').order('name')
+        supabase
+          .from('paver_prices')
+          .select('brand,name,price_per_sf,sf_per_pallet,price_per_lf_vert')
+          .order('brand')
+          .order('name')
           .then(({ data }) => {
             if (!gone && data) setPaverPrices(data)
           }),
       ])
       if (!gone) setLoading(false)
     })()
-    return () => { gone = true }
+    return () => {
+      gone = true
+    }
   }, [refreshAllRates])
 
-  const set    = useCallback((f, v) => setState(p => ({ ...p, [f]: v })), [])
-  const setRow = useCallback((sec, i, f, v) => setState(p => {
-    const rows = [...p[sec]]; rows[i] = { ...rows[i], [f]: v }; return { ...p, [sec]: rows }
-  }), [])
+  const set = useCallback((f, v) => setState(p => ({ ...p, [f]: v })), [])
+  const setRow = useCallback(
+    (sec, i, f, v) =>
+      setState(p => {
+        const rows = [...p[sec]]
+        rows[i] = { ...rows[i], [f]: v }
+        return { ...p, [sec]: rows }
+      }),
+    []
+  )
 
   const gpmd = initialData?.gpmd ?? 425
-  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
-  const calcRaw = calcPaver(state, laborRatePerHour, laborRates, materialRates, paverPrices, gpmd, walkAccess)
+  const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.2
+  const calcRaw = calcPaver(
+    state,
+    laborRatePerHour,
+    laborRates,
+    materialRates,
+    paverPrices,
+    gpmd,
+    walkAccess
+  )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
   // material_cost (saved with the module) ends up tax-inclusive too,
   // so bid totals add up to GpmdBar's displayed price.
   const _salesTaxAmt = (calcRaw.totalMat || 0) * (salesTaxRate || 0)
-  const calc = _salesTaxAmt > 0
-    ? {
-        ...calcRaw,
-        totalMat: (calcRaw.totalMat || 0) + _salesTaxAmt,
-        price:    (calcRaw.price    || 0) + _salesTaxAmt,
-        salesTax: _salesTaxAmt,
-      }
-    : calcRaw
+  const calc =
+    _salesTaxAmt > 0
+      ? {
+          ...calcRaw,
+          totalMat: (calcRaw.totalMat || 0) + _salesTaxAmt,
+          price: (calcRaw.price || 0) + _salesTaxAmt,
+          salesTax: _salesTaxAmt,
+        }
+      : calcRaw
 
+  const fmt2 = v =>
+    `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const fmt = v => `$${Math.round(v).toLocaleString()}`
+  const fh = v => (v > 0 ? v.toFixed(2) : '—')
 
-  const fmt2 = v => `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-  const fmt  = v => `$${Math.round(v).toLocaleString()}`
-  const fh   = v => v > 0 ? v.toFixed(2) : '—'
-
-  const td  = 'py-1.5 pr-2 align-top'
+  const td = 'py-1.5 pr-2 align-top'
   const num = 'py-1.5 pr-2 text-gray-600 tabular-nums text-xs align-top'
 
   function handleSave() {
     onSave({
-      man_days:      parseFloat(calc.manDays.toFixed(2)),
+      man_days: parseFloat(calc.manDays.toFixed(2)),
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
-      labor_cost:    parseFloat(calc.laborCost.toFixed(2)),
-      labor_burden:  parseFloat(calc.burden.toFixed(2)),
-      gross_profit:  parseFloat(calc.gp.toFixed(2)),
-      sub_cost:      parseFloat(calc.subCost.toFixed(2)),
-      total_price:   parseFloat(calc.price.toFixed(2)),
+      labor_cost: parseFloat(calc.laborCost.toFixed(2)),
+      labor_burden: parseFloat(calc.burden.toFixed(2)),
+      gross_profit: parseFloat(calc.gp.toFixed(2)),
+      sub_cost: parseFloat(calc.subCost.toFixed(2)),
+      total_price: parseFloat(calc.price.toFixed(2)),
       data: {
-        ...state, walkAccess, laborRatePerHour, gpmd, laborRates, materialRates, paverPrices,
+        ...state,
+        walkAccess,
+        laborRatePerHour,
+        gpmd,
+        laborRates,
+        materialRates,
+        paverPrices,
         calc: {
-          totalHrs:   calc.totalHrs,
-          manDays:    calc.manDays,
-          laborCost:  calc.laborCost,
-          burden:     calc.burden,
-          totalMat:   calc.totalMat,
-          subCost:    calc.subCost,
-          gp:         calc.gp,
+          totalHrs: calc.totalHrs,
+          manDays: calc.manDays,
+          laborCost: calc.laborCost,
+          burden: calc.burden,
+          totalMat: calc.totalMat,
+          subCost: calc.subCost,
+          gp: calc.gp,
           commission: calc.commission,
-          price:      calc.price,
+          price: calc.price,
         },
       },
     })
@@ -525,27 +684,31 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
     <div className="space-y-4">
       {/* ── Sticky GPMD bar ── */}
       <div className="sticky top-0 z-20 -mx-6 px-6 pt-2 pb-2 bg-gray-900 shadow-lg">
-      <GpmdBar
+        <GpmdBar
           sticky
-        totalMat={calc.totalMat}
-        totalHrs={calc.totalHrs}
-        manDays={calc.manDays}
-        laborCost={calc.laborCost}
-        laborRatePerHour={laborRatePerHour}
-        burden={calc.burden}
-        gp={calc.gp}
-        commission={calc.commission}
-        subCost={calc.subCost}
-        gpmd={gpmd}
-        price={calc.price}
-        subMarkupRate={subGpMarkupRate}
-      />
+          totalMat={calc.totalMat}
+          totalHrs={calc.totalHrs}
+          manDays={calc.manDays}
+          laborCost={calc.laborCost}
+          laborRatePerHour={laborRatePerHour}
+          burden={calc.burden}
+          gp={calc.gp}
+          commission={calc.commission}
+          subCost={calc.subCost}
+          gpmd={gpmd}
+          price={calc.price}
+          subMarkupRate={subGpMarkupRate}
+        />
       </div>
 
       {/* Crew Type */}
       <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
         <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
-        <select value={state.crewType} onChange={e => set('crewType', e.target.value)} className="input text-sm py-1 w-36">
+        <select
+          value={state.crewType}
+          onChange={e => set('crewType', e.target.value)}
+          className="input text-sm py-1 w-36"
+        >
           <option value="Demo">Demo</option>
           <option value="Landscape">Landscape</option>
           <option value="Masonry">Masonry</option>
@@ -564,14 +727,29 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
         <div>
           <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
-          <Inp value={state.difficulty} onChange={e => set('difficulty', e.target.value)} step="5" />
+          <Inp
+            value={state.difficulty}
+            onChange={e => set('difficulty', e.target.value)}
+            step="5"
+          />
           <p className="text-xs text-gray-400 mt-0.5">Adds % to install hrs</p>
         </div>
         <div>
-          <p className="text-xs text-gray-500 mb-0.5" title="Average Distance from Truck to Work Area">Truck → Work Area (Avg LF)</p>
-          <Inp value={state.distanceLF} onChange={e => set('distanceLF', e.target.value)} step="5" />
+          <p
+            className="text-xs text-gray-500 mb-0.5"
+            title="Average Distance from Truck to Work Area"
+          >
+            Truck → Work Area (Avg LF)
+          </p>
+          <Inp
+            value={state.distanceLF}
+            onChange={e => set('distanceLF', e.target.value)}
+            step="5"
+          />
           {calc.walkHrs > 0 && (
-            <p className="text-[10px] text-gray-500 mt-0.5">+{calc.walkHrs.toFixed(2)} hrs walk-access</p>
+            <p className="text-[10px] text-gray-500 mt-0.5">
+              +{calc.walkHrs.toFixed(2)} hrs walk-access
+            </p>
           )}
         </div>
         <div>
@@ -579,8 +757,16 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           <Inp value={state.hoursAdj} onChange={e => set('hoursAdj', e.target.value)} step="0.5" />
         </div>
         <div className="flex flex-col gap-2 justify-center pt-4">
-          <Toggle checked={state.is80mm}   onChange={v => set('is80mm', v)}   label="80mm Pavers (+15%)" />
-          <Toggle checked={state.polySand} onChange={v => set('polySand', v)} label="Polymeric Sand" />
+          <Toggle
+            checked={state.is80mm}
+            onChange={v => set('is80mm', v)}
+            label="80mm Pavers (+15%)"
+          />
+          <Toggle
+            checked={state.polySand}
+            onChange={v => set('polySand', v)}
+            label="Polymeric Sand"
+          />
         </div>
       </div>
 
@@ -590,66 +776,117 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           <span>Paver Material</span>
           {calc.totalInstallSF > 0 && (
             <span className="font-normal normal-case text-gray-400">
-              {calc.totalInstallSF.toLocaleString()} SF total · {calc.totalBaseTons.toFixed(1)} tons base
+              {calc.totalInstallSF.toLocaleString()} SF total · {calc.totalBaseTons.toFixed(1)} tons
+              base
             </span>
           )}
           <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
             · Base rock ${calc.baseRockPerTon}/ton
-            <RateEditPopover table="material_rates" name="Paver - Base Rock" category="Paver"
-              unitLabel="ton" currentValue={calc.baseRockPerTon} onSaved={refreshAllRates} />
+            <RateEditPopover
+              table="material_rates"
+              name="Paver - Base Rock"
+              category="Paver"
+              unitLabel="ton"
+              currentValue={calc.baseRockPerTon}
+              onSaved={refreshAllRates}
+            />
             · Bedding sand ${calc.beddingSandPerTon}/ton
-            <RateEditPopover table="material_rates" name="Paver - Bedding Sand" category="Paver"
-              unitLabel="ton" currentValue={calc.beddingSandPerTon} onSaved={refreshAllRates} />
+            <RateEditPopover
+              table="material_rates"
+              name="Paver - Bedding Sand"
+              category="Paver"
+              unitLabel="ton"
+              currentValue={calc.beddingSandPerTon}
+              onSaved={refreshAllRates}
+            />
             · Joint sand ${calc.jointSandPerSF}/SF
-            <RateEditPopover table="material_rates" name="Paver - Joint Sand" category="Paver"
-              unitLabel="SF" currentValue={calc.jointSandPerSF} onSaved={refreshAllRates} />
+            <RateEditPopover
+              table="material_rates"
+              name="Paver - Joint Sand"
+              category="Paver"
+              unitLabel="SF"
+              currentValue={calc.jointSandPerSF}
+              onSaved={refreshAllRates}
+            />
             · Pallet ${calc.palletCharge}
-            <RateEditPopover table="material_rates" name="Paver - Pallet Charge" category="Paver"
-              unitLabel="pallet" currentValue={calc.palletCharge} onSaved={refreshAllRates} />
+            <RateEditPopover
+              table="material_rates"
+              name="Paver - Pallet Charge"
+              category="Paver"
+              unitLabel="pallet"
+              currentValue={calc.palletCharge}
+              onSaved={refreshAllRates}
+            />
           </span>
         </div>
         <table className="w-full text-xs">
-          <TH cols={[
-            { label: 'Area',         w: 'w-20' },
-            { label: 'SF',           w: 'w-24' },
-            { label: 'Base Install', w: 'w-36' },
-            { label: 'Base (in)',    w: 'w-14' },
-            { label: 'Tons',         w: 'w-12' },
-            { label: 'Hrs',          w: 'w-12' },
-            { label: 'Paver Brand / Type' },
-            { label: '$/SF',         w: 'w-12' },
-            { label: 'Pallets',      w: 'w-12' },
-            { label: 'Cost',         w: 'w-20' },
-          ]} />
+          <TH
+            cols={[
+              { label: 'Area', w: 'w-20' },
+              { label: 'SF', w: 'w-24' },
+              { label: 'Base Install', w: 'w-36' },
+              { label: 'Base (in)', w: 'w-14' },
+              { label: 'Tons', w: 'w-12' },
+              { label: 'Hrs', w: 'w-12' },
+              { label: 'Paver Brand / Type' },
+              { label: '$/SF', w: 'w-12' },
+              { label: 'Pallets', w: 'w-12' },
+              { label: 'Cost', w: 'w-20' },
+            ]}
+          />
           <tbody className="divide-y divide-gray-50">
             {state.areaRows.map((row, i) => {
               const a = calc.areas[i] || {}
-              const baseRate = (
-                row.method === 'Skid Good' ? calc.baseBobcatGood :
-                row.method === 'Skid OK'   ? calc.baseBobcatOK   :
-                row.method === 'Mini Skid' ? calc.baseMiniBobcat :
-                                             calc.baseHand
-              )
+              const baseRate =
+                row.method === 'Skid Good'
+                  ? calc.baseBobcatGood
+                  : row.method === 'Skid OK'
+                    ? calc.baseBobcatOK
+                    : row.method === 'Mini Skid'
+                      ? calc.baseMiniBobcat
+                      : calc.baseHand
               return (
                 <tr key={i}>
                   <td className={td}>
-                    <Inp type="text" value={row.label} onChange={e => setRow('areaRows', i, 'label', e.target.value)}
-                      placeholder={`Area ${i + 1}`} />
+                    <Inp
+                      type="text"
+                      value={row.label}
+                      onChange={e => setRow('areaRows', i, 'label', e.target.value)}
+                      placeholder={`Area ${i + 1}`}
+                    />
                   </td>
                   <td className={td}>
-                    <Inp value={row.sf} onChange={e => setRow('areaRows', i, 'sf', e.target.value)} />
+                    <Inp
+                      value={row.sf}
+                      onChange={e => setRow('areaRows', i, 'sf', e.target.value)}
+                    />
                   </td>
                   <td className={td}>
                     <div className="flex items-center gap-1">
                       <div className="flex-1 min-w-0">
-                        <Sel value={row.method} onChange={e => setRow('areaRows', i, 'method', e.target.value)} options={BASE_METHODS} />
+                        <Sel
+                          value={row.method}
+                          onChange={e => setRow('areaRows', i, 'method', e.target.value)}
+                          options={BASE_METHODS}
+                        />
                       </div>
-                      <RateEditPopover table="labor_rates" name={BASE_METHOD_LABOR_NAME[row.method]} category="Paver"
-                        mode="coefficient" unitLabel="t/hr" currentValue={baseRate} onSaved={refreshAllRates} />
+                      <RateEditPopover
+                        table="labor_rates"
+                        name={BASE_METHOD_LABOR_NAME[row.method]}
+                        category="Paver"
+                        mode="coefficient"
+                        unitLabel="t/hr"
+                        currentValue={baseRate}
+                        onSaved={refreshAllRates}
+                      />
                     </div>
                   </td>
                   <td className={td}>
-                    <Inp value={row.depth} onChange={e => setRow('areaRows', i, 'depth', e.target.value)} placeholder="6" />
+                    <Inp
+                      value={row.depth}
+                      onChange={e => setRow('areaRows', i, 'depth', e.target.value)}
+                      placeholder="6"
+                    />
                   </td>
                   <td className={num}>{a.baseTons > 0 ? a.baseTons.toFixed(1) : '—'}</td>
                   <td className={num}>{fh(a.baseHrs)}</td>
@@ -657,7 +894,10 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                     <PaverPicker
                       brand={row.paverBrand}
                       name={row.paverName}
-                      onSelect={(b, nm) => { setRow('areaRows', i, 'paverBrand', b); setRow('areaRows', i, 'paverName', nm) }}
+                      onSelect={(b, nm) => {
+                        setRow('areaRows', i, 'paverBrand', b)
+                        setRow('areaRows', i, 'paverName', nm)
+                      }}
                       paverPrices={paverPrices}
                     />
                   </td>
@@ -676,26 +916,39 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           Paver Labor
           <span className="ml-2 font-normal normal-case text-gray-400">
-            {calc.installRate} SF/hr install · {calc.straightCutRate}/{calc.curvedCutRate} LF/hr cuts
+            {calc.installRate} SF/hr install · {calc.straightCutRate}/{calc.curvedCutRate} LF/hr
+            cuts
           </span>
         </div>
         <table className="w-full text-xs">
-          <TH cols={[
-            { label: 'Operation', w: 'w-72' },
-            { label: 'Qty / LF / SF', w: 'w-32' },
-            { label: 'Labor Hrs', w: 'w-24' },
-            { label: 'Notes' },
-          ]} />
+          <TH
+            cols={[
+              { label: 'Operation', w: 'w-72' },
+              { label: 'Qty / LF / SF', w: 'w-32' },
+              { label: 'Labor Hrs', w: 'w-24' },
+              { label: 'Notes' },
+            ]}
+          />
           <tbody className="divide-y divide-gray-50">
             <tr>
               <td className={`${td} font-medium text-gray-700`}>
                 <span className="inline-flex items-center gap-1">
-                  Install <span className="text-gray-400 font-normal">({calc.installRate} SF/hr)</span>
-                  <RateEditPopover table="labor_rates" name="Paver - Install" category="Paver"
-                    mode="coefficient" unitLabel="SF/hr" currentValue={calc.installRate} onSaved={refreshAllRates} />
+                  Install{' '}
+                  <span className="text-gray-400 font-normal">({calc.installRate} SF/hr)</span>
+                  <RateEditPopover
+                    table="labor_rates"
+                    name="Paver - Install"
+                    category="Paver"
+                    mode="coefficient"
+                    unitLabel="SF/hr"
+                    currentValue={calc.installRate}
+                    onSaved={refreshAllRates}
+                  />
                 </span>
               </td>
-              <td className={`${num} text-gray-500`}>{calc.totalInstallSF > 0 ? calc.totalInstallSF.toLocaleString() : '—'} SF</td>
+              <td className={`${num} text-gray-500`}>
+                {calc.totalInstallSF > 0 ? calc.totalInstallSF.toLocaleString() : '—'} SF
+              </td>
               <td className={num}>{fh(calc.installHrs)}</td>
               <td className="py-1 text-xs text-gray-400">auto from areas</td>
             </tr>
@@ -704,38 +957,103 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                 <td className={`${td} font-medium text-gray-700`}>
                   <span className="inline-flex items-center gap-1">
                     80mm Add <span className="text-gray-400 font-normal">(+15% penalty)</span>
-                    <RateEditPopover table="labor_rates" name="Paver - 80mm Add" category="Paver"
-                      mode="coefficient" unitLabel="× SF/install" currentValue={laborRates['Paver - 80mm Add'] ?? LABOR_DEFAULTS.add80mm} onSaved={refreshAllRates} />
+                    <RateEditPopover
+                      table="labor_rates"
+                      name="Paver - 80mm Add"
+                      category="Paver"
+                      mode="coefficient"
+                      unitLabel="× SF/install"
+                      currentValue={laborRates['Paver - 80mm Add'] ?? LABOR_DEFAULTS.add80mm}
+                      onSaved={refreshAllRates}
+                    />
                   </span>
                 </td>
-                <td className={`${num} text-gray-500`}>{calc.totalInstallSF > 0 ? calc.totalInstallSF.toLocaleString() : '—'} SF</td>
+                <td className={`${num} text-gray-500`}>
+                  {calc.totalInstallSF > 0 ? calc.totalInstallSF.toLocaleString() : '—'} SF
+                </td>
                 <td className={num}>{fh(calc.add80mmHrs)}</td>
                 <td className="py-1 text-xs text-gray-400">extra for 80mm thickness</td>
               </tr>
             )}
             {[
-              { label: 'Straight Cut', rate: calc.straightCutRate, key: 'straightCutLF', hrs: calc.straightCutHrs, unit: 'LF', rateName: 'Paver - Straight Cut' },
-              { label: 'Curved Cut',   rate: calc.curvedCutRate,   key: 'curvedCutLF',   hrs: calc.curvedCutHrs,   unit: 'LF', rateName: 'Paver - Curved Cut' },
-              { label: 'Restraints',   rate: calc.restraintRate,   key: 'restraintsLF',  hrs: calc.restraintsHrs,  unit: 'LF', rateName: 'Paver - Restraints', matName: 'Paver - Restraint Concrete', matRate: calc.restraintConcrLF, matUnit: 'LF' },
-              { label: 'Sleeves',      rate: calc.sleevesRate,     key: 'sleevesLF',     hrs: calc.sleevesHrs,     unit: 'LF', rateName: 'Paver - Sleeves',    matName: 'Paver - Sleeves',           matRate: calc.sleevesMatLF,    matUnit: 'LF' },
+              {
+                label: 'Straight Cut',
+                rate: calc.straightCutRate,
+                key: 'straightCutLF',
+                hrs: calc.straightCutHrs,
+                unit: 'LF',
+                rateName: 'Paver - Straight Cut',
+              },
+              {
+                label: 'Curved Cut',
+                rate: calc.curvedCutRate,
+                key: 'curvedCutLF',
+                hrs: calc.curvedCutHrs,
+                unit: 'LF',
+                rateName: 'Paver - Curved Cut',
+              },
+              {
+                label: 'Restraints',
+                rate: calc.restraintRate,
+                key: 'restraintsLF',
+                hrs: calc.restraintsHrs,
+                unit: 'LF',
+                rateName: 'Paver - Restraints',
+                matName: 'Paver - Restraint Concrete',
+                matRate: calc.restraintConcrLF,
+                matUnit: 'LF',
+              },
+              {
+                label: 'Sleeves',
+                rate: calc.sleevesRate,
+                key: 'sleevesLF',
+                hrs: calc.sleevesHrs,
+                unit: 'LF',
+                rateName: 'Paver - Sleeves',
+                matName: 'Paver - Sleeves',
+                matRate: calc.sleevesMatLF,
+                matUnit: 'LF',
+              },
             ].map(({ label, rate, key, hrs, unit, rateName, matName, matRate, matUnit }) => (
               <tr key={key}>
                 <td className={`${td} font-medium text-gray-700`}>
                   <span className="inline-flex items-center gap-1 flex-wrap">
-                    {label} <span className="text-gray-400 font-normal">({rate} {unit}/hr)</span>
-                    <RateEditPopover table="labor_rates" name={rateName} category="Paver"
-                      mode="coefficient" unitLabel={`${unit}/hr`} currentValue={rate} onSaved={refreshAllRates} />
+                    {label}{' '}
+                    <span className="text-gray-400 font-normal">
+                      ({rate} {unit}/hr)
+                    </span>
+                    <RateEditPopover
+                      table="labor_rates"
+                      name={rateName}
+                      category="Paver"
+                      mode="coefficient"
+                      unitLabel={`${unit}/hr`}
+                      currentValue={rate}
+                      onSaved={refreshAllRates}
+                    />
                     {matName && (
                       <>
-                        <span className="text-gray-400 font-normal">· ${matRate}/{matUnit} mat</span>
-                        <RateEditPopover table="material_rates" name={matName} category="Paver"
-                          unitLabel={matUnit} currentValue={matRate} onSaved={refreshAllRates} />
+                        <span className="text-gray-400 font-normal">
+                          · ${matRate}/{matUnit} mat
+                        </span>
+                        <RateEditPopover
+                          table="material_rates"
+                          name={matName}
+                          category="Paver"
+                          unitLabel={matUnit}
+                          currentValue={matRate}
+                          onSaved={refreshAllRates}
+                        />
                       </>
                     )}
                   </span>
                 </td>
                 <td className={td}>
-                  <Inp value={state[key]} onChange={e => set(key, e.target.value)} placeholder="0" />
+                  <Inp
+                    value={state[key]}
+                    onChange={e => set(key, e.target.value)}
+                    placeholder="0"
+                  />
                 </td>
                 <td className={num}>{fh(hrs)}</td>
                 <td />
@@ -744,13 +1062,27 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             <tr>
               <td className={`${td} font-medium text-gray-700`}>
                 <span className="inline-flex items-center gap-1">
-                  Stones <span className="text-gray-400 font-normal">({laborRates['Paver - Stone Add'] ?? LABOR_DEFAULTS.addStone} hrs/ea)</span>
-                  <RateEditPopover table="labor_rates" name="Paver - Stone Add" category="Paver"
-                    mode="coefficient" unitLabel="hrs/ea" currentValue={laborRates['Paver - Stone Add'] ?? LABOR_DEFAULTS.addStone} onSaved={refreshAllRates} />
+                  Stones{' '}
+                  <span className="text-gray-400 font-normal">
+                    ({laborRates['Paver - Stone Add'] ?? LABOR_DEFAULTS.addStone} hrs/ea)
+                  </span>
+                  <RateEditPopover
+                    table="labor_rates"
+                    name="Paver - Stone Add"
+                    category="Paver"
+                    mode="coefficient"
+                    unitLabel="hrs/ea"
+                    currentValue={laborRates['Paver - Stone Add'] ?? LABOR_DEFAULTS.addStone}
+                    onSaved={refreshAllRates}
+                  />
                 </span>
               </td>
               <td className={td}>
-                <Inp value={state.numStones} onChange={e => set('numStones', e.target.value)} placeholder="0" />
+                <Inp
+                  value={state.numStones}
+                  onChange={e => set('numStones', e.target.value)}
+                  placeholder="0"
+                />
               </td>
               <td className={num}>{fh(calc.addStoneHrs)}</td>
               <td />
@@ -758,13 +1090,27 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             <tr>
               <td className={`${td} font-medium text-gray-700`}>
                 <span className="inline-flex items-center gap-1">
-                  Colors <span className="text-gray-400 font-normal">({laborRates['Paver - Color Add'] ?? LABOR_DEFAULTS.addColor} hrs/ea)</span>
-                  <RateEditPopover table="labor_rates" name="Paver - Color Add" category="Paver"
-                    mode="coefficient" unitLabel="hrs/ea" currentValue={laborRates['Paver - Color Add'] ?? LABOR_DEFAULTS.addColor} onSaved={refreshAllRates} />
+                  Colors{' '}
+                  <span className="text-gray-400 font-normal">
+                    ({laborRates['Paver - Color Add'] ?? LABOR_DEFAULTS.addColor} hrs/ea)
+                  </span>
+                  <RateEditPopover
+                    table="labor_rates"
+                    name="Paver - Color Add"
+                    category="Paver"
+                    mode="coefficient"
+                    unitLabel="hrs/ea"
+                    currentValue={laborRates['Paver - Color Add'] ?? LABOR_DEFAULTS.addColor}
+                    onSaved={refreshAllRates}
+                  />
                 </span>
               </td>
               <td className={td}>
-                <Inp value={state.numColors} onChange={e => set('numColors', e.target.value)} placeholder="0" />
+                <Inp
+                  value={state.numColors}
+                  onChange={e => set('numColors', e.target.value)}
+                  placeholder="0"
+                />
               </td>
               <td className={num}>{fh(calc.addColorHrs)}</td>
               <td />
@@ -773,15 +1119,38 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
               <tr>
                 <td className={`${td} font-medium text-gray-700`}>
                   <span className="inline-flex items-center gap-1 flex-wrap">
-                    Poly Sand Spread <span className="text-gray-400 font-normal">({laborRates['Paver - Poly Sand Spread'] ?? LABOR_DEFAULTS.polySandSpread} hrs/SF)</span>
-                    <RateEditPopover table="labor_rates" name="Paver - Poly Sand Spread" category="Paver"
-                      mode="coefficient" unitLabel="hrs/SF" currentValue={laborRates['Paver - Poly Sand Spread'] ?? LABOR_DEFAULTS.polySandSpread} onSaved={refreshAllRates} />
-                    <span className="text-gray-400 font-normal">· ${calc.polySandPerSF}/SF mat</span>
-                    <RateEditPopover table="material_rates" name="Paver - Poly Sand" category="Paver"
-                      unitLabel="SF" currentValue={calc.polySandPerSF} onSaved={refreshAllRates} />
+                    Poly Sand Spread{' '}
+                    <span className="text-gray-400 font-normal">
+                      ({laborRates['Paver - Poly Sand Spread'] ?? LABOR_DEFAULTS.polySandSpread}{' '}
+                      hrs/SF)
+                    </span>
+                    <RateEditPopover
+                      table="labor_rates"
+                      name="Paver - Poly Sand Spread"
+                      category="Paver"
+                      mode="coefficient"
+                      unitLabel="hrs/SF"
+                      currentValue={
+                        laborRates['Paver - Poly Sand Spread'] ?? LABOR_DEFAULTS.polySandSpread
+                      }
+                      onSaved={refreshAllRates}
+                    />
+                    <span className="text-gray-400 font-normal">
+                      · ${calc.polySandPerSF}/SF mat
+                    </span>
+                    <RateEditPopover
+                      table="material_rates"
+                      name="Paver - Poly Sand"
+                      category="Paver"
+                      unitLabel="SF"
+                      currentValue={calc.polySandPerSF}
+                      onSaved={refreshAllRates}
+                    />
                   </span>
                 </td>
-                <td className={`${num} text-gray-500`}>{calc.totalInstallSF > 0 ? calc.totalInstallSF.toLocaleString() : '—'} SF</td>
+                <td className={`${num} text-gray-500`}>
+                  {calc.totalInstallSF > 0 ? calc.totalInstallSF.toLocaleString() : '—'} SF
+                </td>
                 <td className={num}>{fh(calc.polySandHrs)}</td>
                 <td className="py-1 text-xs text-gray-400">auto from areas</td>
               </tr>
@@ -789,16 +1158,34 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             <tr>
               <td className={`${td} font-medium text-gray-700`}>
                 <span className="inline-flex items-center gap-1 flex-wrap">
-                  Sealer <span className="text-gray-400 font-normal">({calc.sealerRate} SF/hr)</span>
-                  <RateEditPopover table="labor_rates" name="Paver - Sealer" category="Paver"
-                    mode="coefficient" unitLabel="SF/hr" currentValue={calc.sealerRate} onSaved={refreshAllRates} />
+                  Sealer{' '}
+                  <span className="text-gray-400 font-normal">({calc.sealerRate} SF/hr)</span>
+                  <RateEditPopover
+                    table="labor_rates"
+                    name="Paver - Sealer"
+                    category="Paver"
+                    mode="coefficient"
+                    unitLabel="SF/hr"
+                    currentValue={calc.sealerRate}
+                    onSaved={refreshAllRates}
+                  />
                   <span className="text-gray-400 font-normal">· ${calc.sealerMatPerSF}/SF mat</span>
-                  <RateEditPopover table="material_rates" name="Paver - Sealer" category="Paver"
-                    unitLabel="SF" currentValue={calc.sealerMatPerSF} onSaved={refreshAllRates} />
+                  <RateEditPopover
+                    table="material_rates"
+                    name="Paver - Sealer"
+                    category="Paver"
+                    unitLabel="SF"
+                    currentValue={calc.sealerMatPerSF}
+                    onSaved={refreshAllRates}
+                  />
                 </span>
               </td>
               <td className={td}>
-                <Inp value={state.sealerSF} onChange={e => set('sealerSF', e.target.value)} placeholder="0 SF" />
+                <Inp
+                  value={state.sealerSF}
+                  onChange={e => set('sealerSF', e.target.value)}
+                  placeholder="0 SF"
+                />
               </td>
               <td className={num}>{fh(calc.sealerHrs)}</td>
               <td />
@@ -813,8 +1200,15 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           <span>Vertical Soldier Course</span>
           <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
             {calc.vertSoldierRate} LF/hr
-            <RateEditPopover table="labor_rates" name="Paver - Vertical Soldier" category="Paver"
-              mode="coefficient" unitLabel="LF/hr" currentValue={calc.vertSoldierRate} onSaved={refreshAllRates} />
+            <RateEditPopover
+              table="labor_rates"
+              name="Paver - Vertical Soldier"
+              category="Paver"
+              mode="coefficient"
+              unitLabel="LF/hr"
+              currentValue={calc.vertSoldierRate}
+              onSaved={refreshAllRates}
+            />
             — paver priced $/LF (price_per_lf_vert)
           </span>
         </div>
@@ -830,13 +1224,17 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           <PaverPicker
             brand={state.vertPaverBrand}
             name={state.vertPaverName}
-            onSelect={(b, nm) => { set('vertPaverBrand', b); set('vertPaverName', nm) }}
+            onSelect={(b, nm) => {
+              set('vertPaverBrand', b)
+              set('vertPaverName', nm)
+            }}
             paverPrices={paverPrices.filter(p => p.price_per_lf_vert > 0)}
             showLF
           />
           {calc.vertPaverCost > 0 && (
             <p className="text-xs text-gray-400 mt-0.5">
-              {n(state.vertSoldierLF).toLocaleString()} LF × {fmt2(calc.vertPricePerLF)}/LF = {fmt2(calc.vertPaverCost)}
+              {n(state.vertSoldierLF).toLocaleString()} LF × {fmt2(calc.vertPricePerLF)}/LF ={' '}
+              {fmt2(calc.vertPaverCost)}
             </p>
           )}
         </div>
@@ -847,12 +1245,23 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         <SecHdr title="Material Options" />
         <div>
           <p className="text-xs text-gray-500 mb-0.5">Sales Tax on Pavers (%)</p>
-          <Inp value={state.salesTax} onChange={e => set('salesTax', e.target.value)} step="0.1" placeholder="0" />
-          {calc.salesTaxCost > 0 && <p className="text-xs text-gray-400 mt-0.5">{fmt2(calc.salesTaxCost)} tax</p>}
+          <Inp
+            value={state.salesTax}
+            onChange={e => set('salesTax', e.target.value)}
+            step="0.1"
+            placeholder="0"
+          />
+          {calc.salesTaxCost > 0 && (
+            <p className="text-xs text-gray-400 mt-0.5">{fmt2(calc.salesTaxCost)} tax</p>
+          )}
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-0.5">Shipping / Freight ($)</p>
-          <Inp value={state.shippingCharge} onChange={e => set('shippingCharge', e.target.value)} step="1" />
+          <Inp
+            value={state.shippingCharge}
+            onChange={e => set('shippingCharge', e.target.value)}
+            step="1"
+          />
         </div>
         <div className="flex flex-col gap-2 justify-center pt-4">
           <div className="flex items-center gap-1">
@@ -861,8 +1270,14 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
               onChange={v => set('includeDelivery', v)}
               label={`Delivery (${fmt2(calc.deliveryFlat)} flat)`}
             />
-            <RateEditPopover table="material_rates" name="Paver - Delivery" category="Paver"
-              unitLabel="flat" currentValue={calc.deliveryFlat} onSaved={refreshAllRates} />
+            <RateEditPopover
+              table="material_rates"
+              name="Paver - Delivery"
+              category="Paver"
+              unitLabel="flat"
+              currentValue={calc.deliveryFlat}
+              onSaved={refreshAllRates}
+            />
           </div>
         </div>
       </div>
@@ -870,22 +1285,81 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
       {/* ── Materials Summary ─────────────────────────────────────────────────── */}
       {calc.totalMat > 0 && (
         <div className="bg-gray-50 rounded-lg p-3 text-xs">
-          <p className="font-semibold text-gray-600 uppercase tracking-wide text-xs mb-2">Materials Breakdown</p>
+          <p className="font-semibold text-gray-600 uppercase tracking-wide text-xs mb-2">
+            Materials Breakdown
+          </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-gray-600">
-            {calc.totalPaverCost    > 0 && <span>Paver Material: <strong>{fmt2(calc.totalPaverCost)}</strong></span>}
-            {calc.vertPaverCost     > 0 && <span>Vert Soldier: <strong>{fmt2(calc.vertPaverCost)}</strong></span>}
-            {calc.baseRockCost      > 0 && <span>Base Rock ({calc.totalBaseTons.toFixed(1)}T): <strong>{fmt2(calc.baseRockCost)}</strong></span>}
-            {calc.beddingSandCost   > 0 && <span>Bedding Sand: <strong>{fmt2(calc.beddingSandCost)}</strong></span>}
-            {calc.jointSandCost     > 0 && <span>Joint Sand: <strong>{fmt2(calc.jointSandCost)}</strong></span>}
-            {calc.polySandCost      > 0 && <span>Poly Sand: <strong>{fmt2(calc.polySandCost)}</strong></span>}
-            {calc.sealerMatCost     > 0 && <span>Sealer: <strong>{fmt2(calc.sealerMatCost)}</strong></span>}
-            {calc.restraintMatCost  > 0 && <span>Restraint Concrete: <strong>{fmt2(calc.restraintMatCost)}</strong></span>}
-            {calc.sleevesMatCost    > 0 && <span>Sleeves: <strong>{fmt2(calc.sleevesMatCost)}</strong></span>}
-            {calc.palletCost        > 0 && <span>Pallet Charges ({calc.totalPallets}): <strong>{fmt2(calc.palletCost)}</strong></span>}
-            {calc.deliveryCost      > 0 && <span>Delivery: <strong>{fmt2(calc.deliveryCost)}</strong></span>}
-            {calc.shipping          > 0 && <span>Shipping: <strong>{fmt2(calc.shipping)}</strong></span>}
-            {calc.salesTaxCost      > 0 && <span>Sales Tax: <strong>{fmt2(calc.salesTaxCost)}</strong></span>}
-            {calc.manualMat         > 0 && <span>Manual: <strong>{fmt2(calc.manualMat)}</strong></span>}
+            {calc.totalPaverCost > 0 && (
+              <span>
+                Paver Material: <strong>{fmt2(calc.totalPaverCost)}</strong>
+              </span>
+            )}
+            {calc.vertPaverCost > 0 && (
+              <span>
+                Vert Soldier: <strong>{fmt2(calc.vertPaverCost)}</strong>
+              </span>
+            )}
+            {calc.baseRockCost > 0 && (
+              <span>
+                Base Rock ({calc.totalBaseTons.toFixed(1)}T):{' '}
+                <strong>{fmt2(calc.baseRockCost)}</strong>
+              </span>
+            )}
+            {calc.beddingSandCost > 0 && (
+              <span>
+                Bedding Sand: <strong>{fmt2(calc.beddingSandCost)}</strong>
+              </span>
+            )}
+            {calc.jointSandCost > 0 && (
+              <span>
+                Joint Sand: <strong>{fmt2(calc.jointSandCost)}</strong>
+              </span>
+            )}
+            {calc.polySandCost > 0 && (
+              <span>
+                Poly Sand: <strong>{fmt2(calc.polySandCost)}</strong>
+              </span>
+            )}
+            {calc.sealerMatCost > 0 && (
+              <span>
+                Sealer: <strong>{fmt2(calc.sealerMatCost)}</strong>
+              </span>
+            )}
+            {calc.restraintMatCost > 0 && (
+              <span>
+                Restraint Concrete: <strong>{fmt2(calc.restraintMatCost)}</strong>
+              </span>
+            )}
+            {calc.sleevesMatCost > 0 && (
+              <span>
+                Sleeves: <strong>{fmt2(calc.sleevesMatCost)}</strong>
+              </span>
+            )}
+            {calc.palletCost > 0 && (
+              <span>
+                Pallet Charges ({calc.totalPallets}): <strong>{fmt2(calc.palletCost)}</strong>
+              </span>
+            )}
+            {calc.deliveryCost > 0 && (
+              <span>
+                Delivery: <strong>{fmt2(calc.deliveryCost)}</strong>
+              </span>
+            )}
+            {calc.shipping > 0 && (
+              <span>
+                Shipping: <strong>{fmt2(calc.shipping)}</strong>
+              </span>
+            )}
+            {calc.salesTaxCost > 0 && (
+              <span>
+                Sales Tax: <strong>{fmt2(calc.salesTaxCost)}</strong>
+              </span>
+            )}
+            {calc.manualMat > 0 && (
+              <span>
+                Manual: <strong>{fmt2(calc.manualMat)}</strong>
+              </span>
+            )}
           </div>
           <p className="mt-2 pt-2 border-t border-gray-200 font-semibold text-gray-800">
             Total Materials: {fmt2(calc.totalMat)}
@@ -899,26 +1373,45 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           Manual Entry
         </div>
         <table className="w-full text-xs">
-          <TH cols={[
-            { label: 'Description' },
-            { label: 'Hours', w: 'w-20' },
-            { label: 'Materials ($)', w: 'w-28' },
-            { label: 'Sub Cost ($)', w: 'w-28' },
-          ]} />
+          <TH
+            cols={[
+              { label: 'Description' },
+              { label: 'Hours', w: 'w-20' },
+              { label: 'Materials ($)', w: 'w-28' },
+              { label: 'Sub Cost ($)', w: 'w-28' },
+            ]}
+          />
           <tbody className="divide-y divide-gray-50">
             {state.manualRows.map((r, i) => (
               <tr key={i}>
                 <td className={td}>
-                  <Inp type="text" value={r.label} onChange={e => setRow('manualRows', i, 'label', e.target.value)} placeholder="Description" />
+                  <Inp
+                    type="text"
+                    value={r.label}
+                    onChange={e => setRow('manualRows', i, 'label', e.target.value)}
+                    placeholder="Description"
+                  />
                 </td>
                 <td className={td}>
-                  <Inp value={r.hours}     onChange={e => setRow('manualRows', i, 'hours',     e.target.value)} step="0.5" />
+                  <Inp
+                    value={r.hours}
+                    onChange={e => setRow('manualRows', i, 'hours', e.target.value)}
+                    step="0.5"
+                  />
                 </td>
                 <td className={td}>
-                  <Inp value={r.materials} onChange={e => setRow('manualRows', i, 'materials', e.target.value)} step="1" />
+                  <Inp
+                    value={r.materials}
+                    onChange={e => setRow('manualRows', i, 'materials', e.target.value)}
+                    step="1"
+                  />
                 </td>
                 <td className={td}>
-                  <Inp value={r.subCost}   onChange={e => setRow('manualRows', i, 'subCost',   e.target.value)} step="1" />
+                  <Inp
+                    value={r.subCost}
+                    onChange={e => setRow('manualRows', i, 'subCost', e.target.value)}
+                    step="1"
+                  />
                 </td>
               </tr>
             ))}

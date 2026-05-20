@@ -3,8 +3,8 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { sendSMS, sendEmail } from '../lib/notify'
 
-const FG       = '#3A5038'
-const FG_DARK  = '#2E4030'
+const FG = '#3A5038'
+const FG_DARK = '#2E4030'
 
 // Mask phone: show only last 4 digits
 function maskPhone(phone) {
@@ -34,29 +34,29 @@ export default function Login() {
   const { signIn } = useAuth()
 
   // ── Login form state ───────────────────────────────────────────────────────
-  const [username,   setUsername]   = useState('')
-  const [password,   setPassword]   = useState('')
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(true)
-  const [showPw,     setShowPw]     = useState(false)
-  const [loading,    setLoading]    = useState(false)
-  const [error,      setError]      = useState('')
+  const [showPw, setShowPw] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   // ── Password-reset multi-step state ───────────────────────────────────────
   // mode: 'login' | 'forgot' | 'choose' | 'verify' | 'newpass'
-  const [mode,             setMode]             = useState('login')
-  const [resetUsername,    setResetUsername]    = useState('')
-  const [resetEmail,       setResetEmail]       = useState('')   // resolved email (E.164 or plain)
-  const [resetPhone,       setResetPhone]       = useState('')   // E.164 phone (empty if none on file)
+  const [mode, setMode] = useState('login')
+  const [resetUsername, setResetUsername] = useState('')
+  const [resetEmail, setResetEmail] = useState('') // resolved email (E.164 or plain)
+  const [resetPhone, setResetPhone] = useState('') // E.164 phone (empty if none on file)
   const [resetPhoneMasked, setResetPhoneMasked] = useState('')
   const [resetEmailMasked, setResetEmailMasked] = useState('')
-  const [verifyMethod,     setVerifyMethod]     = useState('')   // 'sms' | 'email'
-  const [pendingOtp,       setPendingOtp]       = useState('')   // generated code
-  const [otpCode,          setOtpCode]          = useState('')
-  const [newPassword,      setNewPassword]      = useState('')
-  const [confirmPassword,  setConfirmPassword]  = useState('')
-  const [showNewPw,        setShowNewPw]        = useState(false)
-  const [resetLoading,     setResetLoading]     = useState(false)
-  const [resetMsg,         setResetMsg]         = useState('')   // 'ok:…' | 'error:…'
+  const [verifyMethod, setVerifyMethod] = useState('') // 'sms' | 'email'
+  const [pendingOtp, setPendingOtp] = useState('') // generated code
+  const [otpCode, setOtpCode] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showNewPw, setShowNewPw] = useState(false)
+  const [resetLoading, setResetLoading] = useState(false)
+  const [resetMsg, setResetMsg] = useState('') // 'ok:…' | 'error:…'
 
   function resetFlow() {
     setMode('login')
@@ -78,22 +78,30 @@ export default function Login() {
   async function handleLogin(e) {
     e.preventDefault()
     setError('')
-    if (!username.trim()) { setError('Please enter your username or email.'); return }
-    if (!password)        { setError('Please enter your password.');           return }
+    if (!username.trim()) {
+      setError('Please enter your username or email.')
+      return
+    }
+    if (!password) {
+      setError('Please enter your password.')
+      return
+    }
     setLoading(true)
 
     try {
       let loginEmail = username.trim()
       if (!loginEmail.includes('@')) {
-        const { data: resolvedEmail, error: rpcErr } = await supabase.rpc(
-          'get_email_by_username',
-          { p_username: loginEmail.toLowerCase() }
-        )
+        const { data: resolvedEmail, error: rpcErr } = await supabase.rpc('get_email_by_username', {
+          p_username: loginEmail.toLowerCase(),
+        })
         if (rpcErr) throw new Error(rpcErr.message)
-        if (!resolvedEmail) throw new Error('Username not found. Try signing in with your email address instead.')
+        if (!resolvedEmail)
+          throw new Error('Username not found. Try signing in with your email address instead.')
         loginEmail = resolvedEmail
       }
-      const { error: signInErr } = await signIn(loginEmail, password, { persistSession: rememberMe })
+      const { error: signInErr } = await signIn(loginEmail, password, {
+        persistSession: rememberMe,
+      })
       if (signInErr) throw new Error('Incorrect password. Please try again.')
     } catch (err) {
       setError(err.message || 'Sign in failed. Please try again.')
@@ -106,19 +114,22 @@ export default function Login() {
     e.preventDefault()
     setResetMsg('')
     const entered = resetUsername.trim()
-    if (!entered) { setResetMsg('error:Please enter your username or email.'); return }
+    if (!entered) {
+      setResetMsg('error:Please enter your username or email.')
+      return
+    }
     setResetLoading(true)
 
     try {
       // Resolve to email
       let email = entered
       if (!email.includes('@')) {
-        const { data: resolvedEmail, error: rpcErr } = await supabase.rpc(
-          'get_email_by_username',
-          { p_username: email.toLowerCase() }
-        )
+        const { data: resolvedEmail, error: rpcErr } = await supabase.rpc('get_email_by_username', {
+          p_username: email.toLowerCase(),
+        })
         if (rpcErr) throw new Error(rpcErr.message)
-        if (!resolvedEmail) throw new Error('Username not found. Try entering your email address instead.')
+        if (!resolvedEmail)
+          throw new Error('Username not found. Try entering your email address instead.')
         email = resolvedEmail
       }
 
@@ -197,7 +208,10 @@ export default function Login() {
     e.preventDefault()
     setResetMsg('')
     const code = otpCode.trim()
-    if (!code || code.length < 6) { setResetMsg('error:Please enter the 6-digit code.'); return }
+    if (!code || code.length < 6) {
+      setResetMsg('error:Please enter the 6-digit code.')
+      return
+    }
     if (code !== pendingOtp) {
       setResetMsg('error:Incorrect code. Please try again.')
       return
@@ -210,20 +224,29 @@ export default function Login() {
   async function handleSetPassword(e) {
     e.preventDefault()
     setResetMsg('')
-    if (!newPassword)                    { setResetMsg('error:Please enter a new password.');             return }
-    if (newPassword.length < 8)          { setResetMsg('error:Password must be at least 8 characters.'); return }
-    if (newPassword !== confirmPassword) { setResetMsg('error:Passwords do not match.');                  return }
+    if (!newPassword) {
+      setResetMsg('error:Please enter a new password.')
+      return
+    }
+    if (newPassword.length < 8) {
+      setResetMsg('error:Password must be at least 8 characters.')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setResetMsg('error:Passwords do not match.')
+      return
+    }
     setResetLoading(true)
 
     try {
-      const supabaseUrl  = import.meta.env.VITE_SUPABASE_URL
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
       const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY
       const res = await fetch(`${supabaseUrl}/functions/v1/reset-user-password`, {
         method: 'POST',
         headers: {
-          'Content-Type':  'application/json',
-          'Authorization': `Bearer ${supabaseAnon}`,
-          'apikey':        supabaseAnon,
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${supabaseAnon}`,
+          apikey: supabaseAnon,
         },
         body: JSON.stringify({ email: resetEmail, newPassword }),
       })
@@ -249,16 +272,19 @@ export default function Login() {
     <span className="animate-spin inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full" />
   )
 
-  const MsgBox = ({ msg }) => !msg ? null : (
-    <div className={`flex items-start gap-2 text-sm px-3 py-2.5 rounded-xl border ${
-      msg.startsWith('ok:')
-        ? 'bg-green-50 border-green-200 text-green-800'
-        : 'bg-red-50 border-red-200 text-red-700'
-    }`}>
-      <span className="mt-0.5">{msg.startsWith('ok:') ? '✅' : '⚠️'}</span>
-      <span>{msg.slice(3)}</span>
-    </div>
-  )
+  const MsgBox = ({ msg }) =>
+    !msg ? null : (
+      <div
+        className={`flex items-start gap-2 text-sm px-3 py-2.5 rounded-xl border ${
+          msg.startsWith('ok:')
+            ? 'bg-green-50 border-green-200 text-green-800'
+            : 'bg-red-50 border-red-200 text-red-700'
+        }`}
+      >
+        <span className="mt-0.5">{msg.startsWith('ok:') ? '✅' : '⚠️'}</span>
+        <span>{msg.slice(3)}</span>
+      </div>
+    )
 
   const BackBtn = ({ label = '← Back to sign in', onClick }) => (
     <button
@@ -277,10 +303,13 @@ export default function Login() {
       className="w-full py-3 rounded-xl text-sm font-bold text-white transition-opacity disabled:opacity-60"
       style={{ backgroundColor: FG }}
     >
-      {ld
-        ? <span className="flex items-center justify-center gap-2"><Spinner /> {loadingLabel}</span>
-        : idleLabel
-      }
+      {ld ? (
+        <span className="flex items-center justify-center gap-2">
+          <Spinner /> {loadingLabel}
+        </span>
+      ) : (
+        idleLabel
+      )}
     </button>
   )
 
@@ -293,7 +322,7 @@ export default function Login() {
       (/[^A-Za-z0-9]/.test(pw) ? 1 : 0)
     )
   }
-  const strengthColors = ['bg-red-400','bg-orange-400','bg-yellow-400','bg-green-500']
+  const strengthColors = ['bg-red-400', 'bg-orange-400', 'bg-yellow-400', 'bg-green-500']
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -302,49 +331,71 @@ export default function Login() {
       style={{ background: `linear-gradient(135deg, ${FG_DARK} 0%, ${FG} 60%, #5a7a58 100%)` }}
     >
       <div className="w-full max-w-sm">
-
         {/* Branding */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-4 shadow-lg overflow-hidden"
-               style={{ backgroundColor: FG_DARK }}>
+          <div
+            className="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-4 shadow-lg overflow-hidden"
+            style={{ backgroundColor: FG_DARK }}
+          >
             <img
-              src="/logo.png" alt="Logo"
+              src="/logo.png"
+              alt="Logo"
               className="w-full h-full object-contain p-2"
-              onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='block' }}
+              onError={e => {
+                e.target.style.display = 'none'
+                e.target.nextSibling.style.display = 'block'
+              }}
             />
-            <span style={{ display:'none', fontSize:'2.5rem' }}>🌿</span>
+            <span style={{ display: 'none', fontSize: '2.5rem' }}>🌿</span>
           </div>
           <h1 className="text-2xl font-bold text-white tracking-tight">Picture Build</h1>
           <p className="text-green-200 text-sm mt-1">Management System</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-
           {/* ── LOGIN ──────────────────────────────────────────────────── */}
           {mode === 'login' && (
             <form onSubmit={handleLogin} className="p-8 space-y-5">
               <div>
                 <h2 className="text-lg font-bold text-gray-900">Welcome back</h2>
-                <p className="text-sm text-gray-500 mt-0.5">Sign in with your username and password</p>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  Sign in with your username and password
+                </p>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Username or Email</label>
-                <input type="text" className={inputCls} value={username}
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                  Username or Email
+                </label>
+                <input
+                  type="text"
+                  className={inputCls}
+                  value={username}
                   onChange={e => setUsername(e.target.value)}
                   placeholder="username or you@company.com"
-                  autoComplete="username" autoFocus spellCheck={false} />
+                  autoComplete="username"
+                  autoFocus
+                  spellCheck={false}
+                />
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Password</label>
                 <div className="relative">
-                  <input type={showPw ? 'text' : 'password'} className={inputCls + ' pr-12'}
-                    value={password} onChange={e => setPassword(e.target.value)}
-                    placeholder="••••••••" autoComplete="current-password" />
-                  <button type="button" tabIndex={-1}
+                  <input
+                    type={showPw ? 'text' : 'password'}
+                    className={inputCls + ' pr-12'}
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    tabIndex={-1}
                     onClick={() => setShowPw(v => !v)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm">
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm"
+                  >
                     {showPw ? '🙈' : '👁️'}
                   </button>
                 </div>
@@ -352,30 +403,48 @@ export default function Login() {
 
               <div className="flex items-center justify-between">
                 <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input type="checkbox" checked={rememberMe}
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
                     onChange={e => setRememberMe(e.target.checked)}
-                    className="w-4 h-4 rounded accent-green-700" />
+                    className="w-4 h-4 rounded accent-green-700"
+                  />
                   <span className="text-sm text-gray-600">Remember me</span>
                 </label>
-                <button type="button"
-                  onClick={() => { setMode('forgot'); setError(''); setResetMsg('') }}
-                  className="text-sm font-medium hover:underline" style={{ color: FG }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('forgot')
+                    setError('')
+                    setResetMsg('')
+                  }}
+                  className="text-sm font-medium hover:underline"
+                  style={{ color: FG }}
+                >
                   Forgot password?
                 </button>
               </div>
 
               {error && (
                 <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2.5 rounded-xl">
-                  <span className="mt-0.5">⚠️</span><span>{error}</span>
+                  <span className="mt-0.5">⚠️</span>
+                  <span>{error}</span>
                 </div>
               )}
 
-              <button type="submit" disabled={loading}
+              <button
+                type="submit"
+                disabled={loading}
                 className="w-full py-3 rounded-xl text-sm font-bold text-white transition-opacity disabled:opacity-60"
-                style={{ backgroundColor: FG }}>
-                {loading
-                  ? <span className="flex items-center justify-center gap-2"><Spinner /> Signing in…</span>
-                  : 'Sign In'}
+                style={{ backgroundColor: FG }}
+              >
+                {loading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Spinner /> Signing in…
+                  </span>
+                ) : (
+                  'Sign In'
+                )}
               </button>
 
               <p className="text-center text-xs text-gray-400">
@@ -391,24 +460,39 @@ export default function Login() {
                 <BackBtn />
                 <h2 className="text-lg font-bold text-gray-900">Forgot your password?</h2>
                 <p className="text-sm text-gray-500 mt-0.5">
-                  Enter your username or email and we'll verify it's you before letting you create a new one.
+                  Enter your username or email and we'll verify it's you before letting you create a
+                  new one.
                 </p>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Username or Email</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                  Username or Email
+                </label>
                 <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm select-none">@</span>
-                  <input type="text" className={inputCls + ' pl-8'} value={resetUsername}
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm select-none">
+                    @
+                  </span>
+                  <input
+                    type="text"
+                    className={inputCls + ' pl-8'}
+                    value={resetUsername}
                     onChange={e => setResetUsername(e.target.value)}
                     placeholder="username or you@company.com"
-                    autoComplete="username" autoFocus spellCheck={false} />
+                    autoComplete="username"
+                    autoFocus
+                    spellCheck={false}
+                  />
                 </div>
               </div>
 
               <MsgBox msg={resetMsg} />
 
-              <SubmitBtn ld={resetLoading} idleLabel="Continue" loadingLabel="Looking up account…" />
+              <SubmitBtn
+                ld={resetLoading}
+                idleLabel="Continue"
+                loadingLabel="Looking up account…"
+              />
             </form>
           )}
 
@@ -416,10 +500,17 @@ export default function Login() {
           {mode === 'choose' && (
             <div className="p-8 space-y-5">
               <div>
-                <BackBtn label="← Change account" onClick={() => { setMode('forgot'); setResetMsg('') }} />
+                <BackBtn
+                  label="← Change account"
+                  onClick={() => {
+                    setMode('forgot')
+                    setResetMsg('')
+                  }}
+                />
                 <h2 className="text-lg font-bold text-gray-900">Verification required</h2>
                 <p className="text-sm text-gray-500 mt-1">
-                  Identity verification is required before you can reset your password. Please choose which method you would like to use.
+                  Identity verification is required before you can reset your password. Please
+                  choose which method you would like to use.
                 </p>
               </div>
 
@@ -434,8 +525,12 @@ export default function Login() {
                   >
                     <span className="text-2xl">📱</span>
                     <div>
-                      <p className="text-sm font-semibold text-gray-800 group-hover:text-green-700">Text message to {resetPhoneMasked}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">Send a text with a 6-digit code for entry</p>
+                      <p className="text-sm font-semibold text-gray-800 group-hover:text-green-700">
+                        Text message to {resetPhoneMasked}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Send a text with a 6-digit code for entry
+                      </p>
                     </div>
                   </button>
                 )}
@@ -449,7 +544,9 @@ export default function Login() {
                 >
                   <span className="text-2xl">✉️</span>
                   <div>
-                    <p className="text-sm font-semibold text-gray-800 group-hover:text-green-700">Email to {resetEmailMasked}</p>
+                    <p className="text-sm font-semibold text-gray-800 group-hover:text-green-700">
+                      Email to {resetEmailMasked}
+                    </p>
                     <p className="text-xs text-gray-500 mt-0.5">Email a 6-digit code for entry</p>
                   </div>
                 </button>
@@ -470,25 +567,43 @@ export default function Login() {
           {mode === 'verify' && (
             <form onSubmit={handleVerifyOtp} className="p-8 space-y-5">
               <div>
-                <BackBtn label="← Choose another method" onClick={() => { setMode('choose'); setResetMsg('') }} />
+                <BackBtn
+                  label="← Choose another method"
+                  onClick={() => {
+                    setMode('choose')
+                    setResetMsg('')
+                  }}
+                />
                 <h2 className="text-lg font-bold text-gray-900">Enter the code</h2>
                 <p className="text-sm text-gray-500 mt-0.5">
-                  {verifyMethod === 'sms'
-                    ? <>We texted a 6-digit code to <span className="font-semibold text-gray-700">{resetPhoneMasked}</span>.</>
-                    : <>We emailed a 6-digit code to <span className="font-semibold text-gray-700">{resetEmailMasked}</span>.</>
-                  }
+                  {verifyMethod === 'sms' ? (
+                    <>
+                      We texted a 6-digit code to{' '}
+                      <span className="font-semibold text-gray-700">{resetPhoneMasked}</span>.
+                    </>
+                  ) : (
+                    <>
+                      We emailed a 6-digit code to{' '}
+                      <span className="font-semibold text-gray-700">{resetEmailMasked}</span>.
+                    </>
+                  )}
                 </p>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Verification Code</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                  Verification Code
+                </label>
                 <input
-                  type="text" inputMode="numeric" maxLength={6}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
                   className={inputCls + ' tracking-[0.4em] text-center text-lg font-semibold'}
                   value={otpCode}
-                  onChange={e => setOtpCode(e.target.value.replace(/\D/g,'').slice(0,6))}
+                  onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   placeholder="000000"
-                  autoFocus autoComplete="one-time-code"
+                  autoFocus
+                  autoComplete="one-time-code"
                 />
               </div>
 
@@ -496,9 +611,12 @@ export default function Login() {
 
               <SubmitBtn ld={resetLoading} idleLabel="Verify Code" loadingLabel="Verifying…" />
 
-              <button type="button" disabled={resetLoading}
+              <button
+                type="button"
+                disabled={resetLoading}
                 onClick={() => handleSendCode(verifyMethod)}
-                className="w-full text-sm text-center text-gray-400 hover:text-gray-600 disabled:opacity-40">
+                className="w-full text-sm text-center text-gray-400 hover:text-gray-600 disabled:opacity-40"
+              >
                 Didn't get it? Resend code
               </button>
             </form>
@@ -515,16 +633,25 @@ export default function Login() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">New Password</label>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                  New Password
+                </label>
                 <div className="relative">
-                  <input type={showNewPw ? 'text' : 'password'}
-                    className={inputCls + ' pr-12'} value={newPassword}
+                  <input
+                    type={showNewPw ? 'text' : 'password'}
+                    className={inputCls + ' pr-12'}
+                    value={newPassword}
                     onChange={e => setNewPassword(e.target.value)}
                     placeholder="At least 8 characters"
-                    autoComplete="new-password" autoFocus />
-                  <button type="button" tabIndex={-1}
+                    autoComplete="new-password"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    tabIndex={-1}
                     onClick={() => setShowNewPw(v => !v)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm">
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm"
+                  >
                     {showNewPw ? '🙈' : '👁️'}
                   </button>
                 </div>
@@ -533,11 +660,12 @@ export default function Login() {
               {/* Strength bar */}
               {newPassword && (
                 <div className="flex gap-1 -mt-2">
-                  {[1,2,3,4].map(n => {
+                  {[1, 2, 3, 4].map(n => {
                     const s = pwStrength(newPassword)
                     return (
-                      <div key={n}
-                        className={`h-1 flex-1 rounded-full transition-all ${n <= s ? strengthColors[s-1] : 'bg-gray-200'}`}
+                      <div
+                        key={n}
+                        className={`h-1 flex-1 rounded-full transition-all ${n <= s ? strengthColors[s - 1] : 'bg-gray-200'}`}
                       />
                     )
                   })}
@@ -545,12 +673,17 @@ export default function Login() {
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Confirm New Password</label>
-                <input type={showNewPw ? 'text' : 'password'}
-                  className={inputCls} value={confirmPassword}
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                  Confirm New Password
+                </label>
+                <input
+                  type={showNewPw ? 'text' : 'password'}
+                  className={inputCls}
+                  value={confirmPassword}
                   onChange={e => setConfirmPassword(e.target.value)}
                   placeholder="Re-enter password"
-                  autoComplete="new-password" />
+                  autoComplete="new-password"
+                />
               </div>
 
               <MsgBox msg={resetMsg} />
@@ -560,15 +693,17 @@ export default function Login() {
               )}
 
               {resetMsg.startsWith('ok:') && (
-                <button type="button" onClick={resetFlow}
+                <button
+                  type="button"
+                  onClick={resetFlow}
                   className="w-full py-3 rounded-xl text-sm font-bold text-white"
-                  style={{ backgroundColor: FG }}>
+                  style={{ backgroundColor: FG }}
+                >
                   Back to Sign In
                 </button>
               )}
             </form>
           )}
-
         </div>
 
         <p className="text-center text-green-300/60 text-xs mt-6">

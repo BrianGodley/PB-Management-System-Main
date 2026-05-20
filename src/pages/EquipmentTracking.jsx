@@ -8,19 +8,19 @@ import MasterEquipment from './MasterEquipment'
 const EQUIPMENT_TYPES = ['Vehicle', 'Trailer', 'Large Power', 'Small Power', 'Hand Tool']
 
 const TYPE_PREFIX = {
-  'Vehicle':     'V',
-  'Trailer':     'T',
+  Vehicle: 'V',
+  Trailer: 'T',
   'Large Power': 'L',
   'Small Power': 'S',
-  'Hand Tool':   'H',
+  'Hand Tool': 'H',
 }
 
 const TYPE_COLORS = {
-  'Vehicle':     'bg-blue-100 text-blue-800 border-blue-200',
-  'Trailer':     'bg-orange-100 text-orange-800 border-orange-200',
+  Vehicle: 'bg-blue-100 text-blue-800 border-blue-200',
+  Trailer: 'bg-orange-100 text-orange-800 border-orange-200',
   'Large Power': 'bg-red-100 text-red-800 border-red-200',
   'Small Power': 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  'Hand Tool':   'bg-green-100 text-green-800 border-green-200',
+  'Hand Tool': 'bg-green-100 text-green-800 border-green-200',
 }
 
 const CONDITION_LABELS = { 4: '4 — Best', 3: '3 — Good', 2: '2 — Fair', 1: '1 — Poor' }
@@ -50,15 +50,18 @@ function generateEquipmentId(type, existingItems) {
 function EquipmentModal({ item, allEquipment, onClose, onSave }) {
   const isNew = !item?.id
   const [manufacturer, setManufacturer] = useState(item?.manufacturer || '')
-  const [model,        setModel]        = useState(item?.model        || '')
-  const [type,         setType]         = useState(item?.type         || 'Vehicle')
-  const [year,         setYear]         = useState(item?.year         || '')
-  const [condition,    setCondition]    = useState(item?.condition    || 4)
-  const [saving,       setSaving]       = useState(false)
-  const [error,        setError]        = useState('')
+  const [model, setModel] = useState(item?.model || '')
+  const [type, setType] = useState(item?.type || 'Vehicle')
+  const [year, setYear] = useState(item?.year || '')
+  const [condition, setCondition] = useState(item?.condition || 4)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   async function handleSave() {
-    if (!model.trim()) { setError('Model is required.'); return }
+    if (!model.trim()) {
+      setError('Model is required.')
+      return
+    }
     setSaving(true)
     setError('')
     try {
@@ -66,16 +69,31 @@ function EquipmentModal({ item, allEquipment, onClose, onSave }) {
         const newId = generateEquipmentId(type, allEquipment)
         const { data, error: err } = await supabase
           .from('master_equipment')
-          .insert({ manufacturer: manufacturer.trim(), model: model.trim(), type, equipment_id: newId, year: year || null, condition })
-          .select().single()
+          .insert({
+            manufacturer: manufacturer.trim(),
+            model: model.trim(),
+            type,
+            equipment_id: newId,
+            year: year || null,
+            condition,
+          })
+          .select()
+          .single()
         if (err) throw err
         onSave(data)
       } else {
         const { data, error: err } = await supabase
           .from('master_equipment')
-          .update({ manufacturer: manufacturer.trim(), model: model.trim(), type, year: year || null, condition })
+          .update({
+            manufacturer: manufacturer.trim(),
+            model: model.trim(),
+            type,
+            year: year || null,
+            condition,
+          })
           .eq('id', item.id)
-          .select().single()
+          .select()
+          .single()
         if (err) throw err
         onSave(data)
       }
@@ -89,8 +107,15 @@ function EquipmentModal({ item, allEquipment, onClose, onSave }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-base font-bold text-gray-900">{isNew ? 'Add Equipment' : 'Edit Equipment'}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+          <h2 className="text-base font-bold text-gray-900">
+            {isNew ? 'Add Equipment' : 'Edit Equipment'}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+          >
+            ×
+          </button>
         </div>
         <div className="px-6 py-5 space-y-4">
           {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
@@ -117,9 +142,15 @@ function EquipmentModal({ item, allEquipment, onClose, onSave }) {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Equipment Type *</label>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">
+              Equipment Type *
+            </label>
             <select value={type} onChange={e => setType(e.target.value)} className="input w-full">
-              {EQUIPMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              {EQUIPMENT_TYPES.map(t => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -138,21 +169,36 @@ function EquipmentModal({ item, allEquipment, onClose, onSave }) {
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">Condition</label>
-              <select value={condition} onChange={e => setCondition(Number(e.target.value))} className="input w-full">
-                {[4, 3, 2, 1].map(c => <option key={c} value={c}>{CONDITION_LABELS[c]}</option>)}
+              <select
+                value={condition}
+                onChange={e => setCondition(Number(e.target.value))}
+                className="input w-full"
+              >
+                {[4, 3, 2, 1].map(c => (
+                  <option key={c} value={c}>
+                    {CONDITION_LABELS[c]}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
 
           {isNew && (
             <p className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
-              Equipment ID will be auto-generated as <strong>{TYPE_PREFIX[type]}100+</strong> when saved.
+              Equipment ID will be auto-generated as <strong>{TYPE_PREFIX[type]}100+</strong> when
+              saved.
             </p>
           )}
         </div>
         <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
-          <button onClick={onClose} className="btn-ghost text-sm px-4 py-2 rounded-lg">Cancel</button>
-          <button onClick={handleSave} disabled={saving} className="btn-primary text-sm px-5 py-2 rounded-lg">
+          <button onClick={onClose} className="btn-ghost text-sm px-4 py-2 rounded-lg">
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="btn-primary text-sm px-5 py-2 rounded-lg"
+          >
             {saving ? 'Saving…' : isNew ? 'Add Equipment' : 'Save Changes'}
           </button>
         </div>
@@ -165,9 +211,9 @@ function EquipmentModal({ item, allEquipment, onClose, onSave }) {
 // Maintenance Modal
 // ─────────────────────────────────────────────────────────────────────────────
 function MaintenanceModal({ item, onClose, onSave }) {
-  const [date,    setDate]    = useState(item?.last_maintenance_date || '')
-  const [summary, setSummary] = useState(item?.maintenance_summary  || '')
-  const [saving,  setSaving]  = useState(false)
+  const [date, setDate] = useState(item?.last_maintenance_date || '')
+  const [summary, setSummary] = useState(item?.maintenance_summary || '')
+  const [saving, setSaving] = useState(false)
 
   async function handleSave() {
     setSaving(true)
@@ -175,7 +221,8 @@ function MaintenanceModal({ item, onClose, onSave }) {
       .from('master_equipment')
       .update({ last_maintenance_date: date || null, maintenance_summary: summary || null })
       .eq('id', item.id)
-      .select().single()
+      .select()
+      .single()
     setSaving(false)
     if (!error) onSave(data)
   }
@@ -184,16 +231,32 @@ function MaintenanceModal({ item, onClose, onSave }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-base font-bold text-gray-900">Maintenance — {item.manufacturer} {item.model}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+          <h2 className="text-base font-bold text-gray-900">
+            Maintenance — {item.manufacturer} {item.model}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+          >
+            ×
+          </button>
         </div>
         <div className="px-6 py-5 space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Last Repair / Maintenance Date</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="input w-full" />
+            <label className="block text-xs font-semibold text-gray-600 mb-1">
+              Last Repair / Maintenance Date
+            </label>
+            <input
+              type="date"
+              value={date}
+              onChange={e => setDate(e.target.value)}
+              className="input w-full"
+            />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Repair / Maintenance Summary</label>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">
+              Repair / Maintenance Summary
+            </label>
             <textarea
               value={summary}
               onChange={e => setSummary(e.target.value)}
@@ -204,8 +267,14 @@ function MaintenanceModal({ item, onClose, onSave }) {
           </div>
         </div>
         <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
-          <button onClick={onClose} className="btn-ghost text-sm px-4 py-2 rounded-lg">Cancel</button>
-          <button onClick={handleSave} disabled={saving} className="btn-primary text-sm px-5 py-2 rounded-lg">
+          <button onClick={onClose} className="btn-ghost text-sm px-4 py-2 rounded-lg">
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="btn-primary text-sm px-5 py-2 rounded-lg"
+          >
             {saving ? 'Saving…' : 'Save'}
           </button>
         </div>
@@ -218,17 +287,19 @@ function MaintenanceModal({ item, onClose, onSave }) {
 // Main Page
 // ─────────────────────────────────────────────────────────────────────────────
 export default function EquipmentTracking() {
-  const [eqTab,      setEqTab]      = useState('equipment') // 'equipment' | 'settings'
+  const [eqTab, setEqTab] = useState('equipment') // 'equipment' | 'settings'
   const [eqSettingsTab, setEqSettingsTab] = useState('general')
-  const [equipment,  setEquipment]  = useState([])
-  const [loading,    setLoading]    = useState(true)
-  const [showModal,  setShowModal]  = useState(false)
-  const [editItem,   setEditItem]   = useState(null)
-  const [maintItem,  setMaintItem]  = useState(null)
-  const [deleteId,   setDeleteId]   = useState(null)
-  const [search,     setSearch]     = useState('')
+  const [equipment, setEquipment] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [showModal, setShowModal] = useState(false)
+  const [editItem, setEditItem] = useState(null)
+  const [maintItem, setMaintItem] = useState(null)
+  const [deleteId, setDeleteId] = useState(null)
+  const [search, setSearch] = useState('')
 
-  useEffect(() => { fetchEquipment() }, [])
+  useEffect(() => {
+    fetchEquipment()
+  }, [])
 
   async function fetchEquipment() {
     const { data } = await supabase
@@ -243,14 +314,14 @@ export default function EquipmentTracking() {
   function handleSaved(item) {
     setEquipment(prev => {
       const exists = prev.find(e => e.id === item.id)
-      return exists ? prev.map(e => e.id === item.id ? item : e) : [...prev, item]
+      return exists ? prev.map(e => (e.id === item.id ? item : e)) : [...prev, item]
     })
     setShowModal(false)
     setEditItem(null)
   }
 
   function handleMaintSaved(item) {
-    setEquipment(prev => prev.map(e => e.id === item.id ? item : e))
+    setEquipment(prev => prev.map(e => (e.id === item.id ? item : e)))
     setMaintItem(null)
   }
 
@@ -273,13 +344,15 @@ export default function EquipmentTracking() {
 
   return (
     <div className="flex flex-col h-full">
-
       {/* Header */}
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <h1 className="text-xl font-bold text-gray-900">Equipment</h1>
         {eqTab === 'equipment' && (
           <button
-            onClick={() => { setEditItem(null); setShowModal(true) }}
+            onClick={() => {
+              setEditItem(null)
+              setShowModal(true)
+            }}
             className="btn-primary text-sm px-4 py-2 rounded-lg"
           >
             + Add Equipment
@@ -291,13 +364,19 @@ export default function EquipmentTracking() {
       <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0">
         {[
           { key: 'equipment', label: `🛠️ Equipment (${equipment.length})` },
-          { key: 'settings',  label: '⚙️ Settings' },
+          { key: 'settings', label: '⚙️ Settings' },
         ].map(t => (
-          <button key={t.key} onClick={() => setEqTab(t.key)}
+          <button
+            key={t.key}
+            onClick={() => setEqTab(t.key)}
             className={`flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
-              eqTab === t.key ? 'border-green-700 text-green-700' : 'border-transparent text-gray-500 hover:text-gray-700'
+              eqTab === t.key
+                ? 'border-green-700 text-green-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
-          >{t.label}</button>
+          >
+            {t.label}
+          </button>
         ))}
       </div>
 
@@ -306,14 +385,20 @@ export default function EquipmentTracking() {
         <div className="-mb-6 mt-3 flex-1 flex flex-col">
           <div className="flex border-b border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0">
             {[
-              { key: 'general',   label: '⚙️ General'   },
+              { key: 'general', label: '⚙️ General' },
               { key: 'equipment', label: '🛠️ Master Equipment' },
             ].map(t => (
-              <button key={t.key} onClick={() => setEqSettingsTab(t.key)}
+              <button
+                key={t.key}
+                onClick={() => setEqSettingsTab(t.key)}
                 className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
-                  eqSettingsTab === t.key ? 'border-green-700 text-green-800' : 'border-transparent text-gray-500 hover:text-gray-800'
+                  eqSettingsTab === t.key
+                    ? 'border-green-700 text-green-800'
+                    : 'border-transparent text-gray-500 hover:text-gray-800'
                 }`}
-              >{t.label}</button>
+              >
+                {t.label}
+              </button>
             ))}
           </div>
           <div className="bg-gray-50 px-6 py-6 flex-1 overflow-y-auto">
@@ -322,176 +407,223 @@ export default function EquipmentTracking() {
                 <div>
                   <p className="text-4xl mb-3">⚙️</p>
                   <h2 className="text-base font-semibold text-gray-800 mb-1">Equipment Settings</h2>
-                  <p className="text-sm text-gray-500">Configuration options will be available here.</p>
+                  <p className="text-sm text-gray-500">
+                    Configuration options will be available here.
+                  </p>
                 </div>
               </div>
             )}
-            {eqSettingsTab === 'equipment' && (
-              <MasterEquipment />
+            {eqSettingsTab === 'equipment' && <MasterEquipment />}
+          </div>
+        </div>
+      )}
+
+      {eqTab === 'equipment' && (
+        <>
+          {/* Search */}
+          <div className="mb-3 mt-4 flex-shrink-0">
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="input text-sm w-full max-w-xs"
+              placeholder="Search equipment…"
+            />
+          </div>
+
+          {/* Table */}
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            {loading ? (
+              <div className="flex justify-center py-16">
+                <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-green-700" />
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="text-center py-16 text-gray-400">
+                <p className="text-4xl mb-2">🛠️</p>
+                <p className="text-sm">
+                  {search
+                    ? 'No equipment matches your search.'
+                    : 'No equipment yet. Click + Add Equipment to get started.'}
+                </p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                        Manufacturer
+                      </th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                        Model
+                      </th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                        Type
+                      </th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                        Equipment ID
+                      </th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                        Year
+                      </th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                        Condition
+                      </th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                        Last Maintenance
+                      </th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide min-w-[180px]">
+                        Maintenance Summary
+                      </th>
+                      <th className="px-4 py-3" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {filtered.map(item => (
+                      <tr key={item.id} className="hover:bg-gray-50 group">
+                        {/* Manufacturer */}
+                        <td className="px-4 py-3 text-gray-600">
+                          {item.manufacturer || (
+                            <span className="text-gray-300 italic text-xs">—</span>
+                          )}
+                        </td>
+
+                        {/* Model */}
+                        <td className="px-4 py-3 font-medium text-gray-900">{item.model}</td>
+
+                        {/* Type */}
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium border ${TYPE_COLORS[item.type]}`}
+                          >
+                            {item.type}
+                          </span>
+                        </td>
+
+                        {/* Equipment ID */}
+                        <td className="px-4 py-3">
+                          <span className="font-mono text-xs font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded">
+                            {item.equipment_id}
+                          </span>
+                        </td>
+
+                        {/* Year */}
+                        <td className="px-4 py-3 text-gray-700">{item.year || '—'}</td>
+
+                        {/* Condition */}
+                        <td className="px-4 py-3">
+                          {item.condition ? (
+                            <span
+                              className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${CONDITION_COLORS[item.condition]}`}
+                            >
+                              {CONDITION_LABELS[item.condition]}
+                            </span>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+
+                        {/* Last Maintenance — clickable */}
+                        <td
+                          className="px-4 py-3 text-gray-600 cursor-pointer hover:text-green-700"
+                          onClick={() => setMaintItem(item)}
+                        >
+                          {item.last_maintenance_date ? (
+                            new Date(item.last_maintenance_date + 'T00:00:00').toLocaleDateString()
+                          ) : (
+                            <span className="text-gray-300 italic text-xs">Click to set</span>
+                          )}
+                        </td>
+
+                        {/* Maintenance Summary — clickable */}
+                        <td
+                          className="px-4 py-3 text-gray-600 max-w-[220px] cursor-pointer hover:text-green-700"
+                          onClick={() => setMaintItem(item)}
+                        >
+                          {item.maintenance_summary ? (
+                            <span className="line-clamp-2 text-xs">{item.maintenance_summary}</span>
+                          ) : (
+                            <span className="text-gray-300 italic text-xs">Click to add notes</span>
+                          )}
+                        </td>
+
+                        {/* Actions */}
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => {
+                                setEditItem(item)
+                                setShowModal(true)
+                              }}
+                              className="text-xs text-gray-500 hover:text-blue-600 font-medium"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => setDeleteId(item.id)}
+                              className="text-xs text-gray-400 hover:text-red-600"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
-        </div>
-      )}
 
-      {eqTab === 'equipment' && <>
-      {/* Search */}
-      <div className="mb-3 mt-4 flex-shrink-0">
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="input text-sm w-full max-w-xs"
-          placeholder="Search equipment…"
-        />
-      </div>
+          {/* Add / Edit Modal */}
+          {showModal && (
+            <EquipmentModal
+              item={editItem}
+              allEquipment={equipment}
+              onClose={() => {
+                setShowModal(false)
+                setEditItem(null)
+              }}
+              onSave={handleSaved}
+            />
+          )}
 
-      {/* Table */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
-        {loading ? (
-          <div className="flex justify-center py-16">
-            <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-green-700" />
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-16 text-gray-400">
-            <p className="text-4xl mb-2">🛠️</p>
-            <p className="text-sm">
-              {search ? 'No equipment matches your search.' : 'No equipment yet. Click + Add Equipment to get started.'}
-            </p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">Manufacturer</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">Model</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">Type</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">Equipment ID</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">Year</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">Condition</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">Last Maintenance</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide min-w-[180px]">Maintenance Summary</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filtered.map(item => (
-                  <tr key={item.id} className="hover:bg-gray-50 group">
+          {/* Maintenance Modal */}
+          {maintItem && (
+            <MaintenanceModal
+              item={maintItem}
+              onClose={() => setMaintItem(null)}
+              onSave={handleMaintSaved}
+            />
+          )}
 
-                    {/* Manufacturer */}
-                    <td className="px-4 py-3 text-gray-600">
-                      {item.manufacturer || <span className="text-gray-300 italic text-xs">—</span>}
-                    </td>
-
-                    {/* Model */}
-                    <td className="px-4 py-3 font-medium text-gray-900">{item.model}</td>
-
-                    {/* Type */}
-                    <td className="px-4 py-3">
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium border ${TYPE_COLORS[item.type]}`}>
-                        {item.type}
-                      </span>
-                    </td>
-
-                    {/* Equipment ID */}
-                    <td className="px-4 py-3">
-                      <span className="font-mono text-xs font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded">
-                        {item.equipment_id}
-                      </span>
-                    </td>
-
-                    {/* Year */}
-                    <td className="px-4 py-3 text-gray-700">{item.year || '—'}</td>
-
-                    {/* Condition */}
-                    <td className="px-4 py-3">
-                      {item.condition ? (
-                        <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${CONDITION_COLORS[item.condition]}`}>
-                          {CONDITION_LABELS[item.condition]}
-                        </span>
-                      ) : '—'}
-                    </td>
-
-                    {/* Last Maintenance — clickable */}
-                    <td
-                      className="px-4 py-3 text-gray-600 cursor-pointer hover:text-green-700"
-                      onClick={() => setMaintItem(item)}
-                    >
-                      {item.last_maintenance_date
-                        ? new Date(item.last_maintenance_date + 'T00:00:00').toLocaleDateString()
-                        : <span className="text-gray-300 italic text-xs">Click to set</span>
-                      }
-                    </td>
-
-                    {/* Maintenance Summary — clickable */}
-                    <td
-                      className="px-4 py-3 text-gray-600 max-w-[220px] cursor-pointer hover:text-green-700"
-                      onClick={() => setMaintItem(item)}
-                    >
-                      {item.maintenance_summary
-                        ? <span className="line-clamp-2 text-xs">{item.maintenance_summary}</span>
-                        : <span className="text-gray-300 italic text-xs">Click to add notes</span>
-                      }
-                    </td>
-
-                    {/* Actions */}
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => { setEditItem(item); setShowModal(true) }}
-                          className="text-xs text-gray-500 hover:text-blue-600 font-medium"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => setDeleteId(item.id)}
-                          className="text-xs text-gray-400 hover:text-red-600"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Add / Edit Modal */}
-      {showModal && (
-        <EquipmentModal
-          item={editItem}
-          allEquipment={equipment}
-          onClose={() => { setShowModal(false); setEditItem(null) }}
-          onSave={handleSaved}
-        />
-      )}
-
-      {/* Maintenance Modal */}
-      {maintItem && (
-        <MaintenanceModal
-          item={maintItem}
-          onClose={() => setMaintItem(null)}
-          onSave={handleMaintSaved}
-        />
-      )}
-
-      {/* Delete Confirm */}
-      {deleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 text-center">
-            <p className="text-3xl mb-3">🗑️</p>
-            <p className="text-sm font-semibold text-gray-800 mb-1">Delete this equipment?</p>
-            <p className="text-xs text-gray-500 mb-5">This will also remove it from all module assignments.</p>
-            <div className="flex justify-center gap-3">
-              <button onClick={() => setDeleteId(null)} className="btn-ghost px-5 py-2 rounded-lg text-sm">Cancel</button>
-              <button onClick={() => handleDelete(deleteId)} className="bg-red-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-red-700">Delete</button>
+          {/* Delete Confirm */}
+          {deleteId && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 text-center">
+                <p className="text-3xl mb-3">🗑️</p>
+                <p className="text-sm font-semibold text-gray-800 mb-1">Delete this equipment?</p>
+                <p className="text-xs text-gray-500 mb-5">
+                  This will also remove it from all module assignments.
+                </p>
+                <div className="flex justify-center gap-3">
+                  <button
+                    onClick={() => setDeleteId(null)}
+                    className="btn-ghost px-5 py-2 rounded-lg text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleDelete(deleteId)}
+                    className="bg-red-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-red-700"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          )}
+        </>
       )}
-      </>}
     </div>
   )
 }

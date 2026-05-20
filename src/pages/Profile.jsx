@@ -3,11 +3,56 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 
 const US_STATES = [
-  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA',
-  'HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
-  'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
-  'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
-  'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY',
+  'AL',
+  'AK',
+  'AZ',
+  'AR',
+  'CA',
+  'CO',
+  'CT',
+  'DE',
+  'FL',
+  'GA',
+  'HI',
+  'ID',
+  'IL',
+  'IN',
+  'IA',
+  'KS',
+  'KY',
+  'LA',
+  'ME',
+  'MD',
+  'MA',
+  'MI',
+  'MN',
+  'MS',
+  'MO',
+  'MT',
+  'NE',
+  'NV',
+  'NH',
+  'NJ',
+  'NM',
+  'NY',
+  'NC',
+  'ND',
+  'OH',
+  'OK',
+  'OR',
+  'PA',
+  'RI',
+  'SC',
+  'SD',
+  'TN',
+  'TX',
+  'UT',
+  'VT',
+  'VA',
+  'WA',
+  'WV',
+  'WI',
+  'WY',
 ]
 
 export default function Profile() {
@@ -15,42 +60,46 @@ export default function Profile() {
   const fileInputRef = useRef(null)
 
   // ── Profile data ─────────────────────────────────────────────────────────────
-  const [profile,        setProfile]        = useState(null)
+  const [profile, setProfile] = useState(null)
   const [loadingProfile, setLoadingProfile] = useState(true)
 
   // ── Avatar ───────────────────────────────────────────────────────────────────
-  const [avatarPreview,  setAvatarPreview]  = useState(null)   // local blob URL
+  const [avatarPreview, setAvatarPreview] = useState(null) // local blob URL
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
-  const [photoMsg,       setPhotoMsg]       = useState(null)
+  const [photoMsg, setPhotoMsg] = useState(null)
 
   // ── Name ─────────────────────────────────────────────────────────────────────
   const [editingName, setEditingName] = useState(false)
-  const [nameValue,   setNameValue]   = useState('')
-  const [savingName,  setSavingName]  = useState(false)
-  const [nameMsg,     setNameMsg]     = useState(null)
+  const [nameValue, setNameValue] = useState('')
+  const [savingName, setSavingName] = useState(false)
+  const [nameMsg, setNameMsg] = useState(null)
 
   // ── Phone ─────────────────────────────────────────────────────────────────────
-  const [phoneCell,   setPhoneCell]   = useState('')
+  const [phoneCell, setPhoneCell] = useState('')
   const [savingPhone, setSavingPhone] = useState(false)
-  const [phoneMsg,    setPhoneMsg]    = useState(null)
+  const [phoneMsg, setPhoneMsg] = useState(null)
 
   // ── Address ──────────────────────────────────────────────────────────────────
   const [addr, setAddr] = useState({
-    address_line1: '', address_line2: '', city: '', state: '', zip_code: '',
+    address_line1: '',
+    address_line2: '',
+    city: '',
+    state: '',
+    zip_code: '',
   })
   const [savingAddr, setSavingAddr] = useState(false)
-  const [addrMsg,    setAddrMsg]    = useState(null)
+  const [addrMsg, setAddrMsg] = useState(null)
 
   // ── Password ─────────────────────────────────────────────────────────────────
-  const [showPwForm,  setShowPwForm]  = useState(false)
-  const [currentPw,   setCurrentPw]  = useState('')
-  const [newPw,       setNewPw]      = useState('')
-  const [confirmPw,   setConfirmPw]  = useState('')
-  const [showCurrent, setShowCurrent]= useState(false)
-  const [showNew,     setShowNew]    = useState(false)
-  const [showConfirm, setShowConfirm]= useState(false)
-  const [savingPw,    setSavingPw]   = useState(false)
-  const [pwMsg,       setPwMsg]      = useState(null)
+  const [showPwForm, setShowPwForm] = useState(false)
+  const [currentPw, setCurrentPw] = useState('')
+  const [newPw, setNewPw] = useState('')
+  const [confirmPw, setConfirmPw] = useState('')
+  const [showCurrent, setShowCurrent] = useState(false)
+  const [showNew, setShowNew] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [savingPw, setSavingPw] = useState(false)
+  const [pwMsg, setPwMsg] = useState(null)
 
   useEffect(() => {
     if (!user?.id) return
@@ -59,11 +108,7 @@ export default function Profile() {
 
   async function loadProfile() {
     setLoadingProfile(true)
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single()
+    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     const p = data || {}
     setProfile(p)
     setNameValue(p.full_name || p.name || '')
@@ -71,9 +116,9 @@ export default function Profile() {
     setAddr({
       address_line1: p.address_line1 || '',
       address_line2: p.address_line2 || '',
-      city:          p.city          || '',
-      state:         p.state         || '',
-      zip_code:      p.zip_code      || '',
+      city: p.city || '',
+      state: p.state || '',
+      zip_code: p.zip_code || '',
     })
     setLoadingProfile(false)
   }
@@ -99,7 +144,7 @@ export default function Profile() {
     setUploadingPhoto(true)
     setPhotoMsg(null)
 
-    const ext  = file.name.split('.').pop()
+    const ext = file.name.split('.').pop()
     const path = `${user.id}/avatar.${ext}`
 
     const { error: uploadErr } = await supabase.storage
@@ -113,7 +158,7 @@ export default function Profile() {
     }
 
     const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path)
-    const publicUrl = urlData.publicUrl + '?t=' + Date.now()   // bust cache
+    const publicUrl = urlData.publicUrl + '?t=' + Date.now() // bust cache
 
     const { error: dbErr } = await supabase
       .from('profiles')
@@ -121,7 +166,10 @@ export default function Profile() {
       .eq('id', user.id)
 
     if (dbErr) {
-      setPhotoMsg({ type: 'error', text: 'Saved image but could not update profile: ' + dbErr.message })
+      setPhotoMsg({
+        type: 'error',
+        text: 'Saved image but could not update profile: ' + dbErr.message,
+      })
     } else {
       setProfile(p => ({ ...p, avatar_url: publicUrl }))
       setPhotoMsg({ type: 'success', text: 'Photo updated!' })
@@ -145,7 +193,8 @@ export default function Profile() {
 
   // ── Save name ─────────────────────────────────────────────────────────────────
   async function handleSaveName() {
-    setSavingName(true); setNameMsg(null)
+    setSavingName(true)
+    setNameMsg(null)
     const { error } = await supabase
       .from('profiles')
       .update({ full_name: nameValue.trim() })
@@ -163,7 +212,8 @@ export default function Profile() {
 
   // ── Save phone ────────────────────────────────────────────────────────────────
   async function handleSavePhone() {
-    setSavingPhone(true); setPhoneMsg(null)
+    setSavingPhone(true)
+    setPhoneMsg(null)
     const { error } = await supabase
       .from('profiles')
       .update({ phone_cell: phoneCell.trim() || null })
@@ -180,11 +230,9 @@ export default function Profile() {
 
   // ── Save address ──────────────────────────────────────────────────────────────
   async function handleSaveAddress() {
-    setSavingAddr(true); setAddrMsg(null)
-    const { error } = await supabase
-      .from('profiles')
-      .update(addr)
-      .eq('id', user.id)
+    setSavingAddr(true)
+    setAddrMsg(null)
+    const { error } = await supabase.from('profiles').update(addr).eq('id', user.id)
     if (error) {
       setAddrMsg({ type: 'error', text: 'Could not save address: ' + error.message })
     } else {
@@ -197,18 +245,30 @@ export default function Profile() {
 
   // ── Change password ───────────────────────────────────────────────────────────
   async function handleChangePassword(e) {
-    e.preventDefault(); setPwMsg(null)
-    if (!currentPw)        { setPwMsg({ type: 'error', text: 'Please enter your current password.' }); return }
-    if (newPw.length < 8)  { setPwMsg({ type: 'error', text: 'New password must be at least 8 characters.' }); return }
-    if (newPw !== confirmPw){ setPwMsg({ type: 'error', text: 'New passwords do not match.' }); return }
+    e.preventDefault()
+    setPwMsg(null)
+    if (!currentPw) {
+      setPwMsg({ type: 'error', text: 'Please enter your current password.' })
+      return
+    }
+    if (newPw.length < 8) {
+      setPwMsg({ type: 'error', text: 'New password must be at least 8 characters.' })
+      return
+    }
+    if (newPw !== confirmPw) {
+      setPwMsg({ type: 'error', text: 'New passwords do not match.' })
+      return
+    }
     setSavingPw(true)
 
     const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: user.email, password: currentPw,
+      email: user.email,
+      password: currentPw,
     })
     if (signInError) {
       setPwMsg({ type: 'error', text: 'Current password is incorrect.' })
-      setSavingPw(false); return
+      setSavingPw(false)
+      return
     }
 
     const { error: updateError } = await supabase.auth.updateUser({ password: newPw })
@@ -216,24 +276,36 @@ export default function Profile() {
       setPwMsg({ type: 'error', text: 'Could not update password: ' + updateError.message })
     } else {
       setPwMsg({ type: 'success', text: 'Password changed successfully!' })
-      setCurrentPw(''); setNewPw(''); setConfirmPw('')
-      setTimeout(() => { setPwMsg(null); setShowPwForm(false) }, 3000)
+      setCurrentPw('')
+      setNewPw('')
+      setConfirmPw('')
+      setTimeout(() => {
+        setPwMsg(null)
+        setShowPwForm(false)
+      }, 3000)
     }
     setSavingPw(false)
   }
 
   function cancelPassword() {
-    setShowPwForm(false); setCurrentPw(''); setNewPw(''); setConfirmPw(''); setPwMsg(null)
+    setShowPwForm(false)
+    setCurrentPw('')
+    setNewPw('')
+    setConfirmPw('')
+    setPwMsg(null)
   }
 
   const currentAvatar = avatarPreview || profile?.avatar_url
-  const displayName   = profile?.full_name || profile?.name || '—'
-  const initials      = (profile?.full_name || user?.email || 'U')[0].toUpperCase()
+  const displayName = profile?.full_name || profile?.name || '—'
+  const initials = (profile?.full_name || user?.email || 'U')[0].toUpperCase()
 
   const inputCls = 'input w-full'
-  const Msg = ({ m }) => m ? (
-    <p className={`text-sm mt-2 ${m.type === 'success' ? 'text-green-700' : 'text-red-600'}`}>{m.text}</p>
-  ) : null
+  const Msg = ({ m }) =>
+    m ? (
+      <p className={`text-sm mt-2 ${m.type === 'success' ? 'text-green-700' : 'text-red-600'}`}>
+        {m.text}
+      </p>
+    ) : null
 
   return (
     <div>
@@ -251,10 +323,11 @@ export default function Profile() {
         </div>
       ) : (
         <div className="max-w-lg space-y-4">
-
           {/* ── Photo ───────────────────────────────────────────────────────── */}
           <div className="card">
-            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">Profile Photo</p>
+            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">
+              Profile Photo
+            </p>
             <div className="flex items-center gap-4">
               {/* Avatar circle */}
               <div className="relative flex-shrink-0">
@@ -262,8 +335,10 @@ export default function Profile() {
                   {currentAvatar ? (
                     <img src={currentAvatar} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-2xl font-bold text-white"
-                      style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)', color: '#3A5038' }}>
+                    <span
+                      className="text-2xl font-bold text-white"
+                      style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)', color: '#3A5038' }}
+                    >
                       {initials}
                     </span>
                   )}
@@ -290,7 +365,11 @@ export default function Profile() {
                     disabled={uploadingPhoto}
                     className="btn-primary text-sm px-3 py-1.5 disabled:opacity-50"
                   >
-                    {uploadingPhoto ? 'Uploading…' : currentAvatar ? 'Change Photo' : 'Upload Photo'}
+                    {uploadingPhoto
+                      ? 'Uploading…'
+                      : currentAvatar
+                        ? 'Change Photo'
+                        : 'Upload Photo'}
                   </button>
                   {currentAvatar && !uploadingPhoto && (
                     <button
@@ -309,14 +388,19 @@ export default function Profile() {
 
           {/* ── Full Name ────────────────────────────────────────────────────── */}
           <div className="card">
-            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">Full Name</p>
+            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">
+              Full Name
+            </p>
             {editingName ? (
               <div className="space-y-3">
                 <input
                   type="text"
                   value={nameValue}
                   onChange={e => setNameValue(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') setEditingName(false) }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleSaveName()
+                    if (e.key === 'Escape') setEditingName(false)
+                  }}
                   placeholder="Your full name"
                   autoFocus
                   className={inputCls}
@@ -330,7 +414,10 @@ export default function Profile() {
                     {savingName ? 'Saving…' : 'Save'}
                   </button>
                   <button
-                    onClick={() => { setEditingName(false); setNameValue(profile?.full_name || '') }}
+                    onClick={() => {
+                      setEditingName(false)
+                      setNameValue(profile?.full_name || '')
+                    }}
                     className="text-sm text-gray-500 hover:text-gray-700"
                   >
                     Cancel
@@ -340,7 +427,10 @@ export default function Profile() {
             ) : (
               <div className="flex items-center justify-between">
                 <span className="text-base font-medium text-gray-900">{displayName}</span>
-                <button onClick={() => setEditingName(true)} className="text-sm text-green-700 hover:text-green-800 font-medium">
+                <button
+                  onClick={() => setEditingName(true)}
+                  className="text-sm text-green-700 hover:text-green-800 font-medium"
+                >
                   Edit
                 </button>
               </div>
@@ -350,14 +440,21 @@ export default function Profile() {
 
           {/* ── Email ────────────────────────────────────────────────────────── */}
           <div className="card">
-            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">Email Address</p>
+            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">
+              Email Address
+            </p>
             <p className="text-base font-medium text-gray-900">{user?.email}</p>
-            <p className="text-xs text-gray-400 mt-1">Contact your administrator to change your email.</p>
+            <p className="text-xs text-gray-400 mt-1">
+              Contact your administrator to change your email.
+            </p>
           </div>
 
           {/* ── Phone ───────────────────────────────────────────────────────── */}
           <div className="card">
-            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">Cell Phone <span className="normal-case font-normal text-gray-400">(for texting)</span></p>
+            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">
+              Cell Phone{' '}
+              <span className="normal-case font-normal text-gray-400">(for texting)</span>
+            </p>
             <div className="flex items-center gap-2">
               <input
                 type="tel"
@@ -380,7 +477,9 @@ export default function Profile() {
 
           {/* ── Address ──────────────────────────────────────────────────────── */}
           <div className="card">
-            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">Address</p>
+            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">
+              Address
+            </p>
             <div className="space-y-3">
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Address Line 1</label>
@@ -421,7 +520,11 @@ export default function Profile() {
                     className={inputCls}
                   >
                     <option value="">—</option>
-                    {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                    {US_STATES.map(s => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -451,11 +554,18 @@ export default function Profile() {
 
           {/* ── Password ─────────────────────────────────────────────────────── */}
           <div className="card">
-            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">Password</p>
+            <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-3">
+              Password
+            </p>
             {!showPwForm ? (
               <div className="flex items-center justify-between">
-                <span className="text-base font-medium text-gray-900 tracking-widest">••••••••</span>
-                <button onClick={() => setShowPwForm(true)} className="text-sm text-green-700 hover:text-green-800 font-medium">
+                <span className="text-base font-medium text-gray-900 tracking-widest">
+                  ••••••••
+                </span>
+                <button
+                  onClick={() => setShowPwForm(true)}
+                  className="text-sm text-green-700 hover:text-green-800 font-medium"
+                >
                   Change Password
                 </button>
               </div>
@@ -465,11 +575,20 @@ export default function Profile() {
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Current Password</label>
                   <div className="relative">
-                    <input type={showCurrent ? 'text' : 'password'} value={currentPw}
+                    <input
+                      type={showCurrent ? 'text' : 'password'}
+                      value={currentPw}
                       onChange={e => setCurrentPw(e.target.value)}
-                      placeholder="Enter current password" autoFocus className={inputCls + ' pr-10'} />
-                    <button type="button" onClick={() => setShowCurrent(v => !v)} tabIndex={-1}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm">
+                      placeholder="Enter current password"
+                      autoFocus
+                      className={inputCls + ' pr-10'}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrent(v => !v)}
+                      tabIndex={-1}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm"
+                    >
                       {showCurrent ? '🙈' : '👁️'}
                     </button>
                   </div>
@@ -478,11 +597,19 @@ export default function Profile() {
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">New Password</label>
                   <div className="relative">
-                    <input type={showNew ? 'text' : 'password'} value={newPw}
+                    <input
+                      type={showNew ? 'text' : 'password'}
+                      value={newPw}
                       onChange={e => setNewPw(e.target.value)}
-                      placeholder="At least 8 characters" className={inputCls + ' pr-10'} />
-                    <button type="button" onClick={() => setShowNew(v => !v)} tabIndex={-1}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm">
+                      placeholder="At least 8 characters"
+                      className={inputCls + ' pr-10'}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNew(v => !v)}
+                      tabIndex={-1}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm"
+                    >
                       {showNew ? '🙈' : '👁️'}
                     </button>
                   </div>
@@ -491,29 +618,43 @@ export default function Profile() {
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Confirm New Password</label>
                   <div className="relative">
-                    <input type={showConfirm ? 'text' : 'password'} value={confirmPw}
+                    <input
+                      type={showConfirm ? 'text' : 'password'}
+                      value={confirmPw}
                       onChange={e => setConfirmPw(e.target.value)}
-                      placeholder="Repeat new password" className={inputCls + ' pr-10'} />
-                    <button type="button" onClick={() => setShowConfirm(v => !v)} tabIndex={-1}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm">
+                      placeholder="Repeat new password"
+                      className={inputCls + ' pr-10'}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirm(v => !v)}
+                      tabIndex={-1}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm"
+                    >
                       {showConfirm ? '🙈' : '👁️'}
                     </button>
                   </div>
                 </div>
                 <Msg m={pwMsg} />
                 <div className="flex items-center gap-2 pt-1">
-                  <button type="submit" disabled={savingPw}
-                    className="btn-primary text-sm px-3 py-1.5 disabled:opacity-50">
+                  <button
+                    type="submit"
+                    disabled={savingPw}
+                    className="btn-primary text-sm px-3 py-1.5 disabled:opacity-50"
+                  >
                     {savingPw ? 'Saving…' : 'Update Password'}
                   </button>
-                  <button type="button" onClick={cancelPassword} className="text-sm text-gray-500 hover:text-gray-700">
+                  <button
+                    type="button"
+                    onClick={cancelPassword}
+                    className="text-sm text-gray-500 hover:text-gray-700"
+                  >
                     Cancel
                   </button>
                 </div>
               </form>
             )}
           </div>
-
         </div>
       )}
     </div>

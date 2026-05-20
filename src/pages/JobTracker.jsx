@@ -12,11 +12,18 @@ export default function JobTracker() {
   const [laborRate, setLaborRate] = useState(400)
   const [loading, setLoading] = useState(true)
   const [logTarget, setLogTarget] = useState(null) // module to log entry for
-  const [logForm, setLogForm] = useState({ actual_man_days: '', actual_material_cost: '', entry_date: new Date().toISOString().split('T')[0], notes: '' })
+  const [logForm, setLogForm] = useState({
+    actual_man_days: '',
+    actual_material_cost: '',
+    entry_date: new Date().toISOString().split('T')[0],
+    notes: '',
+  })
   const [savingLog, setSavingLog] = useState(false)
   const [showHistory, setShowHistory] = useState({}) // moduleId -> bool
 
-  useEffect(() => { fetchData() }, [id])
+  useEffect(() => {
+    fetchData()
+  }, [id])
 
   async function fetchData() {
     setLoading(true)
@@ -27,18 +34,22 @@ export default function JobTracker() {
       supabase.from('jobs').select('*').eq('id', id).single(),
     ])
     if (settingsRes.data) setLaborRate(parseFloat(settingsRes.data.labor_rate_per_man_day) || 400)
-    if (!jobRes.data) { setLoading(false); return }
+    if (!jobRes.data) {
+      setLoading(false)
+      return
+    }
 
     const [projectsRes, cosRes] = await Promise.all([
-      supabase.from('projects')
+      supabase
+        .from('projects')
         .select('*, modules ( *, actual_entries ( * ) )')
         .eq('job_id', jobRes.data.id),
       supabase.from('change_orders').select('*').eq('job_id', jobRes.data.id),
     ])
     setJob({
       ...jobRes.data,
-      projects:      projectsRes.data || [],
-      change_orders: cosRes.data       || [],
+      projects: projectsRes.data || [],
+      change_orders: cosRes.data || [],
     })
     setLoading(false)
   }
@@ -58,7 +69,12 @@ export default function JobTracker() {
     setSavingLog(false)
     if (!error) {
       setLogTarget(null)
-      setLogForm({ actual_man_days: '', actual_material_cost: '', entry_date: new Date().toISOString().split('T')[0], notes: '' })
+      setLogForm({
+        actual_man_days: '',
+        actual_material_cost: '',
+        entry_date: new Date().toISOString().split('T')[0],
+        notes: '',
+      })
       fetchData()
     }
   }
@@ -69,12 +85,19 @@ export default function JobTracker() {
     fetchData()
   }
 
-  if (loading) return <div className="flex items-center justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-700"></div></div>
+  if (loading)
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-700"></div>
+      </div>
+    )
   if (!job) return <div className="card text-center py-12 text-gray-500">Job not found.</div>
 
   // ---- Calculations ----
-  let estManDays = 0, estMaterials = 0
-  let actualManDays = 0, actualMaterials = 0
+  let estManDays = 0,
+    estMaterials = 0
+  let actualManDays = 0,
+    actualMaterials = 0
 
   for (const p of job.projects || []) {
     for (const m of p.modules || []) {
@@ -87,9 +110,18 @@ export default function JobTracker() {
     }
   }
 
-  const coRevenue = (job.change_orders || []).reduce((s, co) => s + parseFloat(co.additional_contract_price || 0), 0)
-  const coManDays = (job.change_orders || []).reduce((s, co) => s + parseFloat(co.additional_man_days || 0), 0)
-  const coMaterials = (job.change_orders || []).reduce((s, co) => s + parseFloat(co.additional_material_cost || 0), 0)
+  const coRevenue = (job.change_orders || []).reduce(
+    (s, co) => s + parseFloat(co.additional_contract_price || 0),
+    0
+  )
+  const coManDays = (job.change_orders || []).reduce(
+    (s, co) => s + parseFloat(co.additional_man_days || 0),
+    0
+  )
+  const coMaterials = (job.change_orders || []).reduce(
+    (s, co) => s + parseFloat(co.additional_material_cost || 0),
+    0
+  )
 
   const totalRevenue = parseFloat(job.contract_price || 0) + coRevenue
   const totalEstMD = estManDays + coManDays
@@ -107,33 +139,38 @@ export default function JobTracker() {
   const overallPct = totalEstCost > 0 ? Math.min(100, (totalActualCost / totalEstCost) * 100) : 0
   const gpTrend = actualGP > estGP ? '📈' : actualGP < estGP ? '📉' : '➡️'
 
-  const crewColors = {
-    General: 'bg-gray-100 text-gray-700',
-    Demo: 'bg-orange-100 text-orange-700',
-    Concrete: 'bg-stone-100 text-stone-700',
-    Irrigation: 'bg-blue-100 text-blue-700',
-    Planting: 'bg-green-100 text-green-700',
-  }
-
   return (
     <div className="max-w-3xl mx-auto">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 mb-4 text-sm">
-        <Link to="/" className="text-gray-400 hover:text-gray-600">Jobs</Link>
+        <Link to="/" className="text-gray-400 hover:text-gray-600">
+          Jobs
+        </Link>
         <span className="text-gray-300">/</span>
-        <Link to={`/jobs/${id}`} className="text-gray-400 hover:text-gray-600 truncate max-w-[120px]">{job.client_name}</Link>
+        <Link
+          to={`/jobs/${id}`}
+          className="text-gray-400 hover:text-gray-600 truncate max-w-[120px]"
+        >
+          {job.client_name}
+        </Link>
         <span className="text-gray-300">/</span>
         <span className="text-gray-700 font-medium">Tracker</span>
       </div>
 
       <h1 className="text-2xl font-bold text-gray-900 mb-1">Job Tracker</h1>
-      <p className="text-gray-500 text-sm mb-5">{job.client_name} — {job.job_address}</p>
+      <p className="text-gray-500 text-sm mb-5">
+        {job.client_name} — {job.job_address}
+      </p>
 
       {/* Overall progress bar */}
       <div className="card mb-5">
         <div className="flex items-center justify-between mb-2">
           <p className="font-semibold text-gray-800">Overall Cost Progress</p>
-          <span className={`text-sm font-bold ${overallPct > 100 ? 'text-red-600' : 'text-gray-700'}`}>{overallPct.toFixed(0)}%</span>
+          <span
+            className={`text-sm font-bold ${overallPct > 100 ? 'text-red-600' : 'text-gray-700'}`}
+          >
+            {overallPct.toFixed(0)}%
+          </span>
         </div>
         <div className="w-full bg-gray-100 rounded-full h-3 mb-1">
           <div
@@ -146,10 +183,30 @@ export default function JobTracker() {
 
       {/* GP Summary Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        <GPSummaryCard label="Total Revenue" value={`$${totalRevenue.toLocaleString()}`} color="blue" />
-        <GPSummaryCard label="Est. Gross Profit" value={`$${estGP.toLocaleString()}`} sub={`${estGPPct.toFixed(1)}% margin`} color={estGPPct >= 25 ? 'green' : estGPPct >= 10 ? 'yellow' : 'red'} />
-        <GPSummaryCard label={`Running GP ${gpTrend}`} value={`$${actualGP.toLocaleString()}`} sub={`${actualGPPct.toFixed(1)}% margin`} color={actualGPPct >= 25 ? 'green' : actualGPPct >= 10 ? 'yellow' : 'red'} large />
-        <GPSummaryCard label="GP Variance" value={`${actualGP - estGP >= 0 ? '+' : ''}$${(actualGP - estGP).toLocaleString()}`} sub="vs. estimate" color={actualGP >= estGP ? 'green' : 'red'} />
+        <GPSummaryCard
+          label="Total Revenue"
+          value={`$${totalRevenue.toLocaleString()}`}
+          color="blue"
+        />
+        <GPSummaryCard
+          label="Est. Gross Profit"
+          value={`$${estGP.toLocaleString()}`}
+          sub={`${estGPPct.toFixed(1)}% margin`}
+          color={estGPPct >= 25 ? 'green' : estGPPct >= 10 ? 'yellow' : 'red'}
+        />
+        <GPSummaryCard
+          label={`Running GP ${gpTrend}`}
+          value={`$${actualGP.toLocaleString()}`}
+          sub={`${actualGPPct.toFixed(1)}% margin`}
+          color={actualGPPct >= 25 ? 'green' : actualGPPct >= 10 ? 'yellow' : 'red'}
+          large
+        />
+        <GPSummaryCard
+          label="GP Variance"
+          value={`${actualGP - estGP >= 0 ? '+' : ''}$${(actualGP - estGP).toLocaleString()}`}
+          sub="vs. estimate"
+          color={actualGP >= estGP ? 'green' : 'red'}
+        />
       </div>
 
       {/* Detailed breakdown */}
@@ -158,12 +215,42 @@ export default function JobTracker() {
           <h3 className="font-semibold text-gray-800 mb-3">Estimated Budget</h3>
           <table className="w-full text-sm">
             <tbody className="divide-y divide-gray-100">
-              <tr><td className="py-1.5 text-gray-500">Contract Price</td><td className="text-right font-medium">${parseFloat(job.contract_price || 0).toLocaleString()}</td></tr>
-              {coRevenue > 0 && <tr><td className="py-1.5 text-gray-500">Change Orders</td><td className="text-right font-medium text-blue-600">+${coRevenue.toLocaleString()}</td></tr>}
-              <tr><td className="py-1.5 text-gray-500">Total Revenue</td><td className="text-right font-bold">${totalRevenue.toLocaleString()}</td></tr>
-              <tr><td className="py-1.5 text-gray-500">Est. Labor ({totalEstMD.toFixed(1)} MD × ${laborRate})</td><td className="text-right text-red-600">-${totalEstLaborCost.toLocaleString()}</td></tr>
-              <tr><td className="py-1.5 text-gray-500">Est. Materials</td><td className="text-right text-red-600">-${totalEstMat.toLocaleString()}</td></tr>
-              <tr className="border-t-2 border-gray-200"><td className="py-2 font-semibold">Est. Gross Profit</td><td className={`text-right font-bold text-lg ${estGP >= 0 ? 'text-green-700' : 'text-red-600'}`}>${estGP.toLocaleString()}</td></tr>
+              <tr>
+                <td className="py-1.5 text-gray-500">Contract Price</td>
+                <td className="text-right font-medium">
+                  ${parseFloat(job.contract_price || 0).toLocaleString()}
+                </td>
+              </tr>
+              {coRevenue > 0 && (
+                <tr>
+                  <td className="py-1.5 text-gray-500">Change Orders</td>
+                  <td className="text-right font-medium text-blue-600">
+                    +${coRevenue.toLocaleString()}
+                  </td>
+                </tr>
+              )}
+              <tr>
+                <td className="py-1.5 text-gray-500">Total Revenue</td>
+                <td className="text-right font-bold">${totalRevenue.toLocaleString()}</td>
+              </tr>
+              <tr>
+                <td className="py-1.5 text-gray-500">
+                  Est. Labor ({totalEstMD.toFixed(1)} MD × ${laborRate})
+                </td>
+                <td className="text-right text-red-600">-${totalEstLaborCost.toLocaleString()}</td>
+              </tr>
+              <tr>
+                <td className="py-1.5 text-gray-500">Est. Materials</td>
+                <td className="text-right text-red-600">-${totalEstMat.toLocaleString()}</td>
+              </tr>
+              <tr className="border-t-2 border-gray-200">
+                <td className="py-2 font-semibold">Est. Gross Profit</td>
+                <td
+                  className={`text-right font-bold text-lg ${estGP >= 0 ? 'text-green-700' : 'text-red-600'}`}
+                >
+                  ${estGP.toLocaleString()}
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -171,10 +258,30 @@ export default function JobTracker() {
           <h3 className="font-semibold text-gray-800 mb-3">Actual to Date</h3>
           <table className="w-full text-sm">
             <tbody className="divide-y divide-gray-100">
-              <tr><td className="py-1.5 text-gray-500">Total Revenue</td><td className="text-right font-medium">${totalRevenue.toLocaleString()}</td></tr>
-              <tr><td className="py-1.5 text-gray-500">Actual Labor ({actualManDays.toFixed(1)} MD × ${laborRate})</td><td className="text-right text-red-600">-${totalActualLaborCost.toLocaleString()}</td></tr>
-              <tr><td className="py-1.5 text-gray-500">Actual Materials</td><td className="text-right text-red-600">-${actualMaterials.toLocaleString()}</td></tr>
-              <tr className="border-t-2 border-gray-200"><td className="py-2 font-semibold">Running GP</td><td className={`text-right font-bold text-lg ${actualGP >= 0 ? 'text-green-700' : 'text-red-600'}`}>${actualGP.toLocaleString()}</td></tr>
+              <tr>
+                <td className="py-1.5 text-gray-500">Total Revenue</td>
+                <td className="text-right font-medium">${totalRevenue.toLocaleString()}</td>
+              </tr>
+              <tr>
+                <td className="py-1.5 text-gray-500">
+                  Actual Labor ({actualManDays.toFixed(1)} MD × ${laborRate})
+                </td>
+                <td className="text-right text-red-600">
+                  -${totalActualLaborCost.toLocaleString()}
+                </td>
+              </tr>
+              <tr>
+                <td className="py-1.5 text-gray-500">Actual Materials</td>
+                <td className="text-right text-red-600">-${actualMaterials.toLocaleString()}</td>
+              </tr>
+              <tr className="border-t-2 border-gray-200">
+                <td className="py-2 font-semibold">Running GP</td>
+                <td
+                  className={`text-right font-bold text-lg ${actualGP >= 0 ? 'text-green-700' : 'text-red-600'}`}
+                >
+                  ${actualGP.toLocaleString()}
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -186,9 +293,14 @@ export default function JobTracker() {
           <h3 className="font-semibold text-gray-800 mb-2">Change Orders</h3>
           <div className="space-y-2">
             {job.change_orders.map(co => (
-              <div key={co.id} className="flex items-center justify-between text-sm p-2 bg-blue-50 rounded-lg">
+              <div
+                key={co.id}
+                className="flex items-center justify-between text-sm p-2 bg-blue-50 rounded-lg"
+              >
                 <span className="text-gray-700">{co.description}</span>
-                <span className="text-blue-700 font-medium ml-2">+${parseFloat(co.additional_contract_price || 0).toLocaleString()}</span>
+                <span className="text-blue-700 font-medium ml-2">
+                  +${parseFloat(co.additional_contract_price || 0).toLocaleString()}
+                </span>
               </div>
             ))}
           </div>
@@ -205,29 +317,76 @@ export default function JobTracker() {
                   <h3 className="font-bold text-gray-900">Log Entry</h3>
                   <p className="text-sm text-gray-500">{logTarget.module_name}</p>
                 </div>
-                <button onClick={() => setLogTarget(null)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+                <button
+                  onClick={() => setLogTarget(null)}
+                  className="text-gray-400 hover:text-gray-600 text-xl"
+                >
+                  ×
+                </button>
               </div>
               <form onSubmit={saveLogEntry} className="space-y-3">
                 <div>
                   <label className="label">Date</label>
-                  <input className="input" type="date" value={logForm.entry_date} onChange={e => setLogForm(p => ({ ...p, entry_date: e.target.value }))} />
+                  <input
+                    className="input"
+                    type="date"
+                    value={logForm.entry_date}
+                    onChange={e => setLogForm(p => ({ ...p, entry_date: e.target.value }))}
+                  />
                 </div>
                 <div>
                   <label className="label">Man Days Worked (1 MD = 8 hrs)</label>
-                  <input className="input" type="number" step="0.25" min="0" value={logForm.actual_man_days} onChange={e => setLogForm(p => ({ ...p, actual_man_days: e.target.value }))} placeholder="e.g. 2.5" />
-                  {logForm.actual_man_days && <p className="text-xs text-gray-400 mt-1">= {(parseFloat(logForm.actual_man_days) * 8).toFixed(1)} hours | Cost: ${(parseFloat(logForm.actual_man_days) * laborRate).toLocaleString()}</p>}
+                  <input
+                    className="input"
+                    type="number"
+                    step="0.25"
+                    min="0"
+                    value={logForm.actual_man_days}
+                    onChange={e => setLogForm(p => ({ ...p, actual_man_days: e.target.value }))}
+                    placeholder="e.g. 2.5"
+                  />
+                  {logForm.actual_man_days && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      = {(parseFloat(logForm.actual_man_days) * 8).toFixed(1)} hours | Cost: $
+                      {(parseFloat(logForm.actual_man_days) * laborRate).toLocaleString()}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="label">Material Cost ($)</label>
-                  <input className="input" type="number" step="0.01" min="0" value={logForm.actual_material_cost} onChange={e => setLogForm(p => ({ ...p, actual_material_cost: e.target.value }))} placeholder="0.00" />
+                  <input
+                    className="input"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={logForm.actual_material_cost}
+                    onChange={e =>
+                      setLogForm(p => ({ ...p, actual_material_cost: e.target.value }))
+                    }
+                    placeholder="0.00"
+                  />
                 </div>
                 <div>
                   <label className="label">Notes (optional)</label>
-                  <textarea className="input resize-none" rows={2} value={logForm.notes} onChange={e => setLogForm(p => ({ ...p, notes: e.target.value }))} placeholder="What was done today..." />
+                  <textarea
+                    className="input resize-none"
+                    rows={2}
+                    value={logForm.notes}
+                    onChange={e => setLogForm(p => ({ ...p, notes: e.target.value }))}
+                    placeholder="What was done today..."
+                  />
                 </div>
                 <div className="flex gap-2 pt-1">
-                  <button type="button" onClick={() => setLogTarget(null)} className="btn-secondary flex-1">Cancel</button>
-                  <button type="submit" disabled={savingLog} className="btn-primary flex-1">{savingLog ? 'Saving...' : 'Save Entry'}</button>
+                  <button
+                    type="button"
+                    onClick={() => setLogTarget(null)}
+                    className="btn-secondary flex-1"
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={savingLog} className="btn-primary flex-1">
+                    {savingLog ? 'Saving...' : 'Save Entry'}
+                  </button>
                 </div>
               </form>
             </div>
@@ -242,16 +401,23 @@ export default function JobTracker() {
           <div key={project.id} className="mb-5">
             <div className="flex items-center gap-2 mb-2">
               <h3 className="font-semibold text-green-800">{project.project_name}</h3>
-              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{project.project_type}</span>
+              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                {project.project_type}
+              </span>
             </div>
             {(project.modules || []).map(mod => (
               <div key={mod.id}>
                 <ModuleTrackerRow
                   module={mod}
                   laborRate={laborRate}
-                  onLogEntry={(m) => {
+                  onLogEntry={m => {
                     setLogTarget(m)
-                    setLogForm({ actual_man_days: '', actual_material_cost: '', entry_date: new Date().toISOString().split('T')[0], notes: '' })
+                    setLogForm({
+                      actual_man_days: '',
+                      actual_material_cost: '',
+                      entry_date: new Date().toISOString().split('T')[0],
+                      notes: '',
+                    })
                   }}
                 />
 
@@ -262,7 +428,8 @@ export default function JobTracker() {
                       onClick={() => setShowHistory(prev => ({ ...prev, [mod.id]: !prev[mod.id] }))}
                       className="text-xs text-green-700 font-medium hover:underline px-4"
                     >
-                      {showHistory[mod.id] ? '▲ Hide' : '▼ Show'} {mod.actual_entries.length} entr{mod.actual_entries.length === 1 ? 'y' : 'ies'}
+                      {showHistory[mod.id] ? '▲ Hide' : '▼ Show'} {mod.actual_entries.length} entr
+                      {mod.actual_entries.length === 1 ? 'y' : 'ies'}
                     </button>
 
                     {showHistory[mod.id] && (
@@ -278,17 +445,32 @@ export default function JobTracker() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">
-                            {mod.actual_entries.sort((a, b) => new Date(b.entry_date) - new Date(a.entry_date)).map(entry => (
-                              <tr key={entry.id} className="bg-white hover:bg-gray-50">
-                                <td className="py-2 px-3 text-gray-700">{new Date(entry.entry_date).toLocaleDateString()}</td>
-                                <td className="py-2 px-3 text-right text-gray-700">{parseFloat(entry.actual_man_days || 0).toFixed(2)}</td>
-                                <td className="py-2 px-3 text-right text-gray-700">${parseFloat(entry.actual_material_cost || 0).toLocaleString()}</td>
-                                <td className="py-2 px-3 text-right text-gray-400 max-w-[100px] truncate">{entry.notes || '-'}</td>
-                                <td className="py-2 px-3">
-                                  <button onClick={() => deleteEntry(entry.id)} className="text-red-400 hover:text-red-600">✕</button>
-                                </td>
-                              </tr>
-                            ))}
+                            {mod.actual_entries
+                              .sort((a, b) => new Date(b.entry_date) - new Date(a.entry_date))
+                              .map(entry => (
+                                <tr key={entry.id} className="bg-white hover:bg-gray-50">
+                                  <td className="py-2 px-3 text-gray-700">
+                                    {new Date(entry.entry_date).toLocaleDateString()}
+                                  </td>
+                                  <td className="py-2 px-3 text-right text-gray-700">
+                                    {parseFloat(entry.actual_man_days || 0).toFixed(2)}
+                                  </td>
+                                  <td className="py-2 px-3 text-right text-gray-700">
+                                    ${parseFloat(entry.actual_material_cost || 0).toLocaleString()}
+                                  </td>
+                                  <td className="py-2 px-3 text-right text-gray-400 max-w-[100px] truncate">
+                                    {entry.notes || '-'}
+                                  </td>
+                                  <td className="py-2 px-3">
+                                    <button
+                                      onClick={() => deleteEntry(entry.id)}
+                                      className="text-red-400 hover:text-red-600"
+                                    >
+                                      ✕
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
                           </tbody>
                         </table>
                       </div>

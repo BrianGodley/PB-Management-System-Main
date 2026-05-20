@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import FinancialSummaryList from './FinancialSummaryList'
 
-const n = (v) => parseFloat(v) || 0
+const n = v => parseFloat(v) || 0
 
 function SectionLabel({ title }) {
   return (
@@ -26,65 +26,72 @@ function LineRow({ label, value, sub }) {
   )
 }
 
-const fmt2 = (v) => `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const fmt2 = v =>
+  `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 const COPING_DEFAULTS = {
-  'Paver Bullnose':            { mat: 8.50,  hrs: 0.400 },
-  'Travertine 12"x12"':       { mat: 13.00, hrs: 0.444 },
-  'Precast Concrete':          { mat: 50.00, hrs: 0.444 },
-  'Arizona Flagstone Eased':   { mat: 13.00, hrs: 0.500 },
-  'Other Flagstone':           { mat: 18.00, hrs: 0.533 },
-  'Pacific Clay':              { mat: 12.00, hrs: 0.410 },
-  'Pour In Place Sand Finish': { mat:  7.50, hrs: 0.727 },
+  'Paver Bullnose': { mat: 8.5, hrs: 0.4 },
+  'Travertine 12"x12"': { mat: 13.0, hrs: 0.444 },
+  'Precast Concrete': { mat: 50.0, hrs: 0.444 },
+  'Arizona Flagstone Eased': { mat: 13.0, hrs: 0.5 },
+  'Other Flagstone': { mat: 18.0, hrs: 0.533 },
+  'Pacific Clay': { mat: 12.0, hrs: 0.41 },
+  'Pour In Place Sand Finish': { mat: 7.5, hrs: 0.727 },
 }
 const SPILLWAY_DEFAULTS = {
-  'TILE':       { mat: 30.00, hrs: 1.25 },
-  'FLAGSTONE':  { mat: 24.00, hrs: 0.50 },
+  TILE: { mat: 30.0, hrs: 1.25 },
+  FLAGSTONE: { mat: 24.0, hrs: 0.5 },
 }
 const TILE_INSTALL_DEFAULTS = {
-  '6" Squares':  0.356,
-  '3" Squares':  0.400,
-  '2" Squares':  0.421,
-  '1" Squares':  0.457,
-  'Segmental':   0.533,
+  '6" Squares': 0.356,
+  '3" Squares': 0.4,
+  '2" Squares': 0.421,
+  '1" Squares': 0.457,
+  Segmental: 0.533,
   'Multi-Piece': 0.457,
-  'Glass Tile':  0.533,
+  'Glass Tile': 0.533,
 }
-const INTERIOR_DEFAULTS = { 'White Plaster': 45, 'Quartzscapes': 87, 'Stonescapes': 83 }
-const EXCAVATION_RATES = {
-  'IH - Bobcat 72"': 7.33, 'IH - Bobcat 64"': 7.14,
-  'Rental 48"': 7.33, 'Rental 42"': 7.33,
-  'Medium Excavator': 29.75, 'Large Excavator': 25.50,
-  'Hand Dig': 0.50, 'Sub Bobcat / Mini Bob': 0,
-}
+const INTERIOR_DEFAULTS = { 'White Plaster': 45, Quartzscapes: 87, Stonescapes: 83 }
 
 export default function PoolSummary({ module }) {
   const data = module?.data || {}
   const {
-    pool = {}, spa = {}, basin = {}, vault = {},
-    excavation = {}, shotcrete = {}, tile = {}, spillways = [],
-    copingRows = [], raisedSurfaces = [], interiorFinish = {},
-    equipment = [], plumbing = {}, steel = {}, manualRows = [],
+    pool = {},
+    spa = {},
+    basin = {},
+    vault = {},
+    excavation = {},
+    tile = {},
+    spillways = [],
+    copingRows = [],
+    raisedSurfaces = [],
+    interiorFinish = {},
+    equipment = [],
+    plumbing = {},
+    manualRows = [],
     laborRatePerHour = 35,
     calc = {},
   } = data
 
   const savedCalc = calc || {}
-  const totalHrs   = n(savedCalc.totalHrs)
-  const manDays    = n(savedCalc.manDays)    || n(module.man_days)
-  const totalMat   = n(savedCalc.totalMat)   || n(module.material_cost)
-  const laborCost  = n(savedCalc.laborCost)  || totalHrs * n(laborRatePerHour)
-  const burden     = n(savedCalc.burden)
-  const subCost    = n(savedCalc.subCost)    || n(module.sub_cost)
-  const gp         = n(savedCalc.gp)
+  const totalHrs = n(savedCalc.totalHrs)
+  const manDays = n(savedCalc.manDays) || n(module.man_days)
+  const totalMat = n(savedCalc.totalMat) || n(module.material_cost)
+  const laborCost = n(savedCalc.laborCost) || totalHrs * n(laborRatePerHour)
+  const burden = n(savedCalc.burden)
+  const subCost = n(savedCalc.subCost) || n(module.sub_cost)
+  const gp = n(savedCalc.gp)
   const commission = n(savedCalc.commission) || gp * 0.12
-  const price      = n(savedCalc.price)      || n(module.total_price)
+  const price = n(savedCalc.price) || n(module.total_price)
 
   const activeStructs = [
-    ['Pool', pool], ['Spa', spa], ['Infinity Basin', basin], ['Cover Vault', vault],
-  ].filter(([,s]) => s.enabled)
+    ['Pool', pool],
+    ['Spa', spa],
+    ['Infinity Basin', basin],
+    ['Cover Vault', vault],
+  ].filter(([, s]) => s.enabled)
 
-  const avgDepth = s => n(s.maxDepth) * 2 / 3
+  const avgDepth = s => (n(s.maxDepth) * 2) / 3
 
   return (
     <div className="space-y-1 text-sm">
@@ -165,18 +172,20 @@ export default function PoolSummary({ module }) {
       {spillways.filter(sw => n(sw.qty) > 0 && n(sw.lf) > 0).length > 0 && (
         <>
           <SectionLabel title="Spillways" />
-          {spillways.filter(sw => n(sw.qty) > 0 && n(sw.lf) > 0).map((sw, i) => {
-            const totalLF = n(sw.qty) * n(sw.lf)
-            const def = SPILLWAY_DEFAULTS[sw.type] || { mat: 24, hrs: 0.5 }
-            return (
-              <LineRow
-                key={i}
-                label={`${sw.struct} — ${sw.type} × ${sw.qty}`}
-                value={`${totalLF} LF`}
-                sub={`${(totalLF * def.hrs).toFixed(1)} hrs · ${fmt2(totalLF * def.mat)} mat`}
-              />
-            )
-          })}
+          {spillways
+            .filter(sw => n(sw.qty) > 0 && n(sw.lf) > 0)
+            .map((sw, i) => {
+              const totalLF = n(sw.qty) * n(sw.lf)
+              const def = SPILLWAY_DEFAULTS[sw.type] || { mat: 24, hrs: 0.5 }
+              return (
+                <LineRow
+                  key={i}
+                  label={`${sw.struct} — ${sw.type} × ${sw.qty}`}
+                  value={`${totalLF} LF`}
+                  sub={`${(totalLF * def.hrs).toFixed(1)} hrs · ${fmt2(totalLF * def.mat)} mat`}
+                />
+              )
+            })}
         </>
       )}
 
@@ -184,19 +193,21 @@ export default function PoolSummary({ module }) {
       {copingRows.filter(cr => n(cr.lf) > 0).length > 0 && (
         <>
           <SectionLabel title="Coping" />
-          {copingRows.filter(cr => n(cr.lf) > 0).map((cr, i) => {
-            const sided = cr.sided === 'double' ? 2 : 1
-            const def   = COPING_DEFAULTS[cr.type] || { mat: 8.50, hrs: 0.4 }
-            const totalLF = n(cr.lf) * sided
-            return (
-              <LineRow
-                key={i}
-                label={`${cr.struct} — ${cr.type}${cr.sided === 'double' ? ' (double)' : ''}`}
-                value={`${n(cr.lf)} LF`}
-                sub={`${(totalLF * def.hrs).toFixed(1)} hrs · ${fmt2(totalLF * def.mat)} mat`}
-              />
-            )
-          })}
+          {copingRows
+            .filter(cr => n(cr.lf) > 0)
+            .map((cr, i) => {
+              const sided = cr.sided === 'double' ? 2 : 1
+              const def = COPING_DEFAULTS[cr.type] || { mat: 8.5, hrs: 0.4 }
+              const totalLF = n(cr.lf) * sided
+              return (
+                <LineRow
+                  key={i}
+                  label={`${cr.struct} — ${cr.type}${cr.sided === 'double' ? ' (double)' : ''}`}
+                  value={`${n(cr.lf)} LF`}
+                  sub={`${(totalLF * def.hrs).toFixed(1)} hrs · ${fmt2(totalLF * def.mat)} mat`}
+                />
+              )
+            })}
         </>
       )}
 
@@ -204,21 +215,30 @@ export default function PoolSummary({ module }) {
       {raisedSurfaces.filter(rs => n(rs.sqft) > 0).length > 0 && (
         <>
           <SectionLabel title="Raised Surfaces" />
-          {raisedSurfaces.filter(rs => n(rs.sqft) > 0).map((rs, i) => (
-            <LineRow
-              key={i}
-              label={rs.matType}
-              value={`${n(rs.sqft)} SF`}
-              sub={n(rs.curvePct) > 0 ? `${rs.curvePct}% curve · ${rs.corners || 0} corners` : undefined}
-            />
-          ))}
+          {raisedSurfaces
+            .filter(rs => n(rs.sqft) > 0)
+            .map((rs, i) => (
+              <LineRow
+                key={i}
+                label={rs.matType}
+                value={`${n(rs.sqft)} SF`}
+                sub={
+                  n(rs.curvePct) > 0
+                    ? `${rs.curvePct}% curve · ${rs.corners || 0} corners`
+                    : undefined
+                }
+              />
+            ))}
         </>
       )}
 
       {/* Interior Finish */}
       {activeStructs.some(([k]) => {
         const fin = interiorFinish[k] || {}
-        const s   = { pool, spa, basin, vault }[k === 'Pool' ? 'pool' : k === 'Spa' ? 'spa' : k === 'Infinity Basin' ? 'basin' : 'vault'] || {}
+        const s =
+          { pool, spa, basin, vault }[
+            k === 'Pool' ? 'pool' : k === 'Spa' ? 'spa' : k === 'Infinity Basin' ? 'basin' : 'vault'
+          ] || {}
         return n(fin.subCost) > 0 || n(s.waterSF) > 0
       }) && (
         <>
@@ -243,14 +263,16 @@ export default function PoolSummary({ module }) {
       {equipment.filter(eq => n(eq.qty) > 0).length > 0 && (
         <>
           <SectionLabel title="Pool Equipment" />
-          {equipment.filter(eq => n(eq.qty) > 0).map((eq, i) => (
-            <LineRow
-              key={i}
-              label={`${eq.category} — ${eq.model}`}
-              value={fmt2(n(eq.qty) * n(eq.unitCost))}
-              sub={`${eq.qty} × $${n(eq.unitCost).toLocaleString()}`}
-            />
-          ))}
+          {equipment
+            .filter(eq => n(eq.qty) > 0)
+            .map((eq, i) => (
+              <LineRow
+                key={i}
+                label={`${eq.category} — ${eq.model}`}
+                value={fmt2(n(eq.qty) * n(eq.unitCost))}
+                sub={`${eq.qty} × $${n(eq.unitCost).toLocaleString()}`}
+              />
+            ))}
         </>
       )}
 
@@ -275,26 +297,42 @@ export default function PoolSummary({ module }) {
       )}
 
       {/* Manual Entry */}
-      {manualRows.filter(r => n(r.hours) > 0 || n(r.materials) > 0 || n(r.subCost) > 0).length > 0 && (
+      {manualRows.filter(r => n(r.hours) > 0 || n(r.materials) > 0 || n(r.subCost) > 0).length >
+        0 && (
         <>
           <SectionLabel title="Manual Entry" />
-          {manualRows.filter(r => n(r.hours) > 0 || n(r.materials) > 0 || n(r.subCost) > 0).map((r, i) => (
-            <div key={i} className="py-1 border-b border-gray-50">
-              <p className="text-xs font-medium text-gray-700">{r.label || 'Manual'}</p>
-              <div className="flex gap-3 mt-0.5">
-                {n(r.hours)     > 0 && <span className="text-xs text-gray-500">{n(r.hours).toFixed(1)} hrs</span>}
-                {n(r.materials) > 0 && <span className="text-xs text-gray-500">{fmt2(r.materials)} mat</span>}
-                {n(r.subCost)   > 0 && <span className="text-xs text-gray-500">{fmt2(r.subCost)} sub</span>}
+          {manualRows
+            .filter(r => n(r.hours) > 0 || n(r.materials) > 0 || n(r.subCost) > 0)
+            .map((r, i) => (
+              <div key={i} className="py-1 border-b border-gray-50">
+                <p className="text-xs font-medium text-gray-700">{r.label || 'Manual'}</p>
+                <div className="flex gap-3 mt-0.5">
+                  {n(r.hours) > 0 && (
+                    <span className="text-xs text-gray-500">{n(r.hours).toFixed(1)} hrs</span>
+                  )}
+                  {n(r.materials) > 0 && (
+                    <span className="text-xs text-gray-500">{fmt2(r.materials)} mat</span>
+                  )}
+                  {n(r.subCost) > 0 && (
+                    <span className="text-xs text-gray-500">{fmt2(r.subCost)} sub</span>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
         </>
       )}
 
       <FinancialSummaryList
-        totalHrs={totalHrs} manDays={manDays} totalMat={totalMat}
-        laborCost={laborCost} lrph={n(laborRatePerHour)} burden={burden}
-        subCost={subCost} gp={gp} commission={commission} price={price}
+        totalHrs={totalHrs}
+        manDays={manDays}
+        totalMat={totalMat}
+        laborCost={laborCost}
+        lrph={n(laborRatePerHour)}
+        burden={burden}
+        subCost={subCost}
+        gp={gp}
+        commission={commission}
+        price={price}
       />
     </div>
   )

@@ -5,7 +5,6 @@ import { LanguageProvider } from './contexts/LanguageContext'
 import { RateIconsProvider } from './contexts/RateIconsContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
-const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Clients = lazy(() => import('./pages/Clients'))
 const ClientDetail = lazy(() => import('./pages/ClientDetail'))
 const Contacts = lazy(() => import('./pages/Contacts'))
@@ -54,14 +53,15 @@ function PortalPlaceholder({ label, icon }) {
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-700 mx-auto mb-4"></div>
-        <p className="text-gray-500">Loading...</p>
+  if (loading)
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-700 mx-auto mb-4"></div>
+          <p className="text-gray-500">Loading...</p>
+        </div>
       </div>
-    </div>
-  )
+    )
   if (!user) return <Navigate to="/login" replace />
   return children
 }
@@ -69,61 +69,69 @@ function ProtectedRoute({ children }) {
 function AppRoutes() {
   const { user } = useAuth()
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-700 mx-auto mb-4"></div>
-          <p className="text-gray-500">Loading…</p>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-700 mx-auto mb-4"></div>
+            <p className="text-gray-500">Loading…</p>
+          </div>
         </div>
-      </div>
-    }>
+      }
+    >
       <Routes>
-      {/* Public routes — no auth required */}
-      <Route path="/apply" element={<ApplyForm />} />
-      <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/" element={
-        <ProtectedRoute>
-          <Layout />
-        </ProtectedRoute>
-      }>
-        <Route index element={<Contacts />} />
-        <Route path="contacts" element={<Contacts />} />
-        <Route path="contacts/:id" element={<ContactDetail />} />
-        <Route path="companies/:id" element={<CompanyDetail />} />
-        <Route path="clients" element={<Clients />} />
-        <Route path="clients/:id" element={<ClientDetail />} />
-        <Route path="design" element={<Design />} />
-        <Route path="design/:id" element={<DesignDetail />} />
-        <Route path="jobs" element={<JobsList />} />
-        <Route path="info" element={<Info />} />
-        <Route path="jobs/new" element={<NewJob />} />
-        <Route path="jobs/:id" element={<JobDetail />} />
-        <Route path="jobs/:id/tracker" element={<JobTracker />} />
-        <Route path="estimates/:id" element={<EstimateDetail />} />
-        <Route path="bids" element={<Bids />} />
-        <Route path="tracker" element={<JobTracker />} />
-        <Route path="collections" element={<Collections />} />
-        <Route path="settings" element={<Settings />} />
-        <Route path="admin" element={<Admin />} />
-        <Route path="master-rates" element={<MasterRates />} />
-        <Route path="master-crews" element={<MasterCrews />} />
-        <Route path="statistics" element={<Statistics />} />
-        <Route path="profile" element={<Profile />} />
-        <Route path="portal/internal" element={<PortalPlaceholder label="Internal Users" icon="👥" />} />
-        <Route path="portal/subs" element={<SubsVendors />} />
-        <Route path="training" element={<LMS />} />
-        <Route path="hr" element={<HR />} />
-        <Route path="hr/employee/:id" element={<EmployeeDetail />} />
-        <Route path="hr/applicant/:id" element={<ApplicantDetail />} />
-        <Route path="accounting" element={<Accounting />} />
-        <Route path="timeclock" element={<TimeClockPage />} />
-        <Route path="daily-logs" element={<DailyLogsPage />} />
-        <Route path="master-equipment" element={<MasterEquipment />} />
-        <Route path="equipment-tracking" element={<EquipmentTracking />} />
-        <Route path="org-chart" element={<OrgChart />} />
-        <Route path="help" element={<Help />} />
-      </Route>
+        {/* Public routes — no auth required */}
+        <Route path="/apply" element={<ApplyForm />} />
+        <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <Layout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Contacts />} />
+          <Route path="contacts" element={<Contacts />} />
+          <Route path="contacts/:id" element={<ContactDetail />} />
+          <Route path="companies/:id" element={<CompanyDetail />} />
+          <Route path="clients" element={<Clients />} />
+          <Route path="clients/:id" element={<ClientDetail />} />
+          <Route path="design" element={<Design />} />
+          <Route path="design/:id" element={<DesignDetail />} />
+          <Route path="jobs" element={<JobsList />} />
+          <Route path="info" element={<Info />} />
+          <Route path="jobs/new" element={<NewJob />} />
+          <Route path="jobs/:id" element={<JobDetail />} />
+          <Route path="jobs/:id/tracker" element={<JobTracker />} />
+          <Route path="estimates/:id" element={<EstimateDetail />} />
+          <Route path="bids" element={<Bids />} />
+          <Route path="tracker" element={<JobTracker />} />
+          <Route path="collections" element={<Collections />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="admin" element={<Admin />} />
+          <Route path="master-rates" element={<MasterRates />} />
+          <Route path="master-crews" element={<MasterCrews />} />
+          <Route path="statistics" element={<Statistics />} />
+          <Route path="profile" element={<Profile />} />
+          <Route
+            path="portal/internal"
+            element={<PortalPlaceholder label="Internal Users" icon="👥" />}
+          />
+          <Route path="portal/subs" element={<SubsVendors />} />
+          <Route path="training" element={<LMS />} />
+          <Route path="hr" element={<HR />} />
+          <Route path="hr/employee/:id" element={<EmployeeDetail />} />
+          <Route path="hr/applicant/:id" element={<ApplicantDetail />} />
+          <Route path="accounting" element={<Accounting />} />
+          <Route path="timeclock" element={<TimeClockPage />} />
+          <Route path="daily-logs" element={<DailyLogsPage />} />
+          <Route path="master-equipment" element={<MasterEquipment />} />
+          <Route path="equipment-tracking" element={<EquipmentTracking />} />
+          <Route path="org-chart" element={<OrgChart />} />
+          <Route path="help" element={<Help />} />
+        </Route>
       </Routes>
     </Suspense>
   )
