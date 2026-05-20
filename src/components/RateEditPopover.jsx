@@ -99,17 +99,18 @@ export default function RateEditPopover({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  // Close on outside click + Escape.
+  // Close on Escape only. (Outside-click closing is handled inside the
+  // portal by the backdrop's onMouseDown — see the modal JSX below.)
+  // Previously we ran a document-level mousedown listener that checked
+  // `wrapRef.contains(e.target)`, but the modal is portal-mounted to
+  // document.body so wrapRef never contains it — every click inside the
+  // modal (including Save) registered as "outside" and auto-closed the
+  // popover before the saveMsg banner could render.
   useEffect(() => {
     if (!open) return
-    function onDown(e) { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false) }
-    function onKey(e)  { if (e.key === 'Escape') setOpen(false) }
-    document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown',   onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown',   onKey)
-    }
+    function onKey(e) { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
   }, [open])
 
   async function save() {
