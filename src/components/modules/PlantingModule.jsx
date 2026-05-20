@@ -322,6 +322,7 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
   const [largePlantRows, setLargePlantRows] = useState(initialData?.largePlantRows ?? DEFAULT_LARGE_ROWS())
   const [addons,         setAddons]         = useState(initialData?.addons         ?? DEFAULT_ADDONS)
   const [manualRows,     setManualRows]     = useState(initialData?.manualRows     ?? DEFAULT_MANUAL_ROWS)
+  const [distanceLF,     setDistanceLF]     = useState(initialData?.distanceLF     ?? '')
 
   // ── Sales tax — applied to totalMat across every module so the bid
   //    reflects supplier-invoiced material cost. Sourced from

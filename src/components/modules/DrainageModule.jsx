@@ -232,6 +232,7 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
   const [laborRatePerHour, setLaborRatePerHour] = useState(
     initialData?.laborRatePerHour ?? DEFAULTS.laborRatePerHour
   )
+  const [distanceLF, setDistanceLF] = useState(initialData?.distanceLF ?? '')
   const [walkAccess, setWalkAccess] = useState(initialData?.walkAccess ?? {
     paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
   })
@@ -404,7 +405,7 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
       <div className="flex items-center gap-3">
         <label className="text-sm font-medium text-gray-700 whitespace-nowrap" title="Average Distance from Truck to Work Area">Truck → Work Area</label>
         <div className="relative w-32">
-          <NumInput value={state.distanceLF} onChange={v => setState(p => ({ ...p, distanceLF: v }))} placeholder="0" />
+          <NumInput value={distanceLF} onChange={setDistanceLF} placeholder="0" />
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">Avg LF</span>
         </div>
         {calc.walkHrs > 0 && (
