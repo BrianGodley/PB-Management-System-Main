@@ -39,6 +39,14 @@ export function parseClientName(name) {
   return { first: parts.slice(0, -1).join(' '), last: parts[parts.length - 1] }
 }
 
+// Display formatter — always renders "Last, First" regardless of how the
+// name was originally stored. Single-word entries (e.g. company names like
+// "Acme LLC") render as-is so we don't end up with "Acme LLC," dangling.
+export function displayLastFirst(name) {
+  const { first, last } = parseClientName(name)
+  return first ? `${last}, ${first}` : last
+}
+
 // Parse "John Smith" → "Smith, John" for default job name
 function formatJobName(clientName) {
   if (!clientName) return ''
@@ -756,10 +764,10 @@ export default function Bids() {
                       {bid.estimates?.client_id ? (
                         <Link to={`/clients/${bid.estimates.client_id}`}
                               className="font-bold text-gray-900 hover:text-green-700 hover:underline">
-                          {bid.client_name}
+                          {displayLastFirst(bid.client_name)}
                         </Link>
                       ) : (
-                        <p className="font-bold text-gray-900">{bid.client_name}</p>
+                        <p className="font-bold text-gray-900">{displayLastFirst(bid.client_name)}</p>
                       )}
                       {bid.estimates?.estimate_name && <p className="text-xs text-gray-500">{bid.estimates.estimate_name}</p>}
                       {bid.job_address && <p className="text-xs text-gray-400 truncate max-w-[180px]">{bid.job_address}</p>}
