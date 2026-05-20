@@ -197,8 +197,25 @@ function calcWalls(state, lrph = DEFAULTS.laborRatePerHour, mp = {}, gpmd = DEFA
   }
 
   // Wall Finishes
-  const { sandStuccoSF, smoothStuccoSF, ledgerstoneSF, stackedStoneSF,
-          tileSF, flagstoneSF, flagstoneRateIn, realStoneSF, realStoneRateIn } = state
+  // Each finish has BOTH a master/default rate (from material_rates, looked
+  // up via r('matKey')) AND an optional per-estimate override that the
+  // estimator types into the Finishes row. Quoted prices vary by supplier
+  // and project, so the override always wins when set; otherwise we fall
+  // back to the master rate.
+  const { sandStuccoSF, sandStuccoRateIn, smoothStuccoSF, smoothStuccoRateIn,
+          ledgerstoneSF, ledgerstoneRateIn, stackedStoneSF, stackedStoneRateIn,
+          tileSF, tileRateIn, flagstoneSF, flagstoneRateIn,
+          realStoneSF, realStoneRateIn } = state
+  // Override-or-master helper. Empty string / 0 / NaN → fall back.
+  const ovr = (input, key) => {
+    const v = parseFloat(input)
+    return Number.isFinite(v) && v > 0 ? v : r(key)
+  }
+  const sandStuccoRate   = ovr(sandStuccoRateIn,   'sandStucco')
+  const smoothStuccoRate = ovr(smoothStuccoRateIn, 'smoothStucco')
+  const ledgerstoneRate  = ovr(ledgerstoneRateIn,  'ledgerstone')
+  const stackedStoneRate = ovr(stackedStoneRateIn, 'stackedStone')
+  const tileRate         = ovr(tileRateIn,         'tile')
 
   const sandStuccoHrs   = n(sandStuccoSF)   > 0 ? (n(sandStuccoSF)   / r('sandStuccoLab'))   * 8 : 0
   const smoothStuccoHrs = n(smoothStuccoSF) > 0 ? (n(smoothStuccoSF) / r('smoothStuccoLab')) * 8 : 0
@@ -208,11 +225,11 @@ function calcWalls(state, lrph = DEFAULTS.laborRatePerHour, mp = {}, gpmd = DEFA
   const flagstoneHrs    = n(flagstoneSF) > 0 ? n(flagstoneSF) * r('flagstoneLab') : 0
   const realStoneHrs    = n(realStoneSF)  > 0 ? n(realStoneSF)  * r('realStoneLab')  : 0
 
-  const sandStuccoMat   = n(sandStuccoSF)   * r('sandStucco')
-  const smoothStuccoMat = n(smoothStuccoSF) * r('smoothStucco')
-  const ledgerstoneMat  = n(ledgerstoneSF)  > 0 ? n(ledgerstoneSF) * r('ledgerstone') * 1.1 + (n(ledgerstoneSF) / 5) * 2 : 0
-  const stackedStoneMat = n(stackedStoneSF) > 0 ? n(stackedStoneSF) * r('stackedStone') * 1.1 + (n(stackedStoneSF) / 5) * 2 : 0
-  const tileMat         = n(tileSF) > 0 ? n(tileSF) * r('tile') + n(tileSF) : 0
+  const sandStuccoMat   = n(sandStuccoSF)   * sandStuccoRate
+  const smoothStuccoMat = n(smoothStuccoSF) * smoothStuccoRate
+  const ledgerstoneMat  = n(ledgerstoneSF)  > 0 ? n(ledgerstoneSF) * ledgerstoneRate * 1.1 + (n(ledgerstoneSF) / 5) * 2 : 0
+  const stackedStoneMat = n(stackedStoneSF) > 0 ? n(stackedStoneSF) * stackedStoneRate * 1.1 + (n(stackedStoneSF) / 5) * 2 : 0
+  const tileMat         = n(tileSF) > 0 ? n(tileSF) * tileRate + n(tileSF) : 0
   const flagstoneRate   = n(flagstoneRateIn) || r('flagstone')
   const flagstoneMat    = n(flagstoneSF) > 0 ? (n(flagstoneSF) / 80) * flagstoneRate + n(flagstoneSF) * 1.5 : 0
   const realStoneRate   = n(realStoneRateIn) || r('realStone')
@@ -533,15 +550,20 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
   const [timberPosts,    setTimberPosts]    = useState(initialData?.timberPosts    ?? '')
 
   // ── Wall Finishes ─────────────────────────────────────────────────────────
-  const [sandStuccoSF,    setSandStuccoSF]    = useState(initialData?.sandStuccoSF    ?? '')
-  const [smoothStuccoSF,  setSmoothStuccoSF]  = useState(initialData?.smoothStuccoSF  ?? '')
-  const [ledgerstoneSF,   setLedgerstoneSF]   = useState(initialData?.ledgerstoneSF   ?? '')
-  const [stackedStoneSF,  setStackedStoneSF]  = useState(initialData?.stackedStoneSF  ?? '')
-  const [tileSF,          setTileSF]          = useState(initialData?.tileSF          ?? '')
-  const [flagstoneSF,     setFlagstoneSF]     = useState(initialData?.flagstoneSF     ?? '')
-  const [flagstoneRateIn, setFlagstoneRateIn] = useState(initialData?.flagstoneRateIn ?? '')
-  const [realStoneSF,     setRealStoneSF]     = useState(initialData?.realStoneSF     ?? '')
-  const [realStoneRateIn, setRealStoneRateIn] = useState(initialData?.realStoneRateIn ?? '')
+  const [sandStuccoSF,      setSandStuccoSF]      = useState(initialData?.sandStuccoSF      ?? '')
+  const [sandStuccoRateIn,  setSandStuccoRateIn]  = useState(initialData?.sandStuccoRateIn  ?? '')
+  const [smoothStuccoSF,    setSmoothStuccoSF]    = useState(initialData?.smoothStuccoSF    ?? '')
+  const [smoothStuccoRateIn,setSmoothStuccoRateIn]= useState(initialData?.smoothStuccoRateIn?? '')
+  const [ledgerstoneSF,     setLedgerstoneSF]     = useState(initialData?.ledgerstoneSF     ?? '')
+  const [ledgerstoneRateIn, setLedgerstoneRateIn] = useState(initialData?.ledgerstoneRateIn ?? '')
+  const [stackedStoneSF,    setStackedStoneSF]    = useState(initialData?.stackedStoneSF    ?? '')
+  const [stackedStoneRateIn,setStackedStoneRateIn]= useState(initialData?.stackedStoneRateIn?? '')
+  const [tileSF,            setTileSF]            = useState(initialData?.tileSF            ?? '')
+  const [tileRateIn,        setTileRateIn]        = useState(initialData?.tileRateIn        ?? '')
+  const [flagstoneSF,       setFlagstoneSF]       = useState(initialData?.flagstoneSF       ?? '')
+  const [flagstoneRateIn,   setFlagstoneRateIn]   = useState(initialData?.flagstoneRateIn   ?? '')
+  const [realStoneSF,       setRealStoneSF]       = useState(initialData?.realStoneSF       ?? '')
+  const [realStoneRateIn,   setRealStoneRateIn]   = useState(initialData?.realStoneRateIn   ?? '')
 
   // ── Caps / Waterproofing / Manual ─────────────────────────────────────────
   const [capRows,    setCapRows]    = useState(initialData?.capRows    ?? DEFAULT_CAP_ROWS)
@@ -585,8 +607,13 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
     cmuWalls, cmuFootingPump, cmuGroutPump,
     pipWalls,
     timberLF, timberHeightIn, timberType, timberPosts,
-    sandStuccoSF, smoothStuccoSF, ledgerstoneSF, stackedStoneSF,
-    tileSF, flagstoneSF, flagstoneRateIn, realStoneSF, realStoneRateIn,
+    sandStuccoSF,   sandStuccoRateIn,
+    smoothStuccoSF, smoothStuccoRateIn,
+    ledgerstoneSF,  ledgerstoneRateIn,
+    stackedStoneSF, stackedStoneRateIn,
+    tileSF,         tileRateIn,
+    flagstoneSF,    flagstoneRateIn,
+    realStoneSF,    realStoneRateIn,
     capRows, wpType, wpSF, manualRows,
   }
   const calc = calcWalls(state, laborRatePerHour, materialPrices, gpmd)
@@ -848,23 +875,32 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
           </thead>
           <tbody>
             {[
-              { label: 'Sand Stucco',        sf: sandStuccoSF,   setSf: setSandStuccoSF,   mat: calc.sandStuccoMat,   matKey: 'sandStucco',   labKey: 'sandStuccoLab' },
-              { label: 'Smooth Stucco',      sf: smoothStuccoSF, setSf: setSmoothStuccoSF, mat: calc.smoothStuccoMat, matKey: 'smoothStucco', labKey: 'smoothStuccoLab' },
-              { label: 'Ledgerstone Veneer', sf: ledgerstoneSF,  setSf: setLedgerstoneSF,  mat: calc.ledgerstoneMat,  matKey: 'ledgerstone',  labKey: 'ledgerstoneLab' },
-              { label: 'Stacked Stone',      sf: stackedStoneSF, setSf: setStackedStoneSF, mat: calc.stackedStoneMat, matKey: 'stackedStone', labKey: 'stackedStoneLab' },
-              { label: 'Tile',               sf: tileSF,         setSf: setTileSF,         mat: calc.tileMat,         matKey: 'tile',         labKey: 'tileLab' },
-            ].map(({ label, sf, setSf, mat, matKey, labKey }) => (
+              { label: 'Sand Stucco',        sf: sandStuccoSF,   setSf: setSandStuccoSF,   rate: sandStuccoRateIn,   setRate: setSandStuccoRateIn,   mat: calc.sandStuccoMat,   matKey: 'sandStucco',   labKey: 'sandStuccoLab' },
+              { label: 'Smooth Stucco',      sf: smoothStuccoSF, setSf: setSmoothStuccoSF, rate: smoothStuccoRateIn, setRate: setSmoothStuccoRateIn, mat: calc.smoothStuccoMat, matKey: 'smoothStucco', labKey: 'smoothStuccoLab' },
+              { label: 'Ledgerstone Veneer', sf: ledgerstoneSF,  setSf: setLedgerstoneSF,  rate: ledgerstoneRateIn,  setRate: setLedgerstoneRateIn,  mat: calc.ledgerstoneMat,  matKey: 'ledgerstone',  labKey: 'ledgerstoneLab' },
+              { label: 'Stacked Stone',      sf: stackedStoneSF, setSf: setStackedStoneSF, rate: stackedStoneRateIn, setRate: setStackedStoneRateIn, mat: calc.stackedStoneMat, matKey: 'stackedStone', labKey: 'stackedStoneLab' },
+              { label: 'Tile',               sf: tileSF,         setSf: setTileSF,         rate: tileRateIn,         setRate: setTileRateIn,         mat: calc.tileMat,         matKey: 'tile',         labKey: 'tileLab' },
+            ].map(({ label, sf, setSf, rate, setRate, mat, matKey, labKey }) => (
               <tr key={label} className="border-b border-gray-100">
                 <td className="py-1 pr-2 text-xs text-gray-700">{label}</td>
                 <td className="py-1 pr-2"><NumInput value={sf} onChange={setSf} /></td>
-                <td className="py-1 pr-2 text-xs text-gray-400">
-                  <span className="inline-flex items-center gap-1 flex-wrap">
-                    ${r(matKey).toFixed(2)}/SF
+                <td className="py-1 pr-2">
+                  {/* Per-estimate $/SF override. Empty falls back to the
+                      master rate (whose placeholder shows the current
+                      default + a RateEdit popover for admin edits). */}
+                  <div className="flex items-center gap-1">
+                    <div className="relative w-24">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                      <input type="number" step="any" className="input text-sm py-1.5 pl-5 w-full"
+                        placeholder={r(matKey).toFixed(2)}
+                        value={rate}
+                        onChange={e => setRate(e.target.value)} />
+                    </div>
                     <RateEditPopover table="material_rates" name={WALL_RATES[matKey].db} category="Walls"
                       unitLabel="SF" currentValue={r(matKey)} onSaved={refreshAllRates} />
                     <RateEditPopover table="labor_rates" name={WALL_RATES[labKey].db} category="Walls"
                       mode="coefficient" unitLabel="rate" currentValue={r(labKey)} onSaved={refreshAllRates} />
-                  </span>
+                  </div>
                 </td>
                 <td className="py-1 text-right text-xs text-gray-600">{n(sf) > 0 ? `$${mat.toFixed(2)}` : '—'}</td>
               </tr>
