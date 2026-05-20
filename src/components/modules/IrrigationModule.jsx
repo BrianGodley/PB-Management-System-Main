@@ -20,7 +20,6 @@ import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
 import {
   calcWalkAccessLabor,
-  DEFAULT_WALK_ACCESS_CREW_SIZE,
   DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
 } from '../../lib/walkAccess'
 
@@ -65,7 +64,6 @@ function calcIrrigation(state, laborRatePerHour, materialPrices, laborRates, sal
   const hrsAdj = n(state.hoursAdj)
   const tax  = n(salesTax) || RATE_DEFAULTS.salesTax
   const pace = n(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
-  const crew = n(walkAccess?.crewSize)     || DEFAULT_WALK_ACCESS_CREW_SIZE
 
   // Rates from DB with fallbacks
   // NOTE: handRate / trenchRate are hrs/zone (not zones/hr).
@@ -113,7 +111,7 @@ function calcIrrigation(state, laborRatePerHour, materialPrices, laborRates, sal
   // added on. Mirrors Excel: O25 uses O24 (labor subtotal after item-level
   // adjustments) and the result flows into O26 = labor + drive.
   const adjLaborHrs  = rawHrs * diff + hrsAdj
-  const walkHrs      = calcWalkAccessLabor(adjLaborHrs, state.distanceLF, { crewSize: crew, paceLfPerMin: pace })
+  const walkHrs      = calcWalkAccessLabor(adjLaborHrs, state.distanceLF, { paceLfPerMin: pace })
   const totalHrs     = adjLaborHrs + walkHrs
   const rawMat       = zoneMat + timerMat + manualMat
   const totalMat     = rawMat * (1 + tax)            // Excel: =P24+(P24*SalesTax)
@@ -192,7 +190,6 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
   const [salesTax,         setSalesTax]         = useState(initialData?.salesTax ?? RATE_DEFAULTS.salesTax)
   const [walkAccess,       setWalkAccess]       = useState(initialData?.walkAccess ?? {
     paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
-    crewSize:     DEFAULT_WALK_ACCESS_CREW_SIZE,
   })
   const [pricesLoading,    setPricesLoading]    = useState(!initialData?.materialPrices)
   const gpmd = initialData?.gpmd ?? 425
@@ -215,7 +212,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
       await Promise.all([
         (!initialData?.laborRatePerHour || !initialData?.salesTax || !initialData?.walkAccess) &&
           supabase.from('company_settings')
-            .select('labor_rate_per_hour, sales_tax_rate, walk_access_pace_lf_per_min, walk_access_crew_size')
+            .select('labor_rate_per_hour, sales_tax_rate, walk_access_pace_lf_per_min')
             .maybeSingle()
             .then(({ data }) => {
               if (!gone && data) {
@@ -225,10 +222,8 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
                   setSalesTax(parseFloat(data.sales_tax_rate) || RATE_DEFAULTS.salesTax)
                 if (!initialData?.walkAccess) {
                   const pace = parseFloat(data.walk_access_pace_lf_per_min)
-                  const crew = parseFloat(data.walk_access_crew_size)
                   setWalkAccess({
                     paceLfPerMin: Number.isFinite(pace) && pace > 0 ? pace : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
-                    crewSize:     Number.isFinite(crew) && crew > 0 ? crew : DEFAULT_WALK_ACCESS_CREW_SIZE,
                   })
                 }
               }
