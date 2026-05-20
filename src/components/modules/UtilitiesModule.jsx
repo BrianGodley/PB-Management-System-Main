@@ -20,6 +20,10 @@ const UTILITY_LINE_TYPES = {
     costPerLF: 1.92,  dbName: 'PVC Conduit with Electrical',
     laborPerLF: 0.05, laborDbName: 'PVC Conduit with Electrical - Labor Rate',
   },
+  '1-1/2" Poly Gas Pipe': {
+    costPerLF: 4.25,  dbName: '1-1/2" Poly Gas Pipe',
+    laborPerLF: 0.05, laborDbName: '1-1/2" Poly Gas Pipe - Labor Rate',
+  },
   '1" Black Iron Gas Pipe': {
     costPerLF: 2.76,  dbName: '1" Black Iron Gas Pipe',
     laborPerLF: 0.15, laborDbName: '1" Black Iron Gas Pipe - Labor Rate',
@@ -28,12 +32,64 @@ const UTILITY_LINE_TYPES = {
     costPerLF: 4.23,  dbName: '1-1/2" Black Iron Gas Pipe',
     laborPerLF: 0.20, laborDbName: '1-1/2" Black Iron Gas Pipe - Labor Rate',
   },
+  '2" Black Iron Gas Pipe': {
+    costPerLF: 5.72,  dbName: '2" Black Iron Gas Pipe',
+    laborPerLF: 0.25, laborDbName: '2" Black Iron Gas Pipe - Labor Rate',
+  },
 }
 
 const FIXTURE_TYPES = {
   '12" Single Gas Ring': {
     cost: 61.75,  dbName: '12" Single Gas Ring',
     laborHrs: 2,  laborDbName: '12" Single Gas Ring - Labor Rate',
+  },
+  '18" Single Gas Ring': {
+    cost: 84.75,  dbName: '18" Single Gas Ring',
+    laborHrs: 2,  laborDbName: '18" Single Gas Ring - Labor Rate',
+  },
+  '24" Single Gas Ring': {
+    cost: 107.75, dbName: '24" Single Gas Ring',
+    laborHrs: 2,  laborDbName: '24" Single Gas Ring - Labor Rate',
+  },
+  '24" Double Gas Ring': {
+    cost: 163.25, dbName: '24" Double Gas Ring',
+    laborHrs: 2,  laborDbName: '24" Double Gas Ring - Labor Rate',
+  },
+  '2\' Straight Gas Bar': {
+    cost: 35.50,  dbName: '2\' Straight Gas Bar',
+    laborHrs: 2,  laborDbName: '2\' Straight Gas Bar - Labor Rate',
+  },
+  '3\' Straight Gas Bar': {
+    cost: 56.00,  dbName: '3\' Straight Gas Bar',
+    laborHrs: 2.5, laborDbName: '3\' Straight Gas Bar - Labor Rate',
+  },
+  '4\' Straight Gas Bar': {
+    cost: 68.50,  dbName: '4\' Straight Gas Bar',
+    laborHrs: 3,  laborDbName: '4\' Straight Gas Bar - Labor Rate',
+  },
+  'Gas Shut-Off Valve': {
+    cost: 89.70,  dbName: 'Gas Shut-Off Valve',
+    laborHrs: 2,  laborDbName: 'Gas Shut-Off Valve - Labor Rate',
+  },
+  'GFCI Protected Receptacles': {
+    cost: 86.25,  dbName: 'GFCI Protected Receptacles',
+    laborHrs: 2,  laborDbName: 'GFCI Protected Receptacles - Labor Rate',
+  },
+  'Bubble Covers for Receptacles': {
+    cost: 19.19,  dbName: 'Bubble Covers for Receptacles',
+    laborHrs: 0.25, laborDbName: 'Bubble Covers for Receptacles - Labor Rate',
+  },
+  'Infratech W2024SS 2000W 240V Heater (Stainless)': {
+    cost: 725.22, dbName: 'Infratech W2024SS 2000W 240V Heater (Stainless)',
+    laborHrs: 6,  laborDbName: 'Infratech W2024SS 2000W 240V Heater (Stainless) - Labor Rate',
+  },
+  'Infratech W39 Flush Mount Frame': {
+    cost: 572.26, dbName: 'Infratech W39 Flush Mount Frame',
+    laborHrs: 2,  laborDbName: 'Infratech W39 Flush Mount Frame - Labor Rate',
+  },
+  'Infratech Single Duplex Switch in Surface Mount Gang Box': {
+    cost: 206.11, dbName: 'Infratech Single Duplex Switch in Surface Mount Gang Box',
+    laborHrs: 2,  laborDbName: 'Infratech Single Duplex Switch in Surface Mount Gang Box - Labor Rate',
   },
 }
 
