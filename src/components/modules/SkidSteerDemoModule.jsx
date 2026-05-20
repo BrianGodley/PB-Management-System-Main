@@ -598,8 +598,23 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
       {pricesLoading && <div className="text-xs text-amber-700 bg-amber-50 rounded px-3 py-2">Loading current rates…</div>}
 
       {/* Settings */}
+      <SecHdr title="Settings" />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <SecHdr title="Settings" />
+        <div>
+          <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
+          <Inp value={state.difficulty} onChange={e=>set('difficulty',e.target.value)} step="5" />
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 mb-0.5" title="Average Distance from Truck to Work Area">Truck → Work Area (Avg LF)</p>
+          <Inp value={state.distanceLF} onChange={e=>set('distanceLF',e.target.value)} step="5" />
+          {calc.walkHrs > 0 && (
+            <p className="text-[10px] text-gray-500 mt-0.5">+{calc.walkHrs.toFixed(2)} hrs walk-access</p>
+          )}
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
+          <Inp value={state.hoursAdj} onChange={e=>set('hoursAdj',e.target.value)} step="0.5" />
+        </div>
         <div>
           <p className="text-xs text-gray-500 mb-0.5">Access Level</p>
           <Sel value={state.access} onChange={e=>set('access',e.target.value)} options={Object.keys(ACCESS_LEVELS)} />
@@ -621,23 +636,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
           {isDumpSub && <p className="text-xs text-amber-600 mt-0.5">Sub haul charges apply</p>}
           {isDemoSub && <p className="text-xs text-gray-400 mt-0.5">N/A — sub demos</p>}
         </div>
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
-          <Inp value={state.difficulty} onChange={e=>set('difficulty',e.target.value)} step="5" />
-        </div>
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
-          <Inp value={state.hoursAdj} onChange={e=>set('hoursAdj',e.target.value)} step="0.5" />
-        </div>
-        <div>
-          <p className="text-xs text-gray-500 mb-0.5" title="Average Distance from Truck to Work Area">Truck → Work Area (Avg LF)</p>
-          <Inp value={state.distanceLF} onChange={e=>set('distanceLF',e.target.value)} step="5" />
-          {calc.walkHrs > 0 && (
-            <p className="text-[10px] text-gray-500 mt-0.5">+{calc.walkHrs.toFixed(2)} hrs walk-access</p>
-          )}
-        </div>
       </div>
-
       {/* Demolition */}
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
@@ -827,8 +826,8 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
       </div>
 
       {/* Shrub & Stump */}
+      <SecHdr title="Shrub & Stump Demo" />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <SecHdr title="Shrub & Stump Demo" />
         {[
           {label:'Shrubs (qty)',       key:'shrubQty',      hrs:calc.shrubHrs,    sub:`${ACCESS_LEVELS[state.access]}× × ${calc.shrubRate} hrs/ea`, rate: calc.shrubRate,    rateName: 'Demo - Shrub'},
           {label:'Stump Grind 1st',    key:'stumpFirstQty', hrs:calc.stumpFstHrs, sub:`${ACCESS_LEVELS[state.access]}× × ${calc.stumpFstRate} hrs`, rate: calc.stumpFstRate, rateName: 'Demo - Stump 1st'},
