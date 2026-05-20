@@ -132,10 +132,16 @@ export default function RateEditPopover({
       if (selErr) throw new Error('Lookup failed: ' + selErr.message)
 
       if (inCat && inCat.length > 0) {
-        // ── 1a. UPDATE the in-category row.
-        const { error: upErr } = await supabase.from(table)
-          .update({ [field]: v }).eq('id', inCat[0].id)
+        // ── 1a. UPDATE the in-category row. The trailing .select() makes
+        // Supabase return the affected rows so we can detect the silent
+        // zero-row case (e.g. RLS blocked the write but returned no error).
+        const { data: upRows, error: upErr } = await supabase.from(table)
+          .update({ [field]: v }).eq('id', inCat[0].id).select()
+        console.log('[RateEditPopover] in-cat UPDATE →', { id: inCat[0].id, returned: upRows?.length, upErr })
         if (upErr) throw new Error('Save failed: ' + upErr.message)
+        if (!upRows || upRows.length === 0) {
+          throw new Error('Save returned 0 rows — RLS likely blocked the write. Check Supabase Auth + your user role.')
+        }
       } else {
         // Step 2 — fall back to a name-only lookup. If a wrong-category row
         // exists, UPDATE it AND reassign category so future category-scoped
@@ -147,16 +153,24 @@ export default function RateEditPopover({
         if (anyRow && anyRow.length > 0) {
           const update = { [field]: v }
           if (category) update.category = category
-          const { error: reErr } = await supabase.from(table)
-            .update(update).eq('id', anyRow[0].id)
+          const { data: reRows, error: reErr } = await supabase.from(table)
+            .update(update).eq('id', anyRow[0].id).select()
+          console.log('[RateEditPopover] wrong-cat UPDATE+reassign →', { id: anyRow[0].id, oldCategory: anyRow[0].category, newCategory: category, returned: reRows?.length, reErr })
           if (reErr) throw new Error('Save failed: ' + reErr.message)
+          if (!reRows || reRows.length === 0) {
+            throw new Error('Save returned 0 rows — RLS likely blocked the write.')
+          }
         } else {
           // Step 3 — no row at all → INSERT.
           const insertRow = { [nameCol]: name, [field]: v }
           if (category)                          insertRow.category = category
           else if (table === 'labor_rates')      insertRow.category = 'General'
-          const { error: insErr } = await supabase.from(table).insert(insertRow)
+          const { data: insRows, error: insErr } = await supabase.from(table).insert(insertRow).select()
+          console.log('[RateEditPopover] INSERT →', { insertRow, returned: insRows?.length, insErr })
           if (insErr) throw new Error('Save failed: ' + insErr.message)
+          if (!insRows || insRows.length === 0) {
+            throw new Error('Insert returned 0 rows — RLS likely blocked the write.')
+          }
         }
       }
     } catch (e) {
