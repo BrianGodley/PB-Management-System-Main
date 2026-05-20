@@ -624,14 +624,23 @@ const log_feature_request_def: ToolDefinition = {
 const log_feature_request_run: ToolExecutor = async (args, ctx) => {
   const sb = userClient(ctx)
 
-  const title    = (args?.title    || '').toString().trim().slice(0, 200)
-  const body     = (args?.body     || '').toString().trim().slice(0, 5000)
-  const category = (args?.category || 'feature').toString()
+  const title = (args?.title || '').toString().trim().slice(0, 200)
+  const body  = (args?.body  || '').toString().trim().slice(0, 5000)
 
-  if (!title || !body) throw new Error('title and body are required')
-  if (!['feature','bug','enhancement','other'].includes(category)) {
-    throw new Error('category must be feature, bug, enhancement, or other')
+  // Normalize category. The model sometimes returns capitalized values
+  // ("Enhancement", "Bug"), or close-but-not-exact terms ("improvement",
+  // "issue"). Lowercase, alias common synonyms, then fall back to 'other'
+  // so we never throw on an out-of-vocab category — the row still saves.
+  let category = (args?.category || 'feature').toString().trim().toLowerCase()
+  const aliasMap: Record<string, string> = {
+    feature: 'feature', features: 'feature', request: 'feature', 'feature request': 'feature', 'new feature': 'feature',
+    bug: 'bug', bugs: 'bug', issue: 'bug', error: 'bug', defect: 'bug', 'bug report': 'bug',
+    enhancement: 'enhancement', enhancements: 'enhancement', improvement: 'enhancement', tweak: 'enhancement', polish: 'enhancement',
+    other: 'other', misc: 'other', feedback: 'other', suggestion: 'other',
   }
+  category = aliasMap[category] || 'other'
+
+  if (!title || !body) throw new Error('title and body are required (Sam was missing one of them)')
 
   // Insert. RLS allows users to insert rows where user_id = auth.uid().
   const { data: row, error } = await sb.from('feature_requests').insert({
