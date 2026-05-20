@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { fetchAllPaginated } from '../lib/fetchAll'
 import { useAuth } from '../contexts/AuthContext'
 import MasterRates from './MasterRates'
-import { DEFAULT_ESTIMATE_GPMD } from '../lib/companyDefaults'
+import { DEFAULT_ESTIMATE_GPMD, DEFAULT_SALES_TAX_RATE } from '../lib/companyDefaults'
 
 const US_STATES = [
   'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA',
@@ -813,7 +813,12 @@ export default function Clients() {
             ))}
           </div>
           <div className="bg-gray-50 px-6 py-6 flex-1 overflow-y-auto">
-            {clientSettingsTab === 'general' && <EstimateGpmdCard />}
+            {clientSettingsTab === 'general' && (
+              <div className="space-y-4">
+                <EstimateGpmdCard />
+                <SalesTaxRateCard />
+              </div>
+            )}
             {clientSettingsTab === 'rates' && (
               <MasterRates />
             )}
@@ -1093,6 +1098,146 @@ function EstimateGpmdCard() {
             <div className="mt-5 p-4 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 leading-relaxed">
               <strong>Heads up:</strong> changing this value only affects modules opened after the save. Existing modules keep whatever GPMD they were created with (stored on the module itself); to reprice them, edit the project's GPMD override or open the What If? modal.
             </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── SalesTaxRateCard ────────────────────────────────────────────────────────
+// Edits the company-wide sales tax rate (company_settings.sales_tax_rate).
+// Stored as a fractional rate (0.095 = 9.5%) but edited in the UI as a
+// percent for readability. Every estimating module applies this rate to its
+// material totals when computing the final estimate price, so changing this
+// value cascades into every new module calc.
+function SalesTaxRateCard() {
+  const [pct,      setPct]      = useState('')
+  const [original, setOriginal] = useState('')
+  const [loading,  setLoading]  = useState(true)
+  const [saving,   setSaving]   = useState(false)
+  const [msg,      setMsg]      = useState('')
+
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      setLoading(true)
+      try {
+        const { data } = await supabase
+          .from('company_settings').select('sales_tax_rate').maybeSingle()
+        if (!alive) return
+        const rate = parseFloat(data?.sales_tax_rate)
+        const display = Number.isFinite(rate) && rate >= 0
+          ? String(+(rate * 100).toFixed(4))
+          : String(DEFAULT_SALES_TAX_RATE * 100)
+        setPct(display)
+        setOriginal(display)
+      } catch {
+        if (alive) {
+          setPct(String(DEFAULT_SALES_TAX_RATE * 100))
+          setOriginal(String(DEFAULT_SALES_TAX_RATE * 100))
+        }
+      }
+      if (alive) setLoading(false)
+    })()
+    return () => { alive = false }
+  }, [])
+
+  async function save() {
+    const n = parseFloat(pct)
+    if (!Number.isFinite(n) || n < 0 || n > 100) {
+      setMsg('error:Enter a percent between 0 and 100.')
+      return
+    }
+    setSaving(true); setMsg('')
+    try {
+      const { data: existing } = await supabase
+        .from('company_settings').select('id').maybeSingle()
+      const { error } = await supabase.from('company_settings').upsert(
+        { id: existing?.id || 1, sales_tax_rate: n / 100, updated_at: new Date().toISOString() },
+        { onConflict: 'id' }
+      )
+      if (error) {
+        setMsg('error:' + error.message)
+      } else {
+        setOriginal(pct)
+        setMsg('ok:Sales tax saved. Open modules will reflect the new rate next time they recalculate.')
+        setTimeout(() => setMsg(''), 5000)
+      }
+    } catch (err) {
+      setMsg('error:' + (err?.message || 'Save failed.'))
+    }
+    setSaving(false)
+  }
+
+  const dirty = pct !== original
+
+  return (
+    <div className="max-w-2xl">
+      <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <h2 className="text-base font-semibold text-gray-800 mb-1 flex items-center gap-2">
+          <span>🧾</span> Sales Tax Rate
+        </h2>
+        <p className="text-sm text-gray-500 mb-5">
+          Applied to every material total across every estimating module. Setting this to <strong>9.5%</strong> means a module with $1,000 of materials will be priced at $1,095 of materials in the bid. Change this rate any time and freshly-opened modules will use the new value.
+        </p>
+
+        {loading ? (
+          <div className="py-8 text-center text-gray-400 text-sm">Loading…</div>
+        ) : (
+          <>
+            <div className="flex items-end gap-3 flex-wrap">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">
+                  Rate %
+                </label>
+                <div className="flex items-center">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.001"
+                    min="0"
+                    max="100"
+                    value={pct}
+                    onChange={e => { setPct(e.target.value); if (msg) setMsg('') }}
+                    className="w-32 text-sm border border-gray-300 rounded-l-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <span className="inline-flex items-center px-3 py-2 text-sm text-gray-600 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg">%</span>
+                </div>
+              </div>
+              <button
+                onClick={save}
+                disabled={!dirty || saving}
+                className="text-sm font-semibold text-white bg-green-700 hover:bg-green-800 disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2 rounded-lg transition-colors"
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+              {msg && (
+                <span className={`text-xs px-2 py-1 rounded ${
+                  msg.startsWith('ok:')
+                    ? 'text-green-800 bg-green-50 border border-green-200'
+                    : 'text-red-700 bg-red-50 border border-red-200'
+                }`}>
+                  {msg.slice(msg.indexOf(':') + 1)}
+                </span>
+              )}
+            </div>
+            {/* Live example so admins can sanity-check the impact */}
+            {(() => {
+              const n = parseFloat(pct)
+              if (!Number.isFinite(n) || n < 0) return null
+              const mat = 1000
+              const tax = Math.round(mat * (n / 100) * 100) / 100
+              return (
+                <div className="mt-5 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                  <p className="text-[10px] uppercase tracking-wide font-semibold text-gray-500 mb-2">Example</p>
+                  <p className="text-sm text-gray-700">
+                    $1,000 of materials &nbsp;→&nbsp; tax <span className="font-semibold">${tax.toLocaleString()}</span>
+                    &nbsp;→&nbsp; in-bid material total <span className="font-semibold text-green-800">${(mat + tax).toLocaleString()}</span>
+                  </p>
+                </div>
+              )
+            })()}
           </>
         )}
       </div>

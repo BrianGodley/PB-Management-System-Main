@@ -33,3 +33,28 @@ export async function fetchGlobalGpmd() {
     return DEFAULT_ESTIMATE_GPMD
   }
 }
+
+// Sales tax rate. Stored as a fractional rate (0.095 = 9.5%) on
+// company_settings; applied to every module's totalMat in the estimating
+// flow so quotes match the supplier-invoiced material cost. Defaults to 0
+// (no tax) until an admin opens Opportunities → Settings → General and
+// sets it.
+export const DEFAULT_SALES_TAX_RATE = 0
+
+/**
+ * fetchSalesTaxRate()
+ * Returns the sales tax fractional rate from company_settings, or
+ * DEFAULT_SALES_TAX_RATE if it can't be read.
+ *
+ * @returns {Promise<number>}
+ */
+export async function fetchSalesTaxRate() {
+  try {
+    const { data } = await supabase
+      .from('company_settings').select('sales_tax_rate').maybeSingle()
+    const n = parseFloat(data?.sales_tax_rate)
+    return Number.isFinite(n) && n >= 0 ? n : DEFAULT_SALES_TAX_RATE
+  } catch {
+    return DEFAULT_SALES_TAX_RATE
+  }
+}
