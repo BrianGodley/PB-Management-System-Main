@@ -772,7 +772,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
 
       {/* Grading */}
       <div>
-        <p className="text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">Grading</p>
+        <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">Grading</div>
         <table className="w-full text-xs">
           <TH cols={[{label:'Operation',w:'w-44'},{label:'SF',w:'w-24'},{label:'Depth (in)',w:'w-20'},{label:'Tons',w:'w-16'},{label:'Labor Hrs',w:'w-20'}]} />
           <tbody className="divide-y divide-gray-50">
@@ -864,7 +864,7 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
 
       {/* Manual */}
       <div>
-        <p className="text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">Manual Entry</p>
+        <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">Manual Entry</div>
         <table className="w-full text-xs">
           <TH cols={[{label:'Description'},{label:'Hours',w:'w-20'},{label:'Materials ($)',w:'w-28'},{label:'Sub Cost ($)',w:'w-28'}]} />
           <tbody className="divide-y divide-gray-50">

@@ -276,9 +276,9 @@ const DEFAULT_STATE = {
 // ── UI helpers ────────────────────────────────────────────────────────────────
 function SecHdr({ title, sub }) {
   return (
-    <p className="col-span-full text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-1">
+    <div className="flex items-center gap-2 col-span-full text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-1">
       {title}{sub && <span className="ml-2 font-normal normal-case text-gray-400">{sub}</span>}
-    </p>
+    </div>
   )
 }
 
@@ -673,12 +673,12 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
 
       {/* ── Paver Labor ─────────────────────────────────────────────────────── */}
       <div>
-        <p className="text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
+        <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           Paver Labor
           <span className="ml-2 font-normal normal-case text-gray-400">
             {calc.installRate} SF/hr install · {calc.straightCutRate}/{calc.curvedCutRate} LF/hr cuts
           </span>
-        </p>
+        </div>
         <table className="w-full text-xs">
           <TH cols={[
             { label: 'Operation', w: 'w-72' },
@@ -895,9 +895,9 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
 
       {/* ── Manual Entry ──────────────────────────────────────────────────────── */}
       <div>
-        <p className="text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
+        <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
           Manual Entry
-        </p>
+        </div>
         <table className="w-full text-xs">
           <TH cols={[
             { label: 'Description' },

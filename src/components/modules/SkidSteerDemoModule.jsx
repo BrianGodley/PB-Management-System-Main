@@ -724,11 +724,11 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
 
       {/* Misc Flat */}
       <div>
-        <p className="text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2 inline-flex items-center gap-2">
+        <div className="text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2 flex items-center gap-2">
           <span>Misc Flat Demo — {calc.rateConc} t/hr</span>
           <RateEditPopover table="labor_rates" name="Demo - Skid Steer Concrete/Dirt" category="Demo"
             mode="coefficient" unitLabel="t/hr" currentValue={calc.rateConc} onSaved={refreshAllRates} />
-        </p>
+        </div>
         <table className="w-full text-xs">
           <TH cols={[{label:'Description'},{label:'SF',w:'w-24'},{label:'Depth (in)',w:'w-20'},{label:'Tons',w:'w-16'},{label:'Labor Hrs',w:'w-20'}]} />
           <tbody className="divide-y divide-gray-50">
@@ -748,11 +748,11 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
 
       {/* Misc Vertical */}
       <div>
-        <p className="text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2 inline-flex items-center gap-2">
+        <div className="text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2 flex items-center gap-2">
           <span>Misc Vertical / Structural Demo — LF × Height × Width · {calc.rateConc} t/hr</span>
           <RateEditPopover table="labor_rates" name="Demo - Skid Steer Concrete/Dirt" category="Demo"
             mode="coefficient" unitLabel="t/hr" currentValue={calc.rateConc} onSaved={refreshAllRates} />
-        </p>
+        </div>
         <table className="w-full text-xs">
           <TH cols={[{label:'Description'},{label:'LF',w:'w-20'},{label:'H (in)',w:'w-18'},{label:'W (in)',w:'w-18'},{label:'Tons',w:'w-16'},{label:'Labor Hrs',w:'w-20'}]} />
           <tbody className="divide-y divide-gray-50">
@@ -773,11 +773,11 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
 
       {/* Footing */}
       <div>
-        <p className="text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2 inline-flex items-center gap-2">
+        <div className="text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2 flex items-center gap-2">
           <span>Footing Demo — SF × Depth · {calc.rateConc} t/hr</span>
           <RateEditPopover table="labor_rates" name="Demo - Skid Steer Concrete/Dirt" category="Demo"
             mode="coefficient" unitLabel="t/hr" currentValue={calc.rateConc} onSaved={refreshAllRates} />
-        </p>
+        </div>
         <table className="w-full text-xs">
           <TH cols={[{label:'Description'},{label:'SF',w:'w-24'},{label:'Depth (in)',w:'w-20'},{label:'Tons',w:'w-16'},{label:'Labor Hrs',w:'w-20'}]} />
           <tbody className="divide-y divide-gray-50">
@@ -797,7 +797,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
 
       {/* Grading */}
       <div>
-        <p className="text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">Grading</p>
+        <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">Grading</div>
         <table className="w-full text-xs">
           <TH cols={[{label:'Operation',w:'w-36'},{label:'SF',w:'w-24'},{label:'Depth (in)',w:'w-20'},{label:'Tons',w:'w-16'},{label:'Labor Hrs',w:'w-20'}]} />
           <tbody className="divide-y divide-gray-50">
@@ -889,7 +889,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
 
       {/* Manual */}
       <div>
-        <p className="text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">Manual Entry</p>
+        <div className="flex items-center gap-2 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">Manual Entry</div>
         <table className="w-full text-xs">
           <TH cols={[{label:'Description'},{label:'Hours',w:'w-20'},{label:'Materials ($)',w:'w-28'},{label:'Sub Cost ($)',w:'w-28'}]} />
           <tbody className="divide-y divide-gray-50">
