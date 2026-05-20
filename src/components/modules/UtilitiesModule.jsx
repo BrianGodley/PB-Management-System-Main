@@ -204,7 +204,7 @@ function calcUtilities(state, laborRatePerHour = DEFAULTS.laborRatePerHour, mate
   const subCost   = manSub + subpanelSub
   const price     = totalMat + laborCost + burden + gp + commission + subCost
 
-  return { totalHrs, manDays, totalMat, laborCost, burden, gp, commission, subCost, price,
+  return { totalHrs, manDays, totalMat, laborCost, burden, gp, commission, subCost, price, walkHrs,
            trenchHrs, lineHrs, lineMat, fixHrs, fixMat, addHrs, addMat }
 }
 

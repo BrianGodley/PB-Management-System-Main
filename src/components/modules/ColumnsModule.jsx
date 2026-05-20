@@ -137,7 +137,7 @@ function calcColumns(state, laborRatePerHour = DEFAULTS.laborRatePerHour, materi
   const subCost     = manSub
   const price       = totalMat + laborCost + burden + gp + commission + subCost
 
-  return { totalHrs, manDays, totalMat, laborCost, burden, gp, commission, subCost, price,
+  return { totalHrs, manDays, totalMat, laborCost, burden, gp, commission, subCost, price, walkHrs,
            installHrs, installMat, finishHrs, finishMat }
 }
 

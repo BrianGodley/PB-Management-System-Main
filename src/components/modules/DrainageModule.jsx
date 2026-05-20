@@ -169,7 +169,7 @@ function calcDrainage(state, laborRatePerHour = DEFAULTS.laborRatePerHour, mater
   const subCost    = manSub
   const price      = totalMat + laborCost + burden + gp + commission + subCost
 
-  return { totalHrs, manDays, totalMat, laborCost, burden, gp, commission, subCost, price,
+  return { totalHrs, manDays, totalMat, laborCost, burden, gp, commission, subCost, price, walkHrs,
            drainFittingFee, fittingFeeEa, addHrs, addMat }
 }
 

@@ -201,7 +201,7 @@ function calcPlanting(state, laborRatePerHour, gpmd, materialPrices, laborRates,
   const commission = gp * WORKER_DEFAULTS.commissionRate
   const price     = totalMat + laborCost + burden + gp + commission + subCost
 
-  return { totalHrs, manDays, totalMat, laborCost, burden, subCost, gp, commission, price,
+  return { totalHrs, manDays, totalMat, laborCost, burden, subCost, gp, commission, price, walkHrs,
            tillHrs, smallHrs, largeHrs, addonHrs, diffHrs }
 }
 
