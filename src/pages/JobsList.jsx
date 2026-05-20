@@ -2098,15 +2098,15 @@ function JobScheduleSettings({ stages = [], onAddStage, onUpdateStage, onDeleteS
   const [dragOverIdx,     setDragOverIdx]     = useState(null)
 
   useEffect(() => {
-    supabase.from('company_settings').select('value').eq('key', 'default_schedule_color').single()
-      .then(({ data }) => { if (data?.value) setDefaultColor(data.value) })
+    supabase.from('company_settings').select('default_schedule_color').maybeSingle()
+      .then(({ data }) => { if (data?.default_schedule_color) setDefaultColor(data.default_schedule_color) })
     supabase.from('company_settings').select('payroll_week_start').maybeSingle()
       .then(({ data }) => { if (data?.payroll_week_start != null) setPayrollWeekStart(data.payroll_week_start) })
   }, [])
 
   async function handleSaveColor() {
     setSaving(true); setSaved(false)
-    await supabase.from('company_settings').upsert({ key: 'default_schedule_color', value: defaultColor })
+    await supabase.from('company_settings').update({ default_schedule_color: defaultColor }).not('id', 'is', null)
     setSaving(false); setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
