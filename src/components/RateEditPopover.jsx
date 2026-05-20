@@ -232,80 +232,114 @@ export default function RateEditPopover({
             style={{ pointerEvents: 'auto' }}
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex items-start justify-between mb-3">
-              <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">{SOURCE_LABEL[table] || 'Master Rates'}</p>
-                <p className="text-base font-semibold text-gray-900 leading-tight" title={name}>{name}</p>
-                {category && <p className="text-xs text-gray-500 mt-0.5">Category: {category}</p>}
-              </div>
-              <button
-                onClick={() => setOpen(false)}
-                className="text-gray-300 hover:text-gray-600 text-xl leading-none p-1 -mt-1 flex-shrink-0"
-                title="Close"
-              >×</button>
-            </div>
+            {saveMsg ? (
+              // ─── SUCCESS STATE — minimal confirmation + a single Close. ───
+              // Hides the rate input and the green Save button entirely so
+              // there's no ambiguity about whether the save committed.
+              <>
+                <div className="flex items-start justify-between mb-4">
+                  <div className="min-w-0 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-xl flex-shrink-0">✓</div>
+                    <div className="min-w-0">
+                      <p className="text-base font-semibold text-gray-900 leading-tight">Rate updated</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{SOURCE_LABEL[table] || 'Master Rates'}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setOpen(false)}
+                    className="text-gray-300 hover:text-gray-600 text-xl leading-none p-1 -mt-1 flex-shrink-0"
+                    title="Close"
+                  >×</button>
+                </div>
 
-            <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
-              {mode === 'coefficient'
-                ? `Coefficient${unitLabel ? ` (${unitLabel})` : ''}`
-                : `Rate${unitLabel ? ` ($/${unitLabel})` : ''}`}
-            </label>
-            {!loaded ? (
-              <p className="text-sm text-gray-400 py-3">Loading current value…</p>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-1.5 mb-5">
+                  <p className="text-sm text-gray-800 font-medium" title={name}>{name}</p>
+                  {category && <p className="text-[11px] text-gray-500">Category: {category}</p>}
+                  <p className="text-sm text-gray-700">
+                    New {mode === 'coefficient' ? 'coefficient' : 'rate'}:{' '}
+                    <strong className="text-green-800">
+                      {saveMsg.replace(/^Saved! New rate:\s*/, '')}
+                    </strong>
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => setOpen(false)}
+                  className="w-full py-2 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800"
+                >
+                  Close
+                </button>
+              </>
             ) : (
-              <div className="relative">
-                {mode === 'currency' && (
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">$</span>
-                )}
-                <input
-                  type="number" step="0.001" min="0" autoFocus
-                  value={draft}
-                  onChange={e => setDraft(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') save() }}
-                  className={`input text-base w-full ${mode === 'currency' ? 'pl-7' : 'pl-3'} ${mode === 'coefficient' && unitLabel ? 'pr-16' : ''}`}
-                />
-                {mode === 'coefficient' && unitLabel && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">{unitLabel}</span>
-                )}
-              </div>
-            )}
-            {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
-            {saveMsg && (
-              <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2 mt-2 font-medium">
-                ✓ {saveMsg}
-              </p>
-            )}
+              // ─── EDIT STATE — original input + Cancel/Save row. ───
+              <>
+                <div className="flex items-start justify-between mb-3">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">{SOURCE_LABEL[table] || 'Master Rates'}</p>
+                    <p className="text-base font-semibold text-gray-900 leading-tight" title={name}>{name}</p>
+                    {category && <p className="text-xs text-gray-500 mt-0.5">Category: {category}</p>}
+                  </div>
+                  <button
+                    onClick={() => setOpen(false)}
+                    className="text-gray-300 hover:text-gray-600 text-xl leading-none p-1 -mt-1 flex-shrink-0"
+                    title="Close"
+                  >×</button>
+                </div>
 
-            <div className="flex gap-2 mt-5">
-              <button
-                onClick={() => setOpen(false)}
-                className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50"
-              >
-                {saveMsg ? 'Close' : 'Cancel'}
-              </button>
-              <button
-                type="button"
-                onMouseDown={e => {
-                  // Fire on mousedown — earlier in the click cycle than
-                  // onClick, so even if some overlay swallows the click
-                  // event we still get the save. The `saving` ref guards
-                  // against double-fire from the cascading handlers.
-                  e.preventDefault()
-                  if (!saving && loaded) save()
-                }}
-                onPointerDown={e => {
-                  e.preventDefault()
-                  if (!saving && loaded) save()
-                }}
-                onClick={() => {
-                  if (!saving && loaded) save()
-                }}
-                disabled={saving || !loaded}
-                className="flex-1 py-2 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800 disabled:opacity-50"
-              >
-                {saving ? 'Saving…' : 'Save'}
-              </button>
-            </div>
+                <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                  {mode === 'coefficient'
+                    ? `Coefficient${unitLabel ? ` (${unitLabel})` : ''}`
+                    : `Rate${unitLabel ? ` ($/${unitLabel})` : ''}`}
+                </label>
+                {!loaded ? (
+                  <p className="text-sm text-gray-400 py-3">Loading current value…</p>
+                ) : (
+                  <div className="relative">
+                    {mode === 'currency' && (
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">$</span>
+                    )}
+                    <input
+                      type="number" step="0.001" min="0" autoFocus
+                      value={draft}
+                      onChange={e => setDraft(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') save() }}
+                      className={`input text-base w-full ${mode === 'currency' ? 'pl-7' : 'pl-3'} ${mode === 'coefficient' && unitLabel ? 'pr-16' : ''}`}
+                    />
+                    {mode === 'coefficient' && unitLabel && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none">{unitLabel}</span>
+                    )}
+                  </div>
+                )}
+                {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+
+                <div className="flex gap-2 mt-5">
+                  <button
+                    onClick={() => setOpen(false)}
+                    className="flex-1 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onMouseDown={e => {
+                      e.preventDefault()
+                      if (!saving && loaded) save()
+                    }}
+                    onPointerDown={e => {
+                      e.preventDefault()
+                      if (!saving && loaded) save()
+                    }}
+                    onClick={() => {
+                      if (!saving && loaded) save()
+                    }}
+                    disabled={saving || !loaded}
+                    className="flex-1 py-2 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800 disabled:opacity-50"
+                  >
+                    {saving ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+              </>
+            )}
 
             <p className="text-[11px] text-gray-400 mt-3 italic text-center">
               Updates the master rate everywhere it's used.
