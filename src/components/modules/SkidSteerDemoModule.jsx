@@ -364,7 +364,7 @@ function TH({ cols }) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export default function SkidSteerDemoModule({ initialData, onSave, onCancel }) {
+export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onSwitchType }) {
   const [state,            setState]            = useState(() => ({ ...DEFAULT_STATE, ...(initialData||{}) }))
   const [materialPrices,   setMaterialPrices]   = useState(initialData?.materialPrices || {})
   const [laborRates,       setLaborRates]       = useState(initialData?.laborRates     || {})
@@ -377,6 +377,14 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel }) {
   //    company_settings.sales_tax_rate via fetchSalesTaxRate(). Default
   //    0 (no tax) until the admin sets it in Opportunities → Settings.
   const [salesTaxRate, setSalesTaxRate] = useState(0)
+
+  // Picker visibility for the "Change Demo Module" button rendered
+  // next to Crew Type. Hosts a tiny popover with the other two demo
+  // types. On selection, we bundle the current state + rate caches
+  // and hand them up to the parent (EstimateDetail) so it can swap
+  // selectedType while keeping the user's entered values.
+  const [showDemoSwitcher, setShowDemoSwitcher] = useState(false)
+
   useEffect(() => {
     let alive = true
     fetchSalesTaxRate().then(r => { if (alive) setSalesTaxRate(r) })
@@ -494,7 +502,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel }) {
       />
       </div>
 
-      {/* Crew Type */}
+      {/* Crew Type + Change Demo Module switcher */}
       <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
         <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Crew Type</label>
         <select value={state.crewType} onChange={e => set('crewType', e.target.value)} className="input text-sm py-1 w-36">
@@ -504,6 +512,52 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel }) {
           <option value="Paver">Paver</option>
           <option value="Specialty">Specialty</option>
         </select>
+        {/* Change Demo Module — bundle current values and switch to
+            another demo type (Hand / Skid Steer / Mini Skid Steer).
+            Shared fields populate automatically in the target. */}
+        {onSwitchType && (
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowDemoSwitcher(v => !v)}
+              className="text-xs font-semibold px-3 py-1.5 rounded-md border border-green-300 bg-green-50 text-green-800 hover:bg-green-100 hover:border-green-500 transition-colors whitespace-nowrap"
+              title="Switch to a different Demo module — keep your entries"
+            >
+              🔁 Change Demo Module
+            </button>
+            {showDemoSwitcher && (
+              <div className="absolute z-30 top-full left-0 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg p-1">
+                <p className="text-[10px] uppercase tracking-wide font-bold text-gray-400 px-2 pt-1 pb-0.5">Switch to</p>
+                  <button
+                    onClick={() => {
+                      // Hand the source module's full state + rate caches
+                      // up to EstimateDetail so the target module loads
+                      // with everything prefilled.
+                      onSwitchType?.('Hand Demo', { ...state, materialPrices, laborRates, laborRatePerHour, subMarkupRate, subRates })
+                      setShowDemoSwitcher(false)
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-green-50 hover:text-green-800 rounded transition-colors"
+                  >
+                    Hand Demo
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Hand the source module's full state + rate caches
+                      // up to EstimateDetail so the target module loads
+                      // with everything prefilled.
+                      onSwitchType?.('Mini Skid Steer Demo', { ...state, materialPrices, laborRates, laborRatePerHour, subMarkupRate, subRates })
+                      setShowDemoSwitcher(false)
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-green-50 hover:text-green-800 rounded transition-colors"
+                  >
+                    Mini Skid Steer Demo
+                  </button>
+                <button onClick={() => setShowDemoSwitcher(false)}
+                  className="w-full text-left px-3 py-1.5 text-[11px] text-gray-400 hover:text-gray-700">Cancel</button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
       {pricesLoading && <div className="text-xs text-amber-700 bg-amber-50 rounded px-3 py-2">Loading current rates…</div>}
 

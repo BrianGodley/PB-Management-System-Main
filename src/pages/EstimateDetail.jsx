@@ -311,6 +311,23 @@ export default function EstimateDetail() {
   // pickerStep: 1 = pick type, 2 = name the module. Auto-advances when the
   // user picks a type from step 1.
   const [pickerStep,       setPickerStep]      = useState(1)
+  // When the user clicks "Change Demo Module" inside one of the three
+  // demo modules (Hand / Skid / Mini Skid), the source module bundles its
+  // current entries and passes them up to us so we can hand them to the
+  // target module as initialData. Null = no in-flight switch.
+  const [switchDemoData,   setSwitchDemoData]  = useState(null)
+
+  // Hand-off callback passed to each demo module. Receives the target
+  // module type ('Hand Demo' | 'Skid Steer Demo' | 'Mini Skid Steer Demo')
+  // and the source module's current payload (state + rate maps). We swap
+  // selectedType WITHOUT going back through the type/name picker so the
+  // user lands directly in the target module with their values prefilled.
+  function switchDemoType(newType, payload) {
+    if (!newType) return
+    setSwitchDemoData(payload || null)
+    setSelectedType(newType)
+    setPickerStep(3)
+  }
   const [moduleForm,       setModuleForm]       = useState({ man_days: '', material_cost: '', notes: '' })
   const [savingModule,     setSavingModule]     = useState(false)
   const [editingModule,    setEditingModule]    = useState(null)  // set when editing existing module
@@ -458,6 +475,7 @@ export default function EstimateDetail() {
     setSelectedType(null)
     setModuleNameInput('')
     setPickerStep(1)
+    setSwitchDemoData(null)
     setModuleForm({ man_days: '', material_cost: '', notes: '' })
     setEditingModule(null)
   }
@@ -825,6 +843,7 @@ export default function EstimateDetail() {
   // module or editing an existing one, regardless of what is stored in module.data.
   const moduleInitialData = {
     ...(editingModule?.data || {}),
+    ...(switchDemoData || {}),
     // Priority: per-project override → stored module GPMD → global default
     // from company_settings.estimate_gpmd_default → hardcoded baseline.
     gpmd: projectGpmds[selectedProject?.id] ?? (editingModule?.data?.gpmd ?? globalGpmd),
@@ -1637,6 +1656,7 @@ export default function EstimateDetail() {
                   <SkidSteerDemoModule
                     onSave={editingModule ? updateModule : saveModule}
                     onCancel={closeModuleFlow}
+                    onSwitchType={switchDemoType}
                     initialData={moduleInitialData}
                   />
                 )}
@@ -1644,6 +1664,7 @@ export default function EstimateDetail() {
                   <MiniSkidSteerDemoModule
                     onSave={editingModule ? updateModule : saveModule}
                     onCancel={closeModuleFlow}
+                    onSwitchType={switchDemoType}
                     initialData={moduleInitialData}
                   />
                 )}
@@ -1660,6 +1681,7 @@ export default function EstimateDetail() {
                   <HandDemoModule
                     onSave={editingModule ? updateModule : saveModule}
                     onCancel={closeModuleFlow}
+                    onSwitchType={switchDemoType}
                     initialData={moduleInitialData}
                   />
                 )}
