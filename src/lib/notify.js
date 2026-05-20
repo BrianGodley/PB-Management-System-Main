@@ -303,3 +303,28 @@ export async function sendFeedbackStatusEmail({ to, title, status, notes, helpUr
   })
   return sendEmail({ to, subject, html })
 }
+
+/**
+ * Client-portal activation invite.
+ * Sent when staff activate a client's portal — contains a link to
+ * /portal/activate?token=... where the client creates their own account.
+ */
+export async function sendClientPortalInvite({ to, clientName, activateUrl }) {
+  const subject = 'Activate your Picture Build System client portal'
+  const html = baseTemplate({
+    title: `Welcome${clientName ? `, ${clientName}` : ''}!`,
+    body: `
+      <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+        Your contractor has set up a client portal for you on the Picture Build
+        System. From the portal you can follow your project's schedule, daily
+        logs, files, and change orders in one place.
+      </p>
+      <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+        Click the button below to activate your account — you'll choose your
+        own account name and password. This link is valid for 14 days.
+      </p>`,
+    buttonText: 'Activate My Portal',
+    buttonUrl: activateUrl || '#',
+  })
+  return sendEmail({ to, subject, html })
+}
