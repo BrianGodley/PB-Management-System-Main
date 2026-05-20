@@ -1,45 +1,46 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { LanguageProvider } from './contexts/LanguageContext'
 import { RateIconsProvider } from './contexts/RateIconsContext'
 import Layout from './components/Layout'
 import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
-import Clients from './pages/Clients'
-import ClientDetail from './pages/ClientDetail'
-import Contacts from './pages/Contacts'
-import ContactDetail from './pages/ContactDetail'
-import CompanyDetail from './pages/CompanyDetail'
-import NewJob from './pages/NewJob'
-import JobDetail from './pages/JobDetail'
-import JobsList from './pages/JobsList'
-import Info from './pages/Info'
-import Design from './pages/Design'
-import DesignDetail from './pages/DesignDetail'
-import Bids from './pages/Bids'
-import JobTracker from './pages/JobTracker'
-import Collections from './pages/Collections'
-import Settings from './pages/Settings'
-import Admin from './pages/Admin'
-import EstimateDetail from './pages/EstimateDetail'
-import MasterRates from './pages/MasterRates'
-import MasterCrews from './pages/MasterCrews'
-import Statistics from './pages/Statistics'
-import Profile from './pages/Profile'
-import SubsVendors from './pages/SubsVendors'
-import LMS from './pages/LMS'
-import HR from './pages/HR'
-import EmployeeDetail from './pages/EmployeeDetail'
-import ApplicantDetail from './pages/ApplicantDetail'
-import ApplyForm from './pages/ApplyForm'
-import ResetPassword from './pages/ResetPassword'
-import Accounting from './pages/Accounting'
-import TimeClockPage from './pages/TimeClockPage'
-import DailyLogsPage from './pages/DailyLogsPage'
-import MasterEquipment from './pages/MasterEquipment'
-import EquipmentTracking from './pages/EquipmentTracking'
-import OrgChart from './pages/OrgChart'
-import Help from './pages/Help'
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Clients = lazy(() => import('./pages/Clients'))
+const ClientDetail = lazy(() => import('./pages/ClientDetail'))
+const Contacts = lazy(() => import('./pages/Contacts'))
+const ContactDetail = lazy(() => import('./pages/ContactDetail'))
+const CompanyDetail = lazy(() => import('./pages/CompanyDetail'))
+const NewJob = lazy(() => import('./pages/NewJob'))
+const JobDetail = lazy(() => import('./pages/JobDetail'))
+const JobsList = lazy(() => import('./pages/JobsList'))
+const Info = lazy(() => import('./pages/Info'))
+const Design = lazy(() => import('./pages/Design'))
+const DesignDetail = lazy(() => import('./pages/DesignDetail'))
+const Bids = lazy(() => import('./pages/Bids'))
+const JobTracker = lazy(() => import('./pages/JobTracker'))
+const Collections = lazy(() => import('./pages/Collections'))
+const Settings = lazy(() => import('./pages/Settings'))
+const Admin = lazy(() => import('./pages/Admin'))
+const EstimateDetail = lazy(() => import('./pages/EstimateDetail'))
+const MasterRates = lazy(() => import('./pages/MasterRates'))
+const MasterCrews = lazy(() => import('./pages/MasterCrews'))
+const Statistics = lazy(() => import('./pages/Statistics'))
+const Profile = lazy(() => import('./pages/Profile'))
+const SubsVendors = lazy(() => import('./pages/SubsVendors'))
+const LMS = lazy(() => import('./pages/LMS'))
+const HR = lazy(() => import('./pages/HR'))
+const EmployeeDetail = lazy(() => import('./pages/EmployeeDetail'))
+const ApplicantDetail = lazy(() => import('./pages/ApplicantDetail'))
+const ApplyForm = lazy(() => import('./pages/ApplyForm'))
+const ResetPassword = lazy(() => import('./pages/ResetPassword'))
+const Accounting = lazy(() => import('./pages/Accounting'))
+const TimeClockPage = lazy(() => import('./pages/TimeClockPage'))
+const DailyLogsPage = lazy(() => import('./pages/DailyLogsPage'))
+const MasterEquipment = lazy(() => import('./pages/MasterEquipment'))
+const EquipmentTracking = lazy(() => import('./pages/EquipmentTracking'))
+const OrgChart = lazy(() => import('./pages/OrgChart'))
+const Help = lazy(() => import('./pages/Help'))
 
 function PortalPlaceholder({ label, icon }) {
   return (
@@ -68,7 +69,15 @@ function ProtectedRoute({ children }) {
 function AppRoutes() {
   const { user } = useAuth()
   return (
-    <Routes>
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-700 mx-auto mb-4"></div>
+          <p className="text-gray-500">Loading…</p>
+        </div>
+      </div>
+    }>
+      <Routes>
       {/* Public routes — no auth required */}
       <Route path="/apply" element={<ApplyForm />} />
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
@@ -115,13 +124,14 @@ function AppRoutes() {
         <Route path="org-chart" element={<OrgChart />} />
         <Route path="help" element={<Help />} />
       </Route>
-    </Routes>
+      </Routes>
+    </Suspense>
   )
 }
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AuthProvider>
         <LanguageProvider>
           <RateIconsProvider>

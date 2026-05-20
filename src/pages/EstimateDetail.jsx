@@ -1,47 +1,47 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { generateBidDoc } from '../lib/generateBidDoc'
 import { fetchGlobalGpmd, DEFAULT_ESTIMATE_GPMD } from '../lib/companyDefaults'
 import { useRateIcons } from '../contexts/RateIconsContext'
-import DrainageModule      from '../components/modules/DrainageModule'
+const DrainageModule = lazy(() => import('../components/modules/DrainageModule'))
 import DrainageSummary     from '../components/modules/DrainageSummary'
-import LightingModule      from '../components/modules/LightingModule'
+const LightingModule = lazy(() => import('../components/modules/LightingModule'))
 import LightingSummary     from '../components/modules/LightingSummary'
-import SkidSteerDemoModule      from '../components/modules/SkidSteerDemoModule'
+const SkidSteerDemoModule = lazy(() => import('../components/modules/SkidSteerDemoModule'))
 import SkidSteerDemoSummary     from '../components/modules/SkidSteerDemoSummary'
-import MiniSkidSteerDemoModule  from '../components/modules/MiniSkidSteerDemoModule'
+const MiniSkidSteerDemoModule = lazy(() => import('../components/modules/MiniSkidSteerDemoModule'))
 import MiniSkidSteerDemoSummary from '../components/modules/MiniSkidSteerDemoSummary'
-import ConcreteModule           from '../components/modules/ConcreteModule'
+const ConcreteModule = lazy(() => import('../components/modules/ConcreteModule'))
 import ConcreteSummary          from '../components/modules/ConcreteSummary'
-import HandDemoModule           from '../components/modules/HandDemoModule'
+const HandDemoModule = lazy(() => import('../components/modules/HandDemoModule'))
 import HandDemoSummary          from '../components/modules/HandDemoSummary'
-import IrrigationModule         from '../components/modules/IrrigationModule'
+const IrrigationModule = lazy(() => import('../components/modules/IrrigationModule'))
 import IrrigationSummary        from '../components/modules/IrrigationSummary'
-import ArtificialTurfModule     from '../components/modules/ArtificialTurfModule'
+const ArtificialTurfModule = lazy(() => import('../components/modules/ArtificialTurfModule'))
 import ArtificialTurfSummary    from '../components/modules/ArtificialTurfSummary'
-import PaverModule              from '../components/modules/PaverModule'
+const PaverModule = lazy(() => import('../components/modules/PaverModule'))
 import PaverSummary             from '../components/modules/PaverSummary'
-import PlantingModule           from '../components/modules/PlantingModule'
+const PlantingModule = lazy(() => import('../components/modules/PlantingModule'))
 import PlantingSummary          from '../components/modules/PlantingSummary'
-import PoolModule               from '../components/modules/PoolModule'
+const PoolModule = lazy(() => import('../components/modules/PoolModule'))
 import PoolSummary              from '../components/modules/PoolSummary'
-import UtilitiesModule          from '../components/modules/UtilitiesModule'
+const UtilitiesModule = lazy(() => import('../components/modules/UtilitiesModule'))
 import UtilitiesSummary         from '../components/modules/UtilitiesSummary'
-import ColumnsModule            from '../components/modules/ColumnsModule'
+const ColumnsModule = lazy(() => import('../components/modules/ColumnsModule'))
 import ColumnsSummary           from '../components/modules/ColumnsSummary'
-import GroundTreatmentsModule   from '../components/modules/GroundTreatmentsModule'
+const GroundTreatmentsModule = lazy(() => import('../components/modules/GroundTreatmentsModule'))
 import GroundTreatmentsSummary  from '../components/modules/GroundTreatmentsSummary'
-import OutdoorKitchenModule     from '../components/modules/OutdoorKitchenModule'
+const OutdoorKitchenModule = lazy(() => import('../components/modules/OutdoorKitchenModule'))
 import OutdoorKitchenSummary    from '../components/modules/OutdoorKitchenSummary'
-import FirePitModule            from '../components/modules/FirePitModule'
+const FirePitModule = lazy(() => import('../components/modules/FirePitModule'))
 import FirePitSummary           from '../components/modules/FirePitSummary'
-import WallsModule              from '../components/modules/WallsModule'
+const WallsModule = lazy(() => import('../components/modules/WallsModule'))
 import WallsSummary             from '../components/modules/WallsSummary'
-import FinishesModule           from '../components/modules/FinishesModule'
+const FinishesModule = lazy(() => import('../components/modules/FinishesModule'))
 import FinishesSummary          from '../components/modules/FinishesSummary'
-import StepsModule              from '../components/modules/StepsModule'
+const StepsModule = lazy(() => import('../components/modules/StepsModule'))
 import StepsSummary             from '../components/modules/StepsSummary'
 import GpmdBar                  from '../components/modules/GpmdBar'
 import EstimateWhatIfModal      from '../components/EstimateWhatIfModal'
@@ -1634,6 +1634,11 @@ export default function EstimateDetail() {
                 <button onClick={closeModuleFlow} className="text-gray-400 hover:text-gray-600 text-base leading-none mt-0.5" aria-label="Close">✕</button>
               </div>
               <div className="overflow-y-auto px-6 pb-6 flex-1">
+                <Suspense fallback={
+                  <div className="flex items-center justify-center py-12 text-sm text-gray-400">
+                    Loading module…
+                  </div>
+                }>
                 {selectedType === 'Drainage' && (
                   <DrainageModule
                     projectName={selectedProject?.project_name}
@@ -1796,6 +1801,7 @@ export default function EstimateDetail() {
                     initialData={moduleInitialData}
                   />
                 )}
+                </Suspense>
               </div>
             </div>
           ) : (
