@@ -40,6 +40,9 @@ const MasterEquipment = lazy(() => import('./pages/MasterEquipment'))
 const EquipmentTracking = lazy(() => import('./pages/EquipmentTracking'))
 const OrgChart = lazy(() => import('./pages/OrgChart'))
 const Help = lazy(() => import('./pages/Help'))
+const PortalLogin = lazy(() => import('./portal/PortalLogin'))
+const PortalActivate = lazy(() => import('./portal/PortalActivate'))
+const PortalShell = lazy(() => import('./portal/PortalShell'))
 
 function PortalPlaceholder({ label, icon }) {
   return (
@@ -84,6 +87,9 @@ function AppRoutes() {
         <Route path="/apply" element={<ApplyForm />} />
         <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/client-portal/login" element={<PortalLogin />} />
+        <Route path="/client-portal/activate" element={<PortalActivate />} />
+        <Route path="/client-portal" element={<PortalShell />} />
         <Route
           path="/"
           element={

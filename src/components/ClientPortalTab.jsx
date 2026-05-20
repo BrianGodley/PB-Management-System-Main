@@ -172,7 +172,7 @@ export default function ClientPortalTab({ clientId, clientData }) {
       setError(e.message)
       return
     }
-    const activateUrl = `${window.location.origin}/portal/activate?token=${token}`
+    const activateUrl = `${window.location.origin}/client-portal/activate?token=${token}`
     const { error: mailErr } = await sendClientPortalInvite({
       to: email,
       clientName: clientDisplayName(clientData),
@@ -280,7 +280,7 @@ export default function ClientPortalTab({ clientId, clientData }) {
                   </p>
                 )}
                 <p className="text-xs text-gray-400">
-                  Client signs in at {window.location.origin}/portal
+                  Client signs in at {window.location.origin}/client-portal
                 </p>
               </div>
             ) : (
