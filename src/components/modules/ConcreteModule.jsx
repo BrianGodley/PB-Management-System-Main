@@ -251,7 +251,7 @@ function SectionHeader({ title }) {
   )
 }
 
-function NumInput({ value, onChange, placeholder = '0', className = '', step = 'any', min = '0' }) {
+function NumInput({ value, onChange, placeholder = '0', className = '', step = 'any', min }) {
   return (
     <input
       type="number" step={step} min={min}

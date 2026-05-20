@@ -180,7 +180,7 @@ function SectionHeader({ title }) {
 function NumInput({ value, onChange, placeholder = '0', className = '' }) {
   return (
     <input
-      type="number" step="any" min="0"
+      type="number" step="any"
       className={`input text-sm py-1.5 ${className}`}
       placeholder={placeholder}
       value={value}
@@ -558,7 +558,7 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
                     <td className="py-1.5 pr-2 text-xs text-gray-700">{rate.label}</td>
                     <td className="py-1.5 pr-2">
                       <input
-                        type="number" step="1" min="0"
+                        type="number" step="1"
                         className="input text-sm py-1 w-20"
                         placeholder="0"
                         value={additionalItems[`${key}Qty`]}

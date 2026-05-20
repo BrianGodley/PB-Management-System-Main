@@ -95,7 +95,7 @@ function SectionHeader({ title, sub }) {
 
 function NumInput({ value, onChange, placeholder = '0', className = '' }) {
   return (
-    <input type="number" step="any" min="0"
+    <input type="number" step="any"
       className={`input text-sm py-1.5 ${className}`}
       placeholder={placeholder} value={value}
       onChange={e => onChange(e.target.value)}

@@ -212,7 +212,7 @@ function SectionHeader({ title }) {
 function NumInput({ value, onChange, placeholder = '0', className = '' }) {
   return (
     <input
-      type="number" step="any" min="0"
+      type="number" step="any"
       className={`input text-sm py-1.5 ${className}`}
       placeholder={placeholder}
       value={value}
@@ -473,7 +473,7 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
                         <div className="relative flex-1">
                           <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
                           <input
-                            type="number" step="any" min="0"
+                            type="number" step="any"
                             className="input text-sm py-1.5 pl-5 w-full"
                             value={row.price}
                             onChange={e => updateSmall(i, 'price', e.target.value)}
@@ -547,7 +547,7 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
                         <div className="relative flex-1">
                           <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
                           <input
-                            type="number" step="any" min="0"
+                            type="number" step="any"
                             className="input text-sm py-1.5 pl-5 w-full"
                             value={row.price}
                             onChange={e => updateLarge(i, 'price', e.target.value)}

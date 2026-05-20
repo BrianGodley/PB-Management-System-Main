@@ -155,7 +155,7 @@ function SectionHeader({ title }) {
 function NumInput({ value, onChange, placeholder = '0', className = '' }) {
   return (
     <input
-      type="number" step="any" min="0"
+      type="number" step="any"
       className={`input text-sm py-1.5 ${className}`}
       placeholder={placeholder}
       value={value}
@@ -503,7 +503,7 @@ export default function UtilitiesModule({ projectName, onSave, onBack, saving, i
             <div className="relative w-36">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
               <input
-                type="number" step="any" min="0"
+                type="number" step="any"
                 className="input text-sm py-1 pl-6"
                 placeholder="Sub cost"
                 value={electricSubpanelSubCost}
@@ -528,7 +528,7 @@ export default function UtilitiesModule({ projectName, onSave, onBack, saving, i
                     unitLabel="ea" currentValue={matCost} onSaved={refreshAllRates} />
                 </span>
                 <input
-                  type="number" step="1" min="0"
+                  type="number" step="1"
                   className="input text-sm py-1 w-20"
                   placeholder="Qty"
                   value={additionalItems[`${key}Qty`]}

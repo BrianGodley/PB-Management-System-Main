@@ -148,7 +148,7 @@ function SectionHeader({ title }) {
 function NumInput({ value, onChange, placeholder = '0', className = '' }) {
   return (
     <input
-      type="number" step="any" min="0"
+      type="number" step="any"
       className={`input text-sm py-1.5 ${className}`}
       placeholder={placeholder}
       value={value}
@@ -437,7 +437,7 @@ export default function ColumnsModule({ projectName, onSave, onBack, saving, ini
                     unitLabel="ea" currentValue={matCost} onSaved={refreshAllRates} />
                 </span>
                 <input
-                  type="number" step="1" min="0"
+                  type="number" step="1"
                   className="input text-sm py-1 w-24"
                   placeholder="Qty"
                   value={miscQty[`${key}Qty`]}

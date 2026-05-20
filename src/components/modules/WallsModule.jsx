@@ -279,7 +279,7 @@ function SectionHeader({ title }) {
 
 function NumInput({ value, onChange, placeholder = '0', className = '' }) {
   return (
-    <input type="number" step="any" min="0"
+    <input type="number" step="any"
       className={`input text-sm py-1.5 ${className}`}
       placeholder={placeholder} value={value}
       onChange={e => onChange(e.target.value)}
@@ -882,7 +882,7 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
                 <div className="flex items-center gap-1">
                   <div className="relative w-24">
                     <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-                    <input type="number" step="any" min="0" className="input text-sm py-1.5 pl-5 w-full"
+                    <input type="number" step="any" className="input text-sm py-1.5 pl-5 w-full"
                       placeholder={r('flagstone').toString()} value={flagstoneRateIn}
                       onChange={e => setFlagstoneRateIn(e.target.value)} />
                   </div>
@@ -905,7 +905,7 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
                 <div className="flex items-center gap-1">
                   <div className="relative w-24">
                     <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-                    <input type="number" step="any" min="0" className="input text-sm py-1.5 pl-5 w-full"
+                    <input type="number" step="any" className="input text-sm py-1.5 pl-5 w-full"
                       placeholder={r('realStone').toString()} value={realStoneRateIn}
                       onChange={e => setRealStoneRateIn(e.target.value)} />
                   </div>

@@ -139,7 +139,7 @@ function SectionHeader({ title, sub }) {
 function QtyInput({ value, onChange, step = '1' }) {
   return (
     <input
-      type="number" step={step} min="0"
+      type="number" step={step}
       className="input text-sm py-1 w-20"
       placeholder="0"
       value={value}
@@ -239,7 +239,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
         <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Difficulty Add</label>
         <div className="relative w-32">
           <input
-            type="number" step="any" min="0"
+            type="number" step="any"
             className="input text-sm py-1.5"
             placeholder="0"
             value={difficulty}
@@ -439,17 +439,17 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
                       onChange={e => updateManual(i, 'label', e.target.value)} />
                   </td>
                   <td className="py-1 pr-2">
-                    <input type="number" step="any" min="0" className="input text-sm py-1 w-20"
+                    <input type="number" step="any" className="input text-sm py-1 w-20"
                       placeholder="0" value={row.hours}
                       onChange={e => updateManual(i, 'hours', e.target.value)} />
                   </td>
                   <td className="py-1 pr-2">
-                    <input type="number" step="any" min="0" className="input text-sm py-1 w-24"
+                    <input type="number" step="any" className="input text-sm py-1 w-24"
                       placeholder="0" value={row.materials}
                       onChange={e => updateManual(i, 'materials', e.target.value)} />
                   </td>
                   <td className="py-1">
-                    <input type="number" step="any" min="0" className="input text-sm py-1 w-24"
+                    <input type="number" step="any" className="input text-sm py-1 w-24"
                       placeholder="0" value={row.subCost}
                       onChange={e => updateManual(i, 'subCost', e.target.value)} />
                   </td>
