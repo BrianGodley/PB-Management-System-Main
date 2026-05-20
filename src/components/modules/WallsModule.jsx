@@ -39,6 +39,11 @@ const DEFAULT_BLOCK_NAME = '8x8x16 (GREY)'
 function blockByName(name) {
   return CMU_BLOCK_TYPES.find(b => b.name === name) || CMU_BLOCK_TYPES[0]
 }
+// Master-rates row name for a given block type. If an admin overrides the
+// price via RateEditPopover the row is stored under this name in the
+// material_rates table (category='Walls'). When no override exists, the
+// calc falls back to the catalog's default price.
+function wallBlockRateName(name) { return `Wall Block ${name}` }
 function groutCyPerBlock(b) {
   // Same formula as the Excel ((L-2) × H × (W-2)) in³ → yd³
   return ((b.l - 2) * b.h * (b.w - 2)) / 1728 / 27
@@ -94,14 +99,17 @@ const DEFAULT_CMU = () => ({
 const DEFAULT_PIP = () => ({ lf: '', heightIn: '' })
 
 // ── Per-wall calculators ──────────────────────────────────────────────────────
-function calcOneCMU(wall, footingPump, groutPump, r) {
+function calcOneCMU(wall, footingPump, groutPump, r, mp = {}) {
   const { blockType, lf, heightIn, footingWIn, footingDIn, rebarSpIn, horizBars, bondBeams, pctGrouted, pctCurved } = wall
   if (!n(lf) || !n(heightIn)) return { hrs: 0, mat: 0, detail: null }
 
   // Selected block type drives both DIMENSIONS (how many blocks per course /
-  // per wall height) and PRICE (grey block unit cost). Falls back to the
-  // default 8x8x16 grey if blockType is missing (legacy walls).
+  // per wall height) and PRICE (grey block unit cost). Price prefers a
+  // master_rates override (set via the Edit Rates popover) and falls back to
+  // the catalog default. Falls back to the default 8x8x16 grey block if
+  // blockType is missing (legacy walls).
   const b = blockByName(blockType)
+  const blockPrice = mp[wallBlockRateName(b.name)] ?? b.price
   const blocksPerCourse = Math.ceil((n(lf) * 12) / b.l)
   const totalCourses    = Math.ceil(n(heightIn) / b.h)
   const bbCourses       = Math.min(n(bondBeams), totalCourses)
@@ -135,7 +143,7 @@ function calcOneCMU(wall, footingPump, groutPump, r) {
   // Grey block price comes from the selected block type's catalog entry
   // (mirroring the Excel VLOOKUP into the CmuBlockPrices table). Bond-beam
   // block stays on the flat master rate — there's only one BB SKU.
-  const mat = orderGreyBlock * b.price
+  const mat = orderGreyBlock * blockPrice
             + orderBBBlock   * r('bondbeamBlock')
             + totalRebarLF   * r('rebar')
             + footingCY      * footConcrPrc
@@ -165,7 +173,7 @@ function calcWalls(state, lrph = DEFAULTS.laborRatePerHour, mp = {}, gpmd = DEFA
 
   if (state.wallType === 'CMU') {
     ;(state.cmuWalls || []).forEach(wall => {
-      const res = calcOneCMU(wall, state.cmuFootingPump, state.cmuGroutPump, r)
+      const res = calcOneCMU(wall, state.cmuFootingPump, state.cmuGroutPump, r, mp)
       structuralHrs += res.hrs
       structuralMat += res.mat
       cmuDetails.push(res.detail)
@@ -301,7 +309,7 @@ const DEFAULT_CAP_ROWS = [
 const CAP_TYPES = ['None', 'Flagstone', 'Precast', 'PIP Concrete', 'Bullnose Brick']
 
 // ── CMU Wall Entry ────────────────────────────────────────────────────────────
-function CmuWallEntry({ wall, idx, total, onChange, onRemove, detail }) {
+function CmuWallEntry({ wall, idx, total, onChange, onRemove, detail, materialPrices, refreshAllRates }) {
   const set = (field) => (val) => onChange(idx, field, val)
   const hasData = n(wall.lf) > 0 && n(wall.heightIn) > 0
   return (
@@ -329,10 +337,32 @@ function CmuWallEntry({ wall, idx, total, onChange, onRemove, detail }) {
           >
             {CMU_BLOCK_TYPES.map(b => (
               <option key={b.name} value={b.name}>
-                {b.name} — {b.w}×{b.h}×{b.l}, ${b.price.toFixed(2)}/ea
+                {b.name} — {b.w}×{b.h}×{b.l}
               </option>
             ))}
           </select>
+          {/* Resolved block price + Edit Rates icon. The price line only
+              appears once a block is chosen. Price prefers a master_rates
+              override (set via the inline RateEditPopover, only visible when
+              the Edit Rates toggle is on) and falls back to the catalog
+              default — so an empty DB still yields a sensible quote. */}
+          {(() => {
+            const b = blockByName(wall.blockType)
+            const price = (materialPrices?.[wallBlockRateName(b.name)] ?? b.price)
+            return (
+              <div className="mt-1 flex items-center gap-1 text-[11px] text-gray-500">
+                <span>Price: <strong className="text-gray-800">${price.toFixed(2)}</strong>/ea</span>
+                <RateEditPopover
+                  table="material_rates"
+                  name={wallBlockRateName(b.name)}
+                  category="Walls"
+                  unitLabel="ea"
+                  currentValue={price}
+                  onSaved={refreshAllRates}
+                />
+              </div>
+            )
+          })()}
         </div>
         <div>
           <label className="block text-xs text-gray-500 mb-1">Linear Feet</label>
@@ -686,6 +716,8 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
               onChange={updateCmuWall}
               onRemove={removeCmuWall}
               detail={calc.cmuDetails[idx] || null}
+              materialPrices={materialPrices}
+              refreshAllRates={refreshAllRates}
             />
           ))}
 
