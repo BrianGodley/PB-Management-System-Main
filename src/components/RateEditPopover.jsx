@@ -287,9 +287,24 @@ export default function RateEditPopover({
                 Cancel
               </button>
               <button
+                type="button"
+                onMouseDown={e => {
+                  // Fire on mousedown — earlier in the click cycle than
+                  // onClick, so even if some overlay swallows the click
+                  // event we still get the save. The `saving` ref guards
+                  // against double-fire from the cascading handlers.
+                  e.preventDefault()
+                  console.log('[RateEditPopover] Save button MOUSEDOWN', { table, name, draft, saving, loaded })
+                  if (!saving && loaded) save()
+                }}
+                onPointerDown={e => {
+                  e.preventDefault()
+                  console.log('[RateEditPopover] Save button POINTERDOWN', { table, name, draft, saving, loaded })
+                  if (!saving && loaded) save()
+                }}
                 onClick={() => {
                   console.log('[RateEditPopover] Save button CLICKED', { table, name, draft, saving, loaded })
-                  save()
+                  if (!saving && loaded) save()
                 }}
                 disabled={saving || !loaded}
                 className="flex-1 py-2 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800 disabled:opacity-50"
