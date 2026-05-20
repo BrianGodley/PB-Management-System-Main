@@ -23,6 +23,22 @@ const STATUS_FILTER = {
   lost:      'bg-red-500 text-white',
 }
 
+// Pull first + last name out of the various formats bids.client_name may
+// have been stored in: "First Last", "Last, First", "Single", or a company
+// name. Used by the Opportunity column's sort logic so the table can be
+// sorted by either name independently.
+export function parseClientName(name) {
+  const t = (name || '').trim()
+  if (!t) return { first: '', last: '' }
+  if (t.includes(',')) {
+    const [last, ...rest] = t.split(',').map(s => s.trim())
+    return { first: rest.join(' '), last }
+  }
+  const parts = t.split(/\s+/)
+  if (parts.length === 1) return { first: '', last: parts[0] }
+  return { first: parts.slice(0, -1).join(' '), last: parts[parts.length - 1] }
+}
+
 // Parse "John Smith" → "Smith, John" for default job name
 function formatJobName(clientName) {
   if (!clientName) return ''
@@ -43,7 +59,7 @@ export default function Bids() {
   const [bidTab,        setBidTab]        = useState('bids') // 'bids' | 'settings'
   const [bidsSettingsTab, setBidsSettingsTab] = useState('general')
   const [filter,        setFilter]        = useState('all')
-  const [sortCol,       setSortCol]       = useState('client_name')
+  const [sortCol,       setSortCol]       = useState('last_name')
   const [sortDir,       setSortDir]       = useState('asc')
   const [search,        setSearch]        = useState('')
   const [updatingId,    setUpdatingId]    = useState(null)
@@ -383,6 +399,15 @@ export default function Bids() {
   function getVal(bid, col) {
     switch (col) {
       case 'client_name':   return (bid.client_name || '').toLowerCase()
+      case 'last_name': {
+        const { last, first } = parseClientName(bid.client_name)
+        // Tiebreaker on first name so "Smith, John" sorts before "Smith, Mary"
+        return (last + ' ' + first).toLowerCase()
+      }
+      case 'first_name': {
+        const { first, last } = parseClientName(bid.client_name)
+        return (first + ' ' + last).toLowerCase()
+      }
       case 'estimate_name': return (bid.estimates?.estimate_name || '').toLowerCase()
       case 'created_at':    return bid.created_at || ''
       case 'salesperson':   return (bid.salesperson || '').toLowerCase()
@@ -662,7 +687,7 @@ export default function Bids() {
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 {[
-                  { col: 'client_name',   label: 'Client',       align: 'left'   },
+                  { col: 'last_name',     label: 'Opportunity',  align: 'left',  isOpportunity: true },
                   { col: null,            label: 'Bid Doc',      align: 'center' },
                   { col: null,            label: 'Projects',     align: 'left',  cls: 'w-72' },
                   { col: 'created_at',    label: 'Created',      align: 'left'   },
@@ -672,18 +697,46 @@ export default function Bids() {
                   { col: 'bid_amount',    label: 'Bid Amount',   align: 'right'  },
                   { col: 'status',        label: 'Status',       align: 'center' },
                   { col: null,            label: 'Delete',       align: 'center' },
-                ].map(({ col, label, align, cls }) => (
+                ].map(({ col, label, align, cls, isOpportunity }) => (
                   <th
                     key={label}
-                    onClick={col ? () => toggleSort(col) : undefined}
-                    className={`px-4 py-3 font-semibold text-gray-700 text-${align} ${cls || ''} ${col ? 'cursor-pointer select-none hover:bg-gray-100 transition-colors' : ''}`}
+                    onClick={col && !isOpportunity ? () => toggleSort(col) : undefined}
+                    className={`px-4 py-3 font-semibold text-gray-700 text-${align} ${cls || ''} ${col && !isOpportunity ? 'cursor-pointer select-none hover:bg-gray-100 transition-colors' : ''}`}
                   >
-                    <span className="inline-flex items-center gap-1">
+                    <span className="inline-flex items-center gap-1 flex-wrap">
                       {label}
-                      {col && (
-                        <span className="text-gray-400 text-xs">
-                          {sortCol === col ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
+                      {/* Opportunity column gets two sort modes: Last (default)
+                          and First. Click the chip to switch — clicking the
+                          same chip again toggles asc/desc, same as other cols. */}
+                      {isOpportunity ? (
+                        <span className="inline-flex items-center gap-1 ml-1">
+                          {[
+                            { key: 'last_name',  label: 'Last'  },
+                            { key: 'first_name', label: 'First' },
+                          ].map(chip => {
+                            const active = sortCol === chip.key
+                            return (
+                              <button
+                                key={chip.key}
+                                onClick={e => { e.stopPropagation(); toggleSort(chip.key) }}
+                                className={`text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded border transition-colors ${
+                                  active
+                                    ? 'bg-green-700 text-white border-green-700'
+                                    : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-100'
+                                }`}
+                                title={`Sort by ${chip.label.toLowerCase()} name`}
+                              >
+                                {chip.label}{active ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
+                              </button>
+                            )
+                          })}
                         </span>
+                      ) : (
+                        col && (
+                          <span className="text-gray-400 text-xs">
+                            {sortCol === col ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
+                          </span>
+                        )
                       )}
                     </span>
                   </th>
