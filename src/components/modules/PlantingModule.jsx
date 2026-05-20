@@ -336,8 +336,8 @@ export default function PlantingModule({ projectName, onSave, onBack, saving, in
 
 
   const calcRaw = calcPlanting(
-    { tillSqft, difficulty, smallPlantRows, largePlantRows, addons, manualRows },
-    laborRatePerHour, gpmd, materialPrices, laborRates,
+    { tillSqft, difficulty, smallPlantRows, largePlantRows, addons, manualRows, distanceLF },
+    laborRatePerHour, gpmd, materialPrices, laborRates, walkAccess,
   )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored

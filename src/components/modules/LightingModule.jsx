@@ -212,7 +212,7 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
   }, [])
 
 
-  const calcRaw = calcLighting({ difficulty, fixtureQtys, transformerQtys, wireQtys, manualRows }, laborRatePerHour, materialPrices, laborRates, gpmd)
+  const calcRaw = calcLighting({ difficulty, fixtureQtys, transformerQtys, wireQtys, manualRows, distanceLF }, laborRatePerHour, materialPrices, laborRates, gpmd, walkAccess)
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
   // material_cost (saved with the module) ends up tax-inclusive too,
