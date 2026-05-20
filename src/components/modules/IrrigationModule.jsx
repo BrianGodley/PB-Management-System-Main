@@ -18,6 +18,11 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
 import RateEditPopover from '../RateEditPopover'
+import {
+  calcWalkAccessLabor,
+  DEFAULT_WALK_ACCESS_CREW_SIZE,
+  DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+} from '../../lib/walkAccess'
 
 // ── Zone definitions ──────────────────────────────────────────────────────────
 // defaultMode: 'Hand' | 'Trench'  — matches Excel defaults; user can override
@@ -52,13 +57,15 @@ const RATE_DEFAULTS = {
 // ── Calculation engine ────────────────────────────────────────────────────────
 const n = v => parseFloat(v) || 0
 
-function calcIrrigation(state, laborRatePerHour, materialPrices, laborRates, salesTax, gpmd = 425) {
+function calcIrrigation(state, laborRatePerHour, materialPrices, laborRates, salesTax, gpmd = 425, walkAccess = null) {
   const mp   = materialPrices || {}
   const lr   = laborRates    || {}
   const lrph = n(laborRatePerHour) || 35
   const diff = 1 + n(state.difficulty) / 100
   const hrsAdj = n(state.hoursAdj)
   const tax  = n(salesTax) || RATE_DEFAULTS.salesTax
+  const pace = n(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN
+  const crew = n(walkAccess?.crewSize)     || DEFAULT_WALK_ACCESS_CREW_SIZE
 
   // Rates from DB with fallbacks
   // NOTE: handRate / trenchRate are hrs/zone (not zones/hr).
@@ -100,11 +107,17 @@ function calcIrrigation(state, laborRatePerHour, materialPrices, laborRates, sal
   const manualSub = manualFiltered.reduce((s, r) => s + n(r.subCost), 0)
 
   // ── Totals ────────────────────────────────────────────────────────────────
-  const rawHrs   = zoneHrs + timerLaborHrs + manualHrs
-  const totalHrs = rawHrs * diff + hrsAdj
-  const rawMat   = zoneMat + timerMat + manualMat
-  const totalMat = rawMat * (1 + tax)               // Excel: =P24+(P24*SalesTax)
-  const subCost  = manualSub
+  const rawHrs       = zoneHrs + timerLaborHrs + manualHrs
+  // Walk-access penalty is calculated against the difficulty-adjusted labor
+  // (i.e. how big the job actually is once site complexity is applied), then
+  // added on. Mirrors Excel: O25 uses O24 (labor subtotal after item-level
+  // adjustments) and the result flows into O26 = labor + drive.
+  const adjLaborHrs  = rawHrs * diff + hrsAdj
+  const walkHrs      = calcWalkAccessLabor(adjLaborHrs, state.distanceLF, { crewSize: crew, paceLfPerMin: pace })
+  const totalHrs     = adjLaborHrs + walkHrs
+  const rawMat       = zoneMat + timerMat + manualMat
+  const totalMat     = rawMat * (1 + tax)            // Excel: =P24+(P24*SalesTax)
+  const subCost      = manualSub
 
   const manDays    = totalHrs / 8
   const laborCost  = totalHrs * lrph
@@ -115,7 +128,7 @@ function calcIrrigation(state, laborRatePerHour, materialPrices, laborRates, sal
 
   return {
     totalHrs, manDays, laborCost, burden, rawMat, totalMat, subCost, gp, commission, price,
-    zoneCalc, timerCalc, zoneHrs, timerLaborHrs, manualHrs,
+    zoneCalc, timerCalc, zoneHrs, timerLaborHrs, manualHrs, walkHrs,
     handRate, trenchRate, timerHrs, salesTax: tax,
   }
 }
@@ -125,6 +138,7 @@ const DEFAULT_STATE = {
   difficulty: 0,
   crewType: 'Landscape',
   hoursAdj:   0,
+  distanceLF: '',   // Average Distance (Truck to Work Area), linear feet
   zoneQtys: Object.fromEntries(ZONE_TYPES.map(z => [z.key, ''])),
   zoneModes: Object.fromEntries(ZONE_TYPES.map(z => [z.key, z.defaultMode])),
   timerQtys: Object.fromEntries(TIMER_TYPES.map(t => [t.key, ''])),
@@ -176,6 +190,10 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
   const [laborRates,       setLaborRates]       = useState(initialData?.laborRates     || {})
   const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? 35)
   const [salesTax,         setSalesTax]         = useState(initialData?.salesTax ?? RATE_DEFAULTS.salesTax)
+  const [walkAccess,       setWalkAccess]       = useState(initialData?.walkAccess ?? {
+    paceLfPerMin: DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+    crewSize:     DEFAULT_WALK_ACCESS_CREW_SIZE,
+  })
   const [pricesLoading,    setPricesLoading]    = useState(!initialData?.materialPrices)
   const gpmd = initialData?.gpmd ?? 425
   const subGpMarkupRate = initialData?.subGpMarkupRate ?? 0.20
@@ -195,14 +213,24 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
     let gone = false
     ;(async () => {
       await Promise.all([
-        (!initialData?.laborRatePerHour || !initialData?.salesTax) &&
-          supabase.from('company_settings').select('labor_rate_per_hour, sales_tax_rate').single()
+        (!initialData?.laborRatePerHour || !initialData?.salesTax || !initialData?.walkAccess) &&
+          supabase.from('company_settings')
+            .select('labor_rate_per_hour, sales_tax_rate, walk_access_pace_lf_per_min, walk_access_crew_size')
+            .maybeSingle()
             .then(({ data }) => {
               if (!gone && data) {
                 if (!initialData?.laborRatePerHour && data.labor_rate_per_hour)
                   setLaborRatePerHour(parseFloat(data.labor_rate_per_hour) || 35)
                 if (!initialData?.salesTax && data.sales_tax_rate != null)
                   setSalesTax(parseFloat(data.sales_tax_rate) || RATE_DEFAULTS.salesTax)
+                if (!initialData?.walkAccess) {
+                  const pace = parseFloat(data.walk_access_pace_lf_per_min)
+                  const crew = parseFloat(data.walk_access_crew_size)
+                  setWalkAccess({
+                    paceLfPerMin: Number.isFinite(pace) && pace > 0 ? pace : DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN,
+                    crewSize:     Number.isFinite(crew) && crew > 0 ? crew : DEFAULT_WALK_ACCESS_CREW_SIZE,
+                  })
+                }
               }
             }),
         refreshAllRates(),
@@ -218,7 +246,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
     const rows = [...p.manualRows]; rows[i] = { ...rows[i], [f]: v }; return { ...p, manualRows: rows }
   }), [])
 
-  const calc = calcIrrigation(state, laborRatePerHour, materialPrices, laborRates, salesTax, gpmd)
+  const calc = calcIrrigation(state, laborRatePerHour, materialPrices, laborRates, salesTax, gpmd, walkAccess)
 
   const fmt2 = v => `$${n(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   const fmt  = v => `$${Math.round(v).toLocaleString()}`
@@ -237,7 +265,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
       sub_cost:     parseFloat(calc.subCost.toFixed(2)),
       total_price:  parseFloat(calc.price.toFixed(2)),
       data: {
-        ...state, laborRatePerHour, gpmd, materialPrices, laborRates, salesTax,
+        ...state, laborRatePerHour, gpmd, materialPrices, laborRates, salesTax, walkAccess,
         calc: {
           totalHrs: calc.totalHrs, manDays: calc.manDays,
           laborCost: calc.laborCost, burden: calc.burden,
@@ -288,7 +316,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
       {/* Settings */}
       <div className="grid grid-cols-2 gap-3">
         <SecHdr title="Settings" />
-        <div className="col-span-2 grid grid-cols-2 gap-3">
+        <div className="col-span-2 grid grid-cols-3 gap-3">
           <div>
             <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
             <Inp value={state.difficulty} onChange={e => set('difficulty', e.target.value)} step="5" />
@@ -296,6 +324,15 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
           <div>
             <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
             <Inp value={state.hoursAdj} onChange={e => set('hoursAdj', e.target.value)} step="0.5" />
+          </div>
+          <div>
+            <p className="text-xs text-gray-500 mb-0.5" title="Average Distance from Truck to Work Area">
+              Truck → Work Area (LF)
+            </p>
+            <Inp value={state.distanceLF} onChange={e => set('distanceLF', e.target.value)} step="5" />
+            {calc.walkHrs > 0 && (
+              <p className="text-[10px] text-gray-500 mt-0.5">+{calc.walkHrs.toFixed(2)} hrs walk-access</p>
+            )}
           </div>
         </div>
       </div>
