@@ -302,6 +302,15 @@ export default function EstimateDetail() {
   // Add / Edit module modals
   const [showModulePicker, setShowModulePicker] = useState(false)
   const [selectedType,     setSelectedType]     = useState(null)
+  // Optional custom display name for the module being added. Pre-filled
+  // with the module_type when the user picks a type; they can edit it
+  // before continuing into the detail modal. Persisted as
+  // estimate_modules.module_name (a new column). Falls back to module_type
+  // for legacy rows / when left blank.
+  const [moduleNameInput,  setModuleNameInput] = useState('')
+  // pickerStep: 1 = pick type, 2 = name the module. Auto-advances when the
+  // user picks a type from step 1.
+  const [pickerStep,       setPickerStep]      = useState(1)
   const [moduleForm,       setModuleForm]       = useState({ man_days: '', material_cost: '', notes: '' })
   const [savingModule,     setSavingModule]     = useState(false)
   const [editingModule,    setEditingModule]    = useState(null)  // set when editing existing module
@@ -439,12 +448,16 @@ export default function EstimateDetail() {
   function openModulePicker() {
     setShowModulePicker(true)
     setSelectedType(null)
+    setModuleNameInput('')
+    setPickerStep(1)
     setModuleForm({ man_days: '', material_cost: '', notes: '' })
   }
 
   function closeModuleFlow() {
     setShowModulePicker(false)
     setSelectedType(null)
+    setModuleNameInput('')
+    setPickerStep(1)
     setModuleForm({ man_days: '', material_cost: '', notes: '' })
     setEditingModule(null)
   }
@@ -452,6 +465,8 @@ export default function EstimateDetail() {
   function openEditModule(mod) {
     setEditingModule(mod)
     setSelectedType(mod.module_type)
+    setPickerStep(3)   // skip the two add-flow steps when editing
+    setModuleNameInput(mod.module_name || mod.module_type)
     // Pre-fill generic form in case it's a non-specific module type
     setModuleForm({
       man_days:      mod.man_days      || '',
@@ -479,6 +494,7 @@ export default function EstimateDetail() {
       id:            crypto.randomUUID(),  // temp local id; stripped on save
       project_id:    selectedProject.id,
       module_type:   selectedType,
+      module_name:   (moduleNameInput || '').trim() || selectedType,
       man_days:      parseFloat(payload.man_days) || 0,
       material_cost: parseFloat(payload.material_cost) || 0,
       data:          payload.data || null,
@@ -502,6 +518,7 @@ export default function EstimateDetail() {
     const fin = extractFinancials(payload)
     const updatedMod = {
       ...editingModule,
+      module_name:   (moduleNameInput || '').trim() || editingModule.module_name || editingModule.module_type,
       man_days:      parseFloat(payload.man_days) || 0,
       material_cost: parseFloat(payload.material_cost) || 0,
       data:          payload.data || editingModule.data || null,
@@ -1327,8 +1344,9 @@ export default function EstimateDetail() {
                     className={`px-4 py-3 cursor-pointer transition-colors group ${isSelected ? 'bg-green-50 border-l-4 border-green-600' : 'hover:bg-gray-50 border-l-4 border-transparent'}`}
                   >
                     <div className="flex items-center justify-between">
-                      <p className={`text-sm font-semibold ${isSelected ? 'text-green-800' : 'text-gray-800'}`}>
-                        {mod.module_type}
+                      <p className={`text-sm font-semibold ${isSelected ? 'text-green-800' : 'text-gray-800'}`}
+                         title={mod.module_name && mod.module_name !== mod.module_type ? mod.module_type : undefined}>
+                        {mod.module_name || mod.module_type}
                       </p>
                       <button
                         onClick={e => { e.stopPropagation(); deleteModule(mod) }}
@@ -1351,7 +1369,7 @@ export default function EstimateDetail() {
         <div className="w-1/3 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
             <h2 className="font-semibold text-gray-900 text-sm">
-              {selectedModule ? selectedModule.module_type : 'Module Detail'}
+              {selectedModule ? (selectedModule.module_name || selectedModule.module_type) : 'Module Detail'}
             </h2>
           </div>
 
@@ -1455,7 +1473,7 @@ export default function EstimateDetail() {
       </div>
 
       {/* ── Module Type Picker Modal ── */}
-      {showModulePicker && !selectedType && (
+      {showModulePicker && !selectedType && pickerStep === 1 && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={closeModuleFlow} />
           <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-3xl mx-4 p-6">
@@ -1472,7 +1490,11 @@ export default function EstimateDetail() {
                     {items.map(type => (
                       <button
                         key={type}
-                        onClick={() => setSelectedType(type)}
+                        onClick={() => {
+                          setSelectedType(type)
+                          setModuleNameInput(type)
+                          setPickerStep(2)
+                        }}
                         className="text-left px-3 py-2.5 rounded-lg border border-gray-200 hover:border-green-500 hover:bg-green-50 text-sm font-medium text-gray-700 hover:text-green-800 transition-colors"
                       >
                         {type}
@@ -1488,7 +1510,52 @@ export default function EstimateDetail() {
       )}
 
       {/* ── Module Form Modal ── */}
-      {selectedType && (
+      {/* Step 2 — Name the module. Pre-filled with the module type so the
+          user can just hit Continue, or override with a custom name like
+          "Front Yard Patio" or "Pool Coping — phase 2". */}
+      {showModulePicker && selectedType && pickerStep === 2 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={closeModuleFlow} />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-0.5">Add Module · Step 2 of 2</p>
+              <h2 className="text-xl font-bold text-gray-900">{selectedType}</h2>
+              <p className="text-sm text-gray-500 mt-0.5">{selectedProject?.project_name}</p>
+            </div>
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">
+                Module Name <span className="text-gray-400 normal-case font-normal">(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={moduleNameInput}
+                onChange={e => setModuleNameInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && moduleNameInput.trim()) setPickerStep(3) }}
+                autoFocus
+                placeholder={selectedType}
+                className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+              <p className="text-[11px] text-gray-400 mt-1">
+                Shown in the module list. Leave as-is for the default "{selectedType}".
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setSelectedType(null); setPickerStep(1) }}
+                className="flex-1 px-4 py-2 rounded-lg border border-gray-200 text-gray-600 text-sm hover:bg-gray-50">
+                ← Back
+              </button>
+              <button
+                onClick={() => setPickerStep(3)}
+                className="flex-1 px-4 py-2 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800">
+                Continue →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedType && pickerStep === 3 && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={closeModuleFlow} />
 
