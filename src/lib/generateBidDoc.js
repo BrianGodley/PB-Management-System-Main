@@ -33,15 +33,33 @@ import {
 } from 'docx'
 import { LOGO_B64 } from './logoBase64'
 import { MODULE_VERBIAGE } from './bidVerbiage'
+import { supabase } from './supabase'
+
+// Fetch the Finance OAC markup rate from company_settings (single-row table).
+// Returns DEFAULT_FINANCE_OAC_RATE if the row or column is missing, the value
+// is null, or the query errors — fail-soft so a bad fetch never blocks the
+// bid doc from rendering.
+export async function fetchFinanceOacRate() {
+  try {
+    const { data } = await supabase
+      .from('company_settings').select('finance_oac_rate').maybeSingle()
+    const n = parseFloat(data?.finance_oac_rate)
+    return Number.isFinite(n) && n >= 0 ? n : DEFAULT_FINANCE_OAC_RATE
+  } catch {
+    return DEFAULT_FINANCE_OAC_RATE
+  }
+}
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const HEADER_FONT = 'Times New Roman'   // matches Sauer header
 const BODY_FONT   = 'Calibri'           // matches Sauer body
 
-// Finance OAC markup. Sauer template: $33,915 cash → $37,307 finance = +10.0%.
-// Centralized so it's easy to tweak / pull from settings later.
-const FINANCE_OAC_RATE = 0.10
+// Finance OAC markup default. Sauer template: $33,915 cash → $37,307 finance
+// = +10.0%. Now configurable in Bids → Settings → Finance, persisted to
+// company_settings.finance_oac_rate. Callers should fetch that value and
+// pass it in; this constant is the fallback when nothing is set.
+const DEFAULT_FINANCE_OAC_RATE = 0.10
 
 // Half-point sizes used throughout (docx sizes are in half-points).
 const SZ_BODY      = 22   // 11pt
@@ -260,9 +278,9 @@ function buildModuleSection(mod, project) {
 }
 
 // ── Final Job Total lines (Cash / Finance OAC) ───────────────────────────────
-function buildJobTotals(grandTotal) {
+function buildJobTotals(grandTotal, financeOacRate) {
   const cash    = grandTotal
-  const finance = grandTotal * (1 + FINANCE_OAC_RATE)
+  const finance = grandTotal * (1 + (Number.isFinite(financeOacRate) ? financeOacRate : DEFAULT_FINANCE_OAC_RATE))
   return [
     emptyLine(120),
     new Paragraph({
@@ -279,14 +297,17 @@ function buildJobTotals(grandTotal) {
 // ── Main export ──────────────────────────────────────────────────────────────
 
 /**
- * generateBidDoc(estimate, projects, clientAddress)
+ * generateBidDoc(estimate, projects, clientAddress, opts)
  * Returns a Blob containing the .docx file.
  *
- * @param {object} estimate       - estimate row from Supabase
- * @param {array}  projects       - estimate_projects with nested estimate_modules[]
- * @param {string} clientAddress  - multi-line address string for the client
+ * @param {object} estimate         - estimate row from Supabase
+ * @param {array}  projects         - estimate_projects with nested estimate_modules[]
+ * @param {string} clientAddress    - multi-line address string for the client
+ * @param {object} [opts]
+ * @param {number} [opts.financeOacRate] - Finance OAC markup (0.10 = +10%).
+ *                                         Falls back to DEFAULT_FINANCE_OAC_RATE.
  */
-export async function generateBidDoc(estimate, projects, clientAddress = '') {
+export async function generateBidDoc(estimate, projects, clientAddress = '', opts = {}) {
   const bidDate = new Date()
 
   const body = []
@@ -307,9 +328,11 @@ export async function generateBidDoc(estimate, projects, clientAddress = '') {
     }
   }
 
-  // Final Job Total block (Cash + Finance OAC)
+  // Final Job Total block (Cash + Finance OAC).
+  // The finance markup comes from company_settings.finance_oac_rate, threaded
+  // through opts. If absent/invalid, falls back to DEFAULT_FINANCE_OAC_RATE.
   if (grandTotal > 0) {
-    body.push(...buildJobTotals(grandTotal))
+    body.push(...buildJobTotals(grandTotal, opts.financeOacRate))
   }
 
   const doc = new Document({

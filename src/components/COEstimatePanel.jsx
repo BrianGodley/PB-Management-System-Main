@@ -16,7 +16,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { generateBidDoc, downloadBidDoc } from '../lib/generateBidDoc'
+import { generateBidDoc, downloadBidDoc, fetchFinanceOacRate } from '../lib/generateBidDoc'
 
 import DrainageModule           from './modules/DrainageModule'
 import DrainageSummary          from './modules/DrainageSummary'
@@ -354,7 +354,8 @@ export default function COEstimatePanel({
         // Generate and download the CO Word doc
         if (estimate && projects.length) {
           try {
-            const blob     = await generateBidDoc(estimate, projects, clientAddress)
+            const financeOacRate = await fetchFinanceOacRate()
+            const blob     = await generateBidDoc(estimate, projects, clientAddress, { financeOacRate })
             const safeName = (description.trim() || 'ChangeOrder').replace(/[^a-z0-9]/gi, '_')
             downloadBidDoc(blob, `${safeName}_CO_${new Date().toISOString().split('T')[0]}.docx`)
           } catch (_) { /* doc gen failure is non-fatal */ }
