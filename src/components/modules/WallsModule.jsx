@@ -97,7 +97,7 @@ const DEFAULT_CMU = () => ({
   rebarSpIn: '16', horizBars: '2', bondBeams: '1',
   pctGrouted: '100', pctCurved: '0',
 })
-const DEFAULT_PIP = () => ({ lf: '', heightIn: '' })
+const DEFAULT_PIP = () => ({ lf: '', heightIn: '', footingWIn: '12', footingDIn: '12', horizBars: '2' })
 
 // ── Per-wall calculators ──────────────────────────────────────────────────────
 function calcOneCMU(wall, footingPump, groutPump, r, mp = {}) {
@@ -156,13 +156,30 @@ function calcOneCMU(wall, footingPump, groutPump, r, mp = {}) {
 }
 
 function calcOnePIP(wall, r) {
-  const { lf, heightIn } = wall
+  const { lf, heightIn, footingWIn, footingDIn, horizBars } = wall
   if (!n(lf) || !n(heightIn)) return { hrs: 0, mat: 0, concCY: 0 }
+  // Wall stem (existing formula)
   const addlCourses = Math.max(0, Math.ceil((n(heightIn) - 6) / 6))
-  const hrs   = n(lf) * (1.0833 + addlCourses * 1.6167)
-  const concCY = n(lf) * (0.2833 + addlCourses * 0.3667)
-  const mat   = concCY * r('concreteTruck')
-  return { hrs, mat, concCY }
+  const wallHrs    = n(lf) * (1.0833 + addlCourses * 1.6167)
+  const wallConcCY = n(lf) * (0.2833 + addlCourses * 0.3667)
+
+  // Footing — same dig + rebar + pour coefficients as the CMU calc so PIP
+  // footings price out consistently. Optional: if the user leaves footing
+  // fields blank, the footing contribution is just 0 and the wall behaves
+  // exactly like the previous (footing-less) version.
+  const fW = n(footingWIn), fD = n(footingDIn), hb = n(horizBars)
+  const footingCF    = (fW > 0 && fD > 0) ? n(lf) * (fW / 12) * (fD / 12) : 0
+  const footingCY    = footingCF / 27
+  const horizRebarLF = hb * n(lf)
+  const footingHrs   = (footingCF    > 0 ? footingCF    / r('digLab')   : 0)
+                     + (horizRebarLF > 0 ? horizRebarLF / r('rebarLab') : 0)
+                     + (footingCY    > 0 ? footingCY    / 0.2037        : 0)
+  const footingMat   = footingCY * r('concreteTruck') + horizRebarLF * r('rebar')
+
+  const hrs    = wallHrs + footingHrs
+  const concCY = wallConcCY + footingCY
+  const mat    = wallConcCY * r('concreteTruck') + footingMat
+  return { hrs, mat, concCY, footingCY, horizRebarLF }
 }
 
 // ── Main calc ─────────────────────────────────────────────────────────────────
@@ -172,29 +189,28 @@ function calcWalls(state, lrph = DEFAULTS.laborRatePerHour, mp = {}, gpmd = DEFA
   let structuralHrs = 0, structuralMat = 0
   let cmuDetails = [], pipDetails = []
 
-  if (state.wallType === 'CMU') {
-    ;(state.cmuWalls || []).forEach(wall => {
-      const res = calcOneCMU(wall, state.cmuFootingPump, state.cmuGroutPump, r, mp)
-      structuralHrs += res.hrs
-      structuralMat += res.mat
-      cmuDetails.push(res.detail)
-    })
-  }
+  // ALL wall types contribute simultaneously — switching the visible tab
+  // no longer drops the other types from the calc. Each section is its
+  // own array and gets summed below.
+  ;(state.cmuWalls || []).forEach(wall => {
+    const res = calcOneCMU(wall, state.cmuFootingPump, state.cmuGroutPump, r, mp)
+    structuralHrs += res.hrs
+    structuralMat += res.mat
+    cmuDetails.push(res.detail)
+  })
 
-  if (state.wallType === 'PIP') {
-    ;(state.pipWalls || []).forEach(wall => {
-      const res = calcOnePIP(wall, r)
-      structuralHrs += res.hrs
-      structuralMat += res.mat
-      pipDetails.push({ ...res, lf: wall.lf, heightIn: wall.heightIn })
-    })
-  }
+  ;(state.pipWalls || []).forEach(wall => {
+    const res = calcOnePIP(wall, r)
+    structuralHrs += res.hrs
+    structuralMat += res.mat
+    pipDetails.push({ ...res, lf: wall.lf, heightIn: wall.heightIn })
+  })
 
-  if (state.wallType === 'Timber') {
+  if (n(state.timberLF) > 0 || n(state.timberPosts) > 0) {
     const addlCourses = Math.max(0, Math.ceil((n(state.timberHeightIn) - 8) / 8))
     const postQty = n(state.timberPosts)
-    structuralHrs = n(state.timberLF) * (0.4417 + addlCourses * 0.80) + postQty * 0.4667
-    structuralMat = n(state.timberLF) * (0.2917 + addlCourses * 0.55) * 50 + postQty * 100
+    structuralHrs += n(state.timberLF) * (0.4417 + addlCourses * 0.80) + postQty * 0.4667
+    structuralMat += n(state.timberLF) * (0.2917 + addlCourses * 0.55) * 50 + postQty * 100
   }
 
   // Wall Finishes
@@ -255,11 +271,23 @@ function calcWalls(state, lrph = DEFAULTS.laborRatePerHour, mp = {}, gpmd = DEFA
     else if (cap.type === 'Bullnose Brick') { capMat += lf*r('capBullnose'); capHrs += lf*0.08 }
   })
 
-  // Waterproofing
-  const wpSF = n(state.wpSF)
-  const wpKey = { 'Primer & Membrane':'wpPrimerMembrane','3 Coats Roll On':'wp3CoatRollOn','Thoroseal & Roll On':'wpThoroseal','Dimple Membrane':'wpDimpleMembrane' }[state.wpType]
-  const wpMat = wpSF > 0 && wpKey ? wpSF * r(wpKey) : 0
-  const wpHrs = wpSF > 0 ? wpSF / 200 : 0
+  // Waterproofing — supports multiple rows now (one row per wall section
+  // that needs its own spec). Each row is { type, sf }; type 'None' or 0 SF
+  // contributes nothing. Legacy single entry (wpType / wpSF) is migrated
+  // into the array form by the component, so callers don't need to change.
+  const WP_KEY = { 'Primer & Membrane':'wpPrimerMembrane','3 Coats Roll On':'wp3CoatRollOn','Thoroseal & Roll On':'wpThoroseal','Dimple Membrane':'wpDimpleMembrane' }
+  const wpRows = Array.isArray(state.wpRows) && state.wpRows.length
+    ? state.wpRows
+    : [{ type: state.wpType, sf: state.wpSF }]
+  let wpMat = 0, wpHrs = 0
+  wpRows.forEach(row => {
+    const sf = n(row?.sf)
+    const k  = WP_KEY[row?.type]
+    if (sf > 0 && k) {
+      wpMat += sf * r(k)
+      wpHrs += sf / 200
+    }
+  })
 
   // Manual
   let manHrs = 0, manMat = 0, manSub = 0
@@ -465,10 +493,24 @@ function PipWallEntry({ wall, idx, total, onChange, onRemove, detail }) {
           <label className="block text-xs text-gray-500 mb-1">Wall Height (in)</label>
           <NumInput value={wall.heightIn} onChange={set('heightIn')} placeholder="48" />
         </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Footing Width (in)</label>
+          <NumInput value={wall.footingWIn} onChange={set('footingWIn')} placeholder="12" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Footing Depth (in)</label>
+          <NumInput value={wall.footingDIn} onChange={set('footingDIn')} placeholder="12" />
+        </div>
+        <div className="col-span-2 sm:col-span-1">
+          <label className="block text-xs text-gray-500 mb-1">Horiz. Bars in Footing</label>
+          <NumInput value={wall.horizBars} onChange={set('horizBars')} placeholder="2" />
+        </div>
       </div>
       {hasData && detail && (
-        <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 text-xs text-gray-600 flex gap-4">
+        <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 text-xs text-gray-600 flex flex-wrap gap-4">
           <span>Concrete: <strong>{detail.concCY.toFixed(2)} CY</strong></span>
+          {detail.footingCY > 0 && <span>Footing: <strong>{detail.footingCY.toFixed(3)} CY</strong></span>}
+          {detail.horizRebarLF > 0 && <span>Footing rebar: <strong>{Math.round(detail.horizRebarLF)} LF</strong></span>}
           <span>Labor: <strong>{detail.hrs.toFixed(2)} hrs</strong></span>
         </div>
       )}
@@ -568,8 +610,20 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
 
   // ── Caps / Waterproofing / Manual ─────────────────────────────────────────
   const [capRows,    setCapRows]    = useState(initialData?.capRows    ?? DEFAULT_CAP_ROWS)
-  const [wpType,     setWpType]     = useState(initialData?.wpType     ?? 'None')
-  const [wpSF,       setWpSF]       = useState(initialData?.wpSF       ?? '')
+  // Multi-row waterproofing. Migrate legacy single-entry initialData on
+  // mount so existing saved walls keep their waterproofing line.
+  const [wpRows, setWpRows] = useState(() => {
+    if (Array.isArray(initialData?.wpRows) && initialData.wpRows.length) return initialData.wpRows
+    if (initialData?.wpType || initialData?.wpSF) {
+      return [{ type: initialData.wpType || 'None', sf: initialData.wpSF || '' }]
+    }
+    return [{ type: 'None', sf: '' }]
+  })
+  function updateWpRow(i, field, val) {
+    setWpRows(rs => rs.map((r, idx) => idx === i ? { ...r, [field]: val } : r))
+  }
+  function addWpRow()    { setWpRows(rs => [...rs, { type: 'None', sf: '' }]) }
+  function removeWpRow(idx) { setWpRows(rs => rs.length > 1 ? rs.filter((_, i) => i !== idx) : rs) }
   const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
 
   // ── Sales tax — applied to totalMat across every module so the bid
@@ -627,7 +681,7 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
     tileSF,         tileRateIn,
     flagstoneSF,    flagstoneRateIn,
     realStoneSF,    realStoneRateIn,
-    capRows, wpType, wpSF, manualRows,
+    capRows, wpRows, manualRows,
   }
   const calcRaw = calcWalls(state, laborRatePerHour, materialPrices, gpmd)
   // Apply company sales tax to the module's total material cost so the
@@ -697,15 +751,24 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
       <div>
         <SectionHeader title="Wall Type" />
         <div className="flex gap-2">
-          {['CMU', 'PIP', 'Timber'].map(t => (
-            <button key={t} onClick={() => setWallType(t)}
+          {[
+            { key: 'CMU',    label: 'CMU Block',        count: cmuWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0).length },
+            { key: 'PIP',    label: 'Poured In Place',  count: pipWalls.filter(w => n(w.lf) > 0 || n(w.heightIn) > 0).length },
+            { key: 'Timber', label: 'Timber / Lumber',  count: (n(timberLF) > 0 || n(timberPosts) > 0) ? 1 : 0 },
+          ].map(t => (
+            <button key={t.key} onClick={() => setWallType(t.key)}
               className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                wallType === t ? 'bg-green-700 text-white border-green-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                wallType === t.key ? 'bg-green-700 text-white border-green-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
               }`}>
-              {t === 'CMU' ? 'CMU Block' : t === 'PIP' ? 'Poured In Place' : 'Timber / Lumber'}
+              {t.label}{t.count > 0 ? ` (${t.count})` : ''}
             </button>
           ))}
         </div>
+        {/* Reassurance line — explains the new behavior so users coming
+            from the old toggle don't worry about data loss. */}
+        <p className="text-[11px] text-gray-500 mt-1">
+          Switching tabs only changes what you see — every wall type's entries continue to contribute to the totals.
+        </p>
       </div>
 
       {/* ── CMU Block Walls ── */}
@@ -795,29 +858,50 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
             </LabeledRow>
           </div>
 
-          {/* Waterproofing */}
+          {/* Waterproofing — multiple rows so different wall sections can
+              get different specs. "None" rows contribute nothing. */}
           <div>
             <label className="block text-xs text-gray-500 mb-1 font-medium">Waterproofing</label>
-            <div className="flex items-center gap-2 flex-wrap">
-              <select className="input text-sm py-1.5 flex-1" value={wpType} onChange={e => setWpType(e.target.value)}>
-                <option>None</option>
-                <option>Primer &amp; Membrane</option>
-                <option>3 Coats Roll On</option>
-                <option>Thoroseal &amp; Roll On</option>
-                <option>Dimple Membrane</option>
-              </select>
-              {wpType !== 'None' && <NumInput value={wpSF} onChange={setWpSF} placeholder="0" className="w-28" />}
-              {wpType !== 'None' && <span className="text-xs text-gray-400 shrink-0">SF</span>}
-              {wpType !== 'None' && (() => {
-                const wpKey = { 'Primer & Membrane':'wpPrimerMembrane','3 Coats Roll On':'wp3CoatRollOn','Thoroseal & Roll On':'wpThoroseal','Dimple Membrane':'wpDimpleMembrane' }[wpType]
-                return wpKey ? (
-                  <span className="inline-flex items-center gap-1 text-xs text-gray-400">
-                    ${r(wpKey).toFixed(2)}/SF
-                    <RateEditPopover table="material_rates" name={WALL_RATES[wpKey].db} category="Walls"
-                      unitLabel="SF" currentValue={r(wpKey)} onSaved={refreshAllRates} />
-                  </span>
-                ) : null
-              })()}
+            <div className="space-y-2">
+              {wpRows.map((row, i) => {
+                const WP_KEY = { 'Primer & Membrane':'wpPrimerMembrane','3 Coats Roll On':'wp3CoatRollOn','Thoroseal & Roll On':'wpThoroseal','Dimple Membrane':'wpDimpleMembrane' }
+                const wpKey = WP_KEY[row.type]
+                return (
+                  <div key={i} className="flex items-center gap-2 flex-wrap">
+                    <select className="input text-sm py-1.5 flex-1"
+                            value={row.type}
+                            onChange={e => updateWpRow(i, 'type', e.target.value)}>
+                      <option>None</option>
+                      <option>Primer &amp; Membrane</option>
+                      <option>3 Coats Roll On</option>
+                      <option>Thoroseal &amp; Roll On</option>
+                      <option>Dimple Membrane</option>
+                    </select>
+                    {row.type !== 'None' && (
+                      <NumInput value={row.sf} onChange={v => updateWpRow(i, 'sf', v)}
+                                placeholder="0" className="w-28" />
+                    )}
+                    {row.type !== 'None' && <span className="text-xs text-gray-400 shrink-0">SF</span>}
+                    {row.type !== 'None' && wpKey && (
+                      <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+                        ${r(wpKey).toFixed(2)}/SF
+                        <RateEditPopover table="material_rates" name={WALL_RATES[wpKey].db} category="Walls"
+                          unitLabel="SF" currentValue={r(wpKey)} onSaved={refreshAllRates} />
+                      </span>
+                    )}
+                    {wpRows.length > 1 && (
+                      <button onClick={() => removeWpRow(i)}
+                              className="text-xs text-red-400 hover:text-red-600 px-2 py-0.5 rounded border border-red-100 hover:border-red-300">
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+              <button onClick={addWpRow}
+                      className="w-full py-1.5 rounded-lg border border-dashed border-green-400 text-green-700 text-xs font-medium hover:bg-green-50 transition-colors">
+                + Add another waterproofing line
+              </button>
             </div>
           </div>
         </div>
