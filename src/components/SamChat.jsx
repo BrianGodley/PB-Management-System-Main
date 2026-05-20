@@ -141,7 +141,7 @@ export default function SamChat() {
 
       {/* Slide-in panel */}
       {open && (
-        <div className="fixed bottom-4 right-4 sm:bottom-5 sm:right-5 z-50 w-[380px] max-w-[95vw] h-[70vh] max-h-[640px] flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
+        <div className="fixed bottom-4 right-4 sm:bottom-5 sm:right-5 z-50 w-[475px] max-w-[95vw] h-[87vh] max-h-[800px] flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
           {/* Header */}
           <div className="flex items-center gap-2 px-4 py-3 flex-shrink-0" style={{ backgroundColor: FG }}>
             <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white font-bold">
@@ -210,7 +210,7 @@ export default function SamChat() {
                 }}
                 rows={1}
                 placeholder="Ask Sam about your stats, sales, costs…"
-                className="flex-1 resize-none border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700/30 focus:border-green-700 max-h-32"
+                className="flex-1 resize-none border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700/30 focus:border-green-700 max-h-40"
               />
               <button
                 onClick={send}
