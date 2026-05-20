@@ -276,34 +276,26 @@ export default function LightingModule({ onSave, onBack, saving, initialData }) 
         </select>
       </div>
 
-      {/* Difficulty */}
-      <div className="flex items-center gap-3">
-        <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Difficulty Add</label>
-        <div className="relative w-32">
-          <input
-            type="number" step="any"
-            className="input text-sm py-1.5"
-            placeholder="0"
-            value={difficulty}
+      {/* Settings */}
+      <SectionHeader title="Settings" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
+          <input type="number" step="5" value={difficulty}
             onChange={e => setDifficulty(e.target.value)}
-          />
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+            placeholder="0"
+            className="input text-sm py-1.5 w-full" />
         </div>
-      </div>
-
-      {/* Truck → Work Area (walk-access penalty input) */}
-      <div className="flex items-center gap-3">
-        <label className="text-sm font-medium text-gray-700 whitespace-nowrap" title="Average Distance from Truck to Work Area">Truck → Work Area</label>
-        <div className="relative w-32">
-          <input type="number" step="any" value={distanceLF}
+        <div>
+          <p className="text-xs text-gray-500 mb-0.5" title="Average Distance from Truck to Work Area">Truck → Work Area (Avg LF)</p>
+          <input type="number" step="5" value={distanceLF}
             onChange={e => setDistanceLF(e.target.value)}
             placeholder="0"
-            className="input text-sm py-1.5 w-full pr-12" />
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">Avg LF</span>
+            className="input text-sm py-1.5 w-full" />
+          {calc.walkHrs > 0 && (
+            <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">+{calc.walkHrs.toFixed(2)} hrs walk-access</p>
+          )}
         </div>
-        {calc.walkHrs > 0 && (
-          <span className="text-xs text-gray-500">+{calc.walkHrs.toFixed(2)} hrs walk-access</span>
-        )}
       </div>
 
       {/* ── Light Fixtures ── */}

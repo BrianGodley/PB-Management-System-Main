@@ -754,24 +754,23 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
         </div>
       )}
 
-      {/* Difficulty + Truck → Work Area */}
-      <div className="flex items-center gap-6 flex-wrap">
-        <div className="flex items-center gap-3">
-          <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Difficulty Add</label>
-          <div className="relative w-32">
-            <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
-          </div>
+      {/* Settings */}
+      <SectionHeader title="Settings" />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+          <p className="text-xs text-gray-500 mb-0.5">Difficulty (%)</p>
+          <NumInput value={difficulty} onChange={setDifficulty} placeholder="0" />
         </div>
-        <div className="flex items-center gap-3">
-          <label className="text-sm font-medium text-gray-700 whitespace-nowrap" title="Average Distance from Truck to Work Area">Truck → Work Area</label>
-          <div className="relative w-32">
-            <NumInput value={distanceLF} onChange={setDistanceLF} placeholder="0" />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">Avg LF</span>
-          </div>
+        <div>
+          <p className="text-xs text-gray-500 mb-0.5" title="Average Distance from Truck to Work Area">Truck → Work Area (Avg LF)</p>
+          <NumInput value={distanceLF} onChange={setDistanceLF} placeholder="0" />
           {calc.walkHrs > 0 && (
-            <span className="text-xs text-gray-500">+{calc.walkHrs.toFixed(2)} hrs walk-access</span>
+            <p className="text-[10px] text-gray-500 italic lowercase mt-0.5">+{calc.walkHrs.toFixed(2)} hrs walk-access</p>
           )}
+        </div>
+        <div>
+          <p className="text-xs text-gray-500 mb-0.5">Hours Adj (±hrs)</p>
+          <NumInput value={hoursAdj} onChange={setHoursAdj} placeholder="0" />
         </div>
       </div>
 
@@ -1177,13 +1176,6 @@ export default function WallsModule({ projectName, onSave, onBack, saving, initi
             ))}
           </tbody>
         </table>
-      </div>
-
-      {/* Hours Adjustment */}
-      <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-3">
-        <label className="text-sm font-medium text-gray-700 whitespace-nowrap flex-1">Hours Adjustment</label>
-        <NumInput value={hoursAdj} onChange={setHoursAdj} placeholder="0" className="w-28" />
-        <span className="text-xs text-gray-400">Net: {calc.totalHrs.toFixed(2)} hrs</span>
       </div>
 
 
