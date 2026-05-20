@@ -62,7 +62,8 @@ function columnGeometry(heightIn, widthIn) {
   return { courses, blocksWide, blocksPerCourse, totalBlocks, rebarLF, footingArea }
 }
 
-function calcColumns(state, laborRatePerHour = DEFAULTS.laborRatePerHour, materialPrices = {}, gpmd = DEFAULTS.gpmd) {
+function calcColumns(state, laborRatePerHour = DEFAULTS.laborRatePerHour, materialPrices = {}, gpmd = DEFAULTS.gpmd, walkAccess = null) {
+  const _pace = (parseFloat(walkAccess?.paceLfPerMin) || DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN)
   const { difficulty, hoursAdj, qty, heightIn, widthIn,
           finishRows, miscQty, manualRows } = state
 
