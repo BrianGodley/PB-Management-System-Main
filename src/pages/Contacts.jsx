@@ -517,13 +517,18 @@ export default function Contacts() {
   const filtered = contacts
     .filter(c => {
       if (!q) return true
-      return (
-        `${c.last_name} ${c.first_name}`.toLowerCase().includes(q) ||
-        (c.email || '').toLowerCase().includes(q) ||
-        (c.phone || '').toLowerCase().includes(q) ||
-        (c.cell || '').toLowerCase().includes(q) ||
-        (c.city || '').toLowerCase().includes(q)
-      )
+      // Token-based search so "first last" and "last, first" both work, and
+      // partial fragments match against any of the indexed fields. Numeric
+      // tokens additionally try to match against digit-only phone/cell.
+      const hay = [
+        c.first_name, c.last_name, c.email, c.city,
+      ].filter(Boolean).join(' ').toLowerCase()
+      const digits = `${(c.phone || '')} ${(c.cell || '')}`.replace(/\D/g, '')
+      return q.split(/[\s,]+/).filter(Boolean).every(t => {
+        if (hay.includes(t)) return true
+        const td = t.replace(/\D/g, '')
+        return td.length > 0 && digits.includes(td)
+      })
     })
     .sort((a, b) => {
       let av = a[sortField] || '', bv = b[sortField] || ''
@@ -533,12 +538,14 @@ export default function Contacts() {
   const filteredCompanies = companies
     .filter(c => {
       if (!q) return true
-      return (
-        (c.company_name || '').toLowerCase().includes(q) ||
-        (c.email || '').toLowerCase().includes(q) ||
-        (c.phone || '').toLowerCase().includes(q) ||
-        (c.company_city || '').toLowerCase().includes(q)
-      )
+      // Token-based, mirrors the contacts filter above.
+      const hay = [c.company_name, c.email, c.company_city].filter(Boolean).join(' ').toLowerCase()
+      const digits = (c.phone || '').replace(/\D/g, '')
+      return q.split(/[\s,]+/).filter(Boolean).every(t => {
+        if (hay.includes(t)) return true
+        const td = t.replace(/\D/g, '')
+        return td.length > 0 && digits.includes(td)
+      })
     })
     .sort((a, b) => {
       const sf = sortField === 'last_name' ? 'company_name' : sortField
