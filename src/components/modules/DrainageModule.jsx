@@ -305,10 +305,11 @@ export default function DrainageModule({ projectName, onSave, onBack, saving, in
 
 
   const calcRaw = calcDrainage(
-    { difficulty, trenchRows, pipeRows, fixtureRows, additionalItems, manualRows },
+    { difficulty, trenchRows, pipeRows, fixtureRows, additionalItems, manualRows, distanceLF },
     laborRatePerHour,
     materialPrices,
     gpmd,
+    walkAccess,
   )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored

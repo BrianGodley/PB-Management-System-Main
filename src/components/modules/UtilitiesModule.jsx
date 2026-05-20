@@ -331,8 +331,8 @@ export default function UtilitiesModule({ projectName, onSave, onBack, saving, i
 
   const calcRaw = calcUtilities(
     { difficulty, hoursAdj, trenchRows, lineRows, fixtureRows, additionalItems,
-      electricSubpanelSubCost, manualRows },
-    laborRatePerHour, materialPrices, gpmd,
+      electricSubpanelSubCost, manualRows, distanceLF },
+    laborRatePerHour, materialPrices, gpmd, walkAccess,
   )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored

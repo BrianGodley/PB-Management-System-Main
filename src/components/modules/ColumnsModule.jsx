@@ -243,8 +243,8 @@ export default function ColumnsModule({ projectName, onSave, onBack, saving, ini
 
 
   const calcRaw = calcColumns(
-    { difficulty, hoursAdj, qty, heightIn, widthIn, finishRows, miscQty, manualRows },
-    laborRatePerHour, materialPrices, gpmd,
+    { difficulty, hoursAdj, qty, heightIn, widthIn, finishRows, miscQty, manualRows, distanceLF },
+    laborRatePerHour, materialPrices, gpmd, walkAccess,
   )
   // Apply company sales tax to the module's total material cost so the
   // estimate price matches what suppliers actually invoice. Stored
