@@ -223,11 +223,13 @@ export default function RateEditPopover({
 
       {open && createPortal(
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
+          style={{ pointerEvents: 'auto' }}
           onMouseDown={e => { if (e.target === e.currentTarget) setOpen(false) }}
         >
           <div
-            className="bg-white border border-gray-200 rounded-xl shadow-2xl w-full max-w-sm p-5"
+            className="bg-white border border-gray-200 rounded-xl shadow-2xl w-full max-w-sm p-5 relative z-[10000]"
+            style={{ pointerEvents: 'auto' }}
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-start justify-between mb-3">
