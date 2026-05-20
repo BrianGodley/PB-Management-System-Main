@@ -455,6 +455,8 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
   const fmt  = v => `$${Math.round(v).toLocaleString()}`
   const fh   = v => v > 0 ? v.toFixed(2) : '—'
   const isSelf = state.dumpType === 'In-House'
+  const isSub      = state.dumpType === 'Subcontractor'
+  const isDumpSub  = !isSub && state.dispType === 'Subcontractor'
 
   const { dumpConc, dumpDirt, dumpGreen, dumpTreeStump, dumpBase } = calc
 

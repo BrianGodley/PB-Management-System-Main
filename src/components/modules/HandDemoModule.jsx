@@ -422,6 +422,8 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
   const fmt  = v => `$${Math.round(v).toLocaleString()}`
   const fh   = v => v > 0 ? v.toFixed(2) : '—'
   const isSelf = state.dumpType === 'In-House'
+  const isSub      = state.dumpType === 'Subcontractor'
+  const isDumpSub  = !isSub && state.dispType === 'Subcontractor'
 
   const dumpConc  = materialPrices['Dump Fee - Concrete']    ?? DUMP_FEE_DEFAULTS['Dump Fee - Concrete']
   const dumpDirt  = materialPrices['Dump Fee - Dirt']         ?? DUMP_FEE_DEFAULTS['Dump Fee - Dirt']
