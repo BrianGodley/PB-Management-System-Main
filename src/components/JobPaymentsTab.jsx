@@ -24,7 +24,7 @@ const dateStr = v => {
     : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-export default function JobPaymentsTab({ job }) {
+export default function JobPaymentsTab({ job, refreshKey = 0 }) {
   const allJobs = !job?.id
   const [loading, setLoading] = useState(true)
   const [rows, setRows] = useState([])
@@ -36,7 +36,7 @@ export default function JobPaymentsTab({ job }) {
 
   useEffect(() => {
     setPage(0)
-  }, [job?.id])
+  }, [job?.id, refreshKey])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -76,7 +76,7 @@ export default function JobPaymentsTab({ job }) {
 
   useEffect(() => {
     load()
-  }, [load])
+  }, [load, refreshKey])
 
   // Grand total — one server-side aggregate. Best-effort: falls back to the
   // count alone if the RPC isn't deployed yet.
@@ -139,6 +139,7 @@ export default function JobPaymentsTab({ job }) {
                   <th className="px-3 py-2">Invoice</th>
                   <th className="px-3 py-2">Method</th>
                   <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Source</th>
                   <th className="px-3 py-2 text-right">Amount</th>
                 </tr>
               </thead>
@@ -154,6 +155,17 @@ export default function JobPaymentsTab({ job }) {
                     </td>
                     <td className="px-3 py-2 text-gray-600">{p.method || '—'}</td>
                     <td className="px-3 py-2 text-gray-600">{p.status || '—'}</td>
+                    <td className="px-3 py-2">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                          p.source === 'portal'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}
+                      >
+                        {p.source === 'portal' ? 'Portal' : 'Direct'}
+                      </span>
+                    </td>
                     <td className="px-3 py-2 text-right font-medium text-gray-900">
                       {money(p.amount)}
                     </td>

@@ -1,19 +1,18 @@
 // src/components/JobFinancePanel.jsx
 //
-// The job's main Finance tab — Invoices / Payments sub-tabs plus a +Invoice
-// menu (Progress Invoice / Manual Invoice) that opens JobInvoiceCreateModal.
+// The job's main Finance tab — Invoices / Payments sub-tabs.
 //
-// Layout: the sub-tab row + +Invoice button are a CONSTANT header that never
-// scrolls; the active sub-tab fills the remaining height and scrolls on its
-// own. When no job is selected ("All Jobs") the tables show every job's rows
-// and +Invoice is disabled — a new invoice needs one specific job.
+// The action button on the right is sub-tab aware:
+//   Invoices tab → "+ Invoice"  (menu: Progress Invoice / Manual Invoice)
+//   Payments tab → "+ Payment"  (record a direct credit-card / bank / check payment)
 //
-// onOpenJobInvoice / invoiceDeepLink let the all-jobs view jump to one job's
-// invoice (clicking a job name in the table).
+// When a job isn't selected ("All Jobs") the tables span every job and the
+// action button is disabled — both need one specific job.
 import { useEffect, useRef, useState } from 'react'
 import JobFinanceTab from './JobFinanceTab'
 import JobPaymentsTab from './JobPaymentsTab'
 import JobInvoiceCreateModal from './JobInvoiceCreateModal'
+import JobPaymentEntryModal from './JobPaymentEntryModal'
 
 const SUBTABS = [
   { key: 'invoices', label: 'Invoices' },
@@ -24,17 +23,22 @@ export default function JobFinancePanel({ job, onOpenJobInvoice, invoiceDeepLink
   const [section, setSection] = useState('invoices')
   const [menuOpen, setMenuOpen] = useState(false)
   const [createMode, setCreateMode] = useState(null) // 'progress' | 'manual' | null
+  const [paymentOpen, setPaymentOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [paymentRefreshKey, setPaymentRefreshKey] = useState(0)
+  const [deepLink, setDeepLink] = useState(invoiceDeepLink || null)
   const [toast, setToast] = useState('')
   const menuRef = useRef(null)
   const hasJob = !!job?.id
 
-  // A deep-link always targets an invoice — make sure the Invoices tab is up.
+  // A deep-link from the all-jobs view targets an invoice — open the Invoices tab.
   useEffect(() => {
-    if (invoiceDeepLink) setSection('invoices')
+    if (invoiceDeepLink) {
+      setDeepLink(invoiceDeepLink)
+      setSection('invoices')
+    }
   }, [invoiceDeepLink])
 
-  // Close the +Invoice menu on any outside click.
   useEffect(() => {
     if (!menuOpen) return
     const onDoc = e => {
@@ -44,7 +48,6 @@ export default function JobFinancePanel({ job, onOpenJobInvoice, invoiceDeepLink
     return () => document.removeEventListener('mousedown', onDoc)
   }, [menuOpen])
 
-  // Auto-dismiss the success toast.
   useEffect(() => {
     if (!toast) return
     const t = setTimeout(() => setToast(''), 6000)
@@ -53,7 +56,7 @@ export default function JobFinancePanel({ job, onOpenJobInvoice, invoiceDeepLink
 
   return (
     <div className="flex h-full flex-col">
-      {/* Constant header — sub-tabs + +Invoice. Never scrolls. */}
+      {/* Constant header — sub-tabs + action button. Never scrolls. */}
       <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-200 px-5 pt-3">
         <div className="flex gap-1">
           {SUBTABS.map(t => (
@@ -72,35 +75,48 @@ export default function JobFinancePanel({ job, onOpenJobInvoice, invoiceDeepLink
         </div>
 
         <div className="relative pb-2" ref={menuRef}>
-          <button
-            onClick={() => hasJob && setMenuOpen(o => !o)}
-            disabled={!hasJob}
-            title={hasJob ? 'Create an invoice' : 'Select a job to create an invoice'}
-            className="rounded-lg bg-green-700 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            + Invoice
-          </button>
-          {menuOpen && hasJob && (
-            <div className="absolute right-0 z-20 mt-1 w-48 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+          {section === 'invoices' ? (
+            <>
               <button
-                onClick={() => {
-                  setMenuOpen(false)
-                  setCreateMode('progress')
-                }}
-                className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                onClick={() => hasJob && setMenuOpen(o => !o)}
+                disabled={!hasJob}
+                title={hasJob ? 'Create an invoice' : 'Select a job to create an invoice'}
+                className="rounded-lg bg-green-700 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                Progress Invoice
+                + Invoice
               </button>
-              <button
-                onClick={() => {
-                  setMenuOpen(false)
-                  setCreateMode('manual')
-                }}
-                className="block w-full border-t border-gray-100 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-              >
-                Manual Invoice
-              </button>
-            </div>
+              {menuOpen && hasJob && (
+                <div className="absolute right-0 z-20 mt-1 w-48 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+                  <button
+                    onClick={() => {
+                      setMenuOpen(false)
+                      setCreateMode('progress')
+                    }}
+                    className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    Progress Invoice
+                  </button>
+                  <button
+                    onClick={() => {
+                      setMenuOpen(false)
+                      setCreateMode('manual')
+                    }}
+                    className="block w-full border-t border-gray-100 px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    Manual Invoice
+                  </button>
+                </div>
+              )}
+            </>
+          ) : (
+            <button
+              onClick={() => hasJob && setPaymentOpen(true)}
+              disabled={!hasJob}
+              title={hasJob ? 'Record a payment' : 'Select a job to record a payment'}
+              className="rounded-lg bg-green-700 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              + Payment
+            </button>
           )}
         </div>
       </div>
@@ -118,10 +134,12 @@ export default function JobFinancePanel({ job, onOpenJobInvoice, invoiceDeepLink
             job={job}
             refreshKey={refreshKey}
             onOpenJobInvoice={onOpenJobInvoice}
-            invoiceDeepLink={invoiceDeepLink}
+            invoiceDeepLink={deepLink}
           />
         )}
-        {section === 'payments' && <JobPaymentsTab job={job} />}
+        {section === 'payments' && (
+          <JobPaymentsTab job={job} refreshKey={paymentRefreshKey} />
+        )}
       </div>
 
       {createMode && job?.id && (
@@ -129,11 +147,26 @@ export default function JobFinancePanel({ job, onOpenJobInvoice, invoiceDeepLink
           job={job}
           mode={createMode}
           onClose={() => setCreateMode(null)}
-          onCreated={msg => {
+          onCreated={(invoiceId, msg) => {
             setCreateMode(null)
             setSection('invoices')
             setRefreshKey(k => k + 1)
             setToast(msg || 'Invoice created.')
+            // Re-open as the saved invoice so the user sees the finished record.
+            if (invoiceId) setDeepLink({ invoiceId, ts: Date.now() })
+          }}
+        />
+      )}
+
+      {paymentOpen && job?.id && (
+        <JobPaymentEntryModal
+          job={job}
+          onClose={() => setPaymentOpen(false)}
+          onSaved={() => {
+            setPaymentOpen(false)
+            setSection('payments')
+            setPaymentRefreshKey(k => k + 1)
+            setToast('Payment recorded.')
           }}
         />
       )}

@@ -2,12 +2,12 @@
 //
 // Modal for creating a new invoice on a job. Opened from the +Invoice menu.
 // Two modes: progress (percentage-of-completion off the sold bid's modules)
-// and manual (ad-hoc title + amount + due date).
+// and manual (ad-hoc title + amount).
 //
 // The invoice number / Invoice ID is auto-assigned per client by a database
-// trigger, so this modal never sends invoice_number — it just shows
-// "(auto assigned)". A client-visible Description and file attachments can be
-// added; attachments are staged here and uploaded once the invoice row exists.
+// trigger. Due Date defaults to the Monday of the following week (editable).
+// A client-visible Description and file attachments can be added; attachments
+// are staged here and uploaded once the invoice row exists.
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { uploadInvoiceFile, fileSizeLabel } from '../lib/invoiceFiles'
@@ -24,6 +24,13 @@ const dateStr = v => {
     ? '—'
     : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
+// Monday of the following week, as a yyyy-mm-dd string.
+function nextWeekMonday() {
+  const d = new Date()
+  const dow = (d.getDay() + 6) % 7 // 0 = Mon … 6 = Sun
+  d.setDate(d.getDate() - dow + 7)
+  return d.toISOString().slice(0, 10)
+}
 
 export default function JobInvoiceCreateModal({ job, mode: initialMode, onClose, onCreated }) {
   const [mode, setMode] = useState(initialMode === 'manual' ? 'manual' : 'progress')
@@ -35,12 +42,12 @@ export default function JobInvoiceCreateModal({ job, mode: initialMode, onClose,
   const [confirmOpen, setConfirmOpen] = useState(false)
   // shared fields
   const [description, setDescription] = useState('')
+  const [dueDate, setDueDate] = useState(nextWeekMonday())
   const [files, setFiles] = useState([]) // staged File objects
   const fileInputRef = useRef(null)
   // manual invoice fields
   const [mTitle, setMTitle] = useState('')
   const [mAmount, setMAmount] = useState('')
-  const [mDue, setMDue] = useState('')
 
   async function load() {
     setLoading(true)
@@ -75,7 +82,6 @@ export default function JobInvoiceCreateModal({ job, mode: initialMode, onClose,
       }
     }
 
-    // prior % invoiced per module
     const { data: invs } = await supabase
       .from('job_invoices')
       .select('id, status, job_invoice_lines(module_id, this_pct)')
@@ -116,7 +122,6 @@ export default function JobInvoiceCreateModal({ job, mode: initialMode, onClose,
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  // Uploads every staged file against the freshly-created invoice.
   async function uploadStaged(invoiceId) {
     if (files.length === 0) return null
     const { data: u } = await supabase.auth.getUser()
@@ -146,6 +151,7 @@ export default function JobInvoiceCreateModal({ job, mode: initialMode, onClose,
         title: `Progress billing — ${dateStr(new Date())}`,
         description: description.trim() || null,
         amount: invoiceTotal,
+        due_date: dueDate || null,
         status: 'draft',
         is_manual: false,
         created_by: user?.user?.id || null,
@@ -177,6 +183,7 @@ export default function JobInvoiceCreateModal({ job, mode: initialMode, onClose,
     const upWarn = await uploadStaged(inv.id)
     setBusy(false)
     onCreated?.(
+      inv.id,
       `Invoice ${inv.invoice_number || ''} created for ${money(invoiceTotal)}.` +
         (upWarn ? ` (${upWarn})` : '')
     )
@@ -197,7 +204,7 @@ export default function JobInvoiceCreateModal({ job, mode: initialMode, onClose,
         title: mTitle.trim(),
         description: description.trim() || null,
         amount: num(mAmount),
-        due_date: mDue || null,
+        due_date: dueDate || null,
         status: 'draft',
         is_manual: true,
         created_by: user?.user?.id || null,
@@ -212,6 +219,7 @@ export default function JobInvoiceCreateModal({ job, mode: initialMode, onClose,
     const upWarn = await uploadStaged(inv.id)
     setBusy(false)
     onCreated?.(
+      inv.id,
       `Invoice ${inv.invoice_number || ''} created for ${money(num(mAmount))}.` +
         (upWarn ? ` (${upWarn})` : '')
     )
@@ -372,34 +380,41 @@ export default function JobInvoiceCreateModal({ job, mode: initialMode, onClose,
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-green-600 focus:outline-none"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-xs text-gray-400">Amount</label>
+              <div>
+                <label className="mb-1 block text-xs text-gray-400">Amount</label>
+                <div className="flex items-center rounded-lg border border-gray-200 focus-within:border-green-600">
+                  <span className="pl-3 text-sm text-gray-400">$</span>
                   <input
-                    type="number"
-                    min="0"
+                    type="text"
+                    inputMode="decimal"
                     value={mAmount}
-                    onChange={e => setMAmount(e.target.value)}
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-green-600 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs text-gray-400">Due Date</label>
-                  <input
-                    type="date"
-                    value={mDue}
-                    onChange={e => setMDue(e.target.value)}
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-green-600 focus:outline-none"
+                    onChange={e => setMAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                    placeholder="0.00"
+                    className="w-full rounded-lg border-0 bg-transparent px-2 py-2 text-sm focus:outline-none"
                   />
                 </div>
               </div>
             </div>
           )}
 
+          {/* Due Date — defaults to the Monday of the following week */}
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Due Date
+            </label>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={e => setDueDate(e.target.value)}
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-green-600 focus:outline-none"
+            />
+          </div>
+
           {/* Description — visible to the client in their portal */}
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
-              Description <span className="font-normal normal-case text-gray-400">(the client sees this)</span>
+              Description{' '}
+              <span className="font-normal normal-case text-gray-400">(the client sees this)</span>
             </label>
             <textarea
               value={description}

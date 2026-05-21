@@ -227,13 +227,16 @@ export default function JobInvoiceDetailModal({ invoiceId, onClose, onChanged })
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="mb-1 block text-xs text-gray-400">Amount</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={amount}
-                    onChange={e => setAmount(e.target.value)}
-                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-green-600 focus:outline-none"
-                  />
+                  <div className="flex items-center rounded-lg border border-gray-200 focus-within:border-green-600">
+                    <span className="pl-3 text-sm text-gray-400">$</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={amount}
+                      onChange={e => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                      className="w-full rounded-lg border-0 bg-transparent px-2 py-2 text-sm focus:outline-none"
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="mb-1 block text-xs text-gray-400">Due Date</label>

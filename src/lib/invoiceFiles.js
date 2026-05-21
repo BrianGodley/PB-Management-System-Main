@@ -2,7 +2,7 @@
 //
 // Shared helpers for invoice attachments. Files live in the existing
 // 'job-files' Storage bucket (same bucket CO + job attachments use) and are
-// tracked as job_files rows with invoice_id set, file_category 'invoice'.
+// tracked as job_files rows with invoice_id set.
 import { supabase } from './supabase'
 
 const BUCKET = 'job-files'
@@ -31,7 +31,7 @@ export async function uploadInvoiceFile(invoiceId, jobId, file, userId) {
       invoice_id: invoiceId,
       file_name: file.name,
       file_type: file.type || null,
-      file_category: 'invoice',
+      file_category: 'document',
       storage_path: path,
       file_size: file.size,
       uploaded_by: userId || null,
