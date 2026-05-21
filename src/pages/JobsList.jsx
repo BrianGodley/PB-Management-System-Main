@@ -1073,8 +1073,14 @@ export default function JobsList() {
   return (
     <div className="flex flex-col h-full">
       {/* ── Page title ────────────────────────────────────────── */}
-      <div className="mb-4 flex-shrink-0">
-        <h1 className="text-xl font-bold text-gray-900">Jobs</h1>
+      <div className="mb-4 flex-shrink-0 flex items-baseline gap-2 min-w-0">
+        <h1 className="text-xl font-bold text-gray-900 flex-shrink-0">Jobs</h1>
+        <span className="text-gray-300 flex-shrink-0">/</span>
+        <span className="text-lg font-semibold text-green-700 truncate">
+          {selectedJob === ALL_JOBS
+            ? 'All Jobs'
+            : selectedJobObj?.name || selectedJobObj?.client_name || '—'}
+        </span>
       </div>
 
       {/* ── Mobile: job selector dropdown ─────────────────────── */}
@@ -1157,6 +1163,18 @@ export default function JobsList() {
                 onChange={e => setSearch(e.target.value)}
                 className="input text-xs mb-2 py-1.5 flex-shrink-0 text-center"
               />
+
+              {/* All Jobs — frozen above the scrolling list so it stays reachable */}
+              <button
+                onClick={() => setSelectedJob(ALL_JOBS)}
+                className={`w-full text-center px-3 h-[25px] rounded-lg text-xs font-medium transition-colors border mb-1 flex-shrink-0 ${
+                  selectedJob === ALL_JOBS
+                    ? 'bg-green-50 border-green-200 text-green-800'
+                    : 'border-gray-200 text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+                }`}
+              >
+                All Jobs
+              </button>
             </div>
             {/* end centered controls column */}
 
@@ -1170,18 +1188,6 @@ export default function JobsList() {
                 onScroll={onJobsListScroll}
                 className="overflow-y-auto flex-1 w-[90%] mx-auto"
               >
-                {/* All Jobs button — 30% shorter than the original (h-[25px]) */}
-                <button
-                  onClick={() => setSelectedJob(ALL_JOBS)}
-                  className={`w-full text-center px-3 h-[25px] rounded-lg text-xs font-medium transition-colors border mb-1 ${
-                    selectedJob === ALL_JOBS
-                      ? 'bg-green-50 border-green-200 text-green-800'
-                      : 'border-transparent text-gray-500 hover:bg-gray-100 hover:text-gray-700'
-                  }`}
-                >
-                  All Jobs
-                </button>
-
                 {/* Stage groups */}
                 {(() => {
                   // Build lookup: stageId → jobs, then alpha-numeric sort within each stage

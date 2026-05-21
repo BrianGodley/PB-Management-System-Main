@@ -5,9 +5,9 @@
 // Each tab pulls its data through a security-definer portal_* RPC that is
 // scoped to this client and gated by the matching permission flag.
 //
-// Phase 1: read-only Client Information / Schedule / Daily Logs / Change
-// Orders, plus an Invoices table. The payment modal UI is in place; live
-// Helcim card/ACH processing is wired in a later phase.
+// The first tab is a Dashboard: client data on the left, with Project
+// Financials, Daily Logs and Schedule stacked on the right (each section only
+// shows when the matching permission is granted).
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -51,8 +51,58 @@ function rpcArgs() {
   return p ? { p_client_id: p } : {}
 }
 
-// ── Client Information ───────────────────────────────────────────────────────
-function ClientInfoView({ client, jobs }) {
+// ── Project Financials (dashboard card) ──────────────────────────────────────
+// Rolls the client's invoices + payments into three headline numbers.
+function ProjectFinancialsCard() {
+  const [data, setData] = useState(null)
+  useEffect(() => {
+    Promise.all([
+      supabase.rpc('portal_invoices', rpcArgs()),
+      supabase.rpc('portal_payments', rpcArgs()),
+    ]).then(([inv, pay]) => {
+      const invoices = inv.data || []
+      const payments = pay.data || []
+      const invoiced = invoices.reduce(
+        (s, i) => s + (Number(pick(i, 'amount', 'total')) || 0),
+        0
+      )
+      const paid = payments.reduce((s, p) => s + (Number(p.amount) || 0), 0)
+      setData({ invoiced, paid, balance: invoiced - paid, count: invoices.length })
+    })
+  }, [])
+  const tiles = [
+    ['Total Invoiced', data ? money(data.invoiced) : '—', false],
+    ['Total Paid', data ? money(data.paid) : '—', false],
+    ['Balance Due', data ? money(data.balance) : '—', true],
+  ]
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-5">
+      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+        Project Financials
+      </p>
+      <div className="grid grid-cols-3 gap-3">
+        {tiles.map(([label, val, accent]) => (
+          <div key={label} className={`rounded-lg p-3 ${accent ? 'bg-green-50' : 'bg-gray-50'}`}>
+            <p className="text-xs text-gray-400">{label}</p>
+            <p
+              className={`mt-1 text-lg font-bold ${accent ? 'text-green-700' : 'text-gray-900'}`}
+            >
+              {val}
+            </p>
+          </div>
+        ))}
+      </div>
+      {data && (
+        <p className="mt-3 text-xs text-gray-400">
+          {data.count} invoice{data.count === 1 ? '' : 's'} on file.
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ── Dashboard ────────────────────────────────────────────────────────────────
+function DashboardView({ client, jobs, portal }) {
   const name =
     pick(client, 'name') ||
     [pick(client, 'first_name'), pick(client, 'last_name')].filter(Boolean).join(' ') ||
@@ -70,35 +120,71 @@ function ClientInfoView({ client, jobs }) {
         .join(', '),
     ],
   ]
+  const showFinancials = !!portal?.perm_invoices
+  const showLogs = !!portal?.perm_daily_logs
+  const showSchedule = !!portal?.perm_schedule
+
   return (
-    <div className="space-y-5">
-      <div className="rounded-xl border border-gray-200 bg-white p-5">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
-          Your Information
-        </p>
-        <div className="space-y-2">
-          {rows.map(([label, val]) => (
-            <div key={label} className="grid grid-cols-3 gap-2">
-              <span className="text-xs text-gray-400">{label}</span>
-              <span className="col-span-2 text-sm text-gray-800">{val || '—'}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="rounded-xl border border-gray-200 bg-white p-5">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
-          Your Projects
-        </p>
-        {jobs.length === 0 ? (
-          <p className="text-sm text-gray-400">No projects on file.</p>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {jobs.map(j => (
-              <div key={j.id} className="flex items-center justify-between py-2">
-                <span className="text-sm text-gray-800">{pick(j, 'name', 'client_name') || 'Project'}</span>
-                <span className="text-xs text-gray-400">{pick(j, 'status') || ''}</span>
+    <div className="grid gap-5 lg:grid-cols-[300px_1fr]">
+      {/* Left — client data */}
+      <aside className="space-y-5">
+        <div className="rounded-xl border border-gray-200 bg-white p-5">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            Your Information
+          </p>
+          <div className="space-y-3">
+            {rows.map(([label, val]) => (
+              <div key={label}>
+                <p className="text-xs text-gray-400">{label}</p>
+                <p className="text-sm text-gray-800">{val || '—'}</p>
               </div>
             ))}
+          </div>
+        </div>
+        <div className="rounded-xl border border-gray-200 bg-white p-5">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            Your Projects
+          </p>
+          {jobs.length === 0 ? (
+            <p className="text-sm text-gray-400">No projects on file.</p>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {jobs.map(j => (
+                <div key={j.id} className="flex items-center justify-between py-2">
+                  <span className="text-sm text-gray-800">
+                    {pick(j, 'name', 'client_name') || 'Project'}
+                  </span>
+                  <span className="text-xs capitalize text-gray-400">
+                    {pick(j, 'status') || ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </aside>
+
+      {/* Right — financials, logs, schedule */}
+      <div className="space-y-6">
+        {showFinancials && <ProjectFinancialsCard />}
+
+        {showLogs && (
+          <section>
+            <h2 className="mb-2 text-sm font-bold text-gray-800">Recent Daily Logs</h2>
+            <DailyLogsView limit={3} />
+          </section>
+        )}
+
+        {showSchedule && (
+          <section>
+            <h2 className="mb-2 text-sm font-bold text-gray-800">Schedule</h2>
+            <ScheduleView />
+          </section>
+        )}
+
+        {!showFinancials && !showLogs && !showSchedule && (
+          <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-400">
+            Welcome to your project portal.
           </div>
         )}
       </div>
@@ -231,16 +317,17 @@ function ScheduleView() {
 }
 
 // ── Daily Logs ───────────────────────────────────────────────────────────────
-function DailyLogsView() {
+function DailyLogsView({ limit }) {
   const [rows, setRows] = useState(null)
   useEffect(() => {
     supabase.rpc('portal_daily_logs', rpcArgs()).then(({ data }) => setRows(data || []))
   }, [])
   if (rows === null) return <Loading />
   if (rows.length === 0) return <Empty label="No daily logs yet." />
+  const shown = limit ? rows.slice(0, limit) : rows
   return (
     <div className="space-y-3">
-      {rows.map(d => (
+      {shown.map(d => (
         <div key={d.id} className="rounded-xl border border-gray-200 bg-white p-4">
           <div className="mb-1 flex items-center justify-between">
             <span className="text-sm font-semibold text-gray-800">
@@ -255,6 +342,11 @@ function DailyLogsView() {
           </p>
         </div>
       ))}
+      {limit && rows.length > limit && (
+        <p className="text-center text-xs text-gray-400">
+          Showing {limit} of {rows.length} — open the Daily Logs tab to see them all.
+        </p>
+      )}
     </div>
   )
 }
@@ -412,7 +504,7 @@ function PaymentModal({ invoice, job, client, onClose }) {
     pick(client, 'name') ||
     [pick(client, 'first_name'), pick(client, 'last_name')].filter(Boolean).join(' ') ||
     pick(client, 'company_name') ||
-    '\u2014'
+    '—'
   const balance = money(pick(invoice, 'balance_due', 'balance', 'amount_due', 'total', 'amount'))
   const info = [
     ['Project', pick(job, 'name', 'client_name')],
@@ -522,7 +614,7 @@ function PaymentModal({ invoice, job, client, onClose }) {
               {info.map(([label, val]) => (
                 <div key={label} className="flex justify-between py-0.5 text-xs">
                   <span className="text-gray-400">{label}</span>
-                  <span className="font-medium text-gray-700">{val || '\u2014'}</span>
+                  <span className="font-medium text-gray-700">{val || '—'}</span>
                 </div>
               ))}
               <div className="mt-2 flex justify-between border-t border-gray-200 pt-2">
@@ -619,8 +711,8 @@ function PaymentsView() {
           {rows.map(p => (
             <tr key={p.id}>
               <td className="px-4 py-2.5 text-gray-600">{dateStr(pick(p, 'payment_date'))}</td>
-              <td className="px-4 py-2.5 text-gray-600">{pick(p, 'method') || '\u2014'}</td>
-              <td className="px-4 py-2.5 text-gray-600">{pick(p, 'status') || '\u2014'}</td>
+              <td className="px-4 py-2.5 text-gray-600">{pick(p, 'method') || '—'}</td>
+              <td className="px-4 py-2.5 text-gray-600">{pick(p, 'status') || '—'}</td>
               <td className="px-4 py-2.5 text-right font-medium text-gray-900">
                 {money(pick(p, 'amount'))}
               </td>
@@ -644,7 +736,7 @@ function PaymentsView() {
 
 // ── Shell ────────────────────────────────────────────────────
 const ALL_TABS = [
-  { key: 'info', label: 'Client Information', perm: null },
+  { key: 'info', label: 'Dashboard', perm: null },
   { key: 'schedule', label: 'Schedule', perm: 'perm_schedule' },
   { key: 'logs', label: 'Daily Logs', perm: 'perm_daily_logs' },
   { key: 'cos', label: 'Change Orders', perm: 'perm_change_orders' },
@@ -738,27 +830,32 @@ export default function PortalShell() {
             Sign Out
           </button>
         </div>
-        {/* Tab bar — across the middle */}
-        <div className="mx-auto flex max-w-5xl gap-1 px-3">
+      </header>
+
+      {/* Tab bar — large full-width rectangle buttons across the top */}
+      <nav className="border-b border-gray-200 bg-white">
+        <div className="mx-auto flex max-w-5xl flex-wrap gap-2 px-5 py-3">
           {tabs.map(t => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`rounded-t-lg px-4 py-2 text-sm font-medium transition-colors ${
+              className={`min-w-[120px] flex-1 rounded-xl border px-3 py-3 text-sm font-semibold transition-colors ${
                 activeTab === t.key
-                  ? 'bg-gray-100 text-gray-900'
-                  : 'text-white/80 hover:bg-white/10'
+                  ? 'border-green-700 bg-green-700 text-white shadow-sm'
+                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
               }`}
             >
               {t.label}
             </button>
           ))}
         </div>
-      </header>
+      </nav>
 
       {/* Content */}
       <main className="mx-auto max-w-5xl px-5 py-6">
-        {activeTab === 'info' && <ClientInfoView client={client} jobs={jobs} />}
+        {activeTab === 'info' && (
+          <DashboardView client={client} jobs={jobs} portal={portal} />
+        )}
         {activeTab === 'schedule' && <ScheduleView />}
         {activeTab === 'logs' && <DailyLogsView />}
         {activeTab === 'cos' && <ChangeOrdersView />}
