@@ -381,54 +381,69 @@ export default function JobFinanceTab({ job }) {
         {invoices.length === 0 ? (
           <p className="text-sm text-gray-400">No invoices yet.</p>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-gray-200">
+          <div className="overflow-x-auto rounded-xl border border-gray-200">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                 <tr>
                   <th className="px-3 py-2">Invoice #</th>
                   <th className="px-3 py-2">Title</th>
-                  <th className="px-3 py-2">Created</th>
-                  <th className="px-3 py-2 text-right">Amount</th>
                   <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2 text-right">Amount</th>
+                  <th className="px-3 py-2 text-right">Paid</th>
+                  <th className="px-3 py-2 text-right">Balance Due</th>
+                  <th className="px-3 py-2">Due Date</th>
+                  <th className="px-3 py-2">Date Paid</th>
                   <th className="px-3 py-2 text-right">&nbsp;</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {invoices.map(inv => (
-                  <tr key={inv.id}>
-                    <td className="px-3 py-2 font-medium text-gray-800">{inv.invoice_number}</td>
-                    <td className="px-3 py-2 text-gray-600">{inv.title}</td>
-                    <td className="px-3 py-2 text-gray-500">{dateStr(inv.invoice_date || inv.created_at)}</td>
-                    <td className="px-3 py-2 text-right text-gray-800">{money(inv.amount)}</td>
-                    <td className="px-3 py-2">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                          STATUS_CLS[inv.status] || STATUS_CLS.draft
-                        }`}
-                      >
-                        {inv.status}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      {inv.status === 'draft' && (
-                        <button
-                          onClick={() => setInvoiceStatus(inv, 'sent')}
-                          className="rounded-lg border border-blue-200 px-2.5 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50"
+                {invoices.map(inv => {
+                  const bal = num(inv.amount) - num(inv.amount_paid)
+                  return (
+                    <tr key={inv.id}>
+                      <td className="px-3 py-2 font-medium text-gray-800">
+                        {inv.invoice_number}
+                      </td>
+                      <td className="px-3 py-2 text-gray-600">{inv.title}</td>
+                      <td className="px-3 py-2">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                            STATUS_CLS[inv.status] || STATUS_CLS.draft
+                          }`}
                         >
-                          Send to Client
-                        </button>
-                      )}
-                      {inv.status === 'sent' && (
-                        <button
-                          onClick={() => setInvoiceStatus(inv, 'paid')}
-                          className="rounded-lg border border-green-200 px-2.5 py-1 text-xs font-semibold text-green-700 hover:bg-green-50"
-                        >
-                          Mark Paid
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                          {inv.status}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-right text-gray-800">{money(inv.amount)}</td>
+                      <td className="px-3 py-2 text-right text-gray-600">
+                        {money(inv.amount_paid)}
+                      </td>
+                      <td className="px-3 py-2 text-right font-medium text-gray-900">
+                        {money(bal)}
+                      </td>
+                      <td className="px-3 py-2 text-gray-500">{dateStr(inv.due_date)}</td>
+                      <td className="px-3 py-2 text-gray-500">{dateStr(inv.paid_date)}</td>
+                      <td className="px-3 py-2 text-right">
+                        {inv.status === 'draft' && (
+                          <button
+                            onClick={() => setInvoiceStatus(inv, 'sent')}
+                            className="rounded-lg border border-blue-200 px-2.5 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-50"
+                          >
+                            Send to Client
+                          </button>
+                        )}
+                        {inv.status === 'sent' && (
+                          <button
+                            onClick={() => setInvoiceStatus(inv, 'paid')}
+                            className="rounded-lg border border-green-200 px-2.5 py-1 text-xs font-semibold text-green-700 hover:bg-green-50"
+                          >
+                            Mark Paid
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
