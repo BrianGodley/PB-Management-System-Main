@@ -1,15 +1,16 @@
 // src/components/JobInvoiceCreateModal.jsx
 //
-// Modal for creating a new invoice on a job. Opened from the +Invoice menu
-// on the Finance tab. Two modes:
-//   progress -> percentage-of-completion billing off the sold bid's modules
-//   manual   -> ad-hoc title + amount + due date
+// Modal for creating a new invoice on a job. Opened from the +Invoice menu.
+// Two modes: progress (percentage-of-completion off the sold bid's modules)
+// and manual (ad-hoc title + amount + due date).
 //
-// Pulls the job's sold bid -> estimate -> projects -> modules. Each module is a
-// billable line at its total_price. Staff enter a cumulative "% complete" per
-// module; the modal shows the % already invoiced and bills only the delta.
-import { Fragment, useEffect, useState } from 'react'
+// The invoice number / Invoice ID is auto-assigned per client by a database
+// trigger, so this modal never sends invoice_number — it just shows
+// "(auto assigned)". A client-visible Description and file attachments can be
+// added; attachments are staged here and uploaded once the invoice row exists.
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { uploadInvoiceFile, fileSizeLabel } from '../lib/invoiceFiles'
 
 const num = v => {
   const n = parseFloat(v)
@@ -28,11 +29,14 @@ export default function JobInvoiceCreateModal({ job, mode: initialMode, onClose,
   const [mode, setMode] = useState(initialMode === 'manual' ? 'manual' : 'progress')
   const [loading, setLoading] = useState(true)
   const [modules, setModules] = useState([]) // {id, project_name, module_name, amount, prior_pct}
-  const [invoiceCount, setInvoiceCount] = useState(0)
   const [pct, setPct] = useState({}) // module_id -> new % (string)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [confirmOpen, setConfirmOpen] = useState(false)
+  // shared fields
+  const [description, setDescription] = useState('')
+  const [files, setFiles] = useState([]) // staged File objects
+  const fileInputRef = useRef(null)
   // manual invoice fields
   const [mTitle, setMTitle] = useState('')
   const [mAmount, setMAmount] = useState('')
@@ -41,7 +45,6 @@ export default function JobInvoiceCreateModal({ job, mode: initialMode, onClose,
   async function load() {
     setLoading(true)
     setError('')
-    // 1) the job's most recent contract bid (prefer a sold one)
     const { data: bids } = await supabase
       .from('bids')
       .select('id, estimate_id, status, created_at')
@@ -53,7 +56,6 @@ export default function JobInvoiceCreateModal({ job, mode: initialMode, onClose,
       (bids || []).find(b => b.estimate_id) ||
       null
 
-    // 2) modules from that estimate, grouped by project
     let mods = []
     if (bid?.estimate_id) {
       const { data: projects } = await supabase
@@ -73,7 +75,7 @@ export default function JobInvoiceCreateModal({ job, mode: initialMode, onClose,
       }
     }
 
-    // 3) existing invoices + lines -> prior % invoiced per module
+    // prior % invoiced per module
     const { data: invs } = await supabase
       .from('job_invoices')
       .select('id, status, job_invoice_lines(module_id, this_pct)')
@@ -89,7 +91,6 @@ export default function JobInvoiceCreateModal({ job, mode: initialMode, onClose,
     mods = mods.map(m => ({ ...m, prior_pct: priorByModule[m.id] || 0 }))
 
     setModules(mods)
-    setInvoiceCount((invs || []).length)
     setPct(Object.fromEntries(mods.map(m => [m.id, String(m.prior_pct)])))
     setLoading(false)
   }
@@ -109,6 +110,24 @@ export default function JobInvoiceCreateModal({ job, mode: initialMode, onClose,
   const byProject = {}
   for (const l of lines) (byProject[l.project_name] = byProject[l.project_name] || []).push(l)
 
+  function addFiles(e) {
+    const picked = Array.from(e.target.files || [])
+    if (picked.length) setFiles(prev => [...prev, ...picked])
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  // Uploads every staged file against the freshly-created invoice.
+  async function uploadStaged(invoiceId) {
+    if (files.length === 0) return null
+    const { data: u } = await supabase.auth.getUser()
+    let failed = 0
+    for (const f of files) {
+      const { error: e } = await uploadInvoiceFile(invoiceId, job.id, f, u?.user?.id)
+      if (e) failed++
+    }
+    return failed ? `${failed} attachment(s) failed to upload` : null
+  }
+
   async function createProgressInvoice() {
     setConfirmOpen(false)
     setBusy(true)
@@ -124,8 +143,8 @@ export default function JobInvoiceCreateModal({ job, mode: initialMode, onClose,
       .from('job_invoices')
       .insert({
         job_id: job.id,
-        invoice_number: `INV-${String(invoiceCount + 1).padStart(4, '0')}`,
         title: `Progress billing — ${dateStr(new Date())}`,
+        description: description.trim() || null,
         amount: invoiceTotal,
         status: 'draft',
         is_manual: false,
@@ -150,12 +169,17 @@ export default function JobInvoiceCreateModal({ job, mode: initialMode, onClose,
       sort_order: i,
     }))
     const { error: e2 } = await supabase.from('job_invoice_lines').insert(lineRows)
-    setBusy(false)
     if (e2) {
+      setBusy(false)
       setError(`Invoice created but lines failed: ${e2.message}`)
       return
     }
-    onCreated?.(`Draft invoice ${inv.invoice_number} created for ${money(invoiceTotal)}.`)
+    const upWarn = await uploadStaged(inv.id)
+    setBusy(false)
+    onCreated?.(
+      `Invoice ${inv.invoice_number || ''} created for ${money(invoiceTotal)}.` +
+        (upWarn ? ` (${upWarn})` : '')
+    )
   }
 
   async function createManualInvoice() {
@@ -170,8 +194,8 @@ export default function JobInvoiceCreateModal({ job, mode: initialMode, onClose,
       .from('job_invoices')
       .insert({
         job_id: job.id,
-        invoice_number: `INV-${String(invoiceCount + 1).padStart(4, '0')}`,
         title: mTitle.trim(),
+        description: description.trim() || null,
         amount: num(mAmount),
         due_date: mDue || null,
         status: 'draft',
@@ -180,12 +204,17 @@ export default function JobInvoiceCreateModal({ job, mode: initialMode, onClose,
       })
       .select()
       .single()
-    setBusy(false)
     if (e) {
+      setBusy(false)
       setError(e.message)
       return
     }
-    onCreated?.(`Draft invoice ${inv.invoice_number} created for ${money(num(mAmount))}.`)
+    const upWarn = await uploadStaged(inv.id)
+    setBusy(false)
+    onCreated?.(
+      `Invoice ${inv.invoice_number || ''} created for ${money(num(mAmount))}.` +
+        (upWarn ? ` (${upWarn})` : '')
+    )
   }
 
   return (
@@ -237,12 +266,20 @@ export default function JobInvoiceCreateModal({ job, mode: initialMode, onClose,
         </div>
 
         {/* body */}
-        <div className="flex-1 overflow-y-auto px-5 py-4">
+        <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
           {error && (
-            <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
               {error}
             </div>
           )}
+
+          {/* Invoice ID — auto-assigned per client by the database */}
+          <div className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Invoice ID
+            </span>
+            <span className="text-sm font-medium italic text-gray-400">(auto assigned)</span>
+          </div>
 
           {mode === 'progress' &&
             (loading ? (
@@ -358,6 +395,58 @@ export default function JobInvoiceCreateModal({ job, mode: initialMode, onClose,
               </div>
             </div>
           )}
+
+          {/* Description — visible to the client in their portal */}
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Description <span className="font-normal normal-case text-gray-400">(the client sees this)</span>
+            </label>
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              rows={3}
+              placeholder="What this invoice covers — shown to the client on their invoice."
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-green-600 focus:outline-none"
+            />
+          </div>
+
+          {/* Attachments */}
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Attachments
+            </label>
+            <div className="space-y-2 rounded-xl border border-gray-200 p-3">
+              {files.length === 0 && (
+                <p className="text-xs text-gray-400">
+                  No files attached. The client can download anything you add here.
+                </p>
+              )}
+              {files.map((f, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-1.5"
+                >
+                  <span className="truncate text-sm text-gray-700">
+                    {f.name}{' '}
+                    <span className="text-xs text-gray-400">{fileSizeLabel(f.size)}</span>
+                  </span>
+                  <button
+                    onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))}
+                    className="ml-3 text-xs font-semibold text-red-500 hover:text-red-700"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              <input ref={fileInputRef} type="file" multiple onChange={addFiles} className="hidden" />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+              >
+                + Add file
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* footer */}
@@ -374,7 +463,7 @@ export default function JobInvoiceCreateModal({ job, mode: initialMode, onClose,
               disabled={busy || loading || invoiceTotal <= 0}
               className="rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-50"
             >
-              Create Invoice
+              {busy ? 'Creating…' : 'Create Invoice'}
             </button>
           ) : (
             <button
@@ -382,7 +471,7 @@ export default function JobInvoiceCreateModal({ job, mode: initialMode, onClose,
               disabled={busy}
               className="rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-50"
             >
-              Create Manual Invoice
+              {busy ? 'Creating…' : 'Create Manual Invoice'}
             </button>
           )}
         </div>

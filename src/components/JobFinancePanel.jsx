@@ -7,6 +7,9 @@
 // scrolls; the active sub-tab fills the remaining height and scrolls on its
 // own. When no job is selected ("All Jobs") the tables show every job's rows
 // and +Invoice is disabled — a new invoice needs one specific job.
+//
+// onOpenJobInvoice / invoiceDeepLink let the all-jobs view jump to one job's
+// invoice (clicking a job name in the table).
 import { useEffect, useRef, useState } from 'react'
 import JobFinanceTab from './JobFinanceTab'
 import JobPaymentsTab from './JobPaymentsTab'
@@ -17,7 +20,7 @@ const SUBTABS = [
   { key: 'payments', label: 'Payments' },
 ]
 
-export default function JobFinancePanel({ job }) {
+export default function JobFinancePanel({ job, onOpenJobInvoice, invoiceDeepLink }) {
   const [section, setSection] = useState('invoices')
   const [menuOpen, setMenuOpen] = useState(false)
   const [createMode, setCreateMode] = useState(null) // 'progress' | 'manual' | null
@@ -25,6 +28,11 @@ export default function JobFinancePanel({ job }) {
   const [toast, setToast] = useState('')
   const menuRef = useRef(null)
   const hasJob = !!job?.id
+
+  // A deep-link always targets an invoice — make sure the Invoices tab is up.
+  useEffect(() => {
+    if (invoiceDeepLink) setSection('invoices')
+  }, [invoiceDeepLink])
 
   // Close the +Invoice menu on any outside click.
   useEffect(() => {
@@ -105,7 +113,14 @@ export default function JobFinancePanel({ job }) {
 
       {/* Scrolling content region — the sub-tab component owns its own scroll. */}
       <div className="min-h-0 flex-1">
-        {section === 'invoices' && <JobFinanceTab job={job} refreshKey={refreshKey} />}
+        {section === 'invoices' && (
+          <JobFinanceTab
+            job={job}
+            refreshKey={refreshKey}
+            onOpenJobInvoice={onOpenJobInvoice}
+            invoiceDeepLink={invoiceDeepLink}
+          />
+        )}
         {section === 'payments' && <JobPaymentsTab job={job} />}
       </div>
 

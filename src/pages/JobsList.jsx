@@ -208,6 +208,9 @@ export default function JobsList() {
   // Bumped each time the URL param changes so JobChangeOrdersPanel knows
   // to re-open even if the same coId arrives twice in a row.
   const [coDeepLink, setCoDeepLink] = useState(null) // { coId, ts } | null
+  // Deep-link for the Finance tab — clicking a job name in the all-jobs
+  // invoice table jumps to that job and opens the specific invoice.
+  const [financeDeepLink, setFinanceDeepLink] = useState(null) // { invoiceId, ts } | null
 
   // ── Sidebar scroll preservation ─────────────────────────────────────────────
   // The jobs sidebar list (left column) is its own scroll container, but
@@ -1407,7 +1410,16 @@ export default function JobsList() {
             {tab === 'change-orders' && (
               <JobChangeOrdersPanel job={selectedJobObj} coDeepLink={coDeepLink} />
             )}
-            {tab === 'finance' && <JobFinancePanel job={selectedJobObj} />}
+            {tab === 'finance' && (
+              <JobFinancePanel
+                job={selectedJobObj}
+                invoiceDeepLink={financeDeepLink}
+                onOpenJobInvoice={(jobId, invoiceId) => {
+                  setSelectedJob(jobId)
+                  setFinanceDeepLink({ invoiceId, ts: Date.now() })
+                }}
+              />
+            )}
             {tab === 'files' && <JobFilesPanel job={selectedJobObj} />}
           </div>
         </div>

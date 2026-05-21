@@ -8,7 +8,7 @@
 // The first tab is a Dashboard: client data on the left, with Project
 // Financials, Daily Logs and Schedule stacked on the right (each section only
 // shows when the matching permission is granted).
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
@@ -407,14 +407,32 @@ function invoiceStatus(inv) {
 function InvoicesView({ jobs, client }) {
   const [rows, setRows] = useState(null)
   const [payInv, setPayInv] = useState(null)
+  const [atts, setAtts] = useState({}) // invoice_id -> [attachment]
+  const [expanded, setExpanded] = useState(null) // open invoice id
   useEffect(() => {
     supabase.rpc('portal_invoices', rpcArgs()).then(({ data }) => setRows(data || []))
+    supabase.rpc('portal_invoice_attachments', rpcArgs()).then(({ data }) => {
+      const by = {}
+      for (const a of data || []) (by[a.invoice_id] = by[a.invoice_id] || []).push(a)
+      setAtts(by)
+    })
   }, [])
   const jobsById = Object.fromEntries(jobs.map(j => [j.id, j]))
   if (rows === null) return <Loading />
   if (rows.length === 0) return <Empty label="No invoices yet." />
+
+  async function openFile(a) {
+    const { data } = await supabase.storage
+      .from('job-files')
+      .createSignedUrl(a.storage_path, 300)
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener')
+  }
+
   return (
     <>
+      <p className="mb-2 text-xs text-gray-400">
+        Tap an invoice to see its description and download any attachments.
+      </p>
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
@@ -431,35 +449,89 @@ function InvoicesView({ jobs, client }) {
           <tbody className="divide-y divide-gray-100">
             {rows.map(inv => {
               const st = invoiceStatus(inv)
+              const fileList = atts[inv.id] || []
+              const desc = pick(inv, 'description')
+              const hasDetail = !!desc || fileList.length > 0
+              const isOpen = expanded === inv.id
               return (
-                <tr key={inv.id}>
-                  <td className="px-4 py-2.5 font-medium text-gray-800">
-                    {pick(inv, 'invoice_number', 'number', 'id') || '—'}
-                  </td>
-                  <td className="px-4 py-2.5 text-gray-600">{dateStr(pick(inv, 'invoice_date', 'created_at'))}</td>
-                  <td className="px-4 py-2.5 text-gray-800">
-                    {pick(inv, 'title', 'name', 'memo', 'description') || '—'}
-                  </td>
-                  <td className="px-4 py-2.5 text-gray-800">
-                    {money(pick(inv, 'balance_due', 'balance', 'amount_due', 'total', 'amount'))}
-                  </td>
-                  <td className="px-4 py-2.5 text-gray-600">{dateStr(pick(inv, 'due_date'))}</td>
-                  <td className="px-4 py-2.5">
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${st.cls}`}>
-                      {st.label}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5 text-right">
-                    {st.payable && (
-                      <button
-                        onClick={() => setPayInv(inv)}
-                        className="rounded-lg bg-green-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-800"
-                      >
-                        Pay
-                      </button>
-                    )}
-                  </td>
-                </tr>
+                <Fragment key={inv.id}>
+                  <tr
+                    className={hasDetail ? 'cursor-pointer hover:bg-gray-50' : ''}
+                    onClick={() => hasDetail && setExpanded(isOpen ? null : inv.id)}
+                  >
+                    <td className="px-4 py-2.5 font-medium text-gray-800">
+                      {hasDetail && (
+                        <span className="mr-1 text-gray-400">{isOpen ? '▾' : '▸'}</span>
+                      )}
+                      {pick(inv, 'invoice_number', 'number', 'id') || '—'}
+                    </td>
+                    <td className="px-4 py-2.5 text-gray-600">
+                      {dateStr(pick(inv, 'invoice_date', 'created_at'))}
+                    </td>
+                    <td className="px-4 py-2.5 text-gray-800">
+                      {pick(inv, 'title', 'name', 'memo') || '—'}
+                      {fileList.length > 0 && (
+                        <span className="ml-1 text-xs text-gray-400">
+                          ({fileList.length} file{fileList.length === 1 ? '' : 's'})
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 text-gray-800">
+                      {money(pick(inv, 'balance_due', 'balance', 'amount_due', 'total', 'amount'))}
+                    </td>
+                    <td className="px-4 py-2.5 text-gray-600">{dateStr(pick(inv, 'due_date'))}</td>
+                    <td className="px-4 py-2.5">
+                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${st.cls}`}>
+                        {st.label}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      {st.payable && (
+                        <button
+                          onClick={e => {
+                            e.stopPropagation()
+                            setPayInv(inv)
+                          }}
+                          className="rounded-lg bg-green-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-800"
+                        >
+                          Pay
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                  {isOpen && hasDetail && (
+                    <tr className="bg-gray-50">
+                      <td colSpan={7} className="px-4 py-3">
+                        {desc && (
+                          <div className="mb-3">
+                            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              Description
+                            </p>
+                            <p className="whitespace-pre-wrap text-sm text-gray-700">{desc}</p>
+                          </div>
+                        )}
+                        {fileList.length > 0 && (
+                          <div>
+                            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              Attachments
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {fileList.map(a => (
+                                <button
+                                  key={a.id}
+                                  onClick={() => openFile(a)}
+                                  className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-50"
+                                >
+                                  ⬇ {a.file_name}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               )
             })}
           </tbody>
