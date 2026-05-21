@@ -386,29 +386,109 @@ function InvoicesView({ jobs, client }) {
 }
 
 // ── Payment modal ────────────────────────────────────────────────────────────
+// Loads Helcim's hosted HelcimPay.js script once.
+function loadHelcimPay() {
+  return new Promise((resolve, reject) => {
+    if (window.appendHelcimPayIframe) return resolve()
+    let s = document.getElementById('helcim-pay-js')
+    if (!s) {
+      s = document.createElement('script')
+      s.id = 'helcim-pay-js'
+      s.src = 'https://secure.helcim.app/helcim-pay/services/start.js'
+      document.head.appendChild(s)
+    }
+    s.addEventListener('load', () => resolve())
+    s.addEventListener('error', () => reject(new Error('Could not load the secure payment form.')))
+  })
+}
+
 function PaymentModal({ invoice, job, client, onClose }) {
   const [method, setMethod] = useState(null) // 'card' | 'ach'
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [done, setDone] = useState(false)
+
   const clientName =
     pick(client, 'name') ||
     [pick(client, 'first_name'), pick(client, 'last_name')].filter(Boolean).join(' ') ||
     pick(client, 'company_name') ||
-    '—'
-  const balance = money(
-    pick(invoice, 'balance_due', 'balance', 'amount_due', 'total', 'amount')
-  )
+    '\u2014'
+  const balance = money(pick(invoice, 'balance_due', 'balance', 'amount_due', 'total', 'amount'))
   const info = [
     ['Project', pick(job, 'name', 'client_name')],
-    ['Bid', pick(invoice, 'bid_name', 'project_name')],
     ['Invoice', pick(invoice, 'title', 'name', 'memo')],
     ['Invoice #', pick(invoice, 'invoice_number', 'number', 'id')],
     ['Client', clientName],
-    ['Invoice Date', dateStr(pick(invoice, 'created_at'))],
+    ['Invoice Date', dateStr(pick(invoice, 'invoice_date', 'created_at'))],
     ['Due Date', dateStr(pick(invoice, 'due_date'))],
   ]
+
+  async function startPayment() {
+    setBusy(true)
+    setError('')
+    try {
+      // 1) Initialize the checkout server-side (amount is authoritative there).
+      const { data, error: fe } = await supabase.functions.invoke('helcim-checkout', {
+        body: { invoice_id: invoice.id },
+      })
+      if (fe || !data?.checkoutToken) {
+        throw new Error(data?.error || fe?.message || 'Could not start the payment.')
+      }
+      const { checkoutToken, amount } = data
+
+      // 2) Load HelcimPay.js.
+      await loadHelcimPay()
+
+      // 3) Listen for the hosted-checkout result.
+      const handler = async event => {
+        if (!event.data || event.data.eventName !== `helcim-pay-js-${checkoutToken}`) return
+        if (event.data.eventStatus === 'ABORTED') {
+          window.removeEventListener('message', handler)
+          window.removeHelcimPayIframe?.()
+          setBusy(false)
+          return
+        }
+        if (event.data.eventStatus === 'SUCCESS') {
+          window.removeEventListener('message', handler)
+          let txnId = null
+          try {
+            const parsed = JSON.parse(event.data.eventMessage)
+            const d = parsed?.data?.data || parsed?.data || parsed
+            txnId = d?.transactionId || d?.id || null
+          } catch {
+            /* leave txnId null */
+          }
+          const { data: rec, error: re } = await supabase.rpc('portal_record_payment', {
+            p_invoice_id: invoice.id,
+            p_amount: amount,
+            p_transaction_id: txnId ? String(txnId) : null,
+            p_method: method === 'ach' ? 'Bank Transfer' : 'Credit Card',
+          })
+          window.removeHelcimPayIframe?.()
+          setBusy(false)
+          if (re || rec !== 'recorded') {
+            setError(
+              'Your payment went through, but recording it in the portal failed — please contact us so we can reconcile it.'
+            )
+            return
+          }
+          setDone(true)
+        }
+      }
+      window.addEventListener('message', handler)
+
+      // 4) Open Helcim's secure modal.
+      window.appendHelcimPayIframe(checkoutToken)
+    } catch (e) {
+      setBusy(false)
+      setError(String(e?.message || e))
+    }
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-      onMouseDown={e => e.target === e.currentTarget && onClose()}
+      onMouseDown={e => e.target === e.currentTarget && !busy && onClose()}
     >
       <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl">
         {/* Company header */}
@@ -420,73 +500,96 @@ function PaymentModal({ invoice, job, client, onClose }) {
           </div>
         </div>
 
-        <div className="space-y-4 px-5 py-4">
-          {/* Invoice summary */}
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
-            {info.map(([label, val]) => (
-              <div key={label} className="flex justify-between py-0.5 text-xs">
-                <span className="text-gray-400">{label}</span>
-                <span className="font-medium text-gray-700">{val || '—'}</span>
-              </div>
-            ))}
-            <div className="mt-2 flex justify-between border-t border-gray-200 pt-2">
-              <span className="text-sm font-semibold text-gray-600">Balance Due</span>
-              <span className="text-sm font-bold text-gray-900">{balance}</span>
-            </div>
-          </div>
-
-          {/* Method choice */}
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-              Payment Method
+        {done ? (
+          <div className="space-y-3 px-5 py-8 text-center">
+            <p className="text-3xl">✅</p>
+            <p className="text-base font-semibold text-gray-900">Payment received</p>
+            <p className="text-sm text-gray-600">
+              Thank you — your payment of {balance} has been recorded. It will show in your
+              Payments tab.
             </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => setMethod('card')}
-                className={`rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors ${
-                  method === 'card'
-                    ? 'border-green-600 bg-green-50 text-green-700'
-                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                Credit Card
-              </button>
-              <button
-                onClick={() => setMethod('ach')}
-                className={`rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors ${
-                  method === 'ach'
-                    ? 'border-green-600 bg-green-50 text-green-700'
-                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                Bank Transfer (ACH)
-              </button>
-            </div>
-          </div>
-
-          {method && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-xs text-amber-700">
-              Secure {method === 'card' ? 'credit card' : 'bank transfer'} payment through Helcim is
-              being connected. Once live, this opens Helcim&apos;s secure checkout so your payment
-              details are entered directly with the processor.
-            </div>
-          )}
-
-          <div className="flex justify-end gap-2 pt-1">
             <button
               onClick={onClose}
-              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+              className="mt-2 rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800"
             >
-              Close
-            </button>
-            <button
-              disabled={!method}
-              className="rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-50"
-            >
-              Continue to Payment
+              Done
             </button>
           </div>
-        </div>
+        ) : (
+          <div className="space-y-4 px-5 py-4">
+            {/* Invoice summary */}
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+              {info.map(([label, val]) => (
+                <div key={label} className="flex justify-between py-0.5 text-xs">
+                  <span className="text-gray-400">{label}</span>
+                  <span className="font-medium text-gray-700">{val || '\u2014'}</span>
+                </div>
+              ))}
+              <div className="mt-2 flex justify-between border-t border-gray-200 pt-2">
+                <span className="text-sm font-semibold text-gray-600">Balance Due</span>
+                <span className="text-sm font-bold text-gray-900">{balance}</span>
+              </div>
+            </div>
+
+            {error && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
+                {error}
+              </div>
+            )}
+
+            {/* Method choice */}
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Payment Method
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setMethod('card')}
+                  disabled={busy}
+                  className={`rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors ${
+                    method === 'card'
+                      ? 'border-green-600 bg-green-50 text-green-700'
+                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  Credit Card
+                </button>
+                <button
+                  onClick={() => setMethod('ach')}
+                  disabled={busy}
+                  className={`rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors ${
+                    method === 'ach'
+                      ? 'border-green-600 bg-green-50 text-green-700'
+                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  Bank Transfer (ACH)
+                </button>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-400">
+              Payment details are entered in Helcim's secure window — they never touch this site.
+            </p>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                onClick={onClose}
+                disabled={busy}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={startPayment}
+                disabled={!method || busy}
+                className="rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-50"
+              >
+                {busy ? 'Opening secure checkout…' : 'Continue to Payment'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
