@@ -15,6 +15,7 @@ import JobInfoModal from '../components/JobInfoModal'
 import JobFinancePanel from '../components/JobFinancePanel'
 import StartLocationsCard from '../components/StartLocationsCard'
 import SupervisorPositionsCard from '../components/SupervisorPositionsCard'
+import InvoiceCommPositionCard from '../components/InvoiceCommPositionCard'
 import { fetchAllPaginated } from '../lib/fetchAll'
 
 function MoveJobModal({ job, stages, onMove, onClose }) {
@@ -2878,6 +2879,9 @@ function JobScheduleSettings({
                 </span>
               </p>
             </div>
+
+            {/* Invoice communication position */}
+            <InvoiceCommPositionCard />
           </div>
         )}
 

@@ -32,7 +32,7 @@ Deno.serve(async req => {
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405)
 
   try {
-    const { invoice_id } = await req.json().catch(() => ({}))
+    const { invoice_id, method } = await req.json().catch(() => ({}))
     if (!invoice_id) return json({ error: 'invoice_id is required' }, 400)
 
     // Look the invoice up server-side so the charged amount is authoritative.
@@ -66,6 +66,9 @@ Deno.serve(async req => {
         paymentType: 'purchase',
         amount: Number(balance.toFixed(2)),
         currency: 'USD',
+        // 'ach' = bank transfer form, 'cc' = card form, 'cc-ach' = let the
+        // customer choose. The portal passes which button the client picked.
+        paymentMethod: method === 'ach' ? 'ach' : method === 'card' ? 'cc' : 'cc-ach',
       }),
     })
     const hData = await hRes.json().catch(() => null)

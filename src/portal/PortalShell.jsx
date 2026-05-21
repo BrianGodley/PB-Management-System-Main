@@ -404,9 +404,105 @@ function invoiceStatus(inv) {
   return { label: 'Past due', cls: 'bg-red-100 text-red-700', payable: true }
 }
 
+// ── Invoice comment modal ────────────────────────────────────────────────────
+function InvoiceCommentModal({ invoice, onClose }) {
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [done, setDone] = useState(false)
+
+  async function submit() {
+    if (!text.trim()) {
+      setError('Please enter a comment first.')
+      return
+    }
+    setBusy(true)
+    setError('')
+    const { data, error: e } = await supabase.functions.invoke('invoice-comment', {
+      body: { invoice_id: invoice.id, comment: text.trim() },
+    })
+    setBusy(false)
+    if (e || data?.error) {
+      setError(data?.error || e?.message || 'Could not send your comment — please try again.')
+      return
+    }
+    setDone(true)
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4"
+      onMouseDown={e => e.target === e.currentTarget && !busy && onClose()}
+    >
+      <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl">
+        <div className="flex items-center gap-2 bg-[#3A5038] px-5 py-4">
+          <span className="text-xl">💬</span>
+          <div>
+            <p className="text-sm font-bold text-white">Invoice Comment</p>
+            <p className="text-xs text-white/70">
+              {pick(invoice, 'invoice_number', 'number', 'id') || ''}
+            </p>
+          </div>
+        </div>
+        {done ? (
+          <div className="space-y-3 px-5 py-8 text-center">
+            <p className="text-3xl">✅</p>
+            <p className="text-base font-semibold text-gray-900">Comment sent</p>
+            <p className="text-sm text-gray-600">
+              Your contractor's team has been notified and will follow up with you.
+            </p>
+            <button
+              onClick={onClose}
+              className="mt-2 rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800"
+            >
+              Done
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3 px-5 py-4">
+            <p className="text-sm text-gray-600">
+              Have a question or note about this invoice? Send it to your contractor's team —
+              they'll get an email and it's saved to your project log.
+            </p>
+            {error && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
+                {error}
+              </div>
+            )}
+            <textarea
+              value={text}
+              onChange={e => setText(e.target.value)}
+              rows={4}
+              placeholder="Type your comment…"
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-green-600 focus:outline-none"
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={onClose}
+                disabled={busy}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submit}
+                disabled={busy}
+                className="rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-50"
+              >
+                {busy ? 'Sending…' : 'Send Comment'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function InvoicesView({ jobs, client }) {
   const [rows, setRows] = useState(null)
   const [payInv, setPayInv] = useState(null)
+  const [commentInv, setCommentInv] = useState(null)
   const [atts, setAtts] = useState({}) // invoice_id -> [attachment]
   const [expanded, setExpanded] = useState(null) // open invoice id
   useEffect(() => {
@@ -433,7 +529,7 @@ function InvoicesView({ jobs, client }) {
       <p className="mb-2 text-xs text-gray-400">
         Tap an invoice to see its description and download any attachments.
       </p>
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
             <tr>
@@ -443,6 +539,7 @@ function InvoicesView({ jobs, client }) {
               <th className="px-4 py-2.5">Balance Due</th>
               <th className="px-4 py-2.5">Date Due</th>
               <th className="px-4 py-2.5">Status</th>
+              <th className="px-4 py-2.5">Comments</th>
               <th className="px-4 py-2.5 text-right">&nbsp;</th>
             </tr>
           </thead>
@@ -485,6 +582,17 @@ function InvoicesView({ jobs, client }) {
                         {st.label}
                       </span>
                     </td>
+                    <td className="px-4 py-2.5">
+                      <button
+                        onClick={e => {
+                          e.stopPropagation()
+                          setCommentInv(inv)
+                        }}
+                        className="rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                      >
+                        💬 Comment
+                      </button>
+                    </td>
                     <td className="px-4 py-2.5 text-right">
                       {st.payable && (
                         <button
@@ -501,7 +609,7 @@ function InvoicesView({ jobs, client }) {
                   </tr>
                   {isOpen && hasDetail && (
                     <tr className="bg-gray-50">
-                      <td colSpan={7} className="px-4 py-3">
+                      <td colSpan={8} className="px-4 py-3">
                         {desc && (
                           <div className="mb-3">
                             <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -544,6 +652,9 @@ function InvoicesView({ jobs, client }) {
           client={client}
           onClose={() => setPayInv(null)}
         />
+      )}
+      {commentInv && (
+        <InvoiceCommentModal invoice={commentInv} onClose={() => setCommentInv(null)} />
       )}
     </>
   )
@@ -593,7 +704,7 @@ function PaymentModal({ invoice, job, client, onClose }) {
     try {
       // 1) Initialize the checkout server-side (amount is authoritative there).
       const { data, error: fe } = await supabase.functions.invoke('helcim-checkout', {
-        body: { invoice_id: invoice.id },
+        body: { invoice_id: invoice.id, method },
       })
       if (fe || !data?.checkoutToken) {
         throw new Error(data?.error || fe?.message || 'Could not start the payment.')
@@ -887,7 +998,7 @@ export default function PortalShell() {
       )}
       {/* Header */}
       <header className="bg-[#3A5038]">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-3">
+        <div className="mx-auto flex w-[90%] items-center justify-between px-5 py-3">
           <div className="flex items-center gap-2">
             <span className="text-2xl">🌿</span>
             <div>
@@ -906,7 +1017,7 @@ export default function PortalShell() {
 
       {/* Tab bar — large full-width rectangle buttons across the top */}
       <nav className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-5xl flex-wrap gap-2 px-5 py-3">
+        <div className="mx-auto flex w-[90%] flex-wrap gap-2 px-5 py-3">
           {tabs.map(t => (
             <button
               key={t.key}
@@ -924,7 +1035,7 @@ export default function PortalShell() {
       </nav>
 
       {/* Content */}
-      <main className="mx-auto max-w-5xl px-5 py-6">
+      <main className="mx-auto w-[90%] px-5 py-6">
         {activeTab === 'info' && (
           <DashboardView client={client} jobs={jobs} portal={portal} />
         )}
