@@ -12,6 +12,7 @@ import MasterCrews from './MasterCrews'
 import COEstimatePanel from '../components/COEstimatePanel'
 import CODetailModal from '../components/CODetailModal'
 import JobInfoModal from '../components/JobInfoModal'
+import JobFinanceTab from '../components/JobFinanceTab'
 import StartLocationsCard from '../components/StartLocationsCard'
 import SupervisorPositionsCard from '../components/SupervisorPositionsCard'
 import { fetchAllPaginated } from '../lib/fetchAll'
@@ -1400,7 +1401,7 @@ export default function JobsList() {
             {tab === 'change-orders' && (
               <JobChangeOrdersPanel job={selectedJobObj} coDeepLink={coDeepLink} />
             )}
-            {tab === 'finance' && <ComingSoon label="Finance" />}
+            {tab === 'finance' && <JobFinanceTab job={selectedJobObj} />}
             {tab === 'files' && <JobFilesPanel job={selectedJobObj} />}
           </div>
         </div>
