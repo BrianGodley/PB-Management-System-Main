@@ -1,15 +1,15 @@
 // supabase/functions/helcim-checkout/index.ts
 //
 // Initializes a HelcimPay.js checkout session for a client-portal invoice
-// payment. Called from the portal payment modal.
+// payment.
 //
-// Why server-side: Helcim's initialize endpoint must run from a back end
-// (a browser call gets a CORS error), and the HELCIM_API_TOKEN secret must
-// never reach the client. The invoice balance is also looked up here so the
-// charge amount can't be tampered with by the browser.
+// `method` ('card' | 'ach') picks the form Helcim shows. When `save` is true
+// the invoice's client is linked to a Helcim customer (created on first use)
+// so the card / bank account entered in the modal is vaulted under that
+// customer and can be re-used later without re-entry.
 //
-// Request  (POST):  { invoice_id: "<uuid>" }
-// Response (200):   { checkoutToken, amount, invoiceNumber }
+// Request  (POST):  { invoice_id, method?, save? }
+// Response (200):   { checkoutToken, amount, invoiceNumber, customerCode }
 //
 // Deploy:  supabase functions deploy helcim-checkout
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -32,17 +32,16 @@ Deno.serve(async req => {
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405)
 
   try {
-    const { invoice_id, method } = await req.json().catch(() => ({}))
+    const { invoice_id, method, save } = await req.json().catch(() => ({}))
     if (!invoice_id) return json({ error: 'invoice_id is required' }, 400)
 
-    // Look the invoice up server-side so the charged amount is authoritative.
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
     const { data: inv, error } = await supabase
       .from('job_invoices')
-      .select('id, invoice_number, amount, amount_paid, status')
+      .select('id, invoice_number, amount, amount_paid, status, job_id')
       .eq('id', invoice_id)
       .maybeSingle()
     if (error || !inv) return json({ error: 'Invoice not found' }, 404)
@@ -54,7 +53,63 @@ Deno.serve(async req => {
     const apiToken = Deno.env.get('HELCIM_API_TOKEN')
     if (!apiToken) return json({ error: 'Helcim is not configured.' }, 500)
 
-    // Initialize the HelcimPay.js checkout session.
+    // When the client opted to save the method, make sure their client record
+    // has a Helcim customer so the entered card / bank is vaulted against it.
+    let customerCode: string | null = null
+    if (save) {
+      const { data: job } = await supabase
+        .from('jobs')
+        .select('id, client_id')
+        .eq('id', inv.job_id)
+        .maybeSingle()
+      const clientId = job?.client_id
+      if (clientId) {
+        const { data: portal } = await supabase
+          .from('client_portals')
+          .select('id, helcim_customer_code')
+          .eq('client_id', clientId)
+          .maybeSingle()
+        customerCode = portal?.helcim_customer_code || null
+        if (!customerCode) {
+          const { data: client } = await supabase
+            .from('clients')
+            .select('name, first_name, last_name, email')
+            .eq('id', clientId)
+            .maybeSingle()
+          const contactName =
+            client?.name ||
+            [client?.first_name, client?.last_name].filter(Boolean).join(' ') ||
+            'Client'
+          const cRes = await fetch('https://api.helcim.com/v2/customers', {
+            method: 'POST',
+            headers: {
+              accept: 'application/json',
+              'api-token': apiToken,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({ contactName, email: client?.email || undefined }),
+          })
+          const cData = await cRes.json().catch(() => null)
+          customerCode = cData?.customerCode || cData?.customer?.customerCode || null
+          if (customerCode && portal?.id) {
+            await supabase
+              .from('client_portals')
+              .update({ helcim_customer_code: customerCode })
+              .eq('id', portal.id)
+          }
+        }
+      }
+    }
+
+    const initBody: Record<string, unknown> = {
+      paymentType: 'purchase',
+      amount: Number(balance.toFixed(2)),
+      currency: 'USD',
+      // 'ach' = bank transfer form, 'cc' = card form, 'cc-ach' = customer choice.
+      paymentMethod: method === 'ach' ? 'ach' : method === 'card' ? 'cc' : 'cc-ach',
+    }
+    if (customerCode) initBody.customerCode = customerCode
+
     const hRes = await fetch('https://api.helcim.com/v2/helcim-pay/initialize', {
       method: 'POST',
       headers: {
@@ -62,14 +117,7 @@ Deno.serve(async req => {
         'api-token': apiToken,
         'content-type': 'application/json',
       },
-      body: JSON.stringify({
-        paymentType: 'purchase',
-        amount: Number(balance.toFixed(2)),
-        currency: 'USD',
-        // 'ach' = bank transfer form, 'cc' = card form, 'cc-ach' = let the
-        // customer choose. The portal passes which button the client picked.
-        paymentMethod: method === 'ach' ? 'ach' : method === 'card' ? 'cc' : 'cc-ach',
-      }),
+      body: JSON.stringify(initBody),
     })
     const hData = await hRes.json().catch(() => null)
     if (!hRes.ok || !hData?.checkoutToken) {
@@ -77,13 +125,11 @@ Deno.serve(async req => {
       return json({ error: `Helcim initialize failed: ${JSON.stringify(detail)}` }, 502)
     }
 
-    // checkoutToken renders the modal in the browser. secretToken stays here —
-    // it's used by the (separate) payment-recording function to verify the
-    // result hash, so it is deliberately NOT returned to the client.
     return json({
       checkoutToken: hData.checkoutToken,
       amount: Number(balance.toFixed(2)),
       invoiceNumber: inv.invoice_number,
+      customerCode,
     })
   } catch (e) {
     return json({ error: String((e as Error)?.message || e) }, 500)

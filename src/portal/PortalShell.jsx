@@ -499,7 +499,7 @@ function InvoiceCommentModal({ invoice, onClose }) {
   )
 }
 
-function InvoicesView({ jobs, client }) {
+function InvoicesView({ jobs, client, clientId }) {
   const [rows, setRows] = useState(null)
   const [payInv, setPayInv] = useState(null)
   const [commentInv, setCommentInv] = useState(null)
@@ -650,6 +650,7 @@ function InvoicesView({ jobs, client }) {
           invoice={payInv}
           job={jobsById[payInv.job_id]}
           client={client}
+          clientId={clientId}
           onClose={() => setPayInv(null)}
         />
       )}
@@ -677,11 +678,33 @@ function loadHelcimPay() {
   })
 }
 
-function PaymentModal({ invoice, job, client, onClose }) {
-  const [method, setMethod] = useState(null) // 'card' | 'ach'
+function PaymentModal({ invoice, job, client, clientId, onClose }) {
+  const [saved, setSaved] = useState(null) // saved methods | null while loading
+  const [choice, setChoice] = useState(null) // a saved method id, or 'new'
+  const [newMethod, setNewMethod] = useState(null) // 'card' | 'ach'
+  const [saveNew, setSaveNew] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
+
+  useEffect(() => {
+    if (!clientId) {
+      setSaved([])
+      setChoice('new')
+      return
+    }
+    supabase
+      .from('client_payment_methods')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('is_default', { ascending: false })
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        const list = data || []
+        setSaved(list)
+        setChoice(list.length ? list.find(m => m.is_default)?.id || list[0].id : 'new')
+      })
+  }, [clientId])
 
   const clientName =
     pick(client, 'name') ||
@@ -694,27 +717,39 @@ function PaymentModal({ invoice, job, client, onClose }) {
     ['Invoice', pick(invoice, 'title', 'name', 'memo')],
     ['Invoice #', pick(invoice, 'invoice_number', 'number', 'id')],
     ['Client', clientName],
-    ['Invoice Date', dateStr(pick(invoice, 'invoice_date', 'created_at'))],
     ['Due Date', dateStr(pick(invoice, 'due_date'))],
   ]
+  const methodLabel = m =>
+    `${m.brand || (m.method_type === 'bank' ? 'Bank account' : 'Card')} •••• ${m.last4 || '----'}`
 
-  async function startPayment() {
+  // Pay with an already-saved (vaulted) method — charged server-side.
+  async function payWithSaved() {
+    setBusy(true)
+    setError('')
+    const { data, error: e } = await supabase.functions.invoke('helcim-charge-saved', {
+      body: { invoice_id: invoice.id, payment_method_id: choice },
+    })
+    setBusy(false)
+    if (e || data?.error || !data?.ok) {
+      setError(data?.error || e?.message || 'The payment could not be completed.')
+      return
+    }
+    setDone(true)
+  }
+
+  // Pay with a new card / bank account through Helcim's secure modal.
+  async function startNewPayment() {
     setBusy(true)
     setError('')
     try {
-      // 1) Initialize the checkout server-side (amount is authoritative there).
       const { data, error: fe } = await supabase.functions.invoke('helcim-checkout', {
-        body: { invoice_id: invoice.id, method },
+        body: { invoice_id: invoice.id, method: newMethod, save: saveNew },
       })
-      if (fe || !data?.checkoutToken) {
+      if (fe || !data?.checkoutToken)
         throw new Error(data?.error || fe?.message || 'Could not start the payment.')
-      }
-      const { checkoutToken, amount } = data
-
-      // 2) Load HelcimPay.js.
+      const { checkoutToken, amount, customerCode } = data
       await loadHelcimPay()
 
-      // 3) Listen for the hosted-checkout result.
       const handler = async event => {
         if (!event.data || event.data.eventName !== `helcim-pay-js-${checkoutToken}`) return
         if (event.data.eventStatus === 'ABORTED') {
@@ -725,20 +760,38 @@ function PaymentModal({ invoice, job, client, onClose }) {
         }
         if (event.data.eventStatus === 'SUCCESS') {
           window.removeEventListener('message', handler)
-          let txnId = null
+          let d = null
           try {
             const parsed = JSON.parse(event.data.eventMessage)
-            const d = parsed?.data?.data || parsed?.data || parsed
-            txnId = d?.transactionId || d?.id || null
+            d = parsed?.data?.data || parsed?.data || parsed
           } catch {
-            /* leave txnId null */
+            d = null
           }
+          const txnId = d?.transactionId || d?.id || null
           const { data: rec, error: re } = await supabase.rpc('portal_record_payment', {
             p_invoice_id: invoice.id,
             p_amount: amount,
             p_transaction_id: txnId ? String(txnId) : null,
-            p_method: method === 'ach' ? 'Bank Transfer' : 'Credit Card',
+            p_method: newMethod === 'ach' ? 'Bank Transfer' : 'Credit Card',
           })
+          // Vault the method in our DB if the client opted in. The token comes
+          // back in the HelcimPay success payload — it is a non-sensitive
+          // reference, never the raw card / account number.
+          if (saveNew && clientId && d) {
+            const token = d.cardToken || d.bankAccountToken || d.achToken || null
+            if (token) {
+              const digits = String(d.cardNumber || d.bankAccountNumber || '').replace(/\D/g, '')
+              await supabase.from('client_payment_methods').insert({
+                client_id: clientId,
+                helcim_customer_code: customerCode || null,
+                helcim_card_token: token,
+                method_type: newMethod === 'ach' ? 'bank' : 'card',
+                brand: d.cardType || d.bankName || null,
+                last4: digits ? digits.slice(-4) : null,
+                exp: d.cardExpiry || d.expiryDate || null,
+              })
+            }
+          }
           window.removeHelcimPayIframe?.()
           setBusy(false)
           if (re || rec !== 'recorded') {
@@ -751,8 +804,6 @@ function PaymentModal({ invoice, job, client, onClose }) {
         }
       }
       window.addEventListener('message', handler)
-
-      // 4) Open Helcim's secure modal.
       window.appendHelcimPayIframe(checkoutToken)
     } catch (e) {
       setBusy(false)
@@ -760,13 +811,14 @@ function PaymentModal({ invoice, job, client, onClose }) {
     }
   }
 
+  const usingSaved = choice && choice !== 'new'
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
       onMouseDown={e => e.target === e.currentTarget && !busy && onClose()}
     >
       <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl">
-        {/* Company header */}
         <div className="flex items-center gap-2 bg-[#3A5038] px-5 py-4">
           <span className="text-2xl">🌿</span>
           <div>
@@ -792,7 +844,6 @@ function PaymentModal({ invoice, job, client, onClose }) {
           </div>
         ) : (
           <div className="space-y-4 px-5 py-4">
-            {/* Invoice summary */}
             <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
               {info.map(([label, val]) => (
                 <div key={label} className="flex justify-between py-0.5 text-xs">
@@ -812,40 +863,85 @@ function PaymentModal({ invoice, job, client, onClose }) {
               </div>
             )}
 
-            {/* Method choice */}
-            <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Payment Method
-              </p>
-              <div className="grid grid-cols-2 gap-2">
+            {saved === null ? (
+              <p className="py-4 text-center text-sm text-gray-400">Loading payment methods…</p>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Payment Method
+                </p>
+                {saved.map(m => (
+                  <button
+                    key={m.id}
+                    onClick={() => setChoice(m.id)}
+                    className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left text-sm transition-colors ${
+                      choice === m.id
+                        ? 'border-green-600 bg-green-50'
+                        : 'border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span className="text-lg">{m.method_type === 'bank' ? '🏦' : '💳'}</span>
+                    <span className="flex-1 font-medium text-gray-800">{methodLabel(m)}</span>
+                    {m.is_default && <span className="text-xs text-gray-400">Default</span>}
+                  </button>
+                ))}
                 <button
-                  onClick={() => setMethod('card')}
-                  disabled={busy}
-                  className={`rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors ${
-                    method === 'card'
-                      ? 'border-green-600 bg-green-50 text-green-700'
-                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                  onClick={() => setChoice('new')}
+                  className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left text-sm transition-colors ${
+                    choice === 'new'
+                      ? 'border-green-600 bg-green-50'
+                      : 'border-gray-200 hover:bg-gray-50'
                   }`}
                 >
-                  Credit Card
-                </button>
-                <button
-                  onClick={() => setMethod('ach')}
-                  disabled={busy}
-                  className={`rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors ${
-                    method === 'ach'
-                      ? 'border-green-600 bg-green-50 text-green-700'
-                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  Bank Transfer (ACH)
+                  <span className="text-lg font-bold text-gray-400">+</span>
+                  <span className="flex-1 font-medium text-gray-800">
+                    {saved.length ? 'Use a new card or bank account' : 'Enter a card or bank account'}
+                  </span>
                 </button>
               </div>
-            </div>
+            )}
 
-            <p className="text-xs text-gray-400">
-              Payment details are entered in Helcim's secure window — they never touch this site.
-            </p>
+            {choice === 'new' && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setNewMethod('card')}
+                    disabled={busy}
+                    className={`rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors ${
+                      newMethod === 'card'
+                        ? 'border-green-600 bg-green-50 text-green-700'
+                        : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    Credit Card
+                  </button>
+                  <button
+                    onClick={() => setNewMethod('ach')}
+                    disabled={busy}
+                    className={`rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors ${
+                      newMethod === 'ach'
+                        ? 'border-green-600 bg-green-50 text-green-700'
+                        : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    Bank Transfer (ACH)
+                  </button>
+                </div>
+                <label className="flex items-center gap-2 text-sm text-gray-600">
+                  <input
+                    type="checkbox"
+                    checked={saveNew}
+                    onChange={e => setSaveNew(e.target.checked)}
+                    className="accent-green-700"
+                  />
+                  Save this {newMethod === 'ach' ? 'bank account' : 'card'} for next time
+                </label>
+                <p className="text-xs text-gray-400">
+                  Payment details are entered in Helcim's secure window — they never touch this
+                  site.
+                </p>
+              </div>
+            )}
 
             <div className="flex justify-end gap-2 pt-1">
               <button
@@ -855,17 +951,134 @@ function PaymentModal({ invoice, job, client, onClose }) {
               >
                 Cancel
               </button>
-              <button
-                onClick={startPayment}
-                disabled={!method || busy}
-                className="rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-50"
-              >
-                {busy ? 'Opening secure checkout…' : 'Continue to Payment'}
-              </button>
+              {usingSaved ? (
+                <button
+                  onClick={payWithSaved}
+                  disabled={busy}
+                  className="rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-50"
+                >
+                  {busy ? 'Processing…' : `Pay ${balance}`}
+                </button>
+              ) : (
+                <button
+                  onClick={startNewPayment}
+                  disabled={!newMethod || busy}
+                  className="rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-50"
+                >
+                  {busy ? 'Opening secure checkout…' : 'Continue to Payment'}
+                </button>
+              )}
             </div>
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// ── Payment Methods (saved cards / bank accounts) ────────────────────────────
+function PaymentMethodsView({ clientId }) {
+  const [rows, setRows] = useState(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!clientId) {
+      setRows([])
+      return
+    }
+    let cancelled = false
+    supabase
+      .from('client_payment_methods')
+      .select('*')
+      .eq('client_id', clientId)
+      .order('is_default', { ascending: false })
+      .order('created_at', { ascending: false })
+      .then(({ data, error: e }) => {
+        if (cancelled) return
+        if (e) setError(e.message)
+        setRows(data || [])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [clientId])
+
+  async function remove(m) {
+    if (!window.confirm('Remove this saved payment method?')) return
+    const { error: e } = await supabase.from('client_payment_methods').delete().eq('id', m.id)
+    if (e) {
+      setError(e.message)
+      return
+    }
+    setRows(prev => (prev || []).filter(x => x.id !== m.id))
+  }
+
+  async function makeDefault(m) {
+    await supabase
+      .from('client_payment_methods')
+      .update({ is_default: false })
+      .eq('client_id', clientId)
+    await supabase.from('client_payment_methods').update({ is_default: true }).eq('id', m.id)
+    setRows(prev => (prev || []).map(x => ({ ...x, is_default: x.id === m.id })))
+  }
+
+  if (rows === null) return <Loading />
+
+  return (
+    <div className="space-y-3">
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
+          {error}
+        </div>
+      )}
+      <p className="text-sm text-gray-500">
+        Cards and bank accounts you've saved. Pick one at checkout to pay without re-entering
+        your details.
+      </p>
+      {rows.length === 0 ? (
+        <Empty label="No saved payment methods yet — tick “Save this for next time” when you pay an invoice." />
+      ) : (
+        <div className="space-y-2">
+          {rows.map(m => (
+            <div
+              key={m.id}
+              className="flex items-center justify-between rounded-xl border border-gray-200 bg-white p-4"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">{m.method_type === 'bank' ? '🏦' : '💳'}</span>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">
+                    {m.brand || (m.method_type === 'bank' ? 'Bank account' : 'Card')} ••••{' '}
+                    {m.last4 || '----'}
+                    {m.is_default && (
+                      <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
+                        Default
+                      </span>
+                    )}
+                  </p>
+                  {m.exp && <p className="text-xs text-gray-400">Expires {m.exp}</p>}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                {!m.is_default && (
+                  <button
+                    onClick={() => makeDefault(m)}
+                    className="rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                  >
+                    Set default
+                  </button>
+                )}
+                <button
+                  onClick={() => remove(m)}
+                  className="rounded-lg border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -925,6 +1138,7 @@ const ALL_TABS = [
   { key: 'cos', label: 'Change Orders', perm: 'perm_change_orders' },
   { key: 'invoices', label: 'Invoices', perm: 'perm_invoices' },
   { key: 'payments', label: 'Payments', perm: 'perm_invoices' },
+  { key: 'methods', label: 'Payment Methods', perm: 'perm_invoices' },
 ]
 
 export default function PortalShell() {
@@ -1042,8 +1256,11 @@ export default function PortalShell() {
         {activeTab === 'schedule' && <ScheduleView />}
         {activeTab === 'logs' && <DailyLogsView />}
         {activeTab === 'cos' && <ChangeOrdersView />}
-        {activeTab === 'invoices' && <InvoicesView jobs={jobs} client={client} />}
+        {activeTab === 'invoices' && (
+          <InvoicesView jobs={jobs} client={client} clientId={portal?.client_id} />
+        )}
         {activeTab === 'payments' && <PaymentsView />}
+        {activeTab === 'methods' && <PaymentMethodsView clientId={portal?.client_id} />}
       </main>
     </div>
   )
