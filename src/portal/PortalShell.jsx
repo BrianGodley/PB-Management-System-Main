@@ -344,7 +344,7 @@ function InvoicesView({ jobs, client }) {
                   <td className="px-4 py-2.5 font-medium text-gray-800">
                     {pick(inv, 'invoice_number', 'number', 'id') || '—'}
                   </td>
-                  <td className="px-4 py-2.5 text-gray-600">{dateStr(pick(inv, 'created_at'))}</td>
+                  <td className="px-4 py-2.5 text-gray-600">{dateStr(pick(inv, 'invoice_date', 'created_at'))}</td>
                   <td className="px-4 py-2.5 text-gray-800">
                     {pick(inv, 'title', 'name', 'memo', 'description') || '—'}
                   </td>
@@ -492,13 +492,61 @@ function PaymentModal({ invoice, job, client, onClose }) {
   )
 }
 
-// ── Shell ────────────────────────────────────────────────────────────────────
+// ── Payments (read-only) ─────────────────────────────────────────────────────
+function PaymentsView() {
+  const [rows, setRows] = useState(null)
+  useEffect(() => {
+    supabase.rpc('portal_payments', rpcArgs()).then(({ data }) => setRows(data || []))
+  }, [])
+  if (rows === null) return <Loading />
+  if (rows.length === 0) return <Empty label="No payments recorded yet." />
+  const total = rows.reduce((s, p) => s + (Number(p.amount) || 0), 0)
+  return (
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      <table className="w-full text-sm">
+        <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+          <tr>
+            <th className="px-4 py-2.5">Date</th>
+            <th className="px-4 py-2.5">Method</th>
+            <th className="px-4 py-2.5">Status</th>
+            <th className="px-4 py-2.5 text-right">Amount</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {rows.map(p => (
+            <tr key={p.id}>
+              <td className="px-4 py-2.5 text-gray-600">{dateStr(pick(p, 'payment_date'))}</td>
+              <td className="px-4 py-2.5 text-gray-600">{pick(p, 'method') || '\u2014'}</td>
+              <td className="px-4 py-2.5 text-gray-600">{pick(p, 'status') || '\u2014'}</td>
+              <td className="px-4 py-2.5 text-right font-medium text-gray-900">
+                {money(pick(p, 'amount'))}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="bg-gray-50">
+            <td colSpan={3} className="px-4 py-2.5 text-right text-sm font-semibold text-gray-600">
+              Total Paid
+            </td>
+            <td className="px-4 py-2.5 text-right text-base font-bold text-gray-900">
+              {money(total)}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  )
+}
+
+// ── Shell ────────────────────────────────────────────────────
 const ALL_TABS = [
   { key: 'info', label: 'Client Information', perm: null },
   { key: 'schedule', label: 'Schedule', perm: 'perm_schedule' },
   { key: 'logs', label: 'Daily Logs', perm: 'perm_daily_logs' },
   { key: 'cos', label: 'Change Orders', perm: 'perm_change_orders' },
   { key: 'invoices', label: 'Invoices', perm: 'perm_invoices' },
+  { key: 'payments', label: 'Payments', perm: 'perm_invoices' },
 ]
 
 export default function PortalShell() {
@@ -612,6 +660,7 @@ export default function PortalShell() {
         {activeTab === 'logs' && <DailyLogsView />}
         {activeTab === 'cos' && <ChangeOrdersView />}
         {activeTab === 'invoices' && <InvoicesView jobs={jobs} client={client} />}
+        {activeTab === 'payments' && <PaymentsView />}
       </main>
     </div>
   )

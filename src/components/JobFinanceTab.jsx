@@ -398,7 +398,7 @@ export default function JobFinanceTab({ job }) {
                   <tr key={inv.id}>
                     <td className="px-3 py-2 font-medium text-gray-800">{inv.invoice_number}</td>
                     <td className="px-3 py-2 text-gray-600">{inv.title}</td>
-                    <td className="px-3 py-2 text-gray-500">{dateStr(inv.created_at)}</td>
+                    <td className="px-3 py-2 text-gray-500">{dateStr(inv.invoice_date || inv.created_at)}</td>
                     <td className="px-3 py-2 text-right text-gray-800">{money(inv.amount)}</td>
                     <td className="px-3 py-2">
                       <span
