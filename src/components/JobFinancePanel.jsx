@@ -3,8 +3,10 @@
 // The job's main Finance tab — Invoices / Payments sub-tabs plus a +Invoice
 // menu (Progress Invoice / Manual Invoice) that opens JobInvoiceCreateModal.
 //
-// When no job is selected ("All Jobs") the tables show every job's rows and
-// +Invoice is disabled — a new invoice needs one specific job.
+// Layout: the sub-tab row + +Invoice button are a CONSTANT header that never
+// scrolls; the active sub-tab fills the remaining height and scrolls on its
+// own. When no job is selected ("All Jobs") the tables show every job's rows
+// and +Invoice is disabled — a new invoice needs one specific job.
 import { useEffect, useRef, useState } from 'react'
 import JobFinanceTab from './JobFinanceTab'
 import JobPaymentsTab from './JobPaymentsTab'
@@ -42,8 +44,9 @@ export default function JobFinancePanel({ job }) {
   }, [toast])
 
   return (
-    <div>
-      <div className="flex items-center justify-between border-b border-gray-200 px-5 pt-3">
+    <div className="flex h-full flex-col">
+      {/* Constant header — sub-tabs + +Invoice. Never scrolls. */}
+      <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-200 px-5 pt-3">
         <div className="flex gap-1">
           {SUBTABS.map(t => (
             <button
@@ -95,13 +98,16 @@ export default function JobFinancePanel({ job }) {
       </div>
 
       {toast && (
-        <div className="mx-5 mt-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-700">
+        <div className="mx-5 mt-3 flex-shrink-0 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-700">
           {toast}
         </div>
       )}
 
-      {section === 'invoices' && <JobFinanceTab job={job} refreshKey={refreshKey} />}
-      {section === 'payments' && <JobPaymentsTab job={job} />}
+      {/* Scrolling content region — the sub-tab component owns its own scroll. */}
+      <div className="min-h-0 flex-1">
+        {section === 'invoices' && <JobFinanceTab job={job} refreshKey={refreshKey} />}
+        {section === 'payments' && <JobPaymentsTab job={job} />}
+      </div>
 
       {createMode && job?.id && (
         <JobInvoiceCreateModal
