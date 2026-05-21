@@ -41,6 +41,16 @@ function Empty({ label }) {
   return <p className="py-10 text-center text-sm text-gray-400">{label}</p>
 }
 
+// Staff preview: /client-portal?preview=<clientId> renders the portal for that
+// client. The portal_* RPCs take an optional p_client_id only staff may use.
+function previewClientId() {
+  return new URLSearchParams(window.location.search).get('preview') || null
+}
+function rpcArgs() {
+  const p = previewClientId()
+  return p ? { p_client_id: p } : {}
+}
+
 // ── Client Information ───────────────────────────────────────────────────────
 function ClientInfoView({ client, jobs }) {
   const name =
@@ -117,7 +127,7 @@ function ScheduleView() {
     return new Date(n.getFullYear(), n.getMonth(), 1)
   })
   useEffect(() => {
-    supabase.rpc('portal_schedule').then(({ data }) => setRows(data || []))
+    supabase.rpc('portal_schedule', rpcArgs()).then(({ data }) => setRows(data || []))
   }, [])
   if (rows === null) return <Loading />
 
@@ -224,7 +234,7 @@ function ScheduleView() {
 function DailyLogsView() {
   const [rows, setRows] = useState(null)
   useEffect(() => {
-    supabase.rpc('portal_daily_logs').then(({ data }) => setRows(data || []))
+    supabase.rpc('portal_daily_logs', rpcArgs()).then(({ data }) => setRows(data || []))
   }, [])
   if (rows === null) return <Loading />
   if (rows.length === 0) return <Empty label="No daily logs yet." />
@@ -253,7 +263,7 @@ function DailyLogsView() {
 function ChangeOrdersView() {
   const [rows, setRows] = useState(null)
   useEffect(() => {
-    supabase.rpc('portal_change_orders').then(({ data }) => setRows(data || []))
+    supabase.rpc('portal_change_orders', rpcArgs()).then(({ data }) => setRows(data || []))
   }, [])
   if (rows === null) return <Loading />
   if (rows.length === 0) return <Empty label="No change orders yet." />
@@ -306,7 +316,7 @@ function InvoicesView({ jobs, client }) {
   const [rows, setRows] = useState(null)
   const [payInv, setPayInv] = useState(null)
   useEffect(() => {
-    supabase.rpc('portal_invoices').then(({ data }) => setRows(data || []))
+    supabase.rpc('portal_invoices', rpcArgs()).then(({ data }) => setRows(data || []))
   }, [])
   const jobsById = Object.fromEntries(jobs.map(j => [j.id, j]))
   if (rows === null) return <Loading />
@@ -509,20 +519,23 @@ export default function PortalShell() {
         navigate('/client-portal/login')
         return
       }
-      const { data: p } = await supabase
-        .from('client_portals')
-        .select('*')
-        .eq('auth_user_id', session.user.id)
-        .eq('status', 'active')
-        .maybeSingle()
+      const pv = previewClientId()
+      const { data: p } = pv
+        ? await supabase.from('client_portals').select('*').eq('client_id', pv).maybeSingle()
+        : await supabase
+            .from('client_portals')
+            .select('*')
+            .eq('auth_user_id', session.user.id)
+            .eq('status', 'active')
+            .maybeSingle()
       if (cancelled) return
       if (!p) {
         navigate('/client-portal/login')
         return
       }
       const [{ data: c }, { data: js }] = await Promise.all([
-        supabase.rpc('portal_client_info'),
-        supabase.rpc('portal_jobs'),
+        supabase.rpc('portal_client_info', rpcArgs()),
+        supabase.rpc('portal_jobs', rpcArgs()),
       ])
       if (cancelled) return
       setPortal(p)
@@ -552,6 +565,11 @@ export default function PortalShell() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      {previewClientId() && (
+        <div className="bg-amber-400 px-4 py-1.5 text-center text-xs font-semibold text-amber-900">
+          Staff preview — this is the client's view of their portal
+        </div>
+      )}
       {/* Header */}
       <header className="bg-[#3A5038]">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-3">

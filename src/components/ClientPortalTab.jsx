@@ -221,9 +221,19 @@ export default function ClientPortalTab({ clientId, clientData }) {
             Lets this client log in to view their jobs at a separate portal.
           </p>
         </div>
-        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${badge.bg} ${badge.text}`}>
-          {badge.label}
-        </span>
+        <div className="flex items-center gap-2">
+          {portal && (
+            <button
+              onClick={() => window.open(`/client-portal?preview=${clientId}`, '_blank')}
+              className="rounded-lg border border-green-700 px-3 py-1 text-xs font-semibold text-green-700 hover:bg-green-50"
+            >
+              Preview Portal
+            </button>
+          )}
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${badge.bg} ${badge.text}`}>
+            {badge.label}
+          </span>
+        </div>
       </div>
 
       {error && (
