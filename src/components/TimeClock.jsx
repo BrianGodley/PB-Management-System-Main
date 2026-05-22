@@ -388,7 +388,7 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
         </h2>
 
         {/* Right: clock-in/out button + manual add — desktop only (mobile uses the hero button) */}
-        <div className="hidden lg:flex items-center gap-3 ml-auto">
+        <div className="hidden lg:flex items-center gap-3 ml-auto mr-6">
           {/* Live status when clocked in */}
           {isClockedIn && myOpenEntry && (
             <div className="text-xs text-gray-500">
@@ -404,11 +404,7 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
           {/* The dynamic Clock In / Clock Out button */}
           <button
             onClick={isClockedIn ? handleClockOut : handleClockIn}
-            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold shadow-sm transition-all ${
-              isClockedIn
-                ? 'bg-red-600 hover:bg-red-700 text-white'
-                : 'bg-green-700 hover:bg-green-800 text-white'
-            }`}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-all bg-blue-600 hover:bg-blue-700 text-white"
           >
             <span
               className={`w-2 h-2 rounded-full bg-white ${isClockedIn ? 'animate-pulse' : ''}`}
@@ -419,7 +415,7 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
           {/* Manual Shift button */}
           <button
             onClick={openNew}
-            className="btn-secondary text-sm px-3 py-1.5 flex items-center gap-1.5"
+            className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path

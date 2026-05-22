@@ -309,12 +309,12 @@ export default function DailyLogs({ jobs = [], selectedJob, statusFilter = 'open
         </h2>
         <button
           onClick={openNew}
-          className="btn-primary text-sm px-3 py-1.5 flex items-center gap-1.5"
+          className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg flex items-center gap-1.5 mr-6"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
-          New Log
+          New Daily Log
         </button>
       </div>
 

@@ -4347,10 +4347,14 @@ function JobTasksPanel({ job }) {
 
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-lg font-bold text-gray-900">Tasks</h2>
-          <p className="text-xs text-gray-400">{job.client_name || job.name}</p>
-        </div>
+        <h2 className="text-sm font-semibold text-gray-700">
+          Tasks{' '}
+          {tasks.length > 0 && (
+            <span className="text-gray-400 font-normal">
+              ({completed}/{tasks.length})
+            </span>
+          )}
+        </h2>
         <div className="flex items-center gap-2">
           {tasks.length > 0 && (
             <button
@@ -4363,7 +4367,7 @@ function JobTasksPanel({ job }) {
           <button
             onClick={addTask}
             disabled={adding}
-            className="text-xs px-3 py-1.5 rounded-lg bg-green-700 text-white font-medium hover:bg-green-800 transition-colors disabled:opacity-50"
+            className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
           >
             {adding ? 'Adding…' : '+ Add Task'}
           </button>

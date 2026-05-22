@@ -2043,7 +2043,7 @@ export default function ScheduleCalendar({
           {/* Toolbar: items-center → all controls share the same vertical center.
               h-9 forces a consistent row height so MonthNav (small icon buttons)
               doesn't ride higher than the chunkier action buttons. */}
-          <div className="flex items-center justify-between gap-2 mb-2 h-9 px-6">
+          <div className="flex items-center justify-center gap-2 mb-2 h-12 px-6">
             {/* Left: Add Schedule + Exceptions */}
             <div className="flex items-center gap-1.5 flex-shrink-0 h-full">
               <button

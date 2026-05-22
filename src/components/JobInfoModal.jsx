@@ -551,7 +551,6 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
       {/* Header */}
       <div className="px-5 pt-5 pb-3 border-b border-gray-100 flex items-start justify-between flex-shrink-0">
         <div className="min-w-0 flex-1">
-          <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-0.5">Job</p>
           <h2 className="text-lg font-bold text-gray-900 truncate">
             {job.name || job.client_name}
           </h2>
