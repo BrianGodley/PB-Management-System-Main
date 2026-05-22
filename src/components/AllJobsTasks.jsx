@@ -6,6 +6,7 @@
 // editing stays in the per-job panel). Click a job to open it.
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import { fetchAllPaginated } from '../lib/fetchAll'
 
 function isJobOpen(j) {
   const s = j?.status || 'active'
@@ -20,11 +21,16 @@ export default function AllJobsTasks({ jobs = [], statusFilter = 'open', onSelec
     let alive = true
     ;(async () => {
       setLoading(true)
-      const { data } = await supabase
-        .from('job_tasks')
-        .select('job_id, task_name, status, sort_order, created_at')
-        .order('sort_order')
-        .order('created_at')
+      // Paginate past the 1k-row PostgREST cap so tasks on closed/older jobs
+      // aren't truncated out of the all-jobs roll-up.
+      const { data } = await fetchAllPaginated(() =>
+        supabase
+          .from('job_tasks')
+          .select('job_id, task_name, status, sort_order, created_at')
+          .order('sort_order')
+          .order('created_at')
+          .order('id')
+      )
       if (alive) {
         setTasks(data || [])
         setLoading(false)

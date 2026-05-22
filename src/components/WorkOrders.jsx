@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { fetchAllPaginated } from '../lib/fetchAll'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
@@ -1867,13 +1868,25 @@ export default function WorkOrders({ jobs, selectedJob, jobStatusFilter = 'open'
     setLoading(true)
     setError(null)
 
-    const woBase = supabase
-      .from('work_orders')
-      .select('*')
-      .order('module_type')
-      .order('is_subcontractor')
+    // Work orders: per-job is one scoped query; all-jobs must paginate past
+    // the 1k-row PostgREST cap so closed jobs' work orders aren't truncated.
+    const woPromise = jobId
+      ? supabase
+          .from('work_orders')
+          .select('*')
+          .eq('job_id', jobId)
+          .order('module_type')
+          .order('is_subcontractor')
+      : fetchAllPaginated(() =>
+          supabase
+            .from('work_orders')
+            .select('*')
+            .order('module_type')
+            .order('is_subcontractor')
+            .order('id')
+        )
     const [woRes, ctRes, mapRes, equipRes, fieldMapRes, crewsRes, subsRes] = await Promise.all([
-      jobId ? woBase.eq('job_id', jobId) : woBase,
+      woPromise,
       supabase.from('crew_types').select('*').order('sort_order').order('name'),
       supabase.from('module_equipment_map').select('module_type, equipment_id'),
       supabase.from('master_equipment').select('*'),
