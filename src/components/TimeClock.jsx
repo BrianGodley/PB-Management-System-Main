@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { fetchAllPaginated } from '../lib/fetchAll'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LanguageContext'
 
@@ -204,15 +205,27 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
 
   async function fetchEntries() {
     setLoading(true)
-    let q = supabase
-      .from('time_entries')
-      .select('*')
-      .order('date', { ascending: false })
-      .order('time_in', { ascending: true })
-
-    if (selectedJob !== 'all') q = q.eq('job_id', selectedJob)
-
-    const { data, error } = await q
+    // All-jobs view must paginate. PostgREST caps a single response at 1,000
+    // rows; ordered date-descending, that window is entirely recent (open-job)
+    // activity, so closed jobs' older entries never load and the Closed filter
+    // shows nothing. Per-job stays one scoped query — a single job is always
+    // well under the cap.
+    const { data, error } =
+      selectedJob === 'all'
+        ? await fetchAllPaginated(() =>
+            supabase
+              .from('time_entries')
+              .select('*')
+              .order('date', { ascending: false })
+              .order('time_in', { ascending: true })
+              .order('id', { ascending: true })
+          )
+        : await supabase
+            .from('time_entries')
+            .select('*')
+            .eq('job_id', selectedJob)
+            .order('date', { ascending: false })
+            .order('time_in', { ascending: true })
     if (error) console.error('fetchEntries:', error)
     if (data) {
       let rows = data

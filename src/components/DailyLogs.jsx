@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { fetchAllPaginated } from '../lib/fetchAll'
 import { useAuth } from '../contexts/AuthContext'
 
 // ── Constants ────────────────────────────────────────────────
@@ -92,15 +93,26 @@ export default function DailyLogs({ jobs = [], selectedJob, statusFilter = 'open
 
   async function fetchLogs() {
     setLoading(true)
-    let q = supabase
-      .from('daily_logs')
-      .select('*, daily_log_photos(*)')
-      .order('date', { ascending: false })
-      .order('created_at', { ascending: false })
-
-    if (selectedJob !== 'all') q = q.eq('job_id', selectedJob)
-
-    const { data, error } = await q
+    // All-jobs view must paginate. PostgREST caps a single response at 1,000
+    // rows; ordered date-descending, that window is entirely recent (open-job)
+    // activity, so closed jobs' older logs never load and the Closed filter
+    // shows nothing. Per-job stays one scoped query — always under the cap.
+    const { data, error } =
+      selectedJob === 'all'
+        ? await fetchAllPaginated(() =>
+            supabase
+              .from('daily_logs')
+              .select('*, daily_log_photos(*)')
+              .order('date', { ascending: false })
+              .order('created_at', { ascending: false })
+              .order('id', { ascending: true })
+          )
+        : await supabase
+            .from('daily_logs')
+            .select('*, daily_log_photos(*)')
+            .eq('job_id', selectedJob)
+            .order('date', { ascending: false })
+            .order('created_at', { ascending: false })
     if (error) console.error('fetchLogs:', error)
     if (data) {
       let rows = data
