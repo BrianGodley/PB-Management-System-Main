@@ -3,12 +3,16 @@
 // database unless the user clicks "Save as New Estimate".
 //
 // Layout:
-//   • Frozen top section — a "New GPMD" + "New Total Price" field side by
-//     side, and one shared GpmdBar. Editing either field bulk-applies to
+//   • Frozen top section — a "New Overall GPMD" + "New Overall Price" field
+//     side by side, and one shared GpmdBar. Editing either bulk-applies to
 //     every module so the bar recomputes.
 //   • Scrolling section below — a per-project / per-module table where each
-//     row's GPMD *or* Price can be edited. Those edits feed the same bar.
+//     row's GPMD *or* Price can be edited freely. Those edits feed the bar.
 //   • One "Save as New Estimate" button.
+//
+// GPMD is the canonical override. A row's Price input keeps the raw text the
+// user typed (priceDrafts) so the field is freely overwritable; the GPMD it
+// converts to is stored alongside in the gpmd drafts for the calc + save.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useMemo } from 'react'
 import GpmdBar from './modules/GpmdBar'
@@ -17,6 +21,11 @@ const fmt = v => '$' + Math.round(v || 0).toLocaleString()
 const n = v => {
   const x = parseFloat(v)
   return Number.isFinite(x) ? x : 0
+}
+const omit = (obj, id) => {
+  const next = { ...obj }
+  delete next[id]
+  return next
 }
 
 export default function EstimateWhatIfModal({
@@ -34,7 +43,7 @@ export default function EstimateWhatIfModal({
   const subGp = et.subCost * (derivedEstSubRate || 0)
   const naturalGpmd = et.manDays > 0 ? Math.round(adjustedEstimateGP / et.manDays) : 0
 
-  // GP ⇄ Price conversions (price = base + (gp + subGp) × 1.12).
+  // GP ⇄ Price (price = base + (gp + subGp) × 1.12).
   const gpFromPrice = (price, b, sg) => Math.max(0, (n(price) - b) / 1.12 - sg)
 
   // ── Per-project + per-module table (natural values prefilled) ──────────────
@@ -84,12 +93,31 @@ export default function EstimateWhatIfModal({
 
   const allModules = useMemo(() => projTable.flatMap(p => p.modules), [projTable])
 
-  // Drafts keyed by id. Empty string = "use the natural value". GPMD is the
-  // canonical stored value; per-row price inputs convert into it.
+  // GPMD drafts are canonical ('' = use natural). priceDrafts hold the raw
+  // text typed into a Price input so that field stays freely overwritable.
   const [projDrafts, setProjDrafts] = useState({})
   const [modDrafts, setModDrafts] = useState({})
-  const setProj = (id, v) => setProjDrafts(p => ({ ...p, [id]: v }))
-  const setMod = (id, v) => setModDrafts(p => ({ ...p, [id]: v }))
+  const [projPriceDrafts, setProjPriceDrafts] = useState({})
+  const [modPriceDrafts, setModPriceDrafts] = useState({})
+
+  // GPMD edit → store GPMD, drop any stale price text for that row.
+  const onProjGpmd = (id, v) => {
+    setProjDrafts(p => ({ ...p, [id]: v }))
+    setProjPriceDrafts(p => omit(p, id))
+  }
+  const onModGpmd = (id, v) => {
+    setModDrafts(p => ({ ...p, [id]: v }))
+    setModPriceDrafts(p => omit(p, id))
+  }
+  // Price edit → keep the raw text AND store the GPMD it converts to.
+  const onProjPrice = (id, rawText, gpmd) => {
+    setProjPriceDrafts(p => ({ ...p, [id]: rawText }))
+    setProjDrafts(p => ({ ...p, [id]: gpmd }))
+  }
+  const onModPrice = (id, rawText, gpmd) => {
+    setModPriceDrafts(p => ({ ...p, [id]: rawText }))
+    setModDrafts(p => ({ ...p, [id]: gpmd }))
+  }
 
   // ── Scenario rollup ────────────────────────────────────────────────────────
   const s3Rows = projTable.map(proj => {
@@ -117,10 +145,14 @@ export default function EstimateWhatIfModal({
   const scenPrice = s3Rows.reduce((s, r) => s + r.projPrice, 0)
   const scenGpmd = et.manDays > 0 ? Math.round(scenGp / et.manDays) : 0
 
-  // ── Top fields — bulk controls (stale after row edits; the bar is the
-  //    live truth). ───────────────────────────────────────────────────────────
+  // ── Top fields — bulk controls ─────────────────────────────────────────────
   const [topGpmd, setTopGpmd] = useState(String(naturalGpmd || ''))
   const [topPrice, setTopPrice] = useState(String(Math.round(et.price) || ''))
+
+  function clearPriceDrafts() {
+    setProjPriceDrafts({})
+    setModPriceDrafts({})
+  }
 
   function applyUniformGpmd(v) {
     setTopGpmd(v)
@@ -128,6 +160,7 @@ export default function EstimateWhatIfModal({
     if (!Number.isFinite(g) || g < 0) return
     setProjDrafts({})
     setModDrafts(Object.fromEntries(allModules.map(m => [m.id, String(g)])))
+    clearPriceDrafts()
     setTopPrice(String(Math.round(baseCost + (et.manDays * g + subGp) * 1.12)))
   }
 
@@ -137,6 +170,7 @@ export default function EstimateWhatIfModal({
     if (!Number.isFinite(p) || p <= 0) return
     const targetGp = gpFromPrice(p, baseCost, subGp)
     setProjDrafts({})
+    clearPriceDrafts()
     if (scenGp > 0) {
       const ratio = targetGp / scenGp
       const next = {}
@@ -157,6 +191,7 @@ export default function EstimateWhatIfModal({
   function resetAll() {
     setProjDrafts({})
     setModDrafts({})
+    clearPriceDrafts()
     setTopGpmd(String(naturalGpmd || ''))
     setTopPrice(String(Math.round(et.price) || ''))
   }
@@ -232,7 +267,7 @@ export default function EstimateWhatIfModal({
           <div className="mb-3 flex flex-wrap items-end gap-4">
             <div>
               <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-                New GPMD
+                New Overall GPMD
               </label>
               <div className="relative">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">
@@ -249,7 +284,7 @@ export default function EstimateWhatIfModal({
             </div>
             <div>
               <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-gray-500">
-                New Total Price
+                New Overall Price
               </label>
               <div className="relative">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">
@@ -280,7 +315,9 @@ export default function EstimateWhatIfModal({
         {/* ── Scrolling section: per-project / per-module tweaks ── */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
           <div className="mb-2 flex items-baseline justify-between">
-            <h3 className="text-sm font-bold text-gray-800">Tweak individual projects &amp; modules</h3>
+            <h3 className="text-sm font-bold text-gray-800">
+              Tweak individual projects &amp; modules
+            </h3>
             <button
               onClick={resetAll}
               className="text-[11px] text-gray-400 underline hover:text-gray-700"
@@ -310,11 +347,15 @@ export default function EstimateWhatIfModal({
                   <ProjectRows
                     key={row.id}
                     row={row}
-                    projDraft={projDrafts[row.id] || ''}
-                    onProjChange={v => setProj(row.id, v)}
-                    modDrafts={modDrafts}
-                    onModChange={setMod}
                     gpFromPrice={gpFromPrice}
+                    projGpmdDraft={projDrafts[row.id] || ''}
+                    projPriceDraft={projPriceDrafts[row.id]}
+                    onProjGpmd={onProjGpmd}
+                    onProjPrice={onProjPrice}
+                    modDrafts={modDrafts}
+                    modPriceDrafts={modPriceDrafts}
+                    onModGpmd={onModGpmd}
+                    onModPrice={onModPrice}
                   />
                 ))}
                 <tr className="border-t-2 border-amber-200 bg-amber-50 font-semibold text-gray-800">
@@ -362,18 +403,40 @@ export default function EstimateWhatIfModal({
   )
 }
 
-// One project row + its module sub-rows. Each row has a linked GPMD + Price
-// input — editing one writes the GPMD draft, the other shows the derived value.
-function ProjectRows({ row, projDraft, onProjChange, modDrafts, onModChange, gpFromPrice }) {
-  const projOvOk = projDraft !== '' && Number.isFinite(parseFloat(projDraft))
-  // Project price input value: derived from the GPMD draft when one is set.
-  const projPriceVal = projOvOk
-    ? String(Math.round(row.baseCost + (row.manDays * parseFloat(projDraft) + row.subGp) * 1.12))
-    : ''
-  const projPriceToGpmd = price => {
-    const gp = gpFromPrice(price, row.baseCost, row.subGp)
-    return row.manDays > 0 ? String(Math.round(gp / row.manDays)) : ''
+// One project row + its module sub-rows. Each row has a GPMD input and a
+// Price input — editing either updates the row; the Price input keeps the
+// raw text typed so it can be freely overwritten.
+function ProjectRows({
+  row,
+  gpFromPrice,
+  projGpmdDraft,
+  projPriceDraft,
+  onProjGpmd,
+  onProjPrice,
+  modDrafts,
+  modPriceDrafts,
+  onModGpmd,
+  onModPrice,
+}) {
+  // Convert a typed price into the GPMD it implies for an entity.
+  const toGpmd = (price, base, subGp, manDays) => {
+    if (price === '') return ''
+    const gp = gpFromPrice(price, base, subGp)
+    return manDays > 0 ? String(Math.round(gp / manDays)) : '0'
   }
+
+  const projOvOk = projGpmdDraft !== '' && Number.isFinite(parseFloat(projGpmdDraft))
+  // Price field value: the raw text if the user typed a price here, else the
+  // price derived from a GPMD draft, else blank (placeholder = natural).
+  const projPriceVal =
+    projPriceDraft !== undefined
+      ? projPriceDraft
+      : projOvOk
+        ? String(
+            Math.round(row.baseCost + (row.manDays * parseFloat(projGpmdDraft) + row.subGp) * 1.12)
+          )
+        : ''
+
   return (
     <>
       <tr className="border-t border-gray-100 bg-white">
@@ -382,9 +445,9 @@ function ProjectRows({ row, projDraft, onProjChange, modDrafts, onModChange, gpF
         <td className="px-3 py-2 text-right text-gray-500">${row.natGpmd.toLocaleString()}</td>
         <td className="px-3 py-2 text-right">
           <DollarInput
-            value={projDraft}
+            value={projGpmdDraft}
             placeholder={String(row.natGpmd)}
-            onChange={onProjChange}
+            onChange={v => onProjGpmd(row.id, v)}
             wide
           />
         </td>
@@ -392,7 +455,9 @@ function ProjectRows({ row, projDraft, onProjChange, modDrafts, onModChange, gpF
           <DollarInput
             value={projPriceVal}
             placeholder={String(Math.round(row.natPrice))}
-            onChange={v => onProjChange(v === '' ? '' : projPriceToGpmd(v))}
+            onChange={v =>
+              onProjPrice(row.id, v, toGpmd(v, row.baseCost, row.subGp, row.manDays))
+            }
             wide
           />
         </td>
@@ -401,15 +466,17 @@ function ProjectRows({ row, projDraft, onProjChange, modDrafts, onModChange, gpF
         </td>
       </tr>
       {row.modUsed.map(m => {
-        const draft = modDrafts[m.id] || ''
-        const modOvOk = draft !== '' && Number.isFinite(parseFloat(draft))
-        const modPriceVal = modOvOk
-          ? String(Math.round(m.baseCost + (m.manDays * parseFloat(draft) + m.subGp) * 1.12))
-          : ''
-        const modPriceToGpmd = price => {
-          const gp = gpFromPrice(price, m.baseCost, m.subGp)
-          return m.manDays > 0 ? String(Math.round(gp / m.manDays)) : ''
-        }
+        const gpmdDraft = modDrafts[m.id] || ''
+        const priceDraft = modPriceDrafts[m.id]
+        const modOvOk = gpmdDraft !== '' && Number.isFinite(parseFloat(gpmdDraft))
+        const modPriceVal =
+          priceDraft !== undefined
+            ? priceDraft
+            : modOvOk
+              ? String(
+                  Math.round(m.baseCost + (m.manDays * parseFloat(gpmdDraft) + m.subGp) * 1.12)
+                )
+              : ''
         return (
           <tr key={m.id} className={`border-t border-gray-50 ${projOvOk ? 'opacity-50' : ''}`}>
             <td className="py-1.5 pl-8 pr-3 text-gray-600">↳ {m.name}</td>
@@ -417,10 +484,10 @@ function ProjectRows({ row, projDraft, onProjChange, modDrafts, onModChange, gpF
             <td className="px-3 py-1.5 text-right text-gray-400">${m.natGpmd.toLocaleString()}</td>
             <td className="px-3 py-1.5 text-right">
               <DollarInput
-                value={draft}
+                value={gpmdDraft}
                 placeholder={String(m.natGpmd)}
                 disabled={projOvOk}
-                onChange={v => onModChange(m.id, v)}
+                onChange={v => onModGpmd(m.id, v)}
               />
             </td>
             <td className="px-3 py-1.5 text-right">
@@ -428,7 +495,7 @@ function ProjectRows({ row, projDraft, onProjChange, modDrafts, onModChange, gpF
                 value={modPriceVal}
                 placeholder={String(Math.round(m.natPrice))}
                 disabled={projOvOk}
-                onChange={v => onModChange(m.id, v === '' ? '' : modPriceToGpmd(v))}
+                onChange={v => onModPrice(m.id, v, toGpmd(v, m.baseCost, m.subGp, m.manDays))}
               />
             </td>
             <td className="px-3 py-1.5 text-right text-gray-700">
