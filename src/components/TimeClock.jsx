@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { fetchAllPaginated } from '../lib/fetchAll'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LanguageContext'
 
@@ -99,19 +98,6 @@ function fmtHours(mins) {
 }
 
 // ── Main Component ───────────────────────────────────────────
-// Open vs closed job-id set for all-jobs views, matching the JobsList sidebar
-// Open/Closed filter. Open = active or on_hold; Closed = everything else.
-function jobIdsByStatus(jobs, statusFilter) {
-  const isOpen = j => {
-    const s = j?.status || 'active'
-    return s === 'active' || s === 'on_hold'
-  }
-  return new Set(
-    (jobs || [])
-      .filter(j => (statusFilter === 'closed' ? !isOpen(j) : isOpen(j)))
-      .map(j => j.id)
-  )
-}
 
 export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open' }) {
   const { user } = useAuth()
@@ -127,6 +113,8 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
   const [payrollWeekStart, setPayrollWeekStart] = useState(0) // 0=Sunday
   const [myWeekEntries, setMyWeekEntries] = useState([])
   const [page, setPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const reqId = useRef(0)
 
   const jobMap = Object.fromEntries(jobs.map(j => [j.id, j.name || j.client_name]))
 
@@ -185,22 +173,21 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
     return () => clearInterval(t)
   }, [])
 
-  // jobs.length is included so the all-jobs view re-fetches once the jobs
-  // list finishes loading — without it, a first paint with an empty jobs
-  // prop filters every entry out and never recovers.
+  // Fetch the current page from the server when the view or page changes.
   useEffect(() => {
     fetchEntries()
-  }, [selectedJob, statusFilter, jobs.length])
+  }, [selectedJob, statusFilter, page])
 
   // Reset to the first page when the job selection or Open/Closed filter changes.
   useEffect(() => {
     setPage(1)
   }, [selectedJob, statusFilter])
 
-  // Derive the current user's open (not yet clocked-out) entry for today
-  const myOpenEntry = entries.find(
-    e => e.created_by === user?.id && !e.time_out && e.date === todayDate()
-  )
+  // Derive the current user's open (not yet clocked-out) entry for today.
+  // Read from myWeekEntries (the user's full week) rather than the paged
+  // `entries` list, so it's still found when the open shift isn't on the
+  // current page.
+  const myOpenEntry = myWeekEntries.find(e => !e.time_out && e.date === todayDate())
   const isClockedIn = !!myOpenEntry
 
   // Personal time stats for mobile UI
@@ -216,37 +203,43 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
     .reduce((sum, e) => sum + (diffMins(e.time_in, e.time_out) || 0), 0)
 
   async function fetchEntries() {
+    const myReq = ++reqId.current
     setLoading(true)
-    // All-jobs view must paginate. PostgREST caps a single response at 1,000
-    // rows; ordered date-descending, that window is entirely recent (open-job)
-    // activity, so closed jobs' older entries never load and the Closed filter
-    // shows nothing. Per-job stays one scoped query — a single job is always
-    // well under the cap.
-    const { data, error } =
-      selectedJob === 'all'
-        ? await fetchAllPaginated(() =>
-            supabase
-              .from('time_entries')
-              .select('*')
-              .order('date', { ascending: false })
-              .order('time_in', { ascending: true })
-              .order('id', { ascending: true })
-          )
-        : await supabase
-            .from('time_entries')
-            .select('*')
-            .eq('job_id', selectedJob)
-            .order('date', { ascending: false })
-            .order('time_in', { ascending: true })
+
+    // Server-side pagination — fetch only the current 50-row page plus an
+    // exact total count, so the view loads fast no matter how many entries
+    // exist. The Open/Closed filter runs server-side via a jobs!inner embed.
+    const from = (page - 1) * ENTRIES_PER_PAGE
+    const to = from + ENTRIES_PER_PAGE - 1
+
+    let q
+    if (selectedJob === 'all') {
+      q = supabase
+        .from('time_entries')
+        .select('*, jobs!inner(status)', { count: 'exact' })
+      q =
+        statusFilter === 'closed'
+          ? q.not('jobs.status', 'in', '(active,on_hold)')
+          : q.or('status.in.(active,on_hold),status.is.null', { foreignTable: 'jobs' })
+    } else {
+      q = supabase
+        .from('time_entries')
+        .select('*', { count: 'exact' })
+        .eq('job_id', selectedJob)
+    }
+
+    const { data, count, error } = await q
+      .order('date', { ascending: false })
+      .order('time_in', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, to)
+
+    // Drop results from a superseded fetch (filter or page changed mid-flight).
+    if (myReq !== reqId.current) return
     if (error) console.error('fetchEntries:', error)
-    if (data) {
-      let rows = data
-      // All-jobs view: keep only entries whose job matches Open/Closed.
-      if (selectedJob === 'all') {
-        const allowed = jobIdsByStatus(jobs, statusFilter)
-        rows = rows.filter(e => allowed.has(e.job_id))
-      }
-      setEntries(rows)
+    if (!error) {
+      setEntries(data || [])
+      setTotalCount(count || 0)
     }
     setLoading(false)
 
@@ -334,7 +327,7 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
   async function deleteEntry(entry) {
     if (!confirm(`Delete time entry for ${entry.employee_name}?`)) return
     await supabase.from('time_entries').delete().eq('id', entry.id)
-    setEntries(prev => prev.filter(e => e.id !== entry.id))
+    fetchEntries()
   }
 
   async function clockOut(entry) {
@@ -377,11 +370,10 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
     fetchEntries()
   }
 
-  // Client-side pagination for the desktop entries table.
-  const totalPages = Math.max(1, Math.ceil(entries.length / ENTRIES_PER_PAGE))
+  // Server-side pagination — `entries` already holds just the current page.
+  const totalPages = Math.max(1, Math.ceil(totalCount / ENTRIES_PER_PAGE))
   const safePage = Math.min(page, totalPages)
   const pageStart = (safePage - 1) * ENTRIES_PER_PAGE
-  const pageEntries = entries.slice(pageStart, pageStart + ENTRIES_PER_PAGE)
 
   return (
     <div className="flex flex-col h-full">
@@ -390,8 +382,8 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
         {/* Left: title + entry count */}
         <h2 className="text-sm font-semibold text-gray-700 flex-shrink-0">
           Time Clock{' '}
-          {entries.length > 0 && (
-            <span className="text-gray-400 font-normal">({entries.length} entries)</span>
+          {totalCount > 0 && (
+            <span className="text-gray-400 font-normal">({totalCount} entries)</span>
           )}
         </h2>
 
@@ -446,7 +438,7 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
         <div className="flex justify-center py-12">
           <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-green-700" />
         </div>
-      ) : entries.length === 0 ? (
+      ) : totalCount === 0 ? (
         <>
           {/* Mobile hero shown even with no entries */}
           <MobileHero
@@ -478,7 +470,7 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
         <>
           {/* Pagination — desktop table only; controls on the left, clear of
               the floating Ask Sam button at the bottom-right. */}
-          {entries.length > ENTRIES_PER_PAGE && (
+          {totalCount > ENTRIES_PER_PAGE && (
             <div className="hidden lg:flex items-center gap-3 mb-2 flex-shrink-0">
               <div className="flex items-center gap-1">
                 <button
@@ -500,7 +492,7 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
                 </button>
               </div>
               <span className="text-xs text-gray-500">
-                {pageStart + 1}–{pageStart + pageEntries.length} of {entries.length}
+                {pageStart + 1}–{pageStart + entries.length} of {totalCount}
               </span>
             </div>
           )}
@@ -534,7 +526,7 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 bg-white">
-                {pageEntries.map(entry => {
+                {entries.map(entry => {
                   const { total, ot } = calcTimes(entry.time_in, entry.time_out)
                   const isClockedIn = !entry.time_out
                   return (
