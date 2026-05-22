@@ -298,10 +298,17 @@ export default function EstimateWhatIfModal({
                   type="text"
                   inputMode="decimal"
                   value={topPrice}
-                  onChange={e => applyTotalPrice(e.target.value)}
+                  onChange={e => setTopPrice(e.target.value)}
+                  onBlur={() => applyTotalPrice(topPrice)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') applyTotalPrice(topPrice)
+                  }}
                   className="input w-44 pl-7 text-sm"
                 />
               </div>
+              <p className="mt-0.5 text-[9px] text-gray-400">
+                Press Enter or click away to apply
+              </p>
             </div>
             <p className="pb-1.5 text-xs text-gray-500">
               Current GPMD{' '}
