@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { fetchAllPaginated } from '../lib/fetchAll'
 import { useAuth } from '../contexts/AuthContext'
 import MasterRates from './MasterRates'
 import { DEFAULT_ESTIMATE_GPMD, DEFAULT_SALES_TAX_RATE } from '../lib/companyDefaults'
+
+// Opportunities list is fetched one page at a time (server-side paging).
+const CLIENTS_PER_PAGE = 200
 
 const US_STATES = [
   'AL',
@@ -981,17 +983,39 @@ export default function Clients() {
   const [loading, setLoading] = useState(true)
   const [clientModal, setClientModal] = useState(null) // null | 'individual' | 'company'
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [tabCounts, setTabCounts] = useState({ active: 0, inactive: 0 })
   const [tab, setTab] = useState('active')
   const [clientSettingsTab, setClientSettingsTab] = useState('general')
   const [visibleCols, setVisibleCols] = useState(DEFAULT_VISIBLE)
   const [colPickerOpen, setColPickerOpen] = useState(false)
   const colPickerRef = useRef(null)
+  const reqId = useRef(0)
 
   // Cascade delete modal: { client, estCount, bidCount, woCount, onConfirm }
   const [deleteModal, setDeleteModal] = useState(null)
 
+  // Debounce the search box so we don't query on every keystroke.
   useEffect(() => {
-    fetchClients()
+    const t = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(t)
+  }, [search])
+
+  // Reset to page 1 whenever the tab or search changes.
+  useEffect(() => {
+    setPage(1)
+  }, [tab, debouncedSearch])
+
+  // Fetch the current page from the server.
+  useEffect(() => {
+    if (tab !== 'settings') fetchClients()
+  }, [tab, debouncedSearch, page])
+
+  // Tab counts (Current / Past) — lightweight count-only queries.
+  useEffect(() => {
+    fetchTabCounts()
   }, [])
 
   // Close column picker on outside click
@@ -1005,12 +1029,52 @@ export default function Clients() {
   }, [colPickerOpen])
 
   async function fetchClients() {
+    const myReq = ++reqId.current
     setLoading(true)
-    // Project's max-rows is 1k server-side; paginate to get all 1.6k+ clients.
-    const { data, error } = await fetchAllPaginated(() => supabase.from('clients').select('*'))
+    const from = (page - 1) * CLIENTS_PER_PAGE
+    const to = from + CLIENTS_PER_PAGE - 1
+
+    let q = supabase.from('clients').select('*', { count: 'exact' })
+
+    // Status tab — a null status counts as 'active'.
+    q = tab === 'active' ? q.or('status.eq.active,status.is.null') : q.eq('status', tab)
+
+    // Token search — chained .or() calls are AND-ed, so every whitespace/
+    // comma-delimited token must match somewhere across the listed fields.
+    for (const raw of debouncedSearch.trim().split(/[\s,]+/)) {
+      const t = raw.replace(/[%(),*]/g, '').trim()
+      if (!t) continue
+      q = q.or(
+        `first_name.ilike.%${t}%,last_name.ilike.%${t}%,name.ilike.%${t}%,` +
+          `company_name.ilike.%${t}%,email.ilike.%${t}%,city.ilike.%${t}%,phone.ilike.%${t}%`
+      )
+    }
+
+    const { data, count, error } = await q
+      .order('last_name', { ascending: true, nullsFirst: false })
+      .order('first_name', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, to)
+
+    // Drop results from a superseded fetch (tab/search/page changed mid-flight).
+    if (myReq !== reqId.current) return
     if (error) console.error('fetchClients error:', error.message)
-    setClients(data || [])
+    if (!error) {
+      setClients(data || [])
+      setTotalCount(count || 0)
+    }
     setLoading(false)
+  }
+
+  async function fetchTabCounts() {
+    const [activeRes, inactiveRes] = await Promise.all([
+      supabase
+        .from('clients')
+        .select('id', { count: 'exact', head: true })
+        .or('status.eq.active,status.is.null'),
+      supabase.from('clients').select('id', { count: 'exact', head: true }).eq('status', 'inactive'),
+    ])
+    setTabCounts({ active: activeRes.count || 0, inactive: inactiveRes.count || 0 })
   }
 
   async function deleteClient(id) {
@@ -1071,6 +1135,7 @@ export default function Clients() {
         await supabase.from('clients').delete().eq('id', id)
         setDeleteModal(null)
         fetchClients()
+        fetchTabCounts()
       },
     })
   }
@@ -1078,6 +1143,7 @@ export default function Clients() {
   async function setClientStatus(id, status) {
     await supabase.from('clients').update({ status }).eq('id', id)
     fetchClients()
+    fetchTabCounts()
   }
 
   function toggleCol(key) {
@@ -1087,42 +1153,6 @@ export default function Clients() {
       return next
     })
   }
-
-  // Sort: company name (for companies) or last_name → first_name
-  const sorted = [...clients].sort((a, b) => {
-    const la = (
-      a.client_type === 'company' ? a.company_name || '' : a.last_name || a.name || ''
-    ).toLowerCase()
-    const lb = (
-      b.client_type === 'company' ? b.company_name || '' : b.last_name || b.name || ''
-    ).toLowerCase()
-    if (la !== lb) return la.localeCompare(lb)
-    return (a.first_name || '').toLowerCase().localeCompare((b.first_name || '').toLowerCase())
-  })
-
-  const tabClients = sorted.filter(c => (c.status || 'active') === tab)
-
-  const filtered = tabClients.filter(c => {
-    const q = search.trim().toLowerCase()
-    if (!q) return true
-    // Token-based search so "john durso", "durso, john", "joh dur", and
-    // partial matches all find the same row. Each whitespace/comma-delimited
-    // token must appear somewhere in the searchable haystack (or the digits
-    // of the phone number when the token is numeric).
-    const haystack = [c.first_name, c.last_name, c.name, c.company_name, c.email, c.city]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase()
-    const phoneDigits = (c.phone || '').replace(/\D/g, '')
-    return q
-      .split(/[\s,]+/)
-      .filter(Boolean)
-      .every(t => {
-        if (haystack.includes(t)) return true
-        const td = t.replace(/\D/g, '')
-        return td.length > 0 && phoneDigits.includes(td)
-      })
-  })
 
   const activeCols = COLUMNS.filter(c => c.always || visibleCols.has(c.key))
 
@@ -1191,12 +1221,10 @@ export default function Clients() {
     }
   }
 
-  if (loading)
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-700" />
-      </div>
-    )
+  // Server-side pagination — `clients` already holds just the current page.
+  const totalPages = Math.max(1, Math.ceil(totalCount / CLIENTS_PER_PAGE))
+  const safePage = Math.min(page, totalPages)
+  const pageStart = (safePage - 1) * CLIENTS_PER_PAGE
 
   return (
     <div className="h-full flex flex-col">
@@ -1269,6 +1297,7 @@ export default function Clients() {
           onSave={() => {
             setClientModal(null)
             fetchClients()
+            fetchTabCounts()
           }}
           onClose={() => setClientModal(null)}
         />
@@ -1279,6 +1308,7 @@ export default function Clients() {
           onSave={() => {
             setClientModal(null)
             fetchClients()
+            fetchTabCounts()
           }}
           onClose={() => setClientModal(null)}
         />
@@ -1306,16 +1336,8 @@ export default function Clients() {
       {/* ── Active / Inactive / Settings tabs ── */}
       <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0">
         {[
-          {
-            key: 'active',
-            label: '✅ Current',
-            count: sorted.filter(c => (c.status || 'active') === 'active').length,
-          },
-          {
-            key: 'inactive',
-            label: '📦 Past',
-            count: sorted.filter(c => (c.status || 'active') === 'inactive').length,
-          },
+          { key: 'active', label: '✅ Current', count: tabCounts.active },
+          { key: 'inactive', label: '📦 Past', count: tabCounts.inactive },
           { key: 'settings', label: '⚙️ Settings', count: null },
         ].map(t => (
           <button
@@ -1456,7 +1478,11 @@ export default function Clients() {
 
           {/* ── Client table ── */}
           <div className="flex-1 overflow-y-auto min-h-0">
-            {filtered.length === 0 ? (
+            {loading ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-700" />
+              </div>
+            ) : totalCount === 0 ? (
               <div className="card text-center py-12">
                 <p className="text-4xl mb-3">👥</p>
                 <p className="text-gray-500 mb-4">
@@ -1464,11 +1490,9 @@ export default function Clients() {
                     ? 'No results match your search.'
                     : tab === 'inactive'
                       ? 'No past opportunities.'
-                      : clients.length === 0
-                        ? 'No opportunities yet.'
-                        : 'No current opportunities.'}
+                      : 'No current opportunities.'}
                 </p>
-                {tab === 'active' && clients.length === 0 && (
+                {tab === 'active' && !search && (
                   <div className="flex items-center justify-center gap-2">
                     <button onClick={() => setClientModal('individual')} className="btn-secondary">
                       Add Individual Opportunity
@@ -1497,7 +1521,7 @@ export default function Clients() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {filtered.map(client => (
+                    {clients.map(client => (
                       <tr
                         key={client.id}
                         className="group hover:bg-gray-50 transition-colors cursor-pointer"
@@ -1551,6 +1575,34 @@ export default function Clients() {
               </div>
             )}
           </div>
+
+          {/* Pagination — controls on the left, clear of the Ask Sam button */}
+          {totalCount > CLIENTS_PER_PAGE && (
+            <div className="flex items-center gap-3 pt-3 mt-1 border-t border-gray-100 flex-shrink-0">
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage(Math.max(1, safePage - 1))}
+                  disabled={safePage === 1}
+                  className="px-2.5 py-1 text-xs rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  ‹ Prev
+                </button>
+                <span className="text-xs text-gray-500 px-2">
+                  Page {safePage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage(Math.min(totalPages, safePage + 1))}
+                  disabled={safePage === totalPages}
+                  className="px-2.5 py-1 text-xs rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Next ›
+                </button>
+              </div>
+              <span className="text-xs text-gray-500">
+                {pageStart + 1}–{pageStart + clients.length} of {totalCount}
+              </span>
+            </div>
+          )}
         </>
       )}
     </div>
