@@ -1024,6 +1024,20 @@ function WorkdayExceptionsModal({ exceptions, onAdd, onDelete, onClose, recalcul
   )
 }
 
+// Open vs closed job-id set for all-jobs views, matching the JobsList sidebar
+// Open/Closed filter. Open = active or on_hold; Closed = everything else.
+function jobIdsByStatus(jobs, statusFilter) {
+  const isOpen = j => {
+    const s = j?.status || 'active'
+    return s === 'active' || s === 'on_hold'
+  }
+  return new Set(
+    (jobs || [])
+      .filter(j => (statusFilter === 'closed' ? !isOpen(j) : isOpen(j)))
+      .map(j => j.id)
+  )
+}
+
 export default function ScheduleCalendar({
   jobs = [],
   selectedJob,
@@ -1476,7 +1490,7 @@ export default function ScheduleCalendar({
 
   useEffect(() => {
     fetchItems()
-  }, [year, month, selectedJob])
+  }, [year, month, selectedJob, statusFilter])
 
   async function fetchItems() {
     setLoading(true)
@@ -1507,7 +1521,13 @@ export default function ScheduleCalendar({
 
     const { data, error } = await q
     if (error) console.error('schedule fetch:', error)
-    if (data) setItems(data)
+    let rows = data || []
+    // All-jobs view: keep only items whose job matches the Open/Closed filter.
+    if (selectedJob === 'all') {
+      const allowed = jobIdsByStatus(jobs, statusFilter)
+      rows = rows.filter(r => allowed.has(r.job_id))
+    }
+    setItems(rows)
     setLoading(false)
   }
 

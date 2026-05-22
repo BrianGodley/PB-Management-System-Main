@@ -95,7 +95,21 @@ function fmtHours(mins) {
 }
 
 // ── Main Component ───────────────────────────────────────────
-export default function TimeClock({ jobs = [], selectedJob }) {
+// Open vs closed job-id set for all-jobs views, matching the JobsList sidebar
+// Open/Closed filter. Open = active or on_hold; Closed = everything else.
+function jobIdsByStatus(jobs, statusFilter) {
+  const isOpen = j => {
+    const s = j?.status || 'active'
+    return s === 'active' || s === 'on_hold'
+  }
+  return new Set(
+    (jobs || [])
+      .filter(j => (statusFilter === 'closed' ? !isOpen(j) : isOpen(j)))
+      .map(j => j.id)
+  )
+}
+
+export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open' }) {
   const { user } = useAuth()
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(false)
@@ -168,7 +182,7 @@ export default function TimeClock({ jobs = [], selectedJob }) {
 
   useEffect(() => {
     fetchEntries()
-  }, [selectedJob])
+  }, [selectedJob, statusFilter])
 
   // Derive the current user's open (not yet clocked-out) entry for today
   const myOpenEntry = entries.find(
@@ -200,7 +214,15 @@ export default function TimeClock({ jobs = [], selectedJob }) {
 
     const { data, error } = await q
     if (error) console.error('fetchEntries:', error)
-    if (data) setEntries(data)
+    if (data) {
+      let rows = data
+      // All-jobs view: keep only entries whose job matches Open/Closed.
+      if (selectedJob === 'all') {
+        const allowed = jobIdsByStatus(jobs, statusFilter)
+        rows = rows.filter(e => allowed.has(e.job_id))
+      }
+      setEntries(rows)
+    }
     setLoading(false)
 
     // Also refresh personal week totals

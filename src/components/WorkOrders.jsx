@@ -1827,7 +1827,21 @@ function CrewGroup({
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
-export default function WorkOrders({ jobs, selectedJob }) {
+// Open vs closed job-id set for all-jobs views, matching the JobsList sidebar
+// Open/Closed filter. Open = active or on_hold; Closed = everything else.
+function jobIdsByStatus(jobs, statusFilter) {
+  const isOpen = j => {
+    const s = j?.status || 'active'
+    return s === 'active' || s === 'on_hold'
+  }
+  return new Set(
+    (jobs || [])
+      .filter(j => (statusFilter === 'closed' ? !isOpen(j) : isOpen(j)))
+      .map(j => j.id)
+  )
+}
+
+export default function WorkOrders({ jobs, selectedJob, jobStatusFilter = 'open' }) {
   const [workOrders, setWorkOrders] = useState([])
   const [crewTypes, setCrewTypes] = useState([])
   const [equipmentMap, setEquipmentMap] = useState({})
@@ -1847,7 +1861,7 @@ export default function WorkOrders({ jobs, selectedJob }) {
 
   useEffect(() => {
     fetchAll()
-  }, [jobId])
+  }, [jobId, jobStatusFilter])
 
   async function fetchAll() {
     setLoading(true)
@@ -1874,7 +1888,12 @@ export default function WorkOrders({ jobs, selectedJob }) {
       return
     }
 
-    const wos = woRes.data || []
+    let wos = woRes.data || []
+    // All-jobs view: keep only work orders whose job matches Open/Closed.
+    if (!jobId) {
+      const allowed = jobIdsByStatus(jobs, jobStatusFilter)
+      wos = wos.filter(w => allowed.has(w.job_id))
+    }
     setWorkOrders(wos)
     setCrewTypes(ctRes.data || [])
 

@@ -46,7 +46,21 @@ function getPublicUrl(path) {
 }
 
 // ── Main Component ───────────────────────────────────────────
-export default function DailyLogs({ jobs = [], selectedJob }) {
+// Open vs closed job-id set for all-jobs views, matching the JobsList sidebar
+// Open/Closed filter. Open = active or on_hold; Closed = everything else.
+function jobIdsByStatus(jobs, statusFilter) {
+  const isOpen = j => {
+    const s = j?.status || 'active'
+    return s === 'active' || s === 'on_hold'
+  }
+  return new Set(
+    (jobs || [])
+      .filter(j => (statusFilter === 'closed' ? !isOpen(j) : isOpen(j)))
+      .map(j => j.id)
+  )
+}
+
+export default function DailyLogs({ jobs = [], selectedJob, statusFilter = 'open' }) {
   const { user } = useAuth()
   const [logs, setLogs] = useState([])
   const [profiles, setProfiles] = useState({})
@@ -68,7 +82,7 @@ export default function DailyLogs({ jobs = [], selectedJob }) {
   }, [])
   useEffect(() => {
     fetchLogs()
-  }, [selectedJob])
+  }, [selectedJob, statusFilter])
 
   async function fetchProfiles() {
     const { data } = await supabase.from('profiles').select('id, full_name, email')
@@ -88,7 +102,15 @@ export default function DailyLogs({ jobs = [], selectedJob }) {
 
     const { data, error } = await q
     if (error) console.error('fetchLogs:', error)
-    if (data) setLogs(data)
+    if (data) {
+      let rows = data
+      // All-jobs view: keep only logs whose job matches Open/Closed.
+      if (selectedJob === 'all') {
+        const allowed = jobIdsByStatus(jobs, statusFilter)
+        rows = rows.filter(l => allowed.has(l.job_id))
+      }
+      setLogs(rows)
+    }
     setLoading(false)
   }
 

@@ -9,6 +9,9 @@ import WorkOrders from '../components/WorkOrders'
 import JobComparison from '../components/JobComparison'
 import TemplatesManager from '../components/TemplatesManager'
 import EmailTemplatesManager from '../components/EmailTemplatesManager'
+import AllJobsTracking from '../components/AllJobsTracking'
+import AllJobsTasks from '../components/AllJobsTasks'
+import AllJobsChangeOrders from '../components/AllJobsChangeOrders'
 import MasterCrews from './MasterCrews'
 import COEstimatePanel from '../components/COEstimatePanel'
 import CODetailModal from '../components/CODetailModal'
@@ -1388,6 +1391,7 @@ export default function JobsList() {
               <WorkOrders
                 jobs={jobs}
                 selectedJob={selectedJob === ALL_JOBS ? 'all' : selectedJob}
+                jobStatusFilter={statusFilter}
               />
             )}
 
@@ -1395,23 +1399,48 @@ export default function JobsList() {
               (selectedJobObj ? (
                 <JobComparison job={selectedJobObj} />
               ) : (
-                <div className="flex flex-col items-center justify-center h-full text-gray-400 py-20">
-                  <p className="text-4xl mb-3">📊</p>
-                  <p className="text-sm">Select a job to view the comparison</p>
-                </div>
+                <AllJobsTracking
+                  jobs={jobs}
+                  statusFilter={statusFilter}
+                  onSelectJob={setSelectedJob}
+                />
               ))}
 
             {tab === 'timeclock' && (
-              <TimeClock jobs={jobs} selectedJob={selectedJob === ALL_JOBS ? 'all' : selectedJob} />
+              <TimeClock
+                jobs={jobs}
+                selectedJob={selectedJob === ALL_JOBS ? 'all' : selectedJob}
+                statusFilter={statusFilter}
+              />
             )}
 
             {tab === 'daily-logs' && (
-              <DailyLogs jobs={jobs} selectedJob={selectedJob === ALL_JOBS ? 'all' : selectedJob} />
+              <DailyLogs
+                jobs={jobs}
+                selectedJob={selectedJob === ALL_JOBS ? 'all' : selectedJob}
+                statusFilter={statusFilter}
+              />
             )}
-            {tab === 'tasks' && <JobTasksPanel job={selectedJobObj} />}
-            {tab === 'change-orders' && (
-              <JobChangeOrdersPanel job={selectedJobObj} coDeepLink={coDeepLink} />
-            )}
+            {tab === 'tasks' &&
+              (selectedJobObj ? (
+                <JobTasksPanel job={selectedJobObj} />
+              ) : (
+                <AllJobsTasks
+                  jobs={jobs}
+                  statusFilter={statusFilter}
+                  onSelectJob={setSelectedJob}
+                />
+              ))}
+            {tab === 'change-orders' &&
+              (selectedJobObj ? (
+                <JobChangeOrdersPanel job={selectedJobObj} coDeepLink={coDeepLink} />
+              ) : (
+                <AllJobsChangeOrders
+                  jobs={jobs}
+                  statusFilter={statusFilter}
+                  onSelectJob={setSelectedJob}
+                />
+              ))}
             {tab === 'finance' && (
               <JobFinancePanel
                 job={selectedJobObj}
