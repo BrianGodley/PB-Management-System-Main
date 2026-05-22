@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { fetchAllPaginated } from '../lib/fetchAll'
 import { useAuth } from '../contexts/AuthContext'
 
 // ── Constants ────────────────────────────────────────────────
@@ -31,6 +30,9 @@ const EMPTY_FORM = {
   weather_notes: '',
 }
 
+// Daily logs are fetched and shown one page at a time (server-side paging).
+const LOGS_PER_PAGE = 20
+
 // ── Helpers ──────────────────────────────────────────────────
 function formatDate(d) {
   return new Date(d + 'T12:00:00').toLocaleDateString('en-US', {
@@ -47,23 +49,11 @@ function getPublicUrl(path) {
 }
 
 // ── Main Component ───────────────────────────────────────────
-// Open vs closed job-id set for all-jobs views, matching the JobsList sidebar
-// Open/Closed filter. Open = active or on_hold; Closed = everything else.
-function jobIdsByStatus(jobs, statusFilter) {
-  const isOpen = j => {
-    const s = j?.status || 'active'
-    return s === 'active' || s === 'on_hold'
-  }
-  return new Set(
-    (jobs || [])
-      .filter(j => (statusFilter === 'closed' ? !isOpen(j) : isOpen(j)))
-      .map(j => j.id)
-  )
-}
 
 export default function DailyLogs({ jobs = [], selectedJob, statusFilter = 'open' }) {
   const { user } = useAuth()
   const [logs, setLogs] = useState([])
+  const [totalCount, setTotalCount] = useState(0)
   const [profiles, setProfiles] = useState({})
   const [loading, setLoading] = useState(false)
   const [showModal, setShowModal] = useState(false)
@@ -77,15 +67,21 @@ export default function DailyLogs({ jobs = [], selectedJob, statusFilter = 'open
   const [page, setPage] = useState(1)
   const fileRef = useRef(null)
   const listRef = useRef(null)
+  const reqId = useRef(0)
 
   const jobMap = Object.fromEntries(jobs.map(j => [j.id, j.name || j.client_name]))
 
   useEffect(() => {
     fetchProfiles()
   }, [])
+  // Reset to the first page when the job selection or Open/Closed filter changes.
+  useEffect(() => {
+    setPage(1)
+  }, [selectedJob, statusFilter])
+  // Fetch the current page from the server when the view or page changes.
   useEffect(() => {
     fetchLogs()
-  }, [selectedJob, statusFilter])
+  }, [selectedJob, statusFilter, page])
   // Scroll the list back to the top whenever the page or filter changes.
   useEffect(() => {
     if (listRef.current) listRef.current.scrollTop = 0
@@ -98,37 +94,44 @@ export default function DailyLogs({ jobs = [], selectedJob, statusFilter = 'open
   }
 
   async function fetchLogs() {
+    const myReq = ++reqId.current
     setLoading(true)
-    // All-jobs view must paginate. PostgREST caps a single response at 1,000
-    // rows; ordered date-descending, that window is entirely recent (open-job)
-    // activity, so closed jobs' older logs never load and the Closed filter
-    // shows nothing. Per-job stays one scoped query — always under the cap.
-    const { data, error } =
-      selectedJob === 'all'
-        ? await fetchAllPaginated(() =>
-            supabase
-              .from('daily_logs')
-              .select('*, daily_log_photos(*)')
-              .order('date', { ascending: false })
-              .order('created_at', { ascending: false })
-              .order('id', { ascending: true })
-          )
-        : await supabase
-            .from('daily_logs')
-            .select('*, daily_log_photos(*)')
-            .eq('job_id', selectedJob)
-            .order('date', { ascending: false })
-            .order('created_at', { ascending: false })
+
+    // Server-side pagination — fetch only the current 20-row page plus an
+    // exact total count, so the view loads fast no matter how many logs exist.
+    const from = (page - 1) * LOGS_PER_PAGE
+    const to = from + LOGS_PER_PAGE - 1
+
+    let q
+    if (selectedJob === 'all') {
+      // jobs!inner lets the Open/Closed filter run server-side: Open =
+      // active / on_hold / null status, Closed = everything else.
+      q = supabase
+        .from('daily_logs')
+        .select('*, daily_log_photos(*), jobs!inner(status)', { count: 'exact' })
+      q =
+        statusFilter === 'closed'
+          ? q.not('jobs.status', 'in', '(active,on_hold)')
+          : q.or('status.in.(active,on_hold),status.is.null', { foreignTable: 'jobs' })
+    } else {
+      q = supabase
+        .from('daily_logs')
+        .select('*, daily_log_photos(*)', { count: 'exact' })
+        .eq('job_id', selectedJob)
+    }
+
+    const { data, count, error } = await q
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, to)
+
+    // Drop results from a superseded fetch (filter or page changed mid-flight).
+    if (myReq !== reqId.current) return
     if (error) console.error('fetchLogs:', error)
-    if (data) {
-      let rows = data
-      // All-jobs view: keep only logs whose job matches Open/Closed.
-      if (selectedJob === 'all') {
-        const allowed = jobIdsByStatus(jobs, statusFilter)
-        rows = rows.filter(l => allowed.has(l.job_id))
-      }
-      setLogs(rows)
-      setPage(1)
+    if (!error) {
+      setLogs(data || [])
+      setTotalCount(count || 0)
     }
     setLoading(false)
   }
@@ -275,7 +278,7 @@ export default function DailyLogs({ jobs = [], selectedJob, statusFilter = 'open
         .remove(log.daily_log_photos.map(p => p.storage_path))
     }
     await supabase.from('daily_logs').delete().eq('id', log.id)
-    setLogs(prev => prev.filter(l => l.id !== log.id))
+    fetchLogs()
   }
 
   async function deletePhoto(log, photo) {
@@ -292,13 +295,9 @@ export default function DailyLogs({ jobs = [], selectedJob, statusFilter = 'open
   }
 
   // ── Render ─────────────────────────────────────────────────
-  // Client-side pagination — fetchLogs already loads every matching log, so
-  // page through them here (BuilderTrend-style) instead of rendering all at once.
-  const LOGS_PER_PAGE = 20
-  const totalPages = Math.max(1, Math.ceil(logs.length / LOGS_PER_PAGE))
+  const totalPages = Math.max(1, Math.ceil(totalCount / LOGS_PER_PAGE))
   const safePage = Math.min(page, totalPages)
   const pageStart = (safePage - 1) * LOGS_PER_PAGE
-  const pageLogs = logs.slice(pageStart, pageStart + LOGS_PER_PAGE)
 
   return (
     <div className="flex flex-col h-full">
@@ -306,7 +305,7 @@ export default function DailyLogs({ jobs = [], selectedJob, statusFilter = 'open
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <h2 className="text-sm font-semibold text-gray-700">
           Daily Logs{' '}
-          {logs.length > 0 && <span className="text-gray-400 font-normal">({logs.length})</span>}
+          {totalCount > 0 && <span className="text-gray-400 font-normal">({totalCount})</span>}
         </h2>
         <button
           onClick={openNew}
@@ -324,7 +323,7 @@ export default function DailyLogs({ jobs = [], selectedJob, statusFilter = 'open
         <div className="flex justify-center py-12">
           <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-green-700" />
         </div>
-      ) : logs.length === 0 ? (
+      ) : totalCount === 0 ? (
         <div className="flex flex-col items-center justify-center flex-1 text-gray-400 py-20">
           <p className="text-5xl mb-3">📋</p>
           <p className="text-sm font-medium text-gray-500">No daily logs yet</p>
@@ -336,7 +335,7 @@ export default function DailyLogs({ jobs = [], selectedJob, statusFilter = 'open
       ) : (
         <>
           <div ref={listRef} className="space-y-4 overflow-y-auto flex-1">
-            {pageLogs.map(log => (
+            {logs.map(log => (
               <LogCard
                 key={log.id}
                 log={log}
@@ -351,10 +350,10 @@ export default function DailyLogs({ jobs = [], selectedJob, statusFilter = 'open
           </div>
 
           {/* Pagination — BuilderTrend-style page controls */}
-          {logs.length > LOGS_PER_PAGE && (
+          {totalCount > LOGS_PER_PAGE && (
             <div className="flex items-center justify-between gap-3 pt-3 mt-1 border-t border-gray-100 flex-shrink-0">
               <span className="text-xs text-gray-500">
-                {pageStart + 1}–{Math.min(pageStart + LOGS_PER_PAGE, logs.length)} of {logs.length}
+                {pageStart + 1}–{pageStart + logs.length} of {totalCount}
               </span>
               <div className="flex items-center gap-1">
                 <button
