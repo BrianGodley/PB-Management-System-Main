@@ -171,21 +171,25 @@ export default function EstimateWhatIfModal({
     const targetGp = gpFromPrice(p, baseCost, subGp)
     setProjDrafts({})
     clearPriceDrafts()
+    let next
     if (scenGp > 0) {
       const ratio = targetGp / scenGp
-      const next = {}
+      next = {}
       for (const r of s3Rows) {
         for (const m of r.modUsed) {
           const effGpmd = m.manDays > 0 ? m.eff / m.manDays : 0
           next[m.id] = String(Math.round(effGpmd * ratio))
         }
       }
-      setModDrafts(next)
     } else {
-      const g = et.manDays > 0 ? targetGp / et.manDays : 0
-      setModDrafts(Object.fromEntries(allModules.map(m => [m.id, String(Math.round(g))])))
+      const g = et.manDays > 0 ? Math.round(targetGp / et.manDays) : 0
+      next = Object.fromEntries(allModules.map(m => [m.id, String(g)]))
     }
-    setTopGpmd(String(et.manDays > 0 ? Math.round(targetGp / et.manDays) : 0))
+    setModDrafts(next)
+    // Reflect the ACTUAL resulting GPMD (after per-module rounding) so the
+    // New Overall GPMD field matches the GPMD bar exactly.
+    const resultGp = allModules.reduce((sum, m) => sum + m.manDays * n(next[m.id]), 0)
+    setTopGpmd(String(et.manDays > 0 ? Math.round(resultGp / et.manDays) : 0))
   }
 
   function resetAll() {
