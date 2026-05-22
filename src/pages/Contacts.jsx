@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { ExportModal, ImportModal } from '../components/ContactImportExport'
@@ -891,7 +891,7 @@ function AddCompanyModal({ onSave, onClose, assignees = [] }) {
 // ── Main Contacts List ────────────────────────────────────────────────────────
 export default function Contacts() {
   const navigate = useNavigate()
-  const PAGE_SIZE = 100
+  const PAGE_SIZE = 200
 
   const [activeTab, setActiveTab] = useState('individuals') // 'individuals' | 'companies' | 'settings'
   const [settingsSubTab, setSettingsSubTab] = useState('import') // 'import' | 'export'
@@ -907,122 +907,159 @@ export default function Contacts() {
   const [companiesError, setCompaniesError] = useState(null)
 
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [sortField, setSortField] = useState('last_name')
   const [sortAsc, setSortAsc] = useState(true)
   const [page, setPage] = useState(0)
+  const [totalCount, setTotalCount] = useState(0)
+  const [contactsTotal, setContactsTotal] = useState(0)
+  const [companiesTotal, setCompaniesTotal] = useState(0)
+  const [exportContacts, setExportContacts] = useState([])
   const [assignees, setAssignees] = useState([])
+  const reqId = useRef(0)
 
   async function fetchContacts() {
+    const myReq = ++reqId.current
     setLoading(true)
-    // Fetch in pages of 1000 to bypass Supabase's default row cap
-    let all = []
-    let from = 0
-    const BATCH = 1000
-    while (true) {
-      const { data, error } = await supabase
-        .from('contacts')
-        .select('*')
-        .order('last_name', { ascending: true })
-        .order('first_name', { ascending: true })
-        .range(from, from + BATCH - 1)
-      if (error) {
-        setError(error.message)
-        break
-      }
-      all = [...all, ...(data || [])]
-      if (!data || data.length < BATCH) break
-      from += BATCH
+    const from = page * PAGE_SIZE
+    const sortCol = [
+      'last_name',
+      'first_name',
+      'ghl_assigned_to',
+      'street_address',
+      'city',
+      'stage',
+      'created_at',
+    ].includes(sortField)
+      ? sortField
+      : 'last_name'
+
+    let q = supabase.from('contacts').select('*', { count: 'exact' })
+    for (const raw of debouncedSearch.trim().split(/[\s,]+/)) {
+      const t = raw.replace(/[%(),*]/g, '').trim()
+      if (!t) continue
+      q = q.or(
+        `first_name.ilike.%${t}%,last_name.ilike.%${t}%,email.ilike.%${t}%,` +
+          `city.ilike.%${t}%,phone.ilike.%${t}%,cell.ilike.%${t}%`
+      )
     }
-    setContacts(all)
+
+    const { data, count, error } = await q
+      .order(sortCol, { ascending: sortAsc })
+      .order('id', { ascending: true })
+      .range(from, from + PAGE_SIZE - 1)
+
+    if (myReq !== reqId.current) return
+    if (error) {
+      setError(error.message)
+    } else {
+      setError(null)
+      setContacts(data || [])
+      setTotalCount(count || 0)
+    }
     setLoading(false)
   }
 
   async function fetchCompanies() {
+    const myReq = ++reqId.current
     setCompaniesLoading(true)
-    let all = []
-    let from = 0
-    const BATCH = 1000
-    while (true) {
-      const { data, error } = await supabase
-        .from('companies')
-        .select(
-          'id,company_name,company_city,company_state,phone,email,stage,contact_type,ghl_assigned_to,created_at'
-        )
-        .order('company_name', { ascending: true })
-        .range(from, from + BATCH - 1)
-      if (error) {
-        setCompaniesError(error.message)
-        break
-      }
-      all = [...all, ...(data || [])]
-      if (!data || data.length < BATCH) break
-      from += BATCH
+    const from = page * PAGE_SIZE
+    const sortCol = [
+      'company_name',
+      'ghl_assigned_to',
+      'company_city',
+      'stage',
+      'created_at',
+    ].includes(sortField)
+      ? sortField
+      : 'company_name'
+
+    let q = supabase
+      .from('companies')
+      .select(
+        'id,company_name,company_city,company_state,phone,email,stage,contact_type,ghl_assigned_to,created_at',
+        { count: 'exact' }
+      )
+    for (const raw of debouncedSearch.trim().split(/[\s,]+/)) {
+      const t = raw.replace(/[%(),*]/g, '').trim()
+      if (!t) continue
+      q = q.or(
+        `company_name.ilike.%${t}%,email.ilike.%${t}%,company_city.ilike.%${t}%,phone.ilike.%${t}%`
+      )
     }
-    setCompanies(all)
+
+    const { data, count, error } = await q
+      .order(sortCol, { ascending: sortAsc })
+      .order('id', { ascending: true })
+      .range(from, from + PAGE_SIZE - 1)
+
+    if (myReq !== reqId.current) return
+    if (error) {
+      setCompaniesError(error.message)
+    } else {
+      setCompaniesError(null)
+      setCompanies(data || [])
+      setTotalCount(count || 0)
+    }
     setCompaniesLoading(false)
   }
 
+  async function fetchCounts() {
+    const [cRes, coRes] = await Promise.all([
+      supabase.from('contacts').select('id', { count: 'exact', head: true }),
+      supabase.from('companies').select('id', { count: 'exact', head: true }),
+    ])
+    setContactsTotal(cRes.count || 0)
+    setCompaniesTotal(coRes.count || 0)
+  }
+
   useEffect(() => {
-    fetchContacts()
-    fetchCompanies()
     fetchAssignableEmployees().then(setAssignees)
+    fetchCounts()
   }, [])
 
-  // Reset to first page when filters change
+  // Debounce the search box so we don't query on every keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(t)
+  }, [search])
+
+  // Reset to the first page when the tab, search, or sort changes.
   useEffect(() => {
     setPage(0)
-  }, [search, activeTab])
+  }, [debouncedSearch, activeTab, sortField, sortAsc])
 
-  // Filter + sort
-  const q = search.toLowerCase()
-  const filtered = contacts
-    .filter(c => {
-      if (!q) return true
-      // Token-based search so "first last" and "last, first" both work, and
-      // partial fragments match against any of the indexed fields. Numeric
-      // tokens additionally try to match against digit-only phone/cell.
-      const hay = [c.first_name, c.last_name, c.email, c.city]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-      const digits = `${c.phone || ''} ${c.cell || ''}`.replace(/\D/g, '')
-      return q
-        .split(/[\s,]+/)
-        .filter(Boolean)
-        .every(t => {
-          if (hay.includes(t)) return true
-          const td = t.replace(/\D/g, '')
-          return td.length > 0 && digits.includes(td)
-        })
-    })
-    .sort((a, b) => {
-      let av = a[sortField] || '',
-        bv = b[sortField] || ''
-      return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av)
-    })
+  // Fetch the active tab's current page from the server.
+  useEffect(() => {
+    if (activeTab === 'individuals') fetchContacts()
+    else if (activeTab === 'companies') fetchCompanies()
+  }, [activeTab, debouncedSearch, page, sortField, sortAsc])
 
-  const filteredCompanies = companies
-    .filter(c => {
-      if (!q) return true
-      // Token-based, mirrors the contacts filter above.
-      const hay = [c.company_name, c.email, c.company_city].filter(Boolean).join(' ').toLowerCase()
-      const digits = (c.phone || '').replace(/\D/g, '')
-      return q
-        .split(/[\s,]+/)
-        .filter(Boolean)
-        .every(t => {
-          if (hay.includes(t)) return true
-          const td = t.replace(/\D/g, '')
-          return td.length > 0 && digits.includes(td)
-        })
-    })
-    .sort((a, b) => {
-      const sf = sortField === 'last_name' ? 'company_name' : sortField
-      let av = a[sf] || '',
-        bv = b[sf] || ''
-      return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av)
-    })
+  // When the Export tab opens, load the full contact list for the export file.
+  useEffect(() => {
+    if (activeTab !== 'settings' || settingsSubTab !== 'export') return
+    let alive = true
+    ;(async () => {
+      let all = []
+      let from = 0
+      const BATCH = 1000
+      while (true) {
+        const { data } = await supabase
+          .from('contacts')
+          .select('*')
+          .order('last_name', { ascending: true })
+          .range(from, from + BATCH - 1)
+        all = all.concat(data || [])
+        if (!data || data.length < BATCH) break
+        from += BATCH
+      }
+      if (alive) setExportContacts(all)
+    })()
+    return () => {
+      alive = false
+    }
+  }, [activeTab, settingsSubTab])
 
   function toggleSort(field) {
     if (sortField === field) setSortAsc(v => !v)
@@ -1032,11 +1069,11 @@ export default function Contacts() {
     }
   }
 
-  const activeList = activeTab === 'individuals' ? filtered : filteredCompanies
-  const totalPages = Math.ceil(activeList.length / PAGE_SIZE)
-  const paginated = activeList.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
-  const rangeStart = activeList.length === 0 ? 0 : page * PAGE_SIZE + 1
-  const rangeEnd = Math.min((page + 1) * PAGE_SIZE, activeList.length)
+  // Server-side paging — `contacts`/`companies` already hold just the current page.
+  const paginated = activeTab === 'companies' ? companies : contacts
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
+  const rangeStart = totalCount === 0 ? 0 : page * PAGE_SIZE + 1
+  const rangeEnd = Math.min((page + 1) * PAGE_SIZE, totalCount)
 
   const thCls =
     'text-left px-4 py-2 font-semibold text-gray-600 uppercase cursor-pointer select-none hover:text-gray-800 transition-colors'
@@ -1062,8 +1099,8 @@ export default function Contacts() {
       {/* Tab bar */}
       <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0">
         {[
-          { id: 'individuals', label: `👤 Individuals (${contacts.length.toLocaleString()})` },
-          { id: 'companies', label: `🏢 Companies (${companies.length.toLocaleString()})` },
+          { id: 'individuals', label: `👤 Individuals (${contactsTotal.toLocaleString()})` },
+          { id: 'companies', label: `🏢 Companies (${companiesTotal.toLocaleString()})` },
           { id: 'settings', label: '⚙️ Settings' },
         ].map(tab => (
           <button
@@ -1072,6 +1109,8 @@ export default function Contacts() {
             onClick={() => {
               setActiveTab(tab.id)
               setSearch('')
+              setSortField(tab.id === 'companies' ? 'company_name' : 'last_name')
+              setSortAsc(true)
             }}
             className={`flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === tab.id
@@ -1114,6 +1153,7 @@ export default function Contacts() {
                   onDone={() => {
                     fetchContacts()
                     fetchCompanies()
+                    fetchCounts()
                   }}
                   onClose={null}
                 />
@@ -1122,7 +1162,7 @@ export default function Contacts() {
 
             {settingsSubTab === 'export' && (
               <div className="max-w-lg">
-                <ExportModal inline contacts={contacts} onClose={null} />
+                <ExportModal inline contacts={exportContacts} onClose={null} />
               </div>
             )}
           </div>
@@ -1193,7 +1233,7 @@ export default function Contacts() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {filtered.length === 0 ? (
+                      {contacts.length === 0 ? (
                         <tr>
                           <td colSpan={9} className="px-4 py-10 text-center text-gray-400">
                             {search
@@ -1313,7 +1353,7 @@ export default function Contacts() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {filteredCompanies.length === 0 ? (
+                    {companies.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="px-4 py-10 text-center text-gray-400">
                           {search
@@ -1390,24 +1430,24 @@ export default function Contacts() {
             )}
 
             {/* Pagination */}
-            {activeList.length > 0 && (
+            {totalCount > 0 && (
               <div className="flex items-center justify-between mt-3">
                 <p className="text-xs text-gray-400">
-                  {rangeStart}–{rangeEnd} of {activeList.length.toLocaleString()}{' '}
+                  {rangeStart}–{rangeEnd} of {totalCount.toLocaleString()}{' '}
                   {isIndividuals ? 'contact' : 'compan'}
                   {isIndividuals
-                    ? activeList.length !== 1
+                    ? totalCount !== 1
                       ? 's'
                       : ''
-                    : activeList.length !== 1
+                    : totalCount !== 1
                       ? 'ies'
                       : 'y'}
                   {isIndividuals &&
-                    contacts.length !== filtered.length &&
-                    ` (${contacts.length.toLocaleString()} total)`}
+                    totalCount !== contactsTotal &&
+                    ` (${contactsTotal.toLocaleString()} total)`}
                   {!isIndividuals &&
-                    companies.length !== filteredCompanies.length &&
-                    ` (${companies.length.toLocaleString()} total)`}
+                    totalCount !== companiesTotal &&
+                    ` (${companiesTotal.toLocaleString()} total)`}
                 </p>
 
                 {totalPages > 1 && (
