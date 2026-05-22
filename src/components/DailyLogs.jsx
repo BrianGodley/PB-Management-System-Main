@@ -324,7 +324,7 @@ export default function DailyLogs({ jobs = [], selectedJob, statusFilter = 'open
             <LogCard
               key={log.id}
               log={log}
-              author={profiles[log.created_by] || 'Unknown'}
+              author={profiles[log.created_by] || log.bt_author_name || 'Unknown'}
               jobName={selectedJob === 'all' ? jobMap[log.job_id] : null}
               onEdit={() => openEdit(log)}
               onDelete={() => deleteLog(log)}

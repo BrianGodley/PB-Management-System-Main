@@ -52,8 +52,16 @@ Imports are **idempotent** — running the same file twice is safe. Existing row
 | Invoices, Bills & POs    | `bt_financials` table |
 | QB Costs                 | `bt_qb_costs` table |
 | Estimate Revised         | `bt_estimate_lines` table |
+| Daily Logs               | `daily_logs` table (the live app table) |
 
-Additional types (Change Orders, Time Clock, Daily Logs, etc.) can be added — just ask!
+Additional types (Change Orders, Time Clock, etc.) can be added — just ask!
+
+> **Daily Logs** writes into the real `daily_logs` app table, not a `bt_*` store.
+> Before importing it, run its one-time setup SQL in the Supabase SQL Editor —
+> it adds the `bt_daily_log_id` and `bt_author_name` columns plus a unique index
+> (which makes the import idempotent). The CSV carries only an attachment *count*,
+> not the photo files, so imported logs have no images — the count is noted in
+> each log's text instead.
 
 ---
 

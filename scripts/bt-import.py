@@ -53,11 +53,17 @@ HEADERS = {
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 def clean(val):
-    """Return None for blank/NaN values, otherwise stripped string."""
+    """Return None for blank / NaN / pd.NA values, otherwise a stripped string."""
     if val is None:
         return None
-    if isinstance(val, float) and math.isnan(val):
-        return None
+    # pd.isna covers numpy NaN, pandas NA and NaT. Needed because pandas 3.x
+    # may surface missing string cells as pd.NA rather than a float nan —
+    # without this, blank fields would import as the literal text "<NA>".
+    try:
+        if pd.isna(val):
+            return None
+    except (TypeError, ValueError):
+        pass
     s = str(val).strip()
     return s if s else None
 
@@ -84,8 +90,27 @@ def to_float(val):
     except ValueError:
         return None
 
-def supabase_upsert(table, rows, conflict_col, dry_run=False):
-    """Upsert rows into a Supabase table. Returns (inserted, errors)."""
+def to_ts(val):
+    """Parse a datetime string to an ISO timestamp (no tz) or None."""
+    s = clean(val)
+    if not s:
+        return None
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d",
+                "%m/%d/%Y %H:%M:%S", "%m/%d/%Y"):
+        try:
+            return datetime.strptime(s.split(".")[0], fmt).isoformat()
+        except ValueError:
+            pass
+    return None
+
+def supabase_upsert(table, rows, conflict_col, dry_run=False, on_conflict=None):
+    """Upsert rows into a Supabase table. Returns (inserted, errors).
+
+    on_conflict: when set, PostgREST resolves conflicts on that column (the
+    table needs a unique constraint/index on it). When None, conflict
+    resolution falls back to the primary key — kept for the existing
+    bt_* importers, which were written that way.
+    """
     if not rows:
         print(f"  No rows to upsert into {table}.")
         return 0, 0
@@ -97,7 +122,9 @@ def supabase_upsert(table, rows, conflict_col, dry_run=False):
         return len(rows), 0
 
     url = f"{SUPABASE_URL}/rest/v1/{table}"
-    headers = {**HEADERS, "Prefer": f"resolution=merge-duplicates,return=minimal"}
+    if on_conflict:
+        url += f"?on_conflict={on_conflict}"
+    headers = {**HEADERS, "Prefer": "resolution=merge-duplicates,return=minimal"}
 
     BATCH = 200
     total_ok = 0
@@ -113,6 +140,26 @@ def supabase_upsert(table, rows, conflict_col, dry_run=False):
             total_err += len(batch)
 
     return total_ok, total_err
+
+
+def supabase_select_all(table, select):
+    """GET every row from a table, paginating past the PostgREST 1k-row cap."""
+    all_rows = []
+    offset = 0
+    PAGE = 1000
+    while True:
+        url = (f"{SUPABASE_URL}/rest/v1/{table}"
+               f"?select={select}&limit={PAGE}&offset={offset}")
+        resp = requests.get(url, headers=HEADERS)
+        if resp.status_code != 200:
+            print(f"  ERROR fetching {table}: {resp.status_code} — {resp.text[:200]}")
+            break
+        chunk = resp.json()
+        all_rows.extend(chunk)
+        if len(chunk) < PAGE:
+            break
+        offset += PAGE
+    return all_rows
 
 
 def detect_type(df):
@@ -133,6 +180,10 @@ def detect_type(df):
         return "sales_rollup"
     if "job_id" in cols and "shift_id" in cols:
         return "schedule_shifts"
+    # The Daily Logs export also carries todo_* columns, so check
+    # daily_log_id first or it gets misdetected as a todos CSV.
+    if "job_id" in cols and "daily_log_id" in cols:
+        return "daily_logs"
     if "job_id" in cols and "todo_id" in cols:
         return "todos"
     if "job_id" in cols and "change_order_id" in cols:
@@ -143,8 +194,6 @@ def detect_type(df):
         return "time_clock"
     if "job_id" in cols and "warranty_id" in cols:
         return "warranty"
-    if "job_id" in cols and "daily_log_id" in cols:
-        return "daily_logs"
 
     return "unknown"
 
@@ -387,6 +436,151 @@ def import_sales_rollup(df, dry_run):
     return ok, err
 
 
+def import_daily_logs(df, dry_run):
+    """Daily Logs → daily_logs table (the real app table, not a bt_* store).
+
+    Mapping:
+      • job_id            — resolved jobs.bt_job_id → jobs.id (real FK)
+      • date              — log_referenced_date, falling back to created date
+      • notes             — log_notes, with a "[N photos in BuilderTrend]"
+                            marker appended (the photo files are NOT in this
+                            CSV — only an attachment count)
+      • created_by        — matched from the log author name → profiles.id
+                            when a profile name matches; NULL otherwise
+      • bt_author_name    — original BT author name, always kept as a fallback
+      • permissions       — is_log_private → {private}; otherwise {internal}
+                            plus client / subs from the show-to flags
+      • created_at / updated_at — preserved from BuilderTrend
+
+    Idempotent: upserts on bt_daily_log_id, so re-running is safe.
+    Requires the daily_logs setup SQL (bt_daily_log_id + bt_author_name
+    columns and the unique index) to have been run first.
+    """
+    print(f"\n→ Importing Daily Logs ({len(df)} rows) into daily_logs table…")
+
+    # 1. jobs.bt_job_id → jobs.id  (paginated — the jobs table is 1k+ rows)
+    job_map = {}
+    for j in supabase_select_all("jobs", "id,bt_job_id"):
+        bt = j.get("bt_job_id")
+        if bt is not None:
+            job_map[int(bt)] = j["id"]
+    print(f"  Loaded {len(job_map)} jobs for ID mapping.")
+
+    # 2. profile display name → profiles.id, for author matching.
+    # The profiles table only carries id / full_name / email.
+    name_to_user = {}
+    for p in supabase_select_all("profiles", "id,full_name"):
+        full = (p.get("full_name") or "").strip()
+        if full:
+            name_to_user[full.lower()] = p["id"]
+    print(f"  Loaded {len(name_to_user)} profile names for author matching.")
+
+    def truthy(v):
+        return str(v).strip().lower() in ("true", "1", "yes")
+
+    rows = []
+    skipped_no_job = 0
+    skipped_no_date = 0
+    unmatched_jobs = set()
+    matched_authors = 0
+    for _, r in df.iterrows():
+        bt_log_id = to_float(r.get("daily_log_id"))
+        if bt_log_id is None:
+            continue
+        bt_log_id = int(bt_log_id)
+
+        # Resolve the job FK. A log with no job is invisible in every Jobs
+        # view, so skip (and report) logs whose BT job didn't import.
+        bt_job_id = to_float(r.get("job_id"))
+        job_uuid = job_map.get(int(bt_job_id)) if bt_job_id is not None else None
+        if job_uuid is None:
+            skipped_no_job += 1
+            if bt_job_id is not None:
+                unmatched_jobs.add(int(bt_job_id))
+            continue
+
+        # date is NOT NULL — referenced date preferred, then created date
+        log_date = (to_date(r.get("log_referenced_date"))
+                    or to_date(r.get("log_created_date")))
+        if not log_date:
+            skipped_no_date += 1
+            continue
+
+        # Permissions from the BuilderTrend visibility flags
+        if truthy(r.get("is_log_private")):
+            permissions = ["private"]
+        else:
+            permissions = ["internal"]
+            if truthy(r.get("show_log_to_owner")):
+                permissions.append("client")
+            if truthy(r.get("show_log_to_subs")):
+                permissions.append("subs")
+
+        # Notes + photo-count marker (the photo files aren't in the CSV)
+        notes = clean(r.get("log_notes")) or ""
+        n_att = to_float(r.get("total_attachments"))
+        n_att = int(n_att) if n_att else 0
+        if n_att > 0:
+            marker = f"[{n_att} photo{'' if n_att == 1 else 's'} in BuilderTrend]"
+            notes = f"{notes}\n\n{marker}".strip() if notes else marker
+
+        weather_notes = clean(r.get("log_weather_notes"))
+
+        # Author: match name → account; always keep the BT name as a fallback
+        bt_author = clean(r.get("log_created_by_name"))
+        created_by = name_to_user.get(bt_author.lower()) if bt_author else None
+        if created_by:
+            matched_authors += 1
+
+        # Timestamps — guaranteed non-null (fall back to the log date at
+        # midnight) so the column never goes NULL on a rare missing value.
+        created_at = to_ts(r.get("log_created_date")) or f"{log_date}T00:00:00"
+        updated_at = to_ts(r.get("log_last_updated_date")) or created_at
+
+        # Every row MUST carry an identical set of keys — PostgREST rejects a
+        # bulk insert whose objects differ ("All object keys must match"), so
+        # optional fields are sent as explicit None (→ null), never omitted.
+        rows.append({
+            "bt_daily_log_id":    bt_log_id,
+            "job_id":             job_uuid,
+            "date":               log_date,
+            "title":              clean(r.get("log_title")),
+            "notes":              notes or None,
+            "created_by":         created_by,
+            "bt_author_name":     bt_author,
+            "permissions":        permissions,
+            "weather_conditions": bool(weather_notes),
+            "weather_notes":      weather_notes,
+            "source":             "buildertrend",
+            "created_at":         created_at,
+            "updated_at":         updated_at,
+        })
+
+    # De-dupe on bt_daily_log_id — a PostgREST upsert can't touch the same
+    # conflict key twice in one batch (keep the last occurrence).
+    dedup = {}
+    for row in rows:
+        dedup[row["bt_daily_log_id"]] = row
+    deduped = list(dedup.values())
+    if len(deduped) != len(rows):
+        print(f"  De-duped {len(rows) - len(deduped)} repeated log IDs.")
+    rows = deduped
+
+    print(f"  Prepared {len(rows)} log rows "
+          f"({matched_authors} authors matched to accounts).")
+    if skipped_no_date:
+        print(f"  Skipped {skipped_no_date} logs with no usable date.")
+    if skipped_no_job:
+        sample = ", ".join(str(x) for x in list(unmatched_jobs)[:10])
+        print(f"  ⚠ Skipped {skipped_no_job} logs whose BuilderTrend job is "
+              f"not in the jobs table (bt_job_id e.g.: {sample}).")
+
+    ok, err = supabase_upsert("daily_logs", rows, "bt_daily_log_id",
+                              dry_run, on_conflict="bt_daily_log_id")
+    print(f"  ✓ {ok} upserted, {err} errors")
+    return ok, err
+
+
 # ── SQL for new tables (printed if they don't exist) ──────────────────────────
 
 SETUP_SQL = """
@@ -570,13 +764,14 @@ def main():
         "qb_costs":           import_qb_costs,
         "estimate_revised":   import_estimate_revised,
         "sales_rollup":       import_sales_rollup,
+        "daily_logs":         import_daily_logs,
     }
 
     if csv_type not in dispatch:
         print(f"\nUnrecognized CSV type '{csv_type}'.")
         print("Columns found:", list(df.columns[:15]))
         print("\nSupported types: Jobsites Rollup, Schedule, Invoices/Bills/POs,")
-        print("QB Costs, Estimate Revised, Sales Rollup")
+        print("QB Costs, Estimate Revised, Sales Rollup, Daily Logs")
         print("\nMore CSV types (Change Orders, Time Clock, etc.) can be added — just ask!")
         sys.exit(1)
 
@@ -584,7 +779,11 @@ def main():
 
     print(f"\n{'='*50}")
     print(f"Done. {ok} rows imported, {err} errors.")
-    if csv_type != "jobsites_rollup":
+    if csv_type == "daily_logs":
+        print("\nNote: Daily Logs needs its own one-time setup SQL (the")
+        print("bt_daily_log_id + bt_author_name columns and the unique index)")
+        print("run in the Supabase SQL Editor before importing.")
+    elif csv_type != "jobsites_rollup":
         print("\nNote: For non-jobs CSVs, run --setup-sql first if you haven't already:")
         print("  python bt-import.py any.csv --setup-sql | (copy output to Supabase SQL Editor)")
 
