@@ -351,10 +351,7 @@ export default function DailyLogs({ jobs = [], selectedJob, statusFilter = 'open
 
           {/* Pagination — BuilderTrend-style page controls */}
           {totalCount > LOGS_PER_PAGE && (
-            <div className="flex items-center justify-between gap-3 pt-3 mt-1 border-t border-gray-100 flex-shrink-0">
-              <span className="text-xs text-gray-500">
-                {pageStart + 1}–{pageStart + logs.length} of {totalCount}
-              </span>
+            <div className="flex items-center gap-3 pt-3 mt-1 border-t border-gray-100 flex-shrink-0">
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setPage(Math.max(1, safePage - 1))}
@@ -374,6 +371,9 @@ export default function DailyLogs({ jobs = [], selectedJob, statusFilter = 'open
                   Next ›
                 </button>
               </div>
+              <span className="text-xs text-gray-500">
+                {pageStart + 1}–{pageStart + logs.length} of {totalCount}
+              </span>
             </div>
           )}
         </>

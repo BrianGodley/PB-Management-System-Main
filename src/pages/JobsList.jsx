@@ -1,4 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -205,6 +206,9 @@ export default function JobsList() {
   const [loading, setLoading] = useState(true)
   const [selectedJob, setSelectedJob] = useState(ALL_JOBS)
   const [tab, setTab] = useState(() => searchParams.get('tab') || 'schedule')
+  // DOM node for the shared green app-header centre slot; the tab bar is
+  // portalled into it. Resolved after mount so the portal never gets null.
+  const [headerSlot, setHeaderSlot] = useState(null)
   const [jobModal, setJobModal] = useState(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('open') // 'open' | 'closed'
@@ -876,6 +880,12 @@ export default function JobsList() {
     fetchClientPhones()
   }, [])
 
+  // Resolve the green app-header centre slot once mounted, so the tab bar
+  // can be portalled into it.
+  useEffect(() => {
+    setHeaderSlot(document.getElementById('app-header-center'))
+  }, [])
+
   // Build phone lookup maps for the JobItem hover tooltip. We only need a
   // few fields so the query stays light even with thousands of clients.
   async function fetchClientPhones() {
@@ -1107,22 +1117,26 @@ export default function JobsList() {
         </select>
       </div>
 
-      {/* ── Menu bar ── */}
-      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0">
-        {TABS.map(t => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
-              tab === t.key
-                ? 'border-green-700 text-green-700'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {/* ── Tabs — portalled into the green app header bar ── */}
+      {headerSlot &&
+        createPortal(
+          <div className="flex items-center gap-0.5 overflow-x-auto max-w-full">
+            {TABS.map(t => (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`px-2 sm:px-2.5 py-1 rounded-md text-[11px] sm:text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-colors ${
+                  tab === t.key
+                    ? 'bg-black/20 text-white'
+                    : 'text-white/80 hover:text-white hover:bg-black/15'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>,
+          headerSlot
+        )}
 
       {/* Settings panel — full-width, no sidebar */}
       {tab === 'settings' && (
@@ -1139,7 +1153,7 @@ export default function JobsList() {
 
       {/* Main content: sidebar + right panel (non-settings tabs) */}
       {tab !== 'settings' && (
-        <div className="flex gap-2 flex-1 min-h-0 pt-4">
+        <div className="flex gap-2 flex-1 min-h-0 pt-2">
           {/* Jobs sidebar — desktop only */}
           <div className="hidden lg:flex w-64 flex-shrink-0 flex-col min-h-0 bg-white border-r border-gray-200">
             {/* Inner column: 90% wide, centered */}
