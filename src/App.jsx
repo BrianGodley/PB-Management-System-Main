@@ -90,6 +90,9 @@ function AppRoutes() {
         <Route path="/client-portal/login" element={<PortalLogin />} />
         <Route path="/client-portal/activate" element={<PortalActivate />} />
         <Route path="/client-portal" element={<PortalShell />} />
+        {/* Aliases so older invite emails (sent before the path change) still resolve */}
+        <Route path="/portal/activate" element={<PortalActivate />} />
+        <Route path="/portal/login" element={<PortalLogin />} />
         <Route
           path="/"
           element={
