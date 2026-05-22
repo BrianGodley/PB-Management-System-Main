@@ -1087,18 +1087,26 @@ export default function JobsList() {
     { key: 'files', label: '📁 Files' },
     ...(isAdmin ? [{ key: 'settings', label: '⚙️ Settings' }] : []),
   ]
+  // Active tab's label without the leading emoji — used in the breadcrumb.
+  const tabName = (TABS.find(t => t.key === tab)?.label || '').replace(/^\S+\s+/, '')
 
   return (
     <div className="flex flex-col h-full">
-      {/* ── Page title ────────────────────────────────────────── */}
+      {/* ── Breadcrumb: Jobs / <tab> / <selection> ──────────────── */}
       <div className="mb-4 flex-shrink-0 flex items-baseline gap-2 min-w-0">
         <h1 className="text-xl font-bold text-gray-900 flex-shrink-0">Jobs</h1>
         <span className="text-gray-300 flex-shrink-0">/</span>
-        <span className="text-lg font-semibold text-green-700 truncate">
-          {selectedJob === ALL_JOBS
-            ? 'All Jobs'
-            : selectedJobObj?.name || selectedJobObj?.client_name || '—'}
-        </span>
+        <span className="text-lg font-semibold text-gray-500 flex-shrink-0">{tabName}</span>
+        {tab !== 'settings' && (
+          <>
+            <span className="text-gray-300 flex-shrink-0">/</span>
+            <span className="text-lg font-semibold text-green-700 truncate">
+              {selectedJob === ALL_JOBS
+                ? 'All Jobs'
+                : selectedJobObj?.name || selectedJobObj?.client_name || '—'}
+            </span>
+          </>
+        )}
       </div>
 
       {/* ── Mobile: job selector dropdown ─────────────────────── */}
