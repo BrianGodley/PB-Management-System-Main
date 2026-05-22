@@ -151,6 +151,8 @@ function calcDemo(
 
   // ── Vegetation ───────────────────────────────────────────────────────────
   const shrubHrs = n(state.shrubQty) * access * shrubRate
+  const shrubSfHrs = n(state.shrubSqFt) * 0.2
+  const shrubSfMat = n(state.shrubSqFt) * 0.8
   const stumpFstHrs = n(state.stumpFirstQty) * access * stumpFstRate
   const stumpAddHrs = n(state.stumpAddQty) * access * stumpAddRate
 
@@ -204,7 +206,7 @@ function calcDemo(
     bucketCalc.reduce((s, r) => s + r.hours, 0) +
     gradeCut.hours
   const gradingHrs = gradeFill.hours + jjHrs
-  const vegHrs = shrubHrs + stumpFstHrs + stumpAddHrs + treeCalc.reduce((s, r) => s + r.hrs, 0)
+  const vegHrs = shrubHrs + shrubSfHrs + stumpFstHrs + stumpAddHrs + treeCalc.reduce((s, r) => s + r.hrs, 0)
 
   const rawHrs = crewDemoHrs + gradingHrs + vegHrs + rebarHrs + manualHrs
   const _preWalkHrs = rawHrs * diff + hrsAdj
@@ -223,7 +225,7 @@ function calcDemo(
       bucketCalc.reduce((s, r) => s + r.dumpFee, 0) +
       gradeCut.dumpFee +
       treeCalc.reduce((s, r) => s + r.dumpFee, 0)
-  const totalMat = dumpMatCost + manualMat
+  const totalMat = dumpMatCost + manualMat + shrubSfMat
 
   // ── Financials ────────────────────────────────────────────────────────────
   const manDays = totalHrs / 8
@@ -260,6 +262,8 @@ function calcDemo(
     jjHrs,
     rebarHrs,
     shrubHrs,
+    shrubSfHrs,
+    shrubSfMat,
     stumpFstHrs,
     stumpAddHrs,
     treeCalc,
@@ -334,6 +338,7 @@ const DEFAULT_STATE = {
   jjDepth: 3,
   // Vegetation
   shrubQty: '',
+  shrubSqFt: '',
   stumpFirstQty: '',
   stumpAddQty: '',
   treeRows: [
@@ -1346,6 +1351,16 @@ export default function HandDemoModule({ initialData, onSave, onCancel, onSwitch
             </p>
           </div>
         ))}
+        {/* Shrubs by square footage — labor + $0.80/SF material */}
+        <div>
+          <p className="text-xs text-gray-500 mb-0.5">Shrubs (Sq Ft)</p>
+          <Inp value={state.shrubSqFt} onChange={e => set('shrubSqFt', e.target.value)} />
+          <p className="text-xs text-gray-400 mt-0.5">
+            {calc.shrubSfHrs > 0
+              ? `${calc.shrubSfHrs.toFixed(2)} hrs · $${calc.shrubSfMat.toFixed(2)} mat`
+              : 'Labor + $0.80/SF material'}
+          </p>
+        </div>
       </div>
 
       {/* Trees */}

@@ -188,6 +188,8 @@ function calcDemo(
 
   // ── Vegetation — Bobcat access ────────────────────────────────────────────
   const shrubHrs = n(state.shrubQty) * accessBobcat * shrubRate
+  const shrubSfHrs = n(state.shrubSqFt) * 0.03
+  const shrubSfMat = n(state.shrubSqFt) * 0.8
   const stumpFstHrs = n(state.stumpFirstQty) * accessBobcat * stumpFstRate
   const stumpAddHrs = n(state.stumpAddQty) * accessBobcat * stumpAddRate
 
@@ -239,7 +241,7 @@ function calcDemo(
     footingCalc.reduce((s, r) => s + r.hours, 0) +
     gradeCut.hours
   const gradingHrs = gradeFill.hours + jjHrs + ssCmpHrs
-  const vegHrs = shrubHrs + stumpFstHrs + stumpAddHrs + treeCalc.reduce((s, r) => s + r.hrs, 0)
+  const vegHrs = shrubHrs + shrubSfHrs + stumpFstHrs + stumpAddHrs + treeCalc.reduce((s, r) => s + r.hrs, 0)
 
   // ── Walk-access (Truck → Work Area) — trip-based for mini-skid demo ───
   // Excel: S4 = (F6 - BobcatTravel) × N4 × 2 × (1/60/60)
@@ -275,7 +277,7 @@ function calcDemo(
       footingCalc.reduce((s, r) => s + r.dumpFee, 0) +
       gradeCut.dumpFee +
       treeCalc.reduce((s, r) => s + r.dumpFee, 0)
-  const totalMat = dumpMatCost + manualMat
+  const totalMat = dumpMatCost + manualMat + shrubSfMat
 
   // ── Financials ────────────────────────────────────────────────────────────
   const manDays = totalHrs / 8
@@ -315,6 +317,8 @@ function calcDemo(
     ssCmpHrs,
     rebarHrs,
     shrubHrs,
+    shrubSfHrs,
+    shrubSfMat,
     stumpFstHrs,
     stumpAddHrs,
     shrubRate,
@@ -388,6 +392,7 @@ const DEFAULT_STATE = {
   ssCmpSF: '',
   ssCmpDepth: 3,
   shrubQty: '',
+  shrubSqFt: '',
   stumpFirstQty: '',
   stumpAddQty: '',
   treeRows: [
@@ -1407,6 +1412,16 @@ export default function MiniSkidSteerDemoModule({ initialData, onSave, onCancel,
             </p>
           </div>
         ))}
+        {/* Shrubs by square footage — labor + $0.80/SF material */}
+        <div>
+          <p className="text-xs text-gray-500 mb-0.5">Shrubs (Sq Ft)</p>
+          <Inp value={state.shrubSqFt} onChange={e => set('shrubSqFt', e.target.value)} />
+          <p className="text-xs text-gray-400 mt-0.5">
+            {calc.shrubSfHrs > 0
+              ? `${calc.shrubSfHrs.toFixed(2)} hrs · $${calc.shrubSfMat.toFixed(2)} mat`
+              : 'Labor + $0.80/SF material'}
+          </p>
+        </div>
       </div>
 
       {/* Trees */}
