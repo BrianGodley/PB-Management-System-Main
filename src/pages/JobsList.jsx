@@ -8,6 +8,7 @@ import TimeClock from '../components/TimeClock'
 import WorkOrders from '../components/WorkOrders'
 import JobComparison from '../components/JobComparison'
 import TemplatesManager from '../components/TemplatesManager'
+import EmailTemplatesManager from '../components/EmailTemplatesManager'
 import MasterCrews from './MasterCrews'
 import COEstimatePanel from '../components/COEstimatePanel'
 import CODetailModal from '../components/CODetailModal'
@@ -2802,7 +2803,8 @@ function JobScheduleSettings({
           { key: 'stages', label: '🪜 Job Stages' },
           { key: 'task-lists', label: '✅ Task Lists' },
           { key: 'scheduling-assistance', label: '✨ Scheduling Assistance' },
-          { key: 'templates', label: '📋 Templates' },
+          { key: 'templates', label: '📋 Job Templates' },
+          { key: 'email-templates', label: '✉️ E-Mail Templates' },
           { key: 'crews', label: '👷 Master Crews' },
         ].map(t => (
           <button
@@ -2820,6 +2822,8 @@ function JobScheduleSettings({
       </div>
       <div className="bg-gray-50 px-6 py-6 flex-1 overflow-y-auto">
         {settingsTab === 'templates' && <TemplatesManager />}
+
+        {settingsTab === 'email-templates' && <EmailTemplatesManager />}
 
         {settingsTab === 'crews' && <MasterCrews />}
 

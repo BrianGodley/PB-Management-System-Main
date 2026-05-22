@@ -3,7 +3,6 @@ import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { sendWelcomeEmail, sendSMS, sendFeedbackStatusEmail } from '../lib/notify'
-import { DEFAULT_INVOICE_EMAIL_SUBJECT, DEFAULT_INVOICE_EMAIL_BODY } from '../lib/companyDefaults'
 import StartLocationsCard from '../components/StartLocationsCard'
 
 const FG = '#3A5038'
@@ -1833,12 +1832,6 @@ function EmailSettings() {
   const [saveMsg, setSaveMsg] = useState('')
   const [testResult, setTestResult] = useState('')
   const [showSecrets, setShowSecrets] = useState({})
-  // Invoice notification email template — the "standard message" emailed to a
-  // client when staff send them an invoice (editable; pre-filled at send time).
-  const [invSubject, setInvSubject] = useState(DEFAULT_INVOICE_EMAIL_SUBJECT)
-  const [invBody, setInvBody] = useState(DEFAULT_INVOICE_EMAIL_BODY)
-  const [savingInv, setSavingInv] = useState(false)
-  const [invMsg, setInvMsg] = useState('')
 
   useEffect(() => {
     loadConfig()
@@ -1846,17 +1839,12 @@ function EmailSettings() {
 
   async function loadConfig() {
     setLoading(true)
-    const { data } = await supabase
-      .from('company_settings')
-      .select('email_config, invoice_email_subject, invoice_email_body')
-      .maybeSingle()
+    const { data } = await supabase.from('company_settings').select('email_config').maybeSingle()
     if (data?.email_config) {
       const cfg = data.email_config
       setActiveKey(cfg.active_provider || 'resend')
       setCredentials(cfg.providers || {})
     }
-    if (data?.invoice_email_subject) setInvSubject(data.invoice_email_subject)
-    if (data?.invoice_email_body) setInvBody(data.invoice_email_body)
     setLoading(false)
   }
 
@@ -1899,30 +1887,6 @@ function EmailSettings() {
     }
     setTesting(false)
     setTimeout(() => setTestResult(''), 8000)
-  }
-
-  async function saveInvoiceTemplate() {
-    setSavingInv(true)
-    setInvMsg('')
-    const { data: existing } = await supabase.from('company_settings').select('id').maybeSingle()
-    let error
-    if (existing?.id) {
-      ;({ error } = await supabase
-        .from('company_settings')
-        .update({
-          invoice_email_subject: invSubject.trim(),
-          invoice_email_body: invBody.trim(),
-        })
-        .eq('id', existing.id))
-    } else {
-      ;({ error } = await supabase.from('company_settings').insert({
-        invoice_email_subject: invSubject.trim(),
-        invoice_email_body: invBody.trim(),
-      }))
-    }
-    setSavingInv(false)
-    setInvMsg(error ? '\u26a0\ufe0f ' + error.message : '\u2713 Invoice email template saved')
-    setTimeout(() => setInvMsg(''), 4000)
   }
 
   function setCred(providerKey, field, value) {
@@ -2066,64 +2030,6 @@ function EmailSettings() {
         <p className="text-xs text-gray-400 mt-3">
           Switching providers here changes the active sender. Save after switching to apply.
         </p>
-      </div>
-
-      {/* Invoice notification email template */}
-      <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-        <p className="text-sm font-semibold text-gray-700">Invoice Notification Email</p>
-        <p className="text-xs text-gray-500 mt-0.5 mb-3">
-          The standard message emailed to a client when staff send them an invoice. It is
-          pre-filled in the Send dialog, where staff can adjust or add to it before sending.
-        </p>
-        <div className="space-y-3">
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Subject</label>
-            <input
-              type="text"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              value={invSubject}
-              onChange={e => setInvSubject(e.target.value)}
-              placeholder={DEFAULT_INVOICE_EMAIL_SUBJECT}
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Message</label>
-            <textarea
-              rows={9}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              value={invBody}
-              onChange={e => setInvBody(e.target.value)}
-              placeholder={DEFAULT_INVOICE_EMAIL_BODY}
-            />
-          </div>
-          <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-            <p className="text-xs font-medium text-gray-600 mb-1">Placeholders you can use:</p>
-            <p className="text-xs text-gray-500 leading-relaxed">
-              <code>{'{{client_name}}'}</code> &middot; <code>{'{{invoice_number}}'}</code> &middot;{' '}
-              <code>{'{{amount}}'}</code> &middot; <code>{'{{due_date}}'}</code> &middot;{' '}
-              <code>{'{{company_name}}'}</code>
-              <br />
-              They are filled in automatically for each invoice. A summary box and a
-              &ldquo;View Invoice in Portal&rdquo; button are added to every email.
-            </p>
-          </div>
-        </div>
-        <div className="mt-4 flex items-center gap-3">
-          <button
-            onClick={saveInvoiceTemplate}
-            disabled={savingInv}
-            className="px-4 py-2 bg-green-700 text-white text-sm font-medium rounded-lg hover:bg-green-800 disabled:opacity-50"
-          >
-            {savingInv ? 'Saving\u2026' : 'Save Template'}
-          </button>
-          {invMsg && (
-            <span
-              className={`text-sm font-medium ${invMsg.startsWith('\u26a0\ufe0f') ? 'text-red-600' : 'text-green-600'}`}
-            >
-              {invMsg}
-            </span>
-          )}
-        </div>
       </div>
     </div>
   )
