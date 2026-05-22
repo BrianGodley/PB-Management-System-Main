@@ -59,3 +59,39 @@ export async function fetchSalesTaxRate() {
     return DEFAULT_SALES_TAX_RATE
   }
 }
+
+// ── Invoice notification email template ───────────────────────────────────────
+// The "standard message" emailed to a client when staff send them an invoice.
+// Editable in Admin -> Email Settings; pre-filled (and tweakable) in the invoice
+// Send dialog. Placeholders resolved at send time:
+//   {{client_name}} {{invoice_number}} {{amount}} {{due_date}} {{company_name}}
+export const DEFAULT_INVOICE_EMAIL_SUBJECT = 'Invoice {{invoice_number}} is ready to view'
+export const DEFAULT_INVOICE_EMAIL_BODY =
+  'Hi {{client_name}},\n\n' +
+  'A new invoice ({{invoice_number}}) for {{amount}} is now available in your client portal. ' +
+  'Payment is due {{due_date}}.\n\n' +
+  'You can review the full invoice, see what it covers, and download any attachments ' +
+  'using the button below. If you have any questions, just reply to this email.\n\n' +
+  'Thank you!'
+
+/**
+ * fetchInvoiceEmailTemplate()
+ * Returns { subject, body } for the invoice notification email from
+ * company_settings, falling back to the defaults above if unset or unreadable.
+ *
+ * @returns {Promise<{subject: string, body: string}>}
+ */
+export async function fetchInvoiceEmailTemplate() {
+  try {
+    const { data } = await supabase
+      .from('company_settings')
+      .select('invoice_email_subject, invoice_email_body')
+      .maybeSingle()
+    return {
+      subject: data?.invoice_email_subject?.trim() || DEFAULT_INVOICE_EMAIL_SUBJECT,
+      body: data?.invoice_email_body?.trim() || DEFAULT_INVOICE_EMAIL_BODY,
+    }
+  } catch {
+    return { subject: DEFAULT_INVOICE_EMAIL_SUBJECT, body: DEFAULT_INVOICE_EMAIL_BODY }
+  }
+}

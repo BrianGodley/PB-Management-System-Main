@@ -9,6 +9,8 @@
 // intact.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { sendInvoiceEmail } from '../lib/notify'
+import { fetchInvoiceEmailTemplate } from '../lib/companyDefaults'
 import {
   listInvoiceFiles,
   uploadInvoiceFile,
@@ -47,6 +49,16 @@ export default function JobInvoiceDetailModal({ invoiceId, onClose, onChanged })
   const [dueDate, setDueDate] = useState('')
   const [status, setStatus] = useState('draft')
   const fileInputRef = useRef(null)
+  // ── Send-to-client email ──────────────────────────────────────────────────
+  const [clientEmail, setClientEmail] = useState('')
+  const [clientName, setClientName] = useState('')
+  const [companyName, setCompanyName] = useState('')
+  const [sendOpen, setSendOpen] = useState(false)
+  const [sendTo, setSendTo] = useState('')
+  const [sendSubject, setSendSubject] = useState('')
+  const [sendMessage, setSendMessage] = useState('')
+  const [sending, setSending] = useState(false)
+  const [sendErr, setSendErr] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -68,6 +80,46 @@ export default function JobInvoiceDetailModal({ invoiceId, onClose, onChanged })
     setAmount(data.amount != null ? String(data.amount) : '')
     setDueDate(data.due_date || '')
     setStatus(data.status || 'draft')
+    // Resolve the client (recipient) for the Send-to-Client email. Jobs link
+    // to clients by client_id; fall back to client_name for older rows.
+    if (data.job_id) {
+      const { data: job } = await supabase
+        .from('jobs')
+        .select('client_id, client_name')
+        .eq('id', data.job_id)
+        .maybeSingle()
+      let client = null
+      if (job?.client_id) {
+        const { data: c } = await supabase
+          .from('clients')
+          .select('email, name, first_name, last_name, company_name')
+          .eq('id', job.client_id)
+          .maybeSingle()
+        client = c
+      } else if (job?.client_name) {
+        const { data: c } = await supabase
+          .from('clients')
+          .select('email, name, first_name, last_name, company_name')
+          .eq('name', job.client_name)
+          .maybeSingle()
+        client = c
+      }
+      setClientEmail(client?.email || '')
+      setClientName(
+        client?.name ||
+          [client?.first_name, client?.last_name].filter(Boolean).join(' ').trim() ||
+          client?.company_name ||
+          job?.client_name ||
+          ''
+      )
+    }
+    {
+      const { data: cs } = await supabase
+        .from('company_settings')
+        .select('company_name')
+        .maybeSingle()
+      setCompanyName(cs?.company_name || 'Picture Build System')
+    }
     const { count } = await supabase
       .from('job_invoice_payments')
       .select('id', { count: 'exact', head: true })
@@ -101,6 +153,74 @@ export default function JobInvoiceDetailModal({ invoiceId, onClose, onChanged })
       return
     }
     onChanged?.(`Invoice ${inv?.invoice_number || ''} updated.`)
+  }
+
+  // Open the Send dialog: pull the company template, resolve its placeholders
+  // against this invoice, and pre-fill the editable fields.
+  async function openSendDialog() {
+    setSendErr('')
+    const tpl = await fetchInvoiceEmailTemplate()
+    const vars = {
+      client_name: clientName || 'there',
+      invoice_number: inv?.invoice_number || '',
+      amount: money(amount),
+      due_date: dueDate ? dateStr(dueDate) : 'upon receipt',
+      company_name: companyName || 'Picture Build System',
+    }
+    const fill = str =>
+      String(str || '').replace(/\{\{\s*(\w+)\s*\}\}/g, (m, key) =>
+        Object.prototype.hasOwnProperty.call(vars, key) ? vars[key] : m
+      )
+    setSendTo(clientEmail || '')
+    setSendSubject(fill(tpl.subject))
+    setSendMessage(fill(tpl.body))
+    setSendOpen(true)
+  }
+
+  // Send the invoice: persist the current edits, flip status to "sent" (which
+  // makes it visible in the client portal), then email the client.
+  async function doSend() {
+    if (!sendTo.trim()) {
+      setSendErr('Enter a recipient email address.')
+      return
+    }
+    setSending(true)
+    setSendErr('')
+    const { error: upErr } = await supabase
+      .from('job_invoices')
+      .update({
+        title: title.trim() || null,
+        description: description.trim() || null,
+        amount: num(amount),
+        due_date: dueDate || null,
+        status: 'sent',
+      })
+      .eq('id', invoiceId)
+    if (upErr) {
+      setSending(false)
+      setSendErr(upErr.message)
+      return
+    }
+    const portalUrl = `${window.location.origin}/client-portal/login`
+    const { error: mailErr } = await sendInvoiceEmail({
+      to: sendTo.trim(),
+      subject: sendSubject,
+      message: sendMessage,
+      invoiceNumber: inv?.invoice_number || '',
+      amount: num(amount),
+      dueDate: dueDate || null,
+      portalUrl,
+    })
+    setSending(false)
+    setStatus('sent')
+    if (mailErr) {
+      // The invoice is already marked Sent and visible in the portal — only
+      // the email failed. Keep the dialog open so staff can retry the send.
+      setSendErr(`Invoice marked Sent, but the email failed: ${mailErr.message}`)
+      return
+    }
+    setSendOpen(false)
+    onChanged?.(`Invoice ${inv?.invoice_number || ''} sent to ${sendTo.trim()}.`)
   }
 
   async function handleDelete() {
@@ -373,6 +493,13 @@ export default function JobInvoiceDetailModal({ invoiceId, onClose, onChanged })
                 Cancel
               </button>
               <button
+                onClick={openSendDialog}
+                disabled={busy}
+                className="rounded-lg border border-green-600 px-4 py-2 text-sm font-semibold text-green-700 hover:bg-green-50 disabled:opacity-50"
+              >
+                {status === 'draft' ? '✉ Send to Client' : '✉ Resend Email'}
+              </button>
+              <button
                 onClick={save}
                 disabled={busy}
                 className="rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-50"
@@ -433,6 +560,94 @@ export default function JobInvoiceDetailModal({ invoiceId, onClose, onChanged })
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* send-to-client dialog */}
+      {sendOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4"
+          onMouseDown={e => e.target === e.currentTarget && !sending && setSendOpen(false)}
+        >
+          <div className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div className="border-b border-gray-200 px-5 py-3.5">
+              <p className="text-sm font-bold text-gray-900">Send Invoice to Client</p>
+              <p className="mt-0.5 text-xs text-gray-500">
+                Emails the client and marks this invoice{' '}
+                <span className="font-semibold">Sent</span> — it becomes visible in their
+                portal.
+              </p>
+            </div>
+            <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
+              {sendErr && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">
+                  {sendErr}
+                </div>
+              )}
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  To
+                </label>
+                <input
+                  type="email"
+                  value={sendTo}
+                  onChange={e => setSendTo(e.target.value)}
+                  placeholder="client@example.com"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-green-600 focus:outline-none"
+                />
+                {!clientEmail && (
+                  <p className="mt-1 text-xs text-amber-600">
+                    No email is on file for this client — enter one above.
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Subject
+                </label>
+                <input
+                  type="text"
+                  value={sendSubject}
+                  onChange={e => setSendSubject(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-green-600 focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Message{' '}
+                  <span className="font-normal normal-case text-gray-400">
+                    (adjust or add to the standard message)
+                  </span>
+                </label>
+                <textarea
+                  value={sendMessage}
+                  onChange={e => setSendMessage(e.target.value)}
+                  rows={9}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-green-600 focus:outline-none"
+                />
+              </div>
+              <p className="text-xs text-gray-400">
+                An invoice summary ({inv?.invoice_number || 'number'}, amount, due date) and a
+                "View Invoice in Portal" button are added automatically.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-gray-200 px-5 py-3">
+              <button
+                onClick={() => setSendOpen(false)}
+                disabled={sending}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={doSend}
+                disabled={sending}
+                className="rounded-lg bg-green-700 px-4 py-2 text-sm font-semibold text-white hover:bg-green-800 disabled:opacity-50"
+              >
+                {sending ? 'Sending…' : 'Send Invoice'}
+              </button>
+            </div>
           </div>
         </div>
       )}

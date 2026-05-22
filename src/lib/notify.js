@@ -328,3 +328,74 @@ export async function sendClientPortalInvite({ to, clientName, activateUrl }) {
   })
   return sendEmail({ to, subject, html })
 }
+
+/**
+ * Invoice notification email.
+ * Sent from the invoice detail modal when staff click "Send to Client".
+ * `subject` and `message` arrive already resolved (the Settings template with
+ * placeholders filled in, optionally tweaked at send time). `message` is plain
+ * text — newlines become <br>. The invoice summary box and the portal button
+ * are rendered here so every invoice email is structurally consistent.
+ */
+export async function sendInvoiceEmail({
+  to,
+  subject,
+  message,
+  invoiceNumber,
+  amount,
+  dueDate,
+  portalUrl,
+}) {
+  const esc = s =>
+    String(s ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+  const messageHtml = esc(message).trim().replace(/\n/g, '<br>')
+
+  const fmtMoney = v => {
+    const num = Number(v)
+    return Number.isFinite(num)
+      ? num.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+      : '\u2014'
+  }
+  const fmtDate = v => {
+    if (!v) return '\u2014'
+    const d = new Date(v)
+    return isNaN(d.getTime())
+      ? '\u2014'
+      : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+
+  const summaryRows = [
+    invoiceNumber ? ['Invoice', esc(invoiceNumber)] : null,
+    amount != null && amount !== '' ? ['Amount Due', fmtMoney(amount)] : null,
+    dueDate ? ['Due Date', fmtDate(dueDate)] : null,
+  ].filter(Boolean)
+
+  const body = `
+    <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 16px;">
+      ${messageHtml || 'A new invoice is ready for you to review.'}
+    </p>
+    ${
+      summaryRows.length
+        ? `<table style="width:100%;background:#f9fafb;border-radius:10px;border:1px solid #e5e7eb;" cellpadding="0" cellspacing="0">
+            ${summaryRows
+              .map(
+                ([k, v]) =>
+                  `<tr><td style="padding:8px 14px;font-size:13px;color:#6b7280;width:120px;">${k}</td>` +
+                  `<td style="padding:8px 14px;font-size:14px;font-weight:700;color:#111827;">${v}</td></tr>`
+              )
+              .join('')}
+          </table>`
+        : ''
+    }`
+
+  const html = baseTemplate({
+    title: 'Your Invoice',
+    body,
+    buttonText: 'View Invoice in Portal',
+    buttonUrl: portalUrl || '#',
+  })
+  return sendEmail({ to, subject: subject || 'New invoice', html })
+}
