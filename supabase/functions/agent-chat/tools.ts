@@ -8,7 +8,7 @@
 // enforced — Sam can only read what the user themselves can read. Service
 // role is never used here.
 
-import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient, SupabaseClient } from 'npm:@supabase/supabase-js@2'
 
 export type ToolContext = {
   userJwt:         string

@@ -12,7 +12,7 @@
 // Deploy:  supabase functions deploy invoice-comment --no-verify-jwt
 //   (--no-verify-jwt so the portal client's session JWT isn't rejected by the
 //    gateway; the caller is still verified below via auth.getUser.)
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const cors = {
   'Access-Control-Allow-Origin': '*',

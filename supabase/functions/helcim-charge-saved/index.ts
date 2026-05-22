@@ -13,7 +13,7 @@
 // endpoint is inferred — verify it against your live Helcim account.
 //
 // Deploy:  supabase functions deploy helcim-charge-saved --no-verify-jwt
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
