@@ -74,7 +74,9 @@ export default function DailyLogs({ jobs = [], selectedJob, statusFilter = 'open
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [lightbox, setLightbox] = useState(null) // { photos, index }
+  const [page, setPage] = useState(1)
   const fileRef = useRef(null)
+  const listRef = useRef(null)
 
   const jobMap = Object.fromEntries(jobs.map(j => [j.id, j.name || j.client_name]))
 
@@ -84,6 +86,10 @@ export default function DailyLogs({ jobs = [], selectedJob, statusFilter = 'open
   useEffect(() => {
     fetchLogs()
   }, [selectedJob, statusFilter])
+  // Scroll the list back to the top whenever the page or filter changes.
+  useEffect(() => {
+    if (listRef.current) listRef.current.scrollTop = 0
+  }, [page, selectedJob, statusFilter])
 
   async function fetchProfiles() {
     const { data } = await supabase.from('profiles').select('id, full_name, email')
@@ -122,6 +128,7 @@ export default function DailyLogs({ jobs = [], selectedJob, statusFilter = 'open
         rows = rows.filter(l => allowed.has(l.job_id))
       }
       setLogs(rows)
+      setPage(1)
     }
     setLoading(false)
   }
@@ -285,6 +292,14 @@ export default function DailyLogs({ jobs = [], selectedJob, statusFilter = 'open
   }
 
   // ── Render ─────────────────────────────────────────────────
+  // Client-side pagination — fetchLogs already loads every matching log, so
+  // page through them here (BuilderTrend-style) instead of rendering all at once.
+  const LOGS_PER_PAGE = 20
+  const totalPages = Math.max(1, Math.ceil(logs.length / LOGS_PER_PAGE))
+  const safePage = Math.min(page, totalPages)
+  const pageStart = (safePage - 1) * LOGS_PER_PAGE
+  const pageLogs = logs.slice(pageStart, pageStart + LOGS_PER_PAGE)
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -319,20 +334,50 @@ export default function DailyLogs({ jobs = [], selectedJob, statusFilter = 'open
           </button>
         </div>
       ) : (
-        <div className="space-y-4 overflow-y-auto flex-1">
-          {logs.map(log => (
-            <LogCard
-              key={log.id}
-              log={log}
-              author={profiles[log.created_by] || log.bt_author_name || 'Unknown'}
-              jobName={selectedJob === 'all' ? jobMap[log.job_id] : null}
-              onEdit={() => openEdit(log)}
-              onDelete={() => deleteLog(log)}
-              onDeletePhoto={photo => deletePhoto(log, photo)}
-              onPhotoClick={(photos, idx) => setLightbox({ photos, idx })}
-            />
-          ))}
-        </div>
+        <>
+          <div ref={listRef} className="space-y-4 overflow-y-auto flex-1">
+            {pageLogs.map(log => (
+              <LogCard
+                key={log.id}
+                log={log}
+                author={profiles[log.created_by] || log.bt_author_name || 'Unknown'}
+                jobName={selectedJob === 'all' ? jobMap[log.job_id] : null}
+                onEdit={() => openEdit(log)}
+                onDelete={() => deleteLog(log)}
+                onDeletePhoto={photo => deletePhoto(log, photo)}
+                onPhotoClick={(photos, idx) => setLightbox({ photos, idx })}
+              />
+            ))}
+          </div>
+
+          {/* Pagination — BuilderTrend-style page controls */}
+          {logs.length > LOGS_PER_PAGE && (
+            <div className="flex items-center justify-between gap-3 pt-3 mt-1 border-t border-gray-100 flex-shrink-0">
+              <span className="text-xs text-gray-500">
+                {pageStart + 1}–{Math.min(pageStart + LOGS_PER_PAGE, logs.length)} of {logs.length}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage(Math.max(1, safePage - 1))}
+                  disabled={safePage === 1}
+                  className="px-2.5 py-1 text-xs rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  ‹ Prev
+                </button>
+                <span className="text-xs text-gray-500 px-2">
+                  Page {safePage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage(Math.min(totalPages, safePage + 1))}
+                  disabled={safePage === totalPages}
+                  className="px-2.5 py-1 text-xs rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Next ›
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* New / Edit Log Modal */}
@@ -376,6 +421,9 @@ function LogCard({ log, author, jobName, onEdit, onDelete, onPhotoClick }) {
       {/* Card header */}
       <div className="flex items-start justify-between px-4 pt-4 pb-2">
         <div>
+          {jobName && (
+            <p className="text-xs font-bold text-green-700 mb-0.5">{jobName}</p>
+          )}
           <p className="text-base font-bold text-gray-900">{formatDate(log.date)}</p>
           {log.title && <p className="text-sm text-gray-600 mt-0.5">{log.title}</p>}
         </div>
@@ -411,7 +459,7 @@ function LogCard({ log, author, jobName, onEdit, onDelete, onPhotoClick }) {
         </div>
       </div>
 
-      {/* Author + permissions + job */}
+      {/* Author + permissions */}
       <div className="flex flex-wrap items-center gap-1.5 px-4 pb-2">
         <span className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full font-medium">
           <span className="w-4 h-4 rounded-full bg-green-700 text-white inline-flex items-center justify-center text-[9px] font-bold">
@@ -430,11 +478,6 @@ function LogCard({ log, author, jobName, onEdit, onDelete, onPhotoClick }) {
             </span>
           ) : null
         })}
-        {jobName && (
-          <span className="text-xs px-2 py-0.5 rounded-full border border-purple-200 bg-purple-50 text-purple-700 font-medium">
-            {jobName}
-          </span>
-        )}
         <span className="text-[10px] text-gray-400 ml-auto">
           {new Date(log.created_at).toLocaleTimeString('en-US', {
             hour: 'numeric',
