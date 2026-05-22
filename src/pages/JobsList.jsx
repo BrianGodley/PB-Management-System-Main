@@ -4272,17 +4272,20 @@ function JobTasksPanel({ job }) {
   async function addTask() {
     if (!job?.id || adding) return
     setAdding(true)
+    // New tasks go to the TOP of the list — give them a sort_order below
+    // every existing task so there's no scrolling down to the new row.
+    const minOrder = tasks.length ? Math.min(...tasks.map(t => t.sort_order ?? 0)) : 0
     const { data } = await supabase
       .from('job_tasks')
       .insert({
         job_id: job.id,
         task_name: '',
         status: 'pending',
-        sort_order: tasks.length,
+        sort_order: minOrder - 1,
       })
       .select()
       .single()
-    if (data) setTasks(prev => [...prev, data])
+    if (data) setTasks(prev => [data, ...prev])
     setAdding(false)
   }
 
