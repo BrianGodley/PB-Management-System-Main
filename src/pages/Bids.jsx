@@ -311,6 +311,7 @@ export default function Bids() {
           .from('estimate_projects')
           .select('id, project_name, estimate_modules(*)')
           .eq('estimate_id', bid.estimate_id)
+          .order('sort_order', { nullsFirst: false })
           .order('created_at')
 
         if (estProjects?.length) {
@@ -409,6 +410,7 @@ export default function Bids() {
         .from('estimate_projects')
         .select('*, estimate_modules(*)')
         .eq('estimate_id', bid.estimate_id)
+        .order('sort_order', { nullsFirst: false })
         .order('created_at')
       const financeOacRate = await fetchFinanceOacRate()
       const blob = await generateBidDoc(est, projs || [], bid.job_address || '', { financeOacRate })

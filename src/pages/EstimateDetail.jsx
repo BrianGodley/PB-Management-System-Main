@@ -94,6 +94,9 @@ export default function EstimateDetail() {
   const returnTo = searchParams.get('return_to') || null
   const [estimate, setEstimate] = useState(null)
   const [projects, setProjects] = useState([])
+  // Drag-and-drop reorder of the project list (left column).
+  const [dragProjId, setDragProjId] = useState(null)
+  const [dragOverProjId, setDragOverProjId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [statusLoading, setStatusLoading] = useState(false)
 
@@ -373,6 +376,7 @@ export default function EstimateDetail() {
         .from('estimate_projects')
         .select('*, estimate_modules(*)')
         .eq('estimate_id', id)
+        .order('sort_order', { nullsFirst: false })
         .order('created_at')
       if (projs) {
         setProjects(projs)
@@ -418,6 +422,7 @@ export default function EstimateDetail() {
       id: crypto.randomUUID(),
       estimate_id: id,
       project_name: newProjectName.trim(),
+      sort_order: projects.length + 1,
       gpmd_override: null,
       sub_gp_markup_rate: 0.2,
       estimate_modules: [],
@@ -454,6 +459,21 @@ export default function EstimateDetail() {
       setSelectedProject(null)
       setSelectedModule(null)
     }
+    markDirty()
+  }
+
+  // ── Project reorder (draft) — drag-and-drop in the left column
+  function reorderProjects(fromId, toId) {
+    if (!fromId || fromId === toId) return
+    setProjects(prev => {
+      const arr = [...prev]
+      const fromIdx = arr.findIndex(p => p.id === fromId)
+      const toIdx = arr.findIndex(p => p.id === toId)
+      if (fromIdx < 0 || toIdx < 0) return prev
+      const [moved] = arr.splice(fromIdx, 1)
+      arr.splice(toIdx, 0, moved)
+      return arr.map((p, i) => ({ ...p, sort_order: i + 1 }))
+    })
     markDirty()
   }
 
@@ -775,6 +795,7 @@ export default function EstimateDetail() {
         .from('estimate_projects')
         .select('*, estimate_modules(*)')
         .eq('estimate_id', id)
+        .order('sort_order', { nullsFirst: false })
         .order('created_at')
       const projsForBid = freshProjs || projects
 
@@ -1474,16 +1495,43 @@ export default function EstimateDetail() {
                 return (
                   <div
                     key={proj.id}
+                    draggable
+                    onDragStart={() => setDragProjId(proj.id)}
+                    onDragEnd={() => {
+                      setDragProjId(null)
+                      setDragOverProjId(null)
+                    }}
+                    onDragOver={e => {
+                      e.preventDefault()
+                      if (dragProjId && dragProjId !== proj.id) setDragOverProjId(proj.id)
+                    }}
+                    onDragLeave={() => setDragOverProjId(o => (o === proj.id ? null : o))}
+                    onDrop={e => {
+                      e.preventDefault()
+                      reorderProjects(dragProjId, proj.id)
+                      setDragProjId(null)
+                      setDragOverProjId(null)
+                    }}
                     onClick={() => {
                       setSelectedProject(proj)
                       setSelectedModule(null)
                     }}
-                    className={`px-4 py-3 cursor-pointer transition-colors group ${isSelected ? 'bg-green-50 border-l-4 border-green-600' : 'hover:bg-gray-50 border-l-4 border-transparent'}`}
+                    className={`px-4 py-3 cursor-pointer transition-colors group ${
+                      dragOverProjId === proj.id && dragProjId !== proj.id
+                        ? 'border-t-2 border-t-green-500'
+                        : ''
+                    } ${dragProjId === proj.id ? 'opacity-40' : ''} ${isSelected ? 'bg-green-50 border-l-4 border-green-600' : 'hover:bg-gray-50 border-l-4 border-transparent'}`}
                   >
                     <div className="flex items-center justify-between">
                       <p
-                        className={`text-sm font-semibold ${isSelected ? 'text-green-800' : 'text-gray-800'}`}
+                        className={`flex items-center text-sm font-semibold ${isSelected ? 'text-green-800' : 'text-gray-800'}`}
                       >
+                        <span
+                          className="mr-1.5 cursor-grab select-none text-gray-300"
+                          title="Drag to reorder"
+                        >
+                          ⠿
+                        </span>
                         {proj.project_name}
                       </p>
                       <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">

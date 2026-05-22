@@ -1963,6 +1963,7 @@ export default function WorkOrders({ jobs, selectedJob }) {
       .from('estimate_projects')
       .select('id, project_name, estimate_modules(*)')
       .eq('estimate_id', job.estimate_id)
+      .order('sort_order', { nullsFirst: false })
       .order('created_at')
 
     if (projErr) {

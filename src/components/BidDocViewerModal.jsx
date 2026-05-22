@@ -141,6 +141,7 @@ export default function BidDocViewerModal({ bid, onClose }) {
       .from('estimate_projects')
       .select('*, estimate_modules(*)')
       .eq('estimate_id', bidLite.estimate_id)
+      .order('sort_order', { nullsFirst: false })
       .order('created_at')
     if (projErr) throw projErr
 

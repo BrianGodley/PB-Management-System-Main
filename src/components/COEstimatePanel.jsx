@@ -147,6 +147,7 @@ export default function COEstimatePanel({
         .from('estimate_projects')
         .select('*, estimate_modules(*)')
         .eq('estimate_id', estimateId)
+        .order('sort_order', { nullsFirst: false })
         .order('created_at')
       if (projs) {
         setProjects(projs)
