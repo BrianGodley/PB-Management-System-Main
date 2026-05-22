@@ -50,6 +50,8 @@ const R = {
   sealerNaturalSFPerHr: 200,
   sealerWetSFPerHr: 120,
   vaporBarrierSFPerHr: 15,
+  // Forming complexity: % of labor added per point of the 0–100 input.
+  complexityPctPerUnit: 1,
   // Material unit costs (material_rates)
   concretePerCY: 185,
   rebarSFPrice: 0.8625,
@@ -98,6 +100,8 @@ function calcConcrete(
   const sealerNaturalSFPerHr = lr['Concrete - Sealer Natural'] ?? R.sealerNaturalSFPerHr
   const sealerWetSFPerHr = lr['Concrete - Sealer Wet-Look'] ?? R.sealerWetSFPerHr
   const vaporBarrierSFPerHr = lr['Concrete - Vapor Barrier'] ?? R.vaporBarrierSFPerHr
+  const complexityPctPerUnit =
+    lr['Concrete - Forming Complexity % Per Unit'] ?? R.complexityPctPerUnit
 
   // ── Material unit costs (material_rates) ─────────────────────────────────
   const concretePerCY = mr['Concrete - Per CY'] ?? R.concretePerCY
@@ -121,7 +125,6 @@ function calcConcrete(
   const layoutHrs = n(state.layoutHrs)
   const distanceLF = n(state.distanceLF)
   const pctBackyard = n(state.pctBackyard) / 100
-  const formComplexity = n(state.formingComplexity) / 100
   const finishType = state.finishType || 'Broom Finish'
   const colorYes = state.colorYes
   const pumpYes = state.pumpYes
@@ -178,7 +181,6 @@ function calcConcrete(
   // ── Forming complexity ───────────────────────────────────────────────────
   const preComplexHrs =
     layoutHrs + travelHrs + backyardHrs + baseHrsTot + installHrs + rebarHrs + formHrs + sleeveHrs
-  const complexityHrs = preComplexHrs * formComplexity * 0.2
 
   // ── Finish add-ons ───────────────────────────────────────────────────────
   let finishHrs = 0,
@@ -225,7 +227,13 @@ function calcConcrete(
   })
 
   // ── Totals ───────────────────────────────────────────────────────────────
-  const preAdjHrs = preComplexHrs + complexityHrs + finishHrs + vaporHrs + sealerHrs + manHrs
+  // ── Forming complexity — a 1-to-1% labor modifier. Each point of the
+  //    0–100 input adds complexityPctPerUnit % (default 1%) to EVERY labor
+  //    hour, so 100 points ⇒ +100% ⇒ the job's labor doubles.
+  const baseLaborHrs = preComplexHrs + finishHrs + vaporHrs + sealerHrs + manHrs
+  const complexityHrs =
+    (baseLaborHrs * n(state.formingComplexity) * complexityPctPerUnit) / 100
+  const preAdjHrs = baseLaborHrs + complexityHrs
   const diffHrs = preAdjHrs * diffPct
   const _preWalkHrs = preAdjHrs + diffHrs + hoursAdj
   const walkHrs = calcWalkAccessLabor(_preWalkHrs, distanceLF, { paceLfPerMin: _pace })
@@ -267,6 +275,7 @@ function calcConcrete(
     travelHrs,
     backyardHrs,
     complexityHrs,
+    complexityPctPerUnit,
     installHrs,
     rebarHrs,
     formHrs,
@@ -319,16 +328,29 @@ function SectionHeader({ title }) {
   )
 }
 
-function NumInput({ value, onChange, placeholder = '0', className = '', step = 'any', min }) {
+function NumInput({ value, onChange, placeholder = '0', className = '', step = 'any', min, max }) {
+  // When a `max` is supplied, hard-cap the value so the user cannot enter a
+  // number higher than it. The HTML5 `max` attribute alone does NOT block
+  // typing — it only fails form validation — so we clamp in onChange too.
+  // Used by e.g. Forming Complexity, which caps at 100 (+100% labor max).
+  const handleChange = e => {
+    let v = e.target.value
+    if (max != null && v !== '') {
+      const parsed = parseFloat(v)
+      if (Number.isFinite(parsed) && parsed > parseFloat(max)) v = String(max)
+    }
+    onChange(v)
+  }
   return (
     <input
       type="number"
       step={step}
       min={min}
+      max={max}
       className={`input text-sm py-1.5 ${className}`}
       placeholder={placeholder}
       value={value}
-      onChange={e => onChange(e.target.value)}
+      onChange={handleChange}
     />
   )
 }
@@ -604,13 +626,30 @@ export default function ConcreteModule({ onSave, onBack, saving, initialData }) 
             <NumInput value={pctBackyard} onChange={setPctBackyard} placeholder="0" max="100" />
           </div>
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Forming Complexity (0–100)</label>
+            <label className="text-xs text-gray-500 block mb-1 inline-flex items-center gap-1 flex-wrap">
+              Forming Complexity (0–100)
+              <span className="text-gray-400">— +{calc.complexityPctPerUnit}% labor / point</span>
+              <RateEditPopover
+                table="labor_rates"
+                name="Concrete - Forming Complexity % Per Unit"
+                category="Concrete"
+                mode="coefficient"
+                unitLabel="%/pt"
+                currentValue={calc.complexityPctPerUnit}
+                onSaved={refreshAllRates}
+              />
+            </label>
             <NumInput
               value={formingComplexity}
               onChange={setFormingComplexity}
               placeholder="0"
               max="100"
             />
+            {calc.complexityHrs > 0 && (
+              <p className="text-[10px] text-gray-500 italic mt-0.5">
+                +{calc.complexityHrs.toFixed(2)} hrs added
+              </p>
+            )}
           </div>
           <div>
             <label className="text-xs text-gray-500 block mb-1">Hrs Adjustment</label>
