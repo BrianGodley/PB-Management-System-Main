@@ -1,52 +1,102 @@
 // src/components/AllJobsTasks.jsx
 //
-// All-Jobs view for the Jobs > Tasks tab. Shown when "All Jobs" is selected
-// instead of the per-job JobTasksPanel. Shows a card per job (with that job's
-// tasks listed inside) for the jobs matching the sidebar Open/Closed filter.
-// Paginated at 100 jobs per page; each page's tasks are fetched server-side
-// scoped to just that page's jobs. Read-only — task editing stays in the
-// per-job panel. Click a job to open it.
+// All-Jobs view for the Jobs > Tasks tab. A card per job (with that job's
+// tasks listed inside), for jobs matching the sidebar Open/Closed filter.
+// A filter bar (My / All x Open / Closed / Both) scopes which tasks count.
+// Paginated at 100 jobs per page; each page's tasks are fetched server-side.
+// Read-only — task editing stays in the per-job panel. Click a job to open it.
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 import { fetchAllPaginated } from '../lib/fetchAll'
 
 const JOBS_PER_PAGE = 100
+
+// Filter bar — scope (whose tasks) x status. A task is "open" until completed.
+const TASK_FILTERS = [
+  { key: 'my-open', label: 'My Tasks Open', scope: 'my', status: 'open' },
+  { key: 'my-closed', label: 'My Tasks Closed', scope: 'my', status: 'closed' },
+  { key: 'my-both', label: 'My Tasks Both', scope: 'my', status: 'both' },
+  { key: 'all-open', label: 'All Open Tasks', scope: 'all', status: 'open' },
+  { key: 'all-closed', label: 'All Closed Tasks', scope: 'all', status: 'closed' },
+  { key: 'all-both', label: 'All Both', scope: 'all', status: 'both' },
+]
 
 function isJobOpen(j) {
   const s = j?.status || 'active'
   return s === 'active' || s === 'on_hold'
 }
 
+// Apply the active task filter (status + assignee) to a job_tasks query.
+function applyTaskFilter(query, filterDef, myEmployeeId) {
+  let q = query
+  if (filterDef.status === 'open') q = q.neq('status', 'completed')
+  else if (filterDef.status === 'closed') q = q.eq('status', 'completed')
+  if (filterDef.scope === 'my') q = q.eq('assignee_id', myEmployeeId)
+  return q
+}
+
 export default function AllJobsTasks({ jobs = [], statusFilter = 'open', onSelectJob }) {
-  // Set of job-ids that have at least one task — loaded once (just the job_id
-  // column, so it's light) so we know which jobs to page through.
-  const [jobIdsWithTasks, setJobIdsWithTasks] = useState(null) // null = not loaded
-  // Current page's tasks, grouped as { jobId: [tasks] }.
+  const { user } = useAuth()
+
+  const [filterKey, setFilterKey] = useState('all-both')
+  // undefined = not resolved yet, null = account not linked to an employee.
+  const [myEmployeeId, setMyEmployeeId] = useState(undefined)
+  const [jobIdsWithTasks, setJobIdsWithTasks] = useState(null) // null = loading
   const [tasksByJob, setTasksByJob] = useState({})
   const [tasksLoading, setTasksLoading] = useState(false)
   const [page, setPage] = useState(1)
 
-  // 1. Load the set of jobs that have tasks (once, on mount).
+  const filterDef = TASK_FILTERS.find(f => f.key === filterKey) || TASK_FILTERS[5]
+
+  // Resolve which employee record is the logged-in account (employees.user_id).
   useEffect(() => {
+    if (!user?.id) {
+      setMyEmployeeId(null)
+      return
+    }
     let alive = true
     ;(async () => {
+      const { data } = await supabase
+        .from('employees')
+        .select('id')
+        .eq('user_id', user.id)
+        .limit(1)
+      if (alive) setMyEmployeeId(data?.[0]?.id || null)
+    })()
+    return () => {
+      alive = false
+    }
+  }, [user?.id])
+
+  // Load the set of jobs that have a task matching the current filter.
+  useEffect(() => {
+    // "My" filters need the employee link resolved first.
+    if (filterDef.scope === 'my' && myEmployeeId === undefined) return
+    if (filterDef.scope === 'my' && !myEmployeeId) {
+      setJobIdsWithTasks(new Set())
+      return
+    }
+    let alive = true
+    setJobIdsWithTasks(null)
+    ;(async () => {
       const { data } = await fetchAllPaginated(() =>
-        supabase.from('job_tasks').select('job_id')
+        applyTaskFilter(supabase.from('job_tasks').select('job_id'), filterDef, myEmployeeId)
       )
       if (alive) setJobIdsWithTasks(new Set((data || []).map(r => r.job_id)))
     })()
     return () => {
       alive = false
     }
-  }, [])
+  }, [filterKey, myEmployeeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reset to page 1 when the Open/Closed filter changes.
+  // Reset to page 1 when the job filter or the task filter changes.
   useEffect(() => {
     setPage(1)
-  }, [statusFilter])
+  }, [statusFilter, filterKey])
 
   // The full list of jobs to page through: matches the Open/Closed filter and
-  // has at least one task. Computed in memory from the jobs prop.
+  // has at least one task matching the task filter. Computed from the jobs prop.
   const taskedJobs = useMemo(() => {
     if (!jobIdsWithTasks) return []
     return jobs
@@ -61,8 +111,7 @@ export default function AllJobsTasks({ jobs = [], statusFilter = 'open', onSelec
   const pageStart = (safePage - 1) * JOBS_PER_PAGE
   const pageJobs = taskedJobs.slice(pageStart, pageStart + JOBS_PER_PAGE)
 
-  // 2. Fetch the current page's tasks, scoped to just this page's jobs.
-  // pageKey changes only when the visible job set changes (page / filter).
+  // Fetch the current page's tasks (matching the filter), scoped to its jobs.
   const pageKey = pageJobs.map(j => j.id).join(',')
   useEffect(() => {
     if (!pageKey) {
@@ -73,10 +122,14 @@ export default function AllJobsTasks({ jobs = [], statusFilter = 'open', onSelec
     setTasksLoading(true)
     ;(async () => {
       const { data } = await fetchAllPaginated(() =>
-        supabase
-          .from('job_tasks')
-          .select('job_id, task_name, status, sort_order, created_at')
-          .in('job_id', pageKey.split(','))
+        applyTaskFilter(
+          supabase
+            .from('job_tasks')
+            .select('job_id, task_name, status, sort_order, created_at')
+            .in('job_id', pageKey.split(',')),
+          filterDef,
+          myEmployeeId
+        )
           .order('sort_order')
           .order('created_at')
           .order('id')
@@ -90,31 +143,48 @@ export default function AllJobsTasks({ jobs = [], statusFilter = 'open', onSelec
     return () => {
       alive = false
     }
-  }, [pageKey])
+  }, [pageKey, filterKey, myEmployeeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (jobIdsWithTasks === null) {
-    return (
-      <div className="flex justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-green-700" />
-      </div>
-    )
-  }
+  const noEmployeeLink = filterDef.scope === 'my' && myEmployeeId === null
 
   return (
     <div className="p-4">
       <div className="mb-3 flex items-baseline justify-between">
         <h2 className="text-lg font-bold text-gray-900">Tasks — All Jobs</h2>
         <span className="text-xs text-gray-400">
-          {taskedJobs.length.toLocaleString()} {statusFilter === 'closed' ? 'closed' : 'open'} job
-          {taskedJobs.length === 1 ? '' : 's'} with tasks
+          {taskedJobs.length.toLocaleString()} job{taskedJobs.length === 1 ? '' : 's'}
         </span>
       </div>
 
-      {taskedJobs.length === 0 ? (
+      {/* Filter bar — My / All x Open / Closed / Both */}
+      <div className="mb-3 flex flex-wrap gap-1.5">
+        {TASK_FILTERS.map(f => (
+          <button
+            key={f.key}
+            type="button"
+            onClick={() => setFilterKey(f.key)}
+            className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+              filterKey === f.key
+                ? 'bg-green-700 text-white'
+                : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {jobIdsWithTasks === null ? (
+        <div className="flex justify-center py-20">
+          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-green-700" />
+        </div>
+      ) : taskedJobs.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-gray-400">
           <p className="mb-2 text-4xl">✅</p>
           <p className="text-sm">
-            No tasks on any {statusFilter === 'closed' ? 'closed' : 'open'} job.
+            {noEmployeeLink
+              ? 'Your login is not linked to an employee record, so there are no personal tasks to show.'
+              : 'No tasks match this filter.'}
           </p>
         </div>
       ) : (
