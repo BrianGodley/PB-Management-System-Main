@@ -317,31 +317,73 @@ function ScheduleView() {
 }
 
 // ── Daily Logs ───────────────────────────────────────────────────────────────
+// Daily-log photos live in the public `daily-log-photos` storage bucket. The
+// portal_daily_log_photos RPC returns the photo rows for this client's logs,
+// scoped exactly like portal_daily_logs; we group them by log_id below.
+function dailyLogPhotoUrl(path) {
+  return supabase.storage.from('daily-log-photos').getPublicUrl(path).data.publicUrl
+}
+
 function DailyLogsView({ limit }) {
   const [rows, setRows] = useState(null)
+  const [photosByLog, setPhotosByLog] = useState({})
   useEffect(() => {
     supabase.rpc('portal_daily_logs', rpcArgs()).then(({ data }) => setRows(data || []))
+    supabase.rpc('portal_daily_log_photos', rpcArgs()).then(({ data }) => {
+      const by = {}
+      for (const p of data || []) {
+        const logId = pick(p, 'log_id')
+        if (logId && pick(p, 'storage_path')) (by[logId] = by[logId] || []).push(p)
+      }
+      setPhotosByLog(by)
+    })
   }, [])
   if (rows === null) return <Loading />
   if (rows.length === 0) return <Empty label="No daily logs yet." />
   const shown = limit ? rows.slice(0, limit) : rows
   return (
     <div className="space-y-3">
-      {shown.map(d => (
-        <div key={d.id} className="rounded-xl border border-gray-200 bg-white p-4">
-          <div className="mb-1 flex items-center justify-between">
-            <span className="text-sm font-semibold text-gray-800">
-              {dateStr(pick(d, 'log_date', 'created_at'))}
-            </span>
-            <span className="text-xs text-gray-400">
-              {[pick(d, 'author'), pick(d, 'weather')].filter(Boolean).join(' · ')}
-            </span>
+      {shown.map(d => {
+        const photos = photosByLog[d.id] || []
+        return (
+          <div key={d.id} className="rounded-xl border border-gray-200 bg-white p-4">
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-sm font-semibold text-gray-800">
+                {dateStr(pick(d, 'log_date', 'created_at'))}
+              </span>
+              <span className="text-xs text-gray-400">
+                {[pick(d, 'author'), pick(d, 'weather')].filter(Boolean).join(' · ')}
+              </span>
+            </div>
+            <p className="whitespace-pre-wrap text-sm text-gray-600">
+              {pick(d, 'notes', 'description') || '—'}
+            </p>
+            {photos.length > 0 && (
+              <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                {photos.map(p => {
+                  const url = dailyLogPhotoUrl(pick(p, 'storage_path'))
+                  return (
+                    <a
+                      key={p.id}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block aspect-square overflow-hidden rounded-lg border border-gray-200 bg-gray-50"
+                    >
+                      <img
+                        src={url}
+                        alt={pick(p, 'file_name') || 'Daily log photo'}
+                        loading="lazy"
+                        className="h-full w-full object-cover transition hover:opacity-90"
+                      />
+                    </a>
+                  )
+                })}
+              </div>
+            )}
           </div>
-          <p className="whitespace-pre-wrap text-sm text-gray-600">
-            {pick(d, 'notes', 'description') || '—'}
-          </p>
-        </div>
-      ))}
+        )
+      })}
       {limit && rows.length > limit && (
         <p className="text-center text-xs text-gray-400">
           Showing {limit} of {rows.length} — open the Daily Logs tab to see them all.
