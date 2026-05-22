@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { LanguageProvider } from './contexts/LanguageContext'
 import { RateIconsProvider } from './contexts/RateIconsContext'
 import Layout from './components/Layout'
+import ErrorBoundary from './components/ErrorBoundary'
 import Login from './pages/Login'
 const Clients = lazy(() => import('./pages/Clients'))
 const ClientDetail = lazy(() => import('./pages/ClientDetail'))
@@ -72,7 +73,8 @@ function ProtectedRoute({ children }) {
 function AppRoutes() {
   const { user } = useAuth()
   return (
-    <Suspense
+    <ErrorBoundary>
+      <Suspense
       fallback={
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
           <div className="text-center">
@@ -142,7 +144,8 @@ function AppRoutes() {
           <Route path="help" element={<Help />} />
         </Route>
       </Routes>
-    </Suspense>
+      </Suspense>
+    </ErrorBoundary>
   )
 }
 
