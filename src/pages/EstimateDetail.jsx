@@ -1844,11 +1844,22 @@ export default function EstimateDetail() {
                   <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-0.5">
                     {editingModule ? 'Edit Module' : 'Add Module'}
                   </p>
-                  <h2 className="text-xl font-bold text-gray-900">
-                    {(moduleNameInput && moduleNameInput.trim()) ||
-                      editingModule?.module_name ||
-                      selectedType}
-                  </h2>
+                  {editingModule ? (
+                    <input
+                      type="text"
+                      value={moduleNameInput}
+                      onChange={e => setModuleNameInput(e.target.value)}
+                      placeholder={editingModule.module_type || selectedType}
+                      title="Edit the module name — saved when you click Update Module"
+                      className="w-full max-w-md rounded-md border border-dashed border-gray-300 bg-white px-2 py-1 text-xl font-bold text-gray-900 focus:border-green-500 focus:outline-none"
+                    />
+                  ) : (
+                    <h2 className="text-xl font-bold text-gray-900">
+                      {(moduleNameInput && moduleNameInput.trim()) ||
+                        editingModule?.module_name ||
+                        selectedType}
+                    </h2>
+                  )}
                   {/* Project-name row: project name on the left, Edit Rates
                       toggle on the right so it sits directly above the
                       "Total Price" cell of the GPMD bar (which is right-most
