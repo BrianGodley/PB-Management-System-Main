@@ -31,7 +31,7 @@ const EMPTY_FORM = {
 }
 
 // Daily logs are fetched and shown one page at a time (server-side paging).
-const LOGS_PER_PAGE = 20
+const LOGS_PER_PAGE = 50
 
 // ── Helpers ──────────────────────────────────────────────────
 function formatDate(d) {
