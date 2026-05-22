@@ -1517,10 +1517,14 @@ export default function EstimateDetail() {
                       setSelectedModule(null)
                     }}
                     className={`px-4 py-3 cursor-pointer transition-colors group ${
+                      dragProjId === proj.id ? 'opacity-40' : ''
+                    } ${
                       dragOverProjId === proj.id && dragProjId !== proj.id
-                        ? 'border-t-2 border-t-green-500'
-                        : ''
-                    } ${dragProjId === proj.id ? 'opacity-40' : ''} ${isSelected ? 'bg-green-50 border-l-4 border-green-600' : 'hover:bg-gray-50 border-l-4 border-transparent'}`}
+                        ? 'bg-green-100'
+                        : isSelected
+                          ? 'bg-green-50'
+                          : 'hover:bg-gray-50'
+                    } ${isSelected ? 'shadow-[inset_4px_0_0_#16a34a]' : ''}`}
                   >
                     <div className="flex items-center justify-between">
                       <p
