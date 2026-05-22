@@ -3641,38 +3641,66 @@ function JobFilesPanel({ job }) {
 
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
-        <div>
-          <h2 className="text-lg font-bold text-gray-900">Files</h2>
-          <p className="text-xs text-gray-400">{job.client_name || job.name}</p>
-        </div>
+        <h2 className="text-sm font-semibold text-gray-700">Files</h2>
       </div>
 
-      {/* Sub-tabs */}
-      <div className="flex gap-1 border-b border-gray-200 mb-4">
-        {[
-          { key: 'documents', label: '📄 Documents' },
-          { key: 'photos', label: '📸 Photos / Videos' },
-        ].map(t => (
-          <button
-            key={t.key}
-            onClick={() => {
-              setSubTab(t.key)
-              setAddingFolder(false)
-              setNewFolderName('')
-            }}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              subTab === t.key
-                ? 'border-green-700 text-green-800 bg-green-50'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      {/* Sub-tabs + root toolbar (same horizontal row) */}
+      <div className="flex items-center justify-between border-b border-gray-200 mb-4">
+        <div className="flex gap-1">
+          {[
+            { key: 'documents', label: '📄 Documents' },
+            { key: 'photos', label: '📸 Photos / Videos' },
+          ].map(t => (
+            <button
+              key={t.key}
+              onClick={() => {
+                setSubTab(t.key)
+                setAddingFolder(false)
+                setNewFolderName('')
+              }}
+              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                subTab === t.key
+                  ? 'border-green-700 text-green-800 bg-green-50'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        {folderStack.length === 0 && (
+          <div className="flex items-center gap-2 pb-1.5 flex-wrap">
+            {/* Upload Document — left */}
+            <label
+              className={`cursor-pointer text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${uploading ? 'bg-gray-200 text-gray-400' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+            >
+              {uploading
+                ? 'Uploading…'
+                : `+ Upload ${subTab === 'documents' ? 'Document' : 'Photo / Video'}`}
+              <input
+                type="file"
+                className="hidden"
+                onChange={handleUpload}
+                disabled={uploading}
+                accept={uploadAccept}
+              />
+            </label>
+            {/* Add Folder — right */}
+            <button
+              onClick={() => {
+                setAddingFolder(a => !a)
+                setNewFolderName('')
+              }}
+              className="text-xs px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors font-medium"
+            >
+              {addingFolder ? '✕ Cancel' : '+ Add Folder'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Breadcrumb / back nav */}
-      {folderStack.length > 0 ? (
+      {folderStack.length > 0 && (
         <div className="flex items-center gap-1.5 mb-4 flex-wrap">
           {/* Root link */}
           <button
@@ -3714,33 +3742,6 @@ function JobFilesPanel({ job }) {
           >
             Delete folder
           </button>
-        </div>
-      ) : (
-        /* Toolbar — root view only */
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
-          <button
-            onClick={() => {
-              setAddingFolder(a => !a)
-              setNewFolderName('')
-            }}
-            className="text-xs px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors font-medium"
-          >
-            {addingFolder ? '✕ Cancel' : '+ Add Folder'}
-          </button>
-          <label
-            className={`cursor-pointer text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${uploading ? 'bg-gray-200 text-gray-400' : 'bg-green-700 text-white hover:bg-green-800'}`}
-          >
-            {uploading
-              ? 'Uploading…'
-              : `+ Upload ${subTab === 'documents' ? 'Document' : 'Photo / Video'}`}
-            <input
-              type="file"
-              className="hidden"
-              onChange={handleUpload}
-              disabled={uploading}
-              accept={uploadAccept}
-            />
-          </label>
         </div>
       )}
 
@@ -4095,13 +4096,10 @@ function JobChangeOrdersPanel({ job, coDeepLink = null }) {
     <div className="p-4">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-lg font-bold text-gray-900">Change Orders</h2>
-          <p className="text-xs text-gray-400">{job.client_name || job.name}</p>
-        </div>
+        <h2 className="text-sm font-semibold text-gray-700">Change Orders</h2>
         <button
           onClick={() => setActiveCo({})}
-          className="text-xs px-3 py-1.5 rounded-lg bg-blue-700 text-white font-semibold hover:bg-blue-800 transition-colors"
+          className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
         >
           + New Change Order
         </button>

@@ -81,9 +81,9 @@ export default function JobFinancePanel({ job, onOpenJobInvoice, invoiceDeepLink
                 onClick={() => hasJob && setMenuOpen(o => !o)}
                 disabled={!hasJob}
                 title={hasJob ? 'Create an invoice' : 'Select a job to create an invoice'}
-                className="rounded-lg bg-green-700 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                + Invoice
+                + Add Invoice
               </button>
               {menuOpen && hasJob && (
                 <div className="absolute right-0 z-20 mt-1 w-48 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">

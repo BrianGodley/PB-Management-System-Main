@@ -2250,40 +2250,39 @@ export default function WorkOrders({ jobs, selectedJob, jobStatusFilter = 'open'
       )}
 
       {/* Summary bar */}
-      <div className="mb-5 rounded-xl border-2 border-green-700 bg-white overflow-hidden shadow-sm">
-        <div className="h-1 bg-green-700 w-full" />
-        <div className="flex flex-wrap items-center gap-0 divide-x divide-gray-200">
+      <div className="mb-5 rounded-xl bg-gray-900 overflow-hidden shadow-sm">
+        <div className="flex flex-wrap items-center gap-0 divide-x divide-gray-700">
           <div className="px-5 py-2 flex-1 min-w-[120px]">
             <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block">
               Total Man Days
             </span>
-            <span className="text-base font-bold text-gray-900">{fmtDays(totalMD)}</span>
+            <span className="text-base font-bold text-white">{fmtDays(totalMD)}</span>
           </div>
           <div className="px-5 py-2 flex-1 min-w-[120px]">
             <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block">
               Materials
             </span>
-            <span className="text-base font-bold text-gray-900">{fmt(totalMat)}</span>
+            <span className="text-base font-bold text-white">{fmt(totalMat)}</span>
           </div>
           {totalSub > 0 && (
             <div className="px-5 py-2 flex-1 min-w-[120px]">
               <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block">
                 Sub Costs
               </span>
-              <span className="text-base font-bold text-gray-900">{fmt(totalSub)}</span>
+              <span className="text-base font-bold text-white">{fmt(totalSub)}</span>
             </div>
           )}
-          <div className="px-5 py-2 flex-1 min-w-[140px] bg-green-50">
-            <span className="text-[10px] font-semibold text-green-700 uppercase tracking-wide block">
+          <div className="px-5 py-2 flex-1 min-w-[140px] bg-white/5">
+            <span className="text-[10px] font-semibold text-green-400 uppercase tracking-wide block">
               Total Value
             </span>
-            <span className="text-base font-bold text-green-800">{fmt(totalValue)}</span>
+            <span className="text-base font-bold text-green-400">{fmt(totalValue)}</span>
           </div>
           <div className="px-5 py-2 flex-1 min-w-[140px]">
             <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block">
               Completion
             </span>
-            <span className="text-base font-bold text-gray-900">
+            <span className="text-base font-bold text-white">
               {complete}{' '}
               <span className="text-sm font-normal text-gray-400">/ {workOrders.length}</span>
             </span>
@@ -2291,7 +2290,7 @@ export default function WorkOrders({ jobs, selectedJob, jobStatusFilter = 'open'
         </div>
 
         {/* Filter row + add button */}
-        <div className="flex items-center justify-between gap-2 px-5 py-2.5 border-t border-gray-100 bg-blue-50">
+        <div className="flex items-center justify-between gap-2 px-5 py-2.5 border-t border-gray-700 bg-gray-800">
           <div className="flex gap-1.5 flex-wrap">
             {['all', 'pending', 'in_progress', 'complete'].map(s => (
               <button
