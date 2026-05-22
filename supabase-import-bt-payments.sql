@@ -1,0 +1,2 @@
+-- SUPERSEDED — too large for the SQL editor.
+-- Use the batch files: supabase-import-bt-payments-1-of-3.sql ... -3-of-3.sql
