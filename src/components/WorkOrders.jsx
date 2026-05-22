@@ -1860,9 +1860,12 @@ export default function WorkOrders({ jobs, selectedJob, jobStatusFilter = 'open'
 
   const jobId = selectedJob === 'all' ? null : selectedJob
 
+  // jobs.length is included so the all-jobs view re-fetches once the jobs
+  // list finishes loading — without it, a first paint with an empty jobs
+  // prop filters every work order out and never recovers.
   useEffect(() => {
     fetchAll()
-  }, [jobId, jobStatusFilter])
+  }, [jobId, jobStatusFilter, jobs.length])
 
   async function fetchAll() {
     setLoading(true)

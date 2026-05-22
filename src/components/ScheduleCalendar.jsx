@@ -1488,9 +1488,12 @@ export default function ScheduleCalendar({
     recalculateScheduleItems(updated)
   }
 
+  // jobs.length is included so the all-jobs view re-fetches once the jobs
+  // list finishes loading — without it, a first paint with an empty jobs
+  // prop filters every item out and never recovers.
   useEffect(() => {
     fetchItems()
-  }, [year, month, selectedJob, statusFilter])
+  }, [year, month, selectedJob, statusFilter, jobs.length])
 
   async function fetchItems() {
     setLoading(true)

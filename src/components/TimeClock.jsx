@@ -60,6 +60,9 @@ const EMPTY_FORM = {
   notes: '',
 }
 
+// Desktop time-clock table is paginated client-side.
+const ENTRIES_PER_PAGE = 50
+
 // Returns "Xh Ym" elapsed from a time_in string to a Date object
 function calcElapsed(timeIn, now) {
   if (!timeIn) return ''
@@ -123,6 +126,7 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
   const [nowTime, setNowTime] = useState(new Date())
   const [payrollWeekStart, setPayrollWeekStart] = useState(0) // 0=Sunday
   const [myWeekEntries, setMyWeekEntries] = useState([])
+  const [page, setPage] = useState(1)
 
   const jobMap = Object.fromEntries(jobs.map(j => [j.id, j.name || j.client_name]))
 
@@ -181,8 +185,16 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
     return () => clearInterval(t)
   }, [])
 
+  // jobs.length is included so the all-jobs view re-fetches once the jobs
+  // list finishes loading — without it, a first paint with an empty jobs
+  // prop filters every entry out and never recovers.
   useEffect(() => {
     fetchEntries()
+  }, [selectedJob, statusFilter, jobs.length])
+
+  // Reset to the first page when the job selection or Open/Closed filter changes.
+  useEffect(() => {
+    setPage(1)
   }, [selectedJob, statusFilter])
 
   // Derive the current user's open (not yet clocked-out) entry for today
@@ -365,6 +377,12 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
     fetchEntries()
   }
 
+  // Client-side pagination for the desktop entries table.
+  const totalPages = Math.max(1, Math.ceil(entries.length / ENTRIES_PER_PAGE))
+  const safePage = Math.min(page, totalPages)
+  const pageStart = (safePage - 1) * ENTRIES_PER_PAGE
+  const pageEntries = entries.slice(pageStart, pageStart + ENTRIES_PER_PAGE)
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -458,6 +476,34 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
         </>
       ) : (
         <>
+          {/* Pagination — desktop table only; controls on the left, clear of
+              the floating Ask Sam button at the bottom-right. */}
+          {entries.length > ENTRIES_PER_PAGE && (
+            <div className="hidden lg:flex items-center gap-3 mb-2 flex-shrink-0">
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage(Math.max(1, safePage - 1))}
+                  disabled={safePage === 1}
+                  className="px-2.5 py-1 text-xs rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  ‹ Prev
+                </button>
+                <span className="text-xs text-gray-500 px-2">
+                  Page {safePage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage(Math.min(totalPages, safePage + 1))}
+                  disabled={safePage === totalPages}
+                  className="px-2.5 py-1 text-xs rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Next ›
+                </button>
+              </div>
+              <span className="text-xs text-gray-500">
+                {pageStart + 1}–{pageStart + pageEntries.length} of {entries.length}
+              </span>
+            </div>
+          )}
           {/* ── Desktop table ─────────────────────────────────── */}
           <div className="hidden lg:block overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
             <table className="w-full text-sm">
@@ -488,7 +534,7 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 bg-white">
-                {entries.map(entry => {
+                {pageEntries.map(entry => {
                   const { total, ot } = calcTimes(entry.time_in, entry.time_out)
                   const isClockedIn = !entry.time_out
                   return (
