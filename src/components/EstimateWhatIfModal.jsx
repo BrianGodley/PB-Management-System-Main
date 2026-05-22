@@ -93,6 +93,12 @@ export default function EstimateWhatIfModal({
 
   const allModules = useMemo(() => projTable.flatMap(p => p.modules), [projTable])
 
+  // The natural (no-override) scenario — exactly what the GPMD bar shows when
+  // the modal first opens. Used to seed (and reset) the two top fields.
+  const naturalScenGp = projTable.reduce((sum, prj) => sum + prj.natGp, 0)
+  const naturalBarGpmd = et.manDays > 0 ? Math.round(naturalScenGp / et.manDays) : 0
+  const naturalBarPrice = Math.round(baseCost + (naturalScenGp + subGp) * 1.12)
+
   // GPMD drafts are canonical ('' = use natural). priceDrafts hold the raw
   // text typed into a Price input so that field stays freely overwritable.
   const [projDrafts, setProjDrafts] = useState({})
@@ -146,8 +152,8 @@ export default function EstimateWhatIfModal({
   const scenGpmd = et.manDays > 0 ? Math.round(scenGp / et.manDays) : 0
 
   // ── Top fields — bulk controls ─────────────────────────────────────────────
-  const [topGpmd, setTopGpmd] = useState(String(naturalGpmd || ''))
-  const [topPrice, setTopPrice] = useState(String(Math.round(et.price) || ''))
+  const [topGpmd, setTopGpmd] = useState(String(naturalBarGpmd || ''))
+  const [topPrice, setTopPrice] = useState(String(naturalBarPrice || ''))
 
   function clearPriceDrafts() {
     setProjPriceDrafts({})
@@ -196,8 +202,8 @@ export default function EstimateWhatIfModal({
     setProjDrafts({})
     setModDrafts({})
     clearPriceDrafts()
-    setTopGpmd(String(naturalGpmd || ''))
-    setTopPrice(String(Math.round(et.price) || ''))
+    setTopGpmd(String(naturalBarGpmd || ''))
+    setTopPrice(String(naturalBarPrice || ''))
   }
 
   async function saveAsNew() {
@@ -285,6 +291,7 @@ export default function EstimateWhatIfModal({
                   className="input w-36 pl-7 text-sm"
                 />
               </div>
+              <p className="mt-0.5 text-[9px] text-gray-400">Auto Applied</p>
             </div>
             <div>
               <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-gray-500">
