@@ -44,46 +44,23 @@ export default function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
   const [showUserMenu, setShowUserMenu] = useState(false)
+  // The left nav's collapsed/expanded state is the user's choice alone:
+  // it defaults to expanded and only changes when the user clicks the
+  // collapse toggle — navigation (including entering /jobs) never touches
+  // it. The preference is persisted in localStorage so it survives reloads.
+  // A dedicated key guarantees everyone starts expanded until they opt in.
   const [navCollapsed, setNavCollapsed] = useState(() => {
     try {
-      return localStorage.getItem('navCollapsed') === '1'
+      return localStorage.getItem('navCollapsedPref') === '1'
     } catch {
       return false
     }
   })
   useEffect(() => {
     try {
-      localStorage.setItem('navCollapsed', navCollapsed ? '1' : '0')
+      localStorage.setItem('navCollapsedPref', navCollapsed ? '1' : '0')
     } catch {}
   }, [navCollapsed])
-
-  // /jobs (Schedule view) auto-collapses the nav on entry to free up
-  // horizontal space, then restores the user's pre-/jobs state on exit.
-  // If the user was already collapsed before /jobs, we DO NOT auto-expand
-  // when they leave — they get to keep their preference.
-  const prevPathRef = useRef(location.pathname)
-  const preJobsCollapsedRef = useRef(null)
-  useEffect(() => {
-    const prev = prevPathRef.current
-    const curr = location.pathname
-    if (curr === '/jobs' && prev !== '/jobs') {
-      // Entering /jobs — capture current state and force collapsed.
-      preJobsCollapsedRef.current = navCollapsed
-      setNavCollapsed(true)
-    } else if (curr !== '/jobs' && prev === '/jobs') {
-      // Leaving /jobs — restore captured state (whether expanded or
-      // collapsed). If user was collapsed before, this is a no-op.
-      if (preJobsCollapsedRef.current !== null) {
-        setNavCollapsed(preJobsCollapsedRef.current)
-        preJobsCollapsedRef.current = null
-      }
-    }
-    prevPathRef.current = curr
-    // navCollapsed intentionally not in deps — we only react to route
-    // changes, not toggle clicks. The closure captures latest navCollapsed
-    // at render time, which is what we want.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname])
 
   // Tooltip for the collapsed nav. Lives at the document.body level via
   // a React portal so it can poke out past the sidebar's overflow-y-auto
