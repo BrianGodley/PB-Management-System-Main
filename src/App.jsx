@@ -6,6 +6,7 @@ import { RateIconsProvider } from './contexts/RateIconsContext'
 import Layout from './components/Layout'
 import ErrorBoundary from './components/ErrorBoundary'
 import Login from './pages/Login'
+const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Clients = lazy(() => import('./pages/Clients'))
 const ClientDetail = lazy(() => import('./pages/ClientDetail'))
 const Contacts = lazy(() => import('./pages/Contacts'))
@@ -103,7 +104,7 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<Contacts />} />
+          <Route index element={<Dashboard />} />
           <Route path="contacts" element={<Contacts />} />
           <Route path="contacts/:id" element={<ContactDetail />} />
           <Route path="companies/:id" element={<CompanyDetail />} />

@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase'
 import SamChat from './SamChat'
 
 const navItems = [
+  { path: '/', label: 'Dashboard', icon: '🏠' },
   { path: '/contacts', label: 'Contacts', icon: '🗂️' },
   { path: '/clients', label: 'Opportunities', icon: '👥' },
   { path: '/design', label: 'Design', icon: '📐' },
@@ -78,6 +79,7 @@ export default function Layout() {
   const [userRole, setUserRole] = useState(null)
   const isAdmin = userRole === 'admin' || userRole === 'super_admin'
   const MAIN_MENU_ITEMS = [
+    { path: '/', label: 'Dashboard', icon: '🏠' },
     { path: '/contacts', label: 'Contacts', icon: '🗂️' },
     { path: '/clients', label: t('clients'), icon: '👥' },
     { path: '/design', label: 'Design', icon: '📐' },
