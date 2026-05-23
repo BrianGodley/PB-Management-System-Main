@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useCachedData } from '../lib/useCachedData'
+import AddEmployeeModal from '../components/AddEmployeeModal'
 import {
   LineChart,
   Line,
@@ -37,7 +38,7 @@ const QUICK_LINKS = [
   { label: 'Add Schedule', icon: '📅', to: '/jobs' },
   { label: 'Daily Log', icon: '🗒️', to: '/daily-logs' },
   { label: 'Continue Training', icon: '🎓', to: '/training' },
-  { label: 'Add Employee', icon: '👤', to: '/hr' },
+  { label: 'Add Employee', icon: '👤', key: 'add-employee' },
   { label: 'Add Vendor / Sub', icon: '🚜', to: '/portal/subs' },
   { label: 'Add Statistic', icon: '📈', to: '/statistics' },
 ]
@@ -297,7 +298,7 @@ function StatMiniGraph({ stat }) {
 // Tolerant of a not-yet-created dashboard_preferences table / weather_location
 // column — the dashboard still renders with defaults until the SQL is run.
 async function fetchDashboardData(userId) {
-  const [prefsRes, settingsRes, statsRes, profRes] = await Promise.all([
+  const [prefsRes, settingsRes, statsRes, profRes, posRes] = await Promise.all([
     supabase.from('dashboard_preferences').select('*').eq('user_id', userId).maybeSingle(),
     supabase.from('company_settings').select('id, weather_location').maybeSingle(),
     supabase
@@ -306,6 +307,7 @@ async function fetchDashboardData(userId) {
       .eq('archived', false)
       .order('name'),
     supabase.from('profiles').select('role').eq('id', userId).maybeSingle(),
+    supabase.from('positions').select('id, title').order('title'),
   ])
   return {
     prefs: prefsRes.data || { user_id: userId, stat_ids: [], layout: {} },
@@ -313,6 +315,7 @@ async function fetchDashboardData(userId) {
     weatherLocation: settingsRes.data?.weather_location || '',
     stats: statsRes.data || [],
     role: profRes.data?.role || null,
+    positions: posRes.data || [],
   }
 }
 
@@ -323,6 +326,7 @@ export default function Dashboard() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [tab, setTab] = useState('dashboard')
+  const [showAddEmp, setShowAddEmp] = useState(false)
 
   const { data, loading, refresh } = useCachedData(
     user?.id ? `dashboard:${user.id}` : 'dashboard:anon',
@@ -334,6 +338,7 @@ export default function Dashboard() {
   const weatherLocation = data?.weatherLocation || ''
   const settingsId = data?.settingsId ?? null
   const isAdmin = data?.role === 'admin' || data?.role === 'super_admin'
+  const positions = data?.positions || []
 
   const statIds = prefs.stat_ids || []
   const stat1 = stats.find(s => s.id === statIds[0]) || null
@@ -388,7 +393,7 @@ export default function Dashboard() {
               {QUICK_LINKS.map(q => (
                 <button
                   key={q.label}
-                  onClick={() => navigate(q.to)}
+                  onClick={() => (q.key === 'add-employee' ? setShowAddEmp(true) : navigate(q.to))}
                   className="flex flex-col items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-3 py-4 hover:border-green-300 hover:bg-green-50 transition-colors"
                 >
                   <span className="text-2xl leading-none">{q.icon}</span>
@@ -399,6 +404,14 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
+
+          {showAddEmp && (
+            <AddEmployeeModal
+              positions={positions}
+              onClose={() => setShowAddEmp(false)}
+              onSave={() => setShowAddEmp(false)}
+            />
+          )}
         </>
       )}
 
