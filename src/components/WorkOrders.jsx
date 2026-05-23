@@ -2249,8 +2249,11 @@ export default function WorkOrders({ jobs, selectedJob, jobStatusFilter = 'open'
         />
       )}
 
-      {/* Summary bar — single uniform row */}
-      <div className="mb-3 rounded-xl bg-gray-900 overflow-hidden shadow-sm">
+      {/* Summary bar + filter buttons — sticky: they freeze at the top
+          while the work-order list scrolls underneath. */}
+      <div className="sticky top-0 z-20 bg-white pb-3">
+        {/* Summary bar — single uniform row */}
+        <div className="mb-3 rounded-xl bg-gray-900 overflow-hidden shadow-sm">
         <div className="flex flex-wrap items-center gap-0 divide-x divide-gray-700">
           <div className="px-5 py-2 flex-1 min-w-[120px]">
             <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block">
@@ -2290,8 +2293,8 @@ export default function WorkOrders({ jobs, selectedJob, jobStatusFilter = 'open'
         </div>
       </div>
 
-      {/* Filter row + add button — outside the summary bar */}
-      <div className="mb-5 flex items-center justify-between gap-2">
+        {/* Filter row + add button */}
+        <div className="flex items-center justify-between gap-2">
         <div className="flex gap-1.5 flex-wrap">
           {['all', 'pending', 'in_progress', 'complete'].map(s => (
             <button
@@ -2320,6 +2323,7 @@ export default function WorkOrders({ jobs, selectedJob, jobStatusFilter = 'open'
             + Work Order
           </button>
         )}
+        </div>
       </div>
 
       {/* Crew type sections — only render if the section has work orders */}

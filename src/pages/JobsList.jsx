@@ -3626,7 +3626,7 @@ function JobFilesPanel({ job }) {
     )
 
   return (
-    <div className="p-4">
+    <div>
       {showModal && (
         <ApplyTemplateModal
           job={job}
@@ -3669,7 +3669,7 @@ function JobFilesPanel({ job }) {
           ))}
         </div>
         {folderStack.length === 0 && (
-          <div className="flex items-center gap-2 pb-1.5 flex-wrap">
+          <div className="flex items-center gap-2 pb-1.5 flex-wrap mr-6">
             {/* Upload Document — left */}
             <label
               className={`cursor-pointer text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${uploading ? 'bg-gray-200 text-gray-400' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
@@ -4093,13 +4093,13 @@ function JobChangeOrdersPanel({ job, coDeepLink = null }) {
   }
 
   return (
-    <div className="p-4">
+    <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold text-gray-700">Change Orders</h2>
         <button
           onClick={() => setActiveCo({})}
-          className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
+          className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors mr-6"
         >
           + New Change Order
         </button>
@@ -4331,7 +4331,7 @@ function JobTasksPanel({ job }) {
   const descListId = 'task-desc-suggestions'
 
   return (
-    <div className="p-4">
+    <div>
       {showModal && (
         <ApplyTemplateModal
           job={job}
@@ -4353,7 +4353,7 @@ function JobTasksPanel({ job }) {
             </span>
           )}
         </h2>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 mr-6">
           {tasks.length > 0 && (
             <button
               onClick={() => setShowModal(true)}

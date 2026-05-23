@@ -85,10 +85,10 @@ export default function AllJobsChangeOrders({ jobs = [], statusFilter = 'open', 
   }
 
   return (
-    <div className="p-4">
+    <div>
       <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="text-lg font-bold text-gray-900">Change Orders — All Jobs</h2>
-        <span className="text-xs text-gray-400">
+        <h2 className="text-sm font-semibold text-gray-700">Change Orders — All Jobs</h2>
+        <span className="text-xs text-gray-400 mr-6">
           {rows.length} CO{rows.length === 1 ? '' : 's'} ·{' '}
           {statusFilter === 'closed' ? 'closed' : 'open'} jobs
         </span>
