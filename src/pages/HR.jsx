@@ -2,11 +2,12 @@
 // HR — Human Resources main page
 // Tabs: Employees | Applicants | Review Forms
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useCachedData } from '../lib/useCachedData'
 import ReviewBuilder from '../components/hr/ReviewBuilder'
 
 const DEPARTMENTS = ['Operations', 'Landscaping', 'Pool', 'Admin', 'Sales', 'Other']
@@ -512,6 +513,68 @@ function AddApplicantModal({ onSave, onClose }) {
   )
 }
 
+// ── Data fetch ────────────────────────────────────────────────────────────────
+// One batched fetch for everything the HR page needs. The returned object is
+// cached by useCachedData('hr:all', …) so revisiting HR renders instantly from
+// cache and refreshes in the background. The lookup maps are built here (rather
+// than in component state) so the cached value is fully self-contained.
+async function fetchHrData() {
+  const [
+    { data: eData },
+    { data: aData },
+    { data: fData },
+    { data: pData },
+    { data: gData },
+    { data: gmData },
+    { data: posData },
+    { data: pcData },
+    { data: cData },
+  ] = await Promise.all([
+    supabase.from('employees').select('*').order('last_name'),
+    supabase.from('applicants').select('*').order('applied_at', { ascending: false }),
+    supabase.from('hr_review_forms').select('*').order('created_at', { ascending: false }),
+    supabase.from('profiles').select('id, email, role'),
+    supabase.from('employee_groups').select('*').order('name'),
+    supabase.from('employee_group_members').select('group_id, employee_id'),
+    supabase.from('positions').select('*').order('title'),
+    supabase.from('position_courses').select('position_id, course_id'),
+    supabase.from('lms_courses').select('id, title, category').order('title'),
+  ])
+
+  // email -> role
+  const profileRoles = {}
+  ;(pData || []).forEach(p => {
+    if (p.email) profileRoles[p.email.toLowerCase()] = p.role
+  })
+
+  // groupId -> Set<employee_id>
+  const groupMembers = {}
+  ;(gmData || []).forEach(m => {
+    if (!groupMembers[m.group_id]) groupMembers[m.group_id] = new Set()
+    groupMembers[m.group_id].add(m.employee_id)
+  })
+
+  // positionId -> Set<course_id>
+  const positionCourses = {}
+  ;(pcData || []).forEach(r => {
+    if (!positionCourses[r.position_id]) positionCourses[r.position_id] = new Set()
+    positionCourses[r.position_id].add(r.course_id)
+  })
+
+  return {
+    employees: eData || [],
+    applicants: aData || [],
+    reviewForms: fData || [],
+    profiles: pData || [],
+    profileRoles,
+    groups: gData || [],
+    groupMembers,
+    positions: posData || [],
+    positionCourses,
+    courses: cData || [],
+  }
+}
+
 // ── Main HR Component ─────────────────────────────────────────────────────────
 export default function HR() {
   const navigate = useNavigate()
@@ -519,12 +582,22 @@ export default function HR() {
 
   const [tab, setTab] = useState('employees')
   const [settingsTab, setSettingsTab] = useState('employee-groups')
-  const [employees, setEmployees] = useState([])
-  const [applicants, setApplicants] = useState([])
-  const [reviewForms, setReviewForms] = useState([])
-  const [profileRoles, setProfileRoles] = useState({}) // email -> role mapping
-  const [profiles, setProfiles] = useState([])
-  const [loading, setLoading] = useState(true)
+
+  // All HR data comes through the shared cache: a revisit renders instantly
+  // from cache, then refreshes quietly in the background. refresh() forces a
+  // refetch — called after every save/delete below.
+  const { data: hrData, loading, refresh } = useCachedData('hr:all', fetchHrData)
+  const employees = hrData?.employees ?? []
+  const applicants = hrData?.applicants ?? []
+  const reviewForms = hrData?.reviewForms ?? []
+  const profiles = hrData?.profiles ?? []
+  const profileRoles = hrData?.profileRoles ?? {}
+  const groups = hrData?.groups ?? []
+  const groupMembers = hrData?.groupMembers ?? {}
+  const positions = hrData?.positions ?? []
+  const positionCourses = hrData?.positionCourses ?? {}
+  const courses = hrData?.courses ?? []
+
   const [appFilter, setAppFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [showAddEmp, setShowAddEmp] = useState(false)
@@ -536,17 +609,12 @@ export default function HR() {
   const [sortDir, setSortDir] = useState('asc')
 
   // Employee Groups state
-  const [groups, setGroups] = useState([])
-  const [groupMembers, setGroupMembers] = useState({}) // groupId -> Set of employee_ids
   const [editingGroup, setEditingGroup] = useState(null) // null | 'new' | group object
   const [groupForm, setGroupForm] = useState({ name: '', description: '', color: '#16a34a' })
   const [groupSaving, setGroupSaving] = useState(false)
   const [selectedMembers, setSelectedMembers] = useState(new Set())
 
   // Positions state
-  const [positions, setPositions] = useState([])
-  const [positionCourses, setPositionCourses] = useState({}) // positionId -> Set of course_ids
-  const [courses, setCourses] = useState([]) // all LMS courses
   const [editingPosition, setEditingPosition] = useState(null) // null | 'new' | position object
   const [positionForm, setPositionForm] = useState({
     title: '',
@@ -562,81 +630,6 @@ export default function HR() {
   const isAdmin = (profiles || []).some(
     p => p.id === user?.id && (p.role === 'admin' || p.role === 'super_admin')
   )
-
-  useEffect(() => {
-    fetchAll()
-  }, [])
-
-  async function fetchAll() {
-    setLoading(true)
-    const [
-      { data: eData },
-      { data: aData },
-      { data: fData },
-      { data: pData },
-      { data: gData },
-      { data: gmData },
-      { data: posData },
-      { data: pcData },
-      { data: cData },
-    ] = await Promise.all([
-      supabase.from('employees').select('*').order('last_name'),
-      supabase.from('applicants').select('*').order('applied_at', { ascending: false }),
-      supabase.from('hr_review_forms').select('*').order('created_at', { ascending: false }),
-      supabase.from('profiles').select('id, email, role'),
-      supabase.from('employee_groups').select('*').order('name'),
-      supabase.from('employee_group_members').select('group_id, employee_id'),
-      supabase.from('positions').select('*').order('title'),
-      supabase.from('position_courses').select('position_id, course_id'),
-      supabase.from('lms_courses').select('id, title, category').order('title'),
-    ])
-    setEmployees(eData || [])
-    setApplicants(aData || [])
-    setReviewForms(fData || [])
-    setProfiles(pData || [])
-    setGroups(gData || [])
-    setPositions(posData || [])
-    setCourses(cData || [])
-
-    // Build email -> role map
-    const roles = {}
-    pData?.forEach(p => {
-      if (p.email) roles[p.email.toLowerCase()] = p.role
-    })
-    setProfileRoles(roles)
-
-    // Build groupId -> Set<employee_id>
-    const memberMap = {}
-    gmData?.forEach(m => {
-      if (!memberMap[m.group_id]) memberMap[m.group_id] = new Set()
-      memberMap[m.group_id].add(m.employee_id)
-    })
-    setGroupMembers(memberMap)
-
-    // Build positionId -> Set<course_id>
-    const pcMap = {}
-    pcData?.forEach(r => {
-      if (!pcMap[r.position_id]) pcMap[r.position_id] = new Set()
-      pcMap[r.position_id].add(r.course_id)
-    })
-    setPositionCourses(pcMap)
-
-    setLoading(false)
-  }
-
-  async function fetchGroups() {
-    const [{ data: gData }, { data: gmData }] = await Promise.all([
-      supabase.from('employee_groups').select('*').order('name'),
-      supabase.from('employee_group_members').select('group_id, employee_id'),
-    ])
-    setGroups(gData || [])
-    const memberMap = {}
-    gmData?.forEach(m => {
-      if (!memberMap[m.group_id]) memberMap[m.group_id] = new Set()
-      memberMap[m.group_id].add(m.employee_id)
-    })
-    setGroupMembers(memberMap)
-  }
 
   function openNewGroup() {
     setGroupForm({ name: '', description: '', color: '#16a34a' })
@@ -691,7 +684,7 @@ export default function HR() {
         await supabase.from('employee_group_members').insert(rows)
       }
       setEditingGroup(null)
-      await fetchGroups()
+      refresh()
     } catch (e) {
       console.error(e)
     }
@@ -701,7 +694,7 @@ export default function HR() {
   async function deleteGroup(id) {
     if (!confirm('Delete this employee group?')) return
     await supabase.from('employee_groups').delete().eq('id', id)
-    await fetchGroups()
+    refresh()
   }
 
   function toggleMember(empId) {
@@ -711,20 +704,6 @@ export default function HR() {
       else next.add(empId)
       return next
     })
-  }
-
-  async function fetchPositions() {
-    const [{ data: posData }, { data: pcData }] = await Promise.all([
-      supabase.from('positions').select('*').order('title'),
-      supabase.from('position_courses').select('position_id, course_id'),
-    ])
-    setPositions(posData || [])
-    const pcMap = {}
-    pcData?.forEach(r => {
-      if (!pcMap[r.position_id]) pcMap[r.position_id] = new Set()
-      pcMap[r.position_id].add(r.course_id)
-    })
-    setPositionCourses(pcMap)
   }
 
   function openNewPosition() {
@@ -800,7 +779,7 @@ export default function HR() {
       }
 
       setEditingPosition(null)
-      await fetchPositions()
+      refresh()
     } catch (e) {
       console.error(e)
     }
@@ -810,7 +789,7 @@ export default function HR() {
   async function deletePosition(id) {
     if (!confirm('Delete this position?')) return
     await supabase.from('positions').delete().eq('id', id)
-    await fetchPositions()
+    refresh()
   }
 
   function toggleCourse(courseId) {
@@ -935,7 +914,7 @@ export default function HR() {
   async function deleteReviewForm(id) {
     if (!confirm('Delete this review form?')) return
     await supabase.from('hr_review_forms').delete().eq('id', id)
-    fetchAll()
+    refresh()
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -1820,7 +1799,7 @@ export default function HR() {
         <AddEmployeeModal
           onSave={() => {
             setShowAddEmp(false)
-            fetchAll()
+            refresh()
           }}
           onClose={() => setShowAddEmp(false)}
           positions={positions}
@@ -1830,7 +1809,7 @@ export default function HR() {
         <AddApplicantModal
           onSave={() => {
             setShowAddApp(false)
-            fetchAll()
+            refresh()
           }}
           onClose={() => setShowAddApp(false)}
         />
@@ -1841,7 +1820,7 @@ export default function HR() {
           onSave={() => {
             setShowBuilder(false)
             setEditForm(null)
-            fetchAll()
+            refresh()
           }}
           onClose={() => {
             setShowBuilder(false)

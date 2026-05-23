@@ -144,6 +144,36 @@ export default function Layout() {
     return () => window.removeEventListener('profile-updated', handler)
   }, [user?.id])
 
+  // ── Keep the Supabase connection warm ───────────────────────────────────────
+  // After ~1–2 idle minutes the browser closes its HTTP/2 connection to
+  // Supabase. The next burst of queries then stalls ~3s waiting for a fresh TLS
+  // handshake (visible as "Stalled" time in DevTools). A cheap HEAD request
+  // every 45s — plus an immediate one whenever the tab regains focus — keeps the
+  // connection and the backend warm so navigation stays instant.
+  useEffect(() => {
+    let stopped = false
+    const ping = () => {
+      if (stopped) return
+      supabase
+        .from('company_settings')
+        .select('id', { head: true, count: 'exact' })
+        .then(
+          () => {},
+          () => {}
+        )
+    }
+    const id = setInterval(ping, 45000)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') ping()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      stopped = true
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [])
+
   // Close user menu on outside click
   useEffect(() => {
     function handleClick(e) {
