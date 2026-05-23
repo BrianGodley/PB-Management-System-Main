@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { useCachedData } from '../lib/useCachedData'
 import * as XLSX from 'xlsx'
 
 // ── Constants ────────────────────────────────────────────────
@@ -82,10 +83,20 @@ const EMPTY_FORM = {
   services_pricing: '',
 }
 
+// ── Data fetch ───────────────────────────────────────────────
+// Cached by useCachedData('subs_vendors:all', …) so revisiting the page
+// renders instantly from cache and refreshes in the background.
+async function fetchSubsData() {
+  const { data, error } = await supabase.from('subs_vendors').select('*').order('company_name')
+  if (error) throw error
+  return data || []
+}
+
 // ── Main Page ────────────────────────────────────────────────
 export default function SubsVendors() {
-  const [subs, setSubs] = useState([])
-  const [loading, setLoading] = useState(true)
+  // Cached data — instant on revisit; refresh() forces a refetch after writes.
+  const { data: subsData, loading, refresh } = useCachedData('subs_vendors:all', fetchSubsData)
+  const subs = subsData ?? []
   const [search, setSearch] = useState('')
   const [svTab, setSvTab] = useState('directory') // 'directory' | 'settings'
   const [svSettingsTab, setSvSettingsTab] = useState('general')
@@ -110,18 +121,6 @@ export default function SubsVendors() {
   const [importError, setImportError] = useState('')
   const [importing, setImporting] = useState(false)
   const importFileRef = useRef(null)
-
-  useEffect(() => {
-    fetchSubs()
-  }, [])
-
-  async function fetchSubs() {
-    setLoading(true)
-    const { data, error } = await supabase.from('subs_vendors').select('*').order('company_name')
-    if (error) console.error('fetchSubs:', error)
-    if (data) setSubs(data)
-    setLoading(false)
-  }
 
   function openNew(type) {
     setEditSub(null)
@@ -203,13 +202,13 @@ export default function SubsVendors() {
     }
     setSaving(false)
     closeModal()
-    fetchSubs()
+    refresh()
   }
 
   async function deleteSub(sub) {
     if (!confirm(`Delete "${sub.company_name}"? This cannot be undone.`)) return
     await supabase.from('subs_vendors').delete().eq('id', sub.id)
-    setSubs(prev => prev.filter(s => s.id !== sub.id))
+    refresh()
     setSelected(prev => {
       const n = new Set(prev)
       n.delete(sub.id)
@@ -495,7 +494,7 @@ export default function SubsVendors() {
     setImportRawData([])
     setImportHeaders([])
     setImportMeta(null)
-    fetchSubs()
+    refresh()
   }
 
   function closeImport() {

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useCachedData } from '../lib/useCachedData'
 import { COLOR_PALETTE } from './JobsList'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -862,63 +863,55 @@ function CrewTypesTab() {
   )
 }
 
+// ── Data fetch ────────────────────────────────────────────────────────────────
+// Cached by useCachedData('master_crews:all', …) so revisiting the page renders
+// instantly from cache and refreshes in the background.
+async function fetchMasterCrewsData() {
+  const [crewsRes, empRes, subRes] = await Promise.all([
+    supabase.from('crews').select('*').order('label'),
+    supabase
+      .from('employees')
+      .select('id, first_name, last_name, job_title')
+      .eq('status', 'active')
+      .order('last_name'),
+    supabase.from('master_sub_crews').select('*').order('name'),
+  ])
+  const err = crewsRes.error || empRes.error || subRes.error
+  if (err) throw err
+  return {
+    crews: crewsRes.data || [],
+    employees: empRes.data || [],
+    subCrews: subRes.data || [],
+  }
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function MasterCrews() {
   const [tab, setTab] = useState('internal') // 'internal' | 'sub' | 'crew-types'
-  const [crews, setCrews] = useState([])
-  const [employees, setEmployees] = useState([])
-  const [subCrews, setSubCrews] = useState([])
-  const [loading, setLoading] = useState(true)
+
+  // Cached data — instant on revisit; refresh() forces a refetch after writes.
+  const { data: mcData, loading, refresh } = useCachedData('master_crews:all', fetchMasterCrewsData)
+  const crews = mcData?.crews ?? []
+  const employees = mcData?.employees ?? []
+  const subCrews = mcData?.subCrews ?? []
+
   const [modal, setModal] = useState(null) // null | 'new' | crew object
   const [subModal, setSubModal] = useState(null) // null | 'new' | sub object
   const [subSearch, setSubSearch] = useState('')
 
-  useEffect(() => {
-    loadAll()
-  }, [])
-
-  async function loadAll() {
-    setLoading(true)
-    await Promise.all([
-      supabase
-        .from('crews')
-        .select('*')
-        .order('label')
-        .then(({ data }) => {
-          if (data) setCrews(data)
-        }),
-      supabase
-        .from('employees')
-        .select('id, first_name, last_name, job_title')
-        .eq('status', 'active')
-        .order('last_name')
-        .then(({ data }) => {
-          if (data) setEmployees(data)
-        }),
-      supabase
-        .from('master_sub_crews')
-        .select('*')
-        .order('name')
-        .then(({ data }) => {
-          if (data) setSubCrews(data)
-        }),
-    ])
-    setLoading(false)
-  }
-
   function handleCrewSaved() {
     setModal(null)
-    loadAll()
+    refresh()
   }
   function handleSubSaved() {
     setSubModal(null)
-    loadAll()
+    refresh()
   }
 
   async function handleDeleteSub(sub) {
     if (!confirm(`Delete ${sub.name}? This cannot be undone.`)) return
     await supabase.from('master_sub_crews').delete().eq('id', sub.id)
-    setSubCrews(prev => prev.filter(s => s.id !== sub.id))
+    refresh()
     setSubModal(null)
   }
 
@@ -1143,7 +1136,7 @@ export default function MasterCrews() {
           onDelete={async crew => {
             if (!confirm(`Delete Crew ${crew.label}? This cannot be undone.`)) return
             await supabase.from('crews').delete().eq('id', crew.id)
-            setCrews(prev => prev.filter(c => c.id !== crew.id))
+            refresh()
             setModal(null)
           }}
         />
