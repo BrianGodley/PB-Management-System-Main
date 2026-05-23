@@ -42,8 +42,8 @@ export default function AllJobsTracking({ jobs = [], statusFilter = 'open', onSe
   )
 
   return (
-    <div>
-      <div className="mb-3 flex items-baseline justify-between">
+    <div className="flex flex-col h-full">
+      <div className="mb-3 flex items-baseline justify-between flex-shrink-0">
         <h2 className="text-sm font-semibold text-gray-700">Tracking — All Jobs</h2>
         <span className="text-xs text-gray-400 mr-6">
           {rows.length} {statusFilter === 'closed' ? 'closed' : 'open'} job
@@ -57,9 +57,9 @@ export default function AllJobsTracking({ jobs = [], statusFilter = 'open', onSe
           <p className="text-sm">No {statusFilter === 'closed' ? 'closed' : 'open'} jobs.</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+        <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-gray-200 bg-white">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+            <thead className="sticky top-0 z-10 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500 border-b border-gray-200">
               <tr>
                 <th className="px-4 py-2.5">Job</th>
                 <th className="px-4 py-2.5 text-right">Contract Price</th>
@@ -108,7 +108,7 @@ export default function AllJobsTracking({ jobs = [], statusFilter = 'open', onSe
           </table>
         </div>
       )}
-      <p className="mt-2 px-1 text-xs text-gray-400">
+      <p className="mt-2 px-1 text-xs text-gray-400 flex-shrink-0">
         Costs are the recorded job costs on each job record. Click a job for its full
         estimated-vs-actual breakdown.
       </p>

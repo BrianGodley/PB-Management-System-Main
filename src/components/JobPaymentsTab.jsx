@@ -33,10 +33,18 @@ export default function JobPaymentsTab({ job, refreshKey = 0 }) {
   const [page, setPage] = useState(0)
   const [total, setTotal] = useState(null)
   const [error, setError] = useState('')
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  // Debounce the search box so we don't fire a query on every keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(t)
+  }, [search])
 
   useEffect(() => {
     setPage(0)
-  }, [job?.id, refreshKey])
+  }, [job?.id, refreshKey, debouncedSearch])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -46,8 +54,29 @@ export default function JobPaymentsTab({ job, refreshKey = 0 }) {
       .from('job_invoice_payments')
       .select('*, job_invoices(invoice_number, title)', { count: 'exact' })
       .order('payment_date', { ascending: false, nullsFirst: false })
-      .range(from, from + PAGE_SIZE - 1)
     if (!allJobs) q = q.eq('job_id', job.id)
+
+    // Search — payment method / status / source, plus job name in all-jobs.
+    const term = debouncedSearch.trim().replace(/[%,()*]/g, ' ').trim()
+    if (term) {
+      const ors = [
+        `method.ilike.*${term}*`,
+        `status.ilike.*${term}*`,
+        `source.ilike.*${term}*`,
+      ]
+      if (allJobs) {
+        const { data: jb } = await supabase
+          .from('jobs')
+          .select('id')
+          .or(`name.ilike.*${term}*,client_name.ilike.*${term}*`)
+          .limit(300)
+        const jids = (jb || []).map(j => j.id)
+        if (jids.length) ors.push(`job_id.in.(${jids.join(',')})`)
+      }
+      q = q.or(ors.join(','))
+    }
+
+    q = q.range(from, from + PAGE_SIZE - 1)
     const { data, error: e, count: c } = await q
     if (e) {
       setError(e.message)
@@ -72,7 +101,7 @@ export default function JobPaymentsTab({ job, refreshKey = 0 }) {
       }
     }
     setLoading(false)
-  }, [allJobs, job?.id, page])
+  }, [allJobs, job?.id, page, debouncedSearch])
 
   useEffect(() => {
     load()
@@ -99,20 +128,29 @@ export default function JobPaymentsTab({ job, refreshKey = 0 }) {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Constant summary header */}
-      <div className="flex flex-shrink-0 items-center justify-between px-5 pb-2 pt-4">
-        <p className="text-sm font-semibold text-gray-900">
-          {allJobs ? 'All Payments Received' : 'Payments Received'}
-        </p>
-        <p className="text-sm text-gray-600">
-          {count.toLocaleString()} payment{count === 1 ? '' : 's'}
-          {total !== null && (
-            <>
-              {' · '}
-              <span className="font-bold text-gray-900">{money(total)}</span>
-            </>
-          )}
-        </p>
+      {/* Constant summary header + search */}
+      <div className="flex-shrink-0 space-y-2 px-5 pb-2 pt-4">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold text-gray-900">
+            {allJobs ? 'All Payments Received' : 'Payments Received'}
+          </p>
+          <p className="text-sm text-gray-600">
+            {count.toLocaleString()} payment{count === 1 ? '' : 's'}
+            {total !== null && (
+              <>
+                {' · '}
+                <span className="font-bold text-gray-900">{money(total)}</span>
+              </>
+            )}
+          </p>
+        </div>
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search by method, status, source, or job…"
+          className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:border-green-600 focus:outline-none"
+        />
       </div>
 
       {error && (
@@ -122,17 +160,21 @@ export default function JobPaymentsTab({ job, refreshKey = 0 }) {
       )}
 
       {/* Scrolling table region */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4">
+      <div className="min-h-0 flex-1 flex flex-col px-5 pb-4">
         {loading ? (
           <div className="py-8 text-center text-sm text-gray-400">Loading payments…</div>
         ) : rows.length === 0 ? (
           <p className="py-8 text-center text-sm text-gray-400">
-            {allJobs ? 'No payments recorded yet.' : 'No payments recorded for this job.'}
+            {debouncedSearch.trim()
+              ? 'No payments match your search.'
+              : allJobs
+                ? 'No payments recorded yet.'
+                : 'No payments recorded for this job.'}
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+          <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-gray-200 bg-white">
             <table className="w-full text-sm">
-              <thead className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+              <thead className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                 <tr>
                   {allJobs && <th className="px-3 py-2">Job</th>}
                   <th className="px-3 py-2">Date</th>

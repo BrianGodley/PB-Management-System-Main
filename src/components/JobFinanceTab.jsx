@@ -189,7 +189,7 @@ export default function JobFinanceTab({ job, refreshKey = 0, onOpenJobInvoice, i
       )}
 
       {/* Scrolling table region */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4">
+      <div className="min-h-0 flex-1 flex flex-col px-5 pb-4">
         {loading ? (
           <div className="py-8 text-center text-sm text-gray-400">Loading invoices…</div>
         ) : invoices.length === 0 ? (
@@ -201,9 +201,9 @@ export default function JobFinanceTab({ job, refreshKey = 0, onOpenJobInvoice, i
                 : 'No invoices for this job yet.'}
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+          <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-gray-200 bg-white">
             <table className="w-full text-sm">
-              <thead className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+              <thead className="sticky top-0 z-10 border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                 <tr>
                   {allJobs && <th className="px-3 py-2">Job</th>}
                   <th className="px-3 py-2">Invoice #</th>

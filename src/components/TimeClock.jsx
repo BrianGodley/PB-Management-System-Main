@@ -464,10 +464,10 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
         </>
       ) : (
         <>
-          {/* ── Desktop table ─────────────────────────────────── */}
-          <div className="hidden lg:block overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+          {/* ── Desktop table — header frozen, body scrolls ───── */}
+          <div className="hidden lg:block lg:flex-1 lg:min-h-0 overflow-auto rounded-xl border border-gray-200 shadow-sm">
             <table className="w-full text-sm">
-              <thead>
+              <thead className="sticky top-0 z-10">
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left">
                     Date

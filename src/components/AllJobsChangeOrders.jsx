@@ -6,6 +6,7 @@
 // CO editing stays in the per-job panel). Click a job to open it.
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import { fetchAllPaginated } from '../lib/fetchAll'
 
 function isJobOpen(j) {
   const s = j?.status || 'active'
@@ -42,10 +43,18 @@ export default function AllJobsChangeOrders({ jobs = [], statusFilter = 'open', 
     let alive = true
     ;(async () => {
       setLoading(true)
-      const { data } = await supabase
-        .from('bids')
-        .select('id, linked_job_id, custom_co_id, co_name, co_type, status, bid_amount, date_submitted')
-        .eq('record_type', 'change_order')
+      // Paginated — the bids table can hold more change orders than the
+      // PostgREST 1,000-row cap, which previously truncated this list and
+      // made some jobs show fewer COs here than in their own CO panel.
+      const { data } = await fetchAllPaginated(() =>
+        supabase
+          .from('bids')
+          .select(
+            'id, linked_job_id, custom_co_id, co_name, co_type, status, bid_amount, date_submitted'
+          )
+          .eq('record_type', 'change_order')
+          .order('id', { ascending: true })
+      )
       if (alive) {
         setCos(data || [])
         setLoading(false)
@@ -85,9 +94,9 @@ export default function AllJobsChangeOrders({ jobs = [], statusFilter = 'open', 
   }
 
   return (
-    <div>
-      <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="text-sm font-semibold text-gray-700">Change Orders — All Jobs</h2>
+    <div className="flex flex-col h-full">
+      <div className="mb-3 flex items-baseline justify-between flex-shrink-0">
+        <h2 className="text-sm font-semibold text-gray-700">Change Orders</h2>
         <span className="text-xs text-gray-400 mr-6">
           {rows.length} CO{rows.length === 1 ? '' : 's'} ·{' '}
           {statusFilter === 'closed' ? 'closed' : 'open'} jobs
@@ -102,9 +111,9 @@ export default function AllJobsChangeOrders({ jobs = [], statusFilter = 'open', 
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+        <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-gray-200 bg-white">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+            <thead className="sticky top-0 z-10 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500 border-b border-gray-200">
               <tr>
                 <th className="px-4 py-2.5">Job</th>
                 <th className="px-4 py-2.5">CO #</th>

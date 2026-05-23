@@ -60,18 +60,18 @@ function KpiCard({ label, est, act, currency = false, inverse = false, sub }) {
     delta === 0 ? 'text-gray-400' : over ? 'text-red-600 bg-red-50' : 'text-green-700 bg-green-50'
   const display = v => (currency ? fmt(v) : fmtD(v))
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4 flex flex-col gap-1 min-w-0 overflow-hidden">
+    <div className="bg-white rounded-xl border border-gray-200 px-3 py-2 flex flex-col gap-0.5 min-w-0 overflow-hidden">
       <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide truncate">
         {label}
       </span>
-      <div className="flex items-start justify-between gap-2 mt-1 min-w-0">
+      <div className="flex items-start justify-between gap-2 mt-0.5 min-w-0">
         <div className="min-w-0 flex-1">
           <p className="text-[10px] text-gray-400">Estimated</p>
-          <p className="text-base sm:text-lg font-bold text-gray-800 truncate">{display(est)}</p>
+          <p className="text-sm sm:text-base font-bold text-gray-800 truncate">{display(est)}</p>
         </div>
         <div className="text-right min-w-0 flex-1">
           <p className="text-[10px] text-gray-400">Actual</p>
-          <p className="text-base sm:text-lg font-bold text-gray-900 truncate">{display(act)}</p>
+          <p className="text-sm sm:text-base font-bold text-gray-900 truncate">{display(act)}</p>
           {delta !== 0 && (
             <div
               className={`inline-block text-[10px] sm:text-[11px] font-semibold px-1.5 sm:px-2 py-0.5 rounded mt-1 ${deltaColor} max-w-full truncate`}
@@ -91,19 +91,19 @@ function GpCard({ estGP, actGP, estPct, actPct }) {
   const color = actGP > estGP ? 'text-green-700' : actGP < estGP ? 'text-red-600' : 'text-gray-500'
   const trend = actGP > estGP ? '📈' : actGP < estGP ? '📉' : '➡️'
   return (
-    <div className="bg-white rounded-xl border-2 border-green-700 p-4 flex flex-col gap-1">
+    <div className="bg-white rounded-xl border-2 border-green-700 px-3 py-2 flex flex-col gap-0.5">
       <span className="text-[10px] font-bold text-green-700 uppercase tracking-wide">
         Gross Profit {trend}
       </span>
-      <div className="flex items-start justify-between gap-2 mt-1">
+      <div className="flex items-start justify-between gap-2 mt-0.5">
         <div>
           <p className="text-[10px] text-gray-400">Estimated</p>
-          <p className="text-lg font-bold text-gray-800">{fmt(estGP)}</p>
+          <p className="text-base font-bold text-gray-800">{fmt(estGP)}</p>
           <p className="text-[10px] text-gray-400">{estPct.toFixed(1)}% margin</p>
         </div>
         <div className="text-right">
           <p className="text-[10px] text-gray-400">Actual</p>
-          <p className={`text-lg font-bold ${color}`}>{fmt(actGP)}</p>
+          <p className={`text-base font-bold ${color}`}>{fmt(actGP)}</p>
           <p className="text-[10px] text-gray-400">{actPct.toFixed(1)}% margin</p>
           {delta !== 0 && (
             <div
@@ -924,9 +924,9 @@ export default function JobComparison({ job }) {
   const c = calcs
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
+    <div className="flex flex-col h-full">
+      {/* Header — frozen */}
+      <div className="flex items-center justify-between flex-wrap gap-2 flex-shrink-0">
         <h2 className="text-sm font-semibold text-gray-700">Job Analysis</h2>
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
           {[
@@ -950,9 +950,12 @@ export default function JobComparison({ job }) {
 
       {/* ── OVERALL TAB ── */}
       {tab === 'overall' && (
-        <div className="space-y-4">
-          {/* KPI cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <>
+          {/* Frozen — KPI summary cards + payroll bar stay put while the
+              detail below scrolls. */}
+          <div className="flex-shrink-0 space-y-3 mt-4">
+            {/* KPI cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <KpiCard
               label="Man Days"
               est={c.estManDays}
@@ -1007,28 +1010,32 @@ export default function JobComparison({ job }) {
               )}
             </div>
           )}
+          </div>
 
-          {/* Module table */}
-          {workOrders.length > 0 && (
-            <ModuleTable
-              workOrders={workOrders}
-              scheduleItems={scheduleItems}
-              crewMap={crewMap}
-              laborRate={laborRate}
-            />
-          )}
+          {/* Scrolls below the payroll bar */}
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-4 mt-4">
+            {/* Module table */}
+            {workOrders.length > 0 && (
+              <ModuleTable
+                workOrders={workOrders}
+                scheduleItems={scheduleItems}
+                crewMap={crewMap}
+                laborRate={laborRate}
+              />
+            )}
 
-          {/* Payroll detail */}
-          <PayrollPanel timeEntries={timeEntries} scheduledManDays={c.scheduledManDays} />
+            {/* Payroll detail */}
+            <PayrollPanel timeEntries={timeEntries} scheduledManDays={c.scheduledManDays} />
 
-          {/* Accounting panel */}
-          <AccountingPanel bills={bills} invoices={invoices} />
-        </div>
+            {/* Accounting panel */}
+            <AccountingPanel bills={bills} invoices={invoices} />
+          </div>
+        </>
       )}
 
       {/* ── BY CREW TAB ── */}
       {tab === 'by-crew' && (
-        <div className="space-y-3">
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-3 mt-4">
           {Object.entries(crewGroups)
             .filter(([key]) => key !== '__unassigned__')
             .map(([crewId, wos]) => {
