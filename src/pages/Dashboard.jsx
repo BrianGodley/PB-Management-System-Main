@@ -12,6 +12,7 @@
 // Run the SQL provided alongside this file before using the Settings tab.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useCachedData } from '../lib/useCachedData'
@@ -26,6 +27,20 @@ import {
 } from 'recharts'
 
 const FG = '#3A5038' // forest green
+
+// ── Quick-link buttons. Batch 1 wires each to its page; richer behaviour
+// (auto-opening modals, the multi-step Quick Estimate flow) follows in later
+// batches.
+const QUICK_LINKS = [
+  { label: 'Quick Estimate', icon: '📝', to: '/clients' },
+  { label: 'New Bid', icon: '📋', to: '/bids' },
+  { label: 'Add Schedule', icon: '📅', to: '/jobs' },
+  { label: 'Daily Log', icon: '🗒️', to: '/daily-logs' },
+  { label: 'Continue Training', icon: '🎓', to: '/training' },
+  { label: 'Add Employee', icon: '👤', to: '/hr' },
+  { label: 'Add Vendor / Sub', icon: '🚜', to: '/portal/subs' },
+  { label: 'Add Statistic', icon: '📈', to: '/statistics' },
+]
 
 // ── WMO weather codes → [emoji, label] ───────────────────────────────────────
 const WX_CODES = {
@@ -306,6 +321,7 @@ async function fetchDashboardData(userId) {
 // ═════════════════════════════════════════════════════════════════════════════
 export default function Dashboard() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [tab, setTab] = useState('dashboard')
 
   const { data, loading, refresh } = useCachedData(
@@ -358,11 +374,32 @@ export default function Dashboard() {
       </div>
 
       {tab === 'dashboard' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <WeatherWidget location={weatherLocation} />
-          <StatMiniGraph stat={stat1} />
-          <StatMiniGraph stat={stat2} />
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <WeatherWidget location={weatherLocation} />
+            <StatMiniGraph stat={stat1} />
+            <StatMiniGraph stat={stat2} />
+          </div>
+
+          {/* Quick Links */}
+          <div className="card mt-4">
+            <h3 className="text-sm font-bold text-gray-800 mb-3">Quick Links</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {QUICK_LINKS.map(q => (
+                <button
+                  key={q.label}
+                  onClick={() => navigate(q.to)}
+                  className="flex flex-col items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-3 py-4 hover:border-green-300 hover:bg-green-50 transition-colors"
+                >
+                  <span className="text-2xl leading-none">{q.icon}</span>
+                  <span className="text-xs font-medium text-gray-700 text-center leading-tight">
+                    {q.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
       )}
 
       {tab === 'settings' && (
