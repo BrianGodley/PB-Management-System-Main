@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { fetchAllPaginated } from '../lib/fetchAll'
+import { useCachedData } from '../lib/useCachedData'
 import { generateBidDoc, downloadBidDoc, fetchFinanceOacRate } from '../lib/generateBidDoc'
 import BidDocViewerModal from '../components/BidDocViewerModal'
 import { JOB_ROLES, nameInitials } from '../components/JobInfoModal'
@@ -58,10 +59,50 @@ function formatJobName(clientName) {
   return `${last}, ${first}`
 }
 
+// ── Data fetch ───────────────────────────────────────────────────────────────
+// Cached by useCachedData('bids:all', …) so revisiting Bids renders instantly
+// from cache and refreshes in the background.
+async function fetchBidsData() {
+  const [bidsRes, profRes, tmplRes, empRes] = await Promise.all([
+    fetchAllPaginated(() =>
+      supabase
+        .from('bids')
+        .select('*, estimates(estimate_name, created_by, client_id)')
+        .in('record_type', ['bid'])
+        .order('date_submitted', { ascending: false })
+    ),
+    supabase.from('profiles').select('id, full_name, email'),
+    supabase
+      .from('job_templates')
+      .select('id, name, auto_trigger, template_folders(*), template_tasks(*)')
+      .order('name'),
+    supabase
+      .from('employees')
+      .select('id, first_name, last_name')
+      .eq('status', 'active')
+      .order('last_name'),
+  ])
+  if (bidsRes.error) throw bidsRes.error
+  const profiles = {}
+  ;(profRes.data || []).forEach(p => {
+    profiles[p.id] = p.full_name || p.email || 'Unknown'
+  })
+  return {
+    bids: bidsRes.data || [],
+    profiles,
+    templates: tmplRes.data || [],
+    employees: empRes.data || [],
+  }
+}
+
 export default function Bids() {
-  const [bids, setBids] = useState([])
-  const [profiles, setProfiles] = useState({})
-  const [loading, setLoading] = useState(true)
+  // Cached data — instant on revisit; refresh() forces a refetch after writes.
+  const { data: bidsData, loading, refresh } = useCachedData('bids:all', fetchBidsData)
+  const bids = bidsData?.bids ?? []
+  const profiles = bidsData?.profiles ?? {}
+  const templates = bidsData?.templates ?? []
+  const employees = bidsData?.employees ?? []
+
   const [bidTab, setBidTab] = useState('bids') // 'bids' | 'settings'
   const [bidsSettingsTab, setBidsSettingsTab] = useState('general')
   const [filter, setFilter] = useState('all')
@@ -75,59 +116,9 @@ export default function Bids() {
   // Sold modal state
   const [soldModal, setSoldModal] = useState(null) // { bidId, bid, jobName, templateId, roles }
   const [savingJob, setSavingJob] = useState(false)
-  const [templates, setTemplates] = useState([])
-  const [employees, setEmployees] = useState([])
-
-  useEffect(() => {
-    supabase
-      .from('job_templates')
-      .select('id, name, auto_trigger, template_folders(*), template_tasks(*)')
-      .order('name')
-      .then(({ data }) => {
-        if (data) setTemplates(data)
-      })
-    supabase
-      .from('employees')
-      .select('id, first_name, last_name')
-      .eq('status', 'active')
-      .order('last_name')
-      .then(({ data }) => {
-        if (data) setEmployees(data)
-      })
-  }, [])
 
   // Cascade warning modal state
   const [cascadeModal, setCascadeModal] = useState(null) // { type, title, body, woCount, onConfirm }
-
-  useEffect(() => {
-    fetchBids()
-    fetchProfiles()
-  }, [])
-
-  async function fetchBids() {
-    setLoading(true)
-    // Project's max-rows hard-caps at 1k server-side; paginate.
-    const { data } = await fetchAllPaginated(() =>
-      supabase
-        .from('bids')
-        .select('*, estimates(estimate_name, created_by, client_id)')
-        .in('record_type', ['bid'])
-        .order('date_submitted', { ascending: false })
-    )
-    if (data) setBids(data)
-    setLoading(false)
-  }
-
-  async function fetchProfiles() {
-    const { data } = await supabase.from('profiles').select('id, full_name, email')
-    if (data) {
-      const map = {}
-      data.forEach(p => {
-        map[p.id] = p.full_name || p.email || 'Unknown'
-      })
-      setProfiles(map)
-    }
-  }
 
   // Helper: count work orders associated with a bid via its estimate_id → jobs → work_orders
   async function getBidWOCount(bid) {
@@ -194,7 +185,7 @@ export default function Bids() {
           await supabase.from('bids').update({ status }).eq('id', id)
           setCascadeModal(null)
           setUpdatingId(null)
-          await fetchBids()
+          await refresh()
         },
       })
       return
@@ -202,7 +193,7 @@ export default function Bids() {
 
     setUpdatingId(id)
     await supabase.from('bids').update({ status }).eq('id', id)
-    await fetchBids()
+    await refresh()
     setUpdatingId(null)
   }
 
@@ -384,7 +375,7 @@ export default function Bids() {
 
     setSoldModal(null)
     setSavingJob(false)
-    await fetchBids()
+    await refresh()
   }
 
   async function handleSoldCancel() {
@@ -393,7 +384,7 @@ export default function Bids() {
     // Revert bid to Presented
     setUpdatingId(bidId)
     await supabase.from('bids').update({ status: 'presented' }).eq('id', bidId)
-    await fetchBids()
+    await refresh()
     setUpdatingId(null)
   }
 
@@ -435,7 +426,7 @@ export default function Bids() {
         if (woCount > 0) await deleteBidWorkOrders(bid)
         await supabase.from('bids').delete().eq('id', id)
         setCascadeModal(null)
-        fetchBids()
+        refresh()
       },
     })
   }

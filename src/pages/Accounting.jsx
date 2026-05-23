@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { fetchAllPaginated } from '../lib/fetchAll'
+import { useCachedData } from '../lib/useCachedData'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const fmt = n => Number(n || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
@@ -2125,53 +2126,56 @@ const TABS = [
   { key: 'reports', label: '📈 Reports' },
 ]
 
+// ── Data fetch ────────────────────────────────────────────────────────────────
+// Cached by useCachedData('accounting:all', …) so revisiting Accounting renders
+// instantly from cache and refreshes in the background.
+async function fetchAccountingData() {
+  const [invRes, billRes, acctRes, bankRes, clientRes, jobRes, vendorRes] = await Promise.all([
+    supabase.from('acct_invoices').select('*').order('date', { ascending: false }),
+    supabase.from('acct_bills').select('*').order('date', { ascending: false }),
+    supabase.from('acct_accounts').select('*').eq('is_active', true).order('sort_order'),
+    supabase.from('acct_bank_accounts').select('*').eq('is_active', true).order('name'),
+    // Server max-rows is 1k; paginate to get all 1.6k+ clients and 2k+ jobs.
+    fetchAllPaginated(() =>
+      supabase.from('clients').select('id, name, client_name').order('name')
+    ),
+    fetchAllPaginated(() =>
+      supabase
+        .from('jobs')
+        .select('id, name, client_name')
+        .order('created_at', { ascending: false })
+    ),
+    supabase
+      .from('subs_vendors')
+      .select('id, company_name')
+      .eq('type', 'sub')
+      .order('company_name'),
+  ])
+  const coreErr = invRes.error || billRes.error || acctRes.error || bankRes.error
+  if (coreErr) throw coreErr
+  return {
+    invoices: invRes.data || [],
+    bills: billRes.data || [],
+    accounts: acctRes.data || [],
+    bankAccounts: bankRes.data || [],
+    clients: clientRes.data || [],
+    jobs: jobRes.data || [],
+    vendors: vendorRes.data || [],
+  }
+}
+
 export default function Accounting() {
   const [tab, setTab] = useState('dashboard')
-  const [invoices, setInvoices] = useState([])
-  const [bills, setBills] = useState([])
-  const [accounts, setAccounts] = useState([])
-  const [bankAccounts, setBankAccounts] = useState([])
-  const [clients, setClients] = useState([])
-  const [jobs, setJobs] = useState([])
-  const [vendors, setVendors] = useState([])
-  const [loading, setLoading] = useState(true)
 
-  const fetchAll = useCallback(async () => {
-    setLoading(true)
-    const [invRes, billRes, acctRes, bankRes, clientRes, jobRes, vendorRes] = await Promise.all([
-      supabase.from('acct_invoices').select('*').order('date', { ascending: false }),
-      supabase.from('acct_bills').select('*').order('date', { ascending: false }),
-      supabase.from('acct_accounts').select('*').eq('is_active', true).order('sort_order'),
-      supabase.from('acct_bank_accounts').select('*').eq('is_active', true).order('name'),
-      // Server max-rows is 1k; paginate to get all 1.6k+ clients and 2k+ jobs.
-      fetchAllPaginated(() =>
-        supabase.from('clients').select('id, name, client_name').order('name')
-      ),
-      fetchAllPaginated(() =>
-        supabase
-          .from('jobs')
-          .select('id, name, client_name')
-          .order('created_at', { ascending: false })
-      ),
-      supabase
-        .from('subs_vendors')
-        .select('id, company_name')
-        .eq('type', 'sub')
-        .order('company_name'),
-    ])
-    if (invRes.data) setInvoices(invRes.data)
-    if (billRes.data) setBills(billRes.data)
-    if (acctRes.data) setAccounts(acctRes.data)
-    if (bankRes.data) setBankAccounts(bankRes.data)
-    if (clientRes.data) setClients(clientRes.data)
-    if (jobRes.data) setJobs(jobRes.data)
-    if (vendorRes.data) setVendors(vendorRes.data)
-    setLoading(false)
-  }, [])
-
-  useEffect(() => {
-    fetchAll()
-  }, [fetchAll])
+  // Cached data — instant on revisit; refresh() forces a refetch after writes.
+  const { data: acctData, loading, refresh } = useCachedData('accounting:all', fetchAccountingData)
+  const invoices = acctData?.invoices ?? []
+  const bills = acctData?.bills ?? []
+  const accounts = acctData?.accounts ?? []
+  const bankAccounts = acctData?.bankAccounts ?? []
+  const clients = acctData?.clients ?? []
+  const jobs = acctData?.jobs ?? []
+  const vendors = acctData?.vendors ?? []
 
   if (loading)
     return (
@@ -2221,7 +2225,7 @@ export default function Accounting() {
             clients={clients}
             jobs={jobs}
             accounts={accounts}
-            onRefresh={fetchAll}
+            onRefresh={refresh}
           />
         )}
         {tab === 'bills' && (
@@ -2230,13 +2234,13 @@ export default function Accounting() {
             vendors={vendors}
             accounts={accounts}
             jobs={jobs}
-            onRefresh={fetchAll}
+            onRefresh={refresh}
           />
         )}
         {tab === 'banking' && (
-          <BankingTab bankAccounts={bankAccounts} accounts={accounts} onRefresh={fetchAll} />
+          <BankingTab bankAccounts={bankAccounts} accounts={accounts} onRefresh={refresh} />
         )}
-        {tab === 'accounts' && <ChartOfAccountsTab accounts={accounts} onRefresh={fetchAll} />}
+        {tab === 'accounts' && <ChartOfAccountsTab accounts={accounts} onRefresh={refresh} />}
         {tab === 'reports' && (
           <ReportsTab
             invoices={invoices}
