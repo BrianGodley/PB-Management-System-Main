@@ -45,6 +45,7 @@ export default function JobFinanceTab({ job, refreshKey = 0, onOpenJobInvoice, i
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [invFilter, setInvFilter] = useState('all') // all | unpaid | paid
   const [detailInvoiceId, setDetailInvoiceId] = useState(null)
 
   // Debounce the search box so we don't fire a query on every keystroke.
@@ -53,10 +54,10 @@ export default function JobFinanceTab({ job, refreshKey = 0, onOpenJobInvoice, i
     return () => clearTimeout(t)
   }, [search])
 
-  // Jump back to page 1 when the job, a refresh, or the search term changes.
+  // Jump back to page 1 when the job, a refresh, the search, or the filter changes.
   useEffect(() => {
     setPage(0)
-  }, [job?.id, refreshKey, debouncedSearch])
+  }, [job?.id, refreshKey, debouncedSearch, invFilter])
 
   // A deep-link (clicking a job name in the all-jobs view) opens that invoice.
   useEffect(() => {
@@ -72,6 +73,10 @@ export default function JobFinanceTab({ job, refreshKey = 0, onOpenJobInvoice, i
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
     if (!allJobs) q = q.eq('job_id', job.id)
+
+    // All / Unpaid / Paid filter
+    if (invFilter === 'paid') q = q.eq('status', 'paid')
+    else if (invFilter === 'unpaid') q = q.in('status', ['draft', 'sent'])
 
     const term = debouncedSearch.trim().replace(/[%,()*]/g, ' ').trim()
     if (term) {
@@ -117,7 +122,7 @@ export default function JobFinanceTab({ job, refreshKey = 0, onOpenJobInvoice, i
       }
     }
     setLoading(false)
-  }, [allJobs, job?.id, page, debouncedSearch])
+  }, [allJobs, job?.id, page, debouncedSearch, invFilter])
 
   useEffect(() => {
     load()
@@ -158,10 +163,32 @@ export default function JobFinanceTab({ job, refreshKey = 0, onOpenJobInvoice, i
     <div className="flex h-full flex-col">
       {/* Constant summary header + search */}
       <div className="flex-shrink-0 space-y-2 px-5 pb-2 pt-4">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold text-gray-900">
-            {allJobs ? 'All Invoices' : 'Invoices'}
-          </p>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold text-gray-900">
+              {allJobs ? 'All Invoices' : 'Invoices'}
+            </p>
+            <div className="flex gap-1">
+              {[
+                { key: 'all', label: 'All' },
+                { key: 'unpaid', label: 'Unpaid' },
+                { key: 'paid', label: 'Paid' },
+              ].map(f => (
+                <button
+                  key={f.key}
+                  type="button"
+                  onClick={() => setInvFilter(f.key)}
+                  className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+                    invFilter === f.key
+                      ? 'bg-green-700 text-white'
+                      : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <p className="text-sm text-gray-600">
             {count.toLocaleString()} invoice{count === 1 ? '' : 's'}
             {showTotals && (
@@ -196,9 +223,11 @@ export default function JobFinanceTab({ job, refreshKey = 0, onOpenJobInvoice, i
           <p className="py-8 text-center text-sm text-gray-400">
             {debouncedSearch.trim()
               ? 'No invoices match your search.'
-              : allJobs
-                ? 'No invoices recorded yet.'
-                : 'No invoices for this job yet.'}
+              : invFilter !== 'all'
+                ? `No ${invFilter} invoices.`
+                : allJobs
+                  ? 'No invoices recorded yet.'
+                  : 'No invoices for this job yet.'}
           </p>
         ) : (
           <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-gray-200 bg-white">
@@ -211,7 +240,7 @@ export default function JobFinanceTab({ job, refreshKey = 0, onOpenJobInvoice, i
                   <th className="px-3 py-2">Status</th>
                   <th className="px-3 py-2 text-right">Amount</th>
                   <th className="px-3 py-2 text-right">Paid</th>
-                  <th className="px-3 py-2 text-right">Balance Due</th>
+                  <th className="px-3 py-2 text-right">Due</th>
                   <th className="px-3 py-2">Due Date</th>
                   <th className="px-3 py-2">Date Paid</th>
                   <th className="px-3 py-2 text-right">&nbsp;</th>
