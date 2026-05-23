@@ -150,7 +150,7 @@ export default function AllJobsTasks({ jobs = [], statusFilter = 'open', onSelec
   return (
     <div className="p-4">
       <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="text-lg font-bold text-gray-900">Tasks — All Jobs</h2>
+        <h2 className="text-sm font-semibold text-gray-700">Tasks — All Jobs</h2>
         <span className="text-xs text-gray-400">
           {taskedJobs.length.toLocaleString()} job{taskedJobs.length === 1 ? '' : 's'}
         </span>

@@ -464,34 +464,6 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
         </>
       ) : (
         <>
-          {/* Pagination — desktop table only; controls on the left, clear of
-              the floating Ask Sam button at the bottom-right. */}
-          {totalCount > ENTRIES_PER_PAGE && (
-            <div className="hidden lg:flex items-center gap-3 mb-2 flex-shrink-0">
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setPage(Math.max(1, safePage - 1))}
-                  disabled={safePage === 1}
-                  className="px-2.5 py-1 text-xs rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  ‹ Prev
-                </button>
-                <span className="text-xs text-gray-500 px-2">
-                  Page {safePage} of {totalPages}
-                </span>
-                <button
-                  onClick={() => setPage(Math.min(totalPages, safePage + 1))}
-                  disabled={safePage === totalPages}
-                  className="px-2.5 py-1 text-xs rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  Next ›
-                </button>
-              </div>
-              <span className="text-xs text-gray-500">
-                {pageStart + 1}–{pageStart + entries.length} of {totalCount}
-              </span>
-            </div>
-          )}
           {/* ── Desktop table ─────────────────────────────────── */}
           <div className="hidden lg:block overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
             <table className="w-full text-sm">
@@ -643,6 +615,35 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
               </tbody>
             </table>
           </div>
+
+          {/* Pagination — desktop table only; controls below the table,
+              clear of the floating Ask Sam button at the bottom-right. */}
+          {totalCount > ENTRIES_PER_PAGE && (
+            <div className="hidden lg:flex items-center gap-3 mt-2 flex-shrink-0">
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage(Math.max(1, safePage - 1))}
+                  disabled={safePage === 1}
+                  className="px-2.5 py-1 text-xs rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  ‹ Prev
+                </button>
+                <span className="text-xs text-gray-500 px-2">
+                  Page {safePage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage(Math.min(totalPages, safePage + 1))}
+                  disabled={safePage === totalPages}
+                  className="px-2.5 py-1 text-xs rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Next ›
+                </button>
+              </div>
+              <span className="text-xs text-gray-500">
+                {pageStart + 1}–{pageStart + entries.length} of {totalCount}
+              </span>
+            </div>
+          )}
 
           {/* ── Mobile UI ─────────────────────────────────────── */}
           <MobileHero

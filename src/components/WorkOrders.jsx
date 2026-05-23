@@ -2249,8 +2249,8 @@ export default function WorkOrders({ jobs, selectedJob, jobStatusFilter = 'open'
         />
       )}
 
-      {/* Summary bar */}
-      <div className="mb-5 rounded-xl bg-gray-900 overflow-hidden shadow-sm">
+      {/* Summary bar — single uniform row */}
+      <div className="mb-3 rounded-xl bg-gray-900 overflow-hidden shadow-sm">
         <div className="flex flex-wrap items-center gap-0 divide-x divide-gray-700">
           <div className="px-5 py-2 flex-1 min-w-[120px]">
             <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block">
@@ -2272,11 +2272,11 @@ export default function WorkOrders({ jobs, selectedJob, jobStatusFilter = 'open'
               <span className="text-base font-bold text-white">{fmt(totalSub)}</span>
             </div>
           )}
-          <div className="px-5 py-2 flex-1 min-w-[140px] bg-white/5">
-            <span className="text-[10px] font-semibold text-green-400 uppercase tracking-wide block">
+          <div className="px-5 py-2 flex-1 min-w-[140px]">
+            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block">
               Total Value
             </span>
-            <span className="text-base font-bold text-green-400">{fmt(totalValue)}</span>
+            <span className="text-base font-bold text-white">{fmt(totalValue)}</span>
           </div>
           <div className="px-5 py-2 flex-1 min-w-[140px]">
             <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block">
@@ -2288,38 +2288,38 @@ export default function WorkOrders({ jobs, selectedJob, jobStatusFilter = 'open'
             </span>
           </div>
         </div>
+      </div>
 
-        {/* Filter row + add button */}
-        <div className="flex items-center justify-between gap-2 px-5 py-2.5 border-t border-gray-700 bg-gray-800">
-          <div className="flex gap-1.5 flex-wrap">
-            {['all', 'pending', 'in_progress', 'complete'].map(s => (
-              <button
-                key={s}
-                onClick={() => setStatusFilter(s)}
-                className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
-                  statusFilter === s
-                    ? 'bg-green-700 text-white'
-                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                }`}
-              >
-                {s === 'all'
-                  ? 'All'
-                  : s === 'in_progress'
-                    ? 'In Progress'
-                    : s.charAt(0).toUpperCase() + s.slice(1)}
-              </button>
-            ))}
-          </div>
-          {/* + Work Order button — only for single job */}
-          {jobId && (
+      {/* Filter row + add button — outside the summary bar */}
+      <div className="mb-5 flex items-center justify-between gap-2">
+        <div className="flex gap-1.5 flex-wrap">
+          {['all', 'pending', 'in_progress', 'complete'].map(s => (
             <button
-              onClick={() => setShowNewWOModal(true)}
-              className="flex-shrink-0 text-xs px-3 py-1.5 rounded-lg font-semibold bg-white border-2 border-green-700 text-green-700 hover:bg-green-50 transition-colors"
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                statusFilter === s
+                  ? 'bg-green-700 text-white'
+                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+              }`}
             >
-              + Work Order
+              {s === 'all'
+                ? 'All'
+                : s === 'in_progress'
+                  ? 'In Progress'
+                  : s.charAt(0).toUpperCase() + s.slice(1)}
             </button>
-          )}
+          ))}
         </div>
+        {/* + Work Order button — only for single job */}
+        {jobId && (
+          <button
+            onClick={() => setShowNewWOModal(true)}
+            className="flex-shrink-0 text-xs px-3 py-1.5 rounded-lg font-semibold bg-white border-2 border-green-700 text-green-700 hover:bg-green-50 transition-colors"
+          >
+            + Work Order
+          </button>
+        )}
       </div>
 
       {/* Crew type sections — only render if the section has work orders */}

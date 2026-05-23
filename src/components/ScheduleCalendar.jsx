@@ -2040,12 +2040,19 @@ export default function ScheduleCalendar({
             Toolbar row layout: [Add Schedule][Exceptions]  ‹‹ ‹ Month Year › ›› [Today]  [✨ Schedule Assistance]
             Each side button is ~60% of the old sidebar-button width. */}
         <div className="sticky top-0 z-10 bg-white pb-0">
-          {/* Toolbar: items-center → all controls share the same vertical center.
-              h-9 forces a consistent row height so MonthNav (small icon buttons)
-              doesn't ride higher than the chunkier action buttons. */}
-          <div className="flex items-center justify-center gap-2 mb-2 h-12 px-6">
-            {/* Left: Add Schedule + Exceptions */}
-            <div className="flex items-center gap-1.5 flex-shrink-0 h-full">
+          {/* Toolbar — a 7-column grid matching the calendar columns below so
+              each control aligns to specific day columns:
+                Sun: spacer | Mon-Tue: Add Schedule + Exceptions
+                Wed: Month nav (centered) | Thu-Fri: Schedule Assistance
+                Sat: spacer
+              items-center keeps every control on the same vertical center. */}
+          <div className="grid grid-cols-7 items-center gap-0 mb-2 h-12">
+            {/* Sun — spacer */}
+            <div />
+
+            {/* Mon-Tue: Add Schedule + Exceptions — Add Schedule's left edge
+                lines up with the Sun/Mon column divider. */}
+            <div className="col-span-2 flex items-center gap-1.5 h-full">
               <button
                 onClick={handleAddNew}
                 className="flex items-center justify-center gap-1 h-7 px-2 rounded-lg bg-green-700 text-white text-[11px] font-semibold hover:bg-green-800 transition-colors w-[140px]"
@@ -2091,23 +2098,27 @@ export default function ScheduleCalendar({
               </button>
             </div>
 
-            {/* Center: Month nav */}
-            <div className="flex items-center h-full">
+            {/* Wed: Month nav — centered over the Wed column. */}
+            <div className="flex items-center justify-center h-full">
               <MonthNav compact inline />
             </div>
 
-            {/* Right: Schedule Assistance */}
-            {onOpenScheduleAssist ? (
-              <button
-                onClick={onOpenScheduleAssist}
-                className="flex items-center justify-center gap-1 h-7 px-2 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[11px] font-semibold hover:from-purple-700 hover:to-indigo-700 transition-colors w-[140px] flex-shrink-0"
-              >
-                <span>✨</span>
-                <span>Schedule Assistance</span>
-              </button>
-            ) : (
-              <div className="w-[140px] flex-shrink-0" />
-            )}
+            {/* Thu-Fri: Schedule Assistance — right edge lines up with the
+                Fri/Sat column divider. */}
+            <div className="col-span-2 flex items-center justify-end h-full">
+              {onOpenScheduleAssist && (
+                <button
+                  onClick={onOpenScheduleAssist}
+                  className="flex items-center justify-center gap-1 h-7 px-2 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[11px] font-semibold hover:from-purple-700 hover:to-indigo-700 transition-colors w-[140px]"
+                >
+                  <span>✨</span>
+                  <span>Schedule Assistance</span>
+                </button>
+              )}
+            </div>
+
+            {/* Sat — spacer */}
+            <div />
           </div>
 
           <div className="grid grid-cols-7 border-l border-t border-gray-200">

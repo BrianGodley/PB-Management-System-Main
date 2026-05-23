@@ -4379,21 +4379,6 @@ function JobTasksPanel({ job }) {
         ))}
       </datalist>
 
-      {/* Progress bar */}
-      {tasks.length > 0 && (
-        <div className="flex items-center gap-3 mb-3">
-          <div className="flex-1 bg-gray-100 rounded-full h-2">
-            <div
-              className="bg-green-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${(completed / tasks.length) * 100}%` }}
-            />
-          </div>
-          <span className="text-xs font-semibold text-gray-500 flex-shrink-0">
-            {completed}/{tasks.length} done
-          </span>
-        </div>
-      )}
-
       {loading ? (
         <div className="flex items-center justify-center py-16">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700" />

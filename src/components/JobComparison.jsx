@@ -927,12 +927,7 @@ export default function JobComparison({ job }) {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h2 className="text-base font-bold text-gray-900">Job Comparison</h2>
-          <p className="text-xs text-gray-400">
-            Estimated vs Actual — {job?.name || job?.client_name}
-          </p>
-        </div>
+        <h2 className="text-sm font-semibold text-gray-700">Job Analysis</h2>
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
           {[
             { key: 'overall', label: '📊 Overall' },
