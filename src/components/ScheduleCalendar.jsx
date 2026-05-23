@@ -1935,6 +1935,17 @@ export default function ScheduleCalendar({
       : `flex items-center justify-center gap-1 ${compact ? 'mb-2' : 'mb-3'}`
     return (
       <div className={wrapCls}>
+        {/* Invisible twin of the Today button — inline (desktop toolbar) only.
+            It mirrors Today's width on the left so the month/year heading sits
+            dead-center over the Wed column instead of being pulled left. */}
+        {inline && (
+          <span
+            aria-hidden="true"
+            className="invisible text-xs font-semibold px-2.5 py-1 rounded-md border mr-2"
+          >
+            Today
+          </span>
+        )}
         <button onClick={prevYear} className={dblBtn} title="Previous year">
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
