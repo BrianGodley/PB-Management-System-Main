@@ -17,6 +17,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useCachedData } from '../lib/useCachedData'
 import AddEmployeeModal from '../components/AddEmployeeModal'
+import CoursePlayer from '../components/lms/CoursePlayer'
 import {
   LineChart,
   Line,
@@ -35,9 +36,9 @@ const FG = '#3A5038' // forest green
 const QUICK_LINKS = [
   { label: 'Quick Estimate', icon: '📝', to: '/clients' },
   { label: 'New Bid', icon: '📋', to: '/bids' },
-  { label: 'Add Schedule', icon: '📅', to: '/jobs' },
-  { label: 'Daily Log', icon: '🗒️', to: '/daily-logs' },
-  { label: 'Continue Training', icon: '🎓', to: '/training' },
+  { label: 'Add Schedule', icon: '📅', to: '/jobs?tab=schedule&addSchedule=1' },
+  { label: 'Daily Log', icon: '🗒️', to: '/daily-logs?new=1' },
+  { label: 'Continue Training', icon: '🎓', key: 'continue-training' },
   { label: 'Add Employee', icon: '👤', key: 'add-employee' },
   { label: 'Add Vendor / Sub', icon: '🚜', to: '/portal/subs' },
   { label: 'Add Statistic', icon: '📈', to: '/statistics' },
@@ -294,6 +295,109 @@ function StatMiniGraph({ stat }) {
   )
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+// CONTINUE TRAINING — picker for the user's in-progress LMS checksheets.
+// ═════════════════════════════════════════════════════════════════════════════
+async function fetchInProgressTraining(email) {
+  if (!email) return []
+  const { data: emp } = await supabase
+    .from('employees')
+    .select('id')
+    .eq('email', email)
+    .maybeSingle()
+  if (!emp) return []
+  const { data: asgn } = await supabase
+    .from('lms_assignments')
+    .select('*, course:lms_courses(*)')
+    .eq('employee_id', emp.id)
+    .order('assigned_at', { ascending: false })
+  if (!asgn?.length) return []
+  const courseIds = [...new Set(asgn.map(a => a.course_id))]
+  const assignmentIds = asgn.map(a => a.id)
+  const [stepsRes, compsRes] = await Promise.all([
+    supabase.from('lms_steps').select('id, course_id').in('course_id', courseIds),
+    supabase
+      .from('lms_step_completions')
+      .select('assignment_id, step_id')
+      .in('assignment_id', assignmentIds),
+  ])
+  const steps = stepsRes.data || []
+  const comps = compsRes.data || []
+  return asgn
+    .map(a => ({
+      ...a,
+      total_steps: steps.filter(s => s.course_id === a.course_id).length,
+      done_steps: comps.filter(c => c.assignment_id === a.id).length,
+    }))
+    .filter(a => a.done_steps > 0 && a.done_steps < a.total_steps)
+}
+
+function ContinueTrainingModal({ email, onPick, onClose }) {
+  const [list, setList] = useState(null)
+
+  useEffect(() => {
+    let alive = true
+    fetchInProgressTraining(email).then(r => {
+      if (alive) setList(r)
+    })
+    return () => {
+      alive = false
+    }
+  }, [email])
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+        <h3 className="text-lg font-bold text-gray-900 mb-1">Continue Training</h3>
+        <p className="text-xs text-gray-500 mb-4">Checksheets you have in progress.</p>
+        {list === null ? (
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-700" />
+          </div>
+        ) : list.length === 0 ? (
+          <p className="text-sm text-gray-400 py-8 text-center">
+            Nothing in progress — you're all caught up.
+          </p>
+        ) : (
+          <div className="space-y-2 max-h-80 overflow-y-auto">
+            {list.map(a => {
+              const pct = a.total_steps ? Math.round((a.done_steps / a.total_steps) * 100) : 0
+              return (
+                <button
+                  key={a.id}
+                  onClick={() => onPick(a)}
+                  className="w-full text-left rounded-xl border border-gray-200 px-4 py-3 hover:border-green-300 hover:bg-green-50 transition-colors"
+                >
+                  <p className="text-sm font-semibold text-gray-800">
+                    {a.course?.title || 'Untitled course'}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-green-500 rounded-full"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-gray-500">
+                      {a.done_steps}/{a.total_steps}
+                    </span>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        )}
+        <button
+          onClick={onClose}
+          className="mt-4 w-full py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Data fetch (cached) ──────────────────────────────────────────────────────
 // Tolerant of a not-yet-created dashboard_preferences table / weather_location
 // column — the dashboard still renders with defaults until the SQL is run.
@@ -327,6 +431,8 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const [tab, setTab] = useState('dashboard')
   const [showAddEmp, setShowAddEmp] = useState(false)
+  const [showTraining, setShowTraining] = useState(false)
+  const [trainingAssignment, setTrainingAssignment] = useState(null)
 
   const { data, loading, refresh } = useCachedData(
     user?.id ? `dashboard:${user.id}` : 'dashboard:anon',
@@ -393,7 +499,11 @@ export default function Dashboard() {
               {QUICK_LINKS.map(q => (
                 <button
                   key={q.label}
-                  onClick={() => (q.key === 'add-employee' ? setShowAddEmp(true) : navigate(q.to))}
+                  onClick={() => {
+                    if (q.key === 'add-employee') setShowAddEmp(true)
+                    else if (q.key === 'continue-training') setShowTraining(true)
+                    else navigate(q.to)
+                  }}
                   className="flex flex-col items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-3 py-4 hover:border-green-300 hover:bg-green-50 transition-colors"
                 >
                   <span className="text-2xl leading-none">{q.icon}</span>
@@ -410,6 +520,23 @@ export default function Dashboard() {
               positions={positions}
               onClose={() => setShowAddEmp(false)}
               onSave={() => setShowAddEmp(false)}
+            />
+          )}
+
+          {showTraining && (
+            <ContinueTrainingModal
+              email={user?.email}
+              onPick={a => {
+                setShowTraining(false)
+                setTrainingAssignment(a)
+              }}
+              onClose={() => setShowTraining(false)}
+            />
+          )}
+          {trainingAssignment && (
+            <CoursePlayer
+              assignment={trainingAssignment}
+              onClose={() => setTrainingAssignment(null)}
             />
           )}
         </>

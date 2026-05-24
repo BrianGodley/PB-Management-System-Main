@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { fetchAllPaginated } from '../lib/fetchAll'
 import { useLang } from '../contexts/LanguageContext'
@@ -6,6 +7,7 @@ import DailyLogs from '../components/DailyLogs'
 
 export default function DailyLogsPage() {
   const { t } = useLang()
+  const [searchParams] = useSearchParams()
   const [jobs, setJobs] = useState([])
   const [selectedJob, setSelectedJob] = useState('all')
   const [loading, setLoading] = useState(true)
@@ -48,7 +50,11 @@ export default function DailyLogsPage() {
             <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-green-700" />
           </div>
         ) : (
-          <DailyLogs jobs={jobs} selectedJob={selectedJob} />
+          <DailyLogs
+            jobs={jobs}
+            selectedJob={selectedJob}
+            newLogTrigger={searchParams.get('new') === '1'}
+          />
         )}
       </div>
     </div>

@@ -50,7 +50,12 @@ function getPublicUrl(path) {
 
 // ── Main Component ───────────────────────────────────────────
 
-export default function DailyLogs({ jobs = [], selectedJob, statusFilter = 'open' }) {
+export default function DailyLogs({
+  jobs = [],
+  selectedJob,
+  statusFilter = 'open',
+  newLogTrigger = false,
+}) {
   const { user } = useAuth()
   const [logs, setLogs] = useState([])
   const [totalCount, setTotalCount] = useState(0)
@@ -86,6 +91,12 @@ export default function DailyLogs({ jobs = [], selectedJob, statusFilter = 'open
   useEffect(() => {
     if (listRef.current) listRef.current.scrollTop = 0
   }, [page, selectedJob, statusFilter])
+
+  // Auto-open the new-log modal when arrived via a ?new=1 dashboard deep-link.
+  useEffect(() => {
+    if (newLogTrigger) openNew()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newLogTrigger])
 
   async function fetchProfiles() {
     const { data } = await supabase.from('profiles').select('id, full_name, email')

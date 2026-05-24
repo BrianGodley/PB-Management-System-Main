@@ -230,6 +230,9 @@ export default function JobsList() {
   // between jobs or job-detail tabs.
   const jobsListRef = useRef(null)
   const jobsScrollTop = useRef(0)
+  // One-shot guard so a ?addSchedule=1 deep-link opens the new-schedule modal
+  // only once, even though the URL-param effect re-runs when jobs load.
+  const addSchedFired = useRef(false)
   const onJobsListScroll = e => {
     jobsScrollTop.current = e.currentTarget.scrollTop
   }
@@ -938,6 +941,11 @@ export default function JobsList() {
       }
     }
     if (coParam) setCoDeepLink({ coId: coParam, ts: Date.now() })
+    // Dashboard "Add Schedule" quick-link: open the new-schedule modal once.
+    if (searchParams.get('addSchedule') === '1' && !addSchedFired.current) {
+      addSchedFired.current = true
+      setAddScheduleTrigger(n => n + 1)
+    }
   }, [searchParams, jobs])
 
   async function fetchStages() {
