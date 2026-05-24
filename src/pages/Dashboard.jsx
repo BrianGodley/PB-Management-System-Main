@@ -40,8 +40,8 @@ const QUICK_LINKS = [
   { label: 'Quick Daily Log', icon: '🗒️', to: '/daily-logs?new=1' },
   { label: 'Continue Training', icon: '🎓', key: 'continue-training' },
   { label: 'Quick Add Employee', icon: '👤', key: 'add-employee' },
-  { label: 'Quick Add Vendor/Sub', icon: '🚜', to: '/portal/subs' },
-  { label: 'Quick Add Statistic', icon: '📈', to: '/statistics' },
+  { label: 'Quick Add Vendor/Sub', icon: '🚜', to: '/portal/subs?new=sub' },
+  { label: 'Quick Add Statistic', icon: '📈', to: '/statistics?new=1' },
 ]
 
 // ── WMO weather codes → [emoji, label] ───────────────────────────────────────

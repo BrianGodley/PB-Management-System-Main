@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useCachedData } from '../lib/useCachedData'
 import * as XLSX from 'xlsx'
@@ -121,6 +122,7 @@ export default function SubsVendors() {
   const [importError, setImportError] = useState('')
   const [importing, setImporting] = useState(false)
   const importFileRef = useRef(null)
+  const [searchParams, setSearchParams] = useSearchParams()
 
   function openNew(type) {
     setEditSub(null)
@@ -128,6 +130,18 @@ export default function SubsVendors() {
     setError('')
     setShowModal(true)
   }
+
+  // Dashboard "Quick Add Vendor/Sub" deep-link: ?new=sub|vendor opens the add
+  // modal on the matching directory.
+  useEffect(() => {
+    const t = searchParams.get('new')
+    if (t === 'sub' || t === 'vendor') {
+      setTypeView(t)
+      openNew(t)
+      setSearchParams({}, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function openEdit(sub) {
     setEditSub(sub)

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useSearchParams } from 'react-router-dom'
 import {
   LineChart,
   Line,
@@ -8108,6 +8109,16 @@ export default function Statistics() {
   const [showPrintModal, setShowPrintModal] = useState(false)
   const [showTargetPicker, setShowTargetPicker] = useState(false)
   const [targetSourceStat, setTargetSourceStat] = useState(null)
+
+  // Dashboard "Quick Add Statistic" deep-link: ?new=1 opens the type selector.
+  const [statSearchParams, setStatSearchParams] = useSearchParams()
+  useEffect(() => {
+    if (statSearchParams.get('new') === '1') {
+      setShowTypeSelector(true)
+      setStatSearchParams({}, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Overlay chart data: array of { stat, part, values } for the selected overlay stat
   const [overlayValues, setOverlayValues] = useState([])
