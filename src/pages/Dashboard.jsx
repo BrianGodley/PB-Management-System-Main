@@ -98,8 +98,11 @@ function SaveMsg({ msg }) {
 // WEATHER WIDGET — current conditions + 5-day outlook from the keyless
 // Open-Meteo API. `location` is a free-text place name (city/state or ZIP).
 // ═════════════════════════════════════════════════════════════════════════════
-function WeatherWidget({ location }) {
+function WeatherWidget({ location, onSaveLocation }) {
   const [wx, setWx] = useState({ status: 'loading', current: null, days: [], place: '' })
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [dayIdx, setDayIdx] = useState(null) // selected 5-day index, or null
 
   useEffect(() => {
     const loc = (location || '').trim()
@@ -109,6 +112,7 @@ function WeatherWidget({ location }) {
     }
     let alive = true
     setWx(w => ({ ...w, status: 'loading' }))
+    setDayIdx(null)
     ;(async () => {
       try {
         const geo = await fetch(
@@ -120,15 +124,30 @@ function WeatherWidget({ location }) {
         if (!place) throw new Error('not-found')
         const fc = await fetch(
           `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}` +
-            `&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min` +
-            `&temperature_unit=fahrenheit&timezone=auto&forecast_days=5`
+            `&current=temperature_2m,weather_code` +
+            `&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,` +
+            `apparent_temperature_min,precipitation_sum,precipitation_probability_max,` +
+            `wind_speed_10m_max,wind_gusts_10m_max,uv_index_max,sunrise,sunset` +
+            `&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch` +
+            `&timezone=auto&forecast_days=5`
         ).then(r => r.json())
         if (!alive) return
-        const days = (fc.daily?.time || []).map((t, i) => ({
+        const d = fc.daily || {}
+        const at = (arr, i) => (arr && arr[i] != null ? arr[i] : null)
+        const days = (d.time || []).map((t, i) => ({
           date: t,
-          code: fc.daily.weather_code[i],
-          hi: Math.round(fc.daily.temperature_2m_max[i]),
-          lo: Math.round(fc.daily.temperature_2m_min[i]),
+          code: at(d.weather_code, i) ?? 0,
+          hi: Math.round(at(d.temperature_2m_max, i) ?? 0),
+          lo: Math.round(at(d.temperature_2m_min, i) ?? 0),
+          feelsHi: Math.round(at(d.apparent_temperature_max, i) ?? 0),
+          feelsLo: Math.round(at(d.apparent_temperature_min, i) ?? 0),
+          precip: at(d.precipitation_sum, i) ?? 0,
+          precipChance: at(d.precipitation_probability_max, i) ?? 0,
+          wind: Math.round(at(d.wind_speed_10m_max, i) ?? 0),
+          gust: Math.round(at(d.wind_gusts_10m_max, i) ?? 0),
+          uv: Math.round(at(d.uv_index_max, i) ?? 0),
+          sunrise: at(d.sunrise, i),
+          sunset: at(d.sunset, i),
         }))
         setWx({
           status: 'ok',
@@ -150,15 +169,68 @@ function WeatherWidget({ location }) {
 
   const dayLabel = (iso, idx) => {
     if (idx === 0) return 'Today'
-    const d = new Date(iso + 'T12:00:00')
-    return d.toLocaleDateString('en-US', { weekday: 'short' })
+    return new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' })
   }
+  const fullDay = iso =>
+    new Date(iso + 'T12:00:00').toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'short',
+      day: 'numeric',
+    })
+  const clockTime = iso => {
+    if (!iso) return '—'
+    const d = new Date(iso)
+    return isNaN(d.getTime())
+      ? '—'
+      : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  }
+
+  function commitEdit() {
+    const v = draft.trim()
+    setEditing(false)
+    if (v && v !== (location || '').trim() && onSaveLocation) onSaveLocation(v)
+  }
+
+  const sel = dayIdx != null ? wx.days[dayIdx] : null
 
   return (
     <div className="card">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-bold text-gray-800">Weather</h3>
-        {wx.place && <span className="text-xs text-gray-400 truncate ml-2">{wx.place}</span>}
+      {/* Header — title + editable per-user location */}
+      <div className="flex items-center justify-between mb-3 gap-2">
+        <h3 className="text-sm font-bold text-gray-800 flex-shrink-0">Weather</h3>
+        {editing ? (
+          <div className="flex items-center gap-1 flex-1 min-w-0">
+            <input
+              autoFocus
+              value={draft}
+              onChange={e => setDraft(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') commitEdit()
+                if (e.key === 'Escape') setEditing(false)
+              }}
+              placeholder="City, State or ZIP"
+              className="input text-xs py-1 flex-1 min-w-0"
+            />
+            <button
+              onClick={commitEdit}
+              className="text-xs font-semibold text-green-700 hover:text-green-800 px-1"
+            >
+              Save
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => {
+              setDraft(location || '')
+              setEditing(true)
+            }}
+            title="Change location"
+            className="flex items-center gap-1 text-xs text-gray-400 hover:text-green-700 min-w-0"
+          >
+            <span className="truncate">{wx.place || location || 'Set location'}</span>
+            <span aria-hidden="true">✎</span>
+          </button>
+        )}
       </div>
 
       {wx.status === 'loading' && (
@@ -169,13 +241,13 @@ function WeatherWidget({ location }) {
 
       {wx.status === 'no-location' && (
         <p className="text-xs text-gray-400 py-10 text-center">
-          No weather location set. An admin can set one in the Settings tab.
+          No location set — use the pencil above to choose one.
         </p>
       )}
 
       {wx.status === 'error' && (
         <p className="text-xs text-gray-400 py-10 text-center">
-          Couldn't load weather — check the location in the Settings tab.
+          Couldn't load weather — try a different location above.
         </p>
       )}
 
@@ -189,19 +261,66 @@ function WeatherWidget({ location }) {
               <p className="text-xs text-gray-500 mt-1">{wxInfo(wx.current.code)[1]}</p>
             </div>
           </div>
-          {/* 5-day outlook */}
+          {/* 5-day outlook — click a day for detail */}
           <div className="grid grid-cols-5 gap-1 border-t border-gray-100 pt-3">
             {wx.days.map((d, i) => (
-              <div key={d.date} className="text-center">
+              <button
+                key={d.date}
+                onClick={() => setDayIdx(dayIdx === i ? null : i)}
+                className={`text-center rounded-lg py-1 transition-colors ${
+                  dayIdx === i ? 'bg-green-50 ring-1 ring-green-200' : 'hover:bg-gray-50'
+                }`}
+              >
                 <p className="text-[10px] font-semibold text-gray-500 uppercase">
                   {dayLabel(d.date, i)}
                 </p>
                 <p className="text-lg leading-tight my-0.5">{wxInfo(d.code)[0]}</p>
                 <p className="text-[11px] font-semibold text-gray-800">{d.hi}°</p>
                 <p className="text-[11px] text-gray-400">{d.lo}°</p>
-              </div>
+              </button>
             ))}
           </div>
+
+          {/* Selected-day detail */}
+          {sel && (
+            <div className="mt-3 border-t border-gray-100 pt-3">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-semibold text-gray-800">{fullDay(sel.date)}</p>
+                <button
+                  onClick={() => setDayIdx(null)}
+                  className="text-gray-300 hover:text-gray-600 text-sm leading-none"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-3xl leading-none">{wxInfo(sel.code)[0]}</span>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">
+                    {sel.hi}° / {sel.lo}°
+                  </p>
+                  <p className="text-xs text-gray-500">{wxInfo(sel.code)[1]}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                {[
+                  ['Feels like', `${sel.feelsHi}° / ${sel.feelsLo}°`],
+                  ['Rain chance', `${sel.precipChance}%`],
+                  ['Precipitation', `${sel.precip.toFixed(2)} in`],
+                  ['Wind', `${sel.wind} mph`],
+                  ['Wind gusts', `${sel.gust} mph`],
+                  ['UV index', `${sel.uv}`],
+                  ['Sunrise', clockTime(sel.sunrise)],
+                  ['Sunset', clockTime(sel.sunset)],
+                ].map(([k, v]) => (
+                  <div key={k} className="flex justify-between">
+                    <span className="text-gray-500">{k}</span>
+                    <span className="font-medium text-gray-800">{v}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
@@ -442,6 +561,9 @@ export default function Dashboard() {
   const prefs = data?.prefs || { stat_ids: [], layout: {} }
   const stats = data?.stats || []
   const weatherLocation = data?.weatherLocation || ''
+  // Effective weather location for the widget: this user's own pick overrides
+  // the company-wide default.
+  const myWeatherLocation = prefs.weather_location || weatherLocation
   const settingsId = data?.settingsId ?? null
   const isAdmin = data?.role === 'admin' || data?.role === 'super_admin'
   const positions = data?.positions || []
@@ -449,6 +571,20 @@ export default function Dashboard() {
   const statIds = (prefs.stat_ids || []).map(Number)
   const stat1 = stats.find(s => s.id === statIds[0]) || null
   const stat2 = stats.find(s => s.id === statIds[1]) || null
+
+  // Persist this user's chosen weather location (per-user, in dashboard_preferences).
+  async function saveWeatherLocation(loc) {
+    if (!user?.id) return
+    await supabase.from('dashboard_preferences').upsert(
+      {
+        user_id: user.id,
+        weather_location: (loc || '').trim() || null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id' }
+    )
+    refresh()
+  }
 
   if (loading)
     return (
@@ -487,7 +623,7 @@ export default function Dashboard() {
       {tab === 'dashboard' && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <WeatherWidget location={weatherLocation} />
+            <WeatherWidget location={myWeatherLocation} onSaveLocation={saveWeatherLocation} />
             <StatMiniGraph stat={stat1} />
             <StatMiniGraph stat={stat2} />
           </div>
@@ -658,7 +794,8 @@ function DashboardSettings({ prefs, stats, userId, isAdmin, weatherLocation, set
         {isAdmin ? (
           <>
             <p className="text-xs text-gray-500 mb-4">
-              The company-wide location shown in the dashboard weather widget. Enter a city, e.g.{' '}
+              The company-wide default weather location. Each user can override it on their own
+              dashboard using the pencil on the weather widget. Enter a city, e.g.{' '}
               <em>Anaheim, CA</em>, or a ZIP code.
             </p>
             <div className="flex items-center gap-3 flex-wrap">
