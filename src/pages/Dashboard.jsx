@@ -18,6 +18,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useCachedData } from '../lib/useCachedData'
 import AddEmployeeModal from '../components/AddEmployeeModal'
 import CoursePlayer from '../components/lms/CoursePlayer'
+import QuickEstimateModal from '../components/QuickEstimateModal'
 import {
   LineChart,
   Line,
@@ -34,7 +35,7 @@ const FG = '#3A5038' // forest green
 // (auto-opening modals, the multi-step Quick Estimate flow) follows in later
 // batches.
 const QUICK_LINKS = [
-  { label: 'Quick Estimate', icon: '📝', to: '/clients' },
+  { label: 'Quick Estimate', icon: '📝', key: 'quick-estimate' },
   { label: 'Quick Bid', icon: '📋', to: '/bids' },
   { label: 'Quick Job Schedule', icon: '📅', to: '/jobs?tab=schedule&addSchedule=1' },
   { label: 'Quick Daily Log', icon: '🗒️', to: '/daily-logs?new=1' },
@@ -552,6 +553,7 @@ export default function Dashboard() {
   const [showAddEmp, setShowAddEmp] = useState(false)
   const [showTraining, setShowTraining] = useState(false)
   const [trainingAssignment, setTrainingAssignment] = useState(null)
+  const [showQuickEst, setShowQuickEst] = useState(false)
 
   const { data, loading, refresh } = useCachedData(
     user?.id ? `dashboard:${user.id}` : 'dashboard:anon',
@@ -638,6 +640,7 @@ export default function Dashboard() {
                   onClick={() => {
                     if (q.key === 'add-employee') setShowAddEmp(true)
                     else if (q.key === 'continue-training') setShowTraining(true)
+                    else if (q.key === 'quick-estimate') setShowQuickEst(true)
                     else navigate(q.to)
                   }}
                   className="flex flex-col items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-3 py-4 hover:border-green-300 hover:bg-green-50 transition-colors"
@@ -675,6 +678,7 @@ export default function Dashboard() {
               onClose={() => setTrainingAssignment(null)}
             />
           )}
+          {showQuickEst && <QuickEstimateModal onClose={() => setShowQuickEst(false)} />}
         </>
       )}
 
