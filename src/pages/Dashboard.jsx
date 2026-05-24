@@ -35,13 +35,13 @@ const FG = '#3A5038' // forest green
 // batches.
 const QUICK_LINKS = [
   { label: 'Quick Estimate', icon: '📝', to: '/clients' },
-  { label: 'New Bid', icon: '📋', to: '/bids' },
-  { label: 'Add Schedule', icon: '📅', to: '/jobs?tab=schedule&addSchedule=1' },
-  { label: 'Daily Log', icon: '🗒️', to: '/daily-logs?new=1' },
+  { label: 'Quick Bid', icon: '📋', to: '/bids' },
+  { label: 'Quick Job Schedule', icon: '📅', to: '/jobs?tab=schedule&addSchedule=1' },
+  { label: 'Quick Daily Log', icon: '🗒️', to: '/daily-logs?new=1' },
   { label: 'Continue Training', icon: '🎓', key: 'continue-training' },
-  { label: 'Add Employee', icon: '👤', key: 'add-employee' },
-  { label: 'Add Vendor / Sub', icon: '🚜', to: '/portal/subs' },
-  { label: 'Add Statistic', icon: '📈', to: '/statistics' },
+  { label: 'Quick Add Employee', icon: '👤', key: 'add-employee' },
+  { label: 'Quick Add Vendor/Sub', icon: '🚜', to: '/portal/subs' },
+  { label: 'Quick Add Statistic', icon: '📈', to: '/statistics' },
 ]
 
 // ── WMO weather codes → [emoji, label] ───────────────────────────────────────
@@ -446,7 +446,7 @@ export default function Dashboard() {
   const isAdmin = data?.role === 'admin' || data?.role === 'super_admin'
   const positions = data?.positions || []
 
-  const statIds = prefs.stat_ids || []
+  const statIds = (prefs.stat_ids || []).map(Number)
   const stat1 = stats.find(s => s.id === statIds[0]) || null
   const stat2 = stats.find(s => s.id === statIds[1]) || null
 
@@ -574,7 +574,8 @@ function DashboardSettings({ prefs, stats, userId, isAdmin, weatherLocation, set
     if (!userId) return
     setSavingStats(true)
     setStatsMsg('')
-    const stat_ids = [s1, s2].filter(Boolean)
+    // Stat ids are integers — coerce so they land in the bigint[] column.
+    const stat_ids = [s1, s2].filter(Boolean).map(Number)
     const { error } = await supabase
       .from('dashboard_preferences')
       .upsert(

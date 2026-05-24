@@ -210,10 +210,15 @@ export default function DailyLogs({
       setError('Please add notes or at least one photo.')
       return
     }
+    if (!editLog && selectedJob === 'all' && !form.job_id) {
+      setError('Please select a job for this daily log.')
+      return
+    }
     setSaving(true)
     setError('')
 
-    const jobId = selectedJob !== 'all' ? selectedJob : null
+    // In all-jobs mode the job comes from the modal's Job picker.
+    const jobId = selectedJob !== 'all' ? selectedJob : form.job_id || null
 
     try {
       let logId
@@ -549,6 +554,61 @@ function LogCard({ log, author, jobName, onEdit, onDelete, onPhotoClick }) {
   )
 }
 
+// ── Open-jobs combobox for the daily-log Job field ──────────
+// Type-to-search picker limited to open jobs (active / on-hold / unstatused).
+function JobPicker({ jobs, value, onChange }) {
+  const jobName = j => j.name || j.client_name || 'Untitled job'
+  const openJobs = jobs.filter(
+    j => j.status === 'active' || j.status === 'on_hold' || !j.status
+  )
+  const selected = jobs.find(j => j.id === value)
+  const [query, setQuery] = useState(selected ? jobName(selected) : '')
+  const [open, setOpen] = useState(false)
+
+  const q = query.trim().toLowerCase()
+  const matches = q ? openJobs.filter(j => jobName(j).toLowerCase().includes(q)) : openJobs
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={query}
+        onChange={e => {
+          setQuery(e.target.value)
+          setOpen(true)
+          if (!e.target.value.trim()) onChange(null)
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder="Search open jobs…"
+        className="input text-sm w-full"
+      />
+      {open && (
+        <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+          {matches.length === 0 ? (
+            <p className="px-3 py-2 text-xs text-gray-400">No open jobs match.</p>
+          ) : (
+            matches.slice(0, 60).map(j => (
+              <button
+                type="button"
+                key={j.id}
+                onMouseDown={() => {
+                  onChange(j.id)
+                  setQuery(jobName(j))
+                  setOpen(false)
+                }}
+                className="block w-full text-left px-3 py-1.5 text-sm hover:bg-green-50"
+              >
+                {jobName(j)}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── New/Edit Log Modal ───────────────────────────────────────
 function LogModal({
   form,
@@ -609,18 +669,11 @@ function LogModal({
               {selectedJob === 'all' && (
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Job</label>
-                  <select
-                    value={form.job_id || ''}
-                    onChange={e => setForm(f => ({ ...f, job_id: e.target.value || null }))}
-                    className="input text-sm w-full"
-                  >
-                    <option value="">— select job —</option>
-                    {jobs.map(j => (
-                      <option key={j.id} value={j.id}>
-                        {j.name || j.client_name}
-                      </option>
-                    ))}
-                  </select>
+                  <JobPicker
+                    jobs={jobs}
+                    value={form.job_id}
+                    onChange={id => setForm(f => ({ ...f, job_id: id }))}
+                  />
                 </div>
               )}
 
