@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useCachedData } from '../lib/useCachedData'
+import { resolveStatSeries } from '../lib/equationStat'
 import AddEmployeeModal from '../components/AddEmployeeModal'
 import CoursePlayer from '../components/lms/CoursePlayer'
 import QuickEstimateModal from '../components/QuickEstimateModal'
@@ -41,7 +42,7 @@ const QUICK_LINKS = [
   { label: 'Quick Daily Log', icon: '🗒️', to: '/daily-logs?new=1' },
   { label: 'Continue Training', icon: '🎓', key: 'continue-training' },
   { label: 'Quick Add Employee', icon: '👤', key: 'add-employee' },
-  { label: 'Quick Add Vendor/Sub', icon: '🚜', to: '/portal/subs?new=sub' },
+  { label: 'Quick Add Vendor/Sub', icon: '🚜', key: 'add-vendor' },
   { label: 'Quick Add Statistic', icon: '📈', to: '/statistics?new=1' },
 ]
 
@@ -331,7 +332,7 @@ function WeatherWidget({ location, onSaveLocation }) {
 // ═════════════════════════════════════════════════════════════════════════════
 // STAT MINI-GRAPH — a small trend line for one statistic from the stat system.
 // ═════════════════════════════════════════════════════════════════════════════
-function StatMiniGraph({ stat }) {
+function StatMiniGraph({ stat, allStats = [] }) {
   const [points, setPoints] = useState(null)
 
   useEffect(() => {
@@ -341,15 +342,11 @@ function StatMiniGraph({ stat }) {
     }
     let alive = true
     setPoints(null)
-    supabase
-      .from('statistic_values')
-      .select('period_date, value')
-      .eq('statistic_id', stat.id)
-      .order('period_date', { ascending: true })
-      .then(({ data }) => {
+    // resolveStatSeries handles stored stats AND computed equation stats.
+    resolveStatSeries(stat, allStats)
+      .then(series => {
         if (!alive) return
-        const rows = (data || [])
-          .filter(r => r.period_date != null && r.value != null)
+        const rows = series
           .slice(-26) // trailing ~6 months of weekly points
           .map(r => ({
             value: Number(r.value),
@@ -360,10 +357,13 @@ function StatMiniGraph({ stat }) {
           }))
         setPoints(rows)
       })
+      .catch(() => {
+        if (alive) setPoints([])
+      })
     return () => {
       alive = false
     }
-  }, [stat?.id])
+  }, [stat?.id, allStats])
 
   return (
     <div className="card">
@@ -527,7 +527,7 @@ async function fetchDashboardData(userId) {
     supabase.from('company_settings').select('id, weather_location').maybeSingle(),
     supabase
       .from('statistics')
-      .select('id, name, stat_category')
+      .select('id, name, stat_category, equation_parts')
       .eq('archived', false)
       .order('name'),
     supabase.from('profiles').select('role').eq('id', userId).maybeSingle(),
@@ -554,6 +554,7 @@ export default function Dashboard() {
   const [showTraining, setShowTraining] = useState(false)
   const [trainingAssignment, setTrainingAssignment] = useState(null)
   const [showQuickEst, setShowQuickEst] = useState(false)
+  const [showVendorChoose, setShowVendorChoose] = useState(false)
 
   const { data, loading, refresh } = useCachedData(
     user?.id ? `dashboard:${user.id}` : 'dashboard:anon',
@@ -626,8 +627,8 @@ export default function Dashboard() {
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <WeatherWidget location={myWeatherLocation} onSaveLocation={saveWeatherLocation} />
-            <StatMiniGraph stat={stat1} />
-            <StatMiniGraph stat={stat2} />
+            <StatMiniGraph stat={stat1} allStats={stats} />
+            <StatMiniGraph stat={stat2} allStats={stats} />
           </div>
 
           {/* Quick Links */}
@@ -641,6 +642,7 @@ export default function Dashboard() {
                     if (q.key === 'add-employee') setShowAddEmp(true)
                     else if (q.key === 'continue-training') setShowTraining(true)
                     else if (q.key === 'quick-estimate') setShowQuickEst(true)
+                    else if (q.key === 'add-vendor') setShowVendorChoose(true)
                     else navigate(q.to)
                   }}
                   className="flex flex-col items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-gray-50 px-3 py-4 hover:border-green-300 hover:bg-green-50 transition-colors"
@@ -679,6 +681,45 @@ export default function Dashboard() {
             />
           )}
           {showQuickEst && <QuickEstimateModal onClose={() => setShowQuickEst(false)} />}
+
+          {showVendorChoose && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div
+                className="absolute inset-0 bg-black/40"
+                onClick={() => setShowVendorChoose(false)}
+              />
+              <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-xs mx-4 p-6">
+                <h2 className="text-base font-bold text-gray-900 mb-1">Add New</h2>
+                <p className="text-xs text-gray-500 mb-4">Subcontractor or vendor?</p>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => {
+                      setShowVendorChoose(false)
+                      navigate('/portal/subs?new=sub')
+                    }}
+                    className="block w-full rounded-xl border border-gray-200 px-4 py-3 text-left text-sm font-semibold text-gray-800 hover:border-green-300 hover:bg-green-50"
+                  >
+                    🚜 Subcontractor
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowVendorChoose(false)
+                      navigate('/portal/subs?new=vendor')
+                    }}
+                    className="block w-full rounded-xl border border-gray-200 px-4 py-3 text-left text-sm font-semibold text-gray-800 hover:border-green-300 hover:bg-green-50"
+                  >
+                    🛒 Vendor
+                  </button>
+                </div>
+                <button
+                  onClick={() => setShowVendorChoose(false)}
+                  className="mt-4 w-full py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
 
