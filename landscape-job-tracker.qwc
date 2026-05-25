@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<QBWCXML>
+  <AppName>Landscape Job Tracker</AppName>
+  <AppID></AppID>
+  <AppURL>https://jjlnpywpmoukgwmwczbz.supabase.co/functions/v1/qbwc</AppURL>
+  <AppDescription>Two-way sync of customers, invoices, payments, bills, and the chart of accounts between Landscape Job Tracker and QuickBooks Desktop.</AppDescription>
+  <AppSupport>https://jjlnpywpmoukgwmwczbz.supabase.co/functions/v1/qbwc</AppSupport>
+  <UserName>qbwc-sync</UserName>
+  <OwnerID>{2D8E4F3A-7B6C-4A1D-9E5F-3C2B1A0D9E8F}</OwnerID>
+  <FileID>{6F5E4D3C-2B1A-4938-8D7C-6E5F4A3B2C1D}</FileID>
+  <QBType>QBFS</QBType>
+  <Scheduler>
+    <RunEveryNMinutes>60</RunEveryNMinutes>
+  </Scheduler>
+  <IsReadOnly>false</IsReadOnly>
+</QBWCXML>
