@@ -656,6 +656,37 @@ const log_feature_request_run: ToolExecutor = async (args, ctx) => {
   }).select('id').single()
   if (error) throw new Error('Could not save request: ' + error.message)
 
+  // Auto-attach every file the user uploaded in this conversation. Mirrors
+  // the rows in agent_message_attachments into feature_request_attachments
+  // so admins reviewing the ticket in Help center see them inline. Both
+  // tables reference the same object in the sam-attachments bucket — no
+  // file duplication. Non-fatal: a failure here just means the ticket
+  // lands without attachments, which is recoverable manually.
+  if (ctx.conversationId) {
+    try {
+      const { data: convAtts } = await sb
+        .from('agent_message_attachments')
+        .select('id, storage_path, file_name, mime_type, size_bytes, kind')
+        .eq('conversation_id', ctx.conversationId)
+      if (convAtts && convAtts.length) {
+        const toInsert = convAtts.map((a: any) => ({
+          feature_request_id:           row.id,
+          source_message_attachment_id: a.id,
+          user_id:                      ctx.userId,
+          storage_path:                 a.storage_path,
+          file_name:                    a.file_name,
+          mime_type:                    a.mime_type,
+          size_bytes:                   a.size_bytes,
+          kind:                         a.kind,
+        }))
+        const { error: attErr } = await sb.from('feature_request_attachments').insert(toInsert)
+        if (attErr) console.warn('feature_request_attachments insert failed:', attErr.message)
+      }
+    } catch (e) {
+      console.warn('feature_request_attachments copy failed:', e instanceof Error ? e.message : e)
+    }
+  }
+
   // Look up reporter profile — name for the admin notification's prose,
   // email for the reporter's own confirmation email below.
   let reporter = 'a user'

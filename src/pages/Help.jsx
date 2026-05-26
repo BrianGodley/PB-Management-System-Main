@@ -530,6 +530,11 @@ function SupportRow({
                   {r.body || <span className="text-gray-400 italic">No description provided.</span>}
                 </p>
 
+                {/* Attachments — auto-copied from the Sam conversation that
+                    led to this ticket. Lazy-loaded the first time the row
+                    is expanded so the index page stays fast. */}
+                <TicketAttachments featureRequestId={r.id} />
+
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-4 mb-1">
                   Notes from the team
                 </p>
@@ -626,6 +631,119 @@ function DetailLine({ label, value }) {
       <span className="text-gray-500 font-semibold uppercase tracking-wide">{label}: </span>
       <span className="text-gray-800">{value}</span>
     </div>
+  )
+}
+
+// ── Ticket attachments — files auto-copied from the Sam chat ─────────────
+// One fetch per expand. Files live in the private sam-attachments bucket;
+// we mint 1-hour signed URLs so the admin can preview images inline and
+// click to download docs. RLS allows admins to read every file in that
+// bucket; non-admins only see their own.
+function TicketAttachments({ featureRequestId }) {
+  const [atts, setAtts] = useState(null) // null = loading, [] = empty, [...] = data
+  const [err, setErr] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('feature_request_attachments')
+          .select('id, storage_path, file_name, mime_type, size_bytes, kind, created_at')
+          .eq('feature_request_id', featureRequestId)
+          .order('created_at', { ascending: true })
+        if (cancelled) return
+        if (error) {
+          setErr(error.message)
+          setAtts([])
+          return
+        }
+        if (!data || data.length === 0) {
+          setAtts([])
+          return
+        }
+        // Sign each path so we can preview/download without exposing the bucket.
+        const signed = await Promise.all(
+          data.map(async a => {
+            const { data: s } = await supabase
+              .storage
+              .from('sam-attachments')
+              .createSignedUrl(a.storage_path, 3600)
+            return { ...a, signed_url: s?.signedUrl || null }
+          })
+        )
+        if (!cancelled) setAtts(signed)
+      } catch (e) {
+        if (!cancelled) {
+          setErr(e?.message || String(e))
+          setAtts([])
+        }
+      }
+    })()
+    return () => { cancelled = true }
+  }, [featureRequestId])
+
+  if (atts == null) {
+    return (
+      <p className="text-xs text-gray-400 mt-4">Loading attachments…</p>
+    )
+  }
+  if (atts.length === 0 && !err) return null
+
+  return (
+    <>
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-4 mb-1">
+        Attachments ({atts.length})
+      </p>
+      <div className="bg-white border border-gray-200 rounded-lg p-3 flex flex-wrap gap-2">
+        {err && (
+          <p className="text-xs text-red-600 w-full">{err}</p>
+        )}
+        {atts.map(a => <TicketAttachmentTile key={a.id} att={a} />)}
+      </div>
+    </>
+  )
+}
+
+function TicketAttachmentTile({ att }) {
+  const sizeStr =
+    att.size_bytes < 1024 ? `${att.size_bytes} B`
+    : att.size_bytes < 1024 * 1024 ? `${(att.size_bytes / 1024).toFixed(0)} KB`
+    : `${(att.size_bytes / 1024 / 1024).toFixed(1)} MB`
+
+  if (att.kind === 'image' && att.signed_url) {
+    return (
+      <a
+        href={att.signed_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block"
+        title={`${att.file_name} (${sizeStr})`}
+      >
+        <img
+          src={att.signed_url}
+          alt={att.file_name}
+          className="w-24 h-24 rounded-lg object-cover border border-gray-200 hover:border-green-600 transition-colors"
+        />
+      </a>
+    )
+  }
+  return (
+    <a
+      href={att.signed_url || '#'}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-2 border border-gray-200 rounded-lg px-2.5 py-1.5 hover:bg-gray-50 hover:border-green-600 transition-colors"
+      title={`${att.file_name} (${sizeStr})`}
+    >
+      <span className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-500 flex-shrink-0">
+        {att.kind === 'pdf' ? 'PDF' : att.kind === 'office' ? 'DOC' : 'FILE'}
+      </span>
+      <div className="min-w-0 max-w-[180px]">
+        <p className="text-xs text-gray-800 truncate">{att.file_name}</p>
+        <p className="text-[10px] text-gray-400">{sizeStr} · click to open</p>
+      </div>
+    </a>
   )
 }
 

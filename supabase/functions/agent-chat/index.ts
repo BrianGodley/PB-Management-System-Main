@@ -163,6 +163,124 @@ async function saveMessage(
   return data.id as string
 }
 
+// ── Attachments ───────────────────────────────────────────────────────────
+// Incoming attachment shape from the client. Files are already uploaded
+// to the sam-attachments bucket (path inside `storage_path`); we just
+// persist the metadata and pull bytes when assembling Claude blocks.
+type AttachmentInput = {
+  storage_path: string
+  file_name:    string
+  mime_type:    string
+  size_bytes:   number
+  kind:         'image' | 'pdf' | 'office' | 'other'
+}
+
+const ATTACH_MAX_BYTES = 25 * 1024 * 1024
+
+function isAcceptedAttachment(a: any): a is AttachmentInput {
+  return (
+    a &&
+    typeof a.storage_path === 'string' && a.storage_path.length > 0 &&
+    typeof a.file_name === 'string' &&
+    typeof a.mime_type === 'string' &&
+    typeof a.size_bytes === 'number' && a.size_bytes <= ATTACH_MAX_BYTES &&
+    ['image','pdf','office','other'].includes(a.kind)
+  )
+}
+
+// Insert one agent_message_attachments row per uploaded file. Rows link
+// back to both the conversation and the user message that carried them.
+async function persistMessageAttachments(
+  admin: ReturnType<typeof adminClient>,
+  conversationId: string,
+  messageId: string,
+  userId: string,
+  attachments: AttachmentInput[],
+) {
+  if (!attachments.length) return
+  const rows = attachments.map(a => ({
+    message_id:      messageId,
+    conversation_id: conversationId,
+    user_id:         userId,
+    storage_path:    a.storage_path,
+    file_name:       a.file_name,
+    mime_type:       a.mime_type,
+    size_bytes:      a.size_bytes,
+    kind:            a.kind,
+  }))
+  const { error } = await admin.from('agent_message_attachments').insert(rows)
+  if (error) console.warn('[agent-chat] attachment insert failed:', error.message)
+}
+
+// Pull a file out of the sam-attachments bucket and base64-encode it for
+// inclusion in a Claude message block. Returns null on failure so a single
+// bad file doesn't break the whole chat.
+async function fetchAttachmentAsBase64(
+  admin: ReturnType<typeof adminClient>,
+  storagePath: string,
+): Promise<string | null> {
+  const { data, error } = await admin.storage.from('sam-attachments').download(storagePath)
+  if (error || !data) {
+    console.warn(`[agent-chat] download failed: ${storagePath}`, error?.message)
+    return null
+  }
+  const buf = new Uint8Array(await data.arrayBuffer())
+  // Chunked base64 — avoid blowing the stack on large files.
+  let bin = ''
+  const CHUNK = 0x8000
+  for (let i = 0; i < buf.length; i += CHUNK) {
+    bin += String.fromCharCode(...buf.subarray(i, i + CHUNK))
+  }
+  return btoa(bin)
+}
+
+// Build the user-message `content` array Claude expects, given the plain
+// text and any image/PDF attachments. Images and PDFs are sent inline as
+// base64 source blocks; Office docs are mentioned in text only (Claude has
+// no native Office reader — the doc is still saved + visible to admins).
+async function buildUserMessageBlocks(
+  admin: ReturnType<typeof adminClient>,
+  text: string,
+  attachments: AttachmentInput[],
+): Promise<Array<any>> {
+  const blocks: Array<any> = []
+
+  // 1) Images first — they read nicely above the text in Claude's reasoning.
+  for (const a of attachments) {
+    if (a.kind !== 'image') continue
+    const b64 = await fetchAttachmentAsBase64(admin, a.storage_path)
+    if (!b64) continue
+    blocks.push({
+      type: 'image',
+      source: { type: 'base64', media_type: a.mime_type, data: b64 },
+    })
+  }
+
+  // 2) PDFs as document blocks (Claude natively reads them).
+  for (const a of attachments) {
+    if (a.kind !== 'pdf') continue
+    const b64 = await fetchAttachmentAsBase64(admin, a.storage_path)
+    if (!b64) continue
+    blocks.push({
+      type: 'document',
+      source: { type: 'base64', media_type: 'application/pdf', data: b64 },
+    })
+  }
+
+  // 3) Office-doc note — Claude can't read them inline, but knowing they
+  //    exist lets Sam acknowledge them and route to the human admin.
+  const officeNames = attachments.filter(a => a.kind === 'office').map(a => a.file_name)
+  const otherNames  = attachments.filter(a => a.kind === 'other').map(a => a.file_name)
+  const trailingNote = [
+    officeNames.length ? `(Attached Office docs I can't read inline, but they're saved for the support team: ${officeNames.join(', ')})` : '',
+    otherNames.length  ? `(Other attachments saved for the support team: ${otherNames.join(', ')})` : '',
+  ].filter(Boolean).join('\n')
+
+  const finalText = trailingNote ? `${text}\n\n${trailingNote}` : text
+  blocks.push({ type: 'text', text: finalText })
+  return blocks
+}
+
 async function logToolCall(
   admin: ReturnType<typeof adminClient>,
   conversationId: string,
@@ -287,17 +405,29 @@ serve(async (req: Request) => {
     const { userId, jwt } = await authFromRequest(req)
     const body = await req.json().catch(() => ({}))
     const message = (body?.message ?? '').toString().trim()
-    if (!message) return json(400, { error: 'message is required' })
+    const rawAttachments = Array.isArray(body?.attachments) ? body.attachments : []
+    const attachments: AttachmentInput[] = rawAttachments.filter(isAcceptedAttachment)
+    // Need text OR at least one attachment.
+    if (!message && attachments.length === 0) {
+      return json(400, { error: 'message or attachments are required' })
+    }
 
     const admin = adminClient()
     const conversationId = await getOrCreateConversation(admin, userId, body?.conversation_id)
     const history        = await loadHistory(admin, conversationId)
 
+    // Build the rich content blocks (text + image/PDF) for this turn.
+    const userBlocks = await buildUserMessageBlocks(admin, message, attachments)
+
     // Save the user's turn before calling the model so it survives a crash.
-    await saveMessage(admin, conversationId, 'user', message, [
-      { type: 'text', text: message },
-    ])
-    history.push({ role: 'user', content: message })
+    // We store text-only blocks in `raw` (no base64 in the DB); attachment
+    // metadata lives in agent_message_attachments, keyed by message_id.
+    const rawForStorage = [{ type: 'text', text: message }]
+    const userMessageId = await saveMessage(admin, conversationId, 'user', message, rawForStorage)
+    if (attachments.length > 0) {
+      await persistMessageAttachments(admin, conversationId, userMessageId, userId, attachments)
+    }
+    history.push({ role: 'user', content: userBlocks })
 
     // Origin of the browser making the chat request — preferred Origin
     // header, falling back to extracting host from Referer. Used by tools
