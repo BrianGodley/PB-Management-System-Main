@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LanguageContext'
 import { supabase } from '../lib/supabase'
 import SamChat from './SamChat'
+import ReportIssueModal from './ReportIssueModal'
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: '🏠' },
@@ -45,6 +46,8 @@ export default function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [showHelpMenu, setShowHelpMenu] = useState(false)
+  const [showReportIssue, setShowReportIssue] = useState(false)
   // The left nav's collapsed/expanded state is the user's choice alone:
   // it defaults to expanded and only changes when the user clicks the
   // collapse toggle — navigation (including entering /jobs) never touches
@@ -97,6 +100,7 @@ export default function Layout() {
   const [avatarUrl, setAvatarUrl] = useState(null)
   const [companyLogoUrl, setCompanyLogoUrl] = useState(null)
   const userMenuRef = useRef(null)
+  const helpMenuRef = useRef(null)
   const mainMenuRef = useRef(null)
 
   // Fetch profile (admin status + avatar)
@@ -184,6 +188,16 @@ export default function Layout() {
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
+
+  // Close help menu on outside click
+  useEffect(() => {
+    if (!showHelpMenu) return
+    function handleClick(e) {
+      if (helpMenuRef.current && !helpMenuRef.current.contains(e.target)) setShowHelpMenu(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showHelpMenu])
 
   // Close main menu on outside click
   useEffect(() => {
@@ -281,15 +295,57 @@ export default function Layout() {
               🛡️ <span className="hidden sm:inline">Admin</span>
             </Link>
 
-            {/* Help / Support — opens the user's tickets, docs, and videos. */}
-            <Link
-              to="/help"
-              style={isActive('/help') ? { backgroundColor: forestGreenDark } : {}}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-white/80 hover:text-white hover:bg-black/20 transition-colors"
-              title="Help & Support"
-            >
-              🛟 <span className="hidden sm:inline">Help</span>
-            </Link>
+            {/* Help dropdown — Documentation, Video Guides, Report Issue,
+                and (admins only) Help Desk for ticket administration. */}
+            <div ref={helpMenuRef} className="relative hidden sm:block">
+              <button
+                onClick={() => setShowHelpMenu(v => !v)}
+                style={isActive('/help') || isActive('/documentation') || isActive('/video-guides')
+                  ? { backgroundColor: forestGreenDark } : {}}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-white/80 hover:text-white hover:bg-black/20 transition-colors"
+                aria-haspopup="true"
+                aria-expanded={showHelpMenu}
+              >
+                🛟 <span className="hidden sm:inline">Help</span>
+                <span className="text-white/40 text-[10px]">▾</span>
+              </button>
+              {showHelpMenu && (
+                <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-50">
+                  <Link
+                    to="/documentation"
+                    onClick={() => setShowHelpMenu(false)}
+                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    📘 Documentation
+                  </Link>
+                  <Link
+                    to="/video-guides"
+                    onClick={() => setShowHelpMenu(false)}
+                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    🎬 Video Guides
+                  </Link>
+                  <button
+                    onClick={() => { setShowHelpMenu(false); setShowReportIssue(true) }}
+                    className="w-full text-left flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    🎫 Report Issue
+                  </button>
+                  {isAdmin && (
+                    <>
+                      <div className="border-t border-gray-100 my-1" />
+                      <Link
+                        to="/help"
+                        onClick={() => setShowHelpMenu(false)}
+                        className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                      >
+                        🛟 Help Desk
+                      </Link>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* User avatar dropdown — desktop only */}
             <div
@@ -507,6 +563,15 @@ export default function Layout() {
             </button>
           </div>
         </>
+      )}
+
+      {/* Report Issue modal — opened from the Help dropdown. */}
+      {showReportIssue && user && (
+        <ReportIssueModal
+          user={user}
+          onClose={() => setShowReportIssue(false)}
+          onCreated={() => setShowReportIssue(false)}
+        />
       )}
 
     </div>

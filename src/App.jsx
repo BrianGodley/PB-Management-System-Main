@@ -42,6 +42,8 @@ const MasterEquipment = lazy(() => import('./pages/MasterEquipment'))
 const EquipmentTracking = lazy(() => import('./pages/EquipmentTracking'))
 const OrgChart = lazy(() => import('./pages/OrgChart'))
 const Help = lazy(() => import('./pages/Help'))
+const Documentation = lazy(() => import('./pages/Documentation'))
+const VideoGuides = lazy(() => import('./pages/VideoGuides'))
 const PortalLogin = lazy(() => import('./portal/PortalLogin'))
 const PortalActivate = lazy(() => import('./portal/PortalActivate'))
 const PortalShell = lazy(() => import('./portal/PortalShell'))
@@ -143,6 +145,8 @@ function AppRoutes() {
           <Route path="equipment-tracking" element={<EquipmentTracking />} />
           <Route path="org-chart" element={<OrgChart />} />
           <Route path="help" element={<Help />} />
+          <Route path="documentation" element={<Documentation />} />
+          <Route path="video-guides" element={<VideoGuides />} />
         </Route>
       </Routes>
       </Suspense>

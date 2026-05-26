@@ -15,7 +15,7 @@
 //   2. Docs   — placeholder, "Coming soon".
 //   3. Videos — placeholder, "Coming soon".
 // ─────────────────────────────────────────────────────────────────────────────
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { sendFeedbackStatusEmail } from '../lib/notify'
@@ -63,9 +63,9 @@ const PRIORITY_STYLE = {
 }
 
 const TABS = [
-  { key: 'tickets', label: 'Support Tickets', icon: '🎫' },
-  { key: 'docs', label: 'Docs', icon: '📘' },
-  { key: 'videos', label: 'Videos', icon: '🎬' },
+  { key: 'tickets', label: 'Support Tickets',      icon: '🎫' },
+  { key: 'docs',    label: 'Manage Support Docs',  icon: '📘' },
+  { key: 'videos',  label: 'Manage Support Videos', icon: '🎬' },
 ]
 
 // ── Note parsing/serializing ────────────────────────────────────────────────
@@ -104,17 +104,73 @@ function serializeNotes(notes) {
 
 export default function Help() {
   const [tab, setTab] = useState('tickets')
+  const [stats, setStats] = useState({ handled: 0, avgDays: null })
+
+  // Top-of-page stat boxes — tickets handled (closed status) and avg
+  // completion time. Computed across ALL tickets, not just the current
+  // user's; this page is admin-facing in practice.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('feature_requests')
+          .select('status, created_at, updated_at')
+          .in('status', ['done', 'declined'])
+          .limit(2000)
+        if (cancelled || error) return
+        const rows = data || []
+        const handled = rows.length
+        if (handled === 0) {
+          setStats({ handled: 0, avgDays: null })
+          return
+        }
+        let totalMs = 0, counted = 0
+        for (const r of rows) {
+          if (r.created_at && r.updated_at) {
+            const ms = new Date(r.updated_at).getTime() - new Date(r.created_at).getTime()
+            if (ms > 0) { totalMs += ms; counted += 1 }
+          }
+        }
+        const avgDays = counted > 0 ? (totalMs / counted) / (1000 * 60 * 60 * 24) : null
+        setStats({ handled, avgDays })
+      } catch (e) {
+        if (!cancelled) console.warn('Help Desk stats failed:', e)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
       {/* Header */}
       <div className="mb-5">
         <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-          <span>🛟</span> Help &amp; Support
+          <span>🛟</span> Help Desk
         </h1>
         <p className="text-sm text-gray-500 mt-1">
-          Track your submitted requests and find help resources.
+          Triage tickets, manage help docs and training videos.
         </p>
+      </div>
+
+      {/* Stat boxes — matches the Bids layout pattern. */}
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 mb-6 mt-4">
+        <div className="card text-center px-2 py-3 sm:px-4 sm:py-4 min-w-0">
+          <p className="text-[10px] sm:text-xs text-gray-500 mb-1 truncate">Tickets Handled</p>
+          <p className="font-bold text-gray-900 text-sm sm:text-lg leading-tight">
+            {stats.handled.toLocaleString()}
+          </p>
+        </div>
+        <div className="card text-center px-2 py-3 sm:px-4 sm:py-4 min-w-0">
+          <p className="text-[10px] sm:text-xs text-gray-500 mb-1 truncate">Avg Time to Complete</p>
+          <p className="font-bold text-green-700 text-sm sm:text-lg leading-tight">
+            {stats.avgDays == null
+              ? '—'
+              : stats.avgDays < 1
+                ? `${(stats.avgDays * 24).toFixed(1)} hr`
+                : `${stats.avgDays.toFixed(1)} days`}
+          </p>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -139,20 +195,8 @@ export default function Help() {
 
       {/* Content */}
       {tab === 'tickets' && <SupportTickets />}
-      {tab === 'docs' && (
-        <ComingSoon
-          icon="📘"
-          label="Documentation"
-          copy="Step-by-step guides for every PBS module will live here."
-        />
-      )}
-      {tab === 'videos' && (
-        <ComingSoon
-          icon="🎬"
-          label="Training Videos"
-          copy="Short walkthrough videos for common PBS workflows are on the way."
-        />
-      )}
+      {tab === 'docs'    && <ManageResourcesTab kind="docs" />}
+      {tab === 'videos'  && <ManageResourcesTab kind="videos" />}
     </div>
   )
 }
@@ -1122,6 +1166,406 @@ function StatusChangeModal({ ticket, targetBucket, onClose, onSaved }) {
             className="text-xs font-semibold text-white px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
           >
             {saveLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// ManageResourcesTab — admin UI for help_doc_categories / help_videos etc.
+//
+// Single component drives both "Manage Support Docs" and "Manage Support
+// Videos" via the `kind` prop. The DB tables are parallel:
+//   docs:   help_doc_categories,   help_docs   (storage path under docs/)
+//   videos: help_video_categories, help_videos (storage path under videos/)
+// Both live in the `help-resources` bucket. Admins can:
+//   • Create / rename / delete categories
+//   • Upload files into a category with a friendly title + description
+//   • Reorder, edit metadata, delete items
+//   • Read-only badge for non-admins (gate via profiles.role check)
+// ─────────────────────────────────────────────────────────────────────────
+function ManageResourcesTab({ kind }) {
+  const { user } = useAuth()
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [categories, setCategories] = useState([])
+  const [items, setItems]           = useState([]) // all items for visible cats
+  const [loading, setLoading]       = useState(true)
+  const [newCatName, setNewCatName] = useState('')
+  const [uploadFor, setUploadFor]   = useState(null) // category id or null
+  const [editItem, setEditItem]     = useState(null) // {id,title,description} or null
+
+  const CONFIG = kind === 'videos'
+    ? {
+        categoriesTable: 'help_video_categories',
+        itemsTable:      'help_videos',
+        kindLabel:       'video',
+        kindLabelPlural: 'videos',
+        pathPrefix:      'videos',
+        acceptMime:      'video/mp4,video/quicktime,video/webm,video/x-m4v,.mp4,.mov,.webm,.m4v',
+        helpText:        'MP4, MOV, WebM (up to 500 MB each).',
+      }
+    : {
+        categoriesTable: 'help_doc_categories',
+        itemsTable:      'help_docs',
+        kindLabel:       'doc',
+        kindLabelPlural: 'docs',
+        pathPrefix:      'docs',
+        acceptMime:
+          'application/pdf,application/msword,' +
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document,' +
+          'application/vnd.ms-excel,' +
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,' +
+          'application/vnd.ms-powerpoint,' +
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation,' +
+          'image/jpeg,image/png,image/webp,' +
+          '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.png,.webp',
+        helpText:        'PDF, Word, Excel, PowerPoint, or images (up to 500 MB each).',
+      }
+
+  useEffect(() => {
+    if (!user?.id) return
+    let alive = true
+    ;(async () => {
+      const { data } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+      if (alive) setIsAdmin(['admin','super_admin'].includes(data?.role))
+    })()
+    return () => { alive = false }
+  }, [user?.id])
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const { data: cats } = await supabase
+      .from(CONFIG.categoriesTable).select('*').order('sort_order').order('name')
+    const { data: rows } = await supabase
+      .from(CONFIG.itemsTable).select('*').order('sort_order').order('created_at')
+    setCategories(cats || [])
+    setItems(rows || [])
+    setLoading(false)
+  }, [CONFIG.categoriesTable, CONFIG.itemsTable])
+
+  useEffect(() => { load() }, [load])
+
+  async function addCategory() {
+    const name = newCatName.trim()
+    if (!name) return
+    const sort_order = (categories[categories.length - 1]?.sort_order ?? -1) + 1
+    const { error } = await supabase.from(CONFIG.categoriesTable).insert({ name, sort_order })
+    if (error) { alert('Could not add category: ' + error.message); return }
+    setNewCatName('')
+    load()
+  }
+
+  async function renameCategory(cat) {
+    const name = prompt('Rename category', cat.name)
+    if (!name || name === cat.name) return
+    const { error } = await supabase.from(CONFIG.categoriesTable).update({ name: name.trim() }).eq('id', cat.id)
+    if (error) { alert(error.message); return }
+    load()
+  }
+
+  async function deleteCategory(cat) {
+    const itemCount = items.filter(i => i.category_id === cat.id).length
+    if (!confirm(`Delete category "${cat.name}"? ${itemCount ? `${itemCount} item(s) inside will become uncategorised.` : ''}`)) return
+    const { error } = await supabase.from(CONFIG.categoriesTable).delete().eq('id', cat.id)
+    if (error) { alert(error.message); return }
+    load()
+  }
+
+  async function deleteItem(it) {
+    if (!confirm(`Delete "${it.title}"? This removes the file from storage.`)) return
+    // Best-effort storage cleanup — RLS allows admins to delete.
+    await supabase.storage.from('help-resources').remove([it.storage_path]).catch(() => {})
+    const { error } = await supabase.from(CONFIG.itemsTable).delete().eq('id', it.id)
+    if (error) { alert(error.message); return }
+    load()
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="text-center py-12 bg-white border border-gray-200 rounded-xl">
+        <p className="text-4xl mb-3">🔒</p>
+        <p className="text-sm text-gray-500">
+          Managing {CONFIG.kindLabelPlural} is restricted to admins.
+        </p>
+      </div>
+    )
+  }
+
+  const itemsByCat = {}
+  for (const it of items) {
+    const k = it.category_id || 'uncat'
+    if (!itemsByCat[k]) itemsByCat[k] = []
+    itemsByCat[k].push(it)
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Add-category row */}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={newCatName}
+          onChange={e => setNewCatName(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') addCategory() }}
+          placeholder="New category name…"
+          className="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2"
+        />
+        <button
+          onClick={addCategory}
+          disabled={!newCatName.trim()}
+          className="px-4 py-2 text-sm font-semibold rounded-lg bg-green-700 text-white hover:bg-green-800 disabled:opacity-40"
+        >
+          + Add Category
+        </button>
+      </div>
+
+      {loading && <p className="text-sm text-gray-400 text-center py-6">Loading…</p>}
+
+      {!loading && categories.length === 0 && !items.length && (
+        <div className="text-center py-12 bg-white border border-dashed border-gray-300 rounded-xl">
+          <p className="text-sm text-gray-500">
+            No categories yet — add one above to get started.
+          </p>
+        </div>
+      )}
+
+      {/* Categories + items */}
+      {categories.map(cat => (
+        <div key={cat.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+            <p className="font-semibold text-gray-800">{cat.name}</p>
+            <div className="flex gap-2 items-center">
+              <button onClick={() => setUploadFor(cat.id)} className="text-xs font-semibold text-green-700 hover:underline">
+                + Upload {CONFIG.kindLabel}
+              </button>
+              <button onClick={() => renameCategory(cat)} className="text-xs text-gray-500 hover:text-gray-800">Rename</button>
+              <button onClick={() => deleteCategory(cat)} className="text-xs text-red-500 hover:text-red-700">Delete</button>
+            </div>
+          </div>
+          {(itemsByCat[cat.id] || []).length === 0 ? (
+            <p className="text-xs text-gray-400 px-4 py-3 italic">No {CONFIG.kindLabelPlural} in this category yet.</p>
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {itemsByCat[cat.id].map(it => (
+                <ResourceRow
+                  key={it.id}
+                  item={it}
+                  kind={kind}
+                  onEdit={() => setEditItem(it)}
+                  onDelete={() => deleteItem(it)}
+                />
+              ))}
+            </ul>
+          )}
+        </div>
+      ))}
+
+      {/* Uncategorised bucket — only shown when there's at least one orphan */}
+      {(itemsByCat['uncat'] || []).length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+            <p className="font-semibold text-gray-500 italic">Uncategorised</p>
+            <button onClick={() => setUploadFor(null)} className="text-xs font-semibold text-green-700 hover:underline">
+              + Upload {CONFIG.kindLabel}
+            </button>
+          </div>
+          <ul className="divide-y divide-gray-100">
+            {itemsByCat['uncat'].map(it => (
+              <ResourceRow
+                key={it.id}
+                item={it}
+                kind={kind}
+                onEdit={() => setEditItem(it)}
+                onDelete={() => deleteItem(it)}
+              />
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {uploadFor !== undefined && uploadFor !== null && (
+        <ResourceUploadModal
+          categoryId={uploadFor}
+          kind={kind}
+          config={CONFIG}
+          onClose={() => setUploadFor(null)}
+          onCreated={() => { setUploadFor(null); load() }}
+          user={user}
+        />
+      )}
+      {editItem && (
+        <ResourceEditModal
+          item={editItem}
+          config={CONFIG}
+          categories={categories}
+          onClose={() => setEditItem(null)}
+          onSaved={() => { setEditItem(null); load() }}
+        />
+      )}
+    </div>
+  )
+}
+
+function ResourceRow({ item, kind, onEdit, onDelete }) {
+  const sizeMb = (item.size_bytes / 1024 / 1024).toFixed(1)
+  return (
+    <li className="px-4 py-3 flex items-center gap-3 hover:bg-gray-50">
+      <span className="w-9 h-9 rounded bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-500 flex-shrink-0">
+        {kind === 'videos' ? 'VIDEO' : 'FILE'}
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-gray-800 truncate">{item.title}</p>
+        {item.description && (
+          <p className="text-xs text-gray-500 truncate">{item.description}</p>
+        )}
+        <p className="text-[10px] text-gray-400">{item.file_name} · {sizeMb} MB</p>
+      </div>
+      <button onClick={onEdit} className="text-xs text-gray-500 hover:text-gray-800">Edit</button>
+      <button onClick={onDelete} className="text-xs text-red-500 hover:text-red-700">Delete</button>
+    </li>
+  )
+}
+
+// Upload a new doc / video into a specific category (or uncategorised).
+function ResourceUploadModal({ categoryId, kind, config, onClose, onCreated, user }) {
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
+  const [file, setFile] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+
+  async function save() {
+    if (!title.trim() || !file) {
+      setErr('Title and file are both required.')
+      return
+    }
+    setSaving(true); setErr('')
+    try {
+      const safeName = file.name.replace(/[^\w.\-]+/g, '_').slice(0, 120)
+      const id = crypto.randomUUID()
+      const path = `${config.pathPrefix}/${id}_${safeName}`
+      const { error: upErr } = await supabase.storage
+        .from('help-resources')
+        .upload(path, file, { contentType: file.type, upsert: false })
+      if (upErr) throw new Error(upErr.message)
+      const { error: insErr } = await supabase.from(config.itemsTable).insert({
+        category_id:  categoryId,
+        title:        title.trim().slice(0, 200),
+        description:  description.trim().slice(0, 1000) || null,
+        storage_path: path,
+        file_name:    file.name,
+        mime_type:    file.type,
+        size_bytes:   file.size,
+        uploaded_by:  user.id,
+      })
+      if (insErr) throw new Error(insErr.message)
+      onCreated()
+    } catch (e) {
+      setErr(e?.message || 'Upload failed.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200" onClick={e => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-gray-800">Upload {config.kindLabel}</h3>
+          <button onClick={onClose} className="text-gray-400 text-xl leading-none">×</button>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Title</label>
+            <input type="text" value={title} onChange={e => setTitle(e.target.value)} maxLength={200}
+              className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2" autoFocus />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Description (optional)</label>
+            <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} maxLength={1000}
+              className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 resize-y" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">File</label>
+            <input type="file" accept={config.acceptMime} onChange={e => setFile(e.target.files?.[0] || null)} className="text-sm" />
+            <p className="text-[11px] text-gray-400 mt-1">{config.helpText}</p>
+          </div>
+          {err && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1.5">{err}</p>}
+        </div>
+        <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button onClick={save} disabled={saving || !title.trim() || !file}
+            className="px-5 py-2 text-sm rounded-lg bg-green-700 text-white font-semibold hover:bg-green-800 disabled:opacity-50">
+            {saving ? 'Uploading…' : 'Upload'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Edit metadata (title / description / category) of an existing item.
+// File itself is not replaced — delete + re-upload if a new file is needed.
+function ResourceEditModal({ item, config, categories, onClose, onSaved }) {
+  const [title, setTitle] = useState(item.title || '')
+  const [description, setDescription] = useState(item.description || '')
+  const [categoryId, setCategoryId] = useState(item.category_id || '')
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+
+  async function save() {
+    if (!title.trim()) { setErr('Title is required.'); return }
+    setSaving(true); setErr('')
+    try {
+      const { error } = await supabase.from(config.itemsTable).update({
+        title:        title.trim().slice(0, 200),
+        description:  description.trim().slice(0, 1000) || null,
+        category_id:  categoryId || null,
+        updated_at:   new Date().toISOString(),
+      }).eq('id', item.id)
+      if (error) throw new Error(error.message)
+      onSaved()
+    } catch (e) { setErr(e?.message || 'Save failed.') } finally { setSaving(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-gray-200" onClick={e => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-gray-800">Edit {config.kindLabel}</h3>
+          <button onClick={onClose} className="text-gray-400 text-xl leading-none">×</button>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Title</label>
+            <input type="text" value={title} onChange={e => setTitle(e.target.value)} maxLength={200}
+              className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2" autoFocus />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Description</label>
+            <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} maxLength={1000}
+              className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 resize-y" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-1">Category</label>
+            <select value={categoryId} onChange={e => setCategoryId(e.target.value)}
+              className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2">
+              <option value="">— Uncategorised —</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <p className="text-[11px] text-gray-400">
+            To replace the file itself, delete this item and upload a new one.
+          </p>
+          {err && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1.5">{err}</p>}
+        </div>
+        <div className="px-5 py-4 border-t border-gray-100 flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button onClick={save} disabled={saving || !title.trim()}
+            className="px-5 py-2 text-sm rounded-lg bg-green-700 text-white font-semibold hover:bg-green-800 disabled:opacity-50">
+            {saving ? 'Saving…' : 'Save'}
           </button>
         </div>
       </div>
