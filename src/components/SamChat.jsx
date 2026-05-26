@@ -85,8 +85,13 @@ export default function SamChat() {
   // Each entry: { id, file, previewUrl, kind } where previewUrl is a local
   // object URL good for the panel's lifetime.
   const [pending, setPending] = useState([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
   const scrollRef = useRef(null)
   const fileInputRef = useRef(null)
+  // Ref (not state) so flipping it doesn't trigger re-renders. Once we've
+  // hydrated history for this panel mount, we don't re-hydrate even if the
+  // user closes and re-opens — preserves any new-thread state they're in.
+  const historyLoadedRef = useRef(false)
 
   // Personalise the greeting once we know who the user is. Pulls full_name +
   // greeting_tagline from profiles. If the user has no profile row, we leave
@@ -123,6 +128,88 @@ export default function SamChat() {
     if (!scrollRef.current) return
     scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages, sending])
+
+  // History hydration — when the panel opens, fetch the user's most recent
+  // conversation and replay it (messages + attachments + signed URLs for
+  // image previews). Runs at most once per panel mount; New Thread resets
+  // the flag so the user can deliberately drop history.
+  //
+  // Tool-role messages (raw tool_result blocks Sam exchanges with the model)
+  // are filtered out — they have no display content and aren't useful in
+  // the visible chat.
+  useEffect(() => {
+    if (!open || !user?.id || historyLoadedRef.current) return
+    historyLoadedRef.current = true
+    let cancelled = false
+
+    ;(async () => {
+      setLoadingHistory(true)
+      try {
+        // Most recent conversation for this user.
+        const { data: conv, error: convErr } = await supabase
+          .from('agent_conversations')
+          .select('id')
+          .eq('user_id', user.id)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        if (cancelled || convErr || !conv) return
+
+        // Messages (cap to last 100 to keep render fast for long threads).
+        const { data: msgs, error: msgErr } = await supabase
+          .from('agent_messages')
+          .select('id, role, content, created_at')
+          .eq('conversation_id', conv.id)
+          .order('created_at', { ascending: true })
+          .limit(100)
+        if (cancelled || msgErr) return
+
+        // Attachments across the whole conversation, then grouped by msg.
+        const { data: atts } = await supabase
+          .from('agent_message_attachments')
+          .select('id, message_id, storage_path, file_name, mime_type, size_bytes, kind')
+          .eq('conversation_id', conv.id)
+        const attsByMsg = {}
+        for (const a of atts || []) {
+          if (!attsByMsg[a.message_id]) attsByMsg[a.message_id] = []
+          attsByMsg[a.message_id].push(a)
+        }
+
+        // Mint 1-hour signed URLs for image attachments so previews render
+        // inline. Docs don't need URLs at hydration time — AttachmentTile
+        // shows a pill regardless.
+        const imageAtts = (atts || []).filter(a => a.kind === 'image')
+        await Promise.all(
+          imageAtts.map(async a => {
+            const { data: signed } = await supabase
+              .storage
+              .from('sam-attachments')
+              .createSignedUrl(a.storage_path, 3600)
+            a.previewUrl = signed?.signedUrl || null
+          })
+        )
+
+        const rendered = (msgs || [])
+          .filter(m => m.role !== 'tool')
+          .map(m => ({
+            role:        m.role,
+            content:     m.content || '',
+            attachments: attsByMsg[m.id], // undefined if none
+          }))
+
+        if (cancelled || rendered.length === 0) return
+        setConversationId(conv.id)
+        setMessages(rendered)
+      } catch (e) {
+        // Non-fatal — leave the greeting in place.
+        console.warn('Sam history hydration failed:', e)
+      } finally {
+        if (!cancelled) setLoadingHistory(false)
+      }
+    })()
+
+    return () => { cancelled = true }
+  }, [open, user?.id])
 
   // ── File picker handlers ─────────────────────────────────────────────────
   // User clicked the paperclip / dropped files in. Validate each file
@@ -253,6 +340,10 @@ export default function SamChat() {
     // Drop any unsent attachments and revoke their preview URLs.
     pending.forEach(p => p.previewUrl && URL.revokeObjectURL(p.previewUrl))
     setPending([])
+    // Keep history-loaded ref true — clicking New is a deliberate fresh
+    // start; we don't want the next message to re-hydrate the old thread.
+    // Closing and re-opening the panel keeps this fresh thread.
+    historyLoadedRef.current = true
   }
 
   // Hide entirely when not signed in — Sam needs an auth context.
@@ -336,6 +427,11 @@ export default function SamChat() {
 
           {/* Messages */}
           <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-gray-50">
+            {loadingHistory && (
+              <div className="text-center text-[11px] text-gray-400 italic py-1">
+                Loading your previous conversation…
+              </div>
+            )}
             {messages.map((m, i) => (
               <div
                 key={i}
