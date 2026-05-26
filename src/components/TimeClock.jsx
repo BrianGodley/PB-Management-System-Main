@@ -97,6 +97,203 @@ function fmtHours(mins) {
   return `${Math.floor(mins / 60)}h ${mins % 60}m`
 }
 
+// ── GPS helpers ──────────────────────────────────────────────
+// Clock events capture the employee's GPS at the moment of clock-in / out,
+// compare it to the job's geocoded lat/lon (populated by the geocode-jobs
+// edge function), and flag the entry as off-site when the distance exceeds
+// ON_SITE_RADIUS_M. Off-site clock-ins are warned-but-allowed so a foreman
+// with a flaky signal isn't blocked from working.
+const ON_SITE_RADIUS_M = 402 // ~1/4 mile
+
+// Haversine distance between two lat/lon pairs, in meters.
+function distanceMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000
+  const toRad = d => (d * Math.PI) / 180
+  const dLat = toRad(lat2 - lat1)
+  const dLon = toRad(lon2 - lon1)
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2
+  return 2 * R * Math.asin(Math.sqrt(a))
+}
+
+// Format meters as a human-readable distance for confirm dialogs and badges.
+function fmtDistance(m) {
+  if (m == null) return ''
+  const ft = m * 3.28084
+  if (ft < 1000) return `${Math.round(ft)} ft`
+  return `${(ft / 5280).toFixed(2)} mi`
+}
+
+// Promise-wrapped navigator.geolocation with an 8s timeout. Resolves with
+// { ok: true, lat, lon, accuracy } on success or { ok: false, reason } on
+// denial / timeout / unsupported. Never rejects, so callers don't need
+// try/catch.
+function getCurrentPosition(timeoutMs = 8000) {
+  return new Promise(resolve => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      resolve({ ok: false, reason: 'unsupported' })
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      pos =>
+        resolve({
+          ok: true,
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        }),
+      err => resolve({ ok: false, reason: err?.message || 'denied' }),
+      { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 30000 }
+    )
+  })
+}
+
+// Fetch a job's cached lat/lon for distance comparison. Returns nulls if
+// the job hasn't been geocoded yet (in which case we record GPS but skip
+// the on-site comparison).
+async function fetchJobLocation(jobId) {
+  if (!jobId) return { lat: null, lon: null, address: null }
+  const { data } = await supabase
+    .from('jobs')
+    .select('lat, lon, job_address')
+    .eq('id', jobId)
+    .maybeSingle()
+  return {
+    lat: data?.lat != null ? Number(data.lat) : null,
+    lon: data?.lon != null ? Number(data.lon) : null,
+    address: data?.job_address ?? null,
+  }
+}
+
+/**
+ * Capture GPS for a clock event and decide whether to proceed.
+ *
+ * Returns { proceed, gps }:
+ *   proceed=false only when the user explicitly cancels the off-site
+ *                 or no-GPS confirm dialog.
+ *   gps        is the column payload to merge into the time_entries row.
+ *
+ * @param {string} jobId   the job being clocked in/out of
+ * @param {'in'|'out'} label  used in the confirm dialog text
+ */
+async function captureGpsForClock(jobId, label) {
+  const [pos, job] = await Promise.all([getCurrentPosition(), fetchJobLocation(jobId)])
+
+  // No GPS — flag and ask whether to proceed.
+  if (!pos.ok) {
+    const ok = window.confirm(
+      `Couldn't get your location. Clock ${label} anyway?\n\n` +
+        `Entry will be flagged "no GPS" for supervisor review.`
+    )
+    if (!ok) return { proceed: false }
+    return {
+      proceed: true,
+      gps: {
+        lat: null,
+        lon: null,
+        accuracy_m: null,
+        distance_m: null,
+        on_site: null,
+        no_gps: true,
+        override: false,
+      },
+    }
+  }
+
+  // Got GPS but job has no coordinates yet (not geocoded) — record GPS,
+  // skip the comparison.
+  if (job.lat == null || job.lon == null) {
+    return {
+      proceed: true,
+      gps: {
+        lat: pos.lat,
+        lon: pos.lon,
+        accuracy_m: pos.accuracy,
+        distance_m: null,
+        on_site: null,
+        no_gps: false,
+        override: false,
+      },
+    }
+  }
+
+  // Both sides have coords — compute distance and decide.
+  const dist = distanceMeters(pos.lat, pos.lon, job.lat, job.lon)
+  const onSite = dist <= ON_SITE_RADIUS_M
+
+  if (!onSite) {
+    const ok = window.confirm(
+      `You're ${fmtDistance(dist)} from the job site` +
+        (job.address ? ` (${job.address})` : '') +
+        `.\n\nClock ${label} anyway? The entry will be flagged "off-site".`
+    )
+    if (!ok) return { proceed: false }
+    return {
+      proceed: true,
+      gps: {
+        lat: pos.lat,
+        lon: pos.lon,
+        accuracy_m: pos.accuracy,
+        distance_m: dist,
+        on_site: false,
+        no_gps: false,
+        override: true,
+      },
+    }
+  }
+
+  return {
+    proceed: true,
+    gps: {
+      lat: pos.lat,
+      lon: pos.lon,
+      accuracy_m: pos.accuracy,
+      distance_m: dist,
+      on_site: true,
+      no_gps: false,
+      override: false,
+    },
+  }
+}
+
+// Tiny inline badge for time_entries rows. Visually flags off-site
+// clock-ins/outs and entries captured without GPS so supervisors can
+// spot them at a glance.
+function GpsBadge({ onSite, noGps, distanceM, override }) {
+  if (noGps) {
+    return (
+      <span
+        title="No GPS when clocking"
+        className="ml-1.5 inline-flex items-center text-[9px] font-semibold uppercase tracking-wide text-gray-600 bg-gray-100 rounded px-1 py-0.5 align-middle"
+      >
+        no GPS
+      </span>
+    )
+  }
+  if (onSite === false) {
+    const dist = fmtDistance(distanceM)
+    return (
+      <span
+        title={`Off-site${override ? ' (override)' : ''}${dist ? ` · ${dist} from job` : ''}`}
+        className="ml-1.5 inline-flex items-center text-[9px] font-semibold uppercase tracking-wide text-red-700 bg-red-100 rounded px-1 py-0.5 align-middle"
+      >
+        off-site{dist ? ` · ${dist}` : ''}
+      </span>
+    )
+  }
+  if (onSite === true) {
+    return (
+      <span
+        title={`On site${distanceM != null ? ` · ${fmtDistance(distanceM)} from job` : ''}`}
+        className="ml-1.5 inline-block w-1.5 h-1.5 rounded-full bg-green-500 align-middle"
+      />
+    )
+  }
+  // on_site === null and !no_gps → job not geocoded or pre-GPS entry; render nothing.
+  return null
+}
+
 // ── Main Component ───────────────────────────────────────────
 
 export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open' }) {
@@ -331,11 +528,24 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
   }
 
   async function clockOut(entry) {
+    // Desktop-table inline Clock Out — captures GPS for the clock-out side.
+    const { proceed, gps } = await captureGpsForClock(entry.job_id, 'out')
+    if (!proceed) return
     const now = new Date()
     const timeOut = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
     await supabase
       .from('time_entries')
-      .update({ time_out: timeOut, updated_at: now.toISOString() })
+      .update({
+        time_out: timeOut,
+        updated_at: now.toISOString(),
+        clock_out_lat:        gps.lat,
+        clock_out_lon:        gps.lon,
+        clock_out_accuracy_m: gps.accuracy_m,
+        clock_out_distance_m: gps.distance_m,
+        clock_out_on_site:    gps.on_site,
+        clock_out_no_gps:     gps.no_gps,
+        clock_out_override:   gps.override,
+      })
       .eq('id', entry.id)
     fetchEntries()
   }
@@ -345,6 +555,8 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
   async function handleClockIn(jobId) {
     const resolvedJobId = jobId || (selectedJob !== 'all' ? selectedJob : null)
     if (!resolvedJobId) return // safety guard — should never reach this on mobile
+    const { proceed, gps } = await captureGpsForClock(resolvedJobId, 'in')
+    if (!proceed) return
     const now = new Date()
     const timeIn = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
     await supabase.from('time_entries').insert({
@@ -355,17 +567,36 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
       time_out: null,
       created_by: user?.id,
       updated_at: now.toISOString(),
+      clock_in_lat:        gps.lat,
+      clock_in_lon:        gps.lon,
+      clock_in_accuracy_m: gps.accuracy_m,
+      clock_in_distance_m: gps.distance_m,
+      clock_in_on_site:    gps.on_site,
+      clock_in_no_gps:     gps.no_gps,
+      clock_in_override:   gps.override,
     })
     fetchEntries()
   }
 
   async function handleClockOut() {
     if (!myOpenEntry) return
+    const { proceed, gps } = await captureGpsForClock(myOpenEntry.job_id, 'out')
+    if (!proceed) return
     const now = new Date()
     const timeOut = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
     await supabase
       .from('time_entries')
-      .update({ time_out: timeOut, updated_at: now.toISOString() })
+      .update({
+        time_out: timeOut,
+        updated_at: now.toISOString(),
+        clock_out_lat:        gps.lat,
+        clock_out_lon:        gps.lon,
+        clock_out_accuracy_m: gps.accuracy_m,
+        clock_out_distance_m: gps.distance_m,
+        clock_out_on_site:    gps.on_site,
+        clock_out_no_gps:     gps.no_gps,
+        clock_out_override:   gps.override,
+      })
       .eq('id', myOpenEntry.id)
     fetchEntries()
   }
@@ -532,6 +763,12 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
                       {/* Time In */}
                       <td className="px-4 py-3 text-gray-700 font-mono text-sm">
                         {fmt12h(entry.time_in)}
+                        <GpsBadge
+                          onSite={entry.clock_in_on_site}
+                          noGps={entry.clock_in_no_gps}
+                          distanceM={entry.clock_in_distance_m}
+                          override={entry.clock_in_override}
+                        />
                       </td>
 
                       {/* Time Out — or Clock Out link */}
@@ -546,6 +783,12 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
                         ) : (
                           <span className="text-gray-700 font-mono text-sm">
                             {fmt12h(entry.time_out)}
+                            <GpsBadge
+                              onSite={entry.clock_out_on_site}
+                              noGps={entry.clock_out_no_gps}
+                              distanceM={entry.clock_out_distance_m}
+                              override={entry.clock_out_override}
+                            />
                           </span>
                         )}
                       </td>
@@ -806,9 +1049,23 @@ function MobileHero({
                       )}
                       <p className="text-sm text-gray-600 mt-0.5">
                         {fmt12h(entry.time_in)}
+                        <GpsBadge
+                          onSite={entry.clock_in_on_site}
+                          noGps={entry.clock_in_no_gps}
+                          distanceM={entry.clock_in_distance_m}
+                          override={entry.clock_in_override}
+                        />
                         {' – '}
                         {entry.time_out ? (
-                          fmt12h(entry.time_out)
+                          <>
+                            {fmt12h(entry.time_out)}
+                            <GpsBadge
+                              onSite={entry.clock_out_on_site}
+                              noGps={entry.clock_out_no_gps}
+                              distanceM={entry.clock_out_distance_m}
+                              override={entry.clock_out_override}
+                            />
+                          </>
                         ) : (
                           <span className="text-green-700 font-semibold">Active</span>
                         )}
