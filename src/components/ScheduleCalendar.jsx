@@ -241,8 +241,18 @@ function WeekRow({
     })
     .sort((a, b) => (a.title || '').localeCompare(b.title || ''))
 
+  // ── Lane assignment: STRICT alphabetical by title ─────────────────────
+  // Every unique title gets its own lane in alphabetical order. Items
+  // sharing a title share a lane (multiple non-overlapping segments of
+  // the same job land on the same row). We deliberately do NOT pack bars
+  // into lower lanes when their dates don't conflict — keeping rows in
+  // alpha order makes the calendar readable as "job X is always row N",
+  // even at the cost of empty space between bars on a row.
+  const uniqueTitles = [...new Set(weekItems.map(i => i.title || ''))]
+    .sort((a, b) => a.localeCompare(b))
+  const laneByTitle = Object.fromEntries(uniqueTitles.map((t, i) => [t, i]))
+
   const itemInfo = {}
-  const laneRanges = []
 
   weekItems.forEach(item => {
     const iStart = new Date(item.start_date + 'T00:00:00')
@@ -272,21 +282,7 @@ function WeekRow({
     if (segStart !== -1) segments.push({ startCol: segStart, endCol: lastWorkingCol })
     if (segments.length === 0) return
 
-    // Use overall first→last col for lane conflict detection
-    const overallStart = segments[0].startCol
-    const overallEnd = segments[segments.length - 1].endCol
-
-    let lane = 0
-    while (true) {
-      const occupied = laneRanges[lane] || []
-      const conflict = occupied.some(r => !(overallEnd < r.s || overallStart > r.e))
-      if (!conflict) {
-        if (!laneRanges[lane]) laneRanges[lane] = []
-        laneRanges[lane].push({ s: overallStart, e: overallEnd })
-        break
-      }
-      lane++
-    }
+    const lane = laneByTitle[item.title || '']
 
     // isItemStart/End: does this week's first/last segment touch the item's actual start/end date?
     const firstSegDate = weekDates[segments[0].startCol]
