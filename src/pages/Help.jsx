@@ -106,7 +106,7 @@ export default function Help() {
   const [tab, setTab] = useState('tickets')
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6">
+    <div className="max-w-7xl mx-auto px-4 py-6">
       {/* Header */}
       <div className="mb-5">
         <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
@@ -398,14 +398,14 @@ function SupportTickets() {
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500">
-                <th className="px-3 py-2 text-left font-semibold w-28">Submitted</th>
+                <th className="px-3 py-2 text-left font-semibold w-28 whitespace-nowrap">Submitted</th>
                 {isAdmin && scope === 'all' && (
-                  <th className="px-3 py-2 text-left font-semibold w-40">Reporter</th>
+                  <th className="px-3 py-2 text-left font-semibold w-40 whitespace-nowrap">Reporter</th>
                 )}
-                <th className="px-3 py-2 text-left font-semibold w-28">Category</th>
+                <th className="px-3 py-2 text-left font-semibold w-28 whitespace-nowrap">Category</th>
                 <th className="px-3 py-2 text-left font-semibold">Title</th>
-                <th className="px-3 py-2 text-left font-semibold w-24">Priority</th>
-                <th className="px-3 py-2 text-left font-semibold w-32">Status</th>
+                <th className="px-3 py-2 text-left font-semibold w-28 whitespace-nowrap">Priority</th>
+                <th className="px-4 py-2 text-left font-semibold w-40 whitespace-nowrap">Status</th>
                 <th className="px-3 py-2 w-10"></th>
               </tr>
             </thead>
@@ -504,12 +504,12 @@ function SupportRow({
           </span>
         </td>
         <td className="px-3 py-2 text-sm font-medium text-gray-800 truncate">{r.title}</td>
-        <td className="px-3 py-2 text-xs">
+        <td className="px-3 py-2 text-xs whitespace-nowrap">
           <span className={PRIORITY_STYLE[r.priority] || PRIORITY_STYLE.medium}>{r.priority}</span>
         </td>
-        <td className="px-3 py-2">
+        <td className="px-4 py-2 whitespace-nowrap">
           <span
-            className={`text-[10px] px-2 py-0.5 rounded-full border font-semibold uppercase ${BUCKET_BADGE_STYLE[bucket]}`}
+            className={`inline-block text-[10px] px-2 py-0.5 rounded-full border font-semibold uppercase whitespace-nowrap ${BUCKET_BADGE_STYLE[bucket]}`}
           >
             {BUCKET_LABEL[bucket]}
           </span>
