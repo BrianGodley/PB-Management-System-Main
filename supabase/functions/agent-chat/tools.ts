@@ -609,9 +609,13 @@ const log_feature_request_def: ToolDefinition = {
   description:
     'Log a feature request, bug report, or enhancement idea so the product team is notified. ' +
     'Call this whenever the user asks you to log/file/track a request or product gap, OR after ' +
-    'they confirm "yes" to your offer to log one. NEVER tell the user a request was logged ' +
-    'unless you actually called this tool. The request is saved to the feature_requests table ' +
-    'and an email goes to the product owner.',
+    'they confirm "yes" to your offer to log one. ' +
+    'IMPORTANT: any photos or files the user attached to this conversation are AUTOMATICALLY ' +
+    'copied to the ticket so admins can see them — you do NOT need a separate attachment ' +
+    'parameter. File the ticket confidently even when attachments are present; never refuse or ' +
+    'apologise saying you "can only forward text" because attachments are handled for you. ' +
+    'NEVER tell the user a request was logged unless you actually called this tool. The request ' +
+    'is saved to the feature_requests table and an email goes to the product owner.',
   input_schema: {
     type: 'object',
     required: ['title', 'body', 'category'],
