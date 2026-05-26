@@ -862,6 +862,270 @@ const log_feature_request_run: ToolExecutor = async (args, ctx) => {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
+// Tool: list_feature_requests
+// ──────────────────────────────────────────────────────────────────────────
+// Returns the user's own tickets so Sam can help them find an earlier one
+// to reference or amend. Admin-filed status / notes are NOT exposed here —
+// users only see their own rows by RLS anyway.
+const list_feature_requests_def: ToolDefinition = {
+  name: 'list_feature_requests',
+  description:
+    'List the current user\'s OWN feature requests, bug reports, and ' +
+    'enhancement ideas so they can reference or amend an earlier one. ' +
+    'Returns id, title, category, status, created_at, updated_at, and an ' +
+    'attachment count per ticket. Use when the user asks things like ' +
+    '"what did I file last week", "show me my open bugs", or "find that ' +
+    'ticket about the calendar". Filter by category, status, or recency ' +
+    'to keep the list short.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      category:  { type: 'string', enum: ['feature','bug','enhancement','other'], description: 'Optional category filter.' },
+      status:    { type: 'string', enum: ['new','triaged','in_progress','done','declined'], description: 'Optional status filter (DB values).' },
+      days_back: { type: 'number', description: 'Only return tickets created in the last N days. Default 90.' },
+      search:    { type: 'string', description: 'Optional case-insensitive substring match on title or body.' },
+      limit:     { type: 'number', description: 'Cap results. Default 20, max 100.' },
+    },
+  },
+}
+const list_feature_requests_run: ToolExecutor = async (args, ctx) => {
+  const sb = userClient(ctx)
+  const limit = Math.max(1, Math.min(Number(args?.limit) || 20, 100))
+  const days  = Math.max(1, Math.min(Number(args?.days_back) || 90, 365))
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+
+  let q = sb
+    .from('feature_requests')
+    .select('id, title, body, category, status, created_at, updated_at')
+    .eq('user_id', ctx.userId)
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (args?.category) q = q.eq('category', args.category)
+  if (args?.status)   q = q.eq('status',   args.status)
+  if (args?.search) {
+    const term = String(args.search).replace(/[%,()*]/g, ' ').trim()
+    if (term) q = q.or(`title.ilike.*${term}*,body.ilike.*${term}*`)
+  }
+  const { data, error } = await q
+  if (error) throw new Error('Could not list tickets: ' + error.message)
+
+  // Attachment counts — one round trip across all returned ids.
+  const ids = (data || []).map(r => r.id)
+  const attCounts: Record<string, number> = {}
+  if (ids.length) {
+    const { data: atts } = await sb
+      .from('feature_request_attachments')
+      .select('feature_request_id')
+      .in('feature_request_id', ids)
+    for (const a of atts || []) {
+      attCounts[a.feature_request_id] = (attCounts[a.feature_request_id] || 0) + 1
+    }
+  }
+
+  return {
+    count: data?.length || 0,
+    tickets: (data || []).map(r => ({
+      id:               r.id,
+      short_id:         r.id.slice(0, 8),
+      title:            r.title,
+      body_preview:     (r.body || '').slice(0, 200),
+      category:         r.category,
+      status:           r.status,
+      created_at:       r.created_at,
+      updated_at:       r.updated_at,
+      attachment_count: attCounts[r.id] || 0,
+    })),
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Tool: get_feature_request
+// ──────────────────────────────────────────────────────────────────────────
+// Full details for one ticket the user owns. Includes the attachment list
+// so Sam can mention by name what's already on the ticket.
+const get_feature_request_def: ToolDefinition = {
+  name: 'get_feature_request',
+  description:
+    'Get the full details of a single feature request / bug / enhancement ' +
+    'ticket the user owns. Returns title, body, category, status, created ' +
+    'and updated timestamps, and the list of attachments by filename. Use ' +
+    'after list_feature_requests once the user has picked which ticket to ' +
+    'amend or discuss. Accepts the full UUID or the short 8-char id from ' +
+    'list_feature_requests.',
+  input_schema: {
+    type: 'object',
+    required: ['id'],
+    properties: {
+      id: { type: 'string', description: 'Ticket UUID, or the short 8-char id from list_feature_requests.' },
+    },
+  },
+}
+const get_feature_request_run: ToolExecutor = async (args, ctx) => {
+  const sb = userClient(ctx)
+  const id = String(args?.id || '').trim()
+  if (!id) throw new Error('id is required')
+
+  // Allow short ids by matching with a LIKE prefix; RLS still restricts to
+  // the user's own rows so this is safe.
+  const isFull = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+  let q = sb
+    .from('feature_requests')
+    .select('id, title, body, category, status, priority, created_at, updated_at')
+    .eq('user_id', ctx.userId)
+    .limit(2)
+  q = isFull ? q.eq('id', id) : q.ilike('id::text', `${id}%`)
+  const { data, error } = await q
+  if (error) throw new Error('Could not load ticket: ' + error.message)
+  if (!data || data.length === 0) throw new Error(`No ticket found for id "${id}"`)
+  if (data.length > 1) throw new Error(`Short id "${id}" matched multiple tickets — please use the full id.`)
+  const row = data[0]
+
+  const { data: atts } = await sb
+    .from('feature_request_attachments')
+    .select('id, file_name, mime_type, size_bytes, kind, created_at')
+    .eq('feature_request_id', row.id)
+    .order('created_at', { ascending: true })
+
+  return {
+    id:          row.id,
+    short_id:    row.id.slice(0, 8),
+    title:       row.title,
+    body:        row.body,
+    category:    row.category,
+    status:      row.status,
+    priority:    row.priority,
+    created_at:  row.created_at,
+    updated_at:  row.updated_at,
+    attachments: (atts || []).map((a: any) => ({
+      file_name: a.file_name,
+      kind:      a.kind,
+      size_kb:   Math.round((a.size_bytes || 0) / 1024),
+    })),
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Tool: update_feature_request
+// ──────────────────────────────────────────────────────────────────────────
+// Lets the user amend their own ticket — title, body, and/or category.
+// Status / priority / admin_notes are intentionally NOT exposed: those are
+// admin-controlled workflow fields. Any attachments the user has added to
+// this conversation that aren't already on the ticket also get linked.
+const update_feature_request_def: ToolDefinition = {
+  name: 'update_feature_request',
+  description:
+    'Amend an existing ticket the user owns. You can change the title, ' +
+    'body (description), and/or category — pass only the fields the user ' +
+    'wants changed. STATUS and PRIORITY are admin-controlled and not ' +
+    'editable through this tool; refuse politely if the user asks to change ' +
+    'either ("Status is moved by an admin from the Help center"). Any new ' +
+    'photos/files the user has attached to this conversation that aren\'t ' +
+    'already on the ticket will be added automatically.',
+  input_schema: {
+    type: 'object',
+    required: ['id'],
+    properties: {
+      id:       { type: 'string', description: 'Ticket UUID or short 8-char id.' },
+      title:    { type: 'string', description: 'New title. Optional.' },
+      body:     { type: 'string', description: 'New body / description. Optional.' },
+      category: { type: 'string', enum: ['feature','bug','enhancement','other'], description: 'New category. Optional.' },
+    },
+  },
+}
+const update_feature_request_run: ToolExecutor = async (args, ctx) => {
+  const sb = userClient(ctx)
+  const id = String(args?.id || '').trim()
+  if (!id) throw new Error('id is required')
+
+  // Resolve short id → full id (RLS scopes to user's own rows).
+  const isFull = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+  let lookup = sb
+    .from('feature_requests')
+    .select('id, title, body, category')
+    .eq('user_id', ctx.userId)
+    .limit(2)
+  lookup = isFull ? lookup.eq('id', id) : lookup.ilike('id::text', `${id}%`)
+  const { data: existing, error: lookupErr } = await lookup
+  if (lookupErr) throw new Error('Could not look up ticket: ' + lookupErr.message)
+  if (!existing || existing.length === 0) throw new Error(`No ticket found for id "${id}"`)
+  if (existing.length > 1) throw new Error(`Short id "${id}" matched multiple tickets — please use the full id.`)
+  const fullId = existing[0].id
+
+  // Build patch — only fields the model explicitly set.
+  const patch: Record<string, unknown> = {}
+  if (typeof args?.title === 'string'    && args.title.trim())    patch.title    = args.title.trim().slice(0, 200)
+  if (typeof args?.body === 'string'     && args.body.trim())     patch.body     = args.body.trim().slice(0, 5000)
+  if (typeof args?.category === 'string' && args.category.trim()) patch.category = args.category.trim().toLowerCase()
+  if (Object.keys(patch).length === 0 && !ctx.conversationId) {
+    throw new Error('Nothing to update — provide at least one of title, body, or category.')
+  }
+
+  if (Object.keys(patch).length > 0) {
+    const { error: upErr } = await sb
+      .from('feature_requests')
+      .update(patch)
+      .eq('id', fullId)
+    if (upErr) throw new Error('Could not save changes: ' + upErr.message)
+  }
+
+  // Auto-attach any new files from this conversation that aren't already
+  // linked to this ticket. Dedupe by source_message_attachment_id.
+  let newAttachmentsLinked = 0
+  if (ctx.conversationId) {
+    const { data: convAtts } = await sb
+      .from('agent_message_attachments')
+      .select('id, storage_path, file_name, mime_type, size_bytes, kind')
+      .eq('conversation_id', ctx.conversationId)
+    if (convAtts && convAtts.length) {
+      const { data: alreadyLinked } = await sb
+        .from('feature_request_attachments')
+        .select('source_message_attachment_id')
+        .eq('feature_request_id', fullId)
+      const linkedSet = new Set(
+        (alreadyLinked || []).map((r: any) => r.source_message_attachment_id).filter(Boolean)
+      )
+      const toAdd = convAtts.filter((a: any) => !linkedSet.has(a.id))
+      if (toAdd.length) {
+        const rows = toAdd.map((a: any) => ({
+          feature_request_id:           fullId,
+          source_message_attachment_id: a.id,
+          user_id:                      ctx.userId,
+          storage_path:                 a.storage_path,
+          file_name:                    a.file_name,
+          mime_type:                    a.mime_type,
+          size_bytes:                   a.size_bytes,
+          kind:                         a.kind,
+        }))
+        const { error: attErr } = await sb.from('feature_request_attachments').insert(rows)
+        if (!attErr) newAttachmentsLinked = rows.length
+        else console.warn('amendment attachment insert failed:', attErr.message)
+      }
+    }
+  }
+
+  const { data: refreshed } = await sb
+    .from('feature_requests')
+    .select('id, title, body, category, status, updated_at')
+    .eq('id', fullId)
+    .maybeSingle()
+
+  return {
+    saved: true,
+    request_id: fullId,
+    short_id: fullId.slice(0, 8),
+    fields_updated: Object.keys(patch),
+    new_attachments_linked: newAttachmentsLinked,
+    current: refreshed,
+    confirmation:
+      `Updated ticket #${fullId.slice(0, 8)}` +
+      (Object.keys(patch).length ? ` (${Object.keys(patch).join(', ')})` : '') +
+      (newAttachmentsLinked ? ` and linked ${newAttachmentsLinked} new attachment${newAttachmentsLinked === 1 ? '' : 's'}` : '') +
+      '.',
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
 // Registry
 // ──────────────────────────────────────────────────────────────────────────
 export const TOOLS: Array<{ definition: ToolDefinition; execute: ToolExecutor }> = [
@@ -877,7 +1141,10 @@ export const TOOLS: Array<{ definition: ToolDefinition; execute: ToolExecutor }>
   { definition: remember_preference_def,  execute: remember_preference_run },
   { definition: forget_preference_def,    execute: forget_preference_run },
   { definition: list_preferences_def,     execute: list_preferences_run },
-  { definition: log_feature_request_def,  execute: log_feature_request_run },
+  { definition: log_feature_request_def,    execute: log_feature_request_run },
+  { definition: list_feature_requests_def,  execute: list_feature_requests_run },
+  { definition: get_feature_request_def,    execute: get_feature_request_run },
+  { definition: update_feature_request_def, execute: update_feature_request_run },
 ]
 
 export const TOOL_DEFINITIONS = TOOLS.map(t => t.definition)
