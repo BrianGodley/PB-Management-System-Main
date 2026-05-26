@@ -10,12 +10,16 @@
 // lives in Help.jsx).
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import DocumentViewerModal from '../components/DocumentViewerModal'
 
 export default function Documentation() {
   const [categories, setCategories] = useState([])
   const [docs, setDocs]             = useState([])
   const [loading, setLoading]       = useState(true)
   const [openCats, setOpenCats]     = useState({}) // categoryId → bool
+  // Currently-open document in the floating viewer. Single-doc-at-a-time
+  // for simplicity; can be extended to a list of windows later.
+  const [viewer, setViewer]         = useState(null) // { doc, signedUrl } | null
 
   useEffect(() => {
     let cancelled = false
@@ -43,6 +47,9 @@ export default function Documentation() {
 
   async function openDoc(doc) {
     // Mint a fresh signed URL each time — short-lived, scoped to the file.
+    // Then hand it to the floating in-app viewer instead of launching a
+    // new browser tab. The viewer renders PDFs and images directly and
+    // proxies Office docs through Microsoft's Office Online embed.
     const { data, error } = await supabase
       .storage
       .from('help-resources')
@@ -51,7 +58,7 @@ export default function Documentation() {
       alert('Could not open file: ' + (error?.message || 'no signed URL returned'))
       return
     }
-    window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+    setViewer({ doc, signedUrl: data.signedUrl })
   }
 
   const docsByCat = {}
@@ -131,7 +138,7 @@ export default function Documentation() {
                         onClick={() => openDoc(d)}
                         className="text-xs font-semibold text-green-700 hover:text-green-900 hover:underline"
                       >
-                        Open ↗
+                        Open
                       </button>
                     </li>
                   ))}
@@ -141,6 +148,17 @@ export default function Documentation() {
           </div>
         ))}
       </div>
+
+      {/* In-app document viewer — draggable + resizable floating window.
+          Non-modal: the user can keep clicking through Documentation
+          while the doc is open. */}
+      {viewer && (
+        <DocumentViewerModal
+          doc={viewer.doc}
+          signedUrl={viewer.signedUrl}
+          onClose={() => setViewer(null)}
+        />
+      )}
     </div>
   )
 }
