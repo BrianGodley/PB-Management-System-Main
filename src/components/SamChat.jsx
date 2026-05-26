@@ -125,11 +125,11 @@ export default function SamChat() {
 
   return (
     <>
-      {/* Trigger — a single bold round Sam icon in the Layout header next
-          to the brand mark. No pill background, no text. Sized large
-          enough (36px) that the cartoon face — round black-rimmed glasses,
-          dark hair, simple smile — reads at a glance against the forest-
-          green header. White face for max contrast. */}
+      {/* Trigger — a single round 36px Sam icon in the Layout header next
+          to the brand mark. White outer circle for contrast on the
+          forest-green bar, with an amber chat bubble inside carrying the
+          word "Sam." Reads instantly at a glance without competing with
+          the brand mark. */}
       {!open && (
         <button
           onClick={() => setOpen(true)}
@@ -144,31 +144,24 @@ export default function SamChat() {
             aria-hidden="true"
             style={{ display: 'block' }}
           >
-            {/* Face circle — white for max contrast on forest-green bar */}
+            {/* White outer circle — high contrast on the forest-green header */}
             <circle cx="20" cy="20" r="19" fill="#FFFFFF" />
-            {/* Hair — bold dark cap, ear-to-ear */}
-            <path
-              d="M5 18 Q6 8 20 8 Q34 8 35 18 Q33 14 28 13 Q20 11 12 13 Q7 14 5 18 Z"
-              fill="#2C2C2A"
-            />
-            {/* Skin-tone face hint behind glasses */}
-            <ellipse cx="20" cy="23" rx="13" ry="11" fill="#FAEEDA" />
-            {/* Glasses — bold black frames, bigger lenses */}
-            <circle cx="14" cy="21" r="5" fill="#FFFFFF" stroke="#2C2C2A" strokeWidth="2" />
-            <circle cx="26" cy="21" r="5" fill="#FFFFFF" stroke="#2C2C2A" strokeWidth="2" />
-            {/* Bridge between lenses */}
-            <line x1="19" y1="21" x2="21" y2="21" stroke="#2C2C2A" strokeWidth="2" />
-            {/* Pupils */}
-            <circle cx="14" cy="21" r="1.4" fill="#2C2C2A" />
-            <circle cx="26" cy="21" r="1.4" fill="#2C2C2A" />
-            {/* Smile */}
-            <path
-              d="M13 29 Q20 33 27 29"
-              stroke="#2C2C2A"
-              strokeWidth="2"
-              fill="none"
-              strokeLinecap="round"
-            />
+            {/* Amber chat bubble */}
+            <rect x="6" y="9" width="28" height="18" rx="5" fill="#FAC775" />
+            {/* Bubble tail — points down-left like a real speech bubble */}
+            <path d="M11 26 L9 32 L17 27 Z" fill="#FAC775" />
+            {/* "Sam" label, dark amber for legibility on the amber fill */}
+            <text
+              x="20"
+              y="22"
+              textAnchor="middle"
+              fontFamily="Arial, sans-serif"
+              fontWeight="700"
+              fontSize="11"
+              fill="#412402"
+            >
+              Sam
+            </text>
           </svg>
         </button>
       )}
