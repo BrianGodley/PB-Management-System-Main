@@ -30,10 +30,19 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 import { XMLParser } from 'https://esm.sh/fast-xml-parser@4.4.1'
 
 const QB_NS = 'http://developer.intuit.com/'
-const SERVER_VERSION = 'Landscape Job Tracker QBWC service 1.1 (payroll-hours pull)'
+const SERVER_VERSION = 'Landscape Job Tracker QBWC service 1.3 (job-cost pull, incremental)'
 
-// The work queue for a session. One entity for now — Time Tracking.
-const SYNC_ENTITIES = ['TimeTracking']
+// The work queue for a session.
+//   * TimeTracking pulls payroll hours into qb_time_tracking (unchanged).
+//   * Bill / Check / CreditCardCharge / ItemReceipt pull job-tagged AP
+//     transactions into the acct_* tables. Each one paginates via QB's
+//     iterator (continuation work items get appended dynamically inside
+//     receiveResponseXML when iteratorRemainingCount > 0).
+const SYNC_ENTITIES = ['TimeTracking', 'Bill', 'Check', 'CreditCardCharge', 'ItemReceipt']
+// How many rows to ask QuickBooks for per page on the AP queries. Lower =
+// safer for QBWC's response buffer; higher = fewer round-trips. 500 is the
+// QBWC sweet spot per Intuit's own QBSDK samples.
+const MAX_RETURNED = 500
 
 // ── Supabase ────────────────────────────────────────────────────────────────
 // Service-role client — the qb_* tables have RLS and QBWC carries no JWT.
@@ -142,7 +151,70 @@ function qbxmlRequest(version: string, inner: string): string {
     `<QBXML><QBXMLMsgsRq onError="continueOnError">${inner}</QBXMLMsgsRq></QBXML>`
 }
 
-type WorkItem = { entity: string; fromDate?: string | null }
+type WorkItem = {
+  entity: string
+  fromDate?: string | null
+  // QB iterator state. Unset on the first request; populated when a
+  // continuation work item is queued from receiveResponseXML.
+  iteratorId?: string | null
+  // Incremental-sync watermark. When set on the first request of an
+  // entity (not on continuations — iterators carry the filter forward
+  // on QB's side), we include a ModifiedDateRangeFilter so QB only
+  // returns records modified on or after this timestamp.
+  fromModifiedDate?: string | null
+}
+
+// QB qbXML DATETIMETYPE accepts YYYY-MM-DDTHH:MM:SS, optionally with a
+// timezone offset. Postgres TIMESTAMPTZ values come back from Supabase as
+// ISO strings with microseconds, e.g. "2025-08-20T14:23:45.123456+00:00",
+// which QB's parser rejects with hresult 0x80040400 (XML parse error).
+//
+// We're paranoid here: re-emit the date explicitly via JS Date math so
+// regardless of what input format Supabase gives us, the output is
+// guaranteed-valid. We DROP the timezone — QB then treats the value as
+// QuickBooks-local time. We also subtract a 24h safety buffer so a
+// UTC-vs-local mismatch can't miss boundary records. The cost is
+// re-pulling up to 24h of overlap on each sync, which is cheap (upserts
+// are idempotent on qb_txn_id / qb_line_id).
+function toQbDateTime(iso: string | null | undefined): string | null {
+  if (!iso) return null
+  const s = String(iso).trim()
+  if (!s) return null
+  const t = new Date(s).getTime()
+  if (!Number.isFinite(t)) return null
+  const d = new Date(t - 24 * 60 * 60 * 1000) // 24h safety buffer
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return (
+    `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}` +
+    `T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`
+  )
+}
+
+// Bill / Check / CCCharge / ItemReceipt all use the same iterator + MaxReturned
+// + IncludeLineItems shape. Centralise it so the four branches stay short.
+function apQueryAttrs(item: WorkItem): {
+  attrs: string
+  modFilter: string
+  max: string
+  lines: string
+} {
+  const attrs = item.iteratorId
+    ? `iterator="Continue" iteratorID="${xmlEscape(item.iteratorId)}"`
+    : `iterator="Start"`
+  // ModifiedDateRangeFilter is only valid on the first request of an
+  // iterator; once iterator="Continue", the filter is locked on QB's
+  // side and we mustn't re-send it.
+  const qbFromMod = !item.iteratorId ? toQbDateTime(item.fromModifiedDate) : null
+  const modFilter = qbFromMod
+    ? `<ModifiedDateRangeFilter><FromModifiedDate>${xmlEscape(qbFromMod)}</FromModifiedDate></ModifiedDateRangeFilter>`
+    : ''
+  return {
+    attrs,
+    modFilter,
+    max: `<MaxReturned>${MAX_RETURNED}</MaxReturned>`,
+    lines: `<IncludeLineItems>true</IncludeLineItems>`,
+  }
+}
 
 function buildEntityRequest(item: WorkItem, version: string): string {
   if (item?.entity === 'TimeTracking') {
@@ -151,6 +223,33 @@ function buildEntityRequest(item: WorkItem, version: string): string {
       : ''
     return qbxmlRequest(version, `<TimeTrackingQueryRq>${filter}</TimeTrackingQueryRq>`)
   }
+
+  const { attrs, modFilter, max, lines } = apQueryAttrs(item)
+
+  // qbXML schema element order is strict AND varies by entity. Sending the
+  // wrong order produces hresult 0x80040400 ("error parsing XML stream").
+  // Verified empirically against QuickBooks Desktop 17:
+  //   - BillQueryRq / CheckQueryRq / CreditCardChargeQueryRq:
+  //       MaxReturned → Filter → IncludeLineItems
+  //   - ItemReceiptQueryRq (the oddball):
+  //       Filter → MaxReturned → IncludeLineItems
+  if (item?.entity === 'Bill') {
+    return qbxmlRequest(version,
+      `<BillQueryRq ${attrs}>${max}${modFilter}${lines}</BillQueryRq>`)
+  }
+  if (item?.entity === 'Check') {
+    return qbxmlRequest(version,
+      `<CheckQueryRq ${attrs}>${max}${modFilter}${lines}</CheckQueryRq>`)
+  }
+  if (item?.entity === 'CreditCardCharge') {
+    return qbxmlRequest(version,
+      `<CreditCardChargeQueryRq ${attrs}>${max}${modFilter}${lines}</CreditCardChargeQueryRq>`)
+  }
+  if (item?.entity === 'ItemReceipt') {
+    return qbxmlRequest(version,
+      `<ItemReceiptQueryRq ${attrs}>${modFilter}${max}${lines}</ItemReceiptQueryRq>`)
+  }
+
   return ''
 }
 
@@ -236,6 +335,283 @@ function parseTimeTracking(qbxml: string): { rows: Record<string, unknown>[]; st
   return { rows, status }
 }
 
+// ── AP transaction parsers ──────────────────────────────────────────────────
+// Bill / Check / CreditCardCharge / ItemReceipt all return a list of header
+// rets with nested ItemLineRet / ExpenseLineRet arrays. The parsers below
+// flatten that into { headers, lines } plus the iterator metadata so the
+// caller can queue a continuation work item when there's more to fetch.
+
+type ApParseResult = {
+  headers: Record<string, unknown>[]
+  lines:   Record<string, unknown>[]
+  iteratorRemaining: number
+  iteratorId: string | null
+  status: string
+  // Highest TimeModified seen in this batch's headers; advance_qb_watermark
+  // uses this to bump qb_sync_state.last_synced_at so subsequent pulls only
+  // request records modified after it.
+  maxTimeModified: string | null
+}
+
+// Extract iterator state from a *QueryRs attribute bag. QB returns
+// iteratorRemainingCount="N" and iteratorID="uuid" as attributes on the Rs.
+function readIteratorState(rs: any): { remaining: number; id: string | null } {
+  const remaining = Number(rs?.['@_iteratorRemainingCount'] ?? 0) || 0
+  const id = rs?.['@_iteratorID'] ?? null
+  return { remaining, id }
+}
+
+// QB TimeModified strings are ISO 8601 ("2026-05-26T18:14:35-04:00"), so
+// lexicographic string comparison on same-offset values gives the right
+// ordering for "newest". We coerce to TIMESTAMPTZ on the postgres side
+// anyway via advance_qb_watermark, which handles tz normalization.
+function maxIsoString(a: string | null, b: string | null | undefined): string | null {
+  if (!b) return a
+  if (!a) return String(b)
+  return b > a ? String(b) : a
+}
+
+// Lines come in two flavours: ItemLineRet (with ItemRef + Quantity + Cost +
+// Amount) and ExpenseLineRet (with AccountRef + Amount only). Both can carry
+// a CustomerRef — that's what tells us this line is a job cost.
+function flattenLines(header: any, txnIdField: string): Record<string, unknown>[] {
+  const out: Record<string, unknown>[] = []
+  const headerId = header?.TxnID
+  if (!headerId) return out
+
+  for (const il of ensureArray(header.ItemLineRet)) {
+    out.push({
+      [txnIdField]:           headerId,    // resolved to a FK by the caller
+      qb_line_id:             il.TxnLineID ?? null,
+      line_type:              'item',
+      qb_customer_full_name:  il.CustomerRef?.FullName ?? null,
+      item_name:              il.ItemRef?.FullName ?? null,
+      qb_account_name:        null,
+      description:            il.Desc ?? null,
+      quantity:               num(il.Quantity),
+      unit_price:             num(il.Cost),
+      amount:                 num(il.Amount),
+      billable_status:        il.BillableStatus ?? null,
+      class_name:             il.ClassRef?.FullName ?? null,
+    })
+  }
+  for (const el of ensureArray(header.ExpenseLineRet)) {
+    out.push({
+      [txnIdField]:           headerId,
+      qb_line_id:             el.TxnLineID ?? null,
+      line_type:              'expense',
+      qb_customer_full_name:  el.CustomerRef?.FullName ?? null,
+      item_name:              null,
+      qb_account_name:        el.AccountRef?.FullName ?? null,
+      description:            el.Memo ?? null,
+      quantity:               null,
+      unit_price:             null,
+      amount:                 num(el.Amount),
+      billable_status:        el.BillableStatus ?? null,
+      class_name:             el.ClassRef?.FullName ?? null,
+    })
+  }
+  return out
+}
+
+function parseBills(qbxml: string): ApParseResult {
+  const doc = xmlParser.parse(qbxml || '')
+  const rs = doc?.QBXML?.QBXMLMsgsRs?.BillQueryRs
+  const rets = ensureArray(rs?.BillRet)
+  const headers: Record<string, unknown>[] = []
+  const lines:   Record<string, unknown>[] = []
+  let maxTM: string | null = null
+  for (const b of rets) {
+    if (!b?.TxnID) continue
+    maxTM = maxIsoString(maxTM, b.TimeModified)
+    headers.push({
+      qb_txn_id:        b.TxnID,
+      number:           b.RefNumber ?? null,
+      vendor_name:      b.VendorRef?.FullName ?? null,
+      date:             b.TxnDate ?? null,
+      due_date:         b.DueDate ?? null,
+      total:            num(b.AmountDue) ?? 0,
+      // acct_bills uses `notes` (pre-existed); the three new transaction
+      // tables we added use `memo`. Map QB's <Memo> into whichever the
+      // target table actually has.
+      notes:            b.Memo ?? null,
+      source:           'qb',
+      qb_edit_sequence: b.EditSequence ?? null,
+      qb_time_created:  b.TimeCreated ?? null,
+      qb_time_modified: b.TimeModified ?? null,
+      qb_synced_at:     nowIso(),
+    })
+    for (const l of flattenLines(b, '__header_qb_txn_id')) lines.push(l)
+  }
+  const { remaining, id } = readIteratorState(rs)
+  const status = rs
+    ? `statusCode ${rs['@_statusCode']} — ${rs['@_statusMessage']}`
+    : 'no BillQueryRs element in response'
+  return { headers, lines, iteratorRemaining: remaining, iteratorId: id, status, maxTimeModified: maxTM }
+}
+
+function parseChecks(qbxml: string): ApParseResult {
+  const doc = xmlParser.parse(qbxml || '')
+  const rs = doc?.QBXML?.QBXMLMsgsRs?.CheckQueryRs
+  const rets = ensureArray(rs?.CheckRet)
+  const headers: Record<string, unknown>[] = []
+  const lines:   Record<string, unknown>[] = []
+  let maxTM: string | null = null
+  for (const c of rets) {
+    if (!c?.TxnID) continue
+    maxTM = maxIsoString(maxTM, c.TimeModified)
+    // QB returns one of PayeeEntityRef (Vendor/Customer/Other) — we keep
+    // the type label so the UI can show "(Employee)" etc. when relevant.
+    const payeeRef = c.PayeeEntityRef
+    headers.push({
+      qb_txn_id:         c.TxnID,
+      ref_number:        c.RefNumber ?? null,
+      payee_type:        payeeRef?.['@_type'] ?? null,
+      payee_name:        payeeRef?.FullName ?? null,
+      bank_account_name: c.AccountRef?.FullName ?? null,
+      date:              c.TxnDate ?? null,
+      total:             num(c.Amount) ?? 0,
+      memo:              c.Memo ?? null,
+      is_to_be_printed:  bool(c.IsToBePrinted),
+      source:            'qb',
+      qb_edit_sequence:  c.EditSequence ?? null,
+      qb_time_created:   c.TimeCreated ?? null,
+      qb_time_modified:  c.TimeModified ?? null,
+      qb_synced_at:      nowIso(),
+    })
+    for (const l of flattenLines(c, '__header_qb_txn_id')) lines.push(l)
+  }
+  const { remaining, id } = readIteratorState(rs)
+  const status = rs
+    ? `statusCode ${rs['@_statusCode']} — ${rs['@_statusMessage']}`
+    : 'no CheckQueryRs element in response'
+  return { headers, lines, iteratorRemaining: remaining, iteratorId: id, status, maxTimeModified: maxTM }
+}
+
+function parseCreditCardCharges(qbxml: string): ApParseResult {
+  const doc = xmlParser.parse(qbxml || '')
+  const rs = doc?.QBXML?.QBXMLMsgsRs?.CreditCardChargeQueryRs
+  const rets = ensureArray(rs?.CreditCardChargeRet)
+  const headers: Record<string, unknown>[] = []
+  const lines:   Record<string, unknown>[] = []
+  let maxTM: string | null = null
+  for (const cc of rets) {
+    if (!cc?.TxnID) continue
+    maxTM = maxIsoString(maxTM, cc.TimeModified)
+    const payeeRef = cc.PayeeEntityRef
+    headers.push({
+      qb_txn_id:                cc.TxnID,
+      ref_number:               cc.RefNumber ?? null,
+      payee_type:               payeeRef?.['@_type'] ?? null,
+      payee_name:               payeeRef?.FullName ?? null,
+      credit_card_account_name: cc.AccountRef?.FullName ?? null,
+      date:                     cc.TxnDate ?? null,
+      total:                    num(cc.Amount) ?? 0,
+      memo:                     cc.Memo ?? null,
+      source:                   'qb',
+      qb_edit_sequence:         cc.EditSequence ?? null,
+      qb_time_created:          cc.TimeCreated ?? null,
+      qb_time_modified:         cc.TimeModified ?? null,
+      qb_synced_at:             nowIso(),
+    })
+    for (const l of flattenLines(cc, '__header_qb_txn_id')) lines.push(l)
+  }
+  const { remaining, id } = readIteratorState(rs)
+  const status = rs
+    ? `statusCode ${rs['@_statusCode']} — ${rs['@_statusMessage']}`
+    : 'no CreditCardChargeQueryRs element in response'
+  return { headers, lines, iteratorRemaining: remaining, iteratorId: id, status, maxTimeModified: maxTM }
+}
+
+function parseItemReceipts(qbxml: string): ApParseResult {
+  const doc = xmlParser.parse(qbxml || '')
+  const rs = doc?.QBXML?.QBXMLMsgsRs?.ItemReceiptQueryRs
+  const rets = ensureArray(rs?.ItemReceiptRet)
+  const headers: Record<string, unknown>[] = []
+  const lines:   Record<string, unknown>[] = []
+  let maxTM: string | null = null
+  for (const r of rets) {
+    if (!r?.TxnID) continue
+    maxTM = maxIsoString(maxTM, r.TimeModified)
+    headers.push({
+      qb_txn_id:        r.TxnID,
+      ref_number:       r.RefNumber ?? null,
+      vendor_name:      r.VendorRef?.FullName ?? null,
+      date:             r.TxnDate ?? null,
+      total:            num(r.TotalAmount) ?? 0,
+      memo:             r.Memo ?? null,
+      source:           'qb',
+      qb_edit_sequence: r.EditSequence ?? null,
+      qb_time_created:  r.TimeCreated ?? null,
+      qb_time_modified: r.TimeModified ?? null,
+      qb_synced_at:     nowIso(),
+    })
+    for (const l of flattenLines(r, '__header_qb_txn_id')) lines.push(l)
+  }
+  const { remaining, id } = readIteratorState(rs)
+  const status = rs
+    ? `statusCode ${rs['@_statusCode']} — ${rs['@_statusMessage']}`
+    : 'no ItemReceiptQueryRs element in response'
+  return { headers, lines, iteratorRemaining: remaining, iteratorId: id, status, maxTimeModified: maxTM }
+}
+
+// Upsert headers, then resolve each line's __header_qb_txn_id placeholder to
+// the actual header UUID, then upsert lines. Returns the row counts so the
+// caller can write a tidy status message into qb_sync_log.
+async function upsertApBundle(
+  sb: ReturnType<typeof admin>,
+  headerTable: string,
+  lineTable: string,
+  lineFkColumn: string,        // e.g. 'bill_id', 'check_id', 'charge_id', 'receipt_id'
+  headers: Record<string, unknown>[],
+  lines:   Record<string, unknown>[],
+): Promise<{ headerCount: number; lineCount: number }> {
+  if (headers.length === 0) return { headerCount: 0, lineCount: 0 }
+
+  // De-dupe headers on qb_txn_id (same TxnID can appear twice if QB returns
+  // overlapping pages on iterator continue — rare but defensive).
+  const seenH = new Map<unknown, Record<string, unknown>>()
+  for (const h of headers) seenH.set(h.qb_txn_id, h)
+  const dedupedHeaders = [...seenH.values()]
+
+  // Upsert and capture id ↔ qb_txn_id so we can wire lines to their FK.
+  const { data: returned, error: hErr } = await sb
+    .from(headerTable)
+    .upsert(dedupedHeaders, { onConflict: 'qb_txn_id' })
+    .select('id, qb_txn_id')
+  if (hErr) throw new Error(`${headerTable} upsert failed: ${hErr.message}`)
+
+  const idMap = new Map<string, string>()
+  for (const r of returned ?? []) idMap.set(String(r.qb_txn_id), String(r.id))
+
+  // Resolve lines' header FK, drop the placeholder, drop orphans.
+  const resolvedLines = lines
+    .map((l) => {
+      const headerId = idMap.get(String(l['__header_qb_txn_id']))
+      if (!headerId) return null
+      const { __header_qb_txn_id, ...rest } = l as any
+      return { ...rest, [lineFkColumn]: headerId }
+    })
+    .filter((l): l is Record<string, unknown> => l != null)
+
+  // De-dupe on qb_line_id within this batch.
+  const seenL = new Map<unknown, Record<string, unknown>>()
+  for (const l of resolvedLines) {
+    if (l.qb_line_id != null) seenL.set(l.qb_line_id, l)
+  }
+  const dedupedLines = [...seenL.values()]
+
+  let lineCount = 0
+  for (let i = 0; i < dedupedLines.length; i += 500) {
+    const chunk = dedupedLines.slice(i, i + 500)
+    const { error } = await sb.from(lineTable).upsert(chunk, { onConflict: 'qb_line_id' })
+    if (error) throw new Error(`${lineTable} upsert failed: ${error.message}`)
+    lineCount += chunk.length
+  }
+
+  return { headerCount: dedupedHeaders.length, lineCount }
+}
+
 // Upsert rows in chunks, de-duplicated on the conflict key.
 async function upsertChunked(
   sb: ReturnType<typeof admin>,
@@ -297,11 +673,27 @@ async function handle(method: string, body: string): Promise<string> {
         )
       }
 
-      // Queue the work items. Snapshot payroll_from_date onto the work item so
-      // the request is consistent for the life of the session.
+      // Load per-entity watermarks for incremental sync. AP entities use
+      // qb_sync_state.last_synced_at as the FromModifiedDate so QB only
+      // returns records modified since the last successful pull.
+      // TimeTracking still uses TxnDateRangeFilter (payroll_from_date)
+      // because we want a date-of-work cut-off, not a modified-since.
+      const { data: syncStates } = await sb
+        .from('qb_sync_state')
+        .select('entity, last_synced_at')
+      const watermarkByEntity = new Map<string, string | null>(
+        (syncStates ?? []).map((s: any) => [s.entity, s.last_synced_at]),
+      )
+      const AP_ENTITIES = new Set(['Bill', 'Check', 'CreditCardCharge', 'ItemReceipt'])
+
+      // Queue the work items. Snapshot per-entity filters onto each work
+      // item so they're consistent for the life of the session.
       const work: WorkItem[] = SYNC_ENTITIES.map((entity) => ({
         entity,
         fromDate: entity === 'TimeTracking' ? (conn.payroll_from_date ?? null) : null,
+        fromModifiedDate: AP_ENTITIES.has(entity)
+          ? (watermarkByEntity.get(entity) ?? null)
+          : null,
       }))
 
       const { data: sess, error: sErr } = await sb
@@ -354,9 +746,20 @@ async function handle(method: string, body: string): Promise<string> {
 
       const item = work[step]
       const reqXml = buildEntityRequest(item, version)
+      // Include the formatted FromModifiedDate in the log when present so
+      // we can correlate any QB parse errors back to the exact filter we
+      // sent. Include a tail of the actual XML for the first request of
+      // each entity (iterator=Start) since that's the one that carries
+      // ModifiedDateRangeFilter.
+      const tag = item.fromModifiedDate
+        ? ` from-modified ${toQbDateTime(item.fromModifiedDate)}`
+        : item.fromDate
+          ? ` from ${item.fromDate}`
+          : ''
+      const xmlTail = !item.iteratorId ? ` xml=${reqXml.replace(/\s+/g, ' ').slice(-220)}` : ''
       await logCall(sb, ticket || null, 'sendRequestXML', 'ok',
-        `Requesting ${item.entity}${item.fromDate ? ` from ${item.fromDate}` : ''} ` +
-        `(step ${step + 1} of ${work.length}, qbXML ${version}).`,
+        `Requesting ${item.entity}${tag} ` +
+        `(step ${step + 1} of ${work.length}, qbXML ${version}).${xmlTail}`,
         item.entity, 'pull')
 
       return methodResponse(
@@ -380,6 +783,37 @@ async function handle(method: string, body: string): Promise<string> {
       const item  = work[step]
       const entity = item?.entity ?? 'unknown'
 
+      // Queue a continuation work item for the next sendRequestXML if QB
+      // tells us iterator pagination is still in flight. Mutates `work`.
+      // Continuations do NOT carry fromModifiedDate — QB's iterator has the
+      // filter locked in on its side; resending would be invalid.
+      async function queueContinuation(iteratorId: string | null, remaining: number) {
+        if (!iteratorId || remaining <= 0) return
+        const next: WorkItem = { entity, iteratorId }
+        const newWork = [...work, next]
+        await sb.from('qb_session')
+          .update({ work: newWork, total_steps: newWork.length, updated_at: nowIso() })
+          .eq('ticket', ticket)
+      }
+
+      // Bump qb_sync_state.last_synced_at for this entity to the highest
+      // TimeModified in the just-processed batch. The RPC uses GREATEST so
+      // a late or out-of-order batch can't regress the watermark.
+      async function advanceWatermark(maxTimeModified: string | null) {
+        if (!maxTimeModified) return
+        const { error } = await sb.rpc('advance_qb_watermark', {
+          p_entity:         entity,
+          p_modified_at:    maxTimeModified,
+          p_session_ticket: ticket || null,
+        })
+        if (error) {
+          // Non-fatal — we just won't have an updated watermark; the data
+          // is already upserted idempotently so the next pull at worst
+          // re-fetches a few records.
+          console.error(`advance_qb_watermark(${entity}) failed:`, error.message)
+        }
+      }
+
       try {
         if (hresult) throw new Error(`QuickBooks reported hresult ${hresult}: ${qbMsg}`)
 
@@ -388,6 +822,47 @@ async function handle(method: string, body: string): Promise<string> {
           const count = await upsertChunked(sb, 'qb_time_tracking', rows, 'txn_id')
           await logCall(sb, ticket || null, 'receiveResponseXML', 'ok',
             `Pulled ${count} time-tracking entries (${status}).`, entity, 'pull')
+
+        } else if (entity === 'Bill') {
+          const { headers, lines, iteratorRemaining, iteratorId, status, maxTimeModified } = parseBills(response)
+          const { headerCount, lineCount } = await upsertApBundle(
+            sb, 'acct_bills', 'acct_bill_lines', 'bill_id', headers, lines)
+          await advanceWatermark(maxTimeModified)
+          await queueContinuation(iteratorId, iteratorRemaining)
+          await logCall(sb, ticket || null, 'receiveResponseXML', 'ok',
+            `Pulled ${headerCount} bills / ${lineCount} lines${iteratorRemaining ? ` (more: ${iteratorRemaining})` : ''} (${status}).`,
+            entity, 'pull')
+
+        } else if (entity === 'Check') {
+          const { headers, lines, iteratorRemaining, iteratorId, status, maxTimeModified } = parseChecks(response)
+          const { headerCount, lineCount } = await upsertApBundle(
+            sb, 'acct_checks', 'acct_check_lines', 'check_id', headers, lines)
+          await advanceWatermark(maxTimeModified)
+          await queueContinuation(iteratorId, iteratorRemaining)
+          await logCall(sb, ticket || null, 'receiveResponseXML', 'ok',
+            `Pulled ${headerCount} checks / ${lineCount} lines${iteratorRemaining ? ` (more: ${iteratorRemaining})` : ''} (${status}).`,
+            entity, 'pull')
+
+        } else if (entity === 'CreditCardCharge') {
+          const { headers, lines, iteratorRemaining, iteratorId, status, maxTimeModified } = parseCreditCardCharges(response)
+          const { headerCount, lineCount } = await upsertApBundle(
+            sb, 'acct_credit_card_charges', 'acct_credit_card_charge_lines', 'charge_id', headers, lines)
+          await advanceWatermark(maxTimeModified)
+          await queueContinuation(iteratorId, iteratorRemaining)
+          await logCall(sb, ticket || null, 'receiveResponseXML', 'ok',
+            `Pulled ${headerCount} CC charges / ${lineCount} lines${iteratorRemaining ? ` (more: ${iteratorRemaining})` : ''} (${status}).`,
+            entity, 'pull')
+
+        } else if (entity === 'ItemReceipt') {
+          const { headers, lines, iteratorRemaining, iteratorId, status, maxTimeModified } = parseItemReceipts(response)
+          const { headerCount, lineCount } = await upsertApBundle(
+            sb, 'acct_item_receipts', 'acct_item_receipt_lines', 'receipt_id', headers, lines)
+          await advanceWatermark(maxTimeModified)
+          await queueContinuation(iteratorId, iteratorRemaining)
+          await logCall(sb, ticket || null, 'receiveResponseXML', 'ok',
+            `Pulled ${headerCount} item receipts / ${lineCount} lines${iteratorRemaining ? ` (more: ${iteratorRemaining})` : ''} (${status}).`,
+            entity, 'pull')
+
         } else {
           await logCall(sb, ticket || null, 'receiveResponseXML', 'ok',
             `No handler for entity "${entity}"; skipped.`, entity, 'pull')
@@ -407,7 +882,16 @@ async function handle(method: string, body: string): Promise<string> {
         .update({ current_step: next, updated_at: nowIso() })
         .eq('ticket', ticket)
 
-      const pct = next >= total ? 100 : Math.max(1, Math.min(99, Math.round((next / total) * 100)))
+      // Re-read total_steps — queueContinuation may have appended work items
+      // since we snapshotted `total` at the top of this method. Without this,
+      // mid-pull progress could be reported as 100% prematurely.
+      const { data: latest } = await sb
+        .from('qb_session').select('total_steps').eq('ticket', ticket).maybeSingle()
+      const liveTotal = latest?.total_steps ?? total
+
+      const pct = next >= liveTotal
+        ? 100
+        : Math.max(1, Math.min(99, Math.round((next / liveTotal) * 100)))
       return methodResponse(
         'receiveResponseXML',
         `<receiveResponseXMLResult>${pct}</receiveResponseXMLResult>`,
@@ -579,7 +1063,7 @@ code{background:#f3f4f6;padding:2px 6px;border-radius:4px}h1{font-size:20px}</st
 It is not meant to be opened in a browser - the QuickBooks Web Connector
 posts to it automatically.</p>
 <p>WSDL: <code>?wsdl</code></p>
-<p>Status: running (payroll-hours pull).</p></body></html>`
+<p>Status: running (payroll hours + job-cost pull: bills, checks, CC charges, item receipts).</p></body></html>`
 
 // ── HTTP entry point ────────────────────────────────────────────────────────
 serve(async (req) => {
