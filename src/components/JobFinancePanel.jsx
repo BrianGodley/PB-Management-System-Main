@@ -11,12 +11,14 @@
 import { useEffect, useRef, useState } from 'react'
 import JobFinanceTab from './JobFinanceTab'
 import JobPaymentsTab from './JobPaymentsTab'
+import JobMaterialCostsTab from './JobMaterialCostsTab'
 import JobInvoiceCreateModal from './JobInvoiceCreateModal'
 import JobPaymentEntryModal from './JobPaymentEntryModal'
 
 const SUBTABS = [
-  { key: 'invoices', label: 'Invoices' },
-  { key: 'payments', label: 'Payments' },
+  { key: 'invoices',       label: 'Invoices' },
+  { key: 'payments',       label: 'Payments' },
+  { key: 'material_costs', label: 'Material Costs' },
 ]
 
 export default function JobFinancePanel({ job, onOpenJobInvoice, invoiceDeepLink }) {
@@ -108,7 +110,7 @@ export default function JobFinancePanel({ job, onOpenJobInvoice, invoiceDeepLink
                 </div>
               )}
             </>
-          ) : (
+          ) : section === 'payments' ? (
             <button
               onClick={() => hasJob && setPaymentOpen(true)}
               disabled={!hasJob}
@@ -117,6 +119,12 @@ export default function JobFinancePanel({ job, onOpenJobInvoice, invoiceDeepLink
             >
               + Payment
             </button>
+          ) : (
+            // Material Costs is read-only — data flows in from QuickBooks
+            // via the qbwc edge function. No PBS-side add/edit button.
+            <span className="text-[10px] uppercase tracking-wide text-gray-400 pb-1">
+              from QuickBooks
+            </span>
           )}
         </div>
       </div>
@@ -139,6 +147,9 @@ export default function JobFinancePanel({ job, onOpenJobInvoice, invoiceDeepLink
         )}
         {section === 'payments' && (
           <JobPaymentsTab job={job} refreshKey={paymentRefreshKey} />
+        )}
+        {section === 'material_costs' && (
+          <JobMaterialCostsTab job={job} />
         )}
       </div>
 
