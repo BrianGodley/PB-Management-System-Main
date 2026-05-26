@@ -207,7 +207,7 @@ function SupportTickets() {
   const [tickets, setTickets] = useState([])
   const [userMap, setUserMap] = useState({}) // user_id → { full_name, email }
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState('all') // 'all' | 'new' | 'pending' | 'completed'
+  const [filter, setFilter] = useState('new') // 'new' | 'pending' | 'completed' | 'all'
   const [scope, setScope] = useState('all') // 'mine' | 'all'  (admins only)
   const [expanded, setExpanded] = useState(null)
   const [isAdmin, setIsAdmin] = useState(false)
@@ -366,10 +366,10 @@ function SupportTickets() {
   }
 
   const FILTERS = [
-    { key: 'all', label: `All (${counts.all})` },
-    { key: 'new', label: `New (${counts.new})` },
-    { key: 'pending', label: `Pending (${counts.pending})` },
+    { key: 'new',       label: `New (${counts.new})` },
+    { key: 'pending',   label: `Pending (${counts.pending})` },
     { key: 'completed', label: `Completed (${counts.completed})` },
+    { key: 'all',       label: `All (${counts.all})` },
   ]
 
   return (
