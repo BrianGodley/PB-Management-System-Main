@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { supabase } from '../lib/supabase'
 import { fetchAllPaginated } from '../lib/fetchAll'
 import { useCachedData } from '../lib/useCachedData'
@@ -1160,6 +1160,342 @@ function BillModal({ bill, accounts, jobs, onSave, onClose }) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
+// CHECKS / CREDIT CARDS TABS
+//
+// Both tabs are paginated read-only views over QB-imported transactions.
+// Their data lives in different tables (acct_checks/acct_check_lines vs.
+// acct_credit_card_charges/acct_credit_card_charge_lines) but the UI
+// shape is identical — date filter, payee search, paginated header list,
+// expand-row to see line items with job links. Driven by a single
+// AcctTransactionsTab component configured by props.
+//
+// Why read-only: these rows are owned by the QB sync. Editing them in PBS
+// would be silently overwritten on the next pull and would risk confusion
+// about which record (PBS or QB) is canonical. To change a check or CC
+// charge, the user edits it in QuickBooks; the next sync reflects it.
+// ═════════════════════════════════════════════════════════════════════════════
+
+function ChecksTab() {
+  return (
+    <AcctTransactionsTab
+      headerTable="acct_checks"
+      lineTable="acct_check_lines"
+      lineFkColumn="check_id"
+      accountColumn="bank_account_name"
+      accountHeader="Bank Account"
+      emptyLabel="No checks found in this date range."
+      refLabel="Check #"
+    />
+  )
+}
+
+function CreditCardsTab() {
+  return (
+    <AcctTransactionsTab
+      headerTable="acct_credit_card_charges"
+      lineTable="acct_credit_card_charge_lines"
+      lineFkColumn="charge_id"
+      accountColumn="credit_card_account_name"
+      accountHeader="Credit Card"
+      emptyLabel="No credit card charges found in this date range."
+      refLabel="Ref #"
+    />
+  )
+}
+
+function AcctTransactionsTab({
+  headerTable,     // 'acct_checks' | 'acct_credit_card_charges'
+  lineTable,       // 'acct_check_lines' | 'acct_credit_card_charge_lines'
+  lineFkColumn,    // 'check_id' | 'charge_id'
+  accountColumn,   // 'bank_account_name' | 'credit_card_account_name'
+  accountHeader,   // 'Bank Account' | 'Credit Card'
+  emptyLabel,
+  refLabel,
+}) {
+  const PAGE_SIZE = 50
+
+  const [page, setPage]               = useState(1)
+  const [rows, setRows]               = useState([])
+  const [totalCount, setTotalCount]   = useState(0)
+  const [loading, setLoading]         = useState(false)
+  const [dateFrom, setDateFrom]       = useState(addDays(today(), -90))
+  const [dateTo, setDateTo]           = useState(today())
+  const [searchInput, setSearchInput] = useState('')
+  const [searchTerm, setSearchTerm]   = useState('')      // applied search; submit via button or Enter
+  const [expandedId, setExpandedId]   = useState(null)
+  const [expandedLines, setExpandedLines] = useState({})  // { rowId: line[] | undefined }
+
+  // Fetch a page whenever the page index or any applied filter changes.
+  // searchTerm (not searchInput) is in the dep array so typing doesn't
+  // hammer the DB — the user submits via Enter or the Apply button.
+  useEffect(() => {
+    let cancelled = false
+    async function fetchPage() {
+      setLoading(true)
+      const from = (page - 1) * PAGE_SIZE
+      const to   = from + PAGE_SIZE - 1
+
+      let q = supabase
+        .from(headerTable)
+        .select('*', { count: 'exact' })
+        .gte('date', dateFrom)
+        .lte('date', dateTo)
+        .order('date', { ascending: false })
+        .range(from, to)
+
+      if (searchTerm.trim()) {
+        q = q.ilike('payee_name', `%${searchTerm.trim()}%`)
+      }
+
+      const { data, count, error } = await q
+      if (cancelled) return
+      if (error) {
+        console.error(`${headerTable} fetch failed:`, error)
+      } else {
+        setRows(data || [])
+        setTotalCount(count || 0)
+      }
+      setLoading(false)
+    }
+    fetchPage()
+    return () => { cancelled = true }
+  }, [headerTable, page, dateFrom, dateTo, searchTerm])
+
+  // Reset to page 1 whenever a filter changes (otherwise you can end up
+  // on an empty late page after narrowing the range).
+  useEffect(() => { setPage(1) }, [dateFrom, dateTo, searchTerm, headerTable])
+
+  function applySearch() {
+    setSearchTerm(searchInput)
+  }
+
+  async function toggleExpand(rowId) {
+    if (expandedId === rowId) {
+      setExpandedId(null)
+      return
+    }
+    setExpandedId(rowId)
+    // Lazy-load lines the first time a row is expanded; cache thereafter.
+    if (!expandedLines[rowId]) {
+      const { data, error } = await supabase
+        .from(lineTable)
+        .select('*, job:jobs(id, client_name, job_address)')
+        .eq(lineFkColumn, rowId)
+        .order('sort_order')
+      if (error) {
+        console.error(`${lineTable} fetch failed:`, error)
+      }
+      setExpandedLines(prev => ({ ...prev, [rowId]: data || [] }))
+    }
+  }
+
+  const totalPages   = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
+  const safePage     = Math.min(page, totalPages)
+  const visibleTotal = rows.reduce((s, r) => s + Number(r.total || 0), 0)
+
+  return (
+    <div>
+      {/* Filter bar */}
+      <div className="flex flex-wrap items-end gap-3 mb-4 p-3 bg-white rounded-xl border border-gray-200">
+        <div>
+          <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">From</label>
+          <input
+            type="date"
+            className="input text-sm"
+            value={dateFrom}
+            onChange={e => setDateFrom(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">To</label>
+          <input
+            type="date"
+            className="input text-sm"
+            value={dateTo}
+            onChange={e => setDateTo(e.target.value)}
+          />
+        </div>
+        <div className="flex-1 min-w-[200px]">
+          <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">Search Payee</label>
+          <input
+            type="text"
+            className="input text-sm w-full"
+            placeholder="Name contains…"
+            value={searchInput}
+            onChange={e => setSearchInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') applySearch() }}
+          />
+        </div>
+        <button onClick={applySearch} className="btn-secondary text-xs px-4 py-2">
+          Apply
+        </button>
+        <div className="ml-auto text-right">
+          <p className="text-[10px] text-gray-400 uppercase font-semibold">Page Total</p>
+          <p className="text-lg font-bold text-gray-800">{fmt(visibleTotal)}</p>
+        </div>
+      </div>
+
+      {/* Header table */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-100 bg-gray-50">
+              <th className="w-8 px-3 py-2.5" />
+              <th className="text-left text-xs font-semibold text-gray-400 px-4 py-2.5">Date</th>
+              <th className="text-left text-xs font-semibold text-gray-400 px-4 py-2.5">{refLabel}</th>
+              <th className="text-left text-xs font-semibold text-gray-400 px-4 py-2.5">Payee</th>
+              <th className="text-left text-xs font-semibold text-gray-400 px-4 py-2.5">{accountHeader}</th>
+              <th className="text-left text-xs font-semibold text-gray-400 px-4 py-2.5">Memo</th>
+              <th className="text-right text-xs font-semibold text-gray-400 px-4 py-2.5">Total</th>
+              <th className="text-center text-xs font-semibold text-gray-400 px-4 py-2.5">Source</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {loading && (
+              <tr><td colSpan={8} className="text-center text-gray-400 text-sm py-10">Loading…</td></tr>
+            )}
+            {!loading && rows.length === 0 && (
+              <tr><td colSpan={8} className="text-center text-gray-400 text-sm py-10">{emptyLabel}</td></tr>
+            )}
+            {!loading && rows.map(row => (
+              <Fragment key={row.id}>
+                <tr
+                  className="hover:bg-gray-50 cursor-pointer"
+                  onClick={() => toggleExpand(row.id)}
+                >
+                  <td className="px-3 py-2.5 text-gray-400 text-xs select-none">
+                    {expandedId === row.id ? '▾' : '▸'}
+                  </td>
+                  <td className="px-4 py-2.5 text-xs text-gray-500">{fmtDate(row.date)}</td>
+                  <td className="px-4 py-2.5 font-mono text-xs text-gray-500">{row.ref_number || '—'}</td>
+                  <td className="px-4 py-2.5 font-medium text-gray-800">{row.payee_name || '—'}</td>
+                  <td className="px-4 py-2.5 text-xs text-gray-500 max-w-[160px] truncate">
+                    {row[accountColumn] || '—'}
+                  </td>
+                  <td className="px-4 py-2.5 text-xs text-gray-500 max-w-[260px] truncate">
+                    {row.memo || ''}
+                  </td>
+                  <td className="px-4 py-2.5 text-right font-semibold text-gray-800">
+                    {fmt(row.total)}
+                  </td>
+                  <td className="px-4 py-2.5 text-center">
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded font-semibold uppercase ${
+                        row.source === 'qb'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-gray-100 text-gray-500'
+                      }`}
+                    >
+                      {row.source}
+                    </span>
+                  </td>
+                </tr>
+                {expandedId === row.id && (
+                  <tr>
+                    <td colSpan={8} className="bg-gray-50 px-12 py-3">
+                      <AcctTxnLineList lines={expandedLines[row.id]} />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination */}
+      {totalCount > PAGE_SIZE && (
+        <div className="flex items-center gap-3 mt-3 text-xs text-gray-500">
+          <button
+            onClick={() => setPage(Math.max(1, safePage - 1))}
+            disabled={safePage === 1}
+            className="px-2.5 py-1 rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            ‹ Prev
+          </button>
+          <span>
+            Page {safePage.toLocaleString()} of {totalPages.toLocaleString()} ·{' '}
+            {totalCount.toLocaleString()} total
+          </span>
+          <button
+            onClick={() => setPage(Math.min(totalPages, safePage + 1))}
+            disabled={safePage >= totalPages}
+            className="px-2.5 py-1 rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Next ›
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Expanded-row line table for Checks / CC Charges. Shows item/account,
+// description, the linked PBS job (if matched) or the raw QB customer
+// (amber, indicates a tagged-but-unmatched line), qty, and amount.
+function AcctTxnLineList({ lines }) {
+  if (lines === undefined) {
+    return <div className="text-xs text-gray-400 py-2">Loading lines…</div>
+  }
+  if (lines.length === 0) {
+    return <div className="text-xs text-gray-400 py-2">No line items on this transaction.</div>
+  }
+  return (
+    <table className="w-full text-xs">
+      <thead>
+        <tr className="text-gray-400 text-[10px] uppercase font-semibold">
+          <th className="text-left px-2 py-1">Type</th>
+          <th className="text-left px-2 py-1">Item / Account</th>
+          <th className="text-left px-2 py-1">Description</th>
+          <th className="text-left px-2 py-1">Job</th>
+          <th className="text-right px-2 py-1">Qty</th>
+          <th className="text-right px-2 py-1">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {lines.map(l => (
+          <tr key={l.id} className="border-t border-gray-200">
+            <td className="px-2 py-1">
+              <span
+                className={`text-[9px] px-1.5 py-0.5 rounded font-semibold uppercase ${
+                  l.line_type === 'item'
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-gray-100 text-gray-600'
+                }`}
+              >
+                {l.line_type || '—'}
+              </span>
+            </td>
+            <td className="px-2 py-1">{l.item_name || l.qb_account_name || '—'}</td>
+            <td className="px-2 py-1 text-gray-500 max-w-[260px] truncate">
+              {l.description || ''}
+            </td>
+            <td className="px-2 py-1 max-w-[220px] truncate">
+              {l.job ? (
+                <span className="text-green-700 font-medium" title={l.job.job_address || ''}>
+                  {l.job.client_name}
+                </span>
+              ) : l.qb_customer_full_name ? (
+                <span
+                  className="text-amber-600"
+                  title="QB customer not auto-matched to a PBS job"
+                >
+                  {l.qb_customer_full_name}
+                </span>
+              ) : (
+                <span className="text-gray-300">—</span>
+              )}
+            </td>
+            <td className="px-2 py-1 text-right">{l.quantity ?? ''}</td>
+            <td className="px-2 py-1 text-right font-semibold">{fmt(l.amount)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 // BANKING TAB
 // ═════════════════════════════════════════════════════════════════════════════
 function BankingTab({ bankAccounts, accounts, onRefresh }) {
@@ -2119,11 +2455,13 @@ function ReportsTab({ invoices, bills, bankAccounts }) {
 // ═════════════════════════════════════════════════════════════════════════════
 const TABS = [
   { key: 'dashboard', label: '📊 Dashboard' },
-  { key: 'invoices', label: '📄 Invoices' },
-  { key: 'bills', label: '💳 Bills & Expenses' },
-  { key: 'banking', label: '🏦 Banking' },
-  { key: 'accounts', label: '📒 Chart of Accounts' },
-  { key: 'reports', label: '📈 Reports' },
+  { key: 'invoices',  label: '📄 Invoices' },
+  { key: 'bills',     label: '💳 Bills & Expenses' },
+  { key: 'checks',    label: '🧾 Checks' },
+  { key: 'cc',        label: '💳 Credit Cards' },
+  { key: 'banking',   label: '🏦 Banking' },
+  { key: 'accounts',  label: '📒 Chart of Accounts' },
+  { key: 'reports',   label: '📈 Reports' },
 ]
 
 // ── Data fetch ────────────────────────────────────────────────────────────────
@@ -2237,6 +2575,8 @@ export default function Accounting() {
             onRefresh={refresh}
           />
         )}
+        {tab === 'checks' && <ChecksTab />}
+        {tab === 'cc'     && <CreditCardsTab />}
         {tab === 'banking' && (
           <BankingTab bankAccounts={bankAccounts} accounts={accounts} onRefresh={refresh} />
         )}
