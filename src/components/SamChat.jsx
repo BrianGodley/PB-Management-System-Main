@@ -125,16 +125,41 @@ export default function SamChat() {
 
   return (
     <>
-      {/* Floating button (always visible). Smaller + lifted up so iOS / Android
-          home-indicator + browser chrome don't clip it on phones. */}
+      {/* Trigger pill — sits inline in the Layout header next to the
+          Picture Build System logo. Amber (#FAC775) pops against the
+          forest-green header bar. The icon is a small cartoon analyst:
+          rounded glasses, dark hair, soft smile — readable at 18px. */}
       {!open && (
         <button
           onClick={() => setOpen(true)}
           title="Chat with Sam"
-          className="fixed right-4 bottom-20 sm:bottom-5 z-40 w-11 h-11 sm:w-12 sm:h-12 rounded-full shadow-lg flex items-center justify-center text-white font-bold transition-transform hover:scale-105"
-          style={{ backgroundColor: FG, paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+          aria-label="Chat with Sam"
+          className="inline-flex items-center gap-1.5 pl-1 pr-3 py-1 rounded-full text-xs font-semibold transition-transform hover:scale-105 flex-shrink-0"
+          style={{ backgroundColor: '#FAC775', color: '#633806' }}
         >
-          <span className="text-xl leading-none">S</span>
+          <span
+            className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
+            style={{ backgroundColor: '#fff' }}
+          >
+            <svg width="18" height="18" viewBox="0 0 36 36" aria-hidden="true">
+              <circle cx="18" cy="18" r="14" fill="#FAEEDA" />
+              <path
+                d="M9 14 Q12 9 18 9 Q24 9 27 14 L27 12 Q22 7 18 7 Q14 7 9 12 Z"
+                fill="#5F5E5A"
+              />
+              <circle cx="13" cy="19" r="3.5" fill="#fff" stroke="#2C2C2A" strokeWidth="1.2" />
+              <circle cx="23" cy="19" r="3.5" fill="#fff" stroke="#2C2C2A" strokeWidth="1.2" />
+              <line x1="16.5" y1="19" x2="19.5" y2="19" stroke="#2C2C2A" strokeWidth="1.2" />
+              <path
+                d="M13 24 Q18 27 23 24"
+                stroke="#5F5E5A"
+                strokeWidth="1.3"
+                fill="none"
+                strokeLinecap="round"
+              />
+            </svg>
+          </span>
+          <span className="hidden sm:inline">Ask Sam</span>
         </button>
       )}
 

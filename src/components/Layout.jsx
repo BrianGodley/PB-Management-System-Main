@@ -260,6 +260,12 @@ export default function Layout() {
             </span>
           </Link>
 
+          {/* Sam — AI assistant trigger lives in the header next to the brand
+              so it's discoverable without competing with floating UI on
+              mobile. SamChat renders its own panel as a fixed overlay when
+              opened; the trigger itself is inline here. */}
+          <SamChat />
+
           {/* Centre slot — pages can portal content here */}
           <div className="flex-1 flex justify-center items-center" id="app-header-center" />
 
@@ -503,8 +509,6 @@ export default function Layout() {
         </>
       )}
 
-      {/* Sam — floating AI assistant, available on every page */}
-      <SamChat />
     </div>
   )
 }
