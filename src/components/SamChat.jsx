@@ -125,41 +125,51 @@ export default function SamChat() {
 
   return (
     <>
-      {/* Trigger pill — sits inline in the Layout header next to the
-          Picture Build System logo. Amber (#FAC775) pops against the
-          forest-green header bar. The icon is a small cartoon analyst:
-          rounded glasses, dark hair, soft smile — readable at 18px. */}
+      {/* Trigger — a single bold round Sam icon in the Layout header next
+          to the brand mark. No pill background, no text. Sized large
+          enough (36px) that the cartoon face — round black-rimmed glasses,
+          dark hair, simple smile — reads at a glance against the forest-
+          green header. White face for max contrast. */}
       {!open && (
         <button
           onClick={() => setOpen(true)}
           title="Chat with Sam"
           aria-label="Chat with Sam"
-          className="inline-flex items-center gap-1.5 pl-1 pr-3 py-1 rounded-full text-xs font-semibold transition-transform hover:scale-105 flex-shrink-0"
-          style={{ backgroundColor: '#FAC775', color: '#633806' }}
+          className="flex-shrink-0 rounded-full transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-white/50"
         >
-          <span
-            className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: '#fff' }}
+          <svg
+            width="36"
+            height="36"
+            viewBox="0 0 40 40"
+            aria-hidden="true"
+            style={{ display: 'block' }}
           >
-            <svg width="18" height="18" viewBox="0 0 36 36" aria-hidden="true">
-              <circle cx="18" cy="18" r="14" fill="#FAEEDA" />
-              <path
-                d="M9 14 Q12 9 18 9 Q24 9 27 14 L27 12 Q22 7 18 7 Q14 7 9 12 Z"
-                fill="#5F5E5A"
-              />
-              <circle cx="13" cy="19" r="3.5" fill="#fff" stroke="#2C2C2A" strokeWidth="1.2" />
-              <circle cx="23" cy="19" r="3.5" fill="#fff" stroke="#2C2C2A" strokeWidth="1.2" />
-              <line x1="16.5" y1="19" x2="19.5" y2="19" stroke="#2C2C2A" strokeWidth="1.2" />
-              <path
-                d="M13 24 Q18 27 23 24"
-                stroke="#5F5E5A"
-                strokeWidth="1.3"
-                fill="none"
-                strokeLinecap="round"
-              />
-            </svg>
-          </span>
-          <span className="hidden sm:inline">Ask Sam</span>
+            {/* Face circle — white for max contrast on forest-green bar */}
+            <circle cx="20" cy="20" r="19" fill="#FFFFFF" />
+            {/* Hair — bold dark cap, ear-to-ear */}
+            <path
+              d="M5 18 Q6 8 20 8 Q34 8 35 18 Q33 14 28 13 Q20 11 12 13 Q7 14 5 18 Z"
+              fill="#2C2C2A"
+            />
+            {/* Skin-tone face hint behind glasses */}
+            <ellipse cx="20" cy="23" rx="13" ry="11" fill="#FAEEDA" />
+            {/* Glasses — bold black frames, bigger lenses */}
+            <circle cx="14" cy="21" r="5" fill="#FFFFFF" stroke="#2C2C2A" strokeWidth="2" />
+            <circle cx="26" cy="21" r="5" fill="#FFFFFF" stroke="#2C2C2A" strokeWidth="2" />
+            {/* Bridge between lenses */}
+            <line x1="19" y1="21" x2="21" y2="21" stroke="#2C2C2A" strokeWidth="2" />
+            {/* Pupils */}
+            <circle cx="14" cy="21" r="1.4" fill="#2C2C2A" />
+            <circle cx="26" cy="21" r="1.4" fill="#2C2C2A" />
+            {/* Smile */}
+            <path
+              d="M13 29 Q20 33 27 29"
+              stroke="#2C2C2A"
+              strokeWidth="2"
+              fill="none"
+              strokeLinecap="round"
+            />
+          </svg>
         </button>
       )}
 
