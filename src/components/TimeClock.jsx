@@ -294,6 +294,97 @@ function GpsBadge({ onSite, noGps, distanceM, override }) {
   return null
 }
 
+// Build a Google Maps URL for a captured clock event. When both the
+// captured GPS and the job's geocoded location are present, we link to
+// Maps' directions view so it's obvious how far apart the two are.
+// When only the captured GPS is known, we drop a pin there. Returns null
+// when there's nothing to show.
+function buildMapHref({ lat, lon, jobLat, jobLon }) {
+  if (lat == null || lon == null) return null
+  if (jobLat != null && jobLon != null) {
+    return `https://www.google.com/maps/dir/?api=1&origin=${lat},${lon}&destination=${jobLat},${jobLon}`
+  }
+  return `https://www.google.com/maps/?q=${lat},${lon}`
+}
+
+// One row of the dedicated GPS column — a labeled status pill plus a tiny
+// pin icon that opens the captured location in Google Maps.
+function GpsLine({ label, onSite, noGps, distanceM, lat, lon, jobLat, jobLon }) {
+  let cls = 'text-gray-400 bg-gray-50'
+  let text = '—'
+  if (noGps) {
+    cls = 'text-gray-600 bg-gray-100'
+    text = 'No GPS'
+  } else if (onSite === false) {
+    cls = 'text-red-700 bg-red-100'
+    text = `Off-site${distanceM != null ? ' · ' + fmtDistance(distanceM) : ''}`
+  } else if (onSite === true) {
+    cls = 'text-green-700 bg-green-100'
+    text = 'On site'
+  } else if (lat != null && lon != null) {
+    cls = 'text-gray-600 bg-gray-100'
+    text = 'No job loc'
+  }
+
+  const href = buildMapHref({ lat, lon, jobLat, jobLon })
+
+  return (
+    <div className="flex items-center gap-1 text-[10px] whitespace-nowrap leading-tight">
+      <span className="text-gray-400 font-semibold uppercase tracking-wide w-5 flex-shrink-0">
+        {label}
+      </span>
+      <span className={`px-1.5 py-0.5 rounded font-semibold ${cls}`}>{text}</span>
+      {href && (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Open in Google Maps"
+          className="text-gray-400 hover:text-blue-600 flex-shrink-0"
+        >
+          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z" />
+          </svg>
+        </a>
+      )}
+    </div>
+  )
+}
+
+// Dedicated GPS cell — stacks the clock-in and (if present) clock-out
+// GpsLines so supervisors can see at a glance whether each side was on/off
+// site and jump to a map of where the employee was.
+function GpsCell({ entry, jobLoc }) {
+  const jobLat = jobLoc?.lat ?? null
+  const jobLon = jobLoc?.lon ?? null
+  return (
+    <div className="flex flex-col gap-0.5">
+      <GpsLine
+        label="In"
+        onSite={entry.clock_in_on_site}
+        noGps={entry.clock_in_no_gps}
+        distanceM={entry.clock_in_distance_m}
+        lat={entry.clock_in_lat}
+        lon={entry.clock_in_lon}
+        jobLat={jobLat}
+        jobLon={jobLon}
+      />
+      {entry.time_out && (
+        <GpsLine
+          label="Out"
+          onSite={entry.clock_out_on_site}
+          noGps={entry.clock_out_no_gps}
+          distanceM={entry.clock_out_distance_m}
+          lat={entry.clock_out_lat}
+          lon={entry.clock_out_lon}
+          jobLat={jobLat}
+          jobLon={jobLon}
+        />
+      )}
+    </div>
+  )
+}
+
 // ── Main Component ───────────────────────────────────────────
 
 export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open' }) {
@@ -314,6 +405,14 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
   const reqId = useRef(0)
 
   const jobMap = Object.fromEntries(jobs.map(j => [j.id, j.name || j.client_name]))
+
+  // Geocoded lat/lon for each job, used by the GPS column to draw Maps
+  // directions from the employee's clock location to the job site.
+  const jobLocMap = Object.fromEntries(
+    jobs
+      .filter(j => j.lat != null && j.lon != null)
+      .map(j => [j.id, { lat: Number(j.lat), lon: Number(j.lon) }])
+  )
 
   // Fetch current user's display name for clock-in
   useEffect(() => {
@@ -715,11 +814,14 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left">
                     Time Out
                   </th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right">
+                  <th className="px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left w-44">
+                    GPS
+                  </th>
+                  <th className="px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right w-16">
                     Total
                   </th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right">
-                    Overtime
+                  <th className="px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right w-16">
+                    OT
                   </th>
                   <th className="px-4 py-3 w-16" />
                 </tr>
@@ -763,12 +865,6 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
                       {/* Time In */}
                       <td className="px-4 py-3 text-gray-700 font-mono text-sm">
                         {fmt12h(entry.time_in)}
-                        <GpsBadge
-                          onSite={entry.clock_in_on_site}
-                          noGps={entry.clock_in_no_gps}
-                          distanceM={entry.clock_in_distance_m}
-                          override={entry.clock_in_override}
-                        />
                       </td>
 
                       {/* Time Out — or Clock Out link */}
@@ -783,23 +879,22 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
                         ) : (
                           <span className="text-gray-700 font-mono text-sm">
                             {fmt12h(entry.time_out)}
-                            <GpsBadge
-                              onSite={entry.clock_out_on_site}
-                              noGps={entry.clock_out_no_gps}
-                              distanceM={entry.clock_out_distance_m}
-                              override={entry.clock_out_override}
-                            />
                           </span>
                         )}
                       </td>
 
+                      {/* GPS — clock-in/out location status + map link */}
+                      <td className="px-3 py-3 align-middle">
+                        <GpsCell entry={entry} jobLoc={jobLocMap[entry.job_id]} />
+                      </td>
+
                       {/* Total */}
-                      <td className="px-4 py-3 text-right font-mono font-semibold text-gray-800">
+                      <td className="px-2 py-3 text-right font-mono font-semibold text-gray-800 text-sm">
                         {isClockedIn ? <span className="text-gray-300">—</span> : fmtMins(total)}
                       </td>
 
                       {/* Overtime */}
-                      <td className="px-4 py-3 text-right font-mono">
+                      <td className="px-2 py-3 text-right font-mono text-sm">
                         {isClockedIn ? (
                           <span className="text-gray-300">—</span>
                         ) : ot > 0 ? (
