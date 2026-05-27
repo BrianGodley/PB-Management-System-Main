@@ -1,26 +1,23 @@
 // src/components/icons/OpportunitiesIcon.jsx
 //
-// Flat-style "opportunities" icon — a document in the background with two
-// arms reaching in for a handshake in the foreground, and a small green
-// check in the lower-right corner indicating a deal closed / agreement
-// reached. Uses the same warm flat palette as SkidSteerIcon and
-// OrgChartIcon (yellow / blue / peach skin) so the nav reads as a set.
+// Flat-style "opportunities" icon — two arms reaching in for a handshake,
+// no background document, no checkmark. Soft mint and green cuffs with
+// peach skin-tone hands clasped in the middle. Bold dark outline to match
+// the reference. Palette stays in the warm/flat family used by the other
+// custom nav icons.
 //
 // Pass a `size` prop (default 20) to override.
 //
 //   { path: '/clients', label: 'Opportunities', icon: <OpportunitiesIcon /> }
 export default function OpportunitiesIcon({ size = 20, className = '' }) {
   // Shared palette
-  const paper = '#FFFDF5'
-  const paperStroke = '#C9B98A'
   const skin = '#F2C9A1'
-  const skinStroke = '#B8895E'
-  const sleeveLeft = '#5AB9E8'        // blue (matches org chart middle person)
-  const sleeveLeftStroke = '#3E8AB0'
-  const sleeveRight = '#F4B82C'       // yellow (matches skid steer body)
-  const sleeveRightStroke = '#C68A12'
-  const check = '#4CAF74'             // green (matches org chart leader)
-  const checkStroke = '#2F7A4E'
+  const cuffLeft = '#A8E6D4'        // soft mint
+  const cuffRight = '#9FD9A6'       // soft green
+  const outline = '#3A3A3A'         // bold dark outline
+  const buttonDot = '#3A3A3A'
+  const buttonRing = '#FFFFFF'
+  const strokeW = 1.1
 
   return (
     <svg
@@ -31,92 +28,72 @@ export default function OpportunitiesIcon({ size = 20, className = '' }) {
       aria-hidden="true"
       style={{ display: 'inline-block', verticalAlign: '-3px' }}
     >
-      {/* Document in background — rectangle with folded top-right corner */}
+      {/* Left cuff — mint rectangle angling in from the lower-left */}
       <path
-        d="M 8 4
-           L 22 4
-           L 26 8
-           L 26 26
-           L 8 26
-           Z"
-        fill={paper}
-        stroke={paperStroke}
-        strokeWidth="0.8"
-        strokeLinejoin="round"
-      />
-      {/* Folded corner accent */}
-      <path
-        d="M 22 4 L 22 8 L 26 8"
-        fill="none"
-        stroke={paperStroke}
-        strokeWidth="0.8"
-        strokeLinejoin="round"
-      />
-
-      {/* Left sleeve / forearm — blue */}
-      <path
-        d="M 2 18
+        d="M 2 22
            L 10 14
-           L 14 17
-           L 6 21
+           L 14 18
+           L 6 26
            Z"
-        fill={sleeveLeft}
-        stroke={sleeveLeftStroke}
-        strokeWidth="0.6"
+        fill={cuffLeft}
+        stroke={outline}
+        strokeWidth={strokeW}
         strokeLinejoin="round"
       />
+      {/* Left cuff button */}
+      <circle cx="4.5" cy="23.5" r="0.9" fill={buttonRing} stroke={outline} strokeWidth="0.6" />
+      <circle cx="4.5" cy="23.5" r="0.35" fill={buttonDot} />
 
-      {/* Right sleeve / forearm — yellow */}
+      {/* Right cuff — green rectangle angling in from the upper-right */}
       <path
-        d="M 30 18
-           L 22 14
-           L 18 17
-           L 26 21
+        d="M 30 10
+           L 22 18
+           L 18 14
+           L 26 6
            Z"
-        fill={sleeveRight}
-        stroke={sleeveRightStroke}
-        strokeWidth="0.6"
+        fill={cuffRight}
+        stroke={outline}
+        strokeWidth={strokeW}
         strokeLinejoin="round"
       />
+      {/* Right cuff button */}
+      <circle cx="27.5" cy="8.5" r="0.9" fill={buttonRing} stroke={outline} strokeWidth="0.6" />
+      <circle cx="27.5" cy="8.5" r="0.35" fill={buttonDot} />
 
-      {/* Clasped hands — single peach shape in the middle */}
+      {/* Left forearm/hand — extends from left cuff into the clasp */}
       <path
         d="M 10 14
-           Q 13 13 16 15
-           Q 19 13 22 14
-           L 22 19
-           Q 19 21 16 19
-           Q 13 21 10 19
-           Z"
+           L 14 18
+           Q 16 19.5 19 19
+           Q 21 18.6 22 18
+           L 18 14
+           Q 16 13 13.5 13.2
+           Q 11.5 13.4 10 14 Z"
         fill={skin}
-        stroke={skinStroke}
-        strokeWidth="0.6"
+        stroke={outline}
+        strokeWidth={strokeW}
         strokeLinejoin="round"
-      />
-      {/* Thumb / grip line across the clasp for definition */}
-      <path
-        d="M 12 17 Q 16 18.5 20 17"
-        fill="none"
-        stroke={skinStroke}
-        strokeWidth="0.5"
-        strokeLinecap="round"
       />
 
-      {/* Green check badge in lower-right corner */}
-      <circle
-        cx="25" cy="25" r="4.5"
-        fill={check}
-        stroke={checkStroke}
-        strokeWidth="0.6"
-      />
+      {/* Right forearm/hand — extends from right cuff into the clasp,
+          drawn second so it sits in front of the left hand (thumb on top) */}
       <path
-        d="M 22.6 25.2 L 24.4 27 L 27.4 23.6"
-        fill="none"
-        stroke="#FFFFFF"
-        strokeWidth="1.4"
-        strokeLinecap="round"
+        d="M 22 18
+           L 18 14
+           Q 16.5 12.5 14 13
+           Q 12 13.4 11 14
+           Q 12.5 15 14.5 15.8
+           Q 17 16.8 19 17.4
+           Q 21 18 22 18 Z"
+        fill={skin}
+        stroke={outline}
+        strokeWidth={strokeW}
         strokeLinejoin="round"
       />
+
+      {/* Finger separations on the front (right) hand for definition */}
+      <path d="M 13 14.4 Q 14.4 15.4 15.8 16.0" fill="none" stroke={outline} strokeWidth="0.55" strokeLinecap="round" />
+      <path d="M 14.6 13.6 Q 16.0 14.6 17.3 15.2" fill="none" stroke={outline} strokeWidth="0.55" strokeLinecap="round" />
     </svg>
   )
 }
