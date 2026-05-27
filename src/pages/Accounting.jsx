@@ -1974,15 +1974,51 @@ function TransactionModal({ onSave, onClose, accounts }) {
 // balance because we may not have complete historical data from QB. The
 // columns mirror QB's: Date / Type / Ref / Payee / Memo / Amount.
 // ═════════════════════════════════════════════════════════════════════════════
+// QB column shape per account-subtype. Determines which amount column an
+// inflow lands in vs an outflow, and what each is labelled.
+//   leftLabel / rightLabel  → the two header labels
+//   numLabel                → "Number" (Bank) vs "Ref" (others)
+//   sign                    → +1 if `amount` adds to balance, -1 if subtracts
+//                             (Bank: checks subtract; CC: charges add liability)
+//   side                    → which column the amount renders in ('left'|'right')
+function registerColsFor(subtype) {
+  if (subtype === 'Bank') {
+    return { numLabel: 'NUMBER', leftLabel: 'PAYMENT', rightLabel: 'DEPOSIT', sign: -1, side: 'left' }
+  }
+  if (subtype === 'Credit Card') {
+    return { numLabel: 'REF', leftLabel: 'CHARGE', rightLabel: 'PAYMENT', sign: +1, side: 'left' }
+  }
+  if (subtype === 'Accounts Receivable') {
+    return { numLabel: 'NUMBER', leftLabel: 'INVOICED', rightLabel: 'RECEIVED', sign: +1, side: 'left' }
+  }
+  if (subtype === 'Accounts Payable') {
+    return { numLabel: 'NUMBER', leftLabel: 'BILLED', rightLabel: 'PAID', sign: +1, side: 'left' }
+  }
+  // Income / Expense / Equity / Other Assets / Other Liabilities — single column.
+  return { numLabel: 'REF', leftLabel: 'AMOUNT', rightLabel: '', sign: +1, side: 'left' }
+}
+
+function fmtMoney(n) {
+  if (n == null || n === '') return ''
+  return Number(n).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+}
+function fmtDate(d) {
+  if (!d) return '—'
+  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
+}
+
 function RegistersTab({ accounts }) {
   const [filterType, setFilterType] = useState('')   // one of the 14 subtypes
   const [filterAcct, setFilterAcct] = useState('')   // selected account id
 
   const [rows, setRows]       = useState([])
   const [loading, setLoading] = useState(false)
-  const [page, setPage]       = useState(0)
-  const [count, setCount]     = useState(0)
-  const PAGE_SIZE = 100
+  const [truncated, setTruncated] = useState(false)
+
+  // Cap the per-account fetch to keep client-side balance calc snappy.
+  // 5k rows = a substantial register; if an account exceeds it we tell
+  // the user and only show the most recent slice.
+  const MAX_ROWS = 5000
 
   // Accounts filtered to the selected type — drives the second dropdown.
   const accountsForType = filterType
@@ -1991,46 +2027,60 @@ function RegistersTab({ accounts }) {
         .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
     : []
 
-  // Clear the chosen account whenever the type changes — otherwise the
-  // old selection might no longer be in the new list.
   useEffect(() => {
     setFilterAcct('')
     setRows([])
-    setCount(0)
+    setTruncated(false)
   }, [filterType])
 
-  // Reset to page 1 on account change.
-  useEffect(() => {
-    setPage(0)
-  }, [filterAcct])
-
-  // Fetch the register for the selected account.
+  // Pull the register for the selected account. We grab up to MAX_ROWS,
+  // sort oldest-to-newest to compute a running balance, then flip the
+  // array for newest-first display.
   useEffect(() => {
     if (!filterAcct) return
     let cancelled = false
     ;(async () => {
       setLoading(true)
-      const from = page * PAGE_SIZE
-      const to   = from + PAGE_SIZE - 1
-      const { data, count: c, error } = await supabase
+      const { data, count, error } = await supabase
         .from('v_acct_account_register')
         .select('*', { count: 'exact' })
         .eq('account_id', filterAcct)
         .order('txn_date', { ascending: false, nullsFirst: false })
-        .range(from, to)
+        .limit(MAX_ROWS)
       if (cancelled) return
-      if (error) console.error('register fetch failed:', error)
-      setRows(data || [])
-      setCount(c || 0)
+      if (error) {
+        console.error('register fetch failed:', error)
+        setRows([])
+        setTruncated(false)
+      } else {
+        setRows(data || [])
+        setTruncated((count ?? 0) > (data?.length ?? 0))
+      }
       setLoading(false)
     })()
     return () => { cancelled = true }
-  }, [filterAcct, page])
+  }, [filterAcct])
 
   const selectedAcct = accounts.find(a => a.id === filterAcct)
-  const totalPages   = Math.max(1, Math.ceil(count / PAGE_SIZE))
-  const safePage     = Math.min(page, totalPages - 1)
-  const pageTotal    = rows.reduce((s, r) => s + Number(r.amount || 0), 0)
+  const cols = registerColsFor(selectedAcct?.subtype)
+
+  // Compute running balance oldest → newest. We loaded newest-first so we
+  // re-sort to ASC, accumulate, then flip back for display.
+  const displayRows = (() => {
+    if (!rows.length) return []
+    const oldestFirst = [...rows].sort((a, b) =>
+      (a.txn_date || '').localeCompare(b.txn_date || '')
+      || String(a.source_id).localeCompare(String(b.source_id))
+    )
+    let running = 0
+    for (const r of oldestFirst) {
+      running += cols.sign * Number(r.amount || 0)
+      r._balance = running
+    }
+    return oldestFirst.reverse()
+  })()
+
+  const grandTotal = rows.reduce((s, r) => s + Number(r.amount || 0), 0)
 
   return (
     <div>
@@ -2075,17 +2125,14 @@ function RegistersTab({ accounts }) {
             ))}
           </select>
         </div>
-        {selectedAcct && count > 0 && (
+        {selectedAcct && rows.length > 0 && (
           <div className="ml-auto text-right">
-            <p className="text-[10px] text-gray-400 uppercase font-semibold">Visible-page Total</p>
-            <p className="text-lg font-bold text-gray-800">
-              {pageTotal.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-            </p>
+            <p className="text-[10px] text-gray-400 uppercase font-semibold">Total Activity</p>
+            <p className="text-lg font-bold text-gray-800">{fmtMoney(grandTotal)}</p>
           </div>
         )}
       </div>
 
-      {/* Register header / empty state */}
       {!selectedAcct ? (
         <div className="text-center py-16 bg-white border border-dashed border-gray-300 rounded-xl">
           <p className="text-4xl mb-3">📒</p>
@@ -2096,90 +2143,119 @@ function RegistersTab({ accounts }) {
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {/* Account header — QB-style title bar */}
-          <div className="px-4 py-3 bg-green-50 border-b border-green-200 flex items-center justify-between">
+          {/* Account title bar (QB-style: heading row with green band) */}
+          <div className="px-4 py-2.5 bg-green-700 text-white flex items-center justify-between">
             <div className="min-w-0">
-              <p className="text-sm font-bold text-green-900 truncate">
-                {selectedAcct.number ? `${selectedAcct.number} · ` : ''}
-                {selectedAcct.name}
+              <p className="text-sm font-bold truncate">
+                {selectedAcct.number ? `${selectedAcct.number} · ` : ''}{selectedAcct.name}
               </p>
-              <p className="text-[11px] text-green-700">
-                {selectedAcct.subtype || '—'} · {count.toLocaleString()} transaction{count === 1 ? '' : 's'}
+              <p className="text-[11px] text-green-100">
+                {selectedAcct.subtype || '—'} · {rows.length.toLocaleString()}{truncated ? '+' : ''} transactions
               </p>
             </div>
-            {count > PAGE_SIZE && (
-              <span className="text-[11px] text-green-700">
-                Page {safePage + 1} of {totalPages.toLocaleString()}
+            {truncated && (
+              <span className="text-[11px] bg-yellow-200 text-yellow-900 px-2 py-0.5 rounded">
+                Showing most recent {MAX_ROWS.toLocaleString()} — narrow the type/account to see older
               </span>
             )}
           </div>
 
-          {/* Register table */}
-          <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
-            <colgroup>
-              <col style={{ width: '100px' }} /> {/* Date */}
-              <col style={{ width: '70px'  }} /> {/* Type */}
-              <col style={{ width: '90px'  }} /> {/* Ref */}
-              <col />                             {/* Payee */}
-              <col />                             {/* Memo */}
-              <col style={{ width: '120px' }} /> {/* Amount */}
-            </colgroup>
-            <thead>
-              <tr className="border-b border-gray-100 bg-gray-50 text-left text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-                <th className="px-3 py-2">Date</th>
-                <th className="px-3 py-2">Type</th>
-                <th className="px-3 py-2">Ref</th>
-                <th className="px-3 py-2">Payee</th>
-                <th className="px-3 py-2">Memo</th>
-                <th className="px-3 py-2 text-right">Amount</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {loading && (
-                <tr><td colSpan={6} className="px-3 py-10 text-center text-gray-400">Loading…</td></tr>
-              )}
-              {!loading && rows.length === 0 && (
-                <tr><td colSpan={6} className="px-3 py-10 text-center text-gray-400">
-                  No transactions hit this account yet.
-                </td></tr>
-              )}
-              {!loading && rows.map(r => (
-                <tr key={`${r.source_type}-${r.source_id}-${r.txn_date}-${r.amount}`} className="hover:bg-gray-50">
-                  <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
-                    {r.txn_date ? new Date(r.txn_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '—'}
-                  </td>
-                  <td className="px-3 py-2">
-                    <span className={`inline-block text-[9px] px-1.5 py-0.5 rounded font-semibold uppercase ${typeStyle(r.txn_type)}`}>
-                      {r.txn_type}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 font-mono text-xs text-gray-500 truncate">{r.ref || '—'}</td>
-                  <td className="px-3 py-2 text-gray-800 truncate" title={r.payee || ''}>{r.payee || '—'}</td>
-                  <td className="px-3 py-2 text-xs text-gray-500 truncate" title={r.memo || ''}>{r.memo || ''}</td>
-                  <td className="px-3 py-2 text-right font-mono font-semibold text-gray-800">
-                    {Number(r.amount || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-                  </td>
+          {/* Register table — QB-style two-row layout per transaction */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse" style={{ tableLayout: 'fixed' }}>
+              <colgroup>
+                <col style={{ width: '95px'  }} /> {/* Date */}
+                <col style={{ width: '95px'  }} /> {/* Number/Ref */}
+                <col />                             {/* Payee / Account / Memo (flex) */}
+                <col style={{ width: '110px' }} /> {/* Left amount (Payment/Charge) */}
+                <col style={{ width: '34px'  }} /> {/* ✓ */}
+                <col style={{ width: '110px' }} /> {/* Right amount (Deposit/Payment) */}
+                <col style={{ width: '120px' }} /> {/* Balance */}
+              </colgroup>
+              <thead>
+                {/* Top header row — main fields */}
+                <tr className="bg-gray-100 border-b border-gray-300 text-[10px] font-bold uppercase tracking-wide text-gray-600">
+                  <th className="px-2 py-1.5 text-left">DATE</th>
+                  <th className="px-2 py-1.5 text-left">{cols.numLabel}</th>
+                  <th className="px-2 py-1.5 text-left">PAYEE</th>
+                  <th className="px-2 py-1.5 text-right">{cols.leftLabel}</th>
+                  <th className="px-1 py-1.5 text-center">✓</th>
+                  <th className="px-2 py-1.5 text-right">{cols.rightLabel || ''}</th>
+                  <th className="px-2 py-1.5 text-right">BALANCE</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {/* Pagination */}
-          {count > PAGE_SIZE && (
-            <div className="px-4 py-2 border-t border-gray-100 flex items-center gap-3 text-xs text-gray-500">
-              <button
-                onClick={() => setPage(Math.max(0, safePage - 1))}
-                disabled={safePage === 0}
-                className="px-2.5 py-1 rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-              >‹ Prev</button>
-              <span>Page {safePage + 1} of {totalPages.toLocaleString()} · {count.toLocaleString()} total</span>
-              <button
-                onClick={() => setPage(Math.min(totalPages - 1, safePage + 1))}
-                disabled={safePage >= totalPages - 1}
-                className="px-2.5 py-1 rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-              >Next ›</button>
-            </div>
-          )}
+                {/* Sub-header row — second-line field labels */}
+                <tr className="bg-gray-50 border-b border-gray-300 text-[9px] font-semibold uppercase tracking-wide text-gray-400">
+                  <th className="px-2 py-1 text-left"></th>
+                  <th className="px-2 py-1 text-left">TYPE</th>
+                  <th className="px-2 py-1 text-left">ACCOUNT / MEMO</th>
+                  <th className="px-1 py-1"></th>
+                  <th className="px-1 py-1"></th>
+                  <th className="px-1 py-1"></th>
+                  <th className="px-1 py-1"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading && (
+                  <tr><td colSpan={7} className="px-3 py-10 text-center text-gray-400">Loading register…</td></tr>
+                )}
+                {!loading && displayRows.length === 0 && (
+                  <tr><td colSpan={7} className="px-3 py-10 text-center text-gray-400">
+                    No transactions hit this account yet.
+                  </td></tr>
+                )}
+                {!loading && displayRows.map((r, idx) => {
+                  // Alternating shading by transaction (both rows of a txn
+                  // share the same bg so they read as one unit).
+                  const bg = idx % 2 === 0 ? 'bg-white' : 'bg-emerald-50'
+                  const amountCell = fmtMoney(r.amount)
+                  const subAccountAndMemo = [r.offset_party, r.memo].filter(Boolean).join('  ·  ')
+                  return (
+                    <Fragment key={`${r.source_type}-${r.source_id}-${idx}`}>
+                      {/* Row 1 of transaction — main data */}
+                      <tr className={`${bg} hover:bg-emerald-100/60`}>
+                        <td className="px-2 py-1.5 text-xs text-gray-700 whitespace-nowrap align-top">{fmtDate(r.txn_date)}</td>
+                        <td className="px-2 py-1.5 font-mono text-xs text-gray-700 truncate align-top">{r.ref || ''}</td>
+                        <td className="px-2 py-1.5 text-gray-900 truncate align-top" title={r.payee || ''}>{r.payee || ''}</td>
+                        <td className="px-2 py-1.5 text-right font-mono text-gray-900 align-top whitespace-nowrap">
+                          {cols.side === 'left' ? amountCell : ''}
+                        </td>
+                        <td className="px-1 py-1.5 text-center text-gray-400 align-top">
+                          {/* Cleared/reconciled — we don't track it yet */}
+                        </td>
+                        <td className="px-2 py-1.5 text-right font-mono text-gray-900 align-top whitespace-nowrap">
+                          {cols.side === 'right' ? amountCell : ''}
+                        </td>
+                        <td className="px-2 py-1.5 text-right font-mono font-semibold text-gray-800 align-top whitespace-nowrap">
+                          {fmtMoney(r._balance)}
+                        </td>
+                      </tr>
+                      {/* Row 2 of transaction — secondary data, each
+                          field stays in the SAME column as its primary:
+                          Type lives under Number/Ref; Account & Memo
+                          live under Payee. Amount / ✓ / Balance columns
+                          stay empty on row 2 so the right-hand columns
+                          line up cleanly with row 1. */}
+                      <tr className={`${bg} border-b border-gray-200 hover:bg-emerald-100/60`}>
+                        <td className="px-2 pb-1.5 pt-0"></td>
+                        <td className="px-2 pb-1.5 pt-0">
+                          <span className={`inline-block text-[9px] px-1.5 py-0.5 rounded font-semibold uppercase ${typeStyle(r.txn_type)}`}>
+                            {r.txn_type}
+                          </span>
+                        </td>
+                        <td className="px-2 pb-1.5 pt-0 text-xs text-gray-500 truncate" title={subAccountAndMemo}>
+                          {subAccountAndMemo || <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-2 pb-1.5 pt-0"></td>
+                        <td className="px-1 pb-1.5 pt-0"></td>
+                        <td className="px-2 pb-1.5 pt-0"></td>
+                        <td className="px-2 pb-1.5 pt-0"></td>
+                      </tr>
+                    </Fragment>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
