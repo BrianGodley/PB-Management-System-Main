@@ -241,19 +241,26 @@ function WeekRow({
     })
     .sort((a, b) => (a.title || '').localeCompare(b.title || ''))
 
-  // ── Lane assignment: STRICT alphabetical by title ─────────────────────
-  // Every unique title gets its own lane in alphabetical order. Items
-  // sharing a title share a lane (multiple non-overlapping segments of
-  // the same job land on the same row). We deliberately do NOT pack bars
-  // into lower lanes when their dates don't conflict — keeping rows in
-  // alpha order makes the calendar readable as "job X is always row N",
-  // even at the cost of empty space between bars on a row.
-  const uniqueTitles = [...new Set(weekItems.map(i => i.title || ''))]
-    .sort((a, b) => a.localeCompare(b))
-  const laneByTitle = Object.fromEntries(uniqueTitles.map((t, i) => [t, i]))
+  // ── Lane assignment: alpha-preserving packer ──────────────────────────
+  // Goal: keep titles in alphabetical order TOP TO BOTTOM on every day
+  // (so the calendar reads consistently) WHILE compacting wherever it's
+  // safe (no whitespace gaps that aren't necessary).
+  //
+  // Rule for placing a title T (processed in alpha order):
+  //   - lane L is acceptable iff
+  //       (a) no date conflict between T and anything already in lane L
+  //       (b) no PREVIOUSLY-placed title (which is alpha-before T) sits in
+  //           a lane > L AND overlaps T's date range.
+  //   Pick the lowest L that satisfies both.
+  //
+  // (b) is the alpha-preservation rule: putting T above an earlier-alpha
+  // title would mean scanning top→bottom on the overlapping days would
+  // see T (later alpha) above the older title (earlier alpha) — wrong.
+  // Same-title multi-segment items share a lane (we union their date
+  // ranges and place them as one slot).
 
-  const itemInfo = {}
-
+  // Pass 1: compute segments + per-item range. Stash for later assembly.
+  const perItem = {}
   weekItems.forEach(item => {
     const iStart = new Date(item.start_date + 'T00:00:00')
     const iEnd = new Date(item.end_date + 'T00:00:00')
@@ -261,7 +268,7 @@ function WeekRow({
     const incSun = item.include_sunday || false
 
     // Build contiguous working-day segments within this week row.
-    // Exception days (and non-working days) break the bar — no rendering on those cols.
+    // Exception days (and non-working days) break the bar.
     const segments = []
     let segStart = -1,
       lastWorkingCol = -1
@@ -282,18 +289,76 @@ function WeekRow({
     if (segStart !== -1) segments.push({ startCol: segStart, endCol: lastWorkingCol })
     if (segments.length === 0) return
 
-    const lane = laneByTitle[item.title || '']
-
-    // isItemStart/End: does this week's first/last segment touch the item's actual start/end date?
     const firstSegDate = weekDates[segments[0].startCol]
     const lastSegDate = weekDates[segments[segments.length - 1].endCol]
-    itemInfo[item.id] = {
+    perItem[item.id] = {
       segments,
-      lane,
-      isItemStart: firstSegDate && firstSegDate.getTime() === iStart.getTime(),
-      isItemEnd: lastSegDate && lastSegDate.getTime() === iEnd.getTime(),
+      overallStart: segments[0].startCol,
+      overallEnd:   segments[segments.length - 1].endCol,
+      title:        item.title || '',
+      isItemStart:  firstSegDate && firstSegDate.getTime() === iStart.getTime(),
+      isItemEnd:    lastSegDate && lastSegDate.getTime() === iEnd.getTime(),
     }
   })
+
+  // Pass 2: union per-title date ranges (multi-segment items of the same
+  // title share a lane, so we treat them as one block for placement).
+  const titleRanges = {}
+  for (const id of Object.keys(perItem)) {
+    const { title, overallStart, overallEnd } = perItem[id]
+    if (!titleRanges[title]) {
+      titleRanges[title] = { start: overallStart, end: overallEnd }
+    } else {
+      titleRanges[title].start = Math.min(titleRanges[title].start, overallStart)
+      titleRanges[title].end   = Math.max(titleRanges[title].end,   overallEnd)
+    }
+  }
+
+  // Pass 3: alpha-order placement with safe packing.
+  const sortedTitles = Object.keys(titleRanges).sort((a, b) => a.localeCompare(b))
+  const lanes = []           // lanes[L] = [{ start, end, title }, ...]
+  const laneByTitle = {}
+
+  function overlaps(a, b) {
+    // Inclusive overlap on column indices.
+    return !(a.end < b.start || a.start > b.end)
+  }
+
+  for (const title of sortedTitles) {
+    const range = titleRanges[title]
+    let chosen = lanes.length
+    for (let L = 0; L <= lanes.length; L++) {
+      // (a) conflict in this lane?
+      const here = lanes[L] || []
+      if (here.some(r => overlaps(r, range))) continue
+      // (b) any earlier-alpha title in a lane below L overlapping this range?
+      let blocked = false
+      for (let lower = L + 1; lower < lanes.length; lower++) {
+        for (const r of (lanes[lower] || [])) {
+          if (overlaps(r, range)) { blocked = true; break }
+        }
+        if (blocked) break
+      }
+      if (blocked) continue
+      chosen = L
+      break
+    }
+    if (!lanes[chosen]) lanes[chosen] = []
+    lanes[chosen].push({ ...range, title })
+    laneByTitle[title] = chosen
+  }
+
+  // Pass 4: build itemInfo for the renderer (each item gets its title's lane).
+  const itemInfo = {}
+  for (const id of Object.keys(perItem)) {
+    const p = perItem[id]
+    itemInfo[id] = {
+      segments: p.segments,
+      lane: laneByTitle[p.title],
+      isItemStart: p.isItemStart,
+      isItemEnd:   p.isItemEnd,
+    }
+  }
 
   return (
     <div className="relative border-b border-gray-200">
