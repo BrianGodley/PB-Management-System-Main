@@ -30,7 +30,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 import { XMLParser } from 'https://esm.sh/fast-xml-parser@4.4.1'
 
 const QB_NS = 'http://developer.intuit.com/'
-const SERVER_VERSION = 'Landscape Job Tracker QBWC service 1.3 (job-cost pull, incremental)'
+const SERVER_VERSION = 'Landscape Job Tracker QBWC service 1.4 (job-cost + chart of accounts)'
 
 // The work queue for a session.
 //   * TimeTracking pulls payroll hours into qb_time_tracking (unchanged).
@@ -38,7 +38,7 @@ const SERVER_VERSION = 'Landscape Job Tracker QBWC service 1.3 (job-cost pull, i
 //     transactions into the acct_* tables. Each one paginates via QB's
 //     iterator (continuation work items get appended dynamically inside
 //     receiveResponseXML when iteratorRemainingCount > 0).
-const SYNC_ENTITIES = ['TimeTracking', 'Bill', 'Check', 'CreditCardCharge', 'ItemReceipt']
+const SYNC_ENTITIES = ['TimeTracking', 'Account', 'Bill', 'Check', 'CreditCardCharge', 'ItemReceipt']
 // How many rows to ask QuickBooks for per page on the AP queries. Lower =
 // safer for QBWC's response buffer; higher = fewer round-trips. 500 is the
 // QBWC sweet spot per Intuit's own QBSDK samples.
@@ -222,6 +222,14 @@ function buildEntityRequest(item: WorkItem, version: string): string {
       ? `<TxnDateRangeFilter><FromTxnDate>${xmlEscape(item.fromDate)}</FromTxnDate></TxnDateRangeFilter>`
       : ''
     return qbxmlRequest(version, `<TimeTrackingQueryRq>${filter}</TimeTrackingQueryRq>`)
+  }
+
+  // List queries like AccountQueryRq don't use the transaction-iterator
+  // pattern — charts of accounts are small enough that a single full
+  // pull is fine. ActiveStatus="All" includes inactive accounts so the
+  // PBS chart shows the same scope as QB.
+  if (item?.entity === 'Account') {
+    return qbxmlRequest(version, `<AccountQueryRq><ActiveStatus>All</ActiveStatus></AccountQueryRq>`)
   }
 
   const { attrs, modFilter, max, lines } = apQueryAttrs(item)
@@ -555,6 +563,68 @@ function parseItemReceipts(qbxml: string): ApParseResult {
   return { headers, lines, iteratorRemaining: remaining, iteratorId: id, status, maxTimeModified: maxTM }
 }
 
+// ── Chart of Accounts ───────────────────────────────────────────────────
+// Maps the QB AccountType string (as it comes back in qbXML, e.g. "Bank",
+// "FixedAsset", "OtherCurrentLiability") to the PBS high-level type the
+// acct_accounts table CHECK constraint accepts. We also keep the raw QB
+// type in `qb_account_type` and store its display-friendly form in
+// `subtype` so reports can pivot either way.
+const QB_ACCOUNT_TYPE_MAP: Record<string, { type: string; subtype: string }> = {
+  Bank:                  { type: 'asset',     subtype: 'Bank' },
+  AccountsReceivable:    { type: 'asset',     subtype: 'Accounts Receivable' },
+  OtherCurrentAsset:     { type: 'asset',     subtype: 'Other Current Asset' },
+  FixedAsset:            { type: 'asset',     subtype: 'Fixed Asset' },
+  OtherAsset:            { type: 'asset',     subtype: 'Other Asset' },
+  AccountsPayable:       { type: 'liability', subtype: 'Accounts Payable' },
+  CreditCard:            { type: 'liability', subtype: 'Credit Card' },
+  OtherCurrentLiability: { type: 'liability', subtype: 'Other Current Liability' },
+  LongTermLiability:     { type: 'liability', subtype: 'Long-Term Liability' },
+  Equity:                { type: 'equity',    subtype: 'Equity' },
+  Income:                { type: 'income',    subtype: 'Income' },
+  OtherIncome:           { type: 'income',    subtype: 'Other Income' },
+  CostOfGoodsSold:       { type: 'cogs',      subtype: 'Cost of Goods Sold' },
+  Expense:               { type: 'expense',   subtype: 'Expense' },
+  OtherExpense:          { type: 'expense',   subtype: 'Other Expense' },
+  NonPosting:            { type: 'expense',   subtype: 'Non-Posting' },
+}
+
+function mapQbAccountType(qbType: string | null | undefined): { type: string; subtype: string } {
+  const t = String(qbType || '').trim()
+  return QB_ACCOUNT_TYPE_MAP[t] || { type: 'expense', subtype: t || 'Unknown' }
+}
+
+function parseAccounts(qbxml: string): { rows: Record<string, unknown>[]; status: string } {
+  const doc = xmlParser.parse(qbxml || '')
+  const rs = doc?.QBXML?.QBXMLMsgsRs?.AccountQueryRs
+  const rets = ensureArray(rs?.AccountRet)
+  const rows = rets
+    .filter((a: any) => a && a.ListID)
+    .map((a: any) => {
+      const mapped = mapQbAccountType(a.AccountType)
+      return {
+        qb_list_id:        a.ListID,
+        qb_full_name:      a.FullName ?? null,
+        qb_account_type:   a.AccountType ?? null,
+        qb_edit_sequence:  a.EditSequence ?? null,
+        qb_time_modified:  a.TimeModified ?? null,
+        qb_synced_at:      nowIso(),
+        parent_qb_list_id: a.ParentRef?.ListID ?? null,
+        source:            'qb',
+        // Mapped values
+        name:              a.FullName ?? a.Name ?? '(unnamed)',
+        number:            a.AccountNumber ?? null,
+        type:              mapped.type,
+        subtype:           mapped.subtype,
+        description:       a.Desc ?? null,
+        is_active:         bool(a.IsActive) ?? true,
+      }
+    })
+  const status = rs
+    ? `statusCode ${rs['@_statusCode']} — ${rs['@_statusMessage']}`
+    : 'no AccountQueryRs element in response'
+  return { rows, status }
+}
+
 // Upsert headers, then resolve each line's __header_qb_txn_id placeholder to
 // the actual header UUID, then upsert lines. Returns the row counts so the
 // caller can write a tidy status message into qb_sync_log.
@@ -822,6 +892,23 @@ async function handle(method: string, body: string): Promise<string> {
           const count = await upsertChunked(sb, 'qb_time_tracking', rows, 'txn_id')
           await logCall(sb, ticket || null, 'receiveResponseXML', 'ok',
             `Pulled ${count} time-tracking entries (${status}).`, entity, 'pull')
+
+        } else if (entity === 'Account') {
+          const { rows, status } = parseAccounts(response)
+          // Upsert chart of accounts via qb_list_id (idempotent). After
+          // the upsert, run the parent resolver so hierarchy (Materials
+          // → Pavers) is wired up without ordering the inserts by depth.
+          const count = await upsertChunked(sb, 'acct_accounts', rows, 'qb_list_id')
+          let resolved = 0
+          try {
+            const { data } = await sb.rpc('resolve_acct_account_parents')
+            resolved = typeof data === 'number' ? data : Number(data) || 0
+          } catch (e) {
+            console.warn('resolve_acct_account_parents failed:', e instanceof Error ? e.message : e)
+          }
+          await logCall(sb, ticket || null, 'receiveResponseXML', 'ok',
+            `Pulled ${count} accounts (${resolved} parent links resolved) (${status}).`,
+            entity, 'pull')
 
         } else if (entity === 'Bill') {
           const { headers, lines, iteratorRemaining, iteratorId, status, maxTimeModified } = parseBills(response)
