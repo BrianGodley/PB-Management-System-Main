@@ -7,18 +7,20 @@ import { supabase } from '../lib/supabase'
 import SamChat from './SamChat'
 import ReportIssueModal from './ReportIssueModal'
 import SkidSteerIcon from './icons/SkidSteerIcon'
+import OrgChartIcon from './icons/OrgChartIcon'
+import OpportunitiesIcon from './icons/OpportunitiesIcon'
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: '🏠' },
   { path: '/contacts', label: 'Contacts', icon: '🗂️' },
-  { path: '/clients', label: 'Opportunities', icon: '👥' },
+  { path: '/clients', label: 'Opportunities', icon: <OpportunitiesIcon /> },
   { path: '/design', label: 'Design', icon: '📐' },
   { path: '/bids', label: 'Bids', icon: '📋' },
   { path: '/jobs', label: 'Jobs', icon: '🏡' },
   { path: '/equipment-tracking', label: 'Equipment', icon: <SkidSteerIcon /> },
   { path: '/collections', label: 'Finance', icon: '🏦' },
   { path: '/statistics', label: 'Statistics', icon: '📈' },
-  { path: '/org-chart', label: 'Org Chart', icon: '🏗️' },
+  { path: '/org-chart', label: 'Org Chart', icon: <OrgChartIcon /> },
   { path: '/portal/subs', label: 'Subs & Vendors', icon: '🧑‍🔧' },
   { path: '/training', label: 'Training', icon: '🎓' },
   { path: '/hr', label: 'HR', icon: '🏢' },
