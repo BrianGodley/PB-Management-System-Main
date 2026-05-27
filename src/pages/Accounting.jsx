@@ -1987,21 +1987,32 @@ const COA_SECTIONS = [
 function ChartOfAccountsTab({ accounts, onRefresh }) {
   const { confirm, dialog } = useConfirm()
   const [modal, setModal] = useState(null)
+  // Per-account transaction count, fetched from v_acct_account_txn_counts.
+  // Empty object renders 0 until the fetch resolves — no spinner needed.
+  const [txnCounts, setTxnCounts] = useState({})
 
-  // Bucket each account into one of the 14 sections by subtype. Anything
-  // with an unrecognised subtype (and any manual rows without a subtype)
-  // falls into an "Uncategorised" catch-all at the bottom so they don't
-  // disappear from the view.
+  useEffect(() => {
+    let cancelled = false
+    supabase
+      .from('v_acct_account_txn_counts')
+      .select('account_id, txn_count')
+      .then(({ data }) => {
+        if (cancelled || !data) return
+        const map = {}
+        for (const r of data) map[r.account_id] = r.txn_count
+        setTxnCounts(map)
+      })
+    return () => { cancelled = true }
+  }, [accounts])
+
+  // Bucket each account into one of the 14 sections by subtype. Accounts
+  // whose subtype isn't one of the 14 are simply dropped from this view —
+  // there is no Uncategorised section.
   const buckets = {}
   for (const s of COA_SECTIONS) buckets[s.subtype] = []
-  const orphans = []
   for (const a of accounts) {
     const sub = (a.subtype || '').trim()
-    if (sub && buckets[sub]) {
-      buckets[sub].push(a)
-    } else {
-      orphans.push(a)
-    }
+    if (sub && buckets[sub]) buckets[sub].push(a)
   }
   for (const sub of Object.keys(buckets)) {
     buckets[sub].sort(
@@ -2011,7 +2022,6 @@ function ChartOfAccountsTab({ accounts, onRefresh }) {
         (a.name   || '').localeCompare(b.name   || '')
     )
   }
-  orphans.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
 
   async function saveAccount(data) {
     if (modal?.id) {
@@ -2033,7 +2043,7 @@ function ChartOfAccountsTab({ accounts, onRefresh }) {
   return (
     <div>
       {dialog}
-      <div className="flex justify-end mb-4">
+      <div className="flex justify-end mb-4 pr-6">
         <button onClick={() => setModal('new')} className="btn-primary text-sm px-4 py-2">
           + New Account
         </button>
@@ -2059,21 +2069,35 @@ function ChartOfAccountsTab({ accounts, onRefresh }) {
                   No {section.subtype.toLowerCase()} accounts.
                 </p>
               ) : (
-                <table className="w-full text-sm">
+                <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
+                  {/* Fixed column widths so the Status badge and Edit/Del
+                      buttons line up vertically across every section. */}
+                  <colgroup>
+                    <col style={{ width: '90px' }} />     {/* # */}
+                    <col />                                {/* Name (flex) */}
+                    <col />                                {/* Description (flex) */}
+                    <col style={{ width: '90px' }} />     {/* Txns */}
+                    <col style={{ width: '100px' }} />    {/* Status */}
+                    <col style={{ width: '90px' }} />     {/* Actions */}
+                  </colgroup>
                   <tbody className="divide-y divide-gray-50">
                     {typeAccts.map(acct => (
                       <tr key={acct.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-2.5 font-mono text-xs text-gray-400 w-16">
+                        <td className="px-4 py-2.5 font-mono text-xs text-gray-400 truncate">
                           {acct.number}
                         </td>
-                        <td className="px-4 py-2.5 font-medium text-gray-800">{acct.name}</td>
-                        <td className="px-4 py-2.5 text-xs text-gray-400">{acct.subtype || '—'}</td>
-                        <td className="px-4 py-2.5 text-xs text-gray-400">
+                        <td className="px-4 py-2.5 font-medium text-gray-800 truncate" title={acct.name}>
+                          {acct.name}
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-gray-400 truncate" title={acct.description || ''}>
                           {acct.description || ''}
                         </td>
-                        <td className="px-4 py-2.5 text-right">
+                        <td className="px-4 py-2.5 text-xs text-gray-600 text-right font-mono">
+                          {(txnCounts[acct.id] || 0).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-2.5 text-center">
                           <span
-                            className={`text-[10px] px-1.5 py-0.5 rounded-full ${acct.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}
+                            className={`inline-block text-[10px] px-1.5 py-0.5 rounded-full ${acct.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}
                           >
                             {acct.is_active ? 'Active' : 'Inactive'}
                           </span>
@@ -2103,49 +2127,6 @@ function ChartOfAccountsTab({ accounts, onRefresh }) {
           )
         })}
 
-        {/* Uncategorised — any account whose subtype isn't one of the 14
-            known QB types (typically manual-source accounts with no
-            subtype). Hidden when there are none. */}
-        {orphans.length > 0 && (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="px-4 py-2.5 flex items-center gap-2 border-b border-gray-100 bg-gray-50">
-              <span className="text-xs font-bold uppercase tracking-wide text-gray-600">
-                Uncategorised
-              </span>
-              <span className="text-[10px] font-semibold text-gray-500 opacity-60">
-                {orphans.length} account{orphans.length !== 1 ? 's' : ''}
-              </span>
-              <span className="text-[10px] text-gray-400 italic ml-1">
-                — set a subtype on Edit to slot these into a section
-              </span>
-            </div>
-            <table className="w-full text-sm">
-              <tbody className="divide-y divide-gray-50">
-                {orphans.map(acct => (
-                  <tr key={acct.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-2.5 font-mono text-xs text-gray-400 w-16">{acct.number}</td>
-                    <td className="px-4 py-2.5 font-medium text-gray-800">{acct.name}</td>
-                    <td className="px-4 py-2.5 text-xs text-gray-400">{acct.subtype || '—'}</td>
-                    <td className="px-4 py-2.5 text-xs text-gray-400">{acct.description || ''}</td>
-                    <td className="px-4 py-2.5 text-right">
-                      <span
-                        className={`text-[10px] px-1.5 py-0.5 rounded-full ${acct.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}
-                      >
-                        {acct.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-right">
-                      <div className="flex justify-end gap-2">
-                        <button onClick={() => setModal(acct)} className="text-xs text-gray-400 hover:text-gray-700">Edit</button>
-                        <button onClick={() => deleteAccount(acct.id)} className="text-xs text-red-400 hover:text-red-600">Del</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
 
       {modal && (
