@@ -291,7 +291,7 @@ export default function TemplatesManager() {
                       {(t.project_manager || t.consultant) && (
                         <p className="text-xs text-gray-400 mt-0.5">
                           {[
-                            t.project_manager && `PM: ${t.project_manager}`,
+                            t.project_manager && `Supv: ${t.project_manager}`,
                             t.consultant && `Cons: ${t.consultant}`,
                           ]
                             .filter(Boolean)
@@ -506,11 +506,11 @@ function TemplateModal({ template, userId, onSave, onClose }) {
             />
           </div>
 
-          {/* PM + Consultant */}
+          {/* Job Supervisor + Consultant */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">
-                Project Manager
+                Job Supervisor
               </label>
               <input
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"

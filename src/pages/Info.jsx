@@ -12,7 +12,7 @@
 // desktop).
 //
 // Editable fields — saving patches the same `jobs` columns as the
-// JobInfoModal (status, name, address, consultant, project_manager).
+// JobInfoModal (status, name, address, consultant, job_supervisor).
 
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
@@ -47,7 +47,7 @@ export default function Info() {
   const [state, setState] = useState('')
   const [zip, setZip] = useState('')
   const [consultant, setConsultant] = useState('')
-  const [projectManager, setProjectManager] = useState('')
+  const [jobSupervisor, setJobSupervisor] = useState('')
   // Responsible employee — FK to employees.id (UUID). Drives the
   // (initials) suffix on the job name everywhere in the app.
   const [responsibleEmployeeId, setResponsibleEmployeeId] = useState('')
@@ -60,7 +60,7 @@ export default function Info() {
     supabase
       .from('jobs')
       .select(
-        'id, name, client_name, status, job_address, job_city, job_state, job_zip, consultant, project_manager, responsible_employee_id'
+        'id, name, client_name, status, job_address, job_city, job_state, job_zip, consultant, job_supervisor, project_manager, responsible_employee_id'
       )
       .order('status', { ascending: true })
       .order('name', { ascending: true })
@@ -101,7 +101,7 @@ export default function Info() {
     setState(selectedJob.job_state || '')
     setZip(selectedJob.job_zip || '')
     setConsultant(selectedJob.consultant || '')
-    setProjectManager(selectedJob.project_manager || '')
+    setJobSupervisor(selectedJob.job_supervisor || selectedJob.project_manager || '')
     setResponsibleEmployeeId(selectedJob.responsible_employee_id || '')
     setSaveError('')
     setActiveTab('info')
@@ -128,7 +128,9 @@ export default function Info() {
       job_state: state.trim(),
       job_zip: zip.trim(),
       consultant: consultant || null,
-      project_manager: projectManager || null,
+      job_supervisor: jobSupervisor || null,
+      // Legacy mirror — keep project_manager filled so any old reader stays in sync.
+      project_manager: jobSupervisor || null,
       responsible_employee_id: responsibleEmployeeId || null,
     }
     const { error } = await supabase.from('jobs').update(updates).eq('id', selectedJob.id)
@@ -362,13 +364,13 @@ export default function Info() {
                     </div>
 
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">Project Manager</label>
+                      <label className="block text-xs text-gray-500 mb-1">Job Supervisor</label>
                       <select
-                        value={projectManager}
-                        onChange={e => setProjectManager(e.target.value)}
+                        value={jobSupervisor}
+                        onChange={e => setJobSupervisor(e.target.value)}
                         className="input text-sm w-full"
                       >
-                        <option value="">— Select project manager —</option>
+                        <option value="">— Select job supervisor —</option>
                         {employeeOptions.map(o => (
                           <option key={o.value} value={o.value}>
                             {o.label}
@@ -430,7 +432,7 @@ export default function Info() {
             {/* Employees tab */}
             {activeTab === 'employees' && (
               <div className="px-5 py-4">
-                {consultant || projectManager ? (
+                {consultant || jobSupervisor ? (
                   <div className="space-y-3">
                     {consultant && (
                       <div>
@@ -438,10 +440,10 @@ export default function Info() {
                         <p className="text-sm font-medium text-gray-800">{consultant}</p>
                       </div>
                     )}
-                    {projectManager && (
+                    {jobSupervisor && (
                       <div>
-                        <p className="text-xs text-gray-400 mb-0.5">Project Manager</p>
-                        <p className="text-sm font-medium text-gray-800">{projectManager}</p>
+                        <p className="text-xs text-gray-400 mb-0.5">Job Supervisor</p>
+                        <p className="text-sm font-medium text-gray-800">{jobSupervisor}</p>
                       </div>
                     )}
                   </div>

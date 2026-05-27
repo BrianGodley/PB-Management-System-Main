@@ -252,9 +252,9 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
     setSuccessSupervisor(job.success_supervisor || '')
   }
 
-  // Save the 9 role columns. Also keeps the legacy consultant /
-  // project_manager columns in sync so older code that reads them keeps
-  // working.
+  // Save the role columns. Also mirrors job_supervisor → the legacy
+  // project_manager column so any older code that still reads it stays
+  // in sync.
   async function handleSaveEmployees() {
     setSaving(true)
     setError('')
@@ -432,7 +432,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
   }))
 
   // Save just the Job Details fields (status, name, address, contract,
-  // permit, consultant, project manager). Site access lives on the job too
+  // permit, consultant, job supervisor). Site access lives on the job too
   // but is edited from the Client tab — see handleSaveClient.
   async function handleSaveDetails() {
     if (!jobTitle.trim()) {

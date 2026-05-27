@@ -272,8 +272,8 @@ export default function Bids() {
       }
 
       // Persist any role assignments the user picked in the sold modal.
-      // Mirrors the legacy consultant / project_manager columns so older
-      // readers stay in sync.
+      // Mirror to the legacy project_manager column so older readers that
+      // still expect it keep showing the job supervisor.
       const r = soldModal.roles || {}
       const roleUpdates = {}
       for (const role of JOB_ROLES) {

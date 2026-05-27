@@ -757,7 +757,8 @@ export default function JobsList() {
   }
 
   // Apply the supervisor assignments — write the supervisor's name to
-  // each job's project_manager column.
+  // each job's job_supervisor column (and mirror to project_manager so
+  // legacy readers stay in sync).
   async function applySupervisorAssignments() {
     if (!supResult) return
     setSupApplying(true)
@@ -765,9 +766,9 @@ export default function JobsList() {
       const updates = []
       for (const sup of supResult.supervisors) {
         for (const job of sup.jobs) {
-          // Skip if this job already has the right PM (saves writes)
+          // Skip if this job already has the right supervisor (saves writes)
           if (job.current_pm === sup.name) continue
-          updates.push({ id: job.id, project_manager: sup.name })
+          updates.push({ id: job.id, job_supervisor: sup.name })
         }
       }
       // Process updates in parallel batches of 10 to keep things fast but
@@ -778,11 +779,14 @@ export default function JobsList() {
           updates
             .slice(i, i + CONC)
             .map(u =>
-              supabase.from('jobs').update({ project_manager: u.project_manager }).eq('id', u.id)
+              supabase
+                .from('jobs')
+                .update({ job_supervisor: u.job_supervisor, project_manager: u.job_supervisor })
+                .eq('id', u.id)
             )
         )
       }
-      // Refresh the local jobs list so the new PMs reflect immediately
+      // Refresh the local jobs list so the new supervisors reflect immediately
       await fetchJobs()
       setShowSchedAssist(false)
       setSchedAssistView('mode')
@@ -1051,10 +1055,11 @@ export default function JobsList() {
     const targetStage = stages.find(s => s.id === stageId)
     const isYardCheck = !!targetStage && /yard\s*check/i.test(targetStage.name || '')
 
-    // Resolve "First Last" text for the picked employee so we can mirror
-    // into job_supervisor (the field the user edits manually in Job > Info)
-    // and project_manager (the legacy column). This keeps every UI in sync
-    // regardless of which one made the most recent edit.
+    // Resolve "First Last" text for the picked employee so we can write
+    // it into job_supervisor (the field the user edits manually in
+    // Job > Info > Assignments) and mirror to project_manager for legacy
+    // readers. Keeps every UI in sync regardless of which one made the
+    // most recent edit.
     const picked = activeEmployees.find(e => e.id === employeeId)
     const supervisorName = picked
       ? `${picked.first_name || ''} ${picked.last_name || ''}`.trim()
@@ -2399,7 +2404,7 @@ export default function JobsList() {
                   </div>
 
                   <p className="text-[11px] text-gray-400 mt-3 italic">
-                    Applying will set <code className="text-gray-600">project_manager</code> on
+                    Applying will set <code className="text-gray-600">job_supervisor</code> on
                     every assigned job to the supervisor's name.
                   </p>
 
