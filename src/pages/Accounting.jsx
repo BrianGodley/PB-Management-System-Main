@@ -2071,14 +2071,16 @@ function ChartOfAccountsTab({ accounts, onRefresh }) {
               ) : (
                 <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
                   {/* Fixed column widths so the Status badge and Edit/Del
-                      buttons line up vertically across every section. */}
+                      buttons line up vertically across every section.
+                      Right-hand columns are sized ~50% wider; Name and
+                      Description are tightened so the right side has room. */}
                   <colgroup>
-                    <col style={{ width: '90px' }} />     {/* # */}
-                    <col />                                {/* Name (flex) */}
-                    <col />                                {/* Description (flex) */}
-                    <col style={{ width: '90px' }} />     {/* Txns */}
-                    <col style={{ width: '100px' }} />    {/* Status */}
-                    <col style={{ width: '90px' }} />     {/* Actions */}
+                    <col style={{ width: '90px'  }} />    {/* # */}
+                    <col style={{ width: '240px' }} />    {/* Name */}
+                    <col style={{ width: '280px' }} />    {/* Description */}
+                    <col style={{ width: '135px' }} />    {/* Txns */}
+                    <col style={{ width: '150px' }} />    {/* Status */}
+                    <col style={{ width: '135px' }} />    {/* Actions */}
                   </colgroup>
                   <tbody className="divide-y divide-gray-50">
                     {typeAccts.map(acct => (
