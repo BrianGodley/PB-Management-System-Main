@@ -1048,16 +1048,24 @@ export default function JobsList() {
     const targetStage = stages.find(s => s.id === stageId)
     const isYardCheck = !!targetStage && /yard\s*check/i.test(targetStage.name || '')
 
-    await supabase
-      .from('jobs')
-      .update({ stage_id: stageId, responsible_employee_id: employeeId })
-      .eq('id', jobId)
+    // Resolve "First Last" text for the picked employee so we can mirror
+    // into job_supervisor (the field the user edits manually in Job > Info)
+    // and project_manager (the legacy column). This keeps every UI in sync
+    // regardless of which one made the most recent edit.
+    const picked = activeEmployees.find(e => e.id === employeeId)
+    const supervisorName = picked
+      ? `${picked.first_name || ''} ${picked.last_name || ''}`.trim()
+      : null
+
+    const updates = {
+      stage_id: stageId,
+      responsible_employee_id: employeeId,
+      job_supervisor: supervisorName,
+      project_manager: supervisorName,
+    }
+    await supabase.from('jobs').update(updates).eq('id', jobId)
     setJobs(prev =>
-      prev.map(j =>
-        j.id === jobId
-          ? { ...j, stage_id: stageId, responsible_employee_id: employeeId }
-          : j,
-      ),
+      prev.map(j => (j.id === jobId ? { ...j, ...updates } : j)),
     )
 
     if (isYardCheck) {
@@ -1362,8 +1370,12 @@ export default function JobsList() {
                                 onMove={moveJobToStage}
                                 clientPhoneMap={clientPhoneMap}
                                 respInitials={
-                                  initialsByEmpId[job.responsible_employee_id] ||
+                                  /* job_supervisor is the text field the
+                                     user edits in Job > Info; it's the
+                                     authoritative source. Fall back to the
+                                     FK lookup only if there's no text. */
                                   nameInitials(job.job_supervisor || '') ||
+                                  initialsByEmpId[job.responsible_employee_id] ||
                                   ''
                                 }
                               />
@@ -1403,8 +1415,12 @@ export default function JobsList() {
                                 onMove={moveJobToStage}
                                 clientPhoneMap={clientPhoneMap}
                                 respInitials={
-                                  initialsByEmpId[job.responsible_employee_id] ||
+                                  /* job_supervisor is the text field the
+                                     user edits in Job > Info; it's the
+                                     authoritative source. Fall back to the
+                                     FK lookup only if there's no text. */
                                   nameInitials(job.job_supervisor || '') ||
+                                  initialsByEmpId[job.responsible_employee_id] ||
                                   ''
                                 }
                               />
