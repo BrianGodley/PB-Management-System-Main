@@ -1998,11 +1998,9 @@ function registerColsFor(subtype) {
   return { numLabel: 'REF', leftLabel: 'AMOUNT', rightLabel: '', sign: +1, side: 'left' }
 }
 
-function fmtMoney(n) {
-  if (n == null || n === '') return ''
-  return Number(n).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
-}
-function fmtDate(d) {
+// Short MM/DD/YYYY date for register rows — QB style. (The existing
+// fmtDate above renders "May 25, 2026" which is too wide here.)
+function fmtRegDate(d) {
   if (!d) return '—'
   return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
 }
@@ -2128,7 +2126,7 @@ function RegistersTab({ accounts }) {
         {selectedAcct && rows.length > 0 && (
           <div className="ml-auto text-right">
             <p className="text-[10px] text-gray-400 uppercase font-semibold">Total Activity</p>
-            <p className="text-lg font-bold text-gray-800">{fmtMoney(grandTotal)}</p>
+            <p className="text-lg font-bold text-gray-800">{fmt(grandTotal)}</p>
           </div>
         )}
       </div>
@@ -2211,13 +2209,13 @@ function RegistersTab({ accounts }) {
                   // register's soft mint banding.
                   const rowBg = idx % 2 === 0 ? '#FFFFFF' : '#DCFCE7'
                   const rowStyle = { backgroundColor: rowBg }
-                  const amountCell = fmtMoney(r.amount)
+                  const amountCell = fmt(r.amount)
                   const subAccountAndMemo = [r.offset_party, r.memo].filter(Boolean).join('  ·  ')
                   return (
                     <Fragment key={`${r.source_type}-${r.source_id}-${idx}`}>
                       {/* Row 1 of transaction — main data */}
                       <tr style={rowStyle}>
-                        <td style={rowStyle} className="px-2 py-1.5 text-xs text-gray-700 whitespace-nowrap align-top">{fmtDate(r.txn_date)}</td>
+                        <td style={rowStyle} className="px-2 py-1.5 text-xs text-gray-700 whitespace-nowrap align-top">{fmtRegDate(r.txn_date)}</td>
                         <td style={rowStyle} className="px-2 py-1.5 font-mono text-xs text-gray-700 truncate align-top">{r.ref || ''}</td>
                         <td style={rowStyle} className="px-2 py-1.5 text-gray-900 truncate align-top" title={r.payee || ''}>{r.payee || ''}</td>
                         <td style={rowStyle} className="px-2 py-1.5 text-right font-mono text-gray-900 align-top whitespace-nowrap">
@@ -2230,7 +2228,7 @@ function RegistersTab({ accounts }) {
                           {cols.side === 'right' ? amountCell : ''}
                         </td>
                         <td style={rowStyle} className="px-2 py-1.5 text-right font-mono font-semibold text-gray-800 align-top whitespace-nowrap">
-                          {fmtMoney(r._balance)}
+                          {fmt(r._balance)}
                         </td>
                       </tr>
                       {/* Row 2 of transaction — secondary data, each
