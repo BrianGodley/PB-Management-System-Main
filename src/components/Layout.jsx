@@ -10,6 +10,7 @@ import SkidSteerIcon from './icons/SkidSteerIcon'
 import OrgChartIcon from './icons/OrgChartIcon'
 import OpportunitiesIcon from './icons/OpportunitiesIcon'
 import WeeklyFPIcon from './icons/WeeklyFPIcon'
+import AccountingIcon from './icons/AccountingIcon'
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: '🏠' },
@@ -25,7 +26,7 @@ const navItems = [
   { path: '/portal/subs', label: 'Subs & Vendors', icon: '🧑‍🔧' },
   { path: '/training', label: 'Training', icon: '🎓' },
   { path: '/hr', label: 'HR', icon: '🏢' },
-  { path: '/accounting', label: 'Accounting', icon: '💼' },
+  { path: '/accounting', label: 'Accounting', icon: <AccountingIcon /> },
 ]
 
 // Dock and main menu labels are computed inside the component via t()
