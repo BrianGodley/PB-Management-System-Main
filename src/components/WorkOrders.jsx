@@ -2223,7 +2223,7 @@ export default function WorkOrders({ jobs, selectedJob, jobStatusFilter = 'open'
   const complete = workOrders.filter(w => w.status === 'complete').length
 
   return (
-    <div>
+    <div className="pr-5">
       {/* Modals */}
       {showNewWOModal && (
         <NewWorkOrderModal
