@@ -1086,7 +1086,7 @@ export default function JobsList() {
     { key: 'info', label: 'ℹ️ Info' },
     { key: 'schedule', label: '📅 Schedule' },
     { key: 'work-orders', label: '📋 Work Orders' },
-    { key: 'tracking', label: '📍 Tracking' },
+    { key: 'tracking', label: '🎯 Tracking' },
     { key: 'timeclock', label: '⏱️ Time Clock' },
     { key: 'daily-logs', label: '📝 Daily Logs' },
     { key: 'tasks', label: '✅ Tasks' },
