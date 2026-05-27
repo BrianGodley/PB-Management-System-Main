@@ -9,6 +9,7 @@ import ReportIssueModal from './ReportIssueModal'
 import SkidSteerIcon from './icons/SkidSteerIcon'
 import OrgChartIcon from './icons/OrgChartIcon'
 import OpportunitiesIcon from './icons/OpportunitiesIcon'
+import WeeklyFPIcon from './icons/WeeklyFPIcon'
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: '🏠' },
@@ -18,7 +19,7 @@ const navItems = [
   { path: '/bids', label: 'Bids', icon: '📋' },
   { path: '/jobs', label: 'Jobs', icon: '🏡' },
   { path: '/equipment-tracking', label: 'Equipment', icon: <SkidSteerIcon /> },
-  { path: '/collections', label: 'Finance', icon: '🏦' },
+  { path: '/collections', label: 'Weekly FP', icon: <WeeklyFPIcon /> },
   { path: '/statistics', label: 'Statistics', icon: '📈' },
   { path: '/org-chart', label: 'Org Chart', icon: <OrgChartIcon /> },
   { path: '/portal/subs', label: 'Subs & Vendors', icon: '🧑‍🔧' },
