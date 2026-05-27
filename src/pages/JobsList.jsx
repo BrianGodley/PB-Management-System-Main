@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -104,6 +104,7 @@ function JobItem({
   setSelectedJob,
   onMove,
   clientPhoneMap = { byId: {}, byName: {} },
+  respInitials = '',
 }) {
   const [showMoveModal, setShowMoveModal] = useState(false)
   // Mouse-tracking tooltip state: { x, y } when active, null when hidden.
@@ -149,6 +150,9 @@ function JobItem({
             className={`font-bold truncate ${selectedJob === job.id ? 'text-green-800' : 'text-gray-800'}`}
           >
             {job.name || job.client_name}
+            {respInitials && (
+              <span className="ml-1 text-gray-500 font-normal">({respInitials})</span>
+            )}
           </p>
         </button>
 
@@ -288,6 +292,15 @@ export default function JobsList() {
   const [stages, setStages] = useState([])
   const [dragOverStage, setDragOverStage] = useState(null)
   const [dragJobId, setDragJobId] = useState(null)
+  // All active employees — used to (a) render the (initials) suffix on each
+  // job name in the sidebar and (b) populate the EmployeePicker modal that
+  // fires on every stage change.
+  const [activeEmployees, setActiveEmployees] = useState([])
+  // EmployeePicker modal state: when set, the modal renders and waits for
+  // the user to pick an employee before the stage move actually commits.
+  // Shape: { jobId, targetStageId } | null. targetStageId may be null for
+  // the Unassigned bucket.
+  const [assignPicker, setAssignPicker] = useState(null)
   const [showExceptions, setShowExceptions] = useState(false)
   const [exceptionsCount, setExceptionsCount] = useState(0)
   const [addScheduleTrigger, setAddScheduleTrigger] = useState(0)
@@ -953,6 +966,29 @@ export default function JobsList() {
     if (data) setStages(data)
   }
 
+  // Load every active employee — needed for the (initials) suffix on each
+  // job name and for the EmployeePicker that fires on every stage change.
+  async function fetchActiveEmployees() {
+    const { data } = await supabase
+      .from('employees')
+      .select('id, first_name, last_name')
+      .eq('status', 'active')
+      .order('first_name')
+    if (data) setActiveEmployees(data)
+  }
+
+  useEffect(() => {
+    fetchActiveEmployees()
+  }, [])
+
+  // Lookup map: employee_id → "JD" — used to render the (initials) suffix
+  // on every job name in the sidebar list.
+  const initialsByEmpId = useMemo(() => {
+    const m = {}
+    for (const e of activeEmployees) m[e.id] = empInitials(e)
+    return m
+  }, [activeEmployees])
+
   async function addStage(name) {
     const maxOrder = stages.reduce((m, s) => Math.max(m, s.sort_order), 0)
     const { data } = await supabase
@@ -998,14 +1034,31 @@ export default function JobsList() {
     )
   }
 
-  async function moveJobToStage(jobId, stageId) {
+  // Public entry: every stage change goes through here. Instead of writing
+  // directly, we open the EmployeePicker — Brian wants the responsible
+  // employee re-confirmed on every stage move. The actual write happens in
+  // commitMoveJobToStage below once the user picks.
+  function moveJobToStage(jobId, stageId) {
+    setAssignPicker({ jobId, targetStageId: stageId ?? null })
+  }
+
+  async function commitMoveJobToStage(jobId, stageId, employeeId) {
     // Detect whether the destination is a Yard Check stage BEFORE we mutate
     // anything, so we can fire the auto-trigger after the DB write succeeds.
     const targetStage = stages.find(s => s.id === stageId)
     const isYardCheck = !!targetStage && /yard\s*check/i.test(targetStage.name || '')
 
-    await supabase.from('jobs').update({ stage_id: stageId }).eq('id', jobId)
-    setJobs(prev => prev.map(j => (j.id === jobId ? { ...j, stage_id: stageId } : j)))
+    await supabase
+      .from('jobs')
+      .update({ stage_id: stageId, responsible_employee_id: employeeId })
+      .eq('id', jobId)
+    setJobs(prev =>
+      prev.map(j =>
+        j.id === jobId
+          ? { ...j, stage_id: stageId, responsible_employee_id: employeeId }
+          : j,
+      ),
+    )
 
     if (isYardCheck) {
       // Make sure the Schedule tab is visible so the modal can render, then
@@ -1274,7 +1327,7 @@ export default function JobsList() {
                           type="button"
                           onClick={() => toggleStageCollapsed(stageId)}
                           title={collapsed ? 'Expand' : 'Collapse'}
-                          className="w-full flex items-center gap-1.5 px-2 pt-1.5 pb-1 text-[11px] font-bold text-gray-500 uppercase tracking-wide truncate bg-gray-100 border border-gray-300 rounded px-2 py-0.5 hover:bg-gray-200 transition-colors text-left"
+                          className="w-full flex items-center gap-1.5 px-2 py-0 text-[11px] font-bold text-gray-500 uppercase tracking-wide truncate bg-gray-100 border border-gray-300 rounded leading-tight hover:bg-gray-200 transition-colors text-left"
                         >
                           <svg
                             className={`w-3 h-3 flex-shrink-0 text-gray-400 transition-transform ${collapsed ? '' : 'rotate-90'}`}
@@ -1308,6 +1361,7 @@ export default function JobsList() {
                                 setJobModal={setJobModal}
                                 onMove={moveJobToStage}
                                 clientPhoneMap={clientPhoneMap}
+                                respInitials={initialsByEmpId[job.responsible_employee_id] || ''}
                               />
                             ))}
                             {stageJobs.length === 0 && isOver && (
@@ -1325,8 +1379,8 @@ export default function JobsList() {
                     return (
                       <>
                         <div className="mb-1 rounded-lg">
-                          <div className="flex items-center gap-1.5 px-2 pt-1.5 pb-1">
-                            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide truncate flex-1 bg-gray-100 border border-gray-300 rounded px-2 py-0.5">
+                          <div className="flex items-center gap-1.5 px-2 py-0">
+                            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide truncate flex-1 bg-gray-100 border border-gray-300 rounded px-2 py-0 leading-tight">
                               Closed{' '}
                               <span className="text-gray-400 font-normal normal-case">
                                 · {sorted.length}
@@ -1344,6 +1398,7 @@ export default function JobsList() {
                                 setJobModal={setJobModal}
                                 onMove={moveJobToStage}
                                 clientPhoneMap={clientPhoneMap}
+                                respInitials={initialsByEmpId[job.responsible_employee_id] || ''}
                               />
                             ))}
                           </div>
@@ -2343,8 +2398,125 @@ export default function JobsList() {
           </div>
         </div>
       )}
+
+      {/* EmployeePicker — fires on every stage move (drag-drop or move modal).
+          User picks the responsible employee, then we write stage_id and
+          responsible_employee_id together. Pre-selects the job's current
+          responsible employee. */}
+      {assignPicker && (
+        <EmployeePicker
+          employees={activeEmployees}
+          currentEmployeeId={
+            jobs.find(j => j.id === assignPicker.jobId)?.responsible_employee_id || null
+          }
+          targetStageName={
+            assignPicker.targetStageId
+              ? stages.find(s => s.id === assignPicker.targetStageId)?.name || 'this stage'
+              : 'Unassigned'
+          }
+          onCancel={() => setAssignPicker(null)}
+          onPick={empId => {
+            const { jobId, targetStageId } = assignPicker
+            setAssignPicker(null)
+            commitMoveJobToStage(jobId, targetStageId, empId)
+          }}
+        />
+      )}
     </div>
   )
+}
+
+// EmployeePicker — small centered modal that lists every active employee.
+// Used by JobsList to (re)assign the responsible employee on every stage
+// change. Pre-selects whatever employee is currently responsible.
+function EmployeePicker({ employees, currentEmployeeId, targetStageName, onCancel, onPick }) {
+  const [selectedId, setSelectedId] = useState(currentEmployeeId || '')
+  const [search, setSearch] = useState('')
+  const filtered = employees.filter(e => {
+    if (!search.trim()) return true
+    const full = `${e.first_name || ''} ${e.last_name || ''}`.toLowerCase()
+    return full.includes(search.toLowerCase())
+  })
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md flex flex-col">
+        <div className="px-4 py-3 border-b border-gray-200">
+          <h3 className="text-sm font-bold text-gray-900">Assign responsible employee</h3>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Moving to <span className="font-medium text-gray-700">{targetStageName}</span>
+          </p>
+        </div>
+        <div className="p-3 border-b border-gray-100">
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search employees…"
+            className="w-full border border-gray-300 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            autoFocus
+          />
+        </div>
+        <div className="max-h-72 overflow-y-auto divide-y divide-gray-100">
+          {filtered.length === 0 && (
+            <p className="text-center text-xs text-gray-400 py-6">No matching employees.</p>
+          )}
+          {filtered.map(e => {
+            const isSel = selectedId === e.id
+            return (
+              <button
+                key={e.id}
+                onClick={() => setSelectedId(e.id)}
+                className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 ${
+                  isSel ? 'bg-green-50' : 'hover:bg-gray-50'
+                }`}
+              >
+                <span
+                  className={`inline-block w-4 h-4 rounded-full border ${
+                    isSel ? 'bg-green-600 border-green-700' : 'border-gray-300'
+                  }`}
+                />
+                <span className="flex-1 truncate">
+                  {e.first_name} {e.last_name}
+                </span>
+                <span className="text-xs text-gray-400 font-mono">
+                  {empInitials(e)}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+        <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="px-3 py-1.5 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onPick(selectedId || null)}
+            disabled={!selectedId}
+            className={`px-3 py-1.5 text-sm rounded-md font-medium ${
+              selectedId
+                ? 'bg-green-600 text-white hover:bg-green-700'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            Assign &amp; move
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Compute initials like "JD" from an employee row. Falls back to first
+// letter only if last_name is missing.
+function empInitials(emp) {
+  if (!emp) return ''
+  const f = (emp.first_name || '').trim()
+  const l = (emp.last_name || '').trim()
+  if (!f && !l) return ''
+  return `${f.charAt(0)}${l.charAt(0)}`.toUpperCase()
 }
 
 function JobDetail({ job, onDelete, price, onEdit }) {

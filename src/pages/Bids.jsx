@@ -241,6 +241,36 @@ export default function Bids() {
       if (jobErr) throw new Error(jobErr.message)
       const job = { id: jobId }
 
+      // Initial responsible employee = whoever created the bid (the bidder).
+      // The new job lands in Unassigned with their initials in parentheses,
+      // until someone moves it to a stage and the EmployeePicker re-assigns.
+      // Tries bid.created_by → employees.user_id; falls back to the current
+      // session's user if the bid pre-dates created_by tracking.
+      try {
+        let authorId = bid.created_by || null
+        if (!authorId) {
+          const { data: u } = await supabase.auth.getUser()
+          authorId = u?.user?.id || null
+        }
+        if (authorId) {
+          const { data: emp } = await supabase
+            .from('employees')
+            .select('id')
+            .eq('user_id', authorId)
+            .eq('status', 'active')
+            .maybeSingle()
+          if (emp?.id) {
+            await supabase
+              .from('jobs')
+              .update({ responsible_employee_id: emp.id })
+              .eq('id', jobId)
+          }
+        }
+      } catch (e) {
+        // Non-fatal — job is still created, just without initial initials.
+        console.warn('Could not set responsible_employee_id from bid creator:', e)
+      }
+
       // Persist any role assignments the user picked in the sold modal.
       // Mirrors the legacy consultant / project_manager columns so older
       // readers stay in sync.

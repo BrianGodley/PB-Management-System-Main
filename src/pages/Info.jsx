@@ -48,6 +48,9 @@ export default function Info() {
   const [zip, setZip] = useState('')
   const [consultant, setConsultant] = useState('')
   const [projectManager, setProjectManager] = useState('')
+  // Responsible employee — FK to employees.id (UUID). Drives the
+  // (initials) suffix on the job name everywhere in the app.
+  const [responsibleEmployeeId, setResponsibleEmployeeId] = useState('')
 
   // Load the user's jobs once on mount. Active jobs are surfaced first,
   // then alpha-by-name. Limit 500 — same as the dock picker had.
@@ -57,7 +60,7 @@ export default function Info() {
     supabase
       .from('jobs')
       .select(
-        'id, name, client_name, status, job_address, job_city, job_state, job_zip, consultant, project_manager'
+        'id, name, client_name, status, job_address, job_city, job_state, job_zip, consultant, project_manager, responsible_employee_id'
       )
       .order('status', { ascending: true })
       .order('name', { ascending: true })
@@ -99,6 +102,7 @@ export default function Info() {
     setZip(selectedJob.job_zip || '')
     setConsultant(selectedJob.consultant || '')
     setProjectManager(selectedJob.project_manager || '')
+    setResponsibleEmployeeId(selectedJob.responsible_employee_id || '')
     setSaveError('')
     setActiveTab('info')
   }, [selectedJob?.id])
@@ -125,6 +129,7 @@ export default function Info() {
       job_zip: zip.trim(),
       consultant: consultant || null,
       project_manager: projectManager || null,
+      responsible_employee_id: responsibleEmployeeId || null,
     }
     const { error } = await supabase.from('jobs').update(updates).eq('id', selectedJob.id)
     setSaving(false)
@@ -370,6 +375,29 @@ export default function Info() {
                           </option>
                         ))}
                       </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">
+                        Responsible Employee
+                      </label>
+                      <select
+                        value={responsibleEmployeeId}
+                        onChange={e => setResponsibleEmployeeId(e.target.value)}
+                        className="input text-sm w-full"
+                      >
+                        <option value="">— None —</option>
+                        {employees.map(e => (
+                          <option key={e.id} value={e.id}>
+                            {e.last_name}, {e.first_name}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[11px] text-gray-400 mt-1">
+                        Their initials appear in parentheses after the job name everywhere
+                        (e.g. "Smith Residence (JD)"). On every stage change the system
+                        will prompt to confirm or change this.
+                      </p>
                     </div>
                   </div>
                 </div>
