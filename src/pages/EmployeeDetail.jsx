@@ -355,6 +355,12 @@ export default function EmployeeDetail() {
 
   // Positions (for Job Title dropdown)
   const [positions, setPositions] = useState([])
+  // Multi-position assignments — rows from employee_positions for this
+  // employee. Each row is the position_id; we resolve titles via the
+  // positions list. The user can add positions one at a time.
+  const [empPositionIds, setEmpPositionIds] = useState([])
+  const [empPosLoading, setEmpPosLoading] = useState(false)
+  const [addingPositionId, setAddingPositionId] = useState('')
 
   // User tab state
   const [userRole, setUserRole] = useState('user')
@@ -671,6 +677,7 @@ export default function EmployeeDetail() {
       { data: reviewsData },
       { data: formsData },
       { data: posData },
+      { data: empPosData },
     ] = await Promise.all([
       supabase.from('employees').select('*').eq('id', id).single(),
       supabase
@@ -694,6 +701,7 @@ export default function EmployeeDetail() {
         .order('review_date', { ascending: false }),
       supabase.from('hr_review_forms').select('*').order('title'),
       supabase.from('positions').select('id, title').order('title'),
+      supabase.from('employee_positions').select('position_id').eq('employee_id', id),
     ])
     setEmployee(emp)
     setDraft(emp || {})
@@ -704,6 +712,7 @@ export default function EmployeeDetail() {
     setReviews(reviewsData || [])
     setReviewForms(formsData || [])
     setPositions(posData || [])
+    setEmpPositionIds((empPosData || []).map(r => r.position_id))
 
     // Fetch linked profile — by user_id first (definitive), then email as fallback
     let prof = null
@@ -1249,6 +1258,104 @@ export default function EmployeeDetail() {
                       </div>
                     </div>
                   </div>
+                </div>
+
+                {/* ── Additional Positions ──────────────────────────────────
+                    Same employee can hold multiple positions (e.g. Design
+                    Consultant + Installation Consultant). Rendered as a list
+                    of chips with a + Add control — read-only outside of
+                    Edit mode. The primary "Position" field above keeps the
+                    legacy single-job-title display. */}
+                <div className="mt-3 mb-3">
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+                    Additional Positions
+                  </p>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {empPositionIds.length === 0 && (
+                      <span className="text-xs text-gray-400 italic">
+                        No additional positions assigned.
+                      </span>
+                    )}
+                    {empPositionIds.map(pid => {
+                      const p = positions.find(x => x.id === pid)
+                      if (!p) return null
+                      return (
+                        <span
+                          key={pid}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-50 border border-green-200 text-xs text-green-800"
+                        >
+                          {p.title}
+                          {editing && (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                if (empPosLoading) return
+                                setEmpPosLoading(true)
+                                const { error } = await supabase
+                                  .from('employee_positions')
+                                  .delete()
+                                  .eq('employee_id', id)
+                                  .eq('position_id', pid)
+                                setEmpPosLoading(false)
+                                if (error) {
+                                  alert('Could not remove position: ' + error.message)
+                                  return
+                                }
+                                setEmpPositionIds(prev => prev.filter(x => x !== pid))
+                              }}
+                              className="text-green-700 hover:text-red-600 -mr-0.5"
+                              title="Remove this position"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </span>
+                      )
+                    })}
+                  </div>
+                  {editing && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <select
+                        value={addingPositionId}
+                        onChange={e => setAddingPositionId(e.target.value)}
+                        className="border border-gray-200 rounded-md px-2 py-1 text-xs focus:outline-none focus:border-green-500"
+                      >
+                        <option value="">Select a position to add…</option>
+                        {positions
+                          .filter(p => !empPositionIds.includes(p.id))
+                          .map(p => (
+                            <option key={p.id} value={p.id}>
+                              {p.title}
+                            </option>
+                          ))}
+                      </select>
+                      <button
+                        type="button"
+                        disabled={!addingPositionId || empPosLoading}
+                        onClick={async () => {
+                          if (!addingPositionId) return
+                          setEmpPosLoading(true)
+                          const { error } = await supabase
+                            .from('employee_positions')
+                            .insert({ employee_id: id, position_id: addingPositionId })
+                          setEmpPosLoading(false)
+                          if (error) {
+                            alert('Could not add position: ' + error.message)
+                            return
+                          }
+                          setEmpPositionIds(prev => [...prev, addingPositionId])
+                          setAddingPositionId('')
+                        }}
+                        className={`px-2.5 py-1 rounded-md text-xs font-semibold ${
+                          addingPositionId && !empPosLoading
+                            ? 'bg-green-700 text-white hover:bg-green-800'
+                            : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                        }`}
+                      >
+                        + Add
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Sam Greeting (sits inside Employment section) */}
