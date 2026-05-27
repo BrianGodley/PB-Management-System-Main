@@ -13,6 +13,7 @@ import WeeklyFPIcon from './icons/WeeklyFPIcon'
 import AccountingIcon from './icons/AccountingIcon'
 import ContactsIcon from './icons/ContactsIcon'
 import DashboardIcon from './icons/DashboardIcon'
+import HRIcon from './icons/HRIcon'
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: <DashboardIcon /> },
@@ -27,7 +28,7 @@ const navItems = [
   { path: '/org-chart', label: 'Org Chart', icon: <OrgChartIcon /> },
   { path: '/portal/subs', label: 'Subs & Vendors', icon: '🧑‍🔧' },
   { path: '/training', label: 'Training', icon: '🎓' },
-  { path: '/hr', label: 'HR', icon: '🏢' },
+  { path: '/hr', label: 'HR', icon: <HRIcon /> },
   { path: '/accounting', label: 'Accounting', icon: <AccountingIcon /> },
 ]
 
