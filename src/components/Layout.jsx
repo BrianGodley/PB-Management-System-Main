@@ -11,10 +11,11 @@ import OrgChartIcon from './icons/OrgChartIcon'
 import OpportunitiesIcon from './icons/OpportunitiesIcon'
 import WeeklyFPIcon from './icons/WeeklyFPIcon'
 import AccountingIcon from './icons/AccountingIcon'
+import ContactsIcon from './icons/ContactsIcon'
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: '🏠' },
-  { path: '/contacts', label: 'Contacts', icon: '🗂️' },
+  { path: '/contacts', label: 'Contacts', icon: <ContactsIcon /> },
   { path: '/clients', label: 'Opportunities', icon: <OpportunitiesIcon /> },
   { path: '/design', label: 'Design', icon: '📐' },
   { path: '/bids', label: 'Bids', icon: '📋' },
@@ -88,7 +89,7 @@ export default function Layout() {
   const isAdmin = userRole === 'admin' || userRole === 'super_admin'
   const MAIN_MENU_ITEMS = [
     { path: '/', label: 'Dashboard', icon: '🏠' },
-    { path: '/contacts', label: 'Contacts', icon: '🗂️' },
+    { path: '/contacts', label: 'Contacts', icon: <ContactsIcon /> },
     { path: '/clients', label: t('clients'), icon: '👥' },
     { path: '/design', label: 'Design', icon: '📐' },
     { path: '/bids', label: 'Bids', icon: '📋' },
