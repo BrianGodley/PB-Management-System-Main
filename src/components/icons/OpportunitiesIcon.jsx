@@ -5,7 +5,7 @@
 // below.
 //
 //   { path: '/clients', label: 'Opportunities', icon: <OpportunitiesIcon /> }
-import handshakeUrl from '../../assets/icons/handshake.png'
+import handshakeUrl from '../../assets/icons/handshake.jfif'
 
 export default function OpportunitiesIcon({ size = 20, className = '' }) {
   return (
