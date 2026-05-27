@@ -16,7 +16,7 @@ import AllJobsChangeOrders from '../components/AllJobsChangeOrders'
 import MasterCrews from './MasterCrews'
 import COEstimatePanel from '../components/COEstimatePanel'
 import CODetailModal from '../components/CODetailModal'
-import JobInfoModal from '../components/JobInfoModal'
+import JobInfoModal, { nameInitials } from '../components/JobInfoModal'
 import JobFinancePanel from '../components/JobFinancePanel'
 import StartLocationsCard from '../components/StartLocationsCard'
 import SupervisorPositionsCard from '../components/SupervisorPositionsCard'
@@ -1361,7 +1361,11 @@ export default function JobsList() {
                                 setJobModal={setJobModal}
                                 onMove={moveJobToStage}
                                 clientPhoneMap={clientPhoneMap}
-                                respInitials={initialsByEmpId[job.responsible_employee_id] || ''}
+                                respInitials={
+                                  initialsByEmpId[job.responsible_employee_id] ||
+                                  nameInitials(job.job_supervisor || '') ||
+                                  ''
+                                }
                               />
                             ))}
                             {stageJobs.length === 0 && isOver && (
@@ -1398,7 +1402,11 @@ export default function JobsList() {
                                 setJobModal={setJobModal}
                                 onMove={moveJobToStage}
                                 clientPhoneMap={clientPhoneMap}
-                                respInitials={initialsByEmpId[job.responsible_employee_id] || ''}
+                                respInitials={
+                                  initialsByEmpId[job.responsible_employee_id] ||
+                                  nameInitials(job.job_supervisor || '') ||
+                                  ''
+                                }
                               />
                             ))}
                           </div>
