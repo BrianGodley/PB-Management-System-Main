@@ -2202,32 +2202,32 @@ function RegistersTab({ accounts }) {
                   </td></tr>
                 )}
                 {!loading && displayRows.map((r, idx) => {
-                  // Alternating shading by TRANSACTION (both rows of a txn
-                  // share the same bg so they read as one unit). Using
-                  // inline style so Tailwind's JIT can't silently drop the
-                  // colour — guaranteed visible. The tint matches the QB
-                  // register's soft mint banding.
-                  const rowBg = idx % 2 === 0 ? '#FFFFFF' : '#DCFCE7'
-                  const rowStyle = { backgroundColor: rowBg }
+                  // Every transaction is the SAME split pattern: row 1
+                  // white (main data), row 2 mint-green (Type / Account /
+                  // Memo). The white-top establishes where each new
+                  // transaction starts visually. Inline style so
+                  // Tailwind's JIT can't drop the colour.
+                  const topStyle    = { backgroundColor: '#FFFFFF' }
+                  const bottomStyle = { backgroundColor: '#DCFCE7' }
                   const amountCell = fmt(r.amount)
                   const subAccountAndMemo = [r.offset_party, r.memo].filter(Boolean).join('  ·  ')
                   return (
                     <Fragment key={`${r.source_type}-${r.source_id}-${idx}`}>
-                      {/* Row 1 of transaction — main data */}
-                      <tr style={rowStyle}>
-                        <td style={rowStyle} className="px-2 py-1.5 text-xs text-gray-700 whitespace-nowrap align-top">{fmtRegDate(r.txn_date)}</td>
-                        <td style={rowStyle} className="px-2 py-1.5 font-mono text-xs text-gray-700 truncate align-top">{r.ref || ''}</td>
-                        <td style={rowStyle} className="px-2 py-1.5 text-gray-900 truncate align-top" title={r.payee || ''}>{r.payee || ''}</td>
-                        <td style={rowStyle} className="px-2 py-1.5 text-right font-mono text-gray-900 align-top whitespace-nowrap">
+                      {/* Row 1 of transaction — main data (WHITE) */}
+                      <tr style={topStyle}>
+                        <td style={topStyle} className="px-2 py-1.5 text-xs text-gray-700 whitespace-nowrap align-top">{fmtRegDate(r.txn_date)}</td>
+                        <td style={topStyle} className="px-2 py-1.5 font-mono text-xs text-gray-700 truncate align-top">{r.ref || ''}</td>
+                        <td style={topStyle} className="px-2 py-1.5 text-gray-900 truncate align-top" title={r.payee || ''}>{r.payee || ''}</td>
+                        <td style={topStyle} className="px-2 py-1.5 text-right font-mono text-gray-900 align-top whitespace-nowrap">
                           {cols.side === 'left' ? amountCell : ''}
                         </td>
-                        <td style={rowStyle} className="px-1 py-1.5 text-center text-gray-400 align-top">
+                        <td style={topStyle} className="px-1 py-1.5 text-center text-gray-400 align-top">
                           {/* Cleared/reconciled — we don't track it yet */}
                         </td>
-                        <td style={rowStyle} className="px-2 py-1.5 text-right font-mono text-gray-900 align-top whitespace-nowrap">
+                        <td style={topStyle} className="px-2 py-1.5 text-right font-mono text-gray-900 align-top whitespace-nowrap">
                           {cols.side === 'right' ? amountCell : ''}
                         </td>
-                        <td style={rowStyle} className="px-2 py-1.5 text-right font-mono font-semibold text-gray-800 align-top whitespace-nowrap">
+                        <td style={topStyle} className="px-2 py-1.5 text-right font-mono font-semibold text-gray-800 align-top whitespace-nowrap">
                           {fmt(r._balance)}
                         </td>
                       </tr>
@@ -2237,20 +2237,20 @@ function RegistersTab({ accounts }) {
                           live under Payee. Amount / ✓ / Balance columns
                           stay empty on row 2 so the right-hand columns
                           line up cleanly with row 1. */}
-                      <tr style={rowStyle} className="border-b border-gray-200">
-                        <td style={rowStyle} className="px-2 pb-1.5 pt-0"></td>
-                        <td style={rowStyle} className="px-2 pb-1.5 pt-0">
+                      <tr style={bottomStyle} className="border-b border-gray-200">
+                        <td style={bottomStyle} className="px-2 pb-1.5 pt-0"></td>
+                        <td style={bottomStyle} className="px-2 pb-1.5 pt-0">
                           <span className={`inline-block text-[9px] px-1.5 py-0.5 rounded font-semibold uppercase ${typeStyle(r.txn_type)}`}>
                             {r.txn_type}
                           </span>
                         </td>
-                        <td style={rowStyle} className="px-2 pb-1.5 pt-0 text-xs text-gray-500 truncate" title={subAccountAndMemo}>
+                        <td style={bottomStyle} className="px-2 pb-1.5 pt-0 text-xs text-gray-500 truncate" title={subAccountAndMemo}>
                           {subAccountAndMemo || <span className="text-gray-300">—</span>}
                         </td>
-                        <td style={rowStyle} className="px-2 pb-1.5 pt-0"></td>
-                        <td style={rowStyle} className="px-1 pb-1.5 pt-0"></td>
-                        <td style={rowStyle} className="px-2 pb-1.5 pt-0"></td>
-                        <td style={rowStyle} className="px-2 pb-1.5 pt-0"></td>
+                        <td style={bottomStyle} className="px-2 pb-1.5 pt-0"></td>
+                        <td style={bottomStyle} className="px-1 pb-1.5 pt-0"></td>
+                        <td style={bottomStyle} className="px-2 pb-1.5 pt-0"></td>
+                        <td style={bottomStyle} className="px-2 pb-1.5 pt-0"></td>
                       </tr>
                     </Fragment>
                   )
