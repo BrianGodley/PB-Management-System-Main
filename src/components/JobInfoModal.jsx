@@ -15,6 +15,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import ClientPortalTab from './ClientPortalTab'
+import ReopenJobModal from './ReopenJobModal'
 
 // Same list ClientDetail uses for its state dropdown — keep them in sync.
 const US_STATES = [
@@ -165,8 +166,8 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
   const [permitNumber, setPermitNumber] = useState(job.permit_number || '')
   const [consultant, setConsultant] = useState(job.consultant || '')
   // projectManager state removed — Job Supervisor lives on the Assignments
-  // tab as `jobSupervisor` (writes to job_supervisor, mirrors to
-  // project_manager for legacy readers).
+  // tab as `jobSupervisor` (writes to job_supervisor; the legacy
+  // project_manager column was dropped).
 
   // Assignments tab — role assignments, each storing the employee's full
   // name. `consultant` and `jobSupervisor` were moved here from the
@@ -177,7 +178,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
   )
   const [finalReview, setFinalReview] = useState(job.final_review || '')
   const [jobSupervisor, setJobSupervisor] = useState(
-    job.job_supervisor || job.project_manager || ''
+    job.job_supervisor || ''
   )
   const [qcSupervisor, setQcSupervisor] = useState(job.quality_control_supervisor || '')
   const [financeManager, setFinanceManager] = useState(job.finance_manager || '')
@@ -246,15 +247,13 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
     setDesignReview(job.design_review || '')
     setPermitCoordinator(job.permit_engineering_coordinator || '')
     setFinalReview(job.final_review || '')
-    setJobSupervisor(job.job_supervisor || job.project_manager || '')
+    setJobSupervisor(job.job_supervisor || '')
     setQcSupervisor(job.quality_control_supervisor || '')
     setFinanceManager(job.finance_manager || '')
     setSuccessSupervisor(job.success_supervisor || '')
   }
 
-  // Save the role columns. Also mirrors job_supervisor → the legacy
-  // project_manager column so any older code that still reads it stays
-  // in sync.
+  // Save the role columns.
   async function handleSaveEmployees() {
     setSaving(true)
     setError('')
@@ -267,9 +266,6 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
       quality_control_supervisor: qcSupervisor || null,
       finance_manager: financeManager || null,
       success_supervisor: successSupervisor || null,
-      // Legacy mirror — keep project_manager filled so any older reader
-      // still sees the job supervisor.
-      project_manager: jobSupervisor || null,
     })
     setSaving(false)
     if (!ok) setError('Failed to save employee assignments.')
@@ -431,14 +427,34 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
     label: `${e.last_name}, ${e.first_name}`.trim(),
   }))
 
+  // ReopenJobModal state — set when the user changes status from
+  // completed → active on save, blocking the save until they pick a
+  // stage + responsible employee.
+  const [showReopenModal, setShowReopenModal] = useState(false)
+
   // Save just the Job Details fields (status, name, address, contract,
-  // permit, consultant, job supervisor). Site access lives on the job too
-  // but is edited from the Client tab — see handleSaveClient.
+  // permit). Site access lives on the job too but is edited from the
+  // Client tab — see handleSaveClient. Consultant + Job Supervisor live
+  // on the Assignments tab.
+  //
+  // Special transition: reopening (completed → active) routes through
+  // the ReopenJobModal so the user picks a new stage + responsible
+  // employee before the status flips. Closing keeps every assignment
+  // field intact — the JobsList display layer hides the (initials)
+  // suffix for closed jobs without touching the data.
   async function handleSaveDetails() {
     if (!jobTitle.trim()) {
       setError('Job title cannot be empty.')
       return
     }
+    // Reopen path — defer the save until the modal returns picks.
+    const wasClosed = job.status && job.status !== 'active' && job.status !== 'on_hold'
+    const nowOpen = status === 'active' || status === 'on_hold'
+    if (wasClosed && nowOpen) {
+      setShowReopenModal(true)
+      return
+    }
+
     setSaving(true)
     setError('')
     const cpNum = contractPrice === '' ? null : parseFloat(contractPrice)
@@ -451,8 +467,6 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
       job_zip: zip.trim(),
       total_price: Number.isFinite(cpNum) ? cpNum : null,
       permit_number: permitNumber.trim() || null,
-      // Consultant + Job Supervisor moved to the Assignments tab; their
-      // values are saved by handleSaveEmployees, not here.
     })
     setSaving(false)
     if (!ok) setError('Failed to save the job. Please try again.')
@@ -1371,30 +1385,68 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
     </>
   )
 
+  // ReopenJobModal — fires when the user changes Status from Closed →
+  // Open on the Job Details tab. Waits for the user to pick a stage +
+  // responsible employee, then commits the save with everything.
+  const reopenModal = showReopenModal ? (
+    <ReopenJobModal
+      jobName={jobTitle || job.name || job.client_name || ''}
+      onCancel={() => setShowReopenModal(false)}
+      onConfirm={async ({ stageId, employeeId, employeeName }) => {
+        setSaving(true)
+        setError('')
+        const cpNum = contractPrice === '' ? null : parseFloat(contractPrice)
+        const ok = await onSave(job.id, {
+          name: jobTitle.trim(),
+          status: 'active',
+          job_address: address.trim(),
+          job_city: city.trim(),
+          job_state: state.trim(),
+          job_zip: zip.trim(),
+          total_price: Number.isFinite(cpNum) ? cpNum : null,
+          permit_number: permitNumber.trim() || null,
+          stage_id: stageId,
+          responsible_employee_id: employeeId,
+          job_supervisor: employeeName,
+        })
+        setSaving(false)
+        setShowReopenModal(false)
+        if (!ok) setError('Failed to reopen the job. Please try again.')
+        else setEditingDetails(false)
+      }}
+    />
+  ) : null
+
   // Inline mode: render directly into the parent panel without overlay chrome.
   if (inline) {
     return (
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col h-full">
-        {innerContent}
-      </div>
+      <>
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden flex flex-col h-full">
+          {innerContent}
+        </div>
+        {reopenModal}
+      </>
     )
   }
 
   // Modal mode (default): fixed overlay with click-outside-to-close.
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-      onMouseDown={e => {
-        if (e.target === e.currentTarget) onClose()
-      }}
-    >
+    <>
       <div
-        className="bg-white rounded-xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col"
-        style={{ maxHeight: '90vh' }}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+        onMouseDown={e => {
+          if (e.target === e.currentTarget) onClose()
+        }}
       >
-        {innerContent}
+        <div
+          className="bg-white rounded-xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col"
+          style={{ maxHeight: '90vh' }}
+        >
+          {innerContent}
+        </div>
       </div>
-    </div>
+      {reopenModal}
+    </>
   )
 }
 

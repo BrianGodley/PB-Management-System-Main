@@ -153,9 +153,13 @@ function JobItem({
                 name — some legacy rows already have initials baked into
                 jobs.name, which would otherwise show as "(XX) (YY)". */}
             {(job.name || job.client_name || '').replace(/\s*\([A-Za-z]{1,3}\)\s*$/, '')}
-            {respInitials && (
-              <span className="ml-1 text-gray-500 font-normal">({respInitials})</span>
-            )}
+            {/* Hide the (initials) suffix for closed jobs — the data on
+                the row stays intact, but the display is clean. Open
+                statuses are 'active' and 'on_hold'. */}
+            {respInitials &&
+              (job.status === 'active' || job.status === 'on_hold' || !job.status) && (
+                <span className="ml-1 text-gray-500 font-normal">({respInitials})</span>
+              )}
           </p>
         </button>
 
@@ -757,8 +761,7 @@ export default function JobsList() {
   }
 
   // Apply the supervisor assignments — write the supervisor's name to
-  // each job's job_supervisor column (and mirror to project_manager so
-  // legacy readers stay in sync).
+  // each job's job_supervisor column.
   async function applySupervisorAssignments() {
     if (!supResult) return
     setSupApplying(true)
@@ -781,7 +784,7 @@ export default function JobsList() {
             .map(u =>
               supabase
                 .from('jobs')
-                .update({ job_supervisor: u.job_supervisor, project_manager: u.job_supervisor })
+                .update({ job_supervisor: u.job_supervisor })
                 .eq('id', u.id)
             )
         )
@@ -1057,9 +1060,8 @@ export default function JobsList() {
 
     // Resolve "First Last" text for the picked employee so we can write
     // it into job_supervisor (the field the user edits manually in
-    // Job > Info > Assignments) and mirror to project_manager for legacy
-    // readers. Keeps every UI in sync regardless of which one made the
-    // most recent edit.
+    // Job > Info > Assignments). Keeps every UI in sync regardless of
+    // which one made the most recent edit.
     const picked = activeEmployees.find(e => e.id === employeeId)
     const supervisorName = picked
       ? `${picked.first_name || ''} ${picked.last_name || ''}`.trim()
@@ -1069,7 +1071,6 @@ export default function JobsList() {
       stage_id: stageId,
       responsible_employee_id: employeeId,
       job_supervisor: supervisorName,
-      project_manager: supervisorName,
     }
     await supabase.from('jobs').update(updates).eq('id', jobId)
     setJobs(prev =>
@@ -1498,9 +1499,12 @@ export default function JobsList() {
                   setSchedAssistMode(null)
                   setShowSchedAssist(true)
                 }}
-                onReopenJob={jobId =>
-                  setJobs(prev => prev.map(j => (j.id === jobId ? { ...j, status: 'active' } : j)))
-                }
+                onReopenJob={() => {
+                  // Reopen now writes stage_id, responsible_employee_id, and
+                  // job_supervisor in addition to status. Refetch the full
+                  // list so all fields land in local state.
+                  fetchJobs()
+                }}
               />
             )}
 
