@@ -2082,82 +2082,82 @@ function RegistersTab({ accounts }) {
 
   return (
     <div>
-      {/* Filter bar */}
-      <div className="flex flex-wrap items-end gap-3 mb-4 p-3 bg-white rounded-xl border border-gray-200">
-        <div className="min-w-[220px]">
-          <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">
-            Account Type
-          </label>
-          <select
-            value={filterType}
-            onChange={e => setFilterType(e.target.value)}
-            className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2"
-          >
-            <option value="">— Select type —</option>
-            {COA_SECTIONS.map(s => (
-              <option key={s.subtype} value={s.subtype}>{s.subtype}</option>
-            ))}
-          </select>
-        </div>
-        <div className="flex-1 min-w-[260px]">
-          <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">
-            Account Name
-          </label>
-          <select
-            value={filterAcct}
-            onChange={e => setFilterAcct(e.target.value)}
-            disabled={!filterType}
-            className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 disabled:bg-gray-50 disabled:text-gray-400"
-          >
-            <option value="">
-              {!filterType
-                ? 'Pick a type first'
-                : accountsForType.length === 0
-                  ? 'No accounts in this type'
-                  : '— Select account —'}
-            </option>
-            {accountsForType.map(a => (
-              <option key={a.id} value={a.id}>
-                {a.number ? `${a.number} · ${a.name}` : a.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        {selectedAcct && rows.length > 0 && (
-          <div className="ml-auto text-right">
-            <p className="text-[10px] text-gray-400 uppercase font-semibold">Total Activity</p>
-            <p className="text-lg font-bold text-gray-800">{fmt(grandTotal)}</p>
-          </div>
-        )}
-      </div>
+      {/* Single card — green header always visible, holds the two filter
+          dropdowns on the left and the active-account info on the right.
+          Body below the header is either the register table or the
+          empty-state hint. */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {/* Green header bar — filters live HERE now, no separate row above */}
+        <div className="px-4 py-2.5 bg-green-700 text-white">
+          <div className="flex flex-wrap items-center gap-3">
+            <select
+              value={filterType}
+              onChange={e => setFilterType(e.target.value)}
+              className="text-sm bg-green-800 text-white border border-green-500/50 rounded px-2 py-1 min-w-[200px] focus:outline-none focus:ring-2 focus:ring-white/40"
+              aria-label="Account type"
+            >
+              <option value="">Select account type…</option>
+              {COA_SECTIONS.map(s => (
+                <option key={s.subtype} value={s.subtype}>{s.subtype}</option>
+              ))}
+            </select>
 
-      {!selectedAcct ? (
-        <div className="text-center py-16 bg-white border border-dashed border-gray-300 rounded-xl">
-          <p className="text-4xl mb-3">📒</p>
-          <p className="text-lg font-semibold text-gray-700">Pick an account to see its register</p>
-          <p className="text-sm text-gray-500 mt-1 max-w-md mx-auto">
-            Choose an Account Type, then an Account Name above.
-          </p>
-        </div>
-      ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {/* Account title bar (QB-style: heading row with green band) */}
-          <div className="px-4 py-2.5 bg-green-700 text-white flex items-center justify-between">
-            <div className="min-w-0">
-              <p className="text-sm font-bold truncate">
-                {selectedAcct.number ? `${selectedAcct.number} · ` : ''}{selectedAcct.name}
-              </p>
-              <p className="text-[11px] text-green-100">
-                {selectedAcct.subtype || '—'} · {rows.length.toLocaleString()}{truncated ? '+' : ''} transactions
-              </p>
-            </div>
-            {truncated && (
-              <span className="text-[11px] bg-yellow-200 text-yellow-900 px-2 py-0.5 rounded">
-                Showing most recent {MAX_ROWS.toLocaleString()} — narrow the type/account to see older
+            <select
+              value={filterAcct}
+              onChange={e => setFilterAcct(e.target.value)}
+              disabled={!filterType}
+              className="text-sm bg-green-800 text-white border border-green-500/50 rounded px-2 py-1 min-w-[260px] disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-white/40"
+              aria-label="Account name"
+            >
+              <option value="">
+                {!filterType
+                  ? 'Pick a type first'
+                  : accountsForType.length === 0
+                    ? 'No accounts in this type'
+                    : '— Select account —'}
+              </option>
+              {accountsForType.map(a => (
+                <option key={a.id} value={a.id}>
+                  {a.number ? `${a.number} · ${a.name}` : a.name}
+                </option>
+              ))}
+            </select>
+
+            {/* Right side: account info when selected, hint otherwise */}
+            {selectedAcct ? (
+              <div className="ml-auto text-right min-w-0">
+                <p className="text-sm font-bold truncate">
+                  {selectedAcct.number ? `${selectedAcct.number} · ` : ''}{selectedAcct.name}
+                </p>
+                <p className="text-[11px] text-green-100">
+                  {selectedAcct.subtype || '—'} · {rows.length.toLocaleString()}{truncated ? '+' : ''} transactions · {fmt(grandTotal)}
+                </p>
+              </div>
+            ) : (
+              <span className="ml-auto text-[11px] text-green-100 italic whitespace-nowrap">
+                Select an account to view its register
               </span>
             )}
           </div>
 
+          {truncated && (
+            <div className="mt-2 text-[11px] bg-yellow-200 text-yellow-900 px-2 py-0.5 rounded inline-block">
+              Showing most recent {MAX_ROWS.toLocaleString()} — narrow further to see older
+            </div>
+          )}
+        </div>
+
+        {/* Body: empty state when no account; otherwise the register table. */}
+        {!selectedAcct ? (
+          <div className="text-center py-16">
+            <p className="text-4xl mb-3">📒</p>
+            <p className="text-lg font-semibold text-gray-700">No account selected</p>
+            <p className="text-sm text-gray-500 mt-1 max-w-md mx-auto">
+              Use the type and account dropdowns in the green header above to pick a register.
+            </p>
+          </div>
+        ) : (
+          <>
           {/* Register table — QB-style two-row layout per transaction.
               Outer container is the scroll viewport (max 75vh tall) so
               the sticky header has something to stick to. Both header
@@ -2262,8 +2262,9 @@ function RegistersTab({ accounts }) {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+          </>
+        )}
+      </div>
     </div>
   )
 }
