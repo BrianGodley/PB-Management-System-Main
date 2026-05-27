@@ -2874,7 +2874,7 @@ async function fetchAccountingData() {
     supabase.from('acct_bank_accounts').select('*').eq('is_active', true).order('name'),
     // Server max-rows is 1k; paginate to get all 1.6k+ clients and 2k+ jobs.
     fetchAllPaginated(() =>
-      supabase.from('clients').select('id, name, client_name').order('name')
+      supabase.from('clients').select('id, name').order('name')
     ),
     fetchAllPaginated(() =>
       supabase
