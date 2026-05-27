@@ -2158,8 +2158,12 @@ function RegistersTab({ accounts }) {
             )}
           </div>
 
-          {/* Register table — QB-style two-row layout per transaction */}
-          <div className="overflow-x-auto">
+          {/* Register table — QB-style two-row layout per transaction.
+              Outer container is the scroll viewport (max 75vh tall) so
+              the sticky header has something to stick to. Both header
+              rows get position:sticky so they stay frozen above the body
+              while the user scrolls a long register. */}
+          <div className="overflow-auto" style={{ maxHeight: '75vh' }}>
             <table className="w-full text-sm border-collapse" style={{ tableLayout: 'fixed' }}>
               <colgroup>
                 <col style={{ width: '95px'  }} /> {/* Date */}
@@ -2171,25 +2175,25 @@ function RegistersTab({ accounts }) {
                 <col style={{ width: '120px' }} /> {/* Balance */}
               </colgroup>
               <thead>
-                {/* Top header row — main fields */}
-                <tr className="bg-gray-100 border-b border-gray-300 text-[10px] font-bold uppercase tracking-wide text-gray-600">
-                  <th className="px-2 py-1.5 text-left">DATE</th>
-                  <th className="px-2 py-1.5 text-left">{cols.numLabel}</th>
-                  <th className="px-2 py-1.5 text-left">PAYEE</th>
-                  <th className="px-2 py-1.5 text-right">{cols.leftLabel}</th>
-                  <th className="px-1 py-1.5 text-center">✓</th>
-                  <th className="px-2 py-1.5 text-right">{cols.rightLabel || ''}</th>
-                  <th className="px-2 py-1.5 text-right">BALANCE</th>
+                {/* Top header row — sticky at top: 0 */}
+                <tr className="border-b border-gray-300 text-[10px] font-bold uppercase tracking-wide text-gray-600">
+                  <th style={{ position: 'sticky', top: 0, zIndex: 20, backgroundColor: '#F3F4F6' }} className="px-2 py-1.5 text-left">DATE</th>
+                  <th style={{ position: 'sticky', top: 0, zIndex: 20, backgroundColor: '#F3F4F6' }} className="px-2 py-1.5 text-left">{cols.numLabel}</th>
+                  <th style={{ position: 'sticky', top: 0, zIndex: 20, backgroundColor: '#F3F4F6' }} className="px-2 py-1.5 text-left">PAYEE</th>
+                  <th style={{ position: 'sticky', top: 0, zIndex: 20, backgroundColor: '#F3F4F6' }} className="px-2 py-1.5 text-right">{cols.leftLabel}</th>
+                  <th style={{ position: 'sticky', top: 0, zIndex: 20, backgroundColor: '#F3F4F6' }} className="px-1 py-1.5 text-center">✓</th>
+                  <th style={{ position: 'sticky', top: 0, zIndex: 20, backgroundColor: '#F3F4F6' }} className="px-2 py-1.5 text-right">{cols.rightLabel || ''}</th>
+                  <th style={{ position: 'sticky', top: 0, zIndex: 20, backgroundColor: '#F3F4F6' }} className="px-2 py-1.5 text-right">BALANCE</th>
                 </tr>
-                {/* Sub-header row — second-line field labels */}
-                <tr className="bg-gray-50 border-b border-gray-300 text-[9px] font-semibold uppercase tracking-wide text-gray-400">
-                  <th className="px-2 py-1 text-left"></th>
-                  <th className="px-2 py-1 text-left">TYPE</th>
-                  <th className="px-2 py-1 text-left">ACCOUNT / MEMO</th>
-                  <th className="px-1 py-1"></th>
-                  <th className="px-1 py-1"></th>
-                  <th className="px-1 py-1"></th>
-                  <th className="px-1 py-1"></th>
+                {/* Sub-header row — sticky at top: 28px (height of row above) */}
+                <tr className="border-b border-gray-300 text-[9px] font-semibold uppercase tracking-wide text-gray-400">
+                  <th style={{ position: 'sticky', top: 28, zIndex: 19, backgroundColor: '#F9FAFB' }} className="px-2 py-1 text-left"></th>
+                  <th style={{ position: 'sticky', top: 28, zIndex: 19, backgroundColor: '#F9FAFB' }} className="px-2 py-1 text-left">TYPE</th>
+                  <th style={{ position: 'sticky', top: 28, zIndex: 19, backgroundColor: '#F9FAFB' }} className="px-2 py-1 text-left">ACCOUNT / MEMO</th>
+                  <th style={{ position: 'sticky', top: 28, zIndex: 19, backgroundColor: '#F9FAFB' }} className="px-1 py-1"></th>
+                  <th style={{ position: 'sticky', top: 28, zIndex: 19, backgroundColor: '#F9FAFB' }} className="px-1 py-1"></th>
+                  <th style={{ position: 'sticky', top: 28, zIndex: 19, backgroundColor: '#F9FAFB' }} className="px-1 py-1"></th>
+                  <th style={{ position: 'sticky', top: 28, zIndex: 19, backgroundColor: '#F9FAFB' }} className="px-1 py-1"></th>
                 </tr>
               </thead>
               <tbody>
@@ -2418,18 +2422,31 @@ function ChartOfAccountsTab({ accounts, onRefresh }) {
                           </span>
                         </td>
                         <td className="px-4 py-2.5 text-right">
-                          <div className="flex justify-end gap-2">
+                          {/* Icons, moved ~1/4 inch (24px) in from the
+                              right edge with pr-6, and spaced ~1/8 inch
+                              (12px) apart with gap-5. */}
+                          <div className="flex justify-end items-center gap-5 pr-6">
                             <button
                               onClick={() => setModal(acct)}
-                              className="text-xs text-gray-400 hover:text-gray-700"
+                              title="Edit account"
+                              aria-label="Edit account"
+                              className="text-gray-400 hover:text-gray-700"
                             >
-                              Edit
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                  d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 0l.172.172a2 2 0 010 2.828L12 16H9v-3z" />
+                              </svg>
                             </button>
                             <button
                               onClick={() => deleteAccount(acct.id)}
-                              className="text-xs text-red-400 hover:text-red-600"
+                              title="Delete account"
+                              aria-label="Delete account"
+                              className="text-red-400 hover:text-red-600"
                             >
-                              Del
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
                             </button>
                           </div>
                         </td>
