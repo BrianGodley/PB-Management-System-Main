@@ -1,41 +1,43 @@
 // src/components/icons/OrgChartIcon.jsx
 //
-// Flat-style org chart icon — one person on top connected by lines down to
-// three people below. Peach skin-tone heads, colored shirts (green leader,
-// pink/blue/yellow reports). Designed to sit alongside emoji icons in the
-// main nav at ~20px and still read clearly. Pass a `size` prop (default 20)
-// to override.
+// Flat-style org chart icon — one filled box on top connected by lines
+// down to three filled boxes below. Boxes are colored in the same warm
+// palette as the other custom nav icons (green leader, pink/blue/yellow
+// reports). Bold dark outline for legibility at ~20px.
 //
-// Use anywhere a React node icon is accepted:
 //   { path: '/org-chart', label: 'Org Chart', icon: <OrgChartIcon /> }
 export default function OrgChartIcon({ size = 20, className = '' }) {
-  // Shared colors
-  const skin = '#F2C9A1'
-  const skinStroke = '#B8895E'
-  const lineColor = '#4B5563'
+  const outline = '#3A3A3A'
+  const lineColor = '#3A3A3A'
+  const SW = 1.1
 
-  // Person glyph helper — head circle + rounded-shoulder body
-  const Person = ({ cx, cy, shirt, shirtStroke }) => (
-    <g>
-      {/* Head */}
-      <circle
-        cx={cx} cy={cy} r="2.4"
-        fill={skin}
-        stroke={skinStroke}
-        strokeWidth="0.4"
-      />
-      {/* Body / shoulders — rounded shape just below head */}
-      <path
-        d={`M ${cx - 3.2} ${cy + 5.4}
-            Q ${cx - 3.2} ${cy + 2.6} ${cx} ${cy + 2.6}
-            Q ${cx + 3.2} ${cy + 2.6} ${cx + 3.2} ${cy + 5.4}
-            Z`}
-        fill={shirt}
-        stroke={shirtStroke}
-        strokeWidth="0.4"
-      />
-    </g>
-  )
+  // Box colors — green leader on top, pink/blue/yellow reports
+  const leaderFill = '#4CAF74'
+  const leaderStroke = '#2F7A4E'
+  const pinkFill = '#EC7C9C'
+  const pinkStroke = '#B85577'
+  const blueFill = '#5AB9E8'
+  const blueStroke = '#3E8AB0'
+  const yellowFill = '#F4C542'
+  const yellowStroke = '#C28F12'
+
+  // Box geometry
+  const boxW = 8
+  const boxH = 7
+  const topX = 12       // centered top box: (32 - 8) / 2 = 12
+  const topY = 3
+  const bottomY = 19
+  const leftX = 2
+  const midX = 12
+  const rightX = 22
+
+  // Center anchors for connector lines
+  const topCx = topX + boxW / 2          // 16
+  const topBottomY = topY + boxH          // 10
+  const barY = 14.5
+  const leftCx = leftX + boxW / 2         // 6
+  const midCx = midX + boxW / 2           // 16
+  const rightCx = rightX + boxW / 2       // 26
 
   return (
     <svg
@@ -46,23 +48,23 @@ export default function OrgChartIcon({ size = 20, className = '' }) {
       aria-hidden="true"
       style={{ display: 'inline-block', verticalAlign: '-3px' }}
     >
-      {/* Connecting lines — drawn first so heads/shoulders sit on top */}
-      {/* Vertical drop from top person down to horizontal bar */}
-      <line x1="16" y1="11" x2="16" y2="17" stroke={lineColor} strokeWidth="1" strokeLinecap="round" />
+      {/* Connector lines — drawn first so boxes sit on top */}
+      {/* Drop from top box down to the horizontal bar */}
+      <line x1={topCx} y1={topBottomY} x2={topCx} y2={barY} stroke={lineColor} strokeWidth={SW} strokeLinecap="round" />
       {/* Horizontal bar across the three reports */}
-      <line x1="6" y1="17" x2="26" y2="17" stroke={lineColor} strokeWidth="1" strokeLinecap="round" />
-      {/* Three short drops to each report */}
-      <line x1="6"  y1="17" x2="6"  y2="20" stroke={lineColor} strokeWidth="1" strokeLinecap="round" />
-      <line x1="16" y1="17" x2="16" y2="20" stroke={lineColor} strokeWidth="1" strokeLinecap="round" />
-      <line x1="26" y1="17" x2="26" y2="20" stroke={lineColor} strokeWidth="1" strokeLinecap="round" />
+      <line x1={leftCx} y1={barY} x2={rightCx} y2={barY} stroke={lineColor} strokeWidth={SW} strokeLinecap="round" />
+      {/* Drops to each report box */}
+      <line x1={leftCx}  y1={barY} x2={leftCx}  y2={bottomY} stroke={lineColor} strokeWidth={SW} strokeLinecap="round" />
+      <line x1={midCx}   y1={barY} x2={midCx}   y2={bottomY} stroke={lineColor} strokeWidth={SW} strokeLinecap="round" />
+      <line x1={rightCx} y1={barY} x2={rightCx} y2={bottomY} stroke={lineColor} strokeWidth={SW} strokeLinecap="round" />
 
-      {/* Top person — green shirt (leader) */}
-      <Person cx={16} cy={6} shirt="#4CAF74" shirtStroke="#2F7A4E" />
+      {/* Top box — green leader */}
+      <rect x={topX} y={topY} width={boxW} height={boxH} rx="1" fill={leaderFill} stroke={leaderStroke} strokeWidth={SW} />
 
       {/* Bottom row — pink, blue, yellow */}
-      <Person cx={6}  cy={23} shirt="#EC7C9C" shirtStroke="#B85577" />
-      <Person cx={16} cy={23} shirt="#5AB9E8" shirtStroke="#3E8AB0" />
-      <Person cx={26} cy={23} shirt="#F4C542" shirtStroke="#C28F12" />
+      <rect x={leftX}  y={bottomY} width={boxW} height={boxH} rx="1" fill={pinkFill}   stroke={pinkStroke}   strokeWidth={SW} />
+      <rect x={midX}   y={bottomY} width={boxW} height={boxH} rx="1" fill={blueFill}   stroke={blueStroke}   strokeWidth={SW} />
+      <rect x={rightX} y={bottomY} width={boxW} height={boxH} rx="1" fill={yellowFill} stroke={yellowStroke} strokeWidth={SW} />
     </svg>
   )
 }
