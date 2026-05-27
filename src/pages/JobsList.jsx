@@ -149,7 +149,10 @@ function JobItem({
           <p
             className={`font-bold truncate ${selectedJob === job.id ? 'text-green-800' : 'text-gray-800'}`}
           >
-            {job.name || job.client_name}
+            {/* Strip any trailing "(XX)" of 1–3 letters from the stored
+                name — some legacy rows already have initials baked into
+                jobs.name, which would otherwise show as "(XX) (YY)". */}
+            {(job.name || job.client_name || '').replace(/\s*\([A-Za-z]{1,3}\)\s*$/, '')}
             {respInitials && (
               <span className="ml-1 text-gray-500 font-normal">({respInitials})</span>
             )}
@@ -1374,7 +1377,7 @@ export default function JobsList() {
                                      user edits in Job > Info; it's the
                                      authoritative source. Fall back to the
                                      FK lookup only if there's no text. */
-                                  nameInitials(job.job_supervisor || '') ||
+                                  supervisorInitials(job.job_supervisor) ||
                                   initialsByEmpId[job.responsible_employee_id] ||
                                   ''
                                 }
@@ -1419,7 +1422,7 @@ export default function JobsList() {
                                      user edits in Job > Info; it's the
                                      authoritative source. Fall back to the
                                      FK lookup only if there's no text. */
-                                  nameInitials(job.job_supervisor || '') ||
+                                  supervisorInitials(job.job_supervisor) ||
                                   initialsByEmpId[job.responsible_employee_id] ||
                                   ''
                                 }
@@ -2541,6 +2544,25 @@ function empInitials(emp) {
   const l = (emp.last_name || '').trim()
   if (!f && !l) return ''
   return `${f.charAt(0)}${l.charAt(0)}`.toUpperCase()
+}
+
+// Robust initials from a text name. Handles "First Last", "Last, First",
+// and ignores trailing parenthesized junk like "John Smith (JS)" so it
+// returns "JS" regardless of which format the user entered.
+function supervisorInitials(raw) {
+  if (!raw) return ''
+  let s = String(raw).trim().replace(/\s*\([^)]*\)\s*$/, '').trim()
+  if (!s) return ''
+  if (s.includes(',')) {
+    // "Last, First" → take first letter of "First" then first letter of "Last"
+    const [last, first = ''] = s.split(',').map(p => p.trim())
+    if (first && last) return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase()
+    return last.slice(0, 2).toUpperCase()
+  }
+  const parts = s.split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return ''
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`.toUpperCase()
 }
 
 function JobDetail({ job, onDelete, price, onEdit }) {
