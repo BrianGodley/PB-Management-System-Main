@@ -1963,6 +1963,241 @@ function TransactionModal({ onSave, onClose, accounts }) {
 // ═════════════════════════════════════════════════════════════════════════════
 // CHART OF ACCOUNTS TAB
 // ═════════════════════════════════════════════════════════════════════════════
+// RegistersTab — QuickBooks-style register per account.
+//
+// Two cascading filter dropdowns: Account Type (one of the 14 QB types)
+// narrows the Account Name dropdown to accounts of that type. Selecting
+// an account loads its register from v_acct_account_register and paints
+// it in the table below.
+//
+// The view's "amount" is shown as-is — we don't try to compute a running
+// balance because we may not have complete historical data from QB. The
+// columns mirror QB's: Date / Type / Ref / Payee / Memo / Amount.
+// ═════════════════════════════════════════════════════════════════════════════
+function RegistersTab({ accounts }) {
+  const [filterType, setFilterType] = useState('')   // one of the 14 subtypes
+  const [filterAcct, setFilterAcct] = useState('')   // selected account id
+
+  const [rows, setRows]       = useState([])
+  const [loading, setLoading] = useState(false)
+  const [page, setPage]       = useState(0)
+  const [count, setCount]     = useState(0)
+  const PAGE_SIZE = 100
+
+  // Accounts filtered to the selected type — drives the second dropdown.
+  const accountsForType = filterType
+    ? accounts
+        .filter(a => (a.subtype || '').trim() === filterType)
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+    : []
+
+  // Clear the chosen account whenever the type changes — otherwise the
+  // old selection might no longer be in the new list.
+  useEffect(() => {
+    setFilterAcct('')
+    setRows([])
+    setCount(0)
+  }, [filterType])
+
+  // Reset to page 1 on account change.
+  useEffect(() => {
+    setPage(0)
+  }, [filterAcct])
+
+  // Fetch the register for the selected account.
+  useEffect(() => {
+    if (!filterAcct) return
+    let cancelled = false
+    ;(async () => {
+      setLoading(true)
+      const from = page * PAGE_SIZE
+      const to   = from + PAGE_SIZE - 1
+      const { data, count: c, error } = await supabase
+        .from('v_acct_account_register')
+        .select('*', { count: 'exact' })
+        .eq('account_id', filterAcct)
+        .order('txn_date', { ascending: false, nullsFirst: false })
+        .range(from, to)
+      if (cancelled) return
+      if (error) console.error('register fetch failed:', error)
+      setRows(data || [])
+      setCount(c || 0)
+      setLoading(false)
+    })()
+    return () => { cancelled = true }
+  }, [filterAcct, page])
+
+  const selectedAcct = accounts.find(a => a.id === filterAcct)
+  const totalPages   = Math.max(1, Math.ceil(count / PAGE_SIZE))
+  const safePage     = Math.min(page, totalPages - 1)
+  const pageTotal    = rows.reduce((s, r) => s + Number(r.amount || 0), 0)
+
+  return (
+    <div>
+      {/* Filter bar */}
+      <div className="flex flex-wrap items-end gap-3 mb-4 p-3 bg-white rounded-xl border border-gray-200">
+        <div className="min-w-[220px]">
+          <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">
+            Account Type
+          </label>
+          <select
+            value={filterType}
+            onChange={e => setFilterType(e.target.value)}
+            className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2"
+          >
+            <option value="">— Select type —</option>
+            {COA_SECTIONS.map(s => (
+              <option key={s.subtype} value={s.subtype}>{s.subtype}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex-1 min-w-[260px]">
+          <label className="block text-[10px] font-semibold text-gray-400 uppercase mb-1">
+            Account Name
+          </label>
+          <select
+            value={filterAcct}
+            onChange={e => setFilterAcct(e.target.value)}
+            disabled={!filterType}
+            className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 disabled:bg-gray-50 disabled:text-gray-400"
+          >
+            <option value="">
+              {!filterType
+                ? 'Pick a type first'
+                : accountsForType.length === 0
+                  ? 'No accounts in this type'
+                  : '— Select account —'}
+            </option>
+            {accountsForType.map(a => (
+              <option key={a.id} value={a.id}>
+                {a.number ? `${a.number} · ${a.name}` : a.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        {selectedAcct && count > 0 && (
+          <div className="ml-auto text-right">
+            <p className="text-[10px] text-gray-400 uppercase font-semibold">Visible-page Total</p>
+            <p className="text-lg font-bold text-gray-800">
+              {pageTotal.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Register header / empty state */}
+      {!selectedAcct ? (
+        <div className="text-center py-16 bg-white border border-dashed border-gray-300 rounded-xl">
+          <p className="text-4xl mb-3">📒</p>
+          <p className="text-lg font-semibold text-gray-700">Pick an account to see its register</p>
+          <p className="text-sm text-gray-500 mt-1 max-w-md mx-auto">
+            Choose an Account Type, then an Account Name above.
+          </p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          {/* Account header — QB-style title bar */}
+          <div className="px-4 py-3 bg-green-50 border-b border-green-200 flex items-center justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-green-900 truncate">
+                {selectedAcct.number ? `${selectedAcct.number} · ` : ''}
+                {selectedAcct.name}
+              </p>
+              <p className="text-[11px] text-green-700">
+                {selectedAcct.subtype || '—'} · {count.toLocaleString()} transaction{count === 1 ? '' : 's'}
+              </p>
+            </div>
+            {count > PAGE_SIZE && (
+              <span className="text-[11px] text-green-700">
+                Page {safePage + 1} of {totalPages.toLocaleString()}
+              </span>
+            )}
+          </div>
+
+          {/* Register table */}
+          <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
+            <colgroup>
+              <col style={{ width: '100px' }} /> {/* Date */}
+              <col style={{ width: '70px'  }} /> {/* Type */}
+              <col style={{ width: '90px'  }} /> {/* Ref */}
+              <col />                             {/* Payee */}
+              <col />                             {/* Memo */}
+              <col style={{ width: '120px' }} /> {/* Amount */}
+            </colgroup>
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50 text-left text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                <th className="px-3 py-2">Date</th>
+                <th className="px-3 py-2">Type</th>
+                <th className="px-3 py-2">Ref</th>
+                <th className="px-3 py-2">Payee</th>
+                <th className="px-3 py-2">Memo</th>
+                <th className="px-3 py-2 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {loading && (
+                <tr><td colSpan={6} className="px-3 py-10 text-center text-gray-400">Loading…</td></tr>
+              )}
+              {!loading && rows.length === 0 && (
+                <tr><td colSpan={6} className="px-3 py-10 text-center text-gray-400">
+                  No transactions hit this account yet.
+                </td></tr>
+              )}
+              {!loading && rows.map(r => (
+                <tr key={`${r.source_type}-${r.source_id}-${r.txn_date}-${r.amount}`} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">
+                    {r.txn_date ? new Date(r.txn_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) : '—'}
+                  </td>
+                  <td className="px-3 py-2">
+                    <span className={`inline-block text-[9px] px-1.5 py-0.5 rounded font-semibold uppercase ${typeStyle(r.txn_type)}`}>
+                      {r.txn_type}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 font-mono text-xs text-gray-500 truncate">{r.ref || '—'}</td>
+                  <td className="px-3 py-2 text-gray-800 truncate" title={r.payee || ''}>{r.payee || '—'}</td>
+                  <td className="px-3 py-2 text-xs text-gray-500 truncate" title={r.memo || ''}>{r.memo || ''}</td>
+                  <td className="px-3 py-2 text-right font-mono font-semibold text-gray-800">
+                    {Number(r.amount || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Pagination */}
+          {count > PAGE_SIZE && (
+            <div className="px-4 py-2 border-t border-gray-100 flex items-center gap-3 text-xs text-gray-500">
+              <button
+                onClick={() => setPage(Math.max(0, safePage - 1))}
+                disabled={safePage === 0}
+                className="px-2.5 py-1 rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >‹ Prev</button>
+              <span>Page {safePage + 1} of {totalPages.toLocaleString()} · {count.toLocaleString()} total</span>
+              <button
+                onClick={() => setPage(Math.min(totalPages - 1, safePage + 1))}
+                disabled={safePage >= totalPages - 1}
+                className="px-2.5 py-1 rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >Next ›</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function typeStyle(code) {
+  switch (code) {
+    case 'CHK':  return 'bg-blue-100 text-blue-700'
+    case 'CC':   return 'bg-purple-100 text-purple-700'
+    case 'BILL': return 'bg-amber-100 text-amber-700'
+    case 'IR':   return 'bg-gray-100 text-gray-700'
+    case 'INV':  return 'bg-green-100 text-green-700'
+    default:     return 'bg-gray-100 text-gray-600'
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 // Chart of Accounts is grouped by QB account TYPE (14 sections) rather than
 // rolled-up into the 6 high-level PBS types. The `subtype` column is what
 // the qbwc Account sync stores; for manual rows without a subtype we fall
@@ -2528,6 +2763,7 @@ const TABS = [
   { key: 'cc',        label: '💳 Credit Cards' },
   { key: 'banking',   label: '🏦 Banking' },
   { key: 'accounts',  label: '📒 Chart of Accounts' },
+  { key: 'registers', label: '📓 Registers' },
   { key: 'reports',   label: '📈 Reports' },
 ]
 
@@ -2647,7 +2883,8 @@ export default function Accounting() {
         {tab === 'banking' && (
           <BankingTab bankAccounts={bankAccounts} accounts={accounts} onRefresh={refresh} />
         )}
-        {tab === 'accounts' && <ChartOfAccountsTab accounts={accounts} onRefresh={refresh} />}
+        {tab === 'accounts'  && <ChartOfAccountsTab accounts={accounts} onRefresh={refresh} />}
+        {tab === 'registers' && <RegistersTab accounts={accounts} />}
         {tab === 'reports' && (
           <ReportsTab
             invoices={invoices}
