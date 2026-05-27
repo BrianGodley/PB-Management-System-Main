@@ -77,14 +77,9 @@ const US_STATES = [
 //   stateKey  — local-state key in JobInfoModal (matches setter name pair)
 export const JOB_ROLES = [
   {
-    key: 'design_consultant',
-    label: 'Design Consultant',
+    key: 'consultant',
+    label: 'Consultant',
     pillCls: 'bg-blue-100 text-blue-700 border border-blue-200',
-  },
-  {
-    key: 'installation_consultant',
-    label: 'Installation Consultant',
-    pillCls: 'bg-indigo-100 text-indigo-700 border border-indigo-200',
   },
   {
     key: 'design_review',
@@ -169,17 +164,13 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
   })
   const [permitNumber, setPermitNumber] = useState(job.permit_number || '')
   const [consultant, setConsultant] = useState(job.consultant || '')
-  const [projectManager, setProjectManager] = useState(job.project_manager || '')
+  // projectManager state removed — Job Supervisor lives on the Assignments
+  // tab as `jobSupervisor` (writes to job_supervisor, mirrors to
+  // project_manager for legacy readers).
 
-  // Employees tab — 9 role assignments, each storing the employee's full
-  // name. Falls back to the legacy fields so jobs imported before the
-  // schema migration still light up.
-  const [designConsultant, setDesignConsultant] = useState(
-    job.design_consultant || job.consultant || ''
-  )
-  const [installationConsultant, setInstallationConsultant] = useState(
-    job.installation_consultant || ''
-  )
+  // Assignments tab — role assignments, each storing the employee's full
+  // name. `consultant` and `jobSupervisor` were moved here from the
+  // (former) Job Details Assignments section.
   const [designReview, setDesignReview] = useState(job.design_review || '')
   const [permitCoordinator, setPermitCoordinator] = useState(
     job.permit_engineering_coordinator || ''
@@ -210,8 +201,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
     const v = job.total_price ?? job.contract_price ?? ''
     setContractPrice(v === '' || v === null || v === undefined ? '' : String(v))
     setPermitNumber(job.permit_number || '')
-    setConsultant(job.consultant || '')
-    setProjectManager(job.project_manager || '')
+    // Consultant + Job Supervisor moved to Assignments tab — handled by resetEmployeesForm.
     setError('')
   }
 
@@ -252,8 +242,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
 
   // Revert all 9 Employees-tab role assignments to whatever's on the job.
   function resetEmployeesForm() {
-    setDesignConsultant(job.design_consultant || job.consultant || '')
-    setInstallationConsultant(job.installation_consultant || '')
+    setConsultant(job.consultant || '')
     setDesignReview(job.design_review || '')
     setPermitCoordinator(job.permit_engineering_coordinator || '')
     setFinalReview(job.final_review || '')
@@ -270,8 +259,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
     setSaving(true)
     setError('')
     const ok = await onSave(job.id, {
-      design_consultant: designConsultant || null,
-      installation_consultant: installationConsultant || null,
+      consultant: consultant || null,
       design_review: designReview || null,
       permit_engineering_coordinator: permitCoordinator || null,
       final_review: finalReview || null,
@@ -279,8 +267,8 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
       quality_control_supervisor: qcSupervisor || null,
       finance_manager: financeManager || null,
       success_supervisor: successSupervisor || null,
-      // Legacy mirror — keep filled so any old reader still sees a value.
-      consultant: designConsultant || null,
+      // Legacy mirror — keep project_manager filled so any older reader
+      // still sees the job supervisor.
       project_manager: jobSupervisor || null,
     })
     setSaving(false)
@@ -463,8 +451,8 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
       job_zip: zip.trim(),
       total_price: Number.isFinite(cpNum) ? cpNum : null,
       permit_number: permitNumber.trim() || null,
-      consultant: consultant || null,
-      project_manager: projectManager || null,
+      // Consultant + Job Supervisor moved to the Assignments tab; their
+      // values are saved by handleSaveEmployees, not here.
     })
     setSaving(false)
     if (!ok) setError('Failed to save the job. Please try again.')
@@ -541,7 +529,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
     { key: 'info', label: 'Job Details' },
     { key: 'client', label: 'Client' },
     { key: 'client_portal', label: 'Client Portal' },
-    { key: 'employees', label: 'Employees' },
+    { key: 'employees', label: 'Assignments' },
   ]
 
   // Shared inner content block. Wrapped differently below depending on
@@ -765,46 +753,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
               </div>
             </div>
 
-            {/* Assignments */}
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                Assignments
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Consultant</label>
-                  <select
-                    value={consultant}
-                    onChange={e => setConsultant(e.target.value)}
-                    disabled={!editingDetails}
-                    className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
-                  >
-                    <option value="">— Select consultant —</option>
-                    {employeeOptions.map(o => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Job Supervisor</label>
-                  <select
-                    value={projectManager}
-                    onChange={e => setProjectManager(e.target.value)}
-                    disabled={!editingDetails}
-                    className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
-                  >
-                    <option value="">— Select job supervisor —</option>
-                    {employeeOptions.map(o => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
+            {/* Consultant + Job Supervisor moved to the Assignments tab. */}
 
             {error && <p className="text-xs text-red-500">{error}</p>}
           </div>
@@ -1284,8 +1233,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
             // Map state values to each role so we can drive everything
             // from JOB_ROLES without repeating boilerplate.
             const roleValueMap = {
-              design_consultant: designConsultant,
-              installation_consultant: installationConsultant,
+              consultant: consultant,
               design_review: designReview,
               permit_engineering_coordinator: permitCoordinator,
               final_review: finalReview,
@@ -1295,8 +1243,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
               success_supervisor: successSupervisor,
             }
             const roleSetterMap = {
-              design_consultant: setDesignConsultant,
-              installation_consultant: setInstallationConsultant,
+              consultant: setConsultant,
               design_review: setDesignReview,
               permit_engineering_coordinator: setPermitCoordinator,
               final_review: setFinalReview,
