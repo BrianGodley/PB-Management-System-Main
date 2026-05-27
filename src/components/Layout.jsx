@@ -17,19 +17,19 @@ import HRIcon from './icons/HRIcon'
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: <DashboardIcon /> },
+  { path: '/org-chart', label: 'Org Chart', icon: <OrgChartIcon /> },
+  { path: '/hr', label: 'HR', icon: <HRIcon /> },
+  { path: '/training', label: 'Training', icon: '🎓' },
   { path: '/contacts', label: 'Contacts', icon: <ContactsIcon /> },
   { path: '/clients', label: 'Opportunities', icon: <OpportunitiesIcon /> },
+  { path: '/accounting', label: 'Accounting', icon: <AccountingIcon /> },
+  { path: '/collections', label: 'Weekly FP', icon: <WeeklyFPIcon /> },
   { path: '/design', label: 'Design', icon: '📐' },
   { path: '/bids', label: 'Bids', icon: '📋' },
   { path: '/jobs', label: 'Jobs', icon: '🏡' },
   { path: '/equipment-tracking', label: 'Equipment', icon: <SkidSteerIcon /> },
-  { path: '/collections', label: 'Weekly FP', icon: <WeeklyFPIcon /> },
-  { path: '/statistics', label: 'Statistics', icon: '📈' },
-  { path: '/org-chart', label: 'Org Chart', icon: <OrgChartIcon /> },
   { path: '/portal/subs', label: 'Subs & Vendors', icon: '🧑‍🔧' },
-  { path: '/training', label: 'Training', icon: '🎓' },
-  { path: '/hr', label: 'HR', icon: <HRIcon /> },
-  { path: '/accounting', label: 'Accounting', icon: <AccountingIcon /> },
+  { path: '/statistics', label: 'Statistics', icon: '📈' },
 ]
 
 // Dock and main menu labels are computed inside the component via t()
