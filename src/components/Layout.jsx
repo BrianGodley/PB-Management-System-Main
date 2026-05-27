@@ -6,6 +6,7 @@ import { useLang } from '../contexts/LanguageContext'
 import { supabase } from '../lib/supabase'
 import SamChat from './SamChat'
 import ReportIssueModal from './ReportIssueModal'
+import SkidSteerIcon from './icons/SkidSteerIcon'
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: '🏠' },
@@ -14,7 +15,7 @@ const navItems = [
   { path: '/design', label: 'Design', icon: '📐' },
   { path: '/bids', label: 'Bids', icon: '📋' },
   { path: '/jobs', label: 'Jobs', icon: '🏡' },
-  { path: '/equipment-tracking', label: 'Equipment', icon: '🛠️' },
+  { path: '/equipment-tracking', label: 'Equipment', icon: <SkidSteerIcon /> },
   { path: '/collections', label: 'Finance', icon: '🏦' },
   { path: '/statistics', label: 'Statistics', icon: '📈' },
   { path: '/org-chart', label: 'Org Chart', icon: '🏗️' },
