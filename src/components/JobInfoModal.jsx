@@ -558,12 +558,63 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
   // whether we're rendering as a modal or as an inline panel.
   const innerContent = (
     <>
-      {/* Header */}
+      {/* Header — job name + inline responsible-employee picker. Changes
+          to the picker save immediately (no separate Save button) so the
+          user can reassign on the fly without diving into the Assignments
+          tab. Writes both job_supervisor (text — drives the (XX) initials)
+          and responsible_employee_id (FK) to keep the two in lockstep. */}
       <div className="px-5 pt-5 pb-3 border-b border-gray-100 flex items-start justify-between flex-shrink-0">
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-bold text-gray-900 truncate">
             {job.name || job.client_name}
           </h2>
+          <div className="mt-1 flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
+              Assigned to
+            </span>
+            <select
+              value={
+                // Prefer FK if set; otherwise try to match the text name
+                // back to an employee row so the dropdown shows the right
+                // option for legacy job_supervisor-only data.
+                job.responsible_employee_id ||
+                (() => {
+                  const txt = (job.job_supervisor || '').trim().toLowerCase()
+                  const m = employees.find(
+                    e =>
+                      `${e.first_name || ''} ${e.last_name || ''}`
+                        .trim()
+                        .toLowerCase() === txt,
+                  )
+                  return m?.id || ''
+                })()
+              }
+              onChange={async e => {
+                const empId = e.target.value || null
+                const picked = empId ? employees.find(x => x.id === empId) : null
+                const name = picked
+                  ? `${picked.first_name || ''} ${picked.last_name || ''}`.trim()
+                  : null
+                await onSave(job.id, {
+                  responsible_employee_id: empId,
+                  job_supervisor: name,
+                })
+              }}
+              className="text-sm border border-gray-300 rounded-md px-2 py-0.5 focus:outline-none focus:border-green-600"
+            >
+              <option value="">— Unassigned —</option>
+              {employees.map(e => (
+                <option key={e.id} value={e.id}>
+                  {e.first_name} {e.last_name}
+                </option>
+              ))}
+            </select>
+            {job.job_supervisor && (
+              <span className="text-[11px] text-gray-400">
+                Currently: {job.job_supervisor}
+              </span>
+            )}
+          </div>
         </div>
         {!inline && (
           <button
