@@ -1230,15 +1230,24 @@ function ChecksTab({ accounts, bankAccounts, jobs, vendors }) {
 // reset form for the next check. Clear → wipe local state (no DB write).
 function WriteCheckModal({
   accounts,
-  bankAccounts,
+  bankAccounts, // kept for backward compatibility; no longer required
   jobs,
   vendors,
   onClose,
   onSaved,
   onSavedNew,
 }) {
+  // Bank picker draws from the Chart of Accounts (subtype = 'Bank') so the
+  // list mirrors the COA the user already maintains. Saving the check stores
+  // the account's name in acct_checks.bank_account_name, which the
+  // v_acct_account_register view JOINs by name to surface the check in
+  // that bank's register.
+  const bankCoaAccounts = (accounts || [])
+    .filter(a => a.subtype === 'Bank' && a.is_active !== false)
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+
   const initial = () => ({
-    bank_account_id: bankAccounts[0]?.id || '',
+    bank_account_id: bankCoaAccounts[0]?.id || '',
     ref_number: '',
     date: new Date().toISOString().slice(0, 10),
     payee_type: 'vendor',
@@ -1254,7 +1263,7 @@ function WriteCheckModal({
   const [form, setForm] = useState(initial)
   const [saving, setSaving] = useState(false)
 
-  const bankAcct = bankAccounts.find(b => b.id === form.bank_account_id)
+  const bankAcct = bankCoaAccounts.find(b => b.id === form.bank_account_id)
   const endingBalance = bankAcct?.current_balance ?? bankAcct?.balance ?? null
 
   const lineTotal = form.lines.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0)
@@ -1304,7 +1313,12 @@ function WriteCheckModal({
       payee_type: form.payee_type,
       payee_id:   form.payee_id || null,
       payee_name: form.payee_name.trim(),
-      bank_account_id: form.bank_account_id,
+      // bank_account_id (FK to acct_bank_accounts) is intentionally left
+      // null for manual checks — the COA dropdown gives us an acct_accounts
+      // row, not an acct_bank_accounts row. The v_acct_account_register
+      // view JOINs by bank_account_name, so storing the name is what makes
+      // the check show up in that bank account's register.
+      bank_account_id: null,
       bank_account_name: bankAcct?.name || null,
       date: form.date,
       total,
@@ -1381,22 +1395,24 @@ function WriteCheckModal({
             className="input text-sm flex-1 max-w-md"
           >
             <option value="">— Select —</option>
-            {bankAccounts.map(b => (
+            {bankCoaAccounts.map(b => (
               <option key={b.id} value={b.id}>
                 {b.name}
               </option>
             ))}
           </select>
-          <div className="ml-auto text-right">
-            <p className="text-[10px] text-gray-400 uppercase font-semibold">Ending Balance</p>
-            <p
-              className={`text-base font-bold ${
-                (endingBalance || 0) < 0 ? 'text-red-600' : 'text-gray-800'
-              }`}
-            >
-              {endingBalance == null ? '—' : fmt(endingBalance)}
-            </p>
-          </div>
+          {endingBalance != null && (
+            <div className="ml-auto text-right">
+              <p className="text-[10px] text-gray-400 uppercase font-semibold">Ending Balance</p>
+              <p
+                className={`text-base font-bold ${
+                  (endingBalance || 0) < 0 ? 'text-red-600' : 'text-gray-800'
+                }`}
+              >
+                {fmt(endingBalance)}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Check face */}
@@ -3543,6 +3559,14 @@ function AccountModal({ account, onSave, onClose }) {
     description: account?.description || '',
     is_active: account?.is_active ?? true,
   })
+  // Category = one of the 14 COA_SECTIONS (e.g. "Bank", "Accounts Receivable",
+  // "Income"). Picking a category sets BOTH subtype + the underlying type
+  // so the new account drops into the right section of the Chart of Accounts.
+  function pickCategory(subtype) {
+    const sec = COA_SECTIONS.find(s => s.subtype === subtype)
+    if (!sec) return
+    setForm(p => ({ ...p, subtype: sec.subtype, type: sec.type }))
+  }
   return (
     <Modal onClose={onClose}>
       <div className="px-6 pt-5 pb-4 border-b border-gray-100 flex-shrink-0">
@@ -3562,18 +3586,22 @@ function AccountModal({ account, onSave, onClose }) {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Category</label>
             <select
               className="input text-sm w-full"
-              value={form.type}
-              onChange={e => setForm(p => ({ ...p, type: e.target.value }))}
+              value={form.subtype}
+              onChange={e => pickCategory(e.target.value)}
             >
-              {ACCOUNT_TYPES.map(t => (
-                <option key={t} value={t}>
-                  {TYPE_COLORS[t].label}
+              <option value="">— Select a category —</option>
+              {COA_SECTIONS.map(s => (
+                <option key={s.subtype} value={s.subtype}>
+                  {s.subtype}
                 </option>
               ))}
             </select>
+            <p className="text-[11px] text-gray-400 mt-0.5">
+              Categories match the sections in the Chart of Accounts.
+            </p>
           </div>
         </div>
         <div>
@@ -3583,15 +3611,6 @@ function AccountModal({ account, onSave, onClose }) {
             value={form.name}
             onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
             placeholder="Account name"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Subtype</label>
-          <input
-            className="input text-sm w-full"
-            value={form.subtype}
-            onChange={e => setForm(p => ({ ...p, subtype: e.target.value }))}
-            placeholder="e.g. bank, receivable, payroll"
           />
         </div>
         <div>
