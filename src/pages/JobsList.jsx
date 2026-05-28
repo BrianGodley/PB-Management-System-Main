@@ -216,7 +216,7 @@ export default function JobsList() {
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedJob, setSelectedJob] = useState(ALL_JOBS)
-  const [tab, setTab] = useState(() => searchParams.get('tab') || 'schedule')
+  const [tab, setTab] = useState(() => searchParams.get('tab') || 'info')
   // DOM node for the shared green app-header centre slot; the tab bar is
   // portalled into it. Resolved after mount so the portal never gets null.
   const [headerSlot, setHeaderSlot] = useState(null)
