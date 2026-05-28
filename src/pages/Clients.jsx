@@ -1537,75 +1537,117 @@ export default function Clients() {
                 )}
               </div>
             ) : (
-              <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-                <table className="w-full text-xs min-w-[900px]">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      {activeCols.map((col, ci) => (
-                        <th
-                          key={col.key}
-                          className={`px-4 py-2 text-left font-semibold text-gray-600 uppercase truncate ${ci === 0 ? 'sticky left-0 bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]' : ''}`}
-                          style={{ width: colWidth(col.key) }}
-                        >
-                          {col.label}
-                        </th>
-                      ))}
-                      <th className="px-4 py-2 w-16" />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {clients.map(client => (
-                      <tr
-                        key={client.id}
-                        className="group hover:bg-gray-50 transition-colors cursor-pointer"
-                      >
-                        {activeCols.map((col, ci) => (
-                          <td
-                            key={col.key}
-                            className={`px-4 py-2 min-w-0 max-w-0 overflow-hidden text-gray-600 ${ci === 0 ? 'sticky left-0 bg-white group-hover:bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]' : ''}`}
-                          >
-                            {cellContent(col, client)}
-                          </td>
-                        ))}
-                        <td className="px-4 py-2 w-28">
-                          <div className="flex items-center justify-end gap-2">
-                            <Link
-                              to={`/clients/${client.id}`}
-                              className="text-gray-500 hover:text-gray-700 whitespace-nowrap text-xs"
-                            >
-                              View →
-                            </Link>
-                            {tab === 'active' ? (
-                              <button
-                                onClick={() => setClientStatus(client.id, 'inactive')}
-                                className="text-xs text-gray-400 hover:text-yellow-600 whitespace-nowrap"
-                                title="Mark inactive"
+              (() => {
+                // Split the current page of opportunities into Individuals
+                // and Companies so we can render them as two stacked tables.
+                // (Pagination remains on the combined list so the user's
+                // page index keeps its meaning.)
+                const individualClients = clients.filter(c => c.client_type !== 'company')
+                const companyClients = clients.filter(c => c.client_type === 'company')
+
+                const renderTable = (rows, kindLabel, emptyMsg) => (
+                  <div className="mb-6 last:mb-0">
+                    <div className="flex items-baseline justify-between mb-2">
+                      <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                        {kindLabel}
+                      </h3>
+                      <span className="text-[11px] text-gray-400">
+                        {rows.length} on this page
+                      </span>
+                    </div>
+                    {rows.length === 0 ? (
+                      <div className="bg-white rounded-xl border border-dashed border-gray-200 text-center py-6 text-xs text-gray-400 italic">
+                        {emptyMsg}
+                      </div>
+                    ) : (
+                      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+                        <table className="w-full text-xs min-w-[900px]">
+                          <thead>
+                            <tr className="bg-gray-50 border-b border-gray-200">
+                              {activeCols.map((col, ci) => (
+                                <th
+                                  key={col.key}
+                                  className={`px-4 py-2 text-left font-semibold text-gray-600 uppercase truncate ${ci === 0 ? 'sticky left-0 bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]' : ''}`}
+                                  style={{ width: colWidth(col.key) }}
+                                >
+                                  {col.label}
+                                </th>
+                              ))}
+                              <th className="px-4 py-2 w-16" />
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {rows.map(client => (
+                              <tr
+                                key={client.id}
+                                className="group hover:bg-gray-50 transition-colors cursor-pointer"
                               >
-                                Deactivate
-                              </button>
-                            ) : (
-                              <>
-                                <button
-                                  onClick={() => setClientStatus(client.id, 'active')}
-                                  className="text-xs text-green-600 hover:text-green-800 whitespace-nowrap"
-                                >
-                                  Reactivate
-                                </button>
-                                <button
-                                  onClick={() => deleteClient(client.id)}
-                                  className="text-red-300 hover:text-red-500 text-xs"
-                                >
-                                  ✕
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                                {activeCols.map((col, ci) => (
+                                  <td
+                                    key={col.key}
+                                    className={`px-4 py-2 min-w-0 max-w-0 overflow-hidden text-gray-600 ${ci === 0 ? 'sticky left-0 bg-white group-hover:bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]' : ''}`}
+                                  >
+                                    {cellContent(col, client)}
+                                  </td>
+                                ))}
+                                <td className="px-4 py-2 w-28">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <Link
+                                      to={`/clients/${client.id}`}
+                                      className="text-gray-500 hover:text-gray-700 whitespace-nowrap text-xs"
+                                    >
+                                      View →
+                                    </Link>
+                                    {tab === 'active' ? (
+                                      <button
+                                        onClick={() => setClientStatus(client.id, 'inactive')}
+                                        className="text-xs text-gray-400 hover:text-yellow-600 whitespace-nowrap"
+                                        title="Mark inactive"
+                                      >
+                                        Deactivate
+                                      </button>
+                                    ) : (
+                                      <>
+                                        <button
+                                          onClick={() => setClientStatus(client.id, 'active')}
+                                          className="text-xs text-green-600 hover:text-green-800 whitespace-nowrap"
+                                        >
+                                          Reactivate
+                                        </button>
+                                        <button
+                                          onClick={() => deleteClient(client.id)}
+                                          className="text-red-300 hover:text-red-500 text-xs"
+                                        >
+                                          ✕
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )
+
+                return (
+                  <>
+                    {renderTable(
+                      individualClients,
+                      'Individual Opportunities',
+                      'No individuals on this page.',
+                    )}
+                    {renderTable(
+                      companyClients,
+                      'Company Opportunities',
+                      'No companies on this page.',
+                    )}
+                  </>
+                )
+              })()
             )}
           </div>
 
