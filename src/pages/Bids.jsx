@@ -3,7 +3,12 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { fetchAllPaginated } from '../lib/fetchAll'
 import { useCachedData } from '../lib/useCachedData'
-import { generateBidDoc, downloadBidDoc, fetchFinanceOacRate } from '../lib/generateBidDoc'
+import {
+  generateBidDoc,
+  downloadBidDoc,
+  fetchFinanceOacRate,
+  fetchConsultantNameForEstimate,
+} from '../lib/generateBidDoc'
 import BidDocViewerModal from '../components/BidDocViewerModal'
 import { JOB_ROLES, nameInitials } from '../components/JobInfoModal'
 
@@ -95,6 +100,87 @@ async function fetchBidsData() {
   }
 }
 
+// Map of JOB_ROLES key → exact HR position title that should fill it.
+// Job Supervisor is intentionally NOT in this map (no default — assigned
+// later in the job). Design Review and Final Review both default from the
+// Sales Manager per spec.
+const ROLE_DEFAULT_POSITIONS = {
+  design_review:                  ['Sales Manager'],
+  final_review:                   ['Sales Manager'],
+  permit_engineering_coordinator: ['Permit and Engineering Supervisor', 'Permit & Engineering Supervisor'],
+  quality_control_supervisor:     ['Quality Control Supervisor'],
+  finance_manager:                ['Finance Manager'],
+  success_supervisor:             ['Success Supervisor'],
+}
+
+// Pre-fill role defaults for the Sold modal. Returns an object keyed by
+// JOB_ROLES key, with "First Last" name strings as values. Consultant is
+// pulled from the bid's client (clients.consultant_employee_id); the other
+// roles come from the first active employee holding the matching position
+// in HR (see ROLE_DEFAULT_POSITIONS above).
+async function fetchSoldRoleDefaults(bid) {
+  const out = {}
+
+  // 1) Consultant from the opportunity. estimates.client_id → clients →
+  //    consultant_employee_id → employees row → "First Last".
+  try {
+    const clientId = bid?.estimates?.client_id
+    if (clientId) {
+      const { data: client } = await supabase
+        .from('clients')
+        .select('consultant_employee_id')
+        .eq('id', clientId)
+        .maybeSingle()
+      if (client?.consultant_employee_id) {
+        const { data: emp } = await supabase
+          .from('employees')
+          .select('first_name, last_name')
+          .eq('id', client.consultant_employee_id)
+          .maybeSingle()
+        if (emp) {
+          out.consultant = `${emp.first_name || ''} ${emp.last_name || ''}`.trim()
+        }
+      }
+    }
+  } catch (_) {
+    // Non-fatal — leave consultant unset
+  }
+
+  // 2) Position-holder defaults. One round-trip pulls every active
+  //    employee/position pair, then we pick the first holder per role.
+  try {
+    const wantedTitles = new Set(
+      Object.values(ROLE_DEFAULT_POSITIONS).flat().map(t => t.toLowerCase()),
+    )
+    const { data: rows } = await supabase
+      .from('employee_positions')
+      .select('positions(title), employees(first_name, last_name, status)')
+    const byTitle = new Map() // titleLower -> first "First Last" we saw
+    for (const r of rows || []) {
+      if (r.employees?.status !== 'active') continue
+      const title = (r.positions?.title || '').trim()
+      const key = title.toLowerCase()
+      if (!wantedTitles.has(key)) continue
+      if (byTitle.has(key)) continue
+      const name = `${r.employees.first_name || ''} ${r.employees.last_name || ''}`.trim()
+      if (name) byTitle.set(key, name)
+    }
+    for (const [roleKey, titles] of Object.entries(ROLE_DEFAULT_POSITIONS)) {
+      for (const t of titles) {
+        const hit = byTitle.get(t.toLowerCase())
+        if (hit) {
+          out[roleKey] = hit
+          break
+        }
+      }
+    }
+  } catch (_) {
+    // Non-fatal — defaults stay empty for any role we couldn't resolve
+  }
+
+  return out
+}
+
 export default function Bids() {
   // Cached data — instant on revisit; refresh() forces a refetch after writes.
   const { data: bidsData, loading, refresh } = useCachedData('bids:all', fetchBidsData)
@@ -157,15 +243,19 @@ export default function Bids() {
 
   async function updateStatus(id, status) {
     if (status === 'sold') {
-      // Intercept — show Sold modal to create job
+      // Intercept — show Sold modal to create job. Pre-fill role
+      // assignments from HR position holders so the user starts from
+      // sane defaults (per spec). Job Supervisor is intentionally left
+      // blank.
       const bid = bids.find(b => b.id === id)
       const autoTemplate = templates.find(t => t.auto_trigger === 'sold_bid')
+      const roles = await fetchSoldRoleDefaults(bid)
       setSoldModal({
         bidId: id,
         bid,
         jobName: formatJobName(bid?.client_name || ''),
         templateId: autoTemplate?.id || '',
-        roles: {}, // { [role.key]: employeeFullName }
+        roles, // { [role.key]: employeeFullName } — pre-filled defaults
       })
       return
     }
@@ -272,15 +362,12 @@ export default function Bids() {
       }
 
       // Persist any role assignments the user picked in the sold modal.
-      // Mirror to the legacy project_manager column so older readers that
-      // still expect it keep showing the job supervisor.
       const r = soldModal.roles || {}
       const roleUpdates = {}
       for (const role of JOB_ROLES) {
         if (r[role.key]) roleUpdates[role.key] = r[role.key]
       }
       if (r.design_consultant) roleUpdates.consultant = r.design_consultant
-      if (r.job_supervisor) roleUpdates.project_manager = r.job_supervisor
       if (Object.keys(roleUpdates).length) {
         await supabase.from('jobs').update(roleUpdates).eq('id', jobId)
       }
@@ -434,7 +521,11 @@ export default function Bids() {
         .order('sort_order', { nullsFirst: false })
         .order('created_at')
       const financeOacRate = await fetchFinanceOacRate()
-      const blob = await generateBidDoc(est, projs || [], bid.job_address || '', { financeOacRate })
+      const consultantName = await fetchConsultantNameForEstimate(supabase, est)
+      const blob = await generateBidDoc(est, projs || [], bid.job_address || '', {
+        financeOacRate,
+        consultantName,
+      })
       const safeName = (est?.estimate_name || bid.client_name || 'Bid').replace(/[^a-z0-9]/gi, '_')
       downloadBidDoc(blob, `${safeName}_Bid_${bid.date_submitted}.docx`)
     } catch (err) {

@@ -237,7 +237,7 @@ function buildFooter() {
 }
 
 // ── Title + address block (Sauer-style opening) ──────────────────────────────
-function buildOpening(estimate, bidDate, clientAddress) {
+function buildOpening(estimate, bidDate, clientAddress, consultantName = '') {
   const out = []
   const name = (estimate.client_name || '').trim() || 'Client'
 
@@ -264,6 +264,18 @@ function buildOpening(estimate, bidDate, clientAddress) {
       })
     )
   })
+
+  // Consultant line — appears under the address when known. Sourced from
+  // the opportunity (clients.consultant_employee_id) by the caller and
+  // threaded in via opts.consultantName.
+  if (consultantName && consultantName.trim()) {
+    out.push(
+      new Paragraph({
+        spacing: { before: 80, after: 0, line: 276 },
+        children: [bRun(`Consultant: ${consultantName.trim()}`)],
+      })
+    )
+  }
 
   out.push(emptyLine(120))
   return out
@@ -382,8 +394,8 @@ export async function generateBidDoc(estimate, projects, clientAddress = '', opt
 
   const body = []
 
-  // Opening: "Estimate For …" + address lines
-  body.push(...buildOpening(estimate, bidDate, clientAddress))
+  // Opening: "Estimate For …" + address lines (+ Consultant line if known)
+  body.push(...buildOpening(estimate, bidDate, clientAddress, opts.consultantName || ''))
 
   // Flatten projects → modules; render each module as a Sauer-style section.
   // Sauer doesn't show a project-level grouping label, so we don't either —
@@ -432,6 +444,35 @@ export async function generateBidDoc(estimate, projects, clientAddress = '', opt
   })
 
   return await Packer.toBlob(doc)
+}
+
+/**
+ * fetchConsultantNameForEstimate(supabase, estimate)
+ * Resolves the consultant's "First Last" text for a bid document, given the
+ * estimate row. The lookup chain is estimate → client → consultant employee.
+ * Returns '' if any link is missing. Pass the project's supabase instance —
+ * we don't import it here to keep this file framework-agnostic.
+ */
+export async function fetchConsultantNameForEstimate(supabase, estimate) {
+  try {
+    const clientId = estimate?.client_id
+    if (!clientId) return ''
+    const { data: client } = await supabase
+      .from('clients')
+      .select('consultant_employee_id')
+      .eq('id', clientId)
+      .maybeSingle()
+    if (!client?.consultant_employee_id) return ''
+    const { data: emp } = await supabase
+      .from('employees')
+      .select('first_name, last_name')
+      .eq('id', client.consultant_employee_id)
+      .maybeSingle()
+    if (!emp) return ''
+    return `${emp.first_name || ''} ${emp.last_name || ''}`.trim()
+  } catch (_) {
+    return ''
+  }
 }
 
 /**

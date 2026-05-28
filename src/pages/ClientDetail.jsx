@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import NewEstimateModal from '../components/NewEstimateModal'
 import BidDocViewerModal from '../components/BidDocViewerModal'
 import ConsultantPicker from '../components/ConsultantPicker'
+import { useAuth } from '../contexts/AuthContext'
 
 const BID_STATUS_STYLES = {
   pending: 'bg-yellow-50  text-yellow-800 border border-yellow-300',
@@ -74,6 +75,7 @@ const US_STATES = [
 export default function ClientDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [client, setClient] = useState(null)
   const [estimates, setEstimates] = useState([])
   const [bids, setBids] = useState([])
@@ -90,6 +92,13 @@ export default function ClientDetail() {
   // Resolved consultant employee (for the read-only display card). Loaded
   // alongside the client whenever consultant_employee_id is set.
   const [consultantEmp, setConsultantEmp] = useState(null)
+  // Consultant-prompt modal — set when the user kicks off a new estimate
+  // on an opportunity that doesn't yet have a consultant. Holds the
+  // estimate-creation data so we can resume after the user picks.
+  // Shape: { estimateData, suggestedEmployeeId } | null
+  const [consultantPrompt, setConsultantPrompt] = useState(null)
+  const [promptPick, setPromptPick] = useState(null)
+  const [promptSaving, setPromptSaving] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -251,7 +260,40 @@ export default function ClientDetail() {
     }
   }
 
+  // Estimate "Next" — if the opportunity already has a consultant, jump
+  // straight to creating the estimate. If not, open the consultant prompt
+  // first; the user must assign someone before the estimate is created.
   async function handleEstimateNext(data) {
+    if (client.consultant_employee_id) {
+      return createEstimateRow(data)
+    }
+    // Default the prompt to the logged-in user — but only if they're a
+    // Design or Installation Consultant themselves. Otherwise the picker
+    // opens with no selection and the user picks manually.
+    let suggestedEmployeeId = null
+    if (user?.id) {
+      const { data: myEmp } = await supabase
+        .from('employees')
+        .select('id, status, employee_positions(positions(title))')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      const titles = (myEmp?.employee_positions || [])
+        .map(r => r.positions?.title)
+        .filter(Boolean)
+      const isConsultant = titles.some(
+        t => t === 'Design Consultant' || t === 'Installation Consultant',
+      )
+      if (myEmp?.id && myEmp.status === 'active' && isConsultant) {
+        suggestedEmployeeId = myEmp.id
+      }
+    }
+    setPromptPick(suggestedEmployeeId)
+    setConsultantPrompt({ estimateData: data, suggestedEmployeeId })
+  }
+
+  // Actually insert the estimate row + navigate. Used both for the no-prompt
+  // path and after the consultant prompt resolves.
+  async function createEstimateRow(data) {
     const { data: est, error } = await supabase
       .from('estimates')
       .insert({
@@ -271,6 +313,35 @@ export default function ClientDetail() {
       setShowEstimateModal(false)
       navigate(`/estimates/${est.id}`)
     }
+  }
+
+  // Save the picked consultant onto the client, refresh local state, then
+  // resume the estimate creation we paused in handleEstimateNext.
+  async function confirmConsultantPrompt() {
+    if (!promptPick || !consultantPrompt) return
+    setPromptSaving(true)
+    const { error } = await supabase
+      .from('clients')
+      .update({ consultant_employee_id: promptPick })
+      .eq('id', id)
+    if (error) {
+      setPromptSaving(false)
+      alert(`Could not save consultant: ${error.message}`)
+      return
+    }
+    // Refresh local client + display card
+    setClient(prev => ({ ...prev, consultant_employee_id: promptPick }))
+    const { data: emp } = await supabase
+      .from('employees')
+      .select('id, first_name, last_name')
+      .eq('id', promptPick)
+      .maybeSingle()
+    setConsultantEmp(emp || null)
+    setPromptSaving(false)
+    const { estimateData } = consultantPrompt
+    setConsultantPrompt(null)
+    setPromptPick(null)
+    await createEstimateRow(estimateData)
   }
 
   async function handleDelete() {
@@ -1226,6 +1297,50 @@ export default function ClientDetail() {
           onNext={handleEstimateNext}
         />
       )}
+
+      {/* Consultant prompt — fires when the user starts a new estimate on
+          an opportunity that doesn't have a consultant yet. Required choice
+          before the estimate is created. */}
+      {consultantPrompt && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md flex flex-col">
+            <div className="px-5 py-4 border-b border-gray-200">
+              <h3 className="text-sm font-bold text-gray-900">Assign a consultant</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                This opportunity doesn't have a consultant yet. Pick one to continue creating
+                the estimate — the choice is saved to the opportunity for future use.
+              </p>
+            </div>
+            <div className="px-5 py-4">
+              <ConsultantPicker value={promptPick} onChange={setPromptPick} />
+            </div>
+            <div className="px-5 py-3 border-t border-gray-200 flex items-center justify-end gap-2">
+              <button
+                onClick={() => {
+                  setConsultantPrompt(null)
+                  setPromptPick(null)
+                }}
+                disabled={promptSaving}
+                className="px-3 py-1.5 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmConsultantPrompt}
+                disabled={!promptPick || promptSaving}
+                className={`px-3 py-1.5 text-sm rounded-md font-medium ${
+                  promptPick && !promptSaving
+                    ? 'bg-green-600 text-white hover:bg-green-700'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                {promptSaving ? 'Saving…' : 'Save & Create Estimate'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {viewingBid && <BidDocViewerModal bid={viewingBid} onClose={() => setViewingBid(null)} />}
     </div>
   )

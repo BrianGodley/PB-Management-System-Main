@@ -16,7 +16,12 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { generateBidDoc, downloadBidDoc, fetchFinanceOacRate } from '../lib/generateBidDoc'
+import {
+  generateBidDoc,
+  downloadBidDoc,
+  fetchFinanceOacRate,
+  fetchConsultantNameForEstimate,
+} from '../lib/generateBidDoc'
 
 import DrainageModule from './modules/DrainageModule'
 import DrainageSummary from './modules/DrainageSummary'
@@ -484,7 +489,11 @@ export default function COEstimatePanel({
         if (estimate && projects.length) {
           try {
             const financeOacRate = await fetchFinanceOacRate()
-            const blob = await generateBidDoc(estimate, projects, clientAddress, { financeOacRate })
+            const consultantName = await fetchConsultantNameForEstimate(supabase, estimate)
+            const blob = await generateBidDoc(estimate, projects, clientAddress, {
+              financeOacRate,
+              consultantName,
+            })
             const safeName = (description.trim() || 'ChangeOrder').replace(/[^a-z0-9]/gi, '_')
             downloadBidDoc(blob, `${safeName}_CO_${new Date().toISOString().split('T')[0]}.docx`)
           } catch {

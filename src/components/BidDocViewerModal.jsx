@@ -27,7 +27,11 @@
 import { useEffect, useRef, useState } from 'react'
 import * as mammoth from 'mammoth'
 import { supabase } from '../lib/supabase'
-import { generateBidDoc, fetchFinanceOacRate } from '../lib/generateBidDoc'
+import {
+  generateBidDoc,
+  fetchFinanceOacRate,
+  fetchConsultantNameForEstimate,
+} from '../lib/generateBidDoc'
 import { LOGO_B64 } from '../lib/logoBase64'
 
 const FG = '#3A5038'
@@ -146,8 +150,10 @@ export default function BidDocViewerModal({ bid, onClose }) {
     if (projErr) throw projErr
 
     const financeOacRate = await fetchFinanceOacRate()
+    const consultantName = await fetchConsultantNameForEstimate(supabase, est)
     const blob = await generateBidDoc(est, projs || [], bidLite.job_address || '', {
       financeOacRate,
+      consultantName,
     })
     const ab = await blob.arrayBuffer()
     const res = await mammoth.convertToHtml({ arrayBuffer: ab })
