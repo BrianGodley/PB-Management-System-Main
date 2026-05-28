@@ -888,14 +888,10 @@ export default function ClientDetail() {
                   </div>
                 </div>
 
-                {/* Actions card */}
-                <div className="bg-white border border-slate-300 rounded-xl p-3 shadow-sm space-y-2">
-                  <button
-                    onClick={() => setShowEstimateModal(true)}
-                    className="w-full py-2 rounded-lg bg-green-700 text-white text-xs font-semibold hover:bg-green-800 transition-colors"
-                  >
-                    + New Estimate
-                  </button>
+                {/* Actions card — "+ New Estimate" was removed from here
+                    because the Estimates section on the right already has
+                    its own + New Estimate button. */}
+                <div className="bg-white border border-slate-300 rounded-xl p-3 shadow-sm">
                   <button
                     onClick={handleDelete}
                     className="w-full py-2 rounded-lg border border-red-200 text-red-500 text-xs font-semibold hover:bg-red-50 hover:border-red-300 transition-colors"
