@@ -25,14 +25,26 @@ export default function ConsultantPicker({ value = null, onChange, compact = fal
   useEffect(() => {
     let cancelled = false
     async function load() {
-      // Pull both consultant types in one query via the employee_positions
-      // join. Each row carries the position title so we can split into the
-      // Design vs Installation buckets without a second round-trip.
-      const { data } = await supabase
-        .from('employee_positions')
-        .select('employee_id, positions(title), employees(id, first_name, last_name, status)')
+      // Pull employees two ways and merge:
+      //   1) Via the employee_positions join (the new multi-position model)
+      //   2) Via the legacy employees.job_title text field
+      // Either path qualifies an active employee for the consultant picker —
+      // this handles the case where someone is added to HR with a
+      // job_title of "Design Consultant" but their employee_positions row
+      // hasn't been backfilled yet.
+      const [joinRes, byTitleRes] = await Promise.all([
+        supabase
+          .from('employee_positions')
+          .select('employee_id, positions(title), employees(id, first_name, last_name, status)'),
+        supabase
+          .from('employees')
+          .select('id, first_name, last_name, status, job_title')
+          .eq('status', 'active')
+          .in('job_title', [POSITION_TITLES.design, POSITION_TITLES.install]),
+      ])
       if (cancelled) return
-      const rows = (data || [])
+
+      const fromJoin = (joinRes.data || [])
         .filter(r => r.employees?.status === 'active')
         .filter(r =>
           r.positions?.title === POSITION_TITLES.design ||
@@ -44,7 +56,18 @@ export default function ConsultantPicker({ value = null, onChange, compact = fal
           last_name: r.employees.last_name || '',
           position_title: r.positions.title,
         }))
-      // De-dupe (employee could hold both positions; keep one row per type)
+
+      const fromTitle = (byTitleRes.data || []).map(e => ({
+        id: e.id,
+        first_name: e.first_name || '',
+        last_name: e.last_name || '',
+        position_title: e.job_title,
+      }))
+
+      const rows = [...fromJoin, ...fromTitle]
+      // De-dupe (employee could hold both positions, and the two queries
+      // can also return the same row twice). Key on id + position so a
+      // person holding both Design + Install still shows up under each.
       const seen = new Set()
       const deduped = []
       for (const r of rows) {
