@@ -102,6 +102,7 @@ function JobItem({
   stages,
   selectedJob,
   setSelectedJob,
+  setTab,
   onMove,
   clientPhoneMap = { byId: {}, byName: {} },
   respInitials = '',
@@ -133,7 +134,12 @@ function JobItem({
         />
       )}
       <div
-        onClick={() => setSelectedJob(job.id)}
+        onClick={() => {
+          setSelectedJob(job.id)
+          // Picking a specific job from the sidebar always jumps to Info —
+          // mirrors the user's mental model of "open this job's details".
+          if (typeof setTab === 'function') setTab('info')
+        }}
         className={`flex items-center rounded-lg cursor-pointer transition-colors ${
           selectedJob === job.id
             ? 'bg-green-50 border border-green-200'
@@ -216,7 +222,10 @@ export default function JobsList() {
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedJob, setSelectedJob] = useState(ALL_JOBS)
-  const [tab, setTab] = useState(() => searchParams.get('tab') || 'info')
+  // Default landing tab is Schedule (combined with selectedJob=ALL_JOBS this
+  // gives the user "Schedule > All Jobs" on first arrival). A ?tab= URL param
+  // still wins for deep-links from elsewhere in the app.
+  const [tab, setTab] = useState(() => searchParams.get('tab') || 'schedule')
   // DOM node for the shared green app-header centre slot; the tab bar is
   // portalled into it. Resolved after mount so the portal never gets null.
   const [headerSlot, setHeaderSlot] = useState(null)
@@ -1191,7 +1200,13 @@ export default function JobsList() {
       <div className="lg:hidden mb-2 flex-shrink-0">
         <select
           value={selectedJob}
-          onChange={e => setSelectedJob(e.target.value)}
+          onChange={e => {
+            const v = e.target.value
+            setSelectedJob(v)
+            // Mirror the sidebar behavior — picking a specific job from the
+            // mobile dropdown also jumps to Info.
+            if (v !== ALL_JOBS) setTab('info')
+          }}
           className="input text-sm w-full"
         >
           <option value={ALL_JOBS}>All Jobs</option>
@@ -1375,6 +1390,7 @@ export default function JobsList() {
                                 stages={stages}
                                 selectedJob={selectedJob}
                                 setSelectedJob={setSelectedJob}
+                                setTab={setTab}
                                 setJobModal={setJobModal}
                                 onMove={moveJobToStage}
                                 clientPhoneMap={clientPhoneMap}
@@ -1420,6 +1436,7 @@ export default function JobsList() {
                                 stages={stages}
                                 selectedJob={selectedJob}
                                 setSelectedJob={setSelectedJob}
+                                setTab={setTab}
                                 setJobModal={setJobModal}
                                 onMove={moveJobToStage}
                                 clientPhoneMap={clientPhoneMap}
