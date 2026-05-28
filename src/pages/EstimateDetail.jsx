@@ -1277,7 +1277,7 @@ export default function EstimateDetail() {
                   if (ok) setDirty(false)
                 }}
                 disabled={savingDraft}
-                className="px-4 py-1.5 rounded-lg bg-amber-600 text-white text-sm font-semibold hover:bg-amber-700 disabled:opacity-50"
+                className="px-4 py-1 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800 disabled:opacity-50"
                 title={
                   isFirstSave
                     ? 'Save this estimate'
@@ -1293,7 +1293,7 @@ export default function EstimateDetail() {
             <button
               onClick={createBid}
               disabled={creatingBid}
-              className={`text-sm px-4 py-2 rounded-lg font-semibold transition-colors disabled:opacity-50 ${
+              className={`text-sm px-4 py-1.5 rounded-lg font-semibold transition-colors disabled:opacity-50 ${
                 isCOMode
                   ? 'border border-blue-700 text-blue-700 hover:bg-blue-50'
                   : 'border border-green-700 text-green-700 hover:bg-green-50'
@@ -1323,7 +1323,7 @@ export default function EstimateDetail() {
           <button
             onClick={deleteEstimate}
             disabled={statusLoading}
-            className="text-sm px-4 py-2 rounded-lg border border-gray-200 text-gray-400 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+            className="text-sm px-4 py-1.5 rounded-lg border border-gray-200 text-gray-400 hover:border-red-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
             title="Delete this estimate"
           >
             🗑 Delete
