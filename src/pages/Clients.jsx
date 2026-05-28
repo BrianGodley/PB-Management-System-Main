@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import MasterRates from './MasterRates'
 import { DEFAULT_ESTIMATE_GPMD, DEFAULT_SALES_TAX_RATE } from '../lib/companyDefaults'
+import ConsultantPicker from '../components/ConsultantPicker'
 
 // Opportunities list is fetched one page at a time (server-side paging).
 const CLIENTS_PER_PAGE = 200
@@ -220,6 +221,8 @@ function AddIndividualModal({ onSave, onClose, user }) {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  // Optional consultant assignment (Design or Installation Consultant).
+  const [consultantEmployeeId, setConsultantEmployeeId] = useState(null)
   const pickerRef = useRef(null)
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
@@ -296,6 +299,7 @@ function AddIndividualModal({ onSave, onClose, user }) {
       first_name: form.first_name.trim(),
       last_name: form.last_name.trim(),
       name,
+      consultant_employee_id: consultantEmployeeId,
       spouse_first_name: form.spouse_first_name.trim() || null,
       spouse_last_name: form.spouse_last_name.trim() || null,
       email: form.email.trim() || null,
@@ -574,6 +578,19 @@ function AddIndividualModal({ onSave, onClose, user }) {
             />
           </div>
 
+          {/* Optional Consultant — Design or Installation Consultant.
+              Source list = employees holding those exact positions in HR. */}
+          <div>
+            <label className={lbl}>
+              Assigned Consultant{' '}
+              <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <ConsultantPicker
+              value={consultantEmployeeId}
+              onChange={setConsultantEmployeeId}
+            />
+          </div>
+
           {saveError && (
             <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2 rounded-lg">
               ⚠️ {saveError}
@@ -624,6 +641,8 @@ function AddCompanyModal({ onSave, onClose, user }) {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  // Optional consultant assignment (Design or Installation Consultant).
+  const [consultantEmployeeId, setConsultantEmployeeId] = useState(null)
   const pickerRef = useRef(null)
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }))
@@ -700,6 +719,7 @@ function AddCompanyModal({ onSave, onClose, user }) {
       zip: form.zip.trim() || null,
       notes: form.notes.trim() || null,
       company_contacts: compContacts.length ? compContacts : null,
+      consultant_employee_id: consultantEmployeeId,
       created_by: user?.id,
     })
     setSaving(false)
@@ -944,6 +964,19 @@ function AddCompanyModal({ onSave, onClose, user }) {
               value={form.notes}
               onChange={e => set('notes', e.target.value)}
               placeholder="Any notes about this opportunity…"
+            />
+          </div>
+
+          {/* Optional Consultant — Design or Installation Consultant.
+              Source list = employees holding those exact positions in HR. */}
+          <div>
+            <label className={lbl}>
+              Assigned Consultant{' '}
+              <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <ConsultantPicker
+              value={consultantEmployeeId}
+              onChange={setConsultantEmployeeId}
             />
           </div>
 

@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import NewEstimateModal from '../components/NewEstimateModal'
 import BidDocViewerModal from '../components/BidDocViewerModal'
+import ConsultantPicker from '../components/ConsultantPicker'
 
 const BID_STATUS_STYLES = {
   pending: 'bg-yellow-50  text-yellow-800 border border-yellow-300',
@@ -86,6 +87,9 @@ export default function ClientDetail() {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({})
   const [deleteModal, setDeleteModal] = useState(null)
+  // Resolved consultant employee (for the read-only display card). Loaded
+  // alongside the client whenever consultant_employee_id is set.
+  const [consultantEmp, setConsultantEmp] = useState(null)
 
   useEffect(() => {
     fetchData()
@@ -107,6 +111,19 @@ export default function ClientDetail() {
     if (clientData) {
       setClient(clientData)
       setForm(clientData)
+
+      // Resolve consultant employee (id → name) so the display card has a
+      // value without a join. Clears when no consultant is assigned.
+      if (clientData.consultant_employee_id) {
+        const { data: emp } = await supabase
+          .from('employees')
+          .select('id, first_name, last_name')
+          .eq('id', clientData.consultant_employee_id)
+          .maybeSingle()
+        setConsultantEmp(emp || null)
+      } else {
+        setConsultantEmp(null)
+      }
 
       const { data: estData } = await supabase
         .from('estimates')
@@ -203,6 +220,7 @@ export default function ClientDetail() {
         state: form.state || null,
         zip: form.zip?.trim() || null,
         notes: form.notes?.trim() || null,
+        consultant_employee_id: form.consultant_employee_id ?? null,
       })
       .eq('id', id)
     setSaving(false)
@@ -216,6 +234,19 @@ export default function ClientDetail() {
         additional_phones: addlPhones && addlPhones.length ? addlPhones : null,
         cell: form.cell?.trim() || null,
       })
+      // Refresh the resolved consultant employee for the display card —
+      // the user may have just changed it.
+      const newConsultantId = form.consultant_employee_id ?? null
+      if (newConsultantId) {
+        const { data: emp } = await supabase
+          .from('employees')
+          .select('id, first_name, last_name')
+          .eq('id', newConsultantId)
+          .maybeSingle()
+        setConsultantEmp(emp || null)
+      } else {
+        setConsultantEmp(null)
+      }
       setEditing(false)
     }
   }
@@ -540,6 +571,18 @@ export default function ClientDetail() {
                           onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
                         />
                       </div>
+                      {/* Assigned Consultant — Design or Installation Consultant */}
+                      <div>
+                        <label className="block text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-0.5">
+                          Assigned Consultant
+                        </label>
+                        <ConsultantPicker
+                          value={form.consultant_employee_id || null}
+                          onChange={empId =>
+                            setForm(p => ({ ...p, consultant_employee_id: empId }))
+                          }
+                        />
+                      </div>
                       <div className="flex gap-2 pt-1">
                         <button
                           type="submit"
@@ -695,6 +738,26 @@ export default function ClientDetail() {
                         )}
                       </div>
                     </>
+                  )}
+                </div>
+
+                {/* Consultant card — sits below the identity card. Shows
+                    the employee currently assigned as this opportunity's
+                    consultant; edit via the identity card's pencil icon. */}
+                <div className="bg-white border border-slate-300 rounded-xl p-4 shadow-sm">
+                  <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                    Consultant
+                  </p>
+                  {consultantEmp ? (
+                    <p className="text-sm font-semibold text-gray-800">
+                      {[consultantEmp.first_name, consultantEmp.last_name]
+                        .filter(Boolean)
+                        .join(' ')}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-gray-400 italic">
+                      No consultant assigned. Click the pencil on the card above to assign one.
+                    </p>
                   )}
                 </div>
 
