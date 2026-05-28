@@ -60,7 +60,7 @@ export default function Info() {
     supabase
       .from('jobs')
       .select(
-        'id, name, client_name, status, job_address, job_city, job_state, job_zip, consultant, job_supervisor, project_manager, responsible_employee_id'
+        'id, name, client_name, status, job_address, job_city, job_state, job_zip, consultant, job_supervisor, responsible_employee_id'
       )
       .order('status', { ascending: true })
       .order('name', { ascending: true })
@@ -101,7 +101,7 @@ export default function Info() {
     setState(selectedJob.job_state || '')
     setZip(selectedJob.job_zip || '')
     setConsultant(selectedJob.consultant || '')
-    setJobSupervisor(selectedJob.job_supervisor || selectedJob.project_manager || '')
+    setJobSupervisor(selectedJob.job_supervisor || '')
     setResponsibleEmployeeId(selectedJob.responsible_employee_id || '')
     setSaveError('')
     setActiveTab('info')
@@ -129,8 +129,6 @@ export default function Info() {
       job_zip: zip.trim(),
       consultant: consultant || null,
       job_supervisor: jobSupervisor || null,
-      // Legacy mirror — keep project_manager filled so any old reader stays in sync.
-      project_manager: jobSupervisor || null,
       responsible_employee_id: responsibleEmployeeId || null,
     }
     const { error } = await supabase.from('jobs').update(updates).eq('id', selectedJob.id)

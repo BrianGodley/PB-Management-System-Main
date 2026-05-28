@@ -225,7 +225,10 @@ def import_jobsites_rollup(df, dry_run):
             "job_city":            clean(r.get("city")) or "",
             "job_state":           clean(r.get("state")) or "",
             "job_zip":             clean(r.get("zip")) or "",
-            "project_manager":     clean(r.get("project_manager")),
+            # BuilderTrend exports their supervisor as a column called
+            # "project_manager"; PBS stores it as job_supervisor (the
+            # legacy project_manager column on jobs was dropped).
+            "job_supervisor":      clean(r.get("project_manager")),
             "notes":               clean(r.get("notes")),
             "status":              status,
             "projected_start":     to_date(r.get("projected_start")),

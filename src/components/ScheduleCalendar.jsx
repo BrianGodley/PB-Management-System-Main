@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { fetchAllPaginated } from '../lib/fetchAll'
 import { COLOR_PALETTE } from '../pages/JobsList'
+import ReopenJobModal from './ReopenJobModal'
 
 // ── Color Dropdown Picker ─────────────────────────────────────
 function ColorDropdown({ value, onChange, allowClear = false }) {
@@ -1141,6 +1142,11 @@ export default function ScheduleCalendar({
   const [modalJobId, setModalJobId] = useState(null)
   const [jobPickerSearch, setJobPickerSearch] = useState('')
   const [saving, setSaving] = useState(false)
+  // Reopen-from-picker flow — when the user clicks a closed job in the
+  // Add Schedule picker, we open the ReopenJobModal first to capture the
+  // new stage + responsible employee, then proceed into the scheduling
+  // type selector once the reopen save succeeds.
+  const [reopenPendingJob, setReopenPendingJob] = useState(null)
   // Administrative scheduling form (crew time off / supervisor scheduling).
   // job_id stays null on these rows; title is prefixed "X - " and uses X's color.
   const [adminForm, setAdminForm] = useState({
@@ -1246,25 +1252,15 @@ export default function ScheduleCalendar({
   }
 
   // Handle a click on a job in the Add-Schedule picker. If the job is
-  // closed (status = completed / cancelled), confirm with the user before
-  // flipping it back to active and proceeding into the scheduling flow.
-  // If the user declines, stay in the picker.
+  // closed (status = completed / cancelled), open the ReopenJobModal to
+  // capture the new stage + responsible employee before we flip it back
+  // to active and proceed into the scheduling flow.
   async function pickJobForSchedule(job) {
     const s = job?.status || 'active'
     const isClosed = s === 'completed' || s === 'cancelled'
     if (isClosed) {
-      const ok = confirm(
-        `"${job.name || job.client_name}" is currently ${s === 'cancelled' ? 'cancelled' : 'closed'}.\n\n` +
-          `You'll need to re-open it before you can schedule anything against it.\n\n` +
-          `Re-open this job now?`
-      )
-      if (!ok) return
-      const { error } = await supabase.from('jobs').update({ status: 'active' }).eq('id', job.id)
-      if (error) {
-        alert('Could not reopen the job: ' + error.message)
-        return
-      }
-      if (typeof onReopenJob === 'function') onReopenJob(job.id)
+      setReopenPendingJob(job)
+      return
     }
     setModalJobId(job.id)
     setPhase('type-select')
@@ -4133,6 +4129,36 @@ export default function ScheduleCalendar({
             </div>
           </div>
         </ModalOverlay>
+      )}
+
+      {/* ReopenJobModal — user clicked a closed job in the Add Schedule
+          picker. We require them to pick the re-entry stage + responsible
+          employee before flipping status to active and proceeding. */}
+      {reopenPendingJob && (
+        <ReopenJobModal
+          jobName={reopenPendingJob.name || reopenPendingJob.client_name || ''}
+          onCancel={() => setReopenPendingJob(null)}
+          onConfirm={async ({ stageId, employeeId, employeeName }) => {
+            const job = reopenPendingJob
+            const { error } = await supabase
+              .from('jobs')
+              .update({
+                status: 'active',
+                stage_id: stageId,
+                responsible_employee_id: employeeId,
+                job_supervisor: employeeName,
+              })
+              .eq('id', job.id)
+            if (error) {
+              alert('Could not reopen the job: ' + error.message)
+              return
+            }
+            if (typeof onReopenJob === 'function') onReopenJob(job.id)
+            setReopenPendingJob(null)
+            setModalJobId(job.id)
+            setPhase('type-select')
+          }}
+        />
       )}
     </div>
   )

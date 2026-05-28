@@ -236,7 +236,7 @@ serve(async (req) => {
     // 2. Get jobs. Default: open + geocoded. Optionally filter by stage_id.
     // The pseudo-id "__none__" means "include jobs with stage_id IS NULL (Unassigned)".
     let jobQuery = admin.from('jobs')
-      .select('id, name, client_name, job_address, job_city, job_state, job_zip, lat, lon, project_manager, stage_id')
+      .select('id, name, client_name, job_address, job_city, job_state, job_zip, lat, lon, job_supervisor, stage_id')
       .not('lat', 'is', null)
       .in('status', ['active', 'on_hold'])
     if (explicitJobIds) jobQuery = jobQuery.in('id', explicitJobIds)
@@ -283,7 +283,7 @@ serve(async (req) => {
         job_zip:      j.job_zip,
         lat:          Number(j.lat),
         lon:          Number(j.lon),
-        current_pm:   j.project_manager,
+        current_pm:   j.job_supervisor,
       })),
     }))
 
