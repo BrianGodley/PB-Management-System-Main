@@ -12,7 +12,7 @@
 //   onSave    – async (jobId, updates) => boolean   (truthy = saved ok)
 //   onDelete  – async (jobId, jobName) => void
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import ClientPortalTab from './ClientPortalTab'
 import ReopenJobModal from './ReopenJobModal'
@@ -123,6 +123,123 @@ export const JOB_ROLES = [
     pillCls: 'bg-red-100 text-red-700 border border-red-200',
   },
 ]
+
+// Searchable inline employee combobox used in the JobInfoModal header.
+// Renders as an input that filters the dropdown list as the user types.
+// Clicking an option calls onPick(employee_id) and closes the panel; the
+// parent saves immediately. Click-outside closes without saving.
+function ResponsibleEmployeePicker({ employees, currentEmployeeId, currentName, onPick }) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [saving, setSaving] = useState(false)
+  const containerRef = useRef(null)
+  const inputRef = useRef(null)
+
+  // Resolve the current selection — prefer FK; fall back to matching
+  // the legacy job_supervisor text back to an employee.
+  const currentEmp = (() => {
+    if (currentEmployeeId) {
+      return employees.find(e => e.id === currentEmployeeId) || null
+    }
+    const txt = (currentName || '').trim().toLowerCase()
+    if (!txt) return null
+    return (
+      employees.find(
+        e =>
+          `${e.first_name || ''} ${e.last_name || ''}`.trim().toLowerCase() === txt,
+      ) || null
+    )
+  })()
+
+  const displayName = currentEmp
+    ? `${currentEmp.first_name || ''} ${currentEmp.last_name || ''}`.trim()
+    : currentName || ''
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return
+    const onDoc = e => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setOpen(false)
+        setQuery('')
+      }
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+
+  const filtered = employees.filter(e => {
+    if (!query.trim()) return true
+    const full = `${e.first_name || ''} ${e.last_name || ''}`.toLowerCase()
+    return full.includes(query.toLowerCase())
+  })
+
+  async function pick(empId) {
+    if (saving) return
+    setSaving(true)
+    try {
+      await onPick(empId)
+    } finally {
+      setSaving(false)
+      setOpen(false)
+      setQuery('')
+    }
+  }
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <input
+        ref={inputRef}
+        type="text"
+        value={open ? query : displayName}
+        placeholder={displayName || 'Search employees…'}
+        onFocus={() => setOpen(true)}
+        onChange={e => {
+          setQuery(e.target.value)
+          if (!open) setOpen(true)
+        }}
+        onKeyDown={e => {
+          if (e.key === 'Escape') {
+            setOpen(false)
+            setQuery('')
+            inputRef.current?.blur()
+          }
+        }}
+        className="text-sm border border-gray-300 rounded-md px-2 py-0.5 focus:outline-none focus:border-green-600 w-56"
+      />
+      {open && (
+        <div className="absolute z-50 mt-1 w-64 max-h-64 overflow-y-auto bg-white border border-gray-200 rounded-md shadow-lg">
+          <button
+            type="button"
+            onClick={() => pick(null)}
+            className="w-full text-left px-3 py-1.5 text-xs text-gray-500 italic hover:bg-gray-50 border-b border-gray-100"
+          >
+            — Unassigned —
+          </button>
+          {filtered.length === 0 ? (
+            <p className="text-xs text-gray-400 italic px-3 py-2">No matches.</p>
+          ) : (
+            filtered.map(e => {
+              const isCurrent = currentEmp?.id === e.id
+              return (
+                <button
+                  key={e.id}
+                  type="button"
+                  onClick={() => pick(e.id)}
+                  className={`w-full text-left px-3 py-1.5 text-sm hover:bg-green-50 ${
+                    isCurrent ? 'bg-green-50 font-semibold text-green-800' : 'text-gray-700'
+                  }`}
+                >
+                  {e.first_name} {e.last_name}
+                </button>
+              )
+            })
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 // "John Smith" → "JS" · single-word names → first 2 chars uppercased.
 export function nameInitials(full) {
@@ -558,11 +675,10 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
   // whether we're rendering as a modal or as an inline panel.
   const innerContent = (
     <>
-      {/* Header — job name + inline responsible-employee picker. Changes
-          to the picker save immediately (no separate Save button) so the
-          user can reassign on the fly without diving into the Assignments
-          tab. Writes both job_supervisor (text — drives the (XX) initials)
-          and responsible_employee_id (FK) to keep the two in lockstep. */}
+      {/* Header — job name + inline searchable responsible-employee picker.
+          Type to filter; pick from the dropdown to save immediately. Writes
+          both job_supervisor (text — drives the (XX) initials) and
+          responsible_employee_id (FK) to keep the two in lockstep. */}
       <div className="px-5 pt-5 pb-3 border-b border-gray-100 flex items-start justify-between flex-shrink-0">
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-bold text-gray-900 truncate">
@@ -572,25 +688,11 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
             <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
               Assigned to
             </span>
-            <select
-              value={
-                // Prefer FK if set; otherwise try to match the text name
-                // back to an employee row so the dropdown shows the right
-                // option for legacy job_supervisor-only data.
-                job.responsible_employee_id ||
-                (() => {
-                  const txt = (job.job_supervisor || '').trim().toLowerCase()
-                  const m = employees.find(
-                    e =>
-                      `${e.first_name || ''} ${e.last_name || ''}`
-                        .trim()
-                        .toLowerCase() === txt,
-                  )
-                  return m?.id || ''
-                })()
-              }
-              onChange={async e => {
-                const empId = e.target.value || null
+            <ResponsibleEmployeePicker
+              employees={employees}
+              currentEmployeeId={job.responsible_employee_id}
+              currentName={job.job_supervisor}
+              onPick={async empId => {
                 const picked = empId ? employees.find(x => x.id === empId) : null
                 const name = picked
                   ? `${picked.first_name || ''} ${picked.last_name || ''}`.trim()
@@ -600,15 +702,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
                   job_supervisor: name,
                 })
               }}
-              className="text-sm border border-gray-300 rounded-md px-2 py-0.5 focus:outline-none focus:border-green-600"
-            >
-              <option value="">— Unassigned —</option>
-              {employees.map(e => (
-                <option key={e.id} value={e.id}>
-                  {e.first_name} {e.last_name}
-                </option>
-              ))}
-            </select>
+            />
             {job.job_supervisor && (
               <span className="text-[11px] text-gray-400">
                 Currently: {job.job_supervisor}
