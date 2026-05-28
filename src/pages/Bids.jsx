@@ -629,8 +629,10 @@ export default function Bids() {
       {/* ── Sold → Create Job Modal ─────────────────────────────────── */}
       {soldModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
-            <div className="flex items-center gap-3 mb-4">
+          {/* Wider modal so the assignments grid can run two columns and
+              everything fits without internal scrolling. */}
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl mx-4 px-6 py-5">
+            <div className="flex items-center gap-3 mb-3">
               <span className="text-2xl">🏗️</span>
               <div>
                 <h2 className="text-lg font-bold text-gray-900">Create Job from Bid</h2>
@@ -641,7 +643,7 @@ export default function Bids() {
               </div>
             </div>
 
-            <div className="bg-gray-50 rounded-xl p-4 mb-4 text-sm text-gray-600 space-y-1">
+            <div className="bg-gray-50 rounded-xl px-4 py-2.5 mb-3 text-sm text-gray-600 flex flex-wrap gap-x-5 gap-y-1">
               <p>
                 <span className="text-gray-400">Opportunity:</span> {soldModal.bid?.client_name}
               </p>
@@ -657,57 +659,67 @@ export default function Bids() {
               )}
             </div>
 
-            <div className="mb-4">
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Job Name</label>
-              <input
-                type="text"
-                value={soldModal.jobName}
-                onChange={e => setSoldModal(prev => ({ ...prev, jobName: e.target.value }))}
-                className="input w-full"
-                placeholder="Smith, John"
-                autoFocus
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Auto-filled as Last, First — edit freely.
-              </p>
-            </div>
-
-            {templates.length > 0 && (
-              <div className="mb-5">
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Apply Template
-                </label>
-                <select
-                  value={soldModal.templateId}
-                  onChange={e => setSoldModal(prev => ({ ...prev, templateId: e.target.value }))}
+            {/* Job Name + Template side-by-side in the wider modal. */}
+            <div
+              className={`grid ${templates.length > 0 ? 'grid-cols-2' : 'grid-cols-1'} gap-3 mb-3`}
+            >
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Job Name</label>
+                <input
+                  type="text"
+                  value={soldModal.jobName}
+                  onChange={e => setSoldModal(prev => ({ ...prev, jobName: e.target.value }))}
                   className="input w-full"
-                >
-                  <option value="">No template</option>
-                  {templates.map(t => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                      {t.auto_trigger === 'sold_bid' ? ' (Auto)' : ''}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-gray-400 mt-1">
-                  Folders from this template will be created on the new job.
+                  placeholder="Smith, John"
+                  autoFocus
+                />
+                <p className="text-[11px] text-gray-400 mt-0.5">
+                  Auto-filled as Last, First — edit freely.
                 </p>
               </div>
-            )}
+              {templates.length > 0 && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Apply Template
+                  </label>
+                  <select
+                    value={soldModal.templateId}
+                    onChange={e =>
+                      setSoldModal(prev => ({ ...prev, templateId: e.target.value }))
+                    }
+                    className="input w-full"
+                  >
+                    <option value="">No template</option>
+                    {templates.map(t => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                        {t.auto_trigger === 'sold_bid' ? ' (Auto)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    Folders from this template will be created on the new job.
+                  </p>
+                </div>
+              )}
+            </div>
 
-            {/* Initial role assignments. Each is optional — the user can fill
-                 the rest in later from Jobs > Info > Employees. */}
-            <div className="mb-5">
+            {/* Initial role assignments — two columns so all 8 fit in 4 rows
+                 with no internal scrolling. Defaults are pre-filled from HR
+                 position holders. */}
+            <div className="mb-3">
               <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Assign Employees (optional)
+                Assign Employees{' '}
+                <span className="text-xs font-normal text-gray-400">
+                  (optional · pre-filled from HR position holders)
+                </span>
               </label>
-              <div className="grid grid-cols-1 gap-2 max-h-72 overflow-y-auto pr-1">
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                 {JOB_ROLES.map(role => {
                   const value = soldModal.roles?.[role.key] || ''
                   return (
                     <div key={role.key} className="flex items-center gap-2">
-                      <label className="text-xs text-gray-500 w-44 flex-shrink-0">
+                      <label className="text-xs text-gray-500 w-40 flex-shrink-0">
                         {role.label}
                       </label>
                       <select
@@ -718,7 +730,7 @@ export default function Bids() {
                             roles: { ...(prev.roles || {}), [role.key]: e.target.value },
                           }))
                         }
-                        className="input text-sm flex-1"
+                        className="input text-sm flex-1 min-w-0"
                       >
                         <option value="">— Unassigned —</option>
                         {employees.map(emp => {
@@ -745,11 +757,11 @@ export default function Bids() {
               </div>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex gap-3 items-center">
               <button
                 onClick={handleSoldSave}
                 disabled={savingJob || !soldModal.jobName.trim()}
-                className="flex-1 bg-green-700 text-white font-semibold py-2 rounded-lg hover:bg-green-800 transition-colors disabled:opacity-50"
+                className="flex-1 bg-green-700 text-white font-semibold py-1.5 rounded-lg hover:bg-green-800 transition-colors disabled:opacity-50"
               >
                 {savingJob ? 'Creating Job…' : '✓ Save & Create Job'}
               </button>
@@ -757,7 +769,7 @@ export default function Bids() {
                 <button
                   onClick={handleSoldCancel}
                   disabled={savingJob}
-                  className="px-4 py-2 rounded-lg border border-gray-300 text-gray-600 font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  className="px-4 py-1.5 rounded-lg border border-gray-300 text-gray-600 font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>
