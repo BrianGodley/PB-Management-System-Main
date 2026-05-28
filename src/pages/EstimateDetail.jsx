@@ -1255,21 +1255,39 @@ export default function EstimateDetail() {
                Snapshots local state into a brand-new estimate version
                (Estimate N+1, where N = max version across the whole tree
                regardless of which version the user is currently on). */}
-          {dirty && (
-            <button
-              onClick={async () => {
-                setSavingDraft(true)
-                const ok = await applyAsNewVersion({})
-                setSavingDraft(false)
-                if (ok) setDirty(false)
-              }}
-              disabled={savingDraft}
-              className="px-4 py-1.5 rounded-lg bg-amber-600 text-white text-sm font-semibold hover:bg-amber-700 disabled:opacity-50"
-              title="Snapshot every change as the next estimate version"
-            >
-              {savingDraft ? 'Saving…' : '💾 Save Changes as New Version'}
-            </button>
-          )}
+          {dirty && (() => {
+            // First save of a brand-new estimate (no prior versions) gets a
+            // plain "Save" label. Once the tree has at least one prior
+            // version saved, subsequent saves become "Save New Version" to
+            // make the version-snapshotting behavior explicit.
+            const isFirstSave =
+              !estimate.parent_estimate_id &&
+              (!estimate.version || estimate.version <= 1)
+            const label = savingDraft
+              ? 'Saving…'
+              : isFirstSave
+                ? '💾 Save'
+                : '💾 Save New Version'
+            return (
+              <button
+                onClick={async () => {
+                  setSavingDraft(true)
+                  const ok = await applyAsNewVersion({})
+                  setSavingDraft(false)
+                  if (ok) setDirty(false)
+                }}
+                disabled={savingDraft}
+                className="px-4 py-1.5 rounded-lg bg-amber-600 text-white text-sm font-semibold hover:bg-amber-700 disabled:opacity-50"
+                title={
+                  isFirstSave
+                    ? 'Save this estimate'
+                    : 'Snapshot every change as the next estimate version'
+                }
+              >
+                {label}
+              </button>
+            )
+          })()}
           {/* Create Bid / Change Order */}
           <div className="flex flex-col items-stretch">
             <button
