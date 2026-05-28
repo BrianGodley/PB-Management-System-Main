@@ -330,7 +330,7 @@ function AddIndividualModal({ onSave, onClose, user }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
@@ -520,29 +520,34 @@ function AddIndividualModal({ onSave, onClose, user }) {
               />
             </div>
           </div>
-          <div>
-            <label className={lbl}>
-              Additional Emails <span className="font-normal text-gray-400">(one per line)</span>
-            </label>
-            <textarea
-              className={`${inp} resize-none`}
-              rows={2}
-              value={form._additionalEmailsRaw}
-              onChange={e => set('_additionalEmailsRaw', e.target.value)}
-              placeholder="extra@email.com"
-            />
-          </div>
-          <div>
-            <label className={lbl}>
-              Additional Phones <span className="font-normal text-gray-400">(one per line)</span>
-            </label>
-            <textarea
-              className={`${inp} resize-none`}
-              rows={2}
-              value={form._additionalPhonesRaw}
-              onChange={e => set('_additionalPhonesRaw', e.target.value)}
-              placeholder="(555) 555-5555"
-            />
+          {/* Two textareas side-by-side to use the wider modal real estate. */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={lbl}>
+                Additional Emails{' '}
+                <span className="font-normal text-gray-400">(one per line)</span>
+              </label>
+              <textarea
+                className={`${inp} resize-none`}
+                rows={2}
+                value={form._additionalEmailsRaw}
+                onChange={e => set('_additionalEmailsRaw', e.target.value)}
+                placeholder="extra@email.com"
+              />
+            </div>
+            <div>
+              <label className={lbl}>
+                Additional Phones{' '}
+                <span className="font-normal text-gray-400">(one per line)</span>
+              </label>
+              <textarea
+                className={`${inp} resize-none`}
+                rows={2}
+                value={form._additionalPhonesRaw}
+                onChange={e => set('_additionalPhonesRaw', e.target.value)}
+                placeholder="(555) 555-5555"
+              />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -566,29 +571,28 @@ function AddIndividualModal({ onSave, onClose, user }) {
             </div>
           </div>
 
-          {/* Notes */}
-          <div>
-            <label className={lbl}>Notes</label>
-            <textarea
-              className={`${inp} resize-none`}
-              rows={2}
-              value={form.notes}
-              onChange={e => set('notes', e.target.value)}
-              placeholder="Any notes about this opportunity…"
-            />
-          </div>
-
-          {/* Optional Consultant — Design or Installation Consultant.
-              Source list = employees holding those exact positions in HR. */}
-          <div>
-            <label className={lbl}>
-              Assigned Consultant{' '}
-              <span className="text-gray-400 font-normal">(optional)</span>
-            </label>
-            <ConsultantPicker
-              value={consultantEmployeeId}
-              onChange={setConsultantEmployeeId}
-            />
+          {/* Notes + Assigned Consultant side-by-side in the wider modal. */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={lbl}>Notes</label>
+              <textarea
+                className={`${inp} resize-none`}
+                rows={2}
+                value={form.notes}
+                onChange={e => set('notes', e.target.value)}
+                placeholder="Any notes about this opportunity…"
+              />
+            </div>
+            <div>
+              <label className={lbl}>
+                Assigned Consultant{' '}
+                <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <ConsultantPicker
+                value={consultantEmployeeId}
+                onChange={setConsultantEmployeeId}
+              />
+            </div>
           </div>
 
           {saveError && (
@@ -738,7 +742,7 @@ function AddCompanyModal({ onSave, onClose, user }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
@@ -955,29 +959,28 @@ function AddCompanyModal({ onSave, onClose, user }) {
             ))}
           </div>
 
-          {/* Notes */}
-          <div>
-            <label className={lbl}>Notes</label>
-            <textarea
-              className={`${inp} resize-none`}
-              rows={2}
-              value={form.notes}
-              onChange={e => set('notes', e.target.value)}
-              placeholder="Any notes about this opportunity…"
-            />
-          </div>
-
-          {/* Optional Consultant — Design or Installation Consultant.
-              Source list = employees holding those exact positions in HR. */}
-          <div>
-            <label className={lbl}>
-              Assigned Consultant{' '}
-              <span className="text-gray-400 font-normal">(optional)</span>
-            </label>
-            <ConsultantPicker
-              value={consultantEmployeeId}
-              onChange={setConsultantEmployeeId}
-            />
+          {/* Notes + Assigned Consultant side-by-side in the wider modal. */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={lbl}>Notes</label>
+              <textarea
+                className={`${inp} resize-none`}
+                rows={2}
+                value={form.notes}
+                onChange={e => set('notes', e.target.value)}
+                placeholder="Any notes about this opportunity…"
+              />
+            </div>
+            <div>
+              <label className={lbl}>
+                Assigned Consultant{' '}
+                <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <ConsultantPicker
+                value={consultantEmployeeId}
+                onChange={setConsultantEmployeeId}
+              />
+            </div>
           </div>
 
           {saveError && (
