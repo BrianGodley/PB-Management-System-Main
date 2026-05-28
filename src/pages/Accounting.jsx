@@ -2005,6 +2005,614 @@ function fmtRegDate(d) {
   return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })
 }
 
+// ── JournalTab ───────────────────────────────────────────────────────────────
+// Manual general-journal entries. Draft → Posted workflow: drafts can be
+// edited/deleted; posted entries lock (post creates a permanent audit
+// trail). Each line is debit OR credit (never both) and the entry must
+// balance (sum of debits = sum of credits) before it can be posted.
+function JournalTab({ accounts, jobs }) {
+  const [entries, setEntries] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [statusFilter, setStatusFilter] = useState('all') // 'all' | 'draft' | 'posted'
+  const [editor, setEditor] = useState(null) // { id?, date, ref, memo, lines: [...] }
+  const [saving, setSaving] = useState(false)
+  const [expanded, setExpanded] = useState(new Set())
+
+  useEffect(() => {
+    fetchEntries()
+  }, [])
+
+  async function fetchEntries() {
+    setLoading(true)
+    const { data } = await supabase
+      .from('acct_journal_entries')
+      .select('*, acct_journal_entry_lines(*)')
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false })
+    setEntries(data || [])
+    setLoading(false)
+  }
+
+  function newEntry() {
+    setEditor({
+      id: null,
+      date: new Date().toISOString().slice(0, 10),
+      ref: '',
+      memo: '',
+      lines: [
+        { account_id: '', job_id: '', description: '', debit: '', credit: '' },
+        { account_id: '', job_id: '', description: '', debit: '', credit: '' },
+      ],
+    })
+  }
+
+  function editEntry(e) {
+    if (e.status === 'posted') {
+      alert(
+        'Posted entries are locked. To change a posted entry, create a new entry that reverses or adjusts it.',
+      )
+      return
+    }
+    setEditor({
+      id: e.id,
+      date: e.date,
+      ref: e.ref || '',
+      memo: e.memo || '',
+      lines: (e.acct_journal_entry_lines || [])
+        .slice()
+        .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+        .map(l => ({
+          id: l.id,
+          account_id: l.account_id,
+          job_id: l.job_id || '',
+          description: l.description || '',
+          debit: l.debit ? String(l.debit) : '',
+          credit: l.credit ? String(l.credit) : '',
+        })),
+    })
+  }
+
+  async function deleteEntry(e) {
+    if (e.status === 'posted') {
+      alert('Posted entries cannot be deleted. Create a reversing entry instead.')
+      return
+    }
+    if (!confirm(`Delete this draft journal entry?`)) return
+    await supabase.from('acct_journal_entries').delete().eq('id', e.id)
+    await fetchEntries()
+  }
+
+  // Persist either as draft (no status change) or as posted. Posting also
+  // validates that debits balance credits.
+  async function save(targetStatus /* 'draft' | 'posted' */) {
+    if (!editor) return
+    const cleanLines = editor.lines
+      .map(l => ({
+        ...l,
+        debit:  parseFloat(l.debit)  || 0,
+        credit: parseFloat(l.credit) || 0,
+      }))
+      .filter(l => l.account_id && (l.debit > 0 || l.credit > 0))
+
+    if (cleanLines.length < 2) {
+      alert('A journal entry needs at least two lines with an account and an amount.')
+      return
+    }
+    const totalDebit  = cleanLines.reduce((s, l) => s + l.debit,  0)
+    const totalCredit = cleanLines.reduce((s, l) => s + l.credit, 0)
+    if (targetStatus === 'posted' && Math.abs(totalDebit - totalCredit) > 0.005) {
+      alert(
+        `Cannot post — entry doesn't balance.\n\nDebits:  $${totalDebit.toFixed(2)}\nCredits: $${totalCredit.toFixed(2)}\nDifference: $${(totalDebit - totalCredit).toFixed(2)}`,
+      )
+      return
+    }
+    setSaving(true)
+    try {
+      const headerPayload = {
+        date: editor.date,
+        ref:  editor.ref?.trim() || null,
+        memo: editor.memo?.trim() || null,
+        status: targetStatus,
+        ...(targetStatus === 'posted'
+          ? { posted_at: new Date().toISOString() }
+          : {}),
+        updated_at: new Date().toISOString(),
+      }
+      let entryId = editor.id
+      if (entryId) {
+        await supabase.from('acct_journal_entries').update(headerPayload).eq('id', entryId)
+        // Replace lines wholesale — simpler than diffing for an unposted entry.
+        await supabase.from('acct_journal_entry_lines').delete().eq('entry_id', entryId)
+      } else {
+        const { data: hdr, error } = await supabase
+          .from('acct_journal_entries')
+          .insert(headerPayload)
+          .select('id')
+          .single()
+        if (error) throw error
+        entryId = hdr.id
+      }
+      const linesPayload = cleanLines.map((l, i) => ({
+        entry_id: entryId,
+        account_id: l.account_id,
+        job_id: l.job_id || null,
+        description: l.description?.trim() || null,
+        debit:  l.debit,
+        credit: l.credit,
+        sort_order: i,
+      }))
+      const { error: linesErr } = await supabase
+        .from('acct_journal_entry_lines')
+        .insert(linesPayload)
+      if (linesErr) throw linesErr
+      setEditor(null)
+      await fetchEntries()
+    } catch (e) {
+      alert('Save failed: ' + (e.message || 'unknown error'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const visible = entries.filter(e =>
+    statusFilter === 'all' ? true : e.status === statusFilter,
+  )
+
+  const draftCount  = entries.filter(e => e.status === 'draft').length
+  const postedCount = entries.filter(e => e.status === 'posted').length
+
+  return (
+    <div>
+      {/* Header row */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-bold text-gray-800">Journal Entries</h2>
+          <span className="text-xs text-gray-400">
+            {draftCount} draft · {postedCount} posted
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+            className="border border-gray-300 rounded-md px-2 py-1 text-sm"
+          >
+            <option value="all">All statuses</option>
+            <option value="draft">Drafts</option>
+            <option value="posted">Posted</option>
+          </select>
+          <button
+            onClick={newEntry}
+            className="bg-green-700 text-white text-sm font-semibold px-3 py-1.5 rounded-md hover:bg-green-800"
+          >
+            + New Journal Entry
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-700" />
+        </div>
+      ) : visible.length === 0 ? (
+        <div className="bg-white border border-gray-200 rounded-xl py-12 text-center text-sm text-gray-400">
+          No journal entries{statusFilter !== 'all' ? ` in ${statusFilter}` : ''}.
+        </div>
+      ) : (
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-3 py-2 text-left font-semibold text-gray-600 w-8"></th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-600">Date</th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-600">Ref</th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-600">Memo</th>
+                <th className="px-3 py-2 text-right font-semibold text-gray-600">Total</th>
+                <th className="px-3 py-2 text-center font-semibold text-gray-600 w-24">Status</th>
+                <th className="px-3 py-2 text-right font-semibold text-gray-600 w-32"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {visible.map(e => {
+                const isOpen = expanded.has(e.id)
+                const lines = e.acct_journal_entry_lines || []
+                const total = lines.reduce(
+                  (s, l) => s + (parseFloat(l.debit) || 0),
+                  0,
+                )
+                return (
+                  <Fragment key={e.id}>
+                    <tr className="hover:bg-gray-50">
+                      <td className="px-3 py-2">
+                        <button
+                          onClick={() => {
+                            setExpanded(prev => {
+                              const next = new Set(prev)
+                              if (next.has(e.id)) next.delete(e.id)
+                              else next.add(e.id)
+                              return next
+                            })
+                          }}
+                          className="text-gray-400 hover:text-gray-700"
+                          title={isOpen ? 'Collapse' : 'Expand'}
+                        >
+                          {isOpen ? '▼' : '▶'}
+                        </button>
+                      </td>
+                      <td className="px-3 py-2 text-gray-700 whitespace-nowrap">
+                        {fmtRegDate(e.date)}
+                      </td>
+                      <td className="px-3 py-2 text-gray-700">{e.ref || '—'}</td>
+                      <td className="px-3 py-2 text-gray-700 truncate max-w-md">
+                        {e.memo || '—'}
+                      </td>
+                      <td className="px-3 py-2 text-right text-gray-800 font-medium">
+                        {fmt(total)}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <span
+                          className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                            e.status === 'posted'
+                              ? 'bg-green-100 text-green-700 border border-green-200'
+                              : e.status === 'void'
+                                ? 'bg-gray-100 text-gray-500 border border-gray-200'
+                                : 'bg-amber-50 text-amber-700 border border-amber-200'
+                          }`}
+                        >
+                          {e.status}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-right whitespace-nowrap">
+                        <button
+                          onClick={() => editEntry(e)}
+                          className="text-xs text-blue-600 hover:text-blue-800 mr-2"
+                          disabled={e.status === 'posted'}
+                          title={
+                            e.status === 'posted'
+                              ? 'Posted entries are locked'
+                              : 'Edit this draft'
+                          }
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => deleteEntry(e)}
+                          className="text-xs text-red-500 hover:text-red-700"
+                          disabled={e.status === 'posted'}
+                          title={
+                            e.status === 'posted'
+                              ? 'Posted entries cannot be deleted'
+                              : 'Delete this draft'
+                          }
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                    {isOpen && (
+                      <tr>
+                        <td></td>
+                        <td colSpan={6} className="px-3 pb-3">
+                          <table className="w-full text-xs border border-gray-200 rounded-md">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="px-2 py-1 text-left font-semibold text-gray-600">
+                                  Account
+                                </th>
+                                <th className="px-2 py-1 text-left font-semibold text-gray-600">
+                                  Job
+                                </th>
+                                <th className="px-2 py-1 text-left font-semibold text-gray-600">
+                                  Description
+                                </th>
+                                <th className="px-2 py-1 text-right font-semibold text-gray-600 w-24">
+                                  Debit
+                                </th>
+                                <th className="px-2 py-1 text-right font-semibold text-gray-600 w-24">
+                                  Credit
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {lines.map(l => {
+                                const acct = accounts.find(a => a.id === l.account_id)
+                                const job  = jobs.find(j => j.id === l.job_id)
+                                return (
+                                  <tr key={l.id} className="border-t border-gray-100">
+                                    <td className="px-2 py-1 text-gray-700">
+                                      {acct?.name || '—'}
+                                    </td>
+                                    <td className="px-2 py-1 text-gray-700">
+                                      {job?.name || job?.client_name || '—'}
+                                    </td>
+                                    <td className="px-2 py-1 text-gray-600">
+                                      {l.description || '—'}
+                                    </td>
+                                    <td className="px-2 py-1 text-right text-gray-800">
+                                      {l.debit > 0 ? fmt(l.debit) : ''}
+                                    </td>
+                                    <td className="px-2 py-1 text-right text-gray-800">
+                                      {l.credit > 0 ? fmt(l.credit) : ''}
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* New/Edit modal */}
+      {editor && (
+        <JournalEditor
+          editor={editor}
+          setEditor={setEditor}
+          accounts={accounts}
+          jobs={jobs}
+          saving={saving}
+          onClose={() => setEditor(null)}
+          onSaveDraft={() => save('draft')}
+          onPost={() => save('posted')}
+        />
+      )}
+    </div>
+  )
+}
+
+// Standalone editor modal — used by JournalTab for both create + edit. Lines
+// are owned by the parent (editor.lines); this just renders the multi-line
+// table + Save/Post buttons.
+function JournalEditor({
+  editor,
+  setEditor,
+  accounts,
+  jobs,
+  saving,
+  onClose,
+  onSaveDraft,
+  onPost,
+}) {
+  const setLine = (idx, patch) => {
+    setEditor(prev => ({
+      ...prev,
+      lines: prev.lines.map((l, i) => (i === idx ? { ...l, ...patch } : l)),
+    }))
+  }
+  const addLine = () =>
+    setEditor(prev => ({
+      ...prev,
+      lines: [
+        ...prev.lines,
+        { account_id: '', job_id: '', description: '', debit: '', credit: '' },
+      ],
+    }))
+  const removeLine = idx =>
+    setEditor(prev => ({
+      ...prev,
+      lines: prev.lines.length > 2 ? prev.lines.filter((_, i) => i !== idx) : prev.lines,
+    }))
+
+  const totalDebit  = editor.lines.reduce((s, l) => s + (parseFloat(l.debit)  || 0), 0)
+  const totalCredit = editor.lines.reduce((s, l) => s + (parseFloat(l.credit) || 0), 0)
+  const diff = totalDebit - totalCredit
+  const balanced = Math.abs(diff) < 0.005
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col">
+        <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
+          <h3 className="text-base font-bold text-gray-900">
+            {editor.id ? 'Edit Journal Entry' : 'New Journal Entry'}
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg">
+            ×
+          </button>
+        </div>
+
+        <div className="px-5 py-3 grid grid-cols-3 gap-3 border-b border-gray-100">
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Date</label>
+            <input
+              type="date"
+              value={editor.date}
+              onChange={e => setEditor(prev => ({ ...prev, date: e.target.value }))}
+              className="input text-sm w-full"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">
+              Reference{' '}
+              <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <input
+              type="text"
+              value={editor.ref}
+              onChange={e => setEditor(prev => ({ ...prev, ref: e.target.value }))}
+              className="input text-sm w-full"
+              placeholder="JE-001"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Memo</label>
+            <input
+              type="text"
+              value={editor.memo}
+              onChange={e => setEditor(prev => ({ ...prev, memo: e.target.value }))}
+              className="input text-sm w-full"
+              placeholder="Short description"
+            />
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-3">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="px-2 py-1.5 text-left font-semibold text-gray-600">Account *</th>
+                <th className="px-2 py-1.5 text-left font-semibold text-gray-600 w-44">
+                  Job <span className="text-gray-400 font-normal">(optional)</span>
+                </th>
+                <th className="px-2 py-1.5 text-left font-semibold text-gray-600">Description</th>
+                <th className="px-2 py-1.5 text-right font-semibold text-gray-600 w-28">Debit</th>
+                <th className="px-2 py-1.5 text-right font-semibold text-gray-600 w-28">Credit</th>
+                <th className="px-2 py-1.5 text-center font-semibold text-gray-600 w-10"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {editor.lines.map((l, i) => (
+                <tr key={i}>
+                  <td className="px-2 py-1">
+                    <select
+                      value={l.account_id}
+                      onChange={e => setLine(i, { account_id: e.target.value })}
+                      className="input text-sm w-full"
+                    >
+                      <option value="">— Account —</option>
+                      {accounts.map(a => (
+                        <option key={a.id} value={a.id}>
+                          {a.name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-2 py-1">
+                    <select
+                      value={l.job_id}
+                      onChange={e => setLine(i, { job_id: e.target.value })}
+                      className="input text-sm w-full"
+                    >
+                      <option value="">—</option>
+                      {jobs.map(j => (
+                        <option key={j.id} value={j.id}>
+                          {j.name || j.client_name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-2 py-1">
+                    <input
+                      type="text"
+                      value={l.description}
+                      onChange={e => setLine(i, { description: e.target.value })}
+                      className="input text-sm w-full"
+                    />
+                  </td>
+                  <td className="px-2 py-1">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={l.debit}
+                      onChange={e =>
+                        setLine(i, {
+                          debit: e.target.value,
+                          credit: e.target.value ? '' : l.credit,
+                        })
+                      }
+                      className="input text-sm w-full text-right"
+                      placeholder="0.00"
+                    />
+                  </td>
+                  <td className="px-2 py-1">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={l.credit}
+                      onChange={e =>
+                        setLine(i, {
+                          credit: e.target.value,
+                          debit: e.target.value ? '' : l.debit,
+                        })
+                      }
+                      className="input text-sm w-full text-right"
+                      placeholder="0.00"
+                    />
+                  </td>
+                  <td className="px-2 py-1 text-center">
+                    <button
+                      onClick={() => removeLine(i)}
+                      disabled={editor.lines.length <= 2}
+                      className="text-xs text-red-400 hover:text-red-600 disabled:opacity-30"
+                      title="Remove line"
+                    >
+                      ×
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              <tr>
+                <td colSpan={6} className="px-2 py-2">
+                  <button
+                    onClick={addLine}
+                    className="text-xs text-green-700 hover:text-green-900 font-medium"
+                  >
+                    + Add line
+                  </button>
+                </td>
+              </tr>
+              <tr className="border-t-2 border-gray-300 bg-gray-50">
+                <td colSpan={3} className="px-2 py-2 text-right font-semibold text-gray-600">
+                  Totals
+                </td>
+                <td className="px-2 py-2 text-right font-bold text-gray-900">
+                  {fmt(totalDebit)}
+                </td>
+                <td className="px-2 py-2 text-right font-bold text-gray-900">
+                  {fmt(totalCredit)}
+                </td>
+                <td></td>
+              </tr>
+              {!balanced && (
+                <tr>
+                  <td colSpan={6} className="px-2 py-1.5 text-right text-xs font-semibold text-red-600">
+                    Out of balance by {fmt(diff)} — must equal $0.00 to post.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="px-5 py-3 border-t border-gray-200 flex items-center justify-end gap-2">
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="px-3 py-1.5 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onSaveDraft}
+            disabled={saving}
+            className="px-3 py-1.5 text-sm rounded-md border border-amber-300 text-amber-700 font-medium hover:bg-amber-50"
+          >
+            {saving ? 'Saving…' : 'Save Draft'}
+          </button>
+          <button
+            onClick={onPost}
+            disabled={saving || !balanced}
+            className={`px-3 py-1.5 text-sm rounded-md font-semibold ${
+              balanced && !saving
+                ? 'bg-green-700 text-white hover:bg-green-800'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            }`}
+            title={balanced ? 'Save and post this entry' : 'Entry must balance to post'}
+          >
+            {saving ? 'Posting…' : 'Save & Post'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function RegistersTab({ accounts }) {
   const [filterType, setFilterType] = useState('')   // one of the 14 subtypes
   const [filterAcct, setFilterAcct] = useState('')   // selected account id
@@ -2858,6 +3466,7 @@ const TABS = [
   { key: 'checks',    label: '🧾 Checks' },
   { key: 'cc',        label: '💳 Credit Cards' },
   { key: 'banking',   label: '🏦 Banking' },
+  { key: 'journal',   label: '📔 Journal' },
   { key: 'accounts',  label: '📒 Chart of Accounts' },
   { key: 'registers', label: '📓 Registers' },
   { key: 'reports',   label: '📈 Reports' },
@@ -2979,6 +3588,7 @@ export default function Accounting() {
         {tab === 'banking' && (
           <BankingTab bankAccounts={bankAccounts} accounts={accounts} onRefresh={refresh} />
         )}
+        {tab === 'journal'   && <JournalTab accounts={accounts} jobs={jobs} />}
         {tab === 'accounts'  && <ChartOfAccountsTab accounts={accounts} onRefresh={refresh} />}
         {tab === 'registers' && <RegistersTab accounts={accounts} />}
         {tab === 'reports' && (
