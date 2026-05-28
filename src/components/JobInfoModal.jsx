@@ -309,12 +309,14 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
 
   // Per-tab edit toggles. Both tabs default to read-only; user clicks Edit
   // to switch into the input form. (Will become permission-driven later.)
+  // editingDetails now drives the combined Job-Details + Client + Site
+  // Access form since the Client tab was folded into Job Details (2026-05-28).
   const [editingDetails, setEditingDetails] = useState(false)
-  const [editingClient, setEditingClient] = useState(false)
   const [editingEmployees, setEditingEmployees] = useState(false)
 
   // Revert all Job Details state back to whatever's on the job prop. Used by
-  // Cancel in the Details tab.
+  // Cancel in the Details tab. Also reverts the merged Client + Site Access
+  // form since they share the Edit toggle now.
   function resetDetailsForm() {
     setStatus(job.status || 'active')
     setJobTitle(job.name || job.client_name || '')
@@ -326,6 +328,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
     setContractPrice(v === '' || v === null || v === undefined ? '' : String(v))
     setPermitNumber(job.permit_number || '')
     // Consultant + Job Supervisor moved to Assignments tab — handled by resetEmployeesForm.
+    resetClientForm()
     setError('')
   }
 
@@ -493,11 +496,12 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
     return (f._additionalEmailsRaw || '') !== eRaw || (f._additionalPhonesRaw || '') !== pRaw
   }
 
-  // When the user switches INTO the Client tab, re-fetch the client row so
-  // any external edits (Clients page, ClientDetail, etc.) show up here.
-  // Skip if the form is dirty so we don't lose unsaved edits.
+  // When the user switches INTO the Job Details tab, re-fetch the client
+  // row so any external edits (Clients page, ClientDetail, etc.) show up
+  // here. Skip if the form is dirty so we don't lose unsaved edits.
+  // (Was 'client' tab pre-2026-05-28 — folded into Job Details since.)
   useEffect(() => {
-    if (activeTab !== 'client' || !clientData?.id) return
+    if (activeTab !== 'info' || !clientData?.id) return
     if (isClientFormDirty()) return
     let cancelled = false
     ;(async () => {
@@ -557,10 +561,11 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
   // stage + responsible employee.
   const [showReopenModal, setShowReopenModal] = useState(false)
 
-  // Save just the Job Details fields (status, name, address, contract,
-  // permit). Site access lives on the job too but is edited from the
-  // Client tab — see handleSaveClient. Consultant + Job Supervisor live
-  // on the Assignments tab.
+  // Combined save for the Job Details tab. Writes:
+  //   1. The jobs row (name/status/address/contract/permit + site-access)
+  //   2. The linked clients row (identity, contact, address, website, notes)
+  // The Client tab was folded into Job Details on 2026-05-28, so a single
+  // Save commits everything visible on the tab.
   //
   // Special transition: reopening (completed → active) routes through
   // the ReopenJobModal so the user picks a new stage + responsible
@@ -583,6 +588,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
     setSaving(true)
     setError('')
     const cpNum = contractPrice === '' ? null : parseFloat(contractPrice)
+    // 1. Jobs row — main fields + site access bundled together.
     const ok = await onSave(job.id, {
       name: jobTitle.trim(),
       status,
@@ -592,24 +598,12 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
       job_zip: zip.trim(),
       total_price: Number.isFinite(cpNum) ? cpNum : null,
       permit_number: permitNumber.trim() || null,
-    })
-    setSaving(false)
-    if (!ok) setError('Failed to save the job. Please try again.')
-    else setEditingDetails(false)
-  }
-
-  // Save the client row plus the Site Access fields on the job.
-  async function handleSaveClient() {
-    setSaving(true)
-    setError('')
-    // Site access lives on the jobs row; bundle with this Save so the Client
-    // tab is a self-contained editor.
-    const jobOk = await onSave(job.id, {
       gate_code: gateCode.trim() || null,
       has_dog: !!hasDog,
       access_notes: accessNotes.trim() || null,
     })
 
+    // 2. Linked clients row — only if we resolved one in the load effect.
     let clientOk = true
     if (clientData?.id) {
       const f = clientForm
@@ -659,14 +653,17 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
     }
 
     setSaving(false)
-    if (!jobOk) setError('Failed to save site access on the job.')
-    else if (!clientOk) setError('Site access saved, but the client update failed.')
-    else setEditingClient(false)
+    if (!ok) setError('Failed to save the job. Please try again.')
+    else if (!clientOk) setError('Job saved, but the client update failed.')
+    else setEditingDetails(false)
   }
 
+  // Client tab was folded into Job Details on 2026-05-28 — Site Access,
+  // Client / Company details, and the client-address subsection all render
+  // inline below Main Details. The Edit / Save / Cancel toolbar on Job
+  // Details now saves the jobs row AND the linked clients row in one go.
   const TABS = [
     { key: 'info', label: 'Job Details' },
-    { key: 'client', label: 'Client' },
     { key: 'client_portal', label: 'Client Portal' },
     { key: 'employees', label: 'Assignments' },
   ]
@@ -922,477 +919,543 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
 
             {/* Consultant + Job Supervisor moved to the Assignments tab. */}
 
-            {error && <p className="text-xs text-red-500">{error}</p>}
-          </div>
-        )}
-
-        {/* ── Client tab — read-only by default, click Edit to change.
-               Saving writes both the client row AND the Site Access fields
-               on the job (handleSaveClient). ── */}
-        {activeTab === 'client' && (
-          <div className="px-5 py-4 space-y-5">
-            {/* Edit / Save / Cancel toolbar */}
-            {clientData && (
-              <div className="flex items-center justify-between flex-shrink-0 -mb-2">
-                <p className="text-xs text-gray-400">
-                  {editingClient
-                    ? 'Editing client + site access'
-                    : 'Read-only — click Edit to make changes'}
-                </p>
-                {editingClient ? (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        resetClientForm()
-                        setEditingClient(false)
-                      }}
-                      className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleSaveClient}
-                      disabled={saving}
-                      className="px-3 py-1.5 rounded-lg bg-green-700 text-white text-xs font-semibold hover:bg-green-800 disabled:opacity-50"
-                    >
-                      {saving ? 'Saving…' : 'Save'}
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setEditingClient(true)}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-green-700 text-xs font-semibold text-green-700 hover:bg-green-50"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                      <path
-                        d="M11.5 1.5a1.414 1.414 0 0 1 2 2L5 12l-3 1 1-3 8.5-8.5z"
-                        stroke="currentColor"
-                        strokeWidth="1.4"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                    Edit
-                  </button>
-                )}
-              </div>
-            )}
-
-            {loadingClient ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-700" />
-              </div>
-            ) : !clientData ? (
-              <div className="text-sm text-gray-500 space-y-2">
-                <p>
-                  <span className="font-semibold text-gray-800">
-                    {job.client_name || 'Unknown client'}
-                  </span>
-                </p>
-                <p className="text-xs text-gray-400 italic">
-                  No matching opportunity record found. This usually means the job was imported from
-                  BuilderTrend or the customer name on the job doesn't exactly match a record in the
-                  Opportunities module. Open the contact or opportunity manually to fill in details.
-                </p>
-              </div>
-            ) : (
-              <>
-                {/* Identity — same input layout in both read & edit modes;
-                       inputs are simply disabled when editingClient is false. */}
+            {/* ── Site Access ─────────────────────────────────────────
+                 Lives on the jobs row. Saved together with Main Details
+                 by handleSaveDetails. */}
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                Site Access
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                    Identity
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">First Name</label>
-                      <input
-                        type="text"
-                        value={clientForm.first_name || ''}
-                        onChange={e => setClientForm(p => ({ ...p, first_name: e.target.value }))}
-                        disabled={!editingClient}
-                        className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
-                        placeholder="First name"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Last Name</label>
-                      <input
-                        type="text"
-                        value={clientForm.last_name || ''}
-                        onChange={e => setClientForm(p => ({ ...p, last_name: e.target.value }))}
-                        disabled={!editingClient}
-                        className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
-                        placeholder="Last name"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Company</label>
-                      <input
-                        type="text"
-                        value={clientForm.company_name || ''}
-                        onChange={e => setClientForm(p => ({ ...p, company_name: e.target.value }))}
-                        disabled={!editingClient}
-                        className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
-                        placeholder="Company name"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Position</label>
-                      <input
-                        type="text"
-                        value={clientForm.company_position || ''}
-                        onChange={e =>
-                          setClientForm(p => ({ ...p, company_position: e.target.value }))
-                        }
-                        disabled={!editingClient}
-                        className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
-                        placeholder="Position / title"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">
-                        Spouse / Partner First
-                      </label>
-                      <input
-                        type="text"
-                        value={clientForm.spouse_first_name || ''}
-                        onChange={e =>
-                          setClientForm(p => ({ ...p, spouse_first_name: e.target.value }))
-                        }
-                        disabled={!editingClient}
-                        className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
-                        placeholder="First"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">
-                        Spouse / Partner Last
-                      </label>
-                      <input
-                        type="text"
-                        value={clientForm.spouse_last_name || ''}
-                        onChange={e =>
-                          setClientForm(p => ({ ...p, spouse_last_name: e.target.value }))
-                        }
-                        disabled={!editingClient}
-                        className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
-                        placeholder="Last"
-                      />
-                    </div>
-                  </div>
+                  <label className="block text-xs text-gray-500 mb-1">Gate code</label>
+                  <input
+                    type="text"
+                    value={gateCode}
+                    onChange={e => setGateCode(e.target.value)}
+                    disabled={!editingDetails}
+                    className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
+                    placeholder="e.g. 1234#"
+                  />
                 </div>
-
-                {/* Contact info */}
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                    Contact info
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Phone</label>
-                      <input
-                        type="tel"
-                        value={clientForm.phone || ''}
-                        onChange={e => setClientForm(p => ({ ...p, phone: e.target.value }))}
-                        disabled={!editingClient}
-                        className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
-                        placeholder="(555) 555-5555"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Cell</label>
-                      <input
-                        type="tel"
-                        value={clientForm.cell || ''}
-                        onChange={e => setClientForm(p => ({ ...p, cell: e.target.value }))}
-                        disabled={!editingClient}
-                        className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
-                        placeholder="(555) 555-5555"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Email</label>
-                      <input
-                        type="email"
-                        value={clientForm.email || ''}
-                        onChange={e => setClientForm(p => ({ ...p, email: e.target.value }))}
-                        disabled={!editingClient}
-                        className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
-                        placeholder="email@example.com"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">
-                        Additional Emails{' '}
-                        <span className="font-normal text-gray-400">(one per line)</span>
-                      </label>
-                      <textarea
-                        rows={2}
-                        value={clientForm._additionalEmailsRaw || ''}
-                        onChange={e =>
-                          setClientForm(p => ({ ...p, _additionalEmailsRaw: e.target.value }))
-                        }
-                        disabled={!editingClient}
-                        className="input text-sm w-full resize-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
-                        placeholder="extra@example.com"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">
-                        Additional Phones{' '}
-                        <span className="font-normal text-gray-400">(one per line)</span>
-                      </label>
-                      <textarea
-                        rows={2}
-                        value={clientForm._additionalPhonesRaw || ''}
-                        onChange={e =>
-                          setClientForm(p => ({ ...p, _additionalPhonesRaw: e.target.value }))
-                        }
-                        disabled={!editingClient}
-                        className="input text-sm w-full resize-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
-                        placeholder="(555) 555-5555"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Address */}
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                    Address
-                  </p>
-                  <div className="mb-3">
-                    <label className="block text-xs text-gray-500 mb-1">Street</label>
-                    <input
-                      type="text"
-                      value={clientForm.street || ''}
-                      onChange={e => setClientForm(p => ({ ...p, street: e.target.value }))}
-                      disabled={!editingClient}
-                      className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
-                      placeholder="123 Main St"
-                    />
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">City</label>
-                      <input
-                        type="text"
-                        value={clientForm.city || ''}
-                        onChange={e => setClientForm(p => ({ ...p, city: e.target.value }))}
-                        disabled={!editingClient}
-                        className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
-                        placeholder="City"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">State</label>
-                      <select
-                        value={clientForm.state || ''}
-                        onChange={e => setClientForm(p => ({ ...p, state: e.target.value }))}
-                        disabled={!editingClient}
-                        className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
-                      >
-                        <option value="">—</option>
-                        {US_STATES.map(s => (
-                          <option key={s}>{s}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Zip</label>
-                      <input
-                        type="text"
-                        value={clientForm.zip || ''}
-                        onChange={e => setClientForm(p => ({ ...p, zip: e.target.value }))}
-                        disabled={!editingClient}
-                        className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
-                        placeholder="00000"
-                        maxLength={10}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Other */}
-                <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                    Other
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Other Email</label>
-                      <input
-                        type="email"
-                        value={clientForm.other_email || ''}
-                        onChange={e => setClientForm(p => ({ ...p, other_email: e.target.value }))}
-                        disabled={!editingClient}
-                        className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
-                        placeholder="other@example.com"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Other Address</label>
-                      <input
-                        type="text"
-                        value={clientForm.other_address || ''}
-                        onChange={e =>
-                          setClientForm(p => ({ ...p, other_address: e.target.value }))
-                        }
-                        disabled={!editingClient}
-                        className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
-                        placeholder="Mailing / vacation address"
-                      />
-                    </div>
-                  </div>
-                  <div className="mb-3">
-                    <label className="block text-xs text-gray-500 mb-1">Website</label>
-                    <input
-                      type="text"
-                      value={clientForm.website || ''}
-                      onChange={e => setClientForm(p => ({ ...p, website: e.target.value }))}
-                      disabled={!editingClient}
-                      className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
-                      placeholder="https://example.com"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Notes</label>
-                    <textarea
-                      rows={3}
-                      value={clientForm.notes || ''}
-                      onChange={e => setClientForm(p => ({ ...p, notes: e.target.value }))}
-                      disabled={!editingClient}
-                      className="input text-sm w-full resize-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
-                      placeholder="Notes about this opportunity…"
-                    />
-                  </div>
-                </div>
-
-                {/* Read-only contact info — these live on the contacts row,
-                       not the client. Editing happens in the Contacts module. */}
-                {(contactData?.secondary_first_name ||
-                  contactData?.source ||
-                  contactData?.how_did_you_hear ||
-                  contactData?.campaign ||
-                  contactData?.project_description) && (
-                  <Section title="From the contact record">
-                    <Field
-                      label="Secondary contact"
-                      value={`${contactData?.secondary_first_name || ''} ${contactData?.secondary_last_name || ''}`.trim()}
-                    />
-                    <Field label="Source" value={contactData?.source} />
-                    <Field label="How did you hear?" value={contactData?.how_did_you_hear} />
-                    <Field label="Campaign" value={contactData?.campaign} />
-                    {contactData?.project_description && (
-                      <div className="pt-2 border-t border-slate-100">
-                        <p className="text-xs text-gray-400 mb-1">Project description</p>
-                        <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
-                          {contactData.project_description}
-                        </p>
-                      </div>
-                    )}
-                  </Section>
-                )}
-
-                {/* COMPANY CONTACTS (only for company clients) */}
-                {(clientData.client_type === 'company' ||
-                  (clientData.company_contacts || []).length > 0) && (
-                  <Section title="Company contacts">
-                    {(clientData.company_contacts || []).length === 0 ? (
-                      <p className="text-xs text-gray-400 italic">No company contacts listed.</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {clientData.company_contacts.map((cc, i) => (
-                          <div key={i} className="border border-gray-200 rounded-lg p-2.5">
-                            <p className="text-sm font-semibold text-gray-800">
-                              {`${cc.first_name || ''} ${cc.last_name || ''}`.trim() || '—'}
-                              {cc.position && (
-                                <span className="text-xs text-gray-500 font-normal ml-2">
-                                  · {cc.position}
-                                </span>
-                              )}
-                            </p>
-                            {(cc.phone || cc.email) && (
-                              <p className="text-xs text-gray-600 mt-0.5 flex gap-3">
-                                {cc.phone && (
-                                  <a href={`tel:${cc.phone}`} className="hover:text-green-700">
-                                    {cc.phone}
-                                  </a>
-                                )}
-                                {cc.email && (
-                                  <a href={`mailto:${cc.email}`} className="hover:text-green-700">
-                                    {cc.email}
-                                  </a>
-                                )}
-                              </p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </Section>
-                )}
-              </>
-            )}
-
-            {/* SITE ACCESS — same layout in read & edit; inputs disabled
-                   when editingClient is false. Lives on the job row. */}
-            {clientData && (
-              <Section title="Site access">
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Gate code</label>
-                    <input
-                      type="text"
-                      value={gateCode}
-                      onChange={e => setGateCode(e.target.value)}
-                      disabled={!editingClient}
-                      className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
-                      placeholder="e.g. 1234#"
-                    />
-                  </div>
+                <div className="flex items-end pb-1.5">
                   <div className="flex items-center gap-2">
                     <input
                       id="has-dog"
                       type="checkbox"
                       checked={hasDog}
                       onChange={e => setHasDog(e.target.checked)}
-                      disabled={!editingClient}
+                      disabled={!editingDetails}
                       className="w-4 h-4 rounded accent-amber-600 disabled:cursor-default"
                     />
                     <label
                       htmlFor="has-dog"
-                      className={`text-sm ${editingClient ? 'text-gray-700 cursor-pointer' : 'text-gray-700 cursor-default'}`}
+                      className={`text-sm ${editingDetails ? 'text-gray-700 cursor-pointer' : 'text-gray-700 cursor-default'}`}
                     >
                       🐕 Dog on premises
                     </label>
                   </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1">Access notes</label>
-                    <textarea
-                      rows={3}
-                      value={accessNotes}
-                      onChange={e => setAccessNotes(e.target.value)}
-                      disabled={!editingClient}
-                      className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
-                      placeholder="e.g. Keys with neighbor at #45 · Park on the street · Side gate sticks"
-                    />
-                  </div>
-                  <p className="text-[11px] text-gray-400 italic">
-                    These will move into the Job Details questionnaire when that lands; safe to fill
-                    in for now.
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Access notes</label>
+                <textarea
+                  rows={3}
+                  value={accessNotes}
+                  onChange={e => setAccessNotes(e.target.value)}
+                  disabled={!editingDetails}
+                  className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
+                  placeholder="e.g. Keys with neighbor at #45 · Park on the street · Side gate sticks"
+                />
+              </div>
+            </div>
+
+            {/* ── Client / Company Details ────────────────────────────
+                 Folded in from the former Client tab on 2026-05-28.
+                 Header flips to "Company Details" when the linked
+                 clients row has client_type='company' (the result of an
+                 Opportunity → Estimate → Bid → Job pipeline where the
+                 lead was a company, not an individual). Person fields
+                 (first/last/spouse) are hidden in that case; company
+                 fields + website + notes take their place. */}
+            {loadingClient ? (
+              <div className="flex justify-center py-6">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-700" />
+              </div>
+            ) : !clientData ? (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                  Client Details
+                </p>
+                <div className="text-sm text-gray-500 space-y-2">
+                  <p>
+                    <span className="font-semibold text-gray-800">
+                      {job.client_name || 'Unknown client'}
+                    </span>
+                  </p>
+                  <p className="text-xs text-gray-400 italic">
+                    No matching opportunity record found. This usually means the job was
+                    imported from BuilderTrend or the customer name on the job doesn't exactly
+                    match a record in the Opportunities module. Open the contact or
+                    opportunity manually to fill in details.
                   </p>
                 </div>
-              </Section>
+              </div>
+            ) : (
+              (() => {
+                const isCompany = clientData.client_type === 'company'
+                // "Same as Job Address" check — collapse the Client Address
+                // subsection to a one-liner when the client row has no address
+                // or it matches the job address exactly (trim-insensitive).
+                const cf = clientForm
+                const clientAddressEmpty = !(
+                  (cf.street || '').trim() ||
+                  (cf.city || '').trim() ||
+                  (cf.state || '').trim() ||
+                  (cf.zip || '').trim()
+                )
+                const clientAddressMatches =
+                  (cf.street || '').trim() === (address || '').trim() &&
+                  (cf.city || '').trim() === (city || '').trim() &&
+                  (cf.state || '').trim() === (state || '').trim() &&
+                  (cf.zip || '').trim() === (zip || '').trim()
+                const showSameAsJob =
+                  !editingDetails && (clientAddressEmpty || clientAddressMatches)
+
+                return (
+                  <>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                        {isCompany ? 'Company Details' : 'Client Details'}
+                      </p>
+
+                      {/* Identity row — companies show Company + Position only;
+                          individuals get first/last/company + spouse fields. */}
+                      {isCompany ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">
+                              Company Name
+                            </label>
+                            <input
+                              type="text"
+                              value={clientForm.company_name || ''}
+                              onChange={e =>
+                                setClientForm(p => ({ ...p, company_name: e.target.value }))
+                              }
+                              disabled={!editingDetails}
+                              className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
+                              placeholder="Company name"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">Position</label>
+                            <input
+                              type="text"
+                              value={clientForm.company_position || ''}
+                              onChange={e =>
+                                setClientForm(p => ({
+                                  ...p,
+                                  company_position: e.target.value,
+                                }))
+                              }
+                              disabled={!editingDetails}
+                              className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
+                              placeholder="Position / title"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">
+                                First Name
+                              </label>
+                              <input
+                                type="text"
+                                value={clientForm.first_name || ''}
+                                onChange={e =>
+                                  setClientForm(p => ({ ...p, first_name: e.target.value }))
+                                }
+                                disabled={!editingDetails}
+                                className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
+                                placeholder="First name"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">
+                                Last Name
+                              </label>
+                              <input
+                                type="text"
+                                value={clientForm.last_name || ''}
+                                onChange={e =>
+                                  setClientForm(p => ({ ...p, last_name: e.target.value }))
+                                }
+                                disabled={!editingDetails}
+                                className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
+                                placeholder="Last name"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">
+                                Company
+                              </label>
+                              <input
+                                type="text"
+                                value={clientForm.company_name || ''}
+                                onChange={e =>
+                                  setClientForm(p => ({ ...p, company_name: e.target.value }))
+                                }
+                                disabled={!editingDetails}
+                                className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
+                                placeholder="Company name"
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">
+                                Position
+                              </label>
+                              <input
+                                type="text"
+                                value={clientForm.company_position || ''}
+                                onChange={e =>
+                                  setClientForm(p => ({
+                                    ...p,
+                                    company_position: e.target.value,
+                                  }))
+                                }
+                                disabled={!editingDetails}
+                                className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
+                                placeholder="Position / title"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">
+                                Spouse / Partner First
+                              </label>
+                              <input
+                                type="text"
+                                value={clientForm.spouse_first_name || ''}
+                                onChange={e =>
+                                  setClientForm(p => ({
+                                    ...p,
+                                    spouse_first_name: e.target.value,
+                                  }))
+                                }
+                                disabled={!editingDetails}
+                                className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
+                                placeholder="First"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">
+                                Spouse / Partner Last
+                              </label>
+                              <input
+                                type="text"
+                                value={clientForm.spouse_last_name || ''}
+                                onChange={e =>
+                                  setClientForm(p => ({
+                                    ...p,
+                                    spouse_last_name: e.target.value,
+                                  }))
+                                }
+                                disabled={!editingDetails}
+                                className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
+                                placeholder="Last"
+                              />
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Phone / Cell / Email — no separate "Contact Info" header;
+                          these read as part of Client/Company Details now. */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Phone</label>
+                          <input
+                            type="tel"
+                            value={clientForm.phone || ''}
+                            onChange={e =>
+                              setClientForm(p => ({ ...p, phone: e.target.value }))
+                            }
+                            disabled={!editingDetails}
+                            className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
+                            placeholder="(555) 555-5555"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Cell</label>
+                          <input
+                            type="tel"
+                            value={clientForm.cell || ''}
+                            onChange={e =>
+                              setClientForm(p => ({ ...p, cell: e.target.value }))
+                            }
+                            disabled={!editingDetails}
+                            className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
+                            placeholder="(555) 555-5555"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Email</label>
+                          <input
+                            type="email"
+                            value={clientForm.email || ''}
+                            onChange={e =>
+                              setClientForm(p => ({ ...p, email: e.target.value }))
+                            }
+                            disabled={!editingDetails}
+                            className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
+                            placeholder="email@example.com"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">
+                            Additional Emails{' '}
+                            <span className="font-normal text-gray-400">(one per line)</span>
+                          </label>
+                          <textarea
+                            rows={2}
+                            value={clientForm._additionalEmailsRaw || ''}
+                            onChange={e =>
+                              setClientForm(p => ({
+                                ...p,
+                                _additionalEmailsRaw: e.target.value,
+                              }))
+                            }
+                            disabled={!editingDetails}
+                            className="input text-sm w-full resize-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
+                            placeholder="extra@example.com"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">
+                            Additional Phones{' '}
+                            <span className="font-normal text-gray-400">(one per line)</span>
+                          </label>
+                          <textarea
+                            rows={2}
+                            value={clientForm._additionalPhonesRaw || ''}
+                            onChange={e =>
+                              setClientForm(p => ({
+                                ...p,
+                                _additionalPhonesRaw: e.target.value,
+                              }))
+                            }
+                            disabled={!editingDetails}
+                            className="input text-sm w-full resize-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
+                            placeholder="(555) 555-5555"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Website + Notes live in the same section for both
+                          individuals and companies — for companies the user
+                          asked these to come along with the merged data. */}
+                      <div className="mb-3">
+                        <label className="block text-xs text-gray-500 mb-1">Website</label>
+                        <input
+                          type="text"
+                          value={clientForm.website || ''}
+                          onChange={e =>
+                            setClientForm(p => ({ ...p, website: e.target.value }))
+                          }
+                          disabled={!editingDetails}
+                          className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
+                          placeholder="https://example.com"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Notes</label>
+                        <textarea
+                          rows={3}
+                          value={clientForm.notes || ''}
+                          onChange={e =>
+                            setClientForm(p => ({ ...p, notes: e.target.value }))
+                          }
+                          disabled={!editingDetails}
+                          className="input text-sm w-full resize-none disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
+                          placeholder="Notes about this opportunity…"
+                        />
+                      </div>
+                    </div>
+
+                    {/* ── Client Address (If different than Job Address) ──
+                         Collapsed to a one-line "Same as Job Address" when
+                         the client address is empty or matches the job
+                         address exactly. In Edit mode the fields are always
+                         visible so the user can fill in a different address. */}
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                        Client Address{' '}
+                        <span className="font-normal normal-case text-gray-400">
+                          (If different than Job Address)
+                        </span>
+                      </p>
+                      {showSameAsJob ? (
+                        <p className="text-sm text-gray-500 italic">Same as Job Address</p>
+                      ) : (
+                        <>
+                          <div className="mb-3">
+                            <label className="block text-xs text-gray-500 mb-1">Street</label>
+                            <input
+                              type="text"
+                              value={clientForm.street || ''}
+                              onChange={e =>
+                                setClientForm(p => ({ ...p, street: e.target.value }))
+                              }
+                              disabled={!editingDetails}
+                              className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
+                              placeholder="123 Main St"
+                            />
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">City</label>
+                              <input
+                                type="text"
+                                value={clientForm.city || ''}
+                                onChange={e =>
+                                  setClientForm(p => ({ ...p, city: e.target.value }))
+                                }
+                                disabled={!editingDetails}
+                                className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
+                                placeholder="City"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">State</label>
+                              <select
+                                value={clientForm.state || ''}
+                                onChange={e =>
+                                  setClientForm(p => ({ ...p, state: e.target.value }))
+                                }
+                                disabled={!editingDetails}
+                                className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
+                              >
+                                <option value="">—</option>
+                                {US_STATES.map(s => (
+                                  <option key={s}>{s}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">Zip</label>
+                              <input
+                                type="text"
+                                value={clientForm.zip || ''}
+                                onChange={e =>
+                                  setClientForm(p => ({ ...p, zip: e.target.value }))
+                                }
+                                disabled={!editingDetails}
+                                className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-700 disabled:cursor-default"
+                                placeholder="00000"
+                                maxLength={10}
+                              />
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Company contacts — only render for company clients
+                        (or any client row that happens to have entries). */}
+                    {(isCompany || (clientData.company_contacts || []).length > 0) && (
+                      <Section title="Company contacts">
+                        {(clientData.company_contacts || []).length === 0 ? (
+                          <p className="text-xs text-gray-400 italic">
+                            No company contacts listed.
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            {clientData.company_contacts.map((cc, i) => (
+                              <div
+                                key={i}
+                                className="border border-gray-200 rounded-lg p-2.5"
+                              >
+                                <p className="text-sm font-semibold text-gray-800">
+                                  {`${cc.first_name || ''} ${cc.last_name || ''}`.trim() ||
+                                    '—'}
+                                  {cc.position && (
+                                    <span className="text-xs text-gray-500 font-normal ml-2">
+                                      · {cc.position}
+                                    </span>
+                                  )}
+                                </p>
+                                {(cc.phone || cc.email) && (
+                                  <p className="text-xs text-gray-600 mt-0.5 flex gap-3">
+                                    {cc.phone && (
+                                      <a
+                                        href={`tel:${cc.phone}`}
+                                        className="hover:text-green-700"
+                                      >
+                                        {cc.phone}
+                                      </a>
+                                    )}
+                                    {cc.email && (
+                                      <a
+                                        href={`mailto:${cc.email}`}
+                                        className="hover:text-green-700"
+                                      >
+                                        {cc.email}
+                                      </a>
+                                    )}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </Section>
+                    )}
+
+                    {/* Read-only fields pulled from the linked contacts row.
+                        Editing happens in the Contacts module. */}
+                    {(contactData?.secondary_first_name ||
+                      contactData?.source ||
+                      contactData?.how_did_you_hear ||
+                      contactData?.campaign ||
+                      contactData?.project_description) && (
+                      <Section title="From the contact record">
+                        <Field
+                          label="Secondary contact"
+                          value={`${contactData?.secondary_first_name || ''} ${contactData?.secondary_last_name || ''}`.trim()}
+                        />
+                        <Field label="Source" value={contactData?.source} />
+                        <Field
+                          label="How did you hear?"
+                          value={contactData?.how_did_you_hear}
+                        />
+                        <Field label="Campaign" value={contactData?.campaign} />
+                        {contactData?.project_description && (
+                          <div className="pt-2 border-t border-slate-100">
+                            <p className="text-xs text-gray-400 mb-1">Project description</p>
+                            <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                              {contactData.project_description}
+                            </p>
+                          </div>
+                        )}
+                      </Section>
+                    )}
+                  </>
+                )
+              })()
             )}
+
             {error && <p className="text-xs text-red-500">{error}</p>}
           </div>
         )}
+
+        {/* Former Client tab content was folded into Job Details above on
+            2026-05-28. */}
 
         {/* ── Employees tab — 9 role assignments, edit-on-toggle. ── */}
         {activeTab === 'employees' &&
