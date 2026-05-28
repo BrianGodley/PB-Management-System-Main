@@ -108,6 +108,7 @@ const ROLE_DEFAULT_POSITIONS = {
   design_review:                  ['Sales Manager'],
   final_review:                   ['Sales Manager'],
   permit_engineering_coordinator: ['Permit and Engineering Supervisor', 'Permit & Engineering Supervisor'],
+  production_manager:             ['Production Manager'],
   quality_control_supervisor:     ['Quality Control Supervisor'],
   finance_manager:                ['Finance Manager'],
   success_supervisor:             ['Success Supervisor'],

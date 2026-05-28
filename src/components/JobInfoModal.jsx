@@ -103,6 +103,11 @@ export const JOB_ROLES = [
     pillCls: 'bg-green-100 text-green-700 border border-green-200',
   },
   {
+    key: 'production_manager',
+    label: 'Production Manager',
+    pillCls: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
+  },
+  {
     key: 'quality_control_supervisor',
     label: 'Quality Control Supervisor',
     pillCls: 'bg-teal-100 text-teal-700 border border-teal-200',
@@ -180,6 +185,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
   const [jobSupervisor, setJobSupervisor] = useState(
     job.job_supervisor || ''
   )
+  const [productionManager, setProductionManager] = useState(job.production_manager || '')
   const [qcSupervisor, setQcSupervisor] = useState(job.quality_control_supervisor || '')
   const [financeManager, setFinanceManager] = useState(job.finance_manager || '')
   const [successSupervisor, setSuccessSupervisor] = useState(job.success_supervisor || '')
@@ -248,6 +254,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
     setPermitCoordinator(job.permit_engineering_coordinator || '')
     setFinalReview(job.final_review || '')
     setJobSupervisor(job.job_supervisor || '')
+    setProductionManager(job.production_manager || '')
     setQcSupervisor(job.quality_control_supervisor || '')
     setFinanceManager(job.finance_manager || '')
     setSuccessSupervisor(job.success_supervisor || '')
@@ -263,6 +270,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
       permit_engineering_coordinator: permitCoordinator || null,
       final_review: finalReview || null,
       job_supervisor: jobSupervisor || null,
+      production_manager: productionManager || null,
       quality_control_supervisor: qcSupervisor || null,
       finance_manager: financeManager || null,
       success_supervisor: successSupervisor || null,
@@ -1252,6 +1260,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
               permit_engineering_coordinator: permitCoordinator,
               final_review: finalReview,
               job_supervisor: jobSupervisor,
+              production_manager: productionManager,
               quality_control_supervisor: qcSupervisor,
               finance_manager: financeManager,
               success_supervisor: successSupervisor,
@@ -1262,6 +1271,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
               permit_engineering_coordinator: setPermitCoordinator,
               final_review: setFinalReview,
               job_supervisor: setJobSupervisor,
+              production_manager: setProductionManager,
               quality_control_supervisor: setQcSupervisor,
               finance_manager: setFinanceManager,
               success_supervisor: setSuccessSupervisor,
