@@ -584,10 +584,6 @@ function AddIndividualModal({ onSave, onClose, user }) {
               />
             </div>
             <div>
-              <label className={lbl}>
-                Assigned Consultant{' '}
-                <span className="text-gray-400 font-normal">(optional)</span>
-              </label>
               <ConsultantPicker
                 value={consultantEmployeeId}
                 onChange={setConsultantEmployeeId}
@@ -972,10 +968,6 @@ function AddCompanyModal({ onSave, onClose, user }) {
               />
             </div>
             <div>
-              <label className={lbl}>
-                Assigned Consultant{' '}
-                <span className="text-gray-400 font-normal">(optional)</span>
-              </label>
               <ConsultantPicker
                 value={consultantEmployeeId}
                 onChange={setConsultantEmployeeId}
@@ -1022,8 +1014,15 @@ export default function Clients() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [page, setPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
-  const [tabCounts, setTabCounts] = useState({ active: 0, inactive: 0 })
-  const [tab, setTab] = useState('active')
+  // Four-tab navigation mirrors Contacts. 'individuals' and 'companies' are
+  // the two main views (active opps split by kind); 'past' is the combined
+  // archive; 'settings' is the page settings.
+  const [tabCounts, setTabCounts] = useState({
+    individuals: 0,
+    companies: 0,
+    past: 0,
+  })
+  const [tab, setTab] = useState('individuals')
   const [clientSettingsTab, setClientSettingsTab] = useState('general')
   const [visibleCols, setVisibleCols] = useState(DEFAULT_VISIBLE)
   const [colPickerOpen, setColPickerOpen] = useState(false)
@@ -1072,8 +1071,20 @@ export default function Clients() {
 
     let q = supabase.from('clients').select('*', { count: 'exact' })
 
-    // Status tab — a null status counts as 'active'.
-    q = tab === 'active' ? q.or('status.eq.active,status.is.null') : q.eq('status', tab)
+    // Tab-driven filters:
+    //   'individuals' — active opps where client_type isn't 'company'
+    //   'companies'   — active opps where client_type = 'company'
+    //   'past'        — every inactive opp regardless of kind
+    if (tab === 'past') {
+      q = q.eq('status', 'inactive')
+    } else if (tab === 'companies') {
+      q = q.or('status.eq.active,status.is.null').eq('client_type', 'company')
+    } else {
+      // Default + 'individuals': active and not a company.
+      q = q
+        .or('status.eq.active,status.is.null')
+        .or('client_type.neq.company,client_type.is.null')
+    }
 
     // Token search — chained .or() calls are AND-ed, so every whitespace/
     // comma-delimited token must match somewhere across the listed fields.
@@ -1103,14 +1114,30 @@ export default function Clients() {
   }
 
   async function fetchTabCounts() {
-    const [activeRes, inactiveRes] = await Promise.all([
+    const [indRes, compRes, pastRes] = await Promise.all([
+      // Active individuals — client_type isn't 'company' AND active status
       supabase
         .from('clients')
         .select('id', { count: 'exact', head: true })
-        .or('status.eq.active,status.is.null'),
-      supabase.from('clients').select('id', { count: 'exact', head: true }).eq('status', 'inactive'),
+        .or('status.eq.active,status.is.null')
+        .or('client_type.neq.company,client_type.is.null'),
+      // Active companies
+      supabase
+        .from('clients')
+        .select('id', { count: 'exact', head: true })
+        .or('status.eq.active,status.is.null')
+        .eq('client_type', 'company'),
+      // Past — everything inactive, regardless of kind
+      supabase
+        .from('clients')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'inactive'),
     ])
-    setTabCounts({ active: activeRes.count || 0, inactive: inactiveRes.count || 0 })
+    setTabCounts({
+      individuals: indRes.count || 0,
+      companies: compRes.count || 0,
+      past: pastRes.count || 0,
+    })
   }
 
   async function deleteClient(id) {
@@ -1372,9 +1399,10 @@ export default function Clients() {
       {/* ── Active / Inactive / Settings tabs ── */}
       <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0">
         {[
-          { key: 'active', label: '✅ Current', count: tabCounts.active },
-          { key: 'inactive', label: '📦 Past', count: tabCounts.inactive },
-          { key: 'settings', label: '⚙️ Settings', count: null },
+          { key: 'individuals', label: '👤 Individuals', count: tabCounts.individuals },
+          { key: 'companies',   label: '🏢 Companies',   count: tabCounts.companies },
+          { key: 'past',        label: '📦 Past',        count: tabCounts.past },
+          { key: 'settings',    label: '⚙️ Settings',    count: null },
         ].map(t => (
           <button
             key={t.key}
@@ -1524,11 +1552,13 @@ export default function Clients() {
                 <p className="text-gray-500 mb-4">
                   {search
                     ? 'No results match your search.'
-                    : tab === 'inactive'
+                    : tab === 'past'
                       ? 'No past opportunities.'
-                      : 'No current opportunities.'}
+                      : tab === 'companies'
+                        ? 'No company opportunities.'
+                        : 'No individual opportunities.'}
                 </p>
-                {tab === 'active' && !search && (
+                {tab !== 'past' && !search && (
                   <div className="flex items-center justify-center gap-2">
                     <button onClick={() => setClientModal('individual')} className="btn-secondary">
                       Add Individual Opportunity
@@ -1540,117 +1570,75 @@ export default function Clients() {
                 )}
               </div>
             ) : (
-              (() => {
-                // Split the current page of opportunities into Individuals
-                // and Companies so we can render them as two stacked tables.
-                // (Pagination remains on the combined list so the user's
-                // page index keeps its meaning.)
-                const individualClients = clients.filter(c => c.client_type !== 'company')
-                const companyClients = clients.filter(c => c.client_type === 'company')
-
-                const renderTable = (rows, kindLabel, emptyMsg) => (
-                  <div className="mb-6 last:mb-0">
-                    <div className="flex items-baseline justify-between mb-2">
-                      <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wide">
-                        {kindLabel}
-                      </h3>
-                      <span className="text-[11px] text-gray-400">
-                        {rows.length} on this page
-                      </span>
-                    </div>
-                    {rows.length === 0 ? (
-                      <div className="bg-white rounded-xl border border-dashed border-gray-200 text-center py-6 text-xs text-gray-400 italic">
-                        {emptyMsg}
-                      </div>
-                    ) : (
-                      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-                        <table className="w-full text-xs min-w-[900px]">
-                          <thead>
-                            <tr className="bg-gray-50 border-b border-gray-200">
-                              {activeCols.map((col, ci) => (
-                                <th
-                                  key={col.key}
-                                  className={`px-4 py-2 text-left font-semibold text-gray-600 uppercase truncate ${ci === 0 ? 'sticky left-0 bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]' : ''}`}
-                                  style={{ width: colWidth(col.key) }}
-                                >
-                                  {col.label}
-                                </th>
-                              ))}
-                              <th className="px-4 py-2 w-16" />
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100">
-                            {rows.map(client => (
-                              <tr
-                                key={client.id}
-                                className="group hover:bg-gray-50 transition-colors cursor-pointer"
+              <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+                <table className="w-full text-xs min-w-[900px]">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      {activeCols.map((col, ci) => (
+                        <th
+                          key={col.key}
+                          className={`px-4 py-2 text-left font-semibold text-gray-600 uppercase truncate ${ci === 0 ? 'sticky left-0 bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]' : ''}`}
+                          style={{ width: colWidth(col.key) }}
+                        >
+                          {col.label}
+                        </th>
+                      ))}
+                      <th className="px-4 py-2 w-16" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {clients.map(client => (
+                      <tr
+                        key={client.id}
+                        className="group hover:bg-gray-50 transition-colors cursor-pointer"
+                      >
+                        {activeCols.map((col, ci) => (
+                          <td
+                            key={col.key}
+                            className={`px-4 py-2 min-w-0 max-w-0 overflow-hidden text-gray-600 ${ci === 0 ? 'sticky left-0 bg-white group-hover:bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]' : ''}`}
+                          >
+                            {cellContent(col, client)}
+                          </td>
+                        ))}
+                        <td className="px-4 py-2 w-28">
+                          <div className="flex items-center justify-end gap-2">
+                            <Link
+                              to={`/clients/${client.id}`}
+                              className="text-gray-500 hover:text-gray-700 whitespace-nowrap text-xs"
+                            >
+                              View →
+                            </Link>
+                            {tab !== 'past' ? (
+                              <button
+                                onClick={() => setClientStatus(client.id, 'inactive')}
+                                className="text-xs text-gray-400 hover:text-yellow-600 whitespace-nowrap"
+                                title="Mark inactive"
                               >
-                                {activeCols.map((col, ci) => (
-                                  <td
-                                    key={col.key}
-                                    className={`px-4 py-2 min-w-0 max-w-0 overflow-hidden text-gray-600 ${ci === 0 ? 'sticky left-0 bg-white group-hover:bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]' : ''}`}
-                                  >
-                                    {cellContent(col, client)}
-                                  </td>
-                                ))}
-                                <td className="px-4 py-2 w-28">
-                                  <div className="flex items-center justify-end gap-2">
-                                    <Link
-                                      to={`/clients/${client.id}`}
-                                      className="text-gray-500 hover:text-gray-700 whitespace-nowrap text-xs"
-                                    >
-                                      View →
-                                    </Link>
-                                    {tab === 'active' ? (
-                                      <button
-                                        onClick={() => setClientStatus(client.id, 'inactive')}
-                                        className="text-xs text-gray-400 hover:text-yellow-600 whitespace-nowrap"
-                                        title="Mark inactive"
-                                      >
-                                        Deactivate
-                                      </button>
-                                    ) : (
-                                      <>
-                                        <button
-                                          onClick={() => setClientStatus(client.id, 'active')}
-                                          className="text-xs text-green-600 hover:text-green-800 whitespace-nowrap"
-                                        >
-                                          Reactivate
-                                        </button>
-                                        <button
-                                          onClick={() => deleteClient(client.id)}
-                                          className="text-red-300 hover:text-red-500 text-xs"
-                                        >
-                                          ✕
-                                        </button>
-                                      </>
-                                    )}
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                )
-
-                return (
-                  <>
-                    {renderTable(
-                      individualClients,
-                      'Individual Opportunities',
-                      'No individuals on this page.',
-                    )}
-                    {renderTable(
-                      companyClients,
-                      'Company Opportunities',
-                      'No companies on this page.',
-                    )}
-                  </>
-                )
-              })()
+                                Deactivate
+                              </button>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => setClientStatus(client.id, 'active')}
+                                  className="text-xs text-green-600 hover:text-green-800 whitespace-nowrap"
+                                >
+                                  Reactivate
+                                </button>
+                                <button
+                                  onClick={() => deleteClient(client.id)}
+                                  className="text-red-300 hover:text-red-500 text-xs"
+                                >
+                                  ✕
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
 
