@@ -1175,17 +1175,467 @@ function BillModal({ bill, accounts, jobs, onSave, onClose }) {
 // charge, the user edits it in QuickBooks; the next sync reflects it.
 // ═════════════════════════════════════════════════════════════════════════════
 
-function ChecksTab() {
+function ChecksTab({ accounts, bankAccounts, jobs, vendors }) {
+  const [showWriter, setShowWriter] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
   return (
-    <AcctTransactionsTab
-      headerTable="acct_checks"
-      lineTable="acct_check_lines"
-      lineFkColumn="check_id"
-      accountColumn="bank_account_name"
-      accountHeader="Bank Account"
-      emptyLabel="No checks found in this date range."
-      refLabel="Check #"
-    />
+    <>
+      <AcctTransactionsTab
+        headerTable="acct_checks"
+        lineTable="acct_check_lines"
+        lineFkColumn="check_id"
+        accountColumn="bank_account_name"
+        accountHeader="Bank Account"
+        emptyLabel="No checks found in this date range."
+        refLabel="Check #"
+        refreshKey={refreshKey}
+        actions={
+          <button
+            onClick={() => setShowWriter(true)}
+            className="ml-3 bg-green-700 text-white text-sm font-semibold px-3 py-2 rounded-md hover:bg-green-800"
+          >
+            + New Check
+          </button>
+        }
+      />
+      {showWriter && (
+        <WriteCheckModal
+          accounts={accounts}
+          bankAccounts={bankAccounts}
+          jobs={jobs}
+          vendors={vendors}
+          onClose={() => setShowWriter(false)}
+          onSaved={() => {
+            setShowWriter(false)
+            setRefreshKey(k => k + 1)
+          }}
+          onSavedNew={() => {
+            // After "Save & New", clear the form and stay open. Bump the
+            // list refresh so the just-saved check shows up immediately.
+            setRefreshKey(k => k + 1)
+          }}
+        />
+      )}
+    </>
+  )
+}
+
+// ── WriteCheckModal ─────────────────────────────────────────────────────────
+// Mirrors the QuickBooks "Write Checks" UI:
+//   - Bank Account picker at the top with the running ending balance
+//   - Check # / Date in the masthead, plus Pay To / Amount / Address / Memo
+//   - Expense lines table below: Account | Amount | Memo | Customer:Job
+//
+// Save & Close → write header + lines, close modal. Save & New → write +
+// reset form for the next check. Clear → wipe local state (no DB write).
+function WriteCheckModal({
+  accounts,
+  bankAccounts,
+  jobs,
+  vendors,
+  onClose,
+  onSaved,
+  onSavedNew,
+}) {
+  const initial = () => ({
+    bank_account_id: bankAccounts[0]?.id || '',
+    ref_number: '',
+    date: new Date().toISOString().slice(0, 10),
+    payee_type: 'vendor',
+    payee_id: '',
+    payee_name: '',
+    address: '',
+    memo: '',
+    lines: [
+      { account_id: '', amount: '', description: '', job_id: '', billable: false, class_name: '' },
+      { account_id: '', amount: '', description: '', job_id: '', billable: false, class_name: '' },
+    ],
+  })
+  const [form, setForm] = useState(initial)
+  const [saving, setSaving] = useState(false)
+
+  const bankAcct = bankAccounts.find(b => b.id === form.bank_account_id)
+  const endingBalance = bankAcct?.current_balance ?? bankAcct?.balance ?? null
+
+  const lineTotal = form.lines.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0)
+
+  const setLine = (i, patch) =>
+    setForm(prev => ({
+      ...prev,
+      lines: prev.lines.map((l, idx) => (idx === i ? { ...l, ...patch } : l)),
+    }))
+  const addLine = () =>
+    setForm(prev => ({
+      ...prev,
+      lines: [
+        ...prev.lines,
+        { account_id: '', amount: '', description: '', job_id: '', billable: false, class_name: '' },
+      ],
+    }))
+  const removeLine = i =>
+    setForm(prev => ({
+      ...prev,
+      lines: prev.lines.length > 1 ? prev.lines.filter((_, idx) => idx !== i) : prev.lines,
+    }))
+
+  async function persist() {
+    if (!form.bank_account_id) {
+      alert('Select a bank account.')
+      return null
+    }
+    if (!form.payee_name.trim()) {
+      alert('Enter who the check is "Pay to the Order of".')
+      return null
+    }
+    const cleanLines = form.lines
+      .map((l, i) => ({
+        ...l,
+        amount: parseFloat(l.amount) || 0,
+        sort_order: i,
+      }))
+      .filter(l => l.account_id && l.amount > 0)
+    if (cleanLines.length === 0) {
+      alert('Add at least one expense line with an account and amount.')
+      return null
+    }
+    const total = cleanLines.reduce((s, l) => s + l.amount, 0)
+    const headerPayload = {
+      ref_number: form.ref_number.trim() || null,
+      payee_type: form.payee_type,
+      payee_id:   form.payee_id || null,
+      payee_name: form.payee_name.trim(),
+      bank_account_id: form.bank_account_id,
+      bank_account_name: bankAcct?.name || null,
+      date: form.date,
+      total,
+      memo: form.memo.trim() || null,
+      source: 'manual',
+    }
+    const { data: hdr, error } = await supabase
+      .from('acct_checks')
+      .insert(headerPayload)
+      .select('id')
+      .single()
+    if (error) {
+      alert('Save failed: ' + error.message)
+      return null
+    }
+    const linesPayload = cleanLines.map(l => ({
+      check_id: hdr.id,
+      line_type: 'expense',
+      job_id: l.job_id || null,
+      account_id: l.account_id,
+      description: l.description?.trim() || null,
+      amount: l.amount,
+      billable_status: l.billable ? 'billable' : null,
+      class_name: l.class_name?.trim() || null,
+      sort_order: l.sort_order,
+    }))
+    const { error: linesErr } = await supabase
+      .from('acct_check_lines')
+      .insert(linesPayload)
+    if (linesErr) {
+      alert('Lines failed to save: ' + linesErr.message)
+      // Roll back the header so the user doesn't see an orphan
+      await supabase.from('acct_checks').delete().eq('id', hdr.id)
+      return null
+    }
+    return hdr.id
+  }
+
+  async function handleSaveClose() {
+    setSaving(true)
+    const id = await persist()
+    setSaving(false)
+    if (id) onSaved?.()
+  }
+  async function handleSaveNew() {
+    setSaving(true)
+    const id = await persist()
+    setSaving(false)
+    if (id) {
+      setForm(initial())
+      onSavedNew?.()
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[94vh] overflow-hidden flex flex-col">
+        {/* Title bar */}
+        <div className="px-5 py-2.5 border-b border-gray-200 bg-green-700 text-white flex items-center justify-between flex-shrink-0">
+          <h3 className="text-sm font-semibold">
+            Write Checks — {bankAcct?.name || 'Select Bank Account'}
+          </h3>
+          <button onClick={onClose} className="text-white/80 hover:text-white text-lg">
+            ×
+          </button>
+        </div>
+
+        {/* Bank account + ending balance */}
+        <div className="px-5 py-2 border-b border-gray-200 flex items-center gap-4 flex-shrink-0">
+          <label className="text-xs font-semibold text-gray-600">Bank Account</label>
+          <select
+            value={form.bank_account_id}
+            onChange={e => setForm(p => ({ ...p, bank_account_id: e.target.value }))}
+            className="input text-sm flex-1 max-w-md"
+          >
+            <option value="">— Select —</option>
+            {bankAccounts.map(b => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+          <div className="ml-auto text-right">
+            <p className="text-[10px] text-gray-400 uppercase font-semibold">Ending Balance</p>
+            <p
+              className={`text-base font-bold ${
+                (endingBalance || 0) < 0 ? 'text-red-600' : 'text-gray-800'
+              }`}
+            >
+              {endingBalance == null ? '—' : fmt(endingBalance)}
+            </p>
+          </div>
+        </div>
+
+        {/* Check face */}
+        <div className="px-5 py-4 border-b border-gray-200 bg-emerald-50/30">
+          <div className="grid grid-cols-12 gap-3 items-start">
+            <div className="col-span-7">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-semibold text-gray-500 uppercase mb-0.5">
+                    Pay to the Order of
+                  </label>
+                  <input
+                    type="text"
+                    list="payee-list"
+                    value={form.payee_name}
+                    onChange={e => {
+                      const v = e.target.value
+                      // If the user picked an exact vendor name, link the id
+                      const match = vendors.find(x => x.company_name === v)
+                      setForm(p => ({
+                        ...p,
+                        payee_name: v,
+                        payee_id: match?.id || '',
+                        payee_type: match ? 'vendor' : p.payee_type,
+                      }))
+                    }}
+                    className="input text-sm w-full"
+                    placeholder="Vendor or name"
+                  />
+                  <datalist id="payee-list">
+                    {vendors.map(v => (
+                      <option key={v.id} value={v.company_name} />
+                    ))}
+                  </datalist>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-gray-500 uppercase mb-0.5">
+                    $ Amount
+                  </label>
+                  <input
+                    type="text"
+                    value={lineTotal ? lineTotal.toFixed(2) : '0.00'}
+                    readOnly
+                    className="input text-sm w-full bg-gray-50 text-gray-700"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-0.5">Auto-summed from line items.</p>
+                </div>
+              </div>
+              <div className="mt-3">
+                <label className="block text-[10px] font-semibold text-gray-500 uppercase mb-0.5">
+                  Address
+                </label>
+                <textarea
+                  value={form.address}
+                  onChange={e => setForm(p => ({ ...p, address: e.target.value }))}
+                  rows={2}
+                  className="input text-sm w-full resize-none"
+                />
+              </div>
+              <div className="mt-3">
+                <label className="block text-[10px] font-semibold text-gray-500 uppercase mb-0.5">
+                  Memo
+                </label>
+                <input
+                  type="text"
+                  value={form.memo}
+                  onChange={e => setForm(p => ({ ...p, memo: e.target.value }))}
+                  className="input text-sm w-full"
+                />
+              </div>
+            </div>
+            <div className="col-span-5 space-y-3">
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-500 uppercase mb-0.5">
+                  Check #
+                </label>
+                <input
+                  type="text"
+                  value={form.ref_number}
+                  onChange={e => setForm(p => ({ ...p, ref_number: e.target.value }))}
+                  className="input text-sm w-full"
+                  placeholder="491"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-500 uppercase mb-0.5">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  value={form.date}
+                  onChange={e => setForm(p => ({ ...p, date: e.target.value }))}
+                  className="input text-sm w-full"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Expense lines */}
+        <div className="flex-1 overflow-y-auto px-5 py-3">
+          <div className="flex items-center gap-4 mb-2">
+            <p className="text-xs font-bold text-gray-600 uppercase">
+              Expenses <span className="ml-2 text-gray-800">{fmt(lineTotal)}</span>
+            </p>
+          </div>
+          <table className="w-full text-xs">
+            <thead className="bg-gray-50 border-y border-gray-200">
+              <tr>
+                <th className="px-2 py-1.5 text-left font-semibold text-gray-600">Account</th>
+                <th className="px-2 py-1.5 text-right font-semibold text-gray-600 w-28">Amount</th>
+                <th className="px-2 py-1.5 text-left font-semibold text-gray-600">Memo</th>
+                <th className="px-2 py-1.5 text-left font-semibold text-gray-600 w-44">
+                  Customer:Job
+                </th>
+                <th className="px-2 py-1.5 text-center font-semibold text-gray-600 w-14">
+                  Billable
+                </th>
+                <th className="px-2 py-1.5 text-left font-semibold text-gray-600 w-28">Class</th>
+                <th className="px-2 py-1.5 w-8" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {form.lines.map((l, i) => (
+                <tr key={i}>
+                  <td className="px-2 py-1">
+                    <select
+                      value={l.account_id}
+                      onChange={e => setLine(i, { account_id: e.target.value })}
+                      className="input text-xs w-full"
+                    >
+                      <option value="">— Account —</option>
+                      {accounts.map(a => (
+                        <option key={a.id} value={a.id}>
+                          {a.name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-2 py-1">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={l.amount}
+                      onChange={e => setLine(i, { amount: e.target.value })}
+                      className="input text-xs w-full text-right"
+                      placeholder="0.00"
+                    />
+                  </td>
+                  <td className="px-2 py-1">
+                    <input
+                      type="text"
+                      value={l.description}
+                      onChange={e => setLine(i, { description: e.target.value })}
+                      className="input text-xs w-full"
+                    />
+                  </td>
+                  <td className="px-2 py-1">
+                    <select
+                      value={l.job_id}
+                      onChange={e => setLine(i, { job_id: e.target.value })}
+                      className="input text-xs w-full"
+                    >
+                      <option value="">—</option>
+                      {jobs.map(j => (
+                        <option key={j.id} value={j.id}>
+                          {j.name || j.client_name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-2 py-1 text-center">
+                    <input
+                      type="checkbox"
+                      checked={l.billable}
+                      onChange={e => setLine(i, { billable: e.target.checked })}
+                      className="accent-green-700"
+                    />
+                  </td>
+                  <td className="px-2 py-1">
+                    <input
+                      type="text"
+                      value={l.class_name}
+                      onChange={e => setLine(i, { class_name: e.target.value })}
+                      className="input text-xs w-full"
+                    />
+                  </td>
+                  <td className="px-2 py-1 text-center">
+                    <button
+                      onClick={() => removeLine(i)}
+                      className="text-red-400 hover:text-red-600 disabled:opacity-30"
+                      disabled={form.lines.length <= 1}
+                      title="Remove line"
+                    >
+                      ×
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              <tr>
+                <td colSpan={7} className="px-2 py-2">
+                  <button
+                    onClick={addLine}
+                    className="text-xs text-green-700 hover:text-green-900 font-medium"
+                  >
+                    + Add line
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Footer actions */}
+        <div className="px-5 py-3 border-t border-gray-200 flex items-center justify-end gap-2 flex-shrink-0">
+          <button
+            onClick={() => setForm(initial())}
+            disabled={saving}
+            className="px-3 py-1.5 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+          >
+            Clear
+          </button>
+          <button
+            onClick={handleSaveClose}
+            disabled={saving}
+            className="px-3 py-1.5 text-sm rounded-md border border-gray-300 text-gray-700 font-medium hover:bg-gray-50"
+          >
+            {saving ? 'Saving…' : 'Save & Close'}
+          </button>
+          <button
+            onClick={handleSaveNew}
+            disabled={saving}
+            className="px-3 py-1.5 text-sm rounded-md bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : 'Save & New'}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -1211,6 +1661,8 @@ function AcctTransactionsTab({
   accountHeader,   // 'Bank Account' | 'Credit Card'
   emptyLabel,
   refLabel,
+  actions = null,  // optional node rendered in the filter bar (e.g. "+ New Check")
+  refreshKey = 0,  // bump this number from the parent to force a refetch
 }) {
   const PAGE_SIZE = 50
 
@@ -1259,7 +1711,7 @@ function AcctTransactionsTab({
     }
     fetchPage()
     return () => { cancelled = true }
-  }, [headerTable, page, dateFrom, dateTo, searchTerm])
+  }, [headerTable, page, dateFrom, dateTo, searchTerm, refreshKey])
 
   // Reset to page 1 whenever a filter changes (otherwise you can end up
   // on an empty late page after narrowing the range).
@@ -1333,6 +1785,7 @@ function AcctTransactionsTab({
           <p className="text-[10px] text-gray-400 uppercase font-semibold">Page Total</p>
           <p className="text-lg font-bold text-gray-800">{fmt(visibleTotal)}</p>
         </div>
+        {actions && <div className="flex items-center">{actions}</div>}
       </div>
 
       {/* Header table */}
@@ -3583,7 +4036,14 @@ export default function Accounting() {
             onRefresh={refresh}
           />
         )}
-        {tab === 'checks' && <ChecksTab />}
+        {tab === 'checks' && (
+          <ChecksTab
+            accounts={accounts}
+            bankAccounts={bankAccounts}
+            jobs={jobs}
+            vendors={vendors}
+          />
+        )}
         {tab === 'cc'     && <CreditCardsTab />}
         {tab === 'banking' && (
           <BankingTab bankAccounts={bankAccounts} accounts={accounts} onRefresh={refresh} />
