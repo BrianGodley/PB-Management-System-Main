@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { fetchAllPaginated } from '../lib/fetchAll'
 import { useAuth } from '../contexts/AuthContext'
 import MasterRates from './MasterRates'
 import { DEFAULT_ESTIMATE_GPMD, DEFAULT_SALES_TAX_RATE } from '../lib/companyDefaults'
@@ -1020,6 +1021,7 @@ export default function Clients() {
   const [tabCounts, setTabCounts] = useState({
     individuals: 0,
     companies: 0,
+    estimates: 0,
     past: 0,
   })
   const [tab, setTab] = useState('individuals')
@@ -1045,7 +1047,7 @@ export default function Clients() {
 
   // Fetch the current page from the server.
   useEffect(() => {
-    if (tab !== 'settings') fetchClients()
+    if (tab !== 'settings' && tab !== 'estimates') fetchClients()
   }, [tab, debouncedSearch, page])
 
   // Tab counts (Current / Past) — lightweight count-only queries.
@@ -1114,7 +1116,7 @@ export default function Clients() {
   }
 
   async function fetchTabCounts() {
-    const [indRes, compRes, pastRes] = await Promise.all([
+    const [indRes, compRes, estRes, pastRes] = await Promise.all([
       // Active individuals — client_type isn't 'company' AND active status
       supabase
         .from('clients')
@@ -1127,6 +1129,13 @@ export default function Clients() {
         .select('id', { count: 'exact', head: true })
         .or('status.eq.active,status.is.null')
         .eq('client_type', 'company'),
+      // Estimates — all estimates with a non-empty name (CO estimates filtered
+      // client-side in EstimatesView; this count is the upper bound).
+      supabase
+        .from('estimates')
+        .select('id', { count: 'exact', head: true })
+        .not('estimate_name', 'is', null)
+        .neq('estimate_name', ''),
       // Past — everything inactive, regardless of kind
       supabase
         .from('clients')
@@ -1136,6 +1145,7 @@ export default function Clients() {
     setTabCounts({
       individuals: indRes.count || 0,
       companies: compRes.count || 0,
+      estimates: estRes.count || 0,
       past: pastRes.count || 0,
     })
   }
@@ -1401,6 +1411,7 @@ export default function Clients() {
         {[
           { key: 'individuals', label: '👤 Individuals', count: tabCounts.individuals },
           { key: 'companies',   label: '🏢 Companies',   count: tabCounts.companies },
+          { key: 'estimates',   label: '📋 Estimates',   count: tabCounts.estimates },
           { key: 'past',        label: '📦 Past',        count: tabCounts.past },
           { key: 'settings',    label: '⚙️ Settings',    count: null },
         ].map(t => (
@@ -1463,7 +1474,10 @@ export default function Clients() {
         </div>
       )}
 
-      {tab !== 'settings' && (
+      {/* ── Estimates tab ── */}
+      {tab === 'estimates' && <EstimatesView />}
+
+      {tab !== 'settings' && tab !== 'estimates' && (
         <>
           {/* ── Search + Column picker ── */}
           <div className="flex items-center justify-between mb-3 gap-3 mt-4 flex-shrink-0">
@@ -1999,6 +2013,369 @@ function SalesTaxRateCard() {
               )
             })()}
           </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── EstimatesView ─────────────────────────────────────────────────────────────
+// Cross-opportunity table of every estimate in the system. Lets the user
+// filter by bid-created status, the profile that created the estimate, and
+// the consultant assigned to the underlying opportunity (clients
+// .consultant_employee_id). Includes a quick-search box that matches on
+// estimate name, client name, or estimate type.
+//
+// CO estimates (those tied to a change_order bid) are filtered out so this
+// stays focused on the original-bid pipeline, mirroring what ClientDetail
+// shows under the "Estimates" section.
+function EstimatesView() {
+  const [loading, setLoading] = useState(true)
+  const [estimates, setEstimates] = useState([])
+  const [bidEstimateIds, setBidEstimateIds] = useState(new Set())
+  const [coEstimateIds, setCoEstimateIds] = useState(new Set())
+  const [clientsById, setClientsById] = useState({})
+  const [employeesById, setEmployeesById] = useState({})
+  const [profiles, setProfiles] = useState({})
+
+  // Filter state
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [bidFilter, setBidFilter] = useState('all') // 'all' | 'created' | 'not_created'
+  const [createdByFilter, setCreatedByFilter] = useState('all')
+  const [consultantFilter, setConsultantFilter] = useState('all')
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 250)
+    return () => clearTimeout(t)
+  }, [search])
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      const [estRes, bidRes, clientsRes, empRes, profRes] = await Promise.all([
+        fetchAllPaginated(() =>
+          supabase
+            .from('estimates')
+            .select('id, estimate_name, type, status, created_at, client_id, client_name, created_by')
+            .order('created_at', { ascending: false })
+        ),
+        // Pull every bid's estimate_id so we know which estimates have bids
+        // (record_type='bid') vs CO estimates (record_type='change_order').
+        fetchAllPaginated(() =>
+          supabase.from('bids').select('estimate_id, record_type')
+        ),
+        supabase.from('clients').select('id, name, first_name, last_name, company_name, consultant_employee_id'),
+        supabase.from('employees').select('id, first_name, last_name'),
+        supabase.from('profiles').select('id, full_name, email'),
+      ])
+      if (cancelled) return
+
+      const bidIds = new Set()
+      const coIds = new Set()
+      ;(bidRes.data || []).forEach(b => {
+        if (!b.estimate_id) return
+        if (b.record_type === 'change_order') coIds.add(b.estimate_id)
+        else bidIds.add(b.estimate_id)
+      })
+
+      const cMap = {}
+      ;(clientsRes.data || []).forEach(c => {
+        cMap[c.id] = c
+      })
+      const eMap = {}
+      ;(empRes.data || []).forEach(e => {
+        eMap[e.id] = e
+      })
+      const pMap = {}
+      ;(profRes.data || []).forEach(p => {
+        pMap[p.id] = p.full_name || p.email || 'Unknown'
+      })
+
+      setEstimates(
+        (estRes.data || []).filter(
+          e => (e.estimate_name || '').trim() !== '' && !coIds.has(e.id)
+        )
+      )
+      setBidEstimateIds(bidIds)
+      setCoEstimateIds(coIds)
+      setClientsById(cMap)
+      setEmployeesById(eMap)
+      setProfiles(pMap)
+      setLoading(false)
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Dropdown option lists — derived from the loaded data so they only show
+  // creators/consultants who actually appear on an estimate's opportunity.
+  const creatorOptions = useMemo(() => {
+    const ids = new Set()
+    estimates.forEach(e => {
+      if (e.created_by) ids.add(e.created_by)
+    })
+    return Array.from(ids)
+      .map(id => ({ id, name: profiles[id] || 'Unknown' }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [estimates, profiles])
+
+  const consultantOptions = useMemo(() => {
+    const ids = new Set()
+    estimates.forEach(e => {
+      const c = clientsById[e.client_id]
+      if (c?.consultant_employee_id) ids.add(c.consultant_employee_id)
+    })
+    return Array.from(ids)
+      .map(id => {
+        const emp = employeesById[id]
+        const name = emp
+          ? `${emp.last_name || ''}, ${emp.first_name || ''}`.replace(/^, |, $/g, '')
+          : 'Unknown'
+        return { id, name }
+      })
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [estimates, clientsById, employeesById])
+
+  const filtered = useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase()
+    return estimates.filter(e => {
+      const hasBid = bidEstimateIds.has(e.id)
+      if (bidFilter === 'created' && !hasBid) return false
+      if (bidFilter === 'not_created' && hasBid) return false
+      if (createdByFilter !== 'all' && e.created_by !== createdByFilter) return false
+      if (consultantFilter !== 'all') {
+        const c = clientsById[e.client_id]
+        if (c?.consultant_employee_id !== consultantFilter) return false
+      }
+      if (q) {
+        const hay = [
+          e.estimate_name,
+          e.client_name,
+          e.type,
+          clientsById[e.client_id]?.company_name,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+        if (!hay.includes(q)) return false
+      }
+      return true
+    })
+  }, [estimates, debouncedSearch, bidFilter, createdByFilter, consultantFilter, bidEstimateIds, clientsById])
+
+  function consultantNameFor(estimate) {
+    const c = clientsById[estimate.client_id]
+    if (!c?.consultant_employee_id) return null
+    const emp = employeesById[c.consultant_employee_id]
+    if (!emp) return null
+    return `${emp.last_name || ''}, ${emp.first_name || ''}`.replace(/^, |, $/g, '')
+  }
+
+  function clientDisplayName(estimate) {
+    const c = clientsById[estimate.client_id]
+    if (c) {
+      if (c.last_name || c.first_name) {
+        return [c.last_name, c.first_name].filter(Boolean).join(', ')
+      }
+      return c.name || estimate.client_name || '—'
+    }
+    return estimate.client_name || '—'
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-700" />
+      </div>
+    )
+  }
+
+  const totalShown = filtered.length
+  const totalAll = estimates.length
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden mt-4">
+      {/* ── Filter row ── */}
+      <div className="flex flex-wrap items-center gap-2 mb-3 flex-shrink-0">
+        <input
+          type="text"
+          placeholder="Search by estimate, client, or type…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="input max-w-xs"
+        />
+
+        <select
+          value={bidFilter}
+          onChange={e => setBidFilter(e.target.value)}
+          className="input text-sm py-1.5 px-2 w-auto"
+          title="Bid status"
+        >
+          <option value="all">Bid: All</option>
+          <option value="created">Bid: Created</option>
+          <option value="not_created">Bid: Not Created</option>
+        </select>
+
+        <select
+          value={createdByFilter}
+          onChange={e => setCreatedByFilter(e.target.value)}
+          className="input text-sm py-1.5 px-2 w-auto"
+          title="Created by"
+        >
+          <option value="all">Created by: All</option>
+          {creatorOptions.map(o => (
+            <option key={o.id} value={o.id}>
+              {o.name}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={consultantFilter}
+          onChange={e => setConsultantFilter(e.target.value)}
+          className="input text-sm py-1.5 px-2 w-auto"
+          title="Consultant"
+        >
+          <option value="all">Consultant: All</option>
+          {consultantOptions.map(o => (
+            <option key={o.id} value={o.id}>
+              {o.name}
+            </option>
+          ))}
+        </select>
+
+        {(bidFilter !== 'all' ||
+          createdByFilter !== 'all' ||
+          consultantFilter !== 'all' ||
+          search) && (
+          <button
+            onClick={() => {
+              setBidFilter('all')
+              setCreatedByFilter('all')
+              setConsultantFilter('all')
+              setSearch('')
+            }}
+            className="text-xs text-gray-500 hover:text-gray-700 underline ml-1"
+          >
+            Clear filters
+          </button>
+        )}
+
+        <span className="ml-auto text-xs text-gray-500">
+          {totalShown === totalAll
+            ? `${totalAll} estimate${totalAll !== 1 ? 's' : ''}`
+            : `${totalShown} of ${totalAll}`}
+        </span>
+      </div>
+
+      {/* ── Table ── */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        {totalShown === 0 ? (
+          <div className="card text-center py-12">
+            <p className="text-4xl mb-3">📋</p>
+            <p className="text-gray-500">No estimates match your filters.</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+            <table className="w-full text-xs min-w-[900px]">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="px-4 py-2 text-left font-semibold text-gray-600 uppercase">
+                    Estimate
+                  </th>
+                  <th className="px-4 py-2 text-left font-semibold text-gray-600 uppercase">
+                    Client
+                  </th>
+                  <th className="px-4 py-2 text-left font-semibold text-gray-600 uppercase">
+                    Type
+                  </th>
+                  <th className="px-4 py-2 text-left font-semibold text-gray-600 uppercase">
+                    Created
+                  </th>
+                  <th className="px-4 py-2 text-left font-semibold text-gray-600 uppercase">
+                    Created By
+                  </th>
+                  <th className="px-4 py-2 text-left font-semibold text-gray-600 uppercase">
+                    Consultant
+                  </th>
+                  <th className="px-4 py-2 text-left font-semibold text-gray-600 uppercase">
+                    Bid
+                  </th>
+                  <th className="px-4 py-2 w-16" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filtered.map(e => {
+                  const hasBid = bidEstimateIds.has(e.id)
+                  const consultantName = consultantNameFor(e)
+                  const creatorName = e.created_by ? profiles[e.created_by] || 'Unknown' : '—'
+                  const created = e.created_at
+                    ? new Date(e.created_at).toLocaleDateString()
+                    : '—'
+                  return (
+                    <tr key={e.id} className="group hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-2 text-gray-700">
+                        <Link
+                          to={`/estimates/${e.id}`}
+                          className="font-semibold text-green-700 hover:text-green-900 hover:underline"
+                        >
+                          {e.estimate_name}
+                        </Link>
+                        {e.version > 1 && (
+                          <span className="ml-1.5 text-[10px] text-gray-400">
+                            v{e.version}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-gray-600">
+                        {e.client_id ? (
+                          <Link
+                            to={`/clients/${e.client_id}`}
+                            className="hover:text-green-700 hover:underline"
+                          >
+                            {clientDisplayName(e)}
+                          </Link>
+                        ) : (
+                          clientDisplayName(e)
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-gray-600">
+                        {e.type || <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-4 py-2 text-gray-600">{created}</td>
+                      <td className="px-4 py-2 text-gray-600">{creatorName}</td>
+                      <td className="px-4 py-2 text-gray-600">
+                        {consultantName || <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-4 py-2">
+                        {hasBid ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-green-50 text-green-700 border border-green-200 rounded-full px-2 py-0.5">
+                            ✓ Created
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-gray-50 text-gray-500 border border-gray-200 rounded-full px-2 py-0.5">
+                            — Not yet
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 w-16">
+                        <Link
+                          to={`/estimates/${e.id}`}
+                          className="text-gray-500 hover:text-gray-700 whitespace-nowrap text-xs"
+                        >
+                          View →
+                        </Link>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
