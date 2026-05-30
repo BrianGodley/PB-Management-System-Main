@@ -314,6 +314,7 @@ export default function JobsList() {
   //  2. hiddenStages — Set of stage IDs the user has chosen to hide. Works
   //     independently of #1 (you can hide stages with no role filter).
   const filterRoleKey = user?.id ? `pbs:jobsList:filterRole:${user.id}` : null
+  const filterEmployeeKey = user?.id ? `pbs:jobsList:filterEmployee:${user.id}` : null
   const hiddenStagesKey = user?.id ? `pbs:jobsList:hiddenStages:${user.id}` : null
   const [filterRole, setFilterRole] = useState(() => {
     if (typeof window === 'undefined' || !filterRoleKey) return null
@@ -322,6 +323,15 @@ export default function JobsList() {
       return raw || null
     } catch {
       return null
+    }
+  })
+  const [filterEmployee, setFilterEmployee] = useState(() => {
+    if (typeof window === 'undefined' || !filterEmployeeKey) return ''
+    try {
+      const raw = window.localStorage.getItem(filterEmployeeKey)
+      return raw || ''
+    } catch {
+      return ''
     }
   })
   const [hiddenStages, setHiddenStages] = useState(() => {
@@ -338,19 +348,23 @@ export default function JobsList() {
   useEffect(() => {
     if (!filterRoleKey) {
       setFilterRole(null)
+      setFilterEmployee('')
       setHiddenStages(new Set())
       return
     }
     try {
       const r = window.localStorage.getItem(filterRoleKey)
       setFilterRole(r || null)
+      const e = window.localStorage.getItem(filterEmployeeKey)
+      setFilterEmployee(e || '')
       const h = window.localStorage.getItem(hiddenStagesKey)
       setHiddenStages(h ? new Set(JSON.parse(h)) : new Set())
     } catch {
       setFilterRole(null)
+      setFilterEmployee('')
       setHiddenStages(new Set())
     }
-  }, [filterRoleKey, hiddenStagesKey])
+  }, [filterRoleKey, filterEmployeeKey, hiddenStagesKey])
   // Persist on change.
   useEffect(() => {
     if (!filterRoleKey) return
@@ -359,6 +373,13 @@ export default function JobsList() {
       else window.localStorage.removeItem(filterRoleKey)
     } catch {}
   }, [filterRoleKey, filterRole])
+  useEffect(() => {
+    if (!filterEmployeeKey) return
+    try {
+      if (filterEmployee) window.localStorage.setItem(filterEmployeeKey, filterEmployee)
+      else window.localStorage.removeItem(filterEmployeeKey)
+    } catch {}
+  }, [filterEmployeeKey, filterEmployee])
   useEffect(() => {
     if (!hiddenStagesKey) return
     try {
@@ -1209,11 +1230,13 @@ export default function JobsList() {
     return true
   }
 
-  // Role filter — only jobs where the chosen role's text column matches the
-  // signed-in user's full name (case-insensitive trim). filterRole is the
-  // jobs-table column name (e.g. 'job_supervisor'); myFullName comes from
-  // the profiles row fetched in the isAdmin effect.
-  const myFullNameLc = (myFullName || '').trim().toLowerCase()
+  // Role + employee filter — only jobs where the chosen role's text column
+  // matches the chosen employee's full name (case-insensitive trim).
+  // filterRole is the jobs-table column name (e.g. 'job_supervisor');
+  // filterEmployee is the picked employee's full name. Both must be set
+  // for the filter to apply.
+  const filterActive = Boolean(filterRole && filterEmployee)
+  const filterEmpLc = (filterEmployee || '').trim().toLowerCase()
   const sorted = [...jobs]
     .filter(j => {
       const status = j.status || 'active'
@@ -1221,9 +1244,8 @@ export default function JobsList() {
       return statusFilter === 'closed' ? !isOpen : isOpen
     })
     .filter(j => {
-      if (!filterRole) return true
-      if (!myFullNameLc) return false
-      return ((j[filterRole] || '').trim().toLowerCase()) === myFullNameLc
+      if (!filterActive) return true
+      return ((j[filterRole] || '').trim().toLowerCase()) === filterEmpLc
     })
     .filter(j => {
       const q = search.toLowerCase()
@@ -1352,12 +1374,12 @@ export default function JobsList() {
                 <button
                   onClick={() => setFilterPopoverOpen(o => !o)}
                   className={`w-full flex items-center justify-between text-[11px] font-semibold px-2 py-1 rounded-md border transition-colors ${
-                    filterRole || hiddenStages.size > 0
+                    filterActive || hiddenStages.size > 0
                       ? 'bg-green-700 text-white border-green-700 hover:bg-green-800'
                       : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-800'
                   }`}
                   title={
-                    filterRole || hiddenStages.size > 0
+                    filterActive || hiddenStages.size > 0
                       ? 'Filter is on — click to adjust'
                       : 'Filter is off — click to set up'
                   }
@@ -1379,7 +1401,7 @@ export default function JobsList() {
                     Filter
                   </span>
                   <span className="text-[10px] opacity-80">
-                    {filterRole || hiddenStages.size > 0 ? 'On' : 'Off'}
+                    {filterActive || hiddenStages.size > 0 ? 'On' : 'Off'}
                   </span>
                 </button>
                 {filterPopoverOpen && (
@@ -1390,11 +1412,11 @@ export default function JobsList() {
                       onClick={() => setFilterPopoverOpen(false)}
                     />
                     <div className="absolute left-0 top-full mt-1 w-72 z-50 bg-white border border-gray-200 rounded-lg shadow-xl p-3">
-                      {/* Section A — role filter */}
+                      {/* Section A — pick a role */}
                       <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-2">
-                        Show only jobs assigned to me as
+                        Filter by role
                       </p>
-                      <div className="space-y-1 mb-3 max-h-60 overflow-y-auto pr-1">
+                      <div className="space-y-1 mb-3 max-h-48 overflow-y-auto pr-1">
                         <label
                           className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer text-xs ${
                             !filterRole ? 'bg-gray-50' : 'hover:bg-gray-50'
@@ -1404,7 +1426,10 @@ export default function JobsList() {
                             type="radio"
                             name="filterRole"
                             checked={!filterRole}
-                            onChange={() => setFilterRole(null)}
+                            onChange={() => {
+                              setFilterRole(null)
+                              setFilterEmployee('')
+                            }}
                             className="accent-green-700"
                           />
                           <span className="italic text-gray-500">(Off)</span>
@@ -1429,6 +1454,40 @@ export default function JobsList() {
                           </label>
                         ))}
                       </div>
+
+                      {/* Section A2 — pick the assigned employee for that role */}
+                      {filterRole && (
+                        <div className="mb-3 pt-2 border-t border-gray-100">
+                          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-2">
+                            Assigned to
+                          </p>
+                          <select
+                            value={filterEmployee}
+                            onChange={e => setFilterEmployee(e.target.value)}
+                            className="w-full text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:border-green-600"
+                          >
+                            <option value="">— Select an employee —</option>
+                            {[...activeEmployees]
+                              .sort((a, b) =>
+                                (a.last_name || '').localeCompare(b.last_name || '') ||
+                                (a.first_name || '').localeCompare(b.first_name || '')
+                              )
+                              .map(emp => {
+                                const fullName = `${emp.first_name || ''} ${emp.last_name || ''}`.trim()
+                                return (
+                                  <option key={emp.id} value={fullName}>
+                                    {emp.last_name}, {emp.first_name}
+                                  </option>
+                                )
+                              })}
+                          </select>
+                          {!filterEmployee && (
+                            <p className="text-[10px] text-gray-400 italic mt-1">
+                              Pick someone to apply the filter.
+                            </p>
+                          )}
+                        </div>
+                      )}
 
                       {/* Section B — hide stages */}
                       <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-2 pt-2 border-t border-gray-100">
@@ -1465,9 +1524,14 @@ export default function JobsList() {
                         <button
                           onClick={() => {
                             setFilterRole(null)
+                            setFilterEmployee('')
                             setHiddenStages(new Set())
                           }}
-                          disabled={!filterRole && hiddenStages.size === 0}
+                          disabled={
+                            !filterRole &&
+                            !filterEmployee &&
+                            hiddenStages.size === 0
+                          }
                           className="flex-1 text-[11px] px-2 py-1 rounded border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           Clear all
@@ -1639,10 +1703,11 @@ export default function JobsList() {
                     )
                   }
 
-                  // When a role filter is active, render a flat list — no
-                  // per-stage headers (per Brian's spec on 2026-05-28: the
-                  // "job status bars do not [display]" while filtering).
-                  if (filterRole) {
+                  // When the role+employee filter is active, render a flat
+                  // list — no per-stage headers (per Brian's spec on
+                  // 2026-05-28: the "job status bars do not [display]"
+                  // while filtering).
+                  if (filterActive) {
                     const roleLabel =
                       (JOB_ROLES.find(r => r.key === filterRole) || {}).label ||
                       filterRole
@@ -1651,7 +1716,7 @@ export default function JobsList() {
                         <div className="mb-1 rounded-lg">
                           <div className="flex items-center gap-1.5 px-2 py-0">
                             <span className="text-[11px] font-bold text-green-700 uppercase tracking-wide truncate flex-1 bg-green-50 border border-green-200 rounded px-2 py-0 leading-tight">
-                              My {roleLabel} jobs{' '}
+                              {roleLabel}: {filterEmployee}{' '}
                               <span className="text-green-500 font-normal normal-case">
                                 · {sorted.length}
                               </span>
@@ -1680,7 +1745,7 @@ export default function JobsList() {
                         </div>
                         {sorted.length === 0 && (
                           <p className="text-xs text-gray-400 text-center py-6">
-                            No jobs assigned to you as {roleLabel}.
+                            No jobs where {filterEmployee} is {roleLabel}.
                           </p>
                         )}
                       </>
