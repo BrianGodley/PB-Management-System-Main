@@ -77,6 +77,9 @@ const MAT_DEFAULTS = {
   beddingSand: 25.3,
   jointSand: 0.05,
   polySandMat: 0.56,
+  // Existing pavers cost 50% more to re-sand (extra prep, more product
+  // consumed by old joints). Default = polySandMat × 1.5.
+  polySandExistingMat: 0.84,
   sealerMat: 0.63,
   restraintConcr: 1.38,
   sleevesMat: 0.46,
@@ -121,6 +124,10 @@ function calcPaver(
   const beddingSandPerTon = mr['Paver - Bedding Sand'] ?? MAT_DEFAULTS.beddingSand
   const jointSandPerSF = mr['Paver - Joint Sand'] ?? MAT_DEFAULTS.jointSand
   const polySandPerSF = mr['Paver - Poly Sand'] ?? MAT_DEFAULTS.polySandMat
+  // Existing-paver poly sand rate falls back to 1.5× the new-paver rate so
+  // changing the base rate cascades sensibly until an admin overrides it.
+  const polySandExistingPerSF =
+    mr['Paver - Poly Sand Existing'] ?? polySandPerSF * 1.5
   const sealerMatPerSF = mr['Paver - Sealer'] ?? MAT_DEFAULTS.sealerMat
   const restraintConcrLF = mr['Paver - Restraint Concrete'] ?? MAT_DEFAULTS.restraintConcr
   const sleevesMatLF = mr['Paver - Sleeves'] ?? MAT_DEFAULTS.sleevesMat
@@ -168,6 +175,11 @@ function calcPaver(
   const vertSoldierHrs = n(state.vertSoldierLF) > 0 ? n(state.vertSoldierLF) / vertSoldierRate : 0
   const sealerHrs = n(state.sealerSF) > 0 ? n(state.sealerSF) / sealerRate : 0
   const polySandHrs = state.polySand && totalInstallSF > 0 ? totalInstallSF * polySandSpread : 0
+  // Existing pavers: same per-SF spread/labor coefficient as new pavers, but
+  // the SF input is independent (user enters how many SF of existing pavers
+  // they're re-sanding).
+  const polySandExistingSFVal = n(state.polySandExistingSF)
+  const polySandExistingHrs = polySandExistingSFVal * polySandSpread
   const addStoneHrs = n(state.numStones) * addStonePer
   const addColorHrs = n(state.numColors) * addColorPer
 
@@ -201,6 +213,7 @@ function calcPaver(
     vertSoldierHrs +
     sealerHrs +
     polySandHrs +
+    polySandExistingHrs +
     addStoneHrs +
     addColorHrs
   const adjustedInstallHrs = rawInstallHrs * diff + hrsAdj
@@ -213,6 +226,7 @@ function calcPaver(
   const beddingSandCost = sfToTons(totalInstallSF, 1) * beddingSandPerTon
   const jointSandCost = totalInstallSF * jointSandPerSF
   const polySandCost = state.polySand ? totalInstallSF * polySandPerSF : 0
+  const polySandExistingCost = polySandExistingSFVal * polySandExistingPerSF
   const sealerMatCost = n(state.sealerSF) * sealerMatPerSF
   const restraintMatCost = n(state.restraintsLF) * restraintConcrLF
   const sleevesMatCost = n(state.sleevesLF) * sleevesMatLF
@@ -235,6 +249,7 @@ function calcPaver(
     beddingSandCost +
     jointSandCost +
     polySandCost +
+    polySandExistingCost +
     sealerMatCost +
     restraintMatCost +
     sleevesMatCost +
@@ -282,12 +297,15 @@ function calcPaver(
     vertSoldierHrs,
     sealerHrs,
     polySandHrs,
+    polySandExistingHrs,
+    polySandExistingSF: polySandExistingSFVal,
     addStoneHrs,
     addColorHrs,
     baseRockCost,
     beddingSandCost,
     jointSandCost,
     polySandCost,
+    polySandExistingCost,
     sealerMatCost,
     restraintMatCost,
     sleevesMatCost,
@@ -316,6 +334,7 @@ function calcPaver(
     beddingSandPerTon,
     jointSandPerSF,
     polySandPerSF,
+    polySandExistingPerSF,
     sealerMatPerSF,
     restraintConcrLF,
     sleevesMatLF,
@@ -348,6 +367,9 @@ const DEFAULT_STATE = {
   sealerSF: '',
   is80mm: false,
   polySand: false,
+  // SF of existing pavers being re-sanded — independent input, uses
+  // the higher "Paver - Poly Sand Existing" material rate.
+  polySandExistingSF: '',
   includeDelivery: false,
   salesTax: 0,
   shippingCharge: '',
@@ -772,8 +794,26 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           <Toggle
             checked={state.polySand}
             onChange={v => set('polySand', v)}
-            label="Polymeric Sand"
+            label="Poly Sand — New Pavers"
           />
+        </div>
+        {/* Poly sand on existing pavers — independent SF entry; material
+            cost defaults to 1.5× the new-paver rate. */}
+        <div>
+          <p className="text-xs text-gray-500 mb-0.5">
+            Poly Sand — Existing Pavers (SF)
+          </p>
+          <Inp
+            value={state.polySandExistingSF}
+            onChange={e => set('polySandExistingSF', e.target.value)}
+            placeholder="0"
+          />
+          {calc.polySandExistingSF > 0 && (
+            <p className="text-xs text-gray-400 mt-0.5">
+              {calc.polySandExistingSF.toLocaleString()} SF × $
+              {calc.polySandExistingPerSF}/SF = {fmt2(calc.polySandExistingCost)}
+            </p>
+          )}
         </div>
       </div>
 
@@ -1162,6 +1202,35 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                 <td className="py-1 text-xs text-gray-400">auto from areas</td>
               </tr>
             )}
+            {calc.polySandExistingSF > 0 && (
+              <tr>
+                <td className={`${td} font-medium text-gray-700`}>
+                  <span className="inline-flex items-center gap-1 flex-wrap">
+                    Poly Sand — Existing{' '}
+                    <span className="text-gray-400 font-normal">
+                      ({laborRates['Paver - Poly Sand Spread'] ?? LABOR_DEFAULTS.polySandSpread}{' '}
+                      hrs/SF)
+                    </span>
+                    <span className="text-gray-400 font-normal">
+                      · ${calc.polySandExistingPerSF}/SF mat
+                    </span>
+                    <RateEditPopover
+                      table="material_rates"
+                      name="Paver - Poly Sand Existing"
+                      category="Paver"
+                      unitLabel="SF"
+                      currentValue={calc.polySandExistingPerSF}
+                      onSaved={refreshAllRates}
+                    />
+                  </span>
+                </td>
+                <td className={`${num} text-gray-500`}>
+                  {calc.polySandExistingSF.toLocaleString()} SF
+                </td>
+                <td className={num}>{fh(calc.polySandExistingHrs)}</td>
+                <td className="py-1 text-xs text-gray-400">existing pavers</td>
+              </tr>
+            )}
             <tr>
               <td className={`${td} font-medium text-gray-700`}>
                 <span className="inline-flex items-center gap-1 flex-wrap">
@@ -1339,6 +1408,11 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             {calc.polySandCost > 0 && (
               <span>
                 Poly Sand: <strong>{fmt2(calc.polySandCost)}</strong>
+              </span>
+            )}
+            {calc.polySandExistingCost > 0 && (
+              <span>
+                Poly Sand (Existing): <strong>{fmt2(calc.polySandExistingCost)}</strong>
               </span>
             )}
             {calc.sealerMatCost > 0 && (
