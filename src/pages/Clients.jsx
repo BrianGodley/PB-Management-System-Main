@@ -2299,10 +2299,10 @@ function EstimatesView({ onCountChange }) {
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="px-4 py-2 text-left font-semibold text-gray-600 uppercase">
-                    Estimate
+                    Opportunity
                   </th>
                   <th className="px-4 py-2 text-left font-semibold text-gray-600 uppercase">
-                    Client
+                    Estimate
                   </th>
                   <th className="px-4 py-2 text-left font-semibold text-gray-600 uppercase">
                     Type
@@ -2333,9 +2333,23 @@ function EstimatesView({ onCountChange }) {
                   return (
                     <tr key={e.id} className="group hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-2 text-gray-700">
+                        {e.client_id ? (
+                          <Link
+                            to={`/clients/${e.client_id}`}
+                            className="font-semibold text-green-700 hover:text-green-900 hover:underline"
+                          >
+                            {clientDisplayName(e)}
+                          </Link>
+                        ) : (
+                          <span className="font-semibold text-gray-700">
+                            {clientDisplayName(e)}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-gray-600">
                         <Link
                           to={`/estimates/${e.id}`}
-                          className="font-semibold text-green-700 hover:text-green-900 hover:underline"
+                          className="text-green-700 hover:text-green-900 hover:underline"
                         >
                           {e.estimate_name}
                         </Link>
@@ -2343,18 +2357,6 @@ function EstimatesView({ onCountChange }) {
                           <span className="ml-1.5 text-[10px] text-gray-400">
                             v{e.version}
                           </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2 text-gray-600">
-                        {e.client_id ? (
-                          <Link
-                            to={`/clients/${e.client_id}`}
-                            className="hover:text-green-700 hover:underline"
-                          >
-                            {clientDisplayName(e)}
-                          </Link>
-                        ) : (
-                          clientDisplayName(e)
                         )}
                       </td>
                       <td className="px-4 py-2 text-gray-600">
@@ -2385,6 +2387,16 @@ function EstimatesView({ onCountChange }) {
                         </Link>
                       </td>
                     </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
                   )
                 })}
               </tbody>
