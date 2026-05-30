@@ -6,3 +6,4 @@ dist
 *.tmp
 *.csv
 supabase/.temp/
+scripts\bt-photo-download.checkpoint.json
