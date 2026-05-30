@@ -2397,13 +2397,4 @@ function EstimatesView({ onCountChange }) {
     </div>
   )
 }
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
+           
