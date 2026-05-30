@@ -600,6 +600,24 @@ def process_job(page: Page, job: dict) -> int:
         if not photos:
             continue
 
+        # Skip photos already in daily_log_photos for this log so re-runs
+        # don't redownload (saving bandwidth) and don't upload orphan
+        # storage objects (since dedup happens AFTER upload). One round-trip
+        # per log to fetch the set of existing filenames.
+        existing_rows = supa_get(
+            "daily_log_photos",
+            {
+                "log_id": f"eq.{log_row['id']}",
+                "select": "file_name",
+            },
+        )
+        existing_names = {r["file_name"] for r in (existing_rows or [])}
+        before_skip = len(photos)
+        photos = [p for p in photos if p["filename"] not in existing_names]
+        skipped = before_skip - len(photos)
+        if skipped:
+            print(f"    ↻ skipping {skipped} already-uploaded photo(s)")
+
         # Sequential downloads via Playwright's page.request (which
         # carries BT's session cookies AND the Chrome client context BT's
         # bot detection expects). Multithreading was attempted but hit
@@ -615,19 +633,46 @@ def process_job(page: Page, job: dict) -> int:
                     print(f"    ! {p_['filename']} -> HTTP {resp.status}")
                     continue
                 blob = resp.body()
-                ctype = (
-                    resp.headers.get("content-type")
-                    or mimetypes.guess_type(p_["filename"])[0]
-                    or "application/octet-stream"
+                # BT's CDN often serves HEIC/HEIF (and sometimes JPEG) with a
+                # generic content-type of application/octet-stream, which used
+                # to make the downloader skip thousands of valid photos. Trust
+                # the file extension when the server's content-type is generic
+                # or missing — Python's mimetypes module doesn't know HEIC, so
+                # we maintain our own extension→MIME map and prefer it over
+                # whatever the server claims for those formats.
+                EXT_MIME = {
+                    "jpg":  "image/jpeg",
+                    "jpeg": "image/jpeg",
+                    "png":  "image/png",
+                    "gif":  "image/gif",
+                    "webp": "image/webp",
+                    "heic": "image/heic",
+                    "heif": "image/heif",
+                    "bmp":  "image/bmp",
+                    "tif":  "image/tiff",
+                    "tiff": "image/tiff",
+                }
+                ext = p_["filename"].rsplit(".", 1)[-1].lower() if "." in p_["filename"] else ""
+                ext_mime = EXT_MIME.get(ext)
+                server_ctype = (resp.headers.get("content-type") or "").lower()
+                generic = (
+                    not server_ctype
+                    or server_ctype.startswith("application/octet-stream")
+                    or server_ctype.startswith("binary/")
                 )
+                if ext_mime and generic:
+                    ctype = ext_mime
+                elif server_ctype:
+                    ctype = server_ctype
+                else:
+                    ctype = ext_mime or mimetypes.guess_type(p_["filename"])[0] or "application/octet-stream"
                 if not ctype.lower().startswith("image/"):
                     print(
                         f"    ! {p_['filename']} -> non-image content-type "
                         f"{ctype}"
                     )
                     continue
-                ext = (p_["filename"].rsplit(".", 1) + ["jpg"])[1].lower()
-                storage_path = f"{log_row['id']}/{uuid.uuid4()}.{ext}"
+                storage_path = f"{log_row['id']}/{uuid.uuid4()}.{ext or 'jpg'}"
                 supa_upload(storage_path, blob, ctype)
                 upsert_daily_log_photo(
                     log_row["id"], storage_path, p_["filename"], ctype,
