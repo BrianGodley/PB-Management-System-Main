@@ -1021,7 +1021,8 @@ export default function Clients() {
   const [tabCounts, setTabCounts] = useState({
     individuals: 0,
     companies: 0,
-    estimates: 0,
+    // null = badge hidden until EstimatesView reports its loaded count
+    estimates: null,
     past: 0,
   })
   const [tab, setTab] = useState('individuals')
@@ -1116,7 +1117,7 @@ export default function Clients() {
   }
 
   async function fetchTabCounts() {
-    const [indRes, compRes, estRes, pastRes] = await Promise.all([
+    const [indRes, compRes, pastRes] = await Promise.all([
       // Active individuals — client_type isn't 'company' AND active status
       supabase
         .from('clients')
@@ -1129,25 +1130,25 @@ export default function Clients() {
         .select('id', { count: 'exact', head: true })
         .or('status.eq.active,status.is.null')
         .eq('client_type', 'company'),
-      // Estimates — all estimates with a non-empty name (CO estimates filtered
-      // client-side in EstimatesView; this count is the upper bound).
-      supabase
-        .from('estimates')
-        .select('id', { count: 'exact', head: true })
-        .not('estimate_name', 'is', null)
-        .neq('estimate_name', ''),
       // Past — everything inactive, regardless of kind
       supabase
         .from('clients')
         .select('id', { count: 'exact', head: true })
         .eq('status', 'inactive'),
     ])
-    setTabCounts({
+    setTabCounts(prev => ({
+      ...prev,
       individuals: indRes.count || 0,
       companies: compRes.count || 0,
-      estimates: estRes.count || 0,
       past: pastRes.count || 0,
-    })
+    }))
+  }
+
+  // EstimatesView reports its own loaded count so the tab badge matches what
+  // the user sees in the table (CO estimates and empty-name estimates are
+  // filtered client-side, so a server-side count would always disagree).
+  function setEstimatesTabCount(n) {
+    setTabCounts(prev => ({ ...prev, estimates: n }))
   }
 
   async function deleteClient(id) {
@@ -1475,7 +1476,7 @@ export default function Clients() {
       )}
 
       {/* ── Estimates tab ── */}
-      {tab === 'estimates' && <EstimatesView />}
+      {tab === 'estimates' && <EstimatesView onCountChange={setEstimatesTabCount} />}
 
       {tab !== 'settings' && tab !== 'estimates' && (
         <>
@@ -2029,7 +2030,7 @@ function SalesTaxRateCard() {
 // CO estimates (those tied to a change_order bid) are filtered out so this
 // stays focused on the original-bid pipeline, mirroring what ClientDetail
 // shows under the "Estimates" section.
-function EstimatesView() {
+function EstimatesView({ onCountChange }) {
   const [loading, setLoading] = useState(true)
   const [estimates, setEstimates] = useState([])
   const [bidEstimateIds, setBidEstimateIds] = useState(new Set())
@@ -2063,10 +2064,22 @@ function EstimatesView() {
         ),
         // Pull every bid's estimate_id so we know which estimates have bids
         // (record_type='bid') vs CO estimates (record_type='change_order').
+        // Needs a stable order so paged ranges don't overlap or skip rows.
         fetchAllPaginated(() =>
-          supabase.from('bids').select('estimate_id, record_type')
+          supabase
+            .from('bids')
+            .select('estimate_id, record_type')
+            .order('id', { ascending: true })
         ),
-        supabase.from('clients').select('id, name, first_name, last_name, company_name, consultant_employee_id'),
+        // Clients must be paginated — without this, the consultant lookup
+        // caps at Supabase's default 1000-row limit, the dropdown becomes
+        // incomplete, and selecting a consultant drops most estimates.
+        fetchAllPaginated(() =>
+          supabase
+            .from('clients')
+            .select('id, name, first_name, last_name, company_name, consultant_employee_id')
+            .order('id', { ascending: true })
+        ),
         supabase.from('employees').select('id, first_name, last_name'),
         supabase.from('profiles').select('id, full_name, email'),
       ])
@@ -2093,17 +2106,18 @@ function EstimatesView() {
         pMap[p.id] = p.full_name || p.email || 'Unknown'
       })
 
-      setEstimates(
-        (estRes.data || []).filter(
-          e => (e.estimate_name || '').trim() !== '' && !coIds.has(e.id)
-        )
+      const filteredEstimates = (estRes.data || []).filter(
+        e => (e.estimate_name || '').trim() !== '' && !coIds.has(e.id)
       )
+      setEstimates(filteredEstimates)
       setBidEstimateIds(bidIds)
       setCoEstimateIds(coIds)
       setClientsById(cMap)
       setEmployeesById(eMap)
       setProfiles(pMap)
       setLoading(false)
+      // Report the real loaded count back so the tab badge matches the table.
+      if (onCountChange) onCountChange(filteredEstimates.length)
     }
     load()
     return () => {
