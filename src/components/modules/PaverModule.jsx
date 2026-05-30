@@ -217,7 +217,13 @@ function calcPaver(
   const restraintMatCost = n(state.restraintsLF) * restraintConcrLF
   const sleevesMatCost = n(state.sleevesLF) * sleevesMatLF
   const palletCost = totalPallets * palletCharge
-  const deliveryCost = state.includeDelivery ? deliveryFlat : 0
+  // Delivery is automatic whenever any paver is selected and is charged once
+  // per 900 SF increment (rounded up). The base rate ($442.75 by default) lives
+  // in material_rates as "Paver - Delivery" and represents the per-increment
+  // fee, not a one-time flat charge.
+  const paverSelected = totalInstallSF > 0
+  const deliveryIncrements = paverSelected ? Math.ceil(totalInstallSF / 900) : 0
+  const deliveryCost = deliveryIncrements * deliveryFlat
   const shipping = n(state.shippingCharge)
   const salesTaxRate = n(state.salesTax) / 100
   const salesTaxCost = (totalPaverCost + vertPaverCost) * salesTaxRate
@@ -287,6 +293,7 @@ function calcPaver(
     sleevesMatCost,
     palletCost,
     deliveryCost,
+    deliveryIncrements,
     shipping,
     salesTaxCost,
     totalPaverCost,
@@ -1240,9 +1247,9 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         </div>
       </div>
 
-      {/* ── Material Options ──────────────────────────────────────────────────── */}
+      {/* ── Added Costs ────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <SecHdr title="Material Options" />
+        <SecHdr title="Added Costs" />
         <div>
           <p className="text-xs text-gray-500 mb-0.5">Sales Tax on Pavers (%)</p>
           <Inp
@@ -1263,22 +1270,36 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             step="1"
           />
         </div>
-        <div className="flex flex-col gap-2 justify-center pt-4">
-          <div className="flex items-center gap-1">
-            <Toggle
-              checked={state.includeDelivery}
-              onChange={v => set('includeDelivery', v)}
-              label={`Delivery (${fmt2(calc.deliveryFlat)} flat)`}
-            />
+        {/* Delivery — auto when any paver is selected, billed per 900 SF
+            increment. Read-only display; the per-increment rate is editable
+            via the inline RateEditPopover. */}
+        <div>
+          <div className="flex items-center gap-1 mb-0.5">
+            <p className="text-xs text-gray-500">Delivery</p>
             <RateEditPopover
               table="material_rates"
               name="Paver - Delivery"
               category="Paver"
-              unitLabel="flat"
+              unitLabel="per 900 SF"
               currentValue={calc.deliveryFlat}
               onSaved={refreshAllRates}
             />
           </div>
+          {calc.deliveryIncrements > 0 ? (
+            <>
+              <div className="px-2 py-1.5 rounded border border-gray-200 bg-gray-50 text-sm font-semibold text-gray-700">
+                {fmt2(calc.deliveryCost)}
+              </div>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {calc.deliveryIncrements} × {fmt2(calc.deliveryFlat)} (
+                {calc.totalInstallSF.toLocaleString()} SF ÷ 900)
+              </p>
+            </>
+          ) : (
+            <div className="px-2 py-1.5 rounded border border-gray-200 bg-gray-50 text-sm text-gray-400 italic">
+              Select a paver to apply
+            </div>
+          )}
         </div>
       </div>
 
