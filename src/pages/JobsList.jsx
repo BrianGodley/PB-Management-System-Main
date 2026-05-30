@@ -16,7 +16,7 @@ import AllJobsChangeOrders from '../components/AllJobsChangeOrders'
 import MasterCrews from './MasterCrews'
 import COEstimatePanel from '../components/COEstimatePanel'
 import CODetailModal from '../components/CODetailModal'
-import JobInfoModal, { nameInitials } from '../components/JobInfoModal'
+import JobInfoModal, { nameInitials, JOB_ROLES } from '../components/JobInfoModal'
 import JobFinancePanel from '../components/JobFinancePanel'
 import StartLocationsCard from '../components/StartLocationsCard'
 import SupervisorPositionsCard from '../components/SupervisorPositionsCard'
@@ -305,6 +305,75 @@ export default function JobsList() {
       return next
     })
   }
+
+  // ── User-specific Jobs filter (2026-05-28) ──────────────────────────────
+  // Two independent dimensions, both persisted per user in localStorage:
+  //  1. filterRole — when set, the sidebar shows ONLY jobs where
+  //     job[role_key] matches the signed-in user's full name. Stage section
+  //     headers collapse into a single flat list.
+  //  2. hiddenStages — Set of stage IDs the user has chosen to hide. Works
+  //     independently of #1 (you can hide stages with no role filter).
+  const filterRoleKey = user?.id ? `pbs:jobsList:filterRole:${user.id}` : null
+  const hiddenStagesKey = user?.id ? `pbs:jobsList:hiddenStages:${user.id}` : null
+  const [filterRole, setFilterRole] = useState(() => {
+    if (typeof window === 'undefined' || !filterRoleKey) return null
+    try {
+      const raw = window.localStorage.getItem(filterRoleKey)
+      return raw || null
+    } catch {
+      return null
+    }
+  })
+  const [hiddenStages, setHiddenStages] = useState(() => {
+    if (typeof window === 'undefined' || !hiddenStagesKey) return new Set()
+    try {
+      const raw = window.localStorage.getItem(hiddenStagesKey)
+      return raw ? new Set(JSON.parse(raw)) : new Set()
+    } catch {
+      return new Set()
+    }
+  })
+  const [filterPopoverOpen, setFilterPopoverOpen] = useState(false)
+  // Re-hydrate on user change.
+  useEffect(() => {
+    if (!filterRoleKey) {
+      setFilterRole(null)
+      setHiddenStages(new Set())
+      return
+    }
+    try {
+      const r = window.localStorage.getItem(filterRoleKey)
+      setFilterRole(r || null)
+      const h = window.localStorage.getItem(hiddenStagesKey)
+      setHiddenStages(h ? new Set(JSON.parse(h)) : new Set())
+    } catch {
+      setFilterRole(null)
+      setHiddenStages(new Set())
+    }
+  }, [filterRoleKey, hiddenStagesKey])
+  // Persist on change.
+  useEffect(() => {
+    if (!filterRoleKey) return
+    try {
+      if (filterRole) window.localStorage.setItem(filterRoleKey, filterRole)
+      else window.localStorage.removeItem(filterRoleKey)
+    } catch {}
+  }, [filterRoleKey, filterRole])
+  useEffect(() => {
+    if (!hiddenStagesKey) return
+    try {
+      window.localStorage.setItem(hiddenStagesKey, JSON.stringify([...hiddenStages]))
+    } catch {}
+  }, [hiddenStagesKey, hiddenStages])
+  function toggleHiddenStage(stageId) {
+    setHiddenStages(prev => {
+      const next = new Set(prev)
+      if (next.has(stageId)) next.delete(stageId)
+      else next.add(stageId)
+      return next
+    })
+  }
+
   const [stages, setStages] = useState([])
   const [dragOverStage, setDragOverStage] = useState(null)
   const [dragJobId, setDragJobId] = useState(null)
@@ -908,6 +977,9 @@ export default function JobsList() {
   // jobs without a client_id still resolve.
   const [clientPhoneMap, setClientPhoneMap] = useState({ byId: {}, byName: {} })
   const [isAdmin, setIsAdmin] = useState(false)
+  // Current user's full_name from profiles — used by the "my jobs" role
+  // filter (we match job[role] text against this string).
+  const [myFullName, setMyFullName] = useState('')
 
   useEffect(() => {
     fetchJobs()
@@ -941,16 +1013,18 @@ export default function JobsList() {
     setClientPhoneMap({ byId, byName })
   }
 
-  // Gate Settings tab to admin / super_admin only
+  // Gate Settings tab to admin / super_admin only — and pick up the user's
+  // full_name in the same fetch so the role filter knows who "me" is.
   useEffect(() => {
     if (!user?.id) return
     supabase
       .from('profiles')
-      .select('role')
+      .select('role, full_name')
       .eq('id', user.id)
       .maybeSingle()
       .then(({ data }) => {
         setIsAdmin(data?.role === 'admin' || data?.role === 'super_admin')
+        setMyFullName((data?.full_name || '').trim())
       })
   }, [user?.id])
 
@@ -1135,11 +1209,21 @@ export default function JobsList() {
     return true
   }
 
+  // Role filter — only jobs where the chosen role's text column matches the
+  // signed-in user's full name (case-insensitive trim). filterRole is the
+  // jobs-table column name (e.g. 'job_supervisor'); myFullName comes from
+  // the profiles row fetched in the isAdmin effect.
+  const myFullNameLc = (myFullName || '').trim().toLowerCase()
   const sorted = [...jobs]
     .filter(j => {
       const status = j.status || 'active'
       const isOpen = status === 'active' || status === 'on_hold'
       return statusFilter === 'closed' ? !isOpen : isOpen
+    })
+    .filter(j => {
+      if (!filterRole) return true
+      if (!myFullNameLc) return false
+      return ((j[filterRole] || '').trim().toLowerCase()) === myFullNameLc
     })
     .filter(j => {
       const q = search.toLowerCase()
@@ -1259,6 +1343,147 @@ export default function JobsList() {
           <div className="hidden lg:flex w-64 flex-shrink-0 flex-col min-h-0 bg-white border-r border-gray-200">
             {/* Inner column: 90% wide, centered */}
             <div className="flex flex-col w-[90%] mx-auto mt-2 flex-shrink-0">
+              {/* ── User-specific Filter button (above Open/Closed) ──────
+                   Two sections in the popover:
+                   - "Show only jobs assigned to me as …" radio list (filterRole)
+                   - "Hide stages" checkbox list (hiddenStages)
+                   Active state (any filter on) flips the button to filled. */}
+              <div className="relative mb-2">
+                <button
+                  onClick={() => setFilterPopoverOpen(o => !o)}
+                  className={`w-full flex items-center justify-between text-[11px] font-semibold px-2 py-1 rounded-md border transition-colors ${
+                    filterRole || hiddenStages.size > 0
+                      ? 'bg-green-700 text-white border-green-700 hover:bg-green-800'
+                      : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-800'
+                  }`}
+                  title={
+                    filterRole || hiddenStages.size > 0
+                      ? 'Filter is on — click to adjust'
+                      : 'Filter is off — click to set up'
+                  }
+                >
+                  <span className="flex items-center gap-1">
+                    <svg
+                      className="w-3 h-3"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                      />
+                    </svg>
+                    Filter
+                  </span>
+                  <span className="text-[10px] opacity-80">
+                    {filterRole || hiddenStages.size > 0 ? 'On' : 'Off'}
+                  </span>
+                </button>
+                {filterPopoverOpen && (
+                  <>
+                    {/* Click-outside catcher */}
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setFilterPopoverOpen(false)}
+                    />
+                    <div className="absolute left-0 top-full mt-1 w-72 z-50 bg-white border border-gray-200 rounded-lg shadow-xl p-3">
+                      {/* Section A — role filter */}
+                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-2">
+                        Show only jobs assigned to me as
+                      </p>
+                      <div className="space-y-1 mb-3 max-h-60 overflow-y-auto pr-1">
+                        <label
+                          className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer text-xs ${
+                            !filterRole ? 'bg-gray-50' : 'hover:bg-gray-50'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="filterRole"
+                            checked={!filterRole}
+                            onChange={() => setFilterRole(null)}
+                            className="accent-green-700"
+                          />
+                          <span className="italic text-gray-500">(Off)</span>
+                        </label>
+                        {JOB_ROLES.map(role => (
+                          <label
+                            key={role.key}
+                            className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer text-xs ${
+                              filterRole === role.key
+                                ? 'bg-green-50'
+                                : 'hover:bg-gray-50'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="filterRole"
+                              checked={filterRole === role.key}
+                              onChange={() => setFilterRole(role.key)}
+                              className="accent-green-700"
+                            />
+                            <span className="text-gray-700">{role.label}</span>
+                          </label>
+                        ))}
+                      </div>
+
+                      {/* Section B — hide stages */}
+                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-2 pt-2 border-t border-gray-100">
+                        Hide stages
+                      </p>
+                      <div className="space-y-1 max-h-44 overflow-y-auto pr-1">
+                        <label className="flex items-center gap-2 px-2 py-1 rounded cursor-pointer text-xs hover:bg-gray-50">
+                          <input
+                            type="checkbox"
+                            checked={hiddenStages.has('__none__')}
+                            onChange={() => toggleHiddenStage('__none__')}
+                            className="accent-green-700"
+                          />
+                          <span className="italic text-gray-500">Unassigned</span>
+                        </label>
+                        {stages.map(s => (
+                          <label
+                            key={s.id}
+                            className="flex items-center gap-2 px-2 py-1 rounded cursor-pointer text-xs hover:bg-gray-50"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={hiddenStages.has(s.id)}
+                              onChange={() => toggleHiddenStage(s.id)}
+                              className="accent-green-700"
+                            />
+                            <span className="text-gray-700">{s.name}</span>
+                          </label>
+                        ))}
+                      </div>
+
+                      {/* Footer — clear all + close */}
+                      <div className="flex gap-2 mt-3 pt-2 border-t border-gray-100">
+                        <button
+                          onClick={() => {
+                            setFilterRole(null)
+                            setHiddenStages(new Set())
+                          }}
+                          disabled={!filterRole && hiddenStages.size === 0}
+                          className="flex-1 text-[11px] px-2 py-1 rounded border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          Clear all
+                        </button>
+                        <button
+                          onClick={() => setFilterPopoverOpen(false)}
+                          className="flex-1 text-[11px] px-2 py-1 rounded bg-green-700 text-white font-semibold hover:bg-green-800"
+                        >
+                          Done
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
               {/* Open / Closed filter */}
               <div className="flex gap-1 mb-2 flex-shrink-0">
                 {[
@@ -1414,6 +1639,54 @@ export default function JobsList() {
                     )
                   }
 
+                  // When a role filter is active, render a flat list — no
+                  // per-stage headers (per Brian's spec on 2026-05-28: the
+                  // "job status bars do not [display]" while filtering).
+                  if (filterRole) {
+                    const roleLabel =
+                      (JOB_ROLES.find(r => r.key === filterRole) || {}).label ||
+                      filterRole
+                    return (
+                      <>
+                        <div className="mb-1 rounded-lg">
+                          <div className="flex items-center gap-1.5 px-2 py-0">
+                            <span className="text-[11px] font-bold text-green-700 uppercase tracking-wide truncate flex-1 bg-green-50 border border-green-200 rounded px-2 py-0 leading-tight">
+                              My {roleLabel} jobs{' '}
+                              <span className="text-green-500 font-normal normal-case">
+                                · {sorted.length}
+                              </span>
+                            </span>
+                          </div>
+                          <div className="space-y-0.5 px-0.5">
+                            {sorted.map(job => (
+                              <JobItem
+                                key={job.id}
+                                job={job}
+                                stages={stages}
+                                selectedJob={selectedJob}
+                                setSelectedJob={setSelectedJob}
+                                setTab={setTab}
+                                setJobModal={setJobModal}
+                                onMove={moveJobToStage}
+                                clientPhoneMap={clientPhoneMap}
+                                respInitials={
+                                  supervisorInitials(job.job_supervisor) ||
+                                  initialsByEmpId[job.responsible_employee_id] ||
+                                  ''
+                                }
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        {sorted.length === 0 && (
+                          <p className="text-xs text-gray-400 text-center py-6">
+                            No jobs assigned to you as {roleLabel}.
+                          </p>
+                        )}
+                      </>
+                    )
+                  }
+
                   // In Closed view, show every closed job under one fixed
                   // "Closed" header — no per-stage grouping and no drop targets.
                   if (statusFilter === 'closed') {
@@ -1462,12 +1735,18 @@ export default function JobsList() {
 
                   return (
                     <>
-                      {byStage['__none__'].length > 0 && (
+                      {byStage['__none__'].length > 0 && !hiddenStages.has('__none__') && (
                         <StageSection stageId="__none__" label="Unassigned" />
                       )}
-                      {stages.map((s, idx) => (
-                        <StageSection key={s.id} stageId={s.id} label={`${idx + 1} - ${s.name}`} />
-                      ))}
+                      {stages
+                        .filter(s => !hiddenStages.has(s.id))
+                        .map((s, idx) => (
+                          <StageSection
+                            key={s.id}
+                            stageId={s.id}
+                            label={`${idx + 1} - ${s.name}`}
+                          />
+                        ))}
                       {sorted.length === 0 && (
                         <p className="text-xs text-gray-400 text-center py-6">No jobs found.</p>
                       )}

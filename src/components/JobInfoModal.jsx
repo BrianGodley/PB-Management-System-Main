@@ -76,7 +76,17 @@ const US_STATES = [
 //   label     — human label
 //   pillCls   — Tailwind classes for the (initials) pill next to the name
 //   stateKey  — local-state key in JobInfoModal (matches setter name pair)
+// Order (per Brian 2026-05-28): Job Supervisor → Consultant → Design Review →
+// Final Review → Permit & Engineering Coordinator → Production Manager →
+// Quality Control Supervisor → Finance Manager → Success Supervisor. Applied
+// here so the Assignments tab AND the JobsList filter dropdown share the
+// same order.
 export const JOB_ROLES = [
+  {
+    key: 'job_supervisor',
+    label: 'Job Supervisor',
+    pillCls: 'bg-green-100 text-green-700 border border-green-200',
+  },
   {
     key: 'consultant',
     label: 'Consultant',
@@ -88,19 +98,14 @@ export const JOB_ROLES = [
     pillCls: 'bg-purple-100 text-purple-700 border border-purple-200',
   },
   {
-    key: 'permit_engineering_coordinator',
-    label: 'Permit & Engineering Coordinator',
-    pillCls: 'bg-orange-100 text-orange-700 border border-orange-200',
-  },
-  {
     key: 'final_review',
     label: 'Final Review',
     pillCls: 'bg-pink-100 text-pink-700 border border-pink-200',
   },
   {
-    key: 'job_supervisor',
-    label: 'Job Supervisor',
-    pillCls: 'bg-green-100 text-green-700 border border-green-200',
+    key: 'permit_engineering_coordinator',
+    label: 'Permit & Engineering Coordinator',
+    pillCls: 'bg-orange-100 text-orange-700 border border-orange-200',
   },
   {
     key: 'production_manager',
