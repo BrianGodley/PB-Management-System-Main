@@ -137,7 +137,14 @@ function addDays(isoDate, n) {
 }
 
 // ── Inline cell components ────────────────────────────────────────────────────
-function CellInput({ value, onSave, placeholder = '', align = 'right', className: extraCls = '' }) {
+function CellInput({
+  value,
+  onSave,
+  placeholder = '',
+  align = 'right',
+  className: extraCls = '',
+  disabled = false,
+}) {
   const [local, setLocal] = useState(value ?? '')
   const [focused, setFocused] = useState(false)
   useEffect(() => setLocal(value ?? ''), [value])
@@ -150,22 +157,30 @@ function CellInput({ value, onSave, placeholder = '', align = 'right', className
       type="text"
       inputMode="decimal"
       value={display}
-      onChange={e => setLocal(e.target.value)}
-      onFocus={() => setFocused(true)}
+      readOnly={disabled}
+      onChange={e => !disabled && setLocal(e.target.value)}
+      onFocus={() => !disabled && setFocused(true)}
       onBlur={() => {
         setFocused(false)
-        if (String(local) !== String(value ?? '')) onSave(local)
+        if (!disabled && String(local) !== String(value ?? '')) onSave(local)
       }}
       onKeyDown={e => {
         if (e.key === 'Enter') e.target.blur()
       }}
       placeholder={placeholder}
-      className={`w-full bg-transparent font-bold text-${align} text-xs px-1 py-0.5 focus:outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-300 rounded ${extraCls}`}
+      className={`w-full bg-transparent font-bold text-${align} text-xs px-1 py-0.5 ${disabled ? 'cursor-not-allowed text-gray-500' : 'focus:outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-300'} rounded ${extraCls}`}
     />
   )
 }
 
-function TextCell({ value, onSave, placeholder = '', bold = false, onDelete = null }) {
+function TextCell({
+  value,
+  onSave,
+  placeholder = '',
+  bold = false,
+  onDelete = null,
+  disabled = false,
+}) {
   const [local, setLocal] = useState(value ?? '')
   const [focused, setFocused] = useState(false)
   useEffect(() => setLocal(value ?? ''), [value])
@@ -174,17 +189,18 @@ function TextCell({ value, onSave, placeholder = '', bold = false, onDelete = nu
       <input
         type="text"
         value={local}
-        onChange={e => setLocal(e.target.value)}
-        onFocus={() => setFocused(true)}
+        readOnly={disabled}
+        onChange={e => !disabled && setLocal(e.target.value)}
+        onFocus={() => !disabled && setFocused(true)}
         onBlur={() => {
           setFocused(false)
-          if (local !== (value ?? '')) onSave(local)
+          if (!disabled && local !== (value ?? '')) onSave(local)
         }}
         onKeyDown={e => {
           if (e.key === 'Enter') e.target.blur()
         }}
         placeholder={placeholder}
-        className={`w-full bg-transparent text-xs px-1 py-0.5 focus:outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-300 rounded ${bold ? 'font-medium text-gray-800' : 'text-gray-600'} ${onDelete && focused ? 'pr-5' : ''}`}
+        className={`w-full bg-transparent text-xs px-1 py-0.5 ${disabled ? 'cursor-not-allowed text-gray-500' : 'focus:outline-none focus:bg-blue-50 focus:ring-1 focus:ring-blue-300'} rounded ${bold ? 'font-medium text-gray-800' : 'text-gray-600'} ${onDelete && focused ? 'pr-5' : ''}`}
       />
       {onDelete && focused && (
         <button
@@ -423,9 +439,23 @@ export default function Collections() {
   const [deleteWeekConfirm, setDeleteWeekConfirm] = useState(false)
   const [deletingWeek, setDeletingWeek] = useState(false)
   const [solvencyStatIds, setSolvencyStatIds] = useState([])
+  // Past-week edit lock — defaults to false (locked) for any week ending
+  // before today. Resets every time the user switches weeks so they have to
+  // explicitly opt into editing each historical week.
+  const [editingPastWeek, setEditingPastWeek] = useState(false)
   const backfillDoneRef = useRef(false)
 
   const selectedWeek = weeks[weekIdx] || null
+  const isPastWeek =
+    !!selectedWeek &&
+    selectedWeek.week_ending < new Date().toISOString().split('T')[0]
+  const inputsLocked = isPastWeek && !editingPastWeek
+
+  // Reset the past-week edit toggle when the user navigates to a different
+  // week — switching to a new week should always start locked.
+  useEffect(() => {
+    setEditingPastWeek(false)
+  }, [selectedWeek?.id])
 
   // Fetch IDs of any stats wired to finance_solvency (once on mount)
   useEffect(() => {
@@ -950,7 +980,43 @@ export default function Collections() {
     .filter(f => f.section === 'payables_alloc' && !f.is_formula && f.subsection)
     .reduce((s, f) => s + (parseFloat(f.amount) || 0), 0)
   const netTotal = cashOnHand - autoAlloc - payrollAlloc - payablesAlloc
-  const solvencyTotal = totalReceivables + (cashOnHand - payrollAlloc) - totalPayables
+  // Reserves row — stored as a single collection_financial row per week
+  // (section='reserves'). Created lazily on first edit so old weeks without
+  // a row keep working.
+  const reservesRow = financial.find(f => f.section === 'reserves') || null
+  const totalReserves = reservesRow ? parseFloat(reservesRow.amount) || 0 : 0
+  const solvencyTotal =
+    totalReceivables + (cashOnHand - payrollAlloc) + totalReserves - totalPayables
+
+  async function saveReserves(value) {
+    if (!selectedWeek) return
+    const parsed = parseFloat(value) || 0
+    if (reservesRow) {
+      // Optimistic local update + persist
+      setFinancial(prev =>
+        prev.map(f => (f.id === reservesRow.id ? { ...f, amount: parsed } : f))
+      )
+      await supabase
+        .from('collection_financial')
+        .update({ amount: parsed })
+        .eq('id', reservesRow.id)
+    } else {
+      const { data } = await supabase
+        .from('collection_financial')
+        .insert({
+          week_id: selectedWeek.id,
+          section: 'reserves',
+          subsection: null,
+          label: 'Total Reserves',
+          amount: parsed,
+          is_formula: false,
+          sort_order: 0,
+        })
+        .select()
+        .single()
+      if (data) setFinancial(prev => [...prev, data])
+    }
+  }
 
   // ── Auto-push solvency total to statistic_values ──────────────────────────
   useEffect(() => {
@@ -1002,6 +1068,23 @@ export default function Collections() {
           </button>
         </div>
         <div className="flex-1" />
+        {selectedWeek && isPastWeek && (
+          <button
+            onClick={() => setEditingPastWeek(v => !v)}
+            className={`text-sm px-3 py-1.5 rounded-lg font-medium transition-colors ${
+              editingPastWeek
+                ? 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+            title={
+              editingPastWeek
+                ? 'Currently editing a past week — click to lock again'
+                : 'Past weeks are locked by default — click to enable editing'
+            }
+          >
+            {editingPastWeek ? '✏️ Editing Past Week' : '🔒 Edit Past Week'}
+          </button>
+        )}
         {selectedWeek && selectedWeek.week_ending >= new Date().toISOString().split('T')[0] && (
           <button
             onClick={() => setDeleteWeekConfirm(true)}
@@ -1258,6 +1341,7 @@ export default function Collections() {
                       onAdd={() => addFinancial(sec.key)}
                       canAdd={sec.allowAdd}
                       cashOnHandTotal={cashOnHand}
+                      disabled={inputsLocked}
                     />
                   ))}
                 </div>
@@ -1273,6 +1357,7 @@ export default function Collections() {
                     onAddFromPayable={addFinancialFromPayable}
                     paySubtotalFn={paySubtotal}
                     payablesByCategory={payablesByCategory}
+                    disabled={inputsLocked}
                   />
 
                   {/* 5 — Financial Planning */}
@@ -1369,9 +1454,27 @@ export default function Collections() {
                           <span className={`font-semibold ${color}`}>{fmtC(value)}</span>
                         </div>
                       ))}
+                      {/* Total Reserves — running balance of the reserve
+                          account, manually entered per week. Persists via
+                          saveReserves() (auto-creates the row on first
+                          edit). Respects the past-week lock. */}
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-500">Total Reserves</span>
+                        <div className="w-32">
+                          <CellInput
+                            value={totalReserves || ''}
+                            onSave={saveReserves}
+                            disabled={inputsLocked}
+                            placeholder="$0"
+                          />
+                        </div>
+                      </div>
                       {(() => {
                         const finalTotal =
-                          totalReceivables + (cashOnHand - payrollAlloc) - totalPayables
+                          totalReceivables +
+                          (cashOnHand - payrollAlloc) +
+                          totalReserves -
+                          totalPayables
                         return (
                           <div className="flex justify-between border-t-2 border-gray-300 pt-2 mt-1">
                             <span className="text-sm font-bold text-gray-800">Total Solvency</span>
@@ -1842,7 +1945,14 @@ const PAY_ALLOC_SUBS = [
   },
 ]
 
-function PayablesAllocSection({ rows, onUpdate, onDelete, onAddFromPayable, payablesByCategory }) {
+function PayablesAllocSection({
+  rows,
+  onUpdate,
+  onDelete,
+  onAddFromPayable,
+  payablesByCategory,
+  disabled = false,
+}) {
   const [openDropdown, setOpenDropdown] = useState(null)
   const [confirmPay, setConfirmPay] = useState(null) // row to confirm paying
   const sectionTotal = rows.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0)
@@ -1864,13 +1974,15 @@ function PayablesAllocSection({ rows, onUpdate, onDelete, onAddFromPayable, paya
             <div className="bg-blue-50 border-b border-blue-100 px-3 py-1.5 flex items-center justify-between relative">
               <span className="text-xs font-semibold text-blue-600">{sub.label}</span>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setOpenDropdown(isOpen ? null : sub.key)}
-                  className="w-5 h-5 flex items-center justify-center rounded-full bg-blue-200 hover:bg-blue-300 text-blue-700 font-bold text-sm leading-none"
-                  title="Add from payables"
-                >
-                  +
-                </button>
+                {!disabled && (
+                  <button
+                    onClick={() => setOpenDropdown(isOpen ? null : sub.key)}
+                    className="w-5 h-5 flex items-center justify-center rounded-full bg-blue-200 hover:bg-blue-300 text-blue-700 font-bold text-sm leading-none"
+                    title="Add from payables"
+                  >
+                    +
+                  </button>
+                )}
               </div>
               {isOpen && (
                 <div className="absolute right-0 top-full z-30 bg-white border border-gray-200 rounded-lg shadow-xl min-w-[280px] max-h-80 overflow-y-auto">
@@ -1963,13 +2075,21 @@ function PayablesAllocSection({ rows, onUpdate, onDelete, onAddFromPayable, paya
                     >
                       <td className="px-3 py-1.5">
                         <button
-                          onClick={() => !row.is_paid && setConfirmPay(row)}
+                          onClick={() => !disabled && !row.is_paid && setConfirmPay(row)}
                           className={`text-left w-full transition-colors ${
                             row.is_paid
                               ? 'text-green-700 line-through decoration-green-400 cursor-default'
-                              : 'text-gray-700 hover:text-blue-700 cursor-pointer'
+                              : disabled
+                                ? 'text-gray-500 cursor-not-allowed'
+                                : 'text-gray-700 hover:text-blue-700 cursor-pointer'
                           }`}
-                          title={row.is_paid ? 'Paid' : 'Click to mark as paid'}
+                          title={
+                            disabled
+                              ? 'Locked — click Edit Past Week to enable'
+                              : row.is_paid
+                                ? 'Paid'
+                                : 'Click to mark as paid'
+                          }
                         >
                           {row.is_paid && <span className="mr-1">✓</span>}
                           {row.label}
@@ -1979,25 +2099,27 @@ function PayablesAllocSection({ rows, onUpdate, onDelete, onAddFromPayable, paya
                         <CellInput
                           value={row.amount || ''}
                           onSave={v => onUpdate(row.id, 'amount', v)}
+                          disabled={disabled}
                         />
                       </td>
                       <td className="px-1 text-center w-8">
-                        {row.is_paid ? (
-                          <button
-                            onClick={() => onUpdate(row.id, 'is_paid', false)}
-                            className="text-green-400 hover:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity text-[10px]"
-                            title="Undo paid"
-                          >
-                            ↩
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => onDelete(row.id)}
-                            className="text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            ✕
-                          </button>
-                        )}
+                        {!disabled &&
+                          (row.is_paid ? (
+                            <button
+                              onClick={() => onUpdate(row.id, 'is_paid', false)}
+                              className="text-green-400 hover:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity text-[10px]"
+                              title="Undo paid"
+                            >
+                              ↩
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => onDelete(row.id)}
+                              className="text-red-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              ✕
+                            </button>
+                          ))}
                       </td>
                     </tr>
                   ))}
