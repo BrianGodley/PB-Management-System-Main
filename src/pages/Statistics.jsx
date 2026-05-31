@@ -2550,7 +2550,7 @@ function MultipleEntryView({ stats, weekEndingDay }) {
           <span className="text-xs text-gray-300 italic">More groups coming soon</span>
         </div>
 
-        {/* Period navigator */}
+        {/* Period navigator + Save (right-aligned on the same row) */}
         <div className="flex items-center gap-3">
           <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide w-20 flex-shrink-0">
             Period
@@ -2577,6 +2577,31 @@ function MultipleEntryView({ stats, weekEndingDay }) {
           <span className="text-xs text-gray-400">
             {filteredStats.length} stat{filteredStats.length !== 1 ? 's' : ''} in this group
           </span>
+
+          {/* Save button + status — pushed to the right edge so it sits on
+              the same horizontal as the Period selector. Only appears when
+              there are unsaved changes (or while saving). */}
+          <div className="ml-auto flex items-center gap-3">
+            {saveMsg && (
+              <span
+                className={`text-xs font-medium ${
+                  saveMsg.startsWith('⚠️') ? 'text-red-600' : 'text-green-600'
+                }`}
+              >
+                {saveMsg}
+              </span>
+            )}
+            {(isDirty || saving) && (
+              <button
+                onClick={handleSave}
+                disabled={saving || loading || filteredStats.length === 0}
+                className="px-5 py-1.5 rounded-lg text-xs font-bold text-white disabled:opacity-40 transition-opacity"
+                style={{ backgroundColor: FG }}
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -2689,29 +2714,8 @@ function MultipleEntryView({ stats, weekEndingDay }) {
         )}
       </div>
 
-      {/* ── Save bar ──────────────────────────────────────────────────────── */}
-      {/* The Save button only appears once the user has made changes; the
-          bar itself stays mounted so the success/error message has somewhere
-          to live for a moment after saving. */}
-      <div className="flex items-center justify-between px-6 py-3 bg-white border-t border-gray-200 flex-shrink-0 min-h-[56px]">
-        <span
-          className={`text-sm font-medium transition-opacity ${
-            saveMsg ? 'opacity-100' : 'opacity-0'
-          } ${saveMsg.startsWith('⚠️') ? 'text-red-600' : 'text-green-600'}`}
-        >
-          {saveMsg || '—'}
-        </span>
-        {(isDirty || saving) && (
-          <button
-            onClick={handleSave}
-            disabled={saving || loading || filteredStats.length === 0}
-            className="px-6 py-2 rounded-lg text-sm font-bold text-white disabled:opacity-40 transition-opacity animate-in fade-in"
-            style={{ backgroundColor: FG }}
-          >
-            {saving ? 'Saving…' : 'Save'}
-          </button>
-        )}
-      </div>
+      {/* Save bar moved to the Period row above so it's reachable without
+          scrolling — see Period navigator section. */}
     </div>
   )
 }
