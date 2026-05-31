@@ -496,10 +496,11 @@ function PaverPicker({
 
   function handleBrandChange(newBrand) {
     if (newBrand === CUSTOM_BRAND) {
-      // Mark the row as custom; "name" stays a stub so the calc engine can
-      // tell from brand alone that this is a manual override.
-      onSelect(CUSTOM_BRAND, CUSTOM_BRAND)
-      setSearch(CUSTOM_BRAND)
+      // Mark the row as custom; leave name blank so the user types their
+      // own. The calc engine keys off brand === 'Custom' so the empty name
+      // doesn't break pricing.
+      onSelect(CUSTOM_BRAND, '')
+      setSearch('')
     } else {
       onSelect(newBrand, '')
       setSearch('')
@@ -535,9 +536,18 @@ function PaverPicker({
         <option value={CUSTOM_BRAND}>Custom</option>
       </select>
 
-      {/* Custom price input OR searchable model — depends on brand selection */}
+      {/* Custom name + price OR searchable model — depends on brand selection */}
       {isCustom ? (
         <div className="relative min-w-0 flex-[2] flex items-center gap-1">
+          {/* Free-text custom paver name (persisted to paverName so it shows
+              on saved estimates / bid docs alongside the price). */}
+          <input
+            type="text"
+            value={name || ''}
+            onChange={e => onSelect(CUSTOM_BRAND, e.target.value)}
+            placeholder="Custom paver name"
+            className="min-w-0 flex-1 border border-gray-200 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
+          />
           <span className="text-xs text-gray-400 flex-shrink-0">$</span>
           <input
             type="number"
@@ -546,8 +556,8 @@ function PaverPicker({
             min="0"
             value={customPrice}
             onChange={e => onCustomPriceChange && onCustomPriceChange(e.target.value)}
-            placeholder={`Custom price per ${priceUnit}`}
-            className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
+            placeholder="0.00"
+            className="w-20 flex-shrink-0 border border-gray-200 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
           />
           <span className="text-xs text-gray-400 flex-shrink-0">/{priceUnit}</span>
         </div>
