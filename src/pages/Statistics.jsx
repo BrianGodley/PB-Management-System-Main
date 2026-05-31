@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { useSearchParams, useBlocker } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import {
   LineChart,
   Line,
@@ -2367,21 +2367,12 @@ function MultipleEntryView({ stats, weekEndingDay }) {
     return () => window.removeEventListener('beforeunload', onBeforeUnload)
   }, [isDirty])
 
-  // Warn before in-app route navigation when there are unsaved changes.
-  // useBlocker is available in react-router-dom v6.7+. The blocker can be
-  // null on older versions, so guard before using.
-  const blocker = useBlocker(({ currentLocation, nextLocation }) =>
-    isDirty && currentLocation.pathname !== nextLocation.pathname
-  )
-  useEffect(() => {
-    if (blocker && blocker.state === 'blocked') {
-      if (confirm('You have unsaved changes. Leave the page anyway?')) {
-        blocker.proceed()
-      } else {
-        blocker.reset()
-      }
-    }
-  }, [blocker])
+  // Note: in-app route navigation isn't blocked here. useBlocker requires a
+  // Data Router (createBrowserRouter), but the app uses BrowserRouter. The
+  // beforeunload listener above still catches tab close / refresh / external
+  // navigation, and the period/tracking changes inside this view confirm
+  // before discarding — which covers the common "I'm about to lose work"
+  // cases without crashing the page.
 
   function formatPeriod(dateStr, tracking) {
     if (!dateStr) return '—'
