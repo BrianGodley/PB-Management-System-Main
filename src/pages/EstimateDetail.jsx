@@ -2247,10 +2247,3 @@ export default function EstimateDetail() {
     </div>
   )
 }
-    </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
