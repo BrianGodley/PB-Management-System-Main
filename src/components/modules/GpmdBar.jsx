@@ -174,7 +174,7 @@ export default function GpmdBar({
   }
 
   const containerCls = sticky
-    ? 'bg-gray-900 text-white py-2 px-2'
+    ? 'bg-gray-900 text-white py-1 px-2'
     : 'bg-gray-900 text-white rounded-xl p-3 mt-2'
 
   return (
