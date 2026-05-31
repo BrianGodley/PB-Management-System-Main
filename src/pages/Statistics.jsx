@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useBlocker } from 'react-router-dom'
 import {
   LineChart,
   Line,
@@ -2218,23 +2218,99 @@ function MultipleEntryView({ stats, weekEndingDay }) {
   const [periodDate, setPeriodDate] = useState(null)
   const [dbValues, setDbValues] = useState([])
   const [drafts, setDrafts] = useState({}) // statId → string
+  // Baseline snapshot of drafts after the last successful load/save. Used
+  // by isDirty so the Save button + nav warnings only show when the user
+  // has actually changed something from what's persisted in the DB.
+  const [baseline, setBaseline] = useState({})
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
 
-  // Stats matching the selected tracking type (non-archived, direct-entry only), sorted A→Z
-  const filteredStats = useMemo(
-    () =>
-      stats
-        .filter(
-          s =>
-            !s.archived &&
-            s.tracking === entryTracking &&
-            !['equation', 'overlay', 'target'].includes(s.stat_category)
-        )
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [stats, entryTracking]
-  )
+  // User-customised display order — array of stat IDs (numbers). Stored per
+  // user × tracking type in localStorage so reorders survive reloads. Unknown
+  // / new stats append in alphabetical order behind the saved list.
+  const orderStorageKey = user?.id
+    ? `stats:multiEntry:order:${user.id}:${entryTracking}`
+    : null
+  const [customOrder, setCustomOrder] = useState([])
+
+  useEffect(() => {
+    if (!orderStorageKey) {
+      setCustomOrder([])
+      return
+    }
+    try {
+      const raw = localStorage.getItem(orderStorageKey)
+      setCustomOrder(raw ? JSON.parse(raw) : [])
+    } catch {
+      setCustomOrder([])
+    }
+  }, [orderStorageKey])
+
+  function saveCustomOrder(next) {
+    setCustomOrder(next)
+    if (orderStorageKey) {
+      try {
+        localStorage.setItem(orderStorageKey, JSON.stringify(next))
+      } catch {
+        // best-effort — quota errors etc. shouldn't break the UI
+      }
+    }
+  }
+
+  // Stats matching the selected tracking type (non-archived, direct-entry
+  // only). Default sort is A→Z; user's saved custom order takes precedence.
+  const filteredStats = useMemo(() => {
+    const base = stats
+      .filter(
+        s =>
+          !s.archived &&
+          s.tracking === entryTracking &&
+          !['equation', 'overlay', 'target'].includes(s.stat_category)
+      )
+      .sort((a, b) => a.name.localeCompare(b.name))
+    if (!customOrder.length) return base
+    const byId = new Map(base.map(s => [s.id, s]))
+    const ordered = []
+    for (const id of customOrder) {
+      const s = byId.get(id)
+      if (s) {
+        ordered.push(s)
+        byId.delete(id)
+      }
+    }
+    // Any new / re-added stats appear at the end in alphabetical order
+    return [...ordered, ...byId.values()]
+  }, [stats, entryTracking, customOrder])
+
+  // Drag-and-drop state — the index (in filteredStats) of the row currently
+  // being dragged. Stored in state so we can highlight the row.
+  const [dragIndex, setDragIndex] = useState(null)
+
+  function handleDrop(targetIdx) {
+    if (dragIndex === null || dragIndex === targetIdx) {
+      setDragIndex(null)
+      return
+    }
+    const next = [...filteredStats]
+    const [moved] = next.splice(dragIndex, 1)
+    next.splice(targetIdx, 0, moved)
+    saveCustomOrder(next.map(s => s.id))
+    setDragIndex(null)
+  }
+
+  // Dirty tracking — compare current draft values to the baseline snapshot.
+  // Treats '' and missing as equivalent so a stat that's never been set
+  // doesn't register as dirty until the user types something.
+  const isDirty = useMemo(() => {
+    const keys = new Set([...Object.keys(drafts), ...Object.keys(baseline)])
+    for (const k of keys) {
+      const a = (drafts[k] ?? '').toString().trim()
+      const b = (baseline[k] ?? '').toString().trim()
+      if (a !== b) return true
+    }
+    return false
+  }, [drafts, baseline])
 
   // ── Period helpers ────────────────────────────────────────────────────────
   function canonicalPeriod(tracking, refDate) {
@@ -2250,6 +2326,9 @@ function MultipleEntryView({ stats, weekEndingDay }) {
   }
 
   function navigatePeriod(dir) {
+    if (isDirty && !confirm('You have unsaved changes. Discard them and switch period?')) {
+      return
+    }
     const d = new Date(periodDate + 'T00:00:00')
     if (entryTracking === 'daily') {
       d.setDate(d.getDate() + dir)
@@ -2265,6 +2344,44 @@ function MultipleEntryView({ stats, weekEndingDay }) {
       setPeriodDate(`${d.getFullYear() + dir}-12-31`)
     }
   }
+
+  function changeTracking(t) {
+    if (
+      t !== entryTracking &&
+      isDirty &&
+      !confirm('You have unsaved changes. Discard them and switch tracking type?')
+    ) {
+      return
+    }
+    setEntryTracking(t)
+  }
+
+  // Warn before browser tab close / refresh when there are unsaved changes.
+  useEffect(() => {
+    if (!isDirty) return
+    function onBeforeUnload(e) {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [isDirty])
+
+  // Warn before in-app route navigation when there are unsaved changes.
+  // useBlocker is available in react-router-dom v6.7+. The blocker can be
+  // null on older versions, so guard before using.
+  const blocker = useBlocker(({ currentLocation, nextLocation }) =>
+    isDirty && currentLocation.pathname !== nextLocation.pathname
+  )
+  useEffect(() => {
+    if (blocker && blocker.state === 'blocked') {
+      if (confirm('You have unsaved changes. Leave the page anyway?')) {
+        blocker.proceed()
+      } else {
+        blocker.reset()
+      }
+    }
+  }, [blocker])
 
   function formatPeriod(dateStr, tracking) {
     if (!dateStr) return '—'
@@ -2340,6 +2457,7 @@ function MultipleEntryView({ stats, weekEndingDay }) {
       d[s.id] = match != null ? String(match.value) : ''
     })
     setDrafts(d)
+    setBaseline(d)
     setLoading(false)
   }
 
@@ -2394,6 +2512,7 @@ function MultipleEntryView({ stats, weekEndingDay }) {
     setSaveMsg(
       `✓ Saved ${toUpsert.length} value${toUpsert.length !== 1 ? 's' : ''}${toDelete.length ? `, cleared ${toDelete.length}` : ''}`
     )
+    // loadValues resets baseline = drafts so isDirty flips back to false.
     await loadValues()
     setTimeout(() => setSaveMsg(''), 4000)
   }
@@ -2412,7 +2531,7 @@ function MultipleEntryView({ stats, weekEndingDay }) {
             {['daily', 'weekly', 'monthly', 'quarterly', 'yearly'].map(t => (
               <button
                 key={t}
-                onClick={() => setEntryTracking(t)}
+                onClick={() => changeTracking(t)}
                 className={`px-4 py-1.5 text-xs font-semibold capitalize transition-colors ${
                   entryTracking === t ? 'text-white' : 'text-gray-600 hover:bg-gray-50'
                 }`}
@@ -2504,6 +2623,7 @@ function MultipleEntryView({ stats, weekEndingDay }) {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-gray-200 bg-gray-50">
+                          <th className="w-6" />
                           <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">
                             Statistic
                           </th>
@@ -2513,27 +2633,61 @@ function MultipleEntryView({ stats, weekEndingDay }) {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {colStats.map(s => (
-                          <tr key={s.id} className="hover:bg-gray-50 transition-colors">
-                            <td className="px-4 py-2.5">
-                              <div className="font-medium text-gray-900 text-sm leading-tight">
-                                {s.name}
-                              </div>
-                              <div className="text-xs text-gray-400 capitalize mt-0.5">
-                                {s.stat_type}
-                              </div>
-                            </td>
-                            <td className="px-3 py-2">
-                              <input
-                                type="number"
-                                value={drafts[s.id] ?? ''}
-                                onChange={e => setDrafts(d => ({ ...d, [s.id]: e.target.value }))}
-                                placeholder="—"
-                                className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white placeholder-gray-300"
-                              />
-                            </td>
-                          </tr>
-                        ))}
+                        {colStats.map(s => {
+                          // Global index across all columns — drag-and-drop
+                          // uses the flat filteredStats order, not per-column.
+                          const globalIdx = filteredStats.findIndex(x => x.id === s.id)
+                          const isDragging = dragIndex === globalIdx
+                          return (
+                            <tr
+                              key={s.id}
+                              className={`hover:bg-gray-50 transition-colors ${
+                                isDragging ? 'opacity-40' : ''
+                              }`}
+                              onDragOver={e => {
+                                if (dragIndex !== null) e.preventDefault()
+                              }}
+                              onDrop={() => handleDrop(globalIdx)}
+                            >
+                              {/* Drag handle — only this cell is draggable so
+                                  text selection in the name / input still
+                                  works normally. */}
+                              <td
+                                draggable
+                                onDragStart={e => {
+                                  setDragIndex(globalIdx)
+                                  e.dataTransfer.effectAllowed = 'move'
+                                  // Required for Firefox to actually start the drag
+                                  e.dataTransfer.setData('text/plain', String(s.id))
+                                }}
+                                onDragEnd={() => setDragIndex(null)}
+                                className="text-center text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing select-none w-6"
+                                title="Drag to reorder"
+                              >
+                                ⋮⋮
+                              </td>
+                              <td className="px-4 py-2.5">
+                                <div className="font-medium text-gray-900 text-sm leading-tight">
+                                  {s.name}
+                                </div>
+                                <div className="text-xs text-gray-400 capitalize mt-0.5">
+                                  {s.stat_type}
+                                </div>
+                              </td>
+                              <td className="px-3 py-2">
+                                <input
+                                  type="number"
+                                  value={drafts[s.id] ?? ''}
+                                  onChange={e =>
+                                    setDrafts(d => ({ ...d, [s.id]: e.target.value }))
+                                  }
+                                  placeholder="—"
+                                  className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white placeholder-gray-300"
+                                />
+                              </td>
+                            </tr>
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -2545,20 +2699,27 @@ function MultipleEntryView({ stats, weekEndingDay }) {
       </div>
 
       {/* ── Save bar ──────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-6 py-3 bg-white border-t border-gray-200 flex-shrink-0">
+      {/* The Save button only appears once the user has made changes; the
+          bar itself stays mounted so the success/error message has somewhere
+          to live for a moment after saving. */}
+      <div className="flex items-center justify-between px-6 py-3 bg-white border-t border-gray-200 flex-shrink-0 min-h-[56px]">
         <span
-          className={`text-sm font-medium transition-opacity ${saveMsg ? 'opacity-100' : 'opacity-0'} ${saveMsg.startsWith('⚠️') ? 'text-red-600' : 'text-green-600'}`}
+          className={`text-sm font-medium transition-opacity ${
+            saveMsg ? 'opacity-100' : 'opacity-0'
+          } ${saveMsg.startsWith('⚠️') ? 'text-red-600' : 'text-green-600'}`}
         >
           {saveMsg || '—'}
         </span>
-        <button
-          onClick={handleSave}
-          disabled={saving || loading || filteredStats.length === 0}
-          className="px-6 py-2 rounded-lg text-sm font-bold text-white disabled:opacity-40 transition-opacity"
-          style={{ backgroundColor: FG }}
-        >
-          {saving ? 'Saving…' : 'Save'}
-        </button>
+        {(isDirty || saving) && (
+          <button
+            onClick={handleSave}
+            disabled={saving || loading || filteredStats.length === 0}
+            className="px-6 py-2 rounded-lg text-sm font-bold text-white disabled:opacity-40 transition-opacity animate-in fade-in"
+            style={{ backgroundColor: FG }}
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        )}
       </div>
     </div>
   )
@@ -10768,6 +10929,7 @@ export default function Statistics() {
           className="fixed inset-0 z-50 bg-black/50 flex items-start sm:items-center justify-center p-3 pt-6 sm:p-4 sm:hidden"
           onClick={() => setShowMobileEditsModal(false)}
         >
+           >
           <div
             className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
             onClick={e => e.stopPropagation()}
