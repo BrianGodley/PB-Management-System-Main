@@ -1126,6 +1126,161 @@ const update_feature_request_run: ToolExecutor = async (args, ctx) => {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
+// Tool: create_estimate_from_takeoff
+// ──────────────────────────────────────────────────────────────────────────
+// Allowed module_type values. MUST match the strings the Estimator UI uses
+// (see MODULE_GROUPS in src/pages/EstimateDetail.jsx). If you add a new
+// module type to the estimator, add it here too.
+const ALLOWED_MODULE_TYPES = [
+  'Hand Demo', 'Mini Skid Steer Demo', 'Skid Steer Demo',
+  'Utilities', 'Drainage',
+  'Concrete', 'Pavers', 'Artificial Turf', 'Ground Treatments', 'Steps',
+  'Pool', 'Outdoor Kitchen', 'Fire Pit', 'Walls', 'Columns',
+  'Water Features', 'Lighting', 'Finishes',
+  'Irrigation', 'Planting',
+] as const
+
+const create_estimate_from_takeoff_def: ToolDefinition = {
+  name: 'create_estimate_from_takeoff',
+  description:
+    "Create a new estimate in PBS from a plan-set takeoff. Use AFTER you've " +
+    'produced a structured takeoff and the user has confirmed they want it ' +
+    'pushed into the Estimator (e.g. "yes, create the estimate" / "go ahead"). ' +
+    'Creates a pending Residential/Commercial/Public Works estimate with one ' +
+    'project containing one module per category from your takeoff. Each module ' +
+    "starts empty (man_days=0, no rates) but its 'notes' field is pre-filled " +
+    "with your takeoff text for that section so the user can type the actual " +
+    "values in. Returns the new estimate id and a URL the user can click to " +
+    "open it. DO NOT call this without an explicit yes from the user.",
+  input_schema: {
+    type: 'object',
+    required: ['estimate_name', 'type', 'modules'],
+    properties: {
+      estimate_name: { type: 'string', description: 'Short estimate name (e.g. "Backyard").' },
+      type: {
+        type: 'string',
+        enum: ['Residential', 'Commercial', 'Public Works'],
+        description: 'Project type. Default Residential unless plan/context says otherwise.',
+      },
+      client_id: { type: 'string', description: 'UUID of an existing client from list_clients. Optional.' },
+      client_name: { type: 'string', description: 'Free-text client name when client_id is unknown.' },
+      project_name: {
+        type: 'string',
+        description: "Project container name. Defaults to 'Auto Takeoff'.",
+      },
+      modules: {
+        type: 'array',
+        minItems: 1,
+        description: 'One entry per category in your takeoff that has actual scope.',
+        items: {
+          type: 'object',
+          required: ['module_type', 'notes'],
+          properties: {
+            module_type: {
+              type: 'string',
+              enum: [...ALLOWED_MODULE_TYPES],
+              description: 'Exact estimator module name ("Pavers" not "Paver", "Hand Demo" not "HandDemo").',
+            },
+            module_name: { type: 'string', description: 'Optional label (e.g. "Front Walkway").' },
+            notes: {
+              type: 'string',
+              description: 'Self-contained takeoff text — quantities + assumptions + plan refs.',
+            },
+          },
+        },
+      },
+    },
+  },
+}
+
+const create_estimate_from_takeoff_run: ToolExecutor = async (args, ctx) => {
+  const sb = userClient(ctx)
+  const estimateName = String(args?.estimate_name || '').trim()
+  if (!estimateName) throw new Error('estimate_name is required.')
+  const type = String(args?.type || '').trim()
+  if (!['Residential', 'Commercial', 'Public Works'].includes(type)) {
+    throw new Error('type must be Residential, Commercial, or Public Works.')
+  }
+  const modulesIn = Array.isArray(args?.modules) ? args.modules : []
+  if (!modulesIn.length) throw new Error('modules must have at least one entry.')
+
+  const allowed = new Set<string>(ALLOWED_MODULE_TYPES as readonly string[])
+  for (const m of modulesIn) {
+    if (!m || typeof m !== 'object') throw new Error('Each module must be an object.')
+    if (!allowed.has(m.module_type)) {
+      throw new Error(`Unknown module_type "${m.module_type}". Allowed: ${[...allowed].join(', ')}.`)
+    }
+    if (!String(m.notes || '').trim()) {
+      throw new Error(`Module "${m.module_type}" is missing notes (the takeoff content).`)
+    }
+  }
+
+  const { data: estimate, error: estErr } = await sb
+    .from('estimates')
+    .insert({
+      estimate_name:  estimateName,
+      type,
+      status:         'pending',
+      client_id:      args?.client_id || null,
+      client_name:    args?.client_name || null,
+      created_by:     ctx.userId,
+    })
+    .select('id, estimate_name, type, client_id, client_name, status, created_at')
+    .single()
+  if (estErr) throw new Error(`Could not create estimate: ${estErr.message}`)
+
+  const projectName = String(args?.project_name || '').trim() || 'Auto Takeoff'
+  const { data: project, error: projErr } = await sb
+    .from('estimate_projects')
+    .insert({ estimate_id: estimate.id, project_name: projectName })
+    .select('id, project_name')
+    .single()
+  if (projErr) {
+    await sb.from('estimates').delete().eq('id', estimate.id)
+    throw new Error(`Could not create project: ${projErr.message}`)
+  }
+
+  const rows = modulesIn.map((m: any, idx: number) => ({
+    project_id:    project.id,
+    module_type:   m.module_type,
+    module_name:   (m.module_name || '').trim() || m.module_type,
+    man_days:      0,
+    material_cost: 0,
+    labor_cost:    0,
+    labor_burden:  0,
+    gross_profit:  0,
+    sub_cost:      0,
+    total_price:   0,
+    data:          null,
+    notes:         String(m.notes).trim(),
+    sort_order:    idx,
+  }))
+  const { data: modules, error: modErr } = await sb
+    .from('estimate_modules')
+    .insert(rows)
+    .select('id, module_type, module_name, notes')
+  if (modErr) {
+    await sb.from('estimate_projects').delete().eq('id', project.id)
+    await sb.from('estimates').delete().eq('id', estimate.id)
+    throw new Error(`Could not create modules: ${modErr.message}`)
+  }
+
+  const appUrl = (ctx.appOrigin || Deno.env.get('APP_URL') || '').replace(/\/$/, '')
+  const estimateUrl = appUrl ? `${appUrl}/estimates/${estimate.id}` : null
+
+  return {
+    saved: true,
+    estimate,
+    project,
+    modules: modules || [],
+    url: estimateUrl,
+    confirmation:
+      `Created estimate "${estimate.estimate_name}" with ${rows.length} module${rows.length === 1 ? '' : 's'}` +
+      (estimateUrl ? `. Open it here: ${estimateUrl}` : '. Open it from the Estimator tab.'),
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────
 // Registry
 // ──────────────────────────────────────────────────────────────────────────
 export const TOOLS: Array<{ definition: ToolDefinition; execute: ToolExecutor }> = [
@@ -1145,6 +1300,7 @@ export const TOOLS: Array<{ definition: ToolDefinition; execute: ToolExecutor }>
   { definition: list_feature_requests_def,  execute: list_feature_requests_run },
   { definition: get_feature_request_def,    execute: get_feature_request_run },
   { definition: update_feature_request_def, execute: update_feature_request_run },
+  { definition: create_estimate_from_takeoff_def,   execute: create_estimate_from_takeoff_run },
 ]
 
 export const TOOL_DEFINITIONS = TOOLS.map(t => t.definition)
