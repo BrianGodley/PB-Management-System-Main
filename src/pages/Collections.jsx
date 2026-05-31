@@ -1078,11 +1078,11 @@ export default function Collections() {
             }`}
             title={
               editingPastWeek
-                ? 'Currently editing a past week — click to lock again'
-                : 'Past weeks are locked by default — click to enable editing'
+                ? 'Click Save to lock this week again (changes auto-save as you type)'
+                : 'This week is locked — click to edit'
             }
           >
-            {editingPastWeek ? '✏️ Editing Past Week' : '🔒 Edit Past Week'}
+            {editingPastWeek ? '💾 Save' : '🔒 Edit'}
           </button>
         )}
         {selectedWeek && selectedWeek.week_ending >= new Date().toISOString().split('T')[0] && (
@@ -2254,6 +2254,10 @@ function FinancialTable({
           </button>
         </div>
       )}
+    </div>
+  )
+}
+)}
     </div>
   )
 }
