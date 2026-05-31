@@ -763,15 +763,33 @@ def _legacy_process_job_unused(page: Page, job: dict) -> int:
 # ── Driver ──────────────────────────────────────────────────────────────────
 
 def all_bt_jobs() -> list[dict]:
-    """Pull every job that has a bt_job_id, oldest-first by created_at."""
-    rows = supa_get(
-        "jobs",
-        {
-            "bt_job_id": "not.is.null",
-            "select": "id,bt_job_id,name,client_name",
-            "order": "created_at.asc",
-        },
-    )
+    """Pull every job that has a bt_job_id, oldest-first by created_at.
+
+    PostgREST caps a single response at 1000 rows by default, so without
+    pagination this used to silently truncate the job list and the
+    downloader would never see anything past job #1000. We page via
+    `?limit=1000&offset=N` until a short page comes back.
+    """
+    PAGE = 1000
+    rows: list[dict] = []
+    offset = 0
+    while True:
+        page = supa_get(
+            "jobs",
+            {
+                "bt_job_id": "not.is.null",
+                "select": "id,bt_job_id,name,client_name",
+                "order": "created_at.asc",
+                "limit": str(PAGE),
+                "offset": str(offset),
+            },
+        )
+        if not page:
+            break
+        rows.extend(page)
+        if len(page) < PAGE:
+            break
+        offset += PAGE
     return rows
 
 
