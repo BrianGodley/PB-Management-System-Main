@@ -587,6 +587,31 @@ def process_job(page: Page, job: dict) -> int:
         return 0
     print(f"    {len(logs)} daily log(s) to scan")
 
+    # Fast-path "already complete" check — one round-trip to Supabase.
+    # If every daily log for this job already has at least one photo
+    # recorded in daily_log_photos, the job was processed in a previous
+    # run (just never reached `cp["done_jobs"].append(...)` — e.g. the
+    # script was killed). Skip the (expensive) BT API + Playwright loop
+    # and return 0 so the caller marks it done. This lets the next run
+    # blow past these jobs instead of re-scanning them every single time.
+    #
+    # Trade-off: if BT had MORE photos for some log than we have on
+    # record (e.g. supervisor added photos after our last download),
+    # we'd miss the new ones. Re-running with --reset will catch them.
+    log_ids = [lg["id"] for lg in logs]
+    in_list = ",".join(f'"{lid}"' for lid in log_ids)
+    existing = supa_get(
+        "daily_log_photos",
+        {
+            "log_id": f"in.({in_list})",
+            "select": "log_id",
+        },
+    )
+    logs_with_photos = {row["log_id"] for row in (existing or [])}
+    if logs_with_photos and all(lid in logs_with_photos for lid in log_ids):
+        print(f"    ✓ already complete ({len(logs)} logs, all have photos) — skipping fetch")
+        return 0
+
     total = 0
     for log_row in logs:
         bt_log_id = log_row["bt_daily_log_id"]
@@ -840,6 +865,38 @@ def run(headed: bool, batch: int, only_job: str | None, discover_url: str | None
                     )
                     save_checkpoint(cp)
         finally:
+            ctx.close()
+            browser.close()
+
+    print("Done with this batch. Re-run to continue.")
+
+
+def main(argv: list[str]) -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--batch", type=int, default=DEFAULT_BATCH)
+    ap.add_argument("--job", dest="only_job", default=None,
+                    help="Process just one job by its UUID or bt_job_id.")
+    ap.add_argument("--reset", action="store_true",
+                    help="Delete the checkpoint and start over.")
+    ap.add_argument("--headed", action="store_true",
+                    help="Show the browser window (debugging).")
+    ap.add_argument("--discover", dest="discover_url", default=None,
+                    help="Paste any BT URL — script logs in, navigates there, "
+                         "dumps network traffic to bt-network-debug.log, exits.")
+    args = ap.parse_args(argv)
+
+    if args.reset:
+        if CHECKPOINT.exists():
+            CHECKPOINT.unlink()
+            print(f"Removed {CHECKPOINT.name}.")
+        return 0
+
+    run(headed=args.headed, batch=args.batch, only_job=args.only_job, discover_url=args.discover_url)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
             ctx.close()
             browser.close()
 
