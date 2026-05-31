@@ -1240,7 +1240,7 @@ const create_estimate_from_takeoff_run: ToolExecutor = async (args, ctx) => {
     throw new Error(`Could not create project: ${projErr.message}`)
   }
 
-  const rows = modulesIn.map((m: any, idx: number) => ({
+  const rows = modulesIn.map((m: any) => ({
     project_id:    project.id,
     module_type:   m.module_type,
     module_name:   (m.module_name || '').trim() || m.module_type,
@@ -1253,7 +1253,6 @@ const create_estimate_from_takeoff_run: ToolExecutor = async (args, ctx) => {
     total_price:   0,
     data:          null,
     notes:         String(m.notes).trim(),
-    sort_order:    idx,
   }))
   const { data: modules, error: modErr } = await sb
     .from('estimate_modules')
