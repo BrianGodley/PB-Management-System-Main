@@ -410,10 +410,19 @@ PUSHING TAKEOFFS INTO PBS (real action, uses create_estimate_from_takeoff)
       or "Backyard Renovation"). If unsure, ask in one short sentence.
     - type — Residential, Commercial, or Public Works. Default Residential
       unless the plan or context says otherwise.
-    - client_id — pass this when you know it from earlier in the
-      conversation (e.g. user said "for the Griefer opportunity" and you
-      looked it up via list_clients). Otherwise omit and pass client_name
-      so the user can link the client themselves from the Estimator.
+    - client_id — REQUIRED for the estimate to appear under the
+      opportunity's Estimates tab. Before calling
+      create_estimate_from_takeoff, ALWAYS call list_clients with
+      name_contains set to the client's surname or company keyword from
+      the plan (e.g. "Griefer"). If exactly one client matches, pass its
+      id. If zero match, pass client_name only and tell the user the
+      opportunity wasn't found so they can create it manually. If
+      multiple match, ASK the user which one before creating the
+      estimate — don't guess.
+    - client_name — pass alongside client_id (the actual recorded
+      opportunity name from list_clients, e.g. "Griefer, John"). When you
+      don't have a client_id, pass the best name you have so the user can
+      at least search for it later.
     - modules — one entry per category in your takeoff that has actual
       scope. Use the exact module_type strings from the tool's enum
       ("Pavers" not "Paver", "Hand Demo" not "HandDemo", etc.). The notes
@@ -427,6 +436,22 @@ PUSHING TAKEOFFS INTO PBS (real action, uses create_estimate_from_takeoff)
   empty for you to type the actual values." If the URL is missing (older
   client without an app origin), tell them to open it from the Estimator
   tab by name.
+- READ THE client_resolution FIELD in the tool response and react to it:
+    - "caller_supplied" / "auto_matched" → success, the estimate is
+      linked to an opportunity and appears under that opportunity's
+      Estimates tab. Mention which client by name in your confirmation.
+    - "no_match" → the estimate was created but couldn't be linked to
+      an existing opportunity. Tell the user: "Heads up — I couldn't
+      find an opportunity matching '<name>' so this estimate is in the
+      main Estimates list only. Want me to look up the right one, or do
+      you want to link it from the Estimator?"
+    - "ambiguous" → multiple opportunities matched. The tool created
+      the estimate orphaned. Surface the candidates from the
+      ambiguous_clients array ("Found a few that could be the right one:
+      <list of labels>. Which one?") and offer to link it. Don't try to
+      pick on your own.
+    - "not_provided" → user never told you a client. Note it and ask
+      if they want to attach the estimate to an opportunity.
 - One module per category, max. Don't create three separate Pavers
   modules for three patio areas — list all three under one module's
   notes and let the user split if they want. Easier to merge than to

@@ -1215,14 +1215,62 @@ const create_estimate_from_takeoff_run: ToolExecutor = async (args, ctx) => {
     }
   }
 
+  // Resolve client_id from client_name when Sam only gave us a name.
+  // Without a client_id the estimate appears at the top-level Estimates
+  // tab but NOT under Opportunity → Estimates (that view filters by
+  // client_name eq <opp name>, which won't match a stray "Griefer
+  // Residence" against an opp recorded as just "Griefer"). We do a
+  // case-insensitive fuzzy match against name/first/last/company; if
+  // exactly one client matches we use them, multiples get returned to
+  // Sam so she can ask the user which.
+  let resolvedClientId: string | null = args?.client_id || null
+  let resolvedClientName: string | null = args?.client_name || null
+  let resolveAmbiguous: { id: string; label: string }[] = []
+  if (!resolvedClientId && resolvedClientName) {
+    const needle = resolvedClientName.trim().replace(/['"%(),]/g, '')
+    if (needle) {
+      const tokens = needle.split(/\s+/).filter(t => t.length >= 3)
+      const searchTerm = tokens.length ? tokens[0] : needle
+      const { data: candidates } = await sb
+        .from('clients')
+        .select('id, name, first_name, last_name, company_name')
+        .or(
+          `name.ilike.%${searchTerm}%,` +
+          `first_name.ilike.%${searchTerm}%,` +
+          `last_name.ilike.%${searchTerm}%,` +
+          `company_name.ilike.%${searchTerm}%`
+        )
+        .limit(10)
+      const cands = candidates || []
+      if (cands.length === 1) {
+        const c = cands[0]
+        resolvedClientId = c.id
+        resolvedClientName =
+          c.name ||
+          [c.last_name, c.first_name].filter(Boolean).join(', ') ||
+          c.company_name ||
+          resolvedClientName
+      } else if (cands.length > 1) {
+        resolveAmbiguous = cands.map(c => ({
+          id: c.id,
+          label:
+            c.name ||
+            [c.last_name, c.first_name].filter(Boolean).join(', ') ||
+            c.company_name ||
+            '(unnamed)',
+        }))
+      }
+    }
+  }
+
   const { data: estimate, error: estErr } = await sb
     .from('estimates')
     .insert({
       estimate_name:  estimateName,
       type,
       status:         'pending',
-      client_id:      args?.client_id || null,
-      client_name:    args?.client_name || null,
+      client_id:      resolvedClientId,
+      client_name:    resolvedClientName,
       created_by:     ctx.userId,
     })
     .select('id, estimate_name, type, client_id, client_name, status, created_at')
@@ -1267,12 +1315,25 @@ const create_estimate_from_takeoff_run: ToolExecutor = async (args, ctx) => {
   const appUrl = (ctx.appOrigin || Deno.env.get('APP_URL') || '').replace(/\/$/, '')
   const estimateUrl = appUrl ? `${appUrl}/estimates/${estimate.id}` : null
 
+  const clientResolution =
+    args?.client_id
+      ? 'caller_supplied'
+      : resolvedClientId
+        ? 'auto_matched'
+        : resolveAmbiguous.length
+          ? 'ambiguous'
+          : args?.client_name
+            ? 'no_match'
+            : 'not_provided'
+
   return {
     saved: true,
     estimate,
     project,
     modules: modules || [],
     url: estimateUrl,
+    client_resolution: clientResolution,
+    ambiguous_clients: resolveAmbiguous,
     confirmation:
       `Created estimate "${estimate.estimate_name}" with ${rows.length} module${rows.length === 1 ? '' : 's'}` +
       (estimateUrl ? `. Open it here: ${estimateUrl}` : '. Open it from the Estimator tab.'),
