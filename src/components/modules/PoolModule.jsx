@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
+import ModuleNotesField from './ModuleNotesField'
 import RateEditPopover from '../RateEditPopover'
 import { fetchSalesTaxRate } from '../../lib/companyDefaults'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
@@ -577,6 +578,11 @@ function StructDims({ label, data, onChange, alwaysEnabled }) {
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function PoolModule({ onSave, onBack, saving, initialData }) {
   const [state, setState] = useState(() => makeInitial(initialData))
+
+  // Free-text notes for this module — Sam writes auto-generated
+  // takeoffs here via create_estimate_from_takeoff, and the user can
+  // overwrite / append their own.
+  const [notes, setNotes] = useState(initialData?.notes ?? '')
   const [materialPrices, setMaterialPrices] = useState({})
   const [laborRates, setLaborRates] = useState({})
   const [subRates, setSubRates] = useState({})
@@ -657,6 +663,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
       calc,
     }
     onSave({
+      notes,
       module_type: 'Pool',
       man_days: calc.manDays,
       material_cost: calc.totalMat,
@@ -766,7 +773,7 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
   return (
     <div className="space-y-6 pb-6">
       {/* ── Sticky GPMD bar ── */}
-      <div className="sticky top-0 z-20 -mx-6 px-6 pt-2 pb-2 bg-gray-900 shadow-lg">
+      <div className="sticky top-0 z-20 -mx-6 px-6 pt-2 pb-2 bg-gray-900 shadow-lg space-y-2">
         <GpmdBar
           sticky
           totalMat={calc.totalMat}
@@ -782,7 +789,8 @@ export default function PoolModule({ onSave, onBack, saving, initialData }) {
           gpmd={n(state.gpmd)}
           subMarkupRate={subGpMarkupRate}
         />
-      </div>
+  <ModuleNotesField value={notes} onChange={setNotes} />
+            </div>
 
       {/* Crew Type */}
       <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">

@@ -17,6 +17,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import GpmdBar from './GpmdBar'
+import ModuleNotesField from './ModuleNotesField'
 import RateEditPopover from '../RateEditPopover'
 import { calcWalkAccessLabor, DEFAULT_WALK_ACCESS_PACE_LF_PER_MIN } from '../../lib/walkAccess'
 
@@ -277,6 +278,11 @@ function TH({ cols }) {
 // ── Main component ────────────────────────────────────────────────────────────
 export default function IrrigationModule({ initialData, onSave, onCancel }) {
   const [state, setState] = useState(() => ({ ...DEFAULT_STATE, ...(initialData || {}) }))
+
+  // Free-text notes for this module — Sam writes auto-generated
+  // takeoffs here via create_estimate_from_takeoff, and the user can
+  // overwrite / append their own.
+  const [notes, setNotes] = useState(initialData?.notes ?? '')
   const [materialPrices, setMaterialPrices] = useState(initialData?.materialPrices || {})
   const [laborRates, setLaborRates] = useState(initialData?.laborRates || {})
   const [laborRatePerHour, setLaborRatePerHour] = useState(initialData?.laborRatePerHour ?? 35)
@@ -382,6 +388,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
 
   function handleSave() {
     onSave({
+      notes,
       man_days: parseFloat(calc.manDays.toFixed(2)),
       material_cost: parseFloat(calc.totalMat.toFixed(2)),
       labor_cost: parseFloat(calc.laborCost.toFixed(2)),
@@ -415,7 +422,7 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
   return (
     <div className="space-y-4">
       {/* ── Sticky GPMD bar ── */}
-      <div className="sticky top-0 z-20 -mx-6 px-6 pt-2 pb-2 bg-gray-900 shadow-lg">
+      <div className="sticky top-0 z-20 -mx-6 px-6 pt-2 pb-2 bg-gray-900 shadow-lg space-y-2">
         {/* GPMD summary bar */}
         <GpmdBar
           sticky
@@ -432,7 +439,8 @@ export default function IrrigationModule({ initialData, onSave, onCancel }) {
           price={calc.price}
           subMarkupRate={subGpMarkupRate}
         />
-      </div>
+  <ModuleNotesField value={notes} onChange={setNotes} />
+            </div>
 
       {/* Crew Type */}
       <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
