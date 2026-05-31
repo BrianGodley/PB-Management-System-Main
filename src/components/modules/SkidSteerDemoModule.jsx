@@ -687,7 +687,7 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
   return (
     <div className="space-y-4">
       {/* ── Sticky GPMD bar ── */}
-      <div className="sticky top-0 z-20 -mx-6 px-6 pt-2 pb-2 bg-gray-900 shadow-lg space-y-2">
+      <div className="sticky top-0 z-20 -mx-6 px-6 pt-2 pb-2 bg-gray-900 shadow-lg">
         {/* GPMD summary bar */}
         <GpmdBar
           sticky
@@ -704,8 +704,13 @@ export default function SkidSteerDemoModule({ initialData, onSave, onCancel, onS
           price={calc.price}
           subMarkupRate={subGpMarkupRate}
         />
-  <ModuleNotesField value={notes} onChange={setNotes} />
             </div>
+
+      {/* Notes — pinned in its own sticky container just below the
+          GPMD bar. Plain white textarea, no card chrome. */}
+      <div className="sticky top-[68px] z-10 -mx-6 px-6 pt-2 pb-2 bg-transparent">
+        <ModuleNotesField value={notes} onChange={setNotes} />
+      </div>
 
       {/* Crew Type + Change Demo Module switcher */}
       <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-2.5 border border-gray-200">
