@@ -1627,7 +1627,11 @@ export default function EstimateDetail() {
                   <div
                     key={mod.id}
                     onClick={() => setSelectedModule(mod)}
-                    className={`px-4 py-3 cursor-pointer transition-colors group ${isSelected ? 'bg-green-50 border-l-4 border-green-600' : 'hover:bg-gray-50 border-l-4 border-transparent'}`}
+                    className={`px-4 py-3 cursor-pointer transition-colors group ${
+                      isSelected
+                        ? 'bg-green-50 shadow-[inset_4px_0_0_#16a34a]'
+                        : 'hover:bg-gray-50'
+                    }`}
                   >
                     <div className="flex items-center justify-between">
                       <p
@@ -2237,6 +2241,13 @@ export default function EstimateDetail() {
                 </button>
               </div>
             </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+    </div>
           )}
         </div>
       )}
