@@ -153,7 +153,18 @@ def load_checkpoint() -> dict:
 
 def save_checkpoint(cp: dict) -> None:
     cp["last_run"] = datetime.now(timezone.utc).isoformat()
-    CHECKPOINT.write_text(json.dumps(cp, indent=2))
+    # Atomic write: serialize to a temp file in the same dir, then rename
+    # over the real checkpoint. `Path.write_text` truncates the existing
+    # file FIRST and then streams content in — if the process is killed
+    # mid-write (Ctrl+C, crash, Windows closing the terminal), the file is
+    # left half-written and json.loads fails next run, losing all progress.
+    # rename() on the same filesystem is atomic on every modern OS, so the
+    # real checkpoint is always either the previous good version or the
+    # new good version. No more "JSONDecodeError: Unterminated string" on
+    # next startup.
+    tmp = CHECKPOINT.with_suffix(CHECKPOINT.suffix + ".tmp")
+    tmp.write_text(json.dumps(cp, indent=2))
+    os.replace(tmp, CHECKPOINT)
 
 
 # ── BuilderTrend selectors (UPDATE WHEN BT CHANGES THEIR HTML) ──────────────
@@ -865,38 +876,6 @@ def run(headed: bool, batch: int, only_job: str | None, discover_url: str | None
                     )
                     save_checkpoint(cp)
         finally:
-            ctx.close()
-            browser.close()
-
-    print("Done with this batch. Re-run to continue.")
-
-
-def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--batch", type=int, default=DEFAULT_BATCH)
-    ap.add_argument("--job", dest="only_job", default=None,
-                    help="Process just one job by its UUID or bt_job_id.")
-    ap.add_argument("--reset", action="store_true",
-                    help="Delete the checkpoint and start over.")
-    ap.add_argument("--headed", action="store_true",
-                    help="Show the browser window (debugging).")
-    ap.add_argument("--discover", dest="discover_url", default=None,
-                    help="Paste any BT URL — script logs in, navigates there, "
-                         "dumps network traffic to bt-network-debug.log, exits.")
-    args = ap.parse_args(argv)
-
-    if args.reset:
-        if CHECKPOINT.exists():
-            CHECKPOINT.unlink()
-            print(f"Removed {CHECKPOINT.name}.")
-        return 0
-
-    run(headed=args.headed, batch=args.batch, only_job=args.only_job, discover_url=args.discover_url)
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
             ctx.close()
             browser.close()
 
