@@ -2257,7 +2257,3 @@ function FinancialTable({
     </div>
   )
 }
-)}
-    </div>
-  )
-}
