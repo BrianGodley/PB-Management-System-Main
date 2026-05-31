@@ -149,9 +149,15 @@ function calcPaver(
     const baseRate = BASE_RATE_MAP[row.method] ?? baseBobcatOK
     const baseHrs = baseTons > 0 ? baseTons / baseRate : 0
 
-    const paverData = pp.find(p => p.brand === row.paverBrand && p.name === row.paverName)
-    const pricePerSF = paverData?.price_per_sf || 0
-    const sfPerPallet = paverData?.sf_per_pallet || 0
+    // Custom-brand rows bypass the paver_prices lookup and use whatever
+    // $/SF the user typed in. They don't carry a pallet count — pallet
+    // charges are skipped for custom material since we have no SF/pallet.
+    const isCustom = row.paverBrand === 'Custom'
+    const paverData = isCustom
+      ? null
+      : pp.find(p => p.brand === row.paverBrand && p.name === row.paverName)
+    const pricePerSF = isCustom ? n(row.customPricePerSF) : paverData?.price_per_sf || 0
+    const sfPerPallet = isCustom ? 0 : paverData?.sf_per_pallet || 0
     const pallets = sf > 0 && sfPerPallet > 0 ? Math.ceil(sf / sfPerPallet) : 0
     const paverCost = sf * pricePerSF
 
@@ -184,10 +190,15 @@ function calcPaver(
   const addColorHrs = n(state.numColors) * addColorPer
 
   // ── Vertical soldier ─────────────────────────────────────────────────────────
-  const vertPaverData = pp.find(
-    p => p.brand === state.vertPaverBrand && p.name === state.vertPaverName
-  )
-  const vertPricePerLF = vertPaverData?.price_per_lf_vert || 0
+  const isVertCustom = state.vertPaverBrand === 'Custom'
+  const vertPaverData = isVertCustom
+    ? null
+    : pp.find(
+        p => p.brand === state.vertPaverBrand && p.name === state.vertPaverName
+      )
+  const vertPricePerLF = isVertCustom
+    ? n(state.vertCustomPricePerLF)
+    : vertPaverData?.price_per_lf_vert || 0
   const vertPaverCost = n(state.vertSoldierLF) * vertPricePerLF
 
   const totalPallets = totalAreaPallets
@@ -351,9 +362,9 @@ const DEFAULT_STATE = {
   crewType: 'Paver',
   hoursAdj: 0,
   areaRows: [
-    { label: 'Area 1', method: 'Skid OK', sf: '', depth: 6, paverBrand: '', paverName: '' },
-    { label: 'Area 2', method: 'Skid OK', sf: '', depth: 6, paverBrand: '', paverName: '' },
-    { label: 'Area 3', method: 'Skid OK', sf: '', depth: 6, paverBrand: '', paverName: '' },
+    { label: 'Area 1', method: 'Skid OK', sf: '', depth: 6, paverBrand: '', paverName: '', customPricePerSF: '' },
+    { label: 'Area 2', method: 'Skid OK', sf: '', depth: 6, paverBrand: '', paverName: '', customPricePerSF: '' },
+    { label: 'Area 3', method: 'Skid OK', sf: '', depth: 6, paverBrand: '', paverName: '', customPricePerSF: '' },
   ],
   straightCutLF: '',
   curvedCutLF: '',
@@ -364,6 +375,8 @@ const DEFAULT_STATE = {
   vertSoldierLF: '',
   vertPaverBrand: '',
   vertPaverName: '',
+  // Used only when vertPaverBrand === 'Custom'
+  vertCustomPricePerLF: '',
   sealerSF: '',
   is80mm: false,
   polySand: false,
@@ -447,7 +460,23 @@ function TH({ cols }) {
 }
 
 // Two-part paver picker: brand dropdown + searchable model input
-function PaverPicker({ brand, name, onSelect, paverPrices, showLF = false }) {
+// PaverPicker — brand dropdown + searchable model.
+//
+// Supports a virtual "Custom" brand: when selected, the model search is
+// replaced by a numeric price input. The custom price (in $/SF, or $/LF when
+// showLF=true) is round-tripped via the customPrice / onCustomPriceChange
+// props so the parent row can persist it. paverPrices is still consulted
+// for the brand list of real catalog entries.
+const CUSTOM_BRAND = 'Custom'
+function PaverPicker({
+  brand,
+  name,
+  onSelect,
+  paverPrices,
+  showLF = false,
+  customPrice = '',
+  onCustomPriceChange,
+}) {
   const [search, setSearch] = useState(name || '')
   const [open, setOpen] = useState(false)
 
@@ -457,6 +486,7 @@ function PaverPicker({ brand, name, onSelect, paverPrices, showLF = false }) {
   }, [name])
 
   const brands = [...new Set(paverPrices.map(p => p.brand))].filter(Boolean).sort()
+  const isCustom = brand === CUSTOM_BRAND
 
   const filtered = paverPrices.filter(p => {
     if (brand && p.brand !== brand) return false
@@ -465,8 +495,18 @@ function PaverPicker({ brand, name, onSelect, paverPrices, showLF = false }) {
   })
 
   function handleBrandChange(newBrand) {
-    onSelect(newBrand, '')
-    setSearch('')
+    if (newBrand === CUSTOM_BRAND) {
+      // Mark the row as custom; "name" stays a stub so the calc engine can
+      // tell from brand alone that this is a manual override.
+      onSelect(CUSTOM_BRAND, CUSTOM_BRAND)
+      setSearch(CUSTOM_BRAND)
+    } else {
+      onSelect(newBrand, '')
+      setSearch('')
+      // Clear any lingering custom price when switching back to a catalog
+      // brand so it doesn't silently get reused.
+      if (onCustomPriceChange) onCustomPriceChange('')
+    }
     setOpen(false)
   }
 
@@ -475,6 +515,8 @@ function PaverPicker({ brand, name, onSelect, paverPrices, showLF = false }) {
     setSearch(p.name)
     setOpen(false)
   }
+
+  const priceUnit = showLF ? 'LF' : 'SF'
 
   return (
     <div className="flex gap-1.5">
@@ -490,59 +532,77 @@ function PaverPicker({ brand, name, onSelect, paverPrices, showLF = false }) {
             {b}
           </option>
         ))}
+        <option value={CUSTOM_BRAND}>Custom</option>
       </select>
 
-      {/* Searchable model */}
-      <div className="relative min-w-0 flex-[2]">
-        <input
-          type="text"
-          value={search}
-          onChange={e => {
-            setSearch(e.target.value)
-            setOpen(true)
-          }}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 200)}
-          placeholder={brand ? 'Search model…' : 'Select brand first'}
-          disabled={!brand}
-          className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
-        />
-        {open && brand && filtered.length > 0 && (
-          <div className="absolute z-50 top-full left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-md shadow-lg max-h-52 overflow-y-auto">
-            {filtered.map(p => {
-              const price =
-                showLF && p.price_per_lf_vert
-                  ? `$${parseFloat(p.price_per_lf_vert).toFixed(2)}/LF`
-                  : `$${parseFloat(p.price_per_sf || 0).toFixed(2)}/SF`
-              const isSelected = p.name === name
-              return (
-                <button
-                  key={p.name}
-                  onMouseDown={() => handleModelSelect(p)}
-                  className={`w-full text-left px-2.5 py-1.5 hover:bg-blue-50 border-b border-gray-50 last:border-0 ${
-                    isSelected ? 'bg-blue-50' : ''
-                  }`}
-                >
-                  <span
-                    className={`block text-xs truncate ${isSelected ? 'font-semibold text-blue-800' : 'text-gray-800'}`}
+      {/* Custom price input OR searchable model — depends on brand selection */}
+      {isCustom ? (
+        <div className="relative min-w-0 flex-[2] flex items-center gap-1">
+          <span className="text-xs text-gray-400 flex-shrink-0">$</span>
+          <input
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            min="0"
+            value={customPrice}
+            onChange={e => onCustomPriceChange && onCustomPriceChange(e.target.value)}
+            placeholder={`Custom price per ${priceUnit}`}
+            className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
+          />
+          <span className="text-xs text-gray-400 flex-shrink-0">/{priceUnit}</span>
+        </div>
+      ) : (
+        <div className="relative min-w-0 flex-[2]">
+          <input
+            type="text"
+            value={search}
+            onChange={e => {
+              setSearch(e.target.value)
+              setOpen(true)
+            }}
+            onFocus={() => setOpen(true)}
+            onBlur={() => setTimeout(() => setOpen(false), 200)}
+            placeholder={brand ? 'Search model…' : 'Select brand first'}
+            disabled={!brand}
+            className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
+          />
+          {open && brand && filtered.length > 0 && (
+            <div className="absolute z-50 top-full left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-md shadow-lg max-h-52 overflow-y-auto">
+              {filtered.map(p => {
+                const price =
+                  showLF && p.price_per_lf_vert
+                    ? `$${parseFloat(p.price_per_lf_vert).toFixed(2)}/LF`
+                    : `$${parseFloat(p.price_per_sf || 0).toFixed(2)}/SF`
+                const isSelected = p.name === name
+                return (
+                  <button
+                    key={p.name}
+                    onMouseDown={() => handleModelSelect(p)}
+                    className={`w-full text-left px-2.5 py-1.5 hover:bg-blue-50 border-b border-gray-50 last:border-0 ${
+                      isSelected ? 'bg-blue-50' : ''
+                    }`}
                   >
-                    {p.name}
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    {price}
-                    {p.sf_per_pallet ? ` · ${p.sf_per_pallet} SF/pallet` : ''}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        )}
-        {open && brand && filtered.length === 0 && search && (
-          <div className="absolute z-50 top-full left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-md shadow-sm px-3 py-2 text-xs text-gray-400">
-            No models match "{search}"
-          </div>
-        )}
-      </div>
+                    <span
+                      className={`block text-xs truncate ${isSelected ? 'font-semibold text-blue-800' : 'text-gray-800'}`}
+                    >
+                      {p.name}
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      {price}
+                      {p.sf_per_pallet ? ` · ${p.sf_per_pallet} SF/pallet` : ''}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+          {open && brand && filtered.length === 0 && search && (
+            <div className="absolute z-50 top-full left-0 right-0 mt-0.5 bg-white border border-gray-200 rounded-md shadow-sm px-3 py-2 text-xs text-gray-400">
+              No models match "{search}"
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -946,6 +1006,10 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                         setRow('areaRows', i, 'paverName', nm)
                       }}
                       paverPrices={paverPrices}
+                      customPrice={row.customPricePerSF || ''}
+                      onCustomPriceChange={v =>
+                        setRow('areaRows', i, 'customPricePerSF', v)
+                      }
                     />
                   </td>
                   <td className={num}>{a.pricePerSF > 0 ? fmt2(a.pricePerSF) : '—'}</td>
@@ -1306,6 +1370,8 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             }}
             paverPrices={paverPrices.filter(p => p.price_per_lf_vert > 0)}
             showLF
+            customPrice={state.vertCustomPricePerLF || ''}
+            onCustomPriceChange={v => set('vertCustomPricePerLF', v)}
           />
           {calc.vertPaverCost > 0 && (
             <p className="text-xs text-gray-400 mt-0.5">
