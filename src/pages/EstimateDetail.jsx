@@ -948,6 +948,10 @@ export default function EstimateDetail() {
     gpmd: projectGpmds[selectedProject?.id] ?? editingModule?.data?.gpmd ?? globalGpmd,
     // Sub GP rate always comes from the project — never from stored module data
     subGpMarkupRate: selectedProject?.sub_gp_markup_rate ?? 0.2,
+    // Notes live as a top-level column on estimate_modules (Sam writes
+    // takeoffs here via create_estimate_from_takeoff). Surface it here so
+    // the module's notes textarea pre-fills when editing.
+    notes: editingModule?.notes ?? '',
   }
 
   // ── Estimate-wide totals across every module in every project ──────────────

@@ -581,6 +581,8 @@ export default function COEstimatePanel({
     ...(editingModule?.data || {}),
     gpmd: projectGpmds[selectedProject?.id] ?? editingModule?.data?.gpmd ?? 425,
     subGpMarkupRate: selectedProject?.sub_gp_markup_rate ?? 0.2,
+    // estimate_modules.notes is a top-level DB column, not inside data
+    notes: editingModule?.notes ?? '',
   }
 
   if (loading)
