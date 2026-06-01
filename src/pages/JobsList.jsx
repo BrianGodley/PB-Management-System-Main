@@ -136,9 +136,11 @@ function JobItem({
       <div
         onClick={() => {
           setSelectedJob(job.id)
-          // Picking a specific job from the sidebar always jumps to Info —
-          // mirrors the user's mental model of "open this job's details".
-          if (typeof setTab === 'function') setTab('info')
+          // Tab is intentionally NOT changed here — picking a job from
+          // the sidebar swaps the data underneath but leaves the user on
+          // whatever tab they were already viewing (Schedule, Files,
+          // Tasks, etc.). First-visit default lands on Schedule via the
+          // useState initialiser further down.
         }}
         className={`flex items-center rounded-lg cursor-pointer transition-colors ${
           selectedJob === job.id
@@ -1309,9 +1311,8 @@ export default function JobsList() {
           onChange={e => {
             const v = e.target.value
             setSelectedJob(v)
-            // Mirror the sidebar behavior — picking a specific job from the
-            // mobile dropdown also jumps to Info.
-            if (v !== ALL_JOBS) setTab('info')
+            // Tab is intentionally NOT changed here — keep the user on
+            // whatever tab they're viewing as they swap between jobs.
           }}
           className="input text-sm w-full"
         >
@@ -5171,6 +5172,10 @@ function JobTasksPanel({ job }) {
           </table>
         </div>
       )}
+    </div>
+  )
+}
+
     </div>
   )
 }
