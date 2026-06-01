@@ -1704,14 +1704,19 @@ export default function JobsList() {
                     )
                   }
 
-                  // When the role+employee filter is active, render a flat
-                  // list — no per-stage headers (per Brian's spec on
-                  // 2026-05-28: the "job status bars do not [display]"
-                  // while filtering).
+                  // When the role+employee filter is active, render jobs
+                  // grouped by stage — but only stages that actually
+                  // contain at least one matching job. Empty stages are
+                  // suppressed regardless of `hiddenStages`. A small green
+                  // banner at the top tells the user the filter scope.
                   if (filterActive) {
                     const roleLabel =
                       (JOB_ROLES.find(r => r.key === filterRole) || {}).label ||
                       filterRole
+                    const populatedStages = stages.filter(
+                      s => (byStage[s.id] || []).length > 0,
+                    )
+                    const unassignedCount = byStage['__none__'].length
                     return (
                       <>
                         <div className="mb-1 rounded-lg">
@@ -1723,27 +1728,17 @@ export default function JobsList() {
                               </span>
                             </span>
                           </div>
-                          <div className="space-y-0.5 px-0.5">
-                            {sorted.map(job => (
-                              <JobItem
-                                key={job.id}
-                                job={job}
-                                stages={stages}
-                                selectedJob={selectedJob}
-                                setSelectedJob={setSelectedJob}
-                                setTab={setTab}
-                                setJobModal={setJobModal}
-                                onMove={moveJobToStage}
-                                clientPhoneMap={clientPhoneMap}
-                                respInitials={
-                                  supervisorInitials(job.job_supervisor) ||
-                                  initialsByEmpId[job.responsible_employee_id] ||
-                                  ''
-                                }
-                              />
-                            ))}
-                          </div>
                         </div>
+                        {unassignedCount > 0 && (
+                          <StageSection stageId="__none__" label="Unassigned" />
+                        )}
+                        {populatedStages.map((s, idx) => (
+                          <StageSection
+                            key={s.id}
+                            stageId={s.id}
+                            label={`${idx + 1} - ${s.name}`}
+                          />
+                        ))}
                         {sorted.length === 0 && (
                           <p className="text-xs text-gray-400 text-center py-6">
                             No jobs where {filterEmployee} is {roleLabel}.
@@ -5172,10 +5167,6 @@ function JobTasksPanel({ job }) {
           </table>
         </div>
       )}
-    </div>
-  )
-}
-
     </div>
   )
 }
