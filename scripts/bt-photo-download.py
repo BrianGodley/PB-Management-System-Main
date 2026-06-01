@@ -162,9 +162,33 @@ def save_checkpoint(cp: dict) -> None:
     # real checkpoint is always either the previous good version or the
     # new good version. No more "JSONDecodeError: Unterminated string" on
     # next startup.
+    payload = json.dumps(cp, indent=2)
     tmp = CHECKPOINT.with_suffix(CHECKPOINT.suffix + ".tmp")
-    tmp.write_text(json.dumps(cp, indent=2))
-    os.replace(tmp, CHECKPOINT)
+    tmp.write_text(payload)
+
+    # On Windows, os.replace can throw PermissionError (WinError 5) when
+    # OneDrive / Dropbox / antivirus / a text editor has the destination
+    # file open even momentarily. The rename normally succeeds on a quick
+    # retry. Try a handful of backoffs before falling back to a direct
+    # write — atomicity is nice-to-have, but losing the current run's
+    # progress because of a transient file lock is worse.
+    last_err: Exception | None = None
+    for attempt in range(5):
+        try:
+            os.replace(tmp, CHECKPOINT)
+            return
+        except PermissionError as e:
+            last_err = e
+            time.sleep(0.1 * (2 ** attempt))  # 100, 200, 400, 800, 1600 ms
+    # All retries blocked — write the payload straight onto the real file.
+    # This sacrifices atomicity (if killed mid-write the file may be
+    # truncated), but the next run's recovery / restart logic handles it.
+    print(f"  ! atomic save retried; falling back to direct write ({last_err})")
+    try:
+        tmp.unlink(missing_ok=True)
+    except Exception:
+        pass
+    CHECKPOINT.write_text(payload)
 
 
 # ── BuilderTrend selectors (UPDATE WHEN BT CHANGES THEIR HTML) ──────────────
