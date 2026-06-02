@@ -4249,27 +4249,27 @@ function FileCard({ f, ops, fmtSize }) {
         )}
         <div className="flex items-center justify-between mt-1">
           <span className="text-[10px] text-gray-400">{fmtSize(f.file_size)}</span>
-          <div className="flex items-center gap-1">
-            {f.publicUrl && (
-              <a
-                href={f.publicUrl}
-                download={f.file_name}
-                className="text-[11px] text-blue-600 hover:text-blue-800 font-medium px-1"
-                title="Download"
-              >
-                ⬇
-              </a>
-            )}
-            <RowMenu
-              items={[
-                { label: 'Rename', onClick: () => setEditing(true) },
-                { label: 'Share link', onClick: () => ops.onShare(f) },
-                { label: 'Copy to…', onClick: () => ops.onCopy(f) },
-                { label: 'Move to…', onClick: () => ops.onMove(f) },
-                { label: 'Delete', onClick: () => ops.onDelete(f), danger: true },
-              ]}
-            />
-          </div>
+          <RowMenu
+            items={[
+              { label: 'Rename', onClick: () => setEditing(true) },
+              {
+                label: 'Download',
+                onClick: () => {
+                  if (!f.publicUrl) return
+                  const a = document.createElement('a')
+                  a.href = f.publicUrl
+                  a.download = f.file_name || ''
+                  document.body.appendChild(a)
+                  a.click()
+                  a.remove()
+                },
+              },
+              { label: 'Share link', onClick: () => ops.onShare(f) },
+              { label: 'Copy to…', onClick: () => ops.onCopy(f) },
+              { label: 'Move to…', onClick: () => ops.onMove(f) },
+              { label: 'Delete', onClick: () => ops.onDelete(f), danger: true },
+            ]}
+          />
         </div>
         {f.source === 'buildertrend' && (
           <span className="text-[9px] text-purple-500 font-medium">BuilderTrend</span>
@@ -4428,11 +4428,22 @@ function JobFilesPanel({ job }) {
     const file = e.target.files?.[0]
     if (!file || !job?.id) return
     setUploading(true)
-    const path = `jobs/${job.id}/${Date.now()}-${file.name}`
-    const { error } = await supabase.storage.from('job-files').upload(path, file)
-    if (!error) {
-      const isMedia = file.type?.startsWith('image/') || file.type?.startsWith('video/')
-      await supabase.from('job_files').insert({
+    // Sanitize filename for storage path — Supabase Storage rejects some
+    // characters (e.g. #, ?) and prefers no spaces. Keep the display name
+    // intact in job_files.file_name.
+    const safeName = file.name
+      .replace(/[^A-Za-z0-9._-]+/g, '_')
+      .replace(/_+/g, '_')
+      .slice(0, 120)
+    const path = `jobs/${job.id}/${Date.now()}-${safeName}`
+    try {
+      const { error: upErr } = await supabase.storage
+        .from('job-files')
+        .upload(path, file, { contentType: file.type || undefined })
+      if (upErr) throw upErr
+      const isMedia =
+        file.type?.startsWith('image/') || file.type?.startsWith('video/')
+      const { error: insErr } = await supabase.from('job_files').insert({
         job_id: job.id,
         file_name: file.name,
         file_type: file.type,
@@ -4443,10 +4454,17 @@ function JobFilesPanel({ job }) {
         uploaded_by: user?.id,
         folder_id: currentFolderId || null,
       })
-      fetchFiles(job.id)
+      if (insErr) throw insErr
+      await fetchFiles(job.id)
+    } catch (err) {
+      // Surface the failure so the user knows uploads aren't silently dropping.
+      // eslint-disable-next-line no-console
+      console.error('Upload failed:', err)
+      alert('Upload failed: ' + (err?.message || err))
+    } finally {
+      setUploading(false)
+      e.target.value = ''
     }
-    setUploading(false)
-    e.target.value = ''
   }
 
   async function handleDeleteFile(f) {
