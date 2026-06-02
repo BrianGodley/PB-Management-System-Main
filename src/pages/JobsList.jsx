@@ -3996,8 +3996,176 @@ function FolderIcon({ color = '#f59e0b', size = 48 }) {
 }
 
 // ── File card ─────────────────────────────────────────────────────────────────
-function FileCard({ f, onDelete, fmtSize }) {
+// ── Small "..." dropdown for row actions ─────────────────────────────
+function RowMenu({ items }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  useEffect(() => {
+    if (!open) return
+    function handler(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={e => {
+          e.stopPropagation()
+          e.preventDefault()
+          setOpen(o => !o)
+        }}
+        className="px-1.5 text-gray-400 hover:text-gray-700 text-base leading-none font-bold"
+        title="More actions"
+      >
+        ⋯
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[160px] text-left">
+          {items.filter(Boolean).map((it, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={e => {
+                e.stopPropagation()
+                e.preventDefault()
+                setOpen(false)
+                it.onClick()
+              }}
+              className={`block w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 ${
+                it.danger ? 'text-red-600' : 'text-gray-700'
+              }`}
+            >
+              {it.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Modal: pick target job + folder for Move/Copy ────────────────────
+function MoveTargetPicker({ open, onClose, onConfirm, allJobs, currentJobId, title, busy }) {
+  const [jobId, setJobId] = useState(currentJobId)
+  const [folderId, setFolderId] = useState(null)
+  const [folders, setFolders] = useState([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    setJobId(currentJobId)
+    setFolderId(null)
+  }, [open, currentJobId])
+
+  useEffect(() => {
+    if (!open || !jobId) return
+    let cancelled = false
+    setLoading(true)
+    ;(async () => {
+      const { data } = await supabase
+        .from('job_folders')
+        .select('id,folder_name,parent_folder_id,folder_type')
+        .eq('job_id', jobId)
+        .order('folder_name')
+      if (!cancelled) {
+        setFolders(data || [])
+        setLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open, jobId])
+
+  // Flatten folder tree with indent for select display
+  const flatFolders = (() => {
+    const byParent = new Map()
+    for (const f of folders) {
+      const k = f.parent_folder_id || null
+      if (!byParent.has(k)) byParent.set(k, [])
+      byParent.get(k).push(f)
+    }
+    const out = []
+    function walk(parentId, depth) {
+      for (const f of byParent.get(parentId) || []) {
+        out.push({ ...f, _depth: depth })
+        walk(f.id, depth + 1)
+      }
+    }
+    walk(null, 0)
+    return out
+  })()
+
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-5">
+        <h3 className="text-base font-semibold text-gray-800 mb-3">{title}</h3>
+        <label className="block text-xs font-medium text-gray-500 mb-1">Job</label>
+        <select
+          value={jobId || ''}
+          onChange={e => setJobId(e.target.value)}
+          className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm mb-3"
+        >
+          {allJobs.map(j => (
+            <option key={j.id} value={j.id}>
+              {j.name || j.title || '(untitled)'}
+            </option>
+          ))}
+        </select>
+        <label className="block text-xs font-medium text-gray-500 mb-1">Folder</label>
+        <select
+          value={folderId || ''}
+          onChange={e => setFolderId(e.target.value || null)}
+          className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm mb-4"
+          disabled={loading}
+        >
+          <option value="">(Root)</option>
+          {flatFolders.map(f => (
+            <option key={f.id} value={f.id}>
+              {'  '.repeat(f._depth)}
+              {f.folder_name}
+            </option>
+          ))}
+        </select>
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-md"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => onConfirm({ jobId, folderId })}
+            disabled={busy || !jobId}
+            className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50"
+          >
+            {busy ? 'Working…' : 'Confirm'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function FileCard({ f, ops, fmtSize }) {
   const isImg = f.file_type?.startsWith('image/')
+  const [editing, setEditing] = useState(false)
+  const [nameDraft, setNameDraft] = useState(f.file_name)
+  useEffect(() => {
+    if (!editing) setNameDraft(f.file_name)
+  }, [f.file_name, editing])
+  function commitRename() {
+    const v = nameDraft.trim()
+    setEditing(false)
+    if (v && v !== f.file_name) ops.onRename(f, v)
+  }
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm group">
       {isImg && f.publicUrl ? (
@@ -4018,33 +4186,122 @@ function FileCard({ f, onDelete, fmtSize }) {
         </div>
       )}
       <div className="p-2.5">
-        <p className="text-xs font-medium text-gray-800 truncate" title={f.file_name}>
-          {f.file_name}
-        </p>
+        {editing ? (
+          <input
+            value={nameDraft}
+            onChange={e => setNameDraft(e.target.value)}
+            onBlur={commitRename}
+            onKeyDown={e => {
+              if (e.key === 'Enter') commitRename()
+              else if (e.key === 'Escape') {
+                setEditing(false)
+                setNameDraft(f.file_name)
+              }
+            }}
+            autoFocus
+            className="w-full text-xs font-medium text-gray-800 border border-blue-400 rounded px-1 py-0.5"
+          />
+        ) : (
+          <p
+            className="text-xs font-medium text-gray-800 truncate"
+            title={f.file_name}
+            onDoubleClick={() => setEditing(true)}
+          >
+            {f.file_name}
+          </p>
+        )}
         <div className="flex items-center justify-between mt-1">
           <span className="text-[10px] text-gray-400">{fmtSize(f.file_size)}</span>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             {f.publicUrl && (
               <a
                 href={f.publicUrl}
                 download={f.file_name}
-                className="text-[10px] text-blue-600 hover:text-blue-800 font-medium"
+                className="text-[11px] text-blue-600 hover:text-blue-800 font-medium px-1"
+                title="Download"
               >
                 ⬇
               </a>
             )}
-            <button
-              onClick={() => onDelete(f)}
-              className="text-[10px] text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              ✕
-            </button>
+            <RowMenu
+              items={[
+                { label: 'Rename', onClick: () => setEditing(true) },
+                { label: 'Share link', onClick: () => ops.onShare(f) },
+                { label: 'Copy to…', onClick: () => ops.onCopy(f) },
+                { label: 'Move to…', onClick: () => ops.onMove(f) },
+                { label: 'Delete', onClick: () => ops.onDelete(f), danger: true },
+              ]}
+            />
           </div>
         </div>
         {f.source === 'buildertrend' && (
           <span className="text-[9px] text-purple-500 font-medium">BuilderTrend</span>
         )}
       </div>
+    </div>
+  )
+}
+
+function FolderCard({ folder, count, color, onOpen, ops }) {
+  const [editing, setEditing] = useState(false)
+  const [nameDraft, setNameDraft] = useState(folder.folder_name)
+  useEffect(() => {
+    if (!editing) setNameDraft(folder.folder_name)
+  }, [folder.folder_name, editing])
+  function commitRename() {
+    const v = nameDraft.trim()
+    setEditing(false)
+    if (v && v !== folder.folder_name) ops.onRename(folder, v)
+  }
+  return (
+    <div className="relative flex flex-col items-center gap-1.5 p-3 rounded-xl hover:bg-gray-100 transition-colors group text-center">
+      <div className="absolute top-1 right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+        <RowMenu
+          items={[
+            { label: 'Rename', onClick: () => setEditing(true) },
+            { label: 'Move to…', onClick: () => ops.onMove(folder) },
+            { label: 'Delete folder', onClick: () => ops.onDelete(folder), danger: true },
+          ]}
+        />
+      </div>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex flex-col items-center gap-1.5 w-full"
+        title={folder.folder_name}
+      >
+        <FolderIcon color={color} size={52} />
+      </button>
+      {editing ? (
+        <input
+          value={nameDraft}
+          onChange={e => setNameDraft(e.target.value)}
+          onBlur={commitRename}
+          onKeyDown={e => {
+            if (e.key === 'Enter') commitRename()
+            else if (e.key === 'Escape') {
+              setEditing(false)
+              setNameDraft(folder.folder_name)
+            }
+          }}
+          autoFocus
+          onClick={e => e.stopPropagation()}
+          className="text-xs font-medium text-gray-700 border border-blue-400 rounded px-1 py-0.5 w-full text-center"
+        />
+      ) : (
+        <span
+          className="text-xs font-medium text-gray-700 leading-tight line-clamp-2 w-full text-center cursor-pointer"
+          onClick={onOpen}
+          onDoubleClick={() => setEditing(true)}
+        >
+          {folder.folder_name}
+        </span>
+      )}
+      {count > 0 && (
+        <span className="text-[10px] text-gray-400">
+          {count} file{count !== 1 ? 's' : ''}
+        </span>
+      )}
     </div>
   )
 }
@@ -4062,6 +4319,27 @@ function JobFilesPanel({ job }) {
   const [showModal, setShowModal] = useState(false)
   // folder navigation stack: [{id, name}] — empty = root
   const [folderStack, setFolderStack] = useState([])
+  // Move/Copy modal state
+  const [moveDialog, setMoveDialog] = useState(null) // { kind: 'file'|'folder', item, op: 'move'|'copy' }
+  const [moveBusy, setMoveBusy] = useState(false)
+  const [allJobs, setAllJobs] = useState([])
+
+  // Fetch the (id, name) pairs for every job once so the move/copy picker
+  // can let the user retarget across jobs without an extra spinner.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase
+        .from('jobs')
+        .select('id,name')
+        .order('name')
+        .limit(5000)
+      if (!cancelled && data) setAllJobs(data)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Current folder id (null = root)
   const currentFolderId = folderStack.length > 0 ? folderStack[folderStack.length - 1].id : null
@@ -4178,6 +4456,272 @@ function JobFilesPanel({ job }) {
         )
       )
     }
+  }
+
+  // ── File rename ────────────────────────────────────────────────────
+  async function handleRenameFile(f, newName) {
+    const { error } = await supabase
+      .from('job_files')
+      .update({ file_name: newName })
+      .eq('id', f.id)
+    if (error) return alert('Rename failed: ' + error.message)
+    setFiles(prev => prev.map(x => (x.id === f.id ? { ...x, file_name: newName } : x)))
+  }
+
+  // ── File share — signed URL to clipboard ──────────────────────────
+  async function handleShareFile(f) {
+    const { data, error } = await supabase.storage
+      .from('job-files')
+      .createSignedUrl(f.storage_path, 3600)
+    if (error || !data?.signedUrl) {
+      alert('Could not create share link: ' + (error?.message || 'unknown'))
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(data.signedUrl)
+      alert('Share link copied to clipboard (valid 1 hour)')
+    } catch {
+      // Some browsers block clipboard outside user-gesture; show URL instead
+      prompt('Share link (valid 1 hour) — copy this:', data.signedUrl)
+    }
+  }
+
+  // ── File move/copy to another folder or job ───────────────────────
+  async function performFileMoveCopy(file, targetJobId, targetFolderId, op) {
+    setMoveBusy(true)
+    try {
+      const sameJob = targetJobId === file.job_id
+      if (op === 'move' && sameJob) {
+        const { error } = await supabase
+          .from('job_files')
+          .update({ folder_id: targetFolderId || null })
+          .eq('id', file.id)
+        if (error) throw error
+        setFiles(prev =>
+          prev.map(x =>
+            x.id === file.id ? { ...x, folder_id: targetFolderId || null } : x
+          )
+        )
+      } else {
+        // Cross-job move OR copy (same or different job): need new storage object
+        const newPath = `jobs/${targetJobId}/${Date.now()}-${file.file_name}`
+        const { data: blob, error: dlErr } = await supabase.storage
+          .from('job-files')
+          .download(file.storage_path)
+        if (dlErr || !blob) throw new Error('Source download failed: ' + (dlErr?.message || ''))
+        const { error: upErr } = await supabase.storage
+          .from('job-files')
+          .upload(newPath, blob, { contentType: file.file_type || undefined })
+        if (upErr) throw upErr
+        if (op === 'move') {
+          const { error: updErr } = await supabase
+            .from('job_files')
+            .update({
+              job_id: targetJobId,
+              folder_id: targetFolderId || null,
+              storage_path: newPath,
+            })
+            .eq('id', file.id)
+          if (updErr) throw updErr
+          await supabase.storage.from('job-files').remove([file.storage_path])
+          setFiles(prev => prev.filter(x => x.id !== file.id))
+        } else {
+          // copy: insert new row
+          const { data: inserted, error: insErr } = await supabase
+            .from('job_files')
+            .insert({
+              job_id: targetJobId,
+              file_name: file.file_name,
+              file_type: file.file_type,
+              file_category: file.file_category,
+              storage_path: newPath,
+              file_size: file.file_size,
+              source: 'manual',
+              uploaded_by: user?.id,
+              folder_id: targetFolderId || null,
+            })
+            .select()
+            .single()
+          if (insErr) throw insErr
+          if (sameJob && inserted) {
+            const publicUrl =
+              supabase.storage.from('job-files').getPublicUrl(newPath).data?.publicUrl || null
+            setFiles(prev => [{ ...inserted, publicUrl }, ...prev])
+          }
+        }
+      }
+      setMoveDialog(null)
+    } catch (e) {
+      alert((op === 'move' ? 'Move' : 'Copy') + ' failed: ' + (e?.message || e))
+    } finally {
+      setMoveBusy(false)
+    }
+  }
+
+  // ── Folder rename ──────────────────────────────────────────────────
+  async function handleRenameFolder(folder, newName) {
+    const { error } = await supabase
+      .from('job_folders')
+      .update({ folder_name: newName })
+      .eq('id', folder.id)
+    if (error) return alert('Rename failed: ' + error.message)
+    setFolders(prev =>
+      prev.map(x => (x.id === folder.id ? { ...x, folder_name: newName } : x))
+    )
+    setFolderStack(prev =>
+      prev.map(x => (x.id === folder.id ? { ...x, name: newName } : x))
+    )
+  }
+
+  // Helper: collect a folder's id + every descendant folder id within job
+  async function collectDescendantFolderIds(jobId, rootId) {
+    const { data } = await supabase
+      .from('job_folders')
+      .select('id,parent_folder_id')
+      .eq('job_id', jobId)
+    const all = data || []
+    const out = new Set([rootId])
+    let added = true
+    while (added) {
+      added = false
+      for (const f of all) {
+        if (f.parent_folder_id && out.has(f.parent_folder_id) && !out.has(f.id)) {
+          out.add(f.id)
+          added = true
+        }
+      }
+    }
+    return out
+  }
+
+  // ── Folder recursive delete ────────────────────────────────────────
+  async function handleDeleteFolderRecursive(folder) {
+    if (
+      !confirm(
+        `Delete folder "${folder.folder_name}" and ALL files + subfolders inside it? This cannot be undone.`,
+      )
+    )
+      return
+    setMoveBusy(true)
+    try {
+      const descIds = await collectDescendantFolderIds(folder.job_id, folder.id)
+      const idList = [...descIds]
+      const { data: descFiles } = await supabase
+        .from('job_files')
+        .select('id,storage_path')
+        .eq('job_id', folder.job_id)
+        .in('folder_id', idList)
+      if (descFiles?.length) {
+        // Storage remove in batches of 100 to avoid huge payloads
+        for (let i = 0; i < descFiles.length; i += 100) {
+          const batch = descFiles.slice(i, i + 100).map(x => x.storage_path)
+          await supabase.storage.from('job-files').remove(batch)
+        }
+        await supabase
+          .from('job_files')
+          .delete()
+          .in(
+            'id',
+            descFiles.map(x => x.id),
+          )
+      }
+      await supabase.from('job_folders').delete().in('id', idList)
+      setFolders(prev => prev.filter(f => !descIds.has(f.id)))
+      setFiles(prev => prev.filter(f => !(descFiles || []).some(d => d.id === f.id)))
+      if (folderStack.some(f => descIds.has(f.id))) {
+        setFolderStack(prev => {
+          const idx = prev.findIndex(f => descIds.has(f.id))
+          return idx >= 0 ? prev.slice(0, idx) : prev
+        })
+      }
+    } catch (e) {
+      alert('Delete failed: ' + (e?.message || e))
+    } finally {
+      setMoveBusy(false)
+    }
+  }
+
+  // ── Folder move (same job or another job) ──────────────────────────
+  async function performFolderMove(folder, targetJobId, targetFolderId) {
+    setMoveBusy(true)
+    try {
+      const descIds = await collectDescendantFolderIds(folder.job_id, folder.id)
+      if (targetFolderId && descIds.has(targetFolderId)) {
+        throw new Error('Cannot move a folder into itself or its descendants')
+      }
+      if (targetJobId === folder.job_id) {
+        const { error } = await supabase
+          .from('job_folders')
+          .update({ parent_folder_id: targetFolderId || null })
+          .eq('id', folder.id)
+        if (error) throw error
+        setFolders(prev =>
+          prev.map(x =>
+            x.id === folder.id ? { ...x, parent_folder_id: targetFolderId || null } : x,
+          ),
+        )
+      } else {
+        // Different job: rewrite job_id on folder + all descendants + every
+        // file inside them. Storage objects keep their existing paths
+        // (paths happen to be prefixed with the old job_id; that's a
+        // cosmetic mismatch but downloads + signed URLs still resolve).
+        const idList = [...descIds]
+        const { error: f1 } = await supabase
+          .from('job_folders')
+          .update({ job_id: targetJobId, parent_folder_id: targetFolderId || null })
+          .eq('id', folder.id)
+        if (f1) throw f1
+        if (idList.length > 1) {
+          const childIds = idList.filter(id => id !== folder.id)
+          const { error: f2 } = await supabase
+            .from('job_folders')
+            .update({ job_id: targetJobId })
+            .in('id', childIds)
+          if (f2) throw f2
+        }
+        const { data: descFiles } = await supabase
+          .from('job_files')
+          .select('id')
+          .eq('job_id', folder.job_id)
+          .in('folder_id', idList)
+        if (descFiles?.length) {
+          await supabase
+            .from('job_files')
+            .update({ job_id: targetJobId })
+            .in(
+              'id',
+              descFiles.map(x => x.id),
+            )
+        }
+        setFolders(prev => prev.filter(f => !descIds.has(f.id)))
+        setFiles(prev => prev.filter(f => !(descFiles || []).some(d => d.id === f.id)))
+        if (folderStack.some(f => descIds.has(f.id))) {
+          setFolderStack(prev => {
+            const idx = prev.findIndex(f => descIds.has(f.id))
+            return idx >= 0 ? prev.slice(0, idx) : prev
+          })
+        }
+      }
+      setMoveDialog(null)
+    } catch (e) {
+      alert('Move failed: ' + (e?.message || e))
+    } finally {
+      setMoveBusy(false)
+    }
+  }
+
+  // Bundle for FileCard / FolderCard
+  const fileOps = {
+    onRename: handleRenameFile,
+    onShare: handleShareFile,
+    onCopy: f => setMoveDialog({ kind: 'file', item: f, op: 'copy' }),
+    onMove: f => setMoveDialog({ kind: 'file', item: f, op: 'move' }),
+    onDelete: handleDeleteFile,
+  }
+  const folderOps = {
+    onRename: handleRenameFolder,
+    onMove: f => setMoveDialog({ kind: 'folder', item: f, op: 'move' }),
+    onDelete: handleDeleteFolderRecursive,
   }
 
   function fmtSize(bytes) {
@@ -4412,30 +4956,19 @@ function JobFilesPanel({ job }) {
                 Subfolders
               </p>
               <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {activeFolders.map(f => {
-                  const count = allTabFiles.filter(x => x.folder_id === f.id).length
-                  return (
-                    <button
-                      key={f.id}
-                      onClick={() => {
-                        setFolderStack(prev => [...prev, { id: f.id, name: f.folder_name }])
-                        setAddingFolder(false)
-                      }}
-                      className="flex flex-col items-center gap-1.5 p-3 rounded-xl hover:bg-gray-100 transition-colors group relative text-center"
-                      title={f.folder_name}
-                    >
-                      <FolderIcon color={folderIconColor} size={52} />
-                      <span className="text-xs font-medium text-gray-700 leading-tight line-clamp-2 w-full text-center">
-                        {f.folder_name}
-                      </span>
-                      {count > 0 && (
-                        <span className="text-[10px] text-gray-400">
-                          {count} file{count !== 1 ? 's' : ''}
-                        </span>
-                      )}
-                    </button>
-                  )
-                })}
+                {activeFolders.map(f => (
+                  <FolderCard
+                    key={f.id}
+                    folder={f}
+                    count={allTabFiles.filter(x => x.folder_id === f.id).length}
+                    color={folderIconColor}
+                    onOpen={() => {
+                      setFolderStack(prev => [...prev, { id: f.id, name: f.folder_name }])
+                      setAddingFolder(false)
+                    }}
+                    ops={folderOps}
+                  />
+                ))}
               </div>
             </div>
           )}
@@ -4454,7 +4987,7 @@ function JobFilesPanel({ job }) {
           {visibleFiles.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {visibleFiles.map(f => (
-                <FileCard key={f.id} f={f} onDelete={handleDeleteFile} fmtSize={fmtSize} />
+                <FileCard key={f.id} f={f} ops={fileOps} fmtSize={fmtSize} />
               ))}
             </div>
           )}
@@ -4469,30 +5002,19 @@ function JobFilesPanel({ job }) {
                 Folders
               </p>
               <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {activeFolders.map(f => {
-                  const folderFileCount = allTabFiles.filter(x => x.folder_id === f.id).length
-                  return (
-                    <button
-                      key={f.id}
-                      onClick={() => {
-                        setFolderStack([{ id: f.id, name: f.folder_name }])
-                        setAddingFolder(false)
-                      }}
-                      className="flex flex-col items-center gap-1.5 p-3 rounded-xl hover:bg-gray-100 transition-colors group relative text-center"
-                      title={f.folder_name}
-                    >
-                      <FolderIcon color={folderIconColor} size={52} />
-                      <span className="text-xs font-medium text-gray-700 leading-tight line-clamp-2 w-full text-center">
-                        {f.folder_name}
-                      </span>
-                      {folderFileCount > 0 && (
-                        <span className="text-[10px] text-gray-400">
-                          {folderFileCount} file{folderFileCount !== 1 ? 's' : ''}
-                        </span>
-                      )}
-                    </button>
-                  )
-                })}
+                {activeFolders.map(f => (
+                  <FolderCard
+                    key={f.id}
+                    folder={f}
+                    count={allTabFiles.filter(x => x.folder_id === f.id).length}
+                    color={folderIconColor}
+                    onOpen={() => {
+                      setFolderStack([{ id: f.id, name: f.folder_name }])
+                      setAddingFolder(false)
+                    }}
+                    ops={folderOps}
+                  />
+                ))}
               </div>
             </div>
           )}
@@ -4505,7 +5027,7 @@ function JobFilesPanel({ job }) {
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 {visibleFiles.map(f => (
-                  <FileCard key={f.id} f={f} onDelete={handleDeleteFile} fmtSize={fmtSize} />
+                  <FileCard key={f.id} f={f} ops={fileOps} fmtSize={fmtSize} />
                 ))}
               </div>
             </div>
@@ -4531,6 +5053,31 @@ function JobFilesPanel({ job }) {
           )}
         </>
       )}
+
+      <MoveTargetPicker
+        open={!!moveDialog}
+        onClose={() => setMoveDialog(null)}
+        onConfirm={({ jobId, folderId }) => {
+          if (!moveDialog) return
+          if (moveDialog.kind === 'file') {
+            performFileMoveCopy(moveDialog.item, jobId, folderId, moveDialog.op)
+          } else {
+            performFolderMove(moveDialog.item, jobId, folderId)
+          }
+        }}
+        allJobs={allJobs}
+        currentJobId={job?.id}
+        title={
+          moveDialog
+            ? `${moveDialog.op === 'copy' ? 'Copy' : 'Move'} ${
+                moveDialog.kind === 'file'
+                  ? `"${moveDialog.item.file_name}"`
+                  : `folder "${moveDialog.item.folder_name}"`
+              } to…`
+            : ''
+        }
+        busy={moveBusy}
+      />
     </div>
   )
 }
@@ -5173,4 +5720,3 @@ function JobTasksPanel({ job }) {
     </div>
   )
 }
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
