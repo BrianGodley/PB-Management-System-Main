@@ -622,28 +622,43 @@ def process_job(page: Page, job: dict) -> int:
         return 0
     print(f"    {len(logs)} daily log(s) to scan")
 
-    # Fast-path "already complete" check — one round-trip to Supabase.
-    # If every daily log for this job already has at least one photo
-    # recorded in daily_log_photos, the job was processed in a previous
-    # run (just never reached `cp["done_jobs"].append(...)` — e.g. the
-    # script was killed). Skip the (expensive) BT API + Playwright loop
-    # and return 0 so the caller marks it done. This lets the next run
-    # blow past these jobs instead of re-scanning them every single time.
+    # Fast-path "already complete" check. If every daily log for this
+    # job already has at least one photo in daily_log_photos, the job was
+    # processed before (just never reached done_jobs — e.g. the script
+    # was killed). Skip the expensive BT/Playwright loop and return 0 so
+    # the caller marks it done. Trade-off: if BT got NEW photos for some
+    # log after our last run, we'd miss them. --reset catches that.
     #
-    # Trade-off: if BT had MORE photos for some log than we have on
-    # record (e.g. supervisor added photos after our last download),
-    # we'd miss the new ones. Re-running with --reset will catch them.
+    # The `in.(...)` query is chunked because a single URL with hundreds
+    # of UUIDs blows past PostgREST / Supabase's request-line limit and
+    # returns HTTP 400. CHUNK_SIZE is a comfortable margin under the
+    # default 8 KB line limit (each UUID + quotes + comma ~ 40 bytes).
     log_ids = [lg["id"] for lg in logs]
-    in_list = ",".join(f'"{lid}"' for lid in log_ids)
-    existing = supa_get(
-        "daily_log_photos",
-        {
-            "log_id": f"in.({in_list})",
-            "select": "log_id",
-        },
-    )
-    logs_with_photos = {row["log_id"] for row in (existing or [])}
-    if logs_with_photos and all(lid in logs_with_photos for lid in log_ids):
+    LOG_ID_CHUNK = 50
+    logs_with_photos: set = set()
+    chunk_err: Exception | None = None
+    for i in range(0, len(log_ids), LOG_ID_CHUNK):
+        chunk = log_ids[i:i + LOG_ID_CHUNK]
+        in_list = ",".join(f'"{lid}"' for lid in chunk)
+        try:
+            existing = supa_get(
+                "daily_log_photos",
+                {
+                    "log_id": f"in.({in_list})",
+                    "select": "log_id",
+                },
+            )
+        except Exception as e:
+            # Don't fail the whole job over a transient supabase hiccup —
+            # fall back to the full BT fetch path and let the per-photo
+            # dedup catch duplicates. Note the error in the checkpoint so
+            # we can see if it's a persistent issue.
+            chunk_err = e
+            break
+        logs_with_photos.update(row["log_id"] for row in (existing or []))
+    if chunk_err is not None:
+        print(f"    ! supabase fast-path query failed; falling through ({chunk_err})")
+    elif logs_with_photos and all(lid in logs_with_photos for lid in log_ids):
         print(f"    ✓ already complete ({len(logs)} logs, all have photos) — skipping fetch")
         return 0
 
