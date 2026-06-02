@@ -3997,20 +3997,50 @@ function FolderIcon({ color = '#f59e0b', size = 48 }) {
 
 // ── File card ─────────────────────────────────────────────────────────────────
 // ── Small "..." dropdown for row actions ─────────────────────────────
+// Portaled to document.body so an ancestor's overflow-hidden (e.g. the
+// rounded image area on FileCard) can't clip the menu.
 function RowMenu({ items }) {
   const [open, setOpen] = useState(false)
-  const ref = useRef(null)
+  const [pos, setPos] = useState({ top: 0, left: 0 })
+  const btnRef = useRef(null)
+  const menuRef = useRef(null)
+
+  function recalc() {
+    if (!btnRef.current) return
+    const r = btnRef.current.getBoundingClientRect()
+    const menuWidth = 170
+    let left = r.right - menuWidth
+    if (left < 8) left = 8
+    if (left + menuWidth > window.innerWidth - 8)
+      left = window.innerWidth - menuWidth - 8
+    setPos({ top: r.bottom + 4, left })
+  }
+
   useEffect(() => {
     if (!open) return
-    function handler(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    recalc()
+    function down(e) {
+      if (menuRef.current && menuRef.current.contains(e.target)) return
+      if (btnRef.current && btnRef.current.contains(e.target)) return
+      setOpen(false)
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    function onScrollOrResize() {
+      recalc()
+    }
+    document.addEventListener('mousedown', down)
+    window.addEventListener('scroll', onScrollOrResize, true)
+    window.addEventListener('resize', onScrollOrResize)
+    return () => {
+      document.removeEventListener('mousedown', down)
+      window.removeEventListener('scroll', onScrollOrResize, true)
+      window.removeEventListener('resize', onScrollOrResize)
+    }
   }, [open])
+
   return (
-    <div className="relative" ref={ref}>
+    <>
       <button
+        ref={btnRef}
         type="button"
         onClick={e => {
           e.stopPropagation()
@@ -4022,28 +4052,35 @@ function RowMenu({ items }) {
       >
         ⋯
       </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[160px] text-left">
-          {items.filter(Boolean).map((it, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={e => {
-                e.stopPropagation()
-                e.preventDefault()
-                setOpen(false)
-                it.onClick()
-              }}
-              className={`block w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 ${
-                it.danger ? 'text-red-600' : 'text-gray-700'
-              }`}
-            >
-              {it.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+      {open &&
+        createPortal(
+          <div
+            ref={menuRef}
+            className="fixed z-[9999] bg-white rounded-lg shadow-xl border border-gray-200 py-1 min-w-[170px] text-left"
+            style={{ top: pos.top, left: pos.left }}
+            onClick={e => e.stopPropagation()}
+          >
+            {items.filter(Boolean).map((it, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={e => {
+                  e.stopPropagation()
+                  e.preventDefault()
+                  setOpen(false)
+                  it.onClick()
+                }}
+                className={`block w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 ${
+                  it.danger ? 'text-red-600' : 'text-gray-700'
+                }`}
+              >
+                {it.label}
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
+    </>
   )
 }
 
@@ -5689,7 +5726,6 @@ function JobTasksPanel({ job }) {
                         ))}
                       </select>
                     </td>
-
                     {/* Due date picker */}
                     <td className="px-2 py-1">
                       <input
