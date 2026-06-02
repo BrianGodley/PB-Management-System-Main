@@ -4191,8 +4191,206 @@ function MoveTargetPicker({ open, onClose, onConfirm, allJobs, currentJobId, tit
   )
 }
 
+// Fetch the first ~2KB of a CSV (enough for header + a few rows) and
+// render as a compact monospace snippet. Uses Range header so we don't
+// pull the whole file down.
+function CsvSnippet({ url }) {
+  const [text, setText] = useState(null)
+  const [err, setErr] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    fetch(url, { headers: { Range: 'bytes=0-2047' } })
+      .then(r => (r.ok || r.status === 206 ? r.text() : Promise.reject(r.status)))
+      .then(t => {
+        if (!cancelled) setText(t)
+      })
+      .catch(() => {
+        if (!cancelled) setErr(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [url])
+  if (err)
+    return (
+      <div className="w-full h-28 flex items-center justify-center text-4xl">📊</div>
+    )
+  if (text === null)
+    return <div className="w-full h-28 bg-gray-50 animate-pulse" />
+  const rows = text.split(/\r?\n/).slice(0, 6)
+  return (
+    <div className="w-full h-28 p-1.5 overflow-hidden text-[8px] leading-tight font-mono text-gray-700 bg-white">
+      {rows.map((row, i) => (
+        <div key={i} className="truncate">
+          {row || ' '}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Lazy preview: only mounts the heavy <embed>/<video> once the card has
+// scrolled close to the viewport. Big folders with 100+ files would
+// otherwise fire that many parallel network requests on mount.
+function FilePreview({ f }) {
+  const ref = useRef(null)
+  const [visible, setVisible] = useState(false)
+  useEffect(() => {
+    if (visible || !ref.current) return
+    const io = new IntersectionObserver(
+      entries => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            setVisible(true)
+            io.disconnect()
+            break
+          }
+        }
+      },
+      { rootMargin: '200px' },
+    )
+    io.observe(ref.current)
+    return () => io.disconnect()
+  }, [visible])
+
+  const isImg = f.file_type?.startsWith('image/') && f.publicUrl
+  const isVideo = f.file_type?.startsWith('video/') && f.publicUrl
+  const isPdf = f.file_type === 'application/pdf' && f.publicUrl
+  const nameLower = (f.file_name || '').toLowerCase()
+  // Microsoft Office Online viewer renders Word/Excel/PowerPoint from a
+  // public URL into an iframe — zero libraries, just a hosted service.
+  // Requires the file URL to be internet-reachable (job-files bucket
+  // serves publicUrls so this works).
+  const isOfficeDoc =
+    f.publicUrl &&
+    (nameLower.endsWith('.docx') ||
+      nameLower.endsWith('.doc') ||
+      nameLower.endsWith('.xlsx') ||
+      nameLower.endsWith('.xls') ||
+      nameLower.endsWith('.pptx') ||
+      nameLower.endsWith('.ppt'))
+  const isCsv = f.publicUrl && (nameLower.endsWith('.csv') || nameLower.endsWith('.tsv'))
+
+  if (isImg) {
+    return (
+      <a
+        ref={ref}
+        href={f.publicUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block w-full h-28 bg-gray-50"
+      >
+        {visible && (
+          <img
+            src={f.publicUrl}
+            alt={f.file_name}
+            className="w-full h-28 object-cover hover:opacity-90 transition-opacity"
+            loading="lazy"
+          />
+        )}
+      </a>
+    )
+  }
+  if (isVideo) {
+    return (
+      <a
+        ref={ref}
+        href={f.publicUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block w-full h-28 bg-black"
+      >
+        {visible && (
+          <video
+            src={f.publicUrl}
+            preload="metadata"
+            muted
+            playsInline
+            className="w-full h-28 object-cover pointer-events-none"
+          />
+        )}
+      </a>
+    )
+  }
+  if (isPdf) {
+    return (
+      <a
+        ref={ref}
+        href={f.publicUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block w-full h-28 bg-gray-50 overflow-hidden relative"
+      >
+        {visible && (
+          <embed
+            src={f.publicUrl + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH'}
+            type="application/pdf"
+            className="w-full h-44 pointer-events-none -mt-2"
+          />
+        )}
+        {/* Click overlay so the link is reliably clickable even if the
+            embed swallows pointer events on some browsers. */}
+        <span className="absolute inset-0" />
+      </a>
+    )
+  }
+  if (isOfficeDoc) {
+    const officeUrl =
+      'https://view.officeapps.live.com/op/embed.aspx?src=' +
+      encodeURIComponent(f.publicUrl)
+    return (
+      <a
+        ref={ref}
+        href={f.publicUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block w-full h-28 bg-gray-50 overflow-hidden relative"
+        title="Open in new tab"
+      >
+        {visible && (
+          <iframe
+            src={officeUrl}
+            title={f.file_name}
+            className="w-full h-44 pointer-events-none -mt-2 border-0"
+          />
+        )}
+        <span className="absolute inset-0" />
+      </a>
+    )
+  }
+  if (isCsv) {
+    return (
+      <a
+        ref={ref}
+        href={f.publicUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block w-full h-28 bg-gray-50 overflow-hidden relative"
+        title="Open CSV in new tab"
+      >
+        {visible && <CsvSnippet url={f.publicUrl} />}
+        <span className="absolute inset-0" />
+      </a>
+    )
+  }
+  return (
+    <div ref={ref} className="w-full h-28 bg-gray-50 flex items-center justify-center text-4xl">
+      {f.file_type?.startsWith('video/')
+        ? '🎥'
+        : f.file_type === 'application/pdf'
+          ? '📄'
+          : f.file_type?.includes('word') || f.file_name?.toLowerCase().endsWith('.docx')
+            ? '📝'
+            : f.file_type?.includes('sheet') ||
+                f.file_name?.toLowerCase().endsWith('.xlsx') ||
+                f.file_name?.toLowerCase().endsWith('.csv')
+              ? '📊'
+              : '📎'}
+    </div>
+  )
+}
+
 function FileCard({ f, ops, fmtSize }) {
-  const isImg = f.file_type?.startsWith('image/')
   const [editing, setEditing] = useState(false)
   const [nameDraft, setNameDraft] = useState(f.file_name)
   useEffect(() => {
@@ -4205,23 +4403,7 @@ function FileCard({ f, ops, fmtSize }) {
   }
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm group">
-      {isImg && f.publicUrl ? (
-        <a href={f.publicUrl} target="_blank" rel="noopener noreferrer">
-          <img
-            src={f.publicUrl}
-            alt={f.file_name}
-            className="w-full h-28 object-cover hover:opacity-90 transition-opacity"
-          />
-        </a>
-      ) : (
-        <div className="w-full h-28 bg-gray-50 flex items-center justify-center text-4xl">
-          {f.file_type?.startsWith('video/')
-            ? '🎥'
-            : f.file_type === 'application/pdf'
-              ? '📄'
-              : '📎'}
-        </div>
-      )}
+      <FilePreview f={f} />
       <div className="p-2.5">
         {editing ? (
           <input
