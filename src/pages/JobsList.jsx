@@ -4200,68 +4200,18 @@ function JobFilesPanel({ job }) {
   )
 
   // ── BT virtual folders ─────────────────────────────────────────────────
-  // Files imported by the BT downloader carry their folder hierarchy in
-  // job_files.folder_path (e.g. "3. Designs/Older Designs") instead of a
-  // job_folders id. We derive a virtual folder tree from those strings so
-  // the user navigates BT's structure without needing real job_folders
-  // rows.
-  //
-  // Convention: a virtual-folder navigation step is pushed onto
-  // folderStack with id = `bt:<full folder path>` so we don't collide
-  // with real job_folders UUIDs. currentBtPath is the path under the
-  // most recent bt: entry on the stack (or null if we're not inside one).
-  const lastBt = [...folderStack].reverse().find(f => String(f.id).startsWith('bt:')) || null
-  const currentBtPath = lastBt ? String(lastBt.id).slice(3) : null
-
   const allTabFiles = files.filter(f => (subTab === 'documents' ? !isMedia(f) : isMedia(f)))
 
-  // Set of unique non-empty folder paths from the BT-imported files in
-  // this sub-tab.
-  const btPaths = Array.from(
-    new Set(allTabFiles.map(f => (f.folder_path || '').trim()).filter(Boolean))
-  )
-
-  // Virtual folders to show at the current level:
-  //   - if we're inside a real job_folder, no BT folders show (they live
-  //     parallel to manual folders, not inside them).
-  //   - otherwise show the next path segment after currentBtPath, deduped.
-  const btVirtualFolders = currentFolderId
-    ? []
-    : (() => {
-        const prefix = currentBtPath ? currentBtPath + '/' : ''
-        const out = new Map() // segment → full path of that segment
-        for (const p of btPaths) {
-          if (currentBtPath) {
-            if (p !== currentBtPath && !p.startsWith(prefix)) continue
-            const rest = p === currentBtPath ? '' : p.slice(prefix.length)
-            if (!rest) continue
-            const seg = rest.split('/')[0]
-            if (!out.has(seg)) out.set(seg, prefix + seg)
-          } else {
-            const seg = p.split('/')[0]
-            if (!out.has(seg)) out.set(seg, seg)
-          }
-        }
-        return Array.from(out, ([name, fullPath]) => ({
-          id: `bt:${fullPath}`,
-          folder_name: name,
-          folder_type: subTab === 'documents' ? 'document' : 'photo_video',
-          _isVirtual: true,
-        }))
-      })()
-
-  // Files scoped to current view
-  const visibleFiles = currentBtPath
-    ? allTabFiles.filter(f => (f.folder_path || '') === currentBtPath)
-    : currentFolderId
-      ? allTabFiles.filter(f => f.folder_id === currentFolderId)
-      : allTabFiles.filter(f => !f.folder_id && !f.folder_path)
+  // Files scoped to current view. BT-imported files now have folder_id set
+  // (the downloader creates real job_folders rows), so virtual derivation
+  // from folder_path is no longer needed — the same job_folders logic the
+  // app already had for manual folders handles everything.
+  const visibleFiles = currentFolderId
+    ? allTabFiles.filter(f => f.folder_id === currentFolderId)
+    : allTabFiles.filter(f => !f.folder_id)
 
   const rootIsEmpty =
-    !filesLoading &&
-    activeFolders.length === 0 &&
-    btVirtualFolders.length === 0 &&
-    visibleFiles.length === 0
+    !filesLoading && activeFolders.length === 0 && visibleFiles.length === 0
   const folderIsEmpty = !filesLoading && visibleFiles.length === 0
 
   if (!job)
@@ -4455,23 +4405,15 @@ function JobFilesPanel({ job }) {
             </label>
           </div>
 
-          {/* Subfolders — real job_folders + BT virtual folders combined */}
-          {(activeFolders.length > 0 || btVirtualFolders.length > 0) && (
+          {/* Subfolders */}
+          {activeFolders.length > 0 && (
             <div className="mb-6">
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-3">
                 Subfolders
               </p>
               <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {[...activeFolders, ...btVirtualFolders].map(f => {
-                  const isVirtual = String(f.id).startsWith('bt:')
-                  // For BT virtual folders, count files whose folder_path
-                  // either equals or sits underneath this virtual folder.
-                  const count = isVirtual
-                    ? allTabFiles.filter(x => {
-                        const p = String(f.id).slice(3)
-                        return (x.folder_path || '') === p || (x.folder_path || '').startsWith(p + '/')
-                      }).length
-                    : allTabFiles.filter(x => x.folder_id === f.id).length
+                {activeFolders.map(f => {
+                  const count = allTabFiles.filter(x => x.folder_id === f.id).length
                   return (
                     <button
                       key={f.id}
@@ -4498,7 +4440,7 @@ function JobFilesPanel({ job }) {
             </div>
           )}
 
-          {folderIsEmpty && activeFolders.length === 0 && btVirtualFolders.length === 0 && (
+          {folderIsEmpty && activeFolders.length === 0 && (
             <div className="flex flex-col items-center py-12 text-gray-400">
               <div className="mb-3 opacity-40">
                 <FolderIcon color={folderIconColor} size={56} />
@@ -4520,21 +4462,15 @@ function JobFilesPanel({ job }) {
       ) : (
         /* ── ROOT VIEW ───────────────────────────────────────────── */
         <>
-          {/* Folder grid — real job_folders + BT virtual folders combined */}
-          {(activeFolders.length > 0 || btVirtualFolders.length > 0) && (
+          {/* Folder grid */}
+          {activeFolders.length > 0 && (
             <div className="mb-6">
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-3">
                 Folders
               </p>
               <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {[...activeFolders, ...btVirtualFolders].map(f => {
-                  const isVirtual = String(f.id).startsWith('bt:')
-                  const folderFileCount = isVirtual
-                    ? allTabFiles.filter(x => {
-                        const p = String(f.id).slice(3)
-                        return (x.folder_path || '') === p || (x.folder_path || '').startsWith(p + '/')
-                      }).length
-                    : allTabFiles.filter(x => x.folder_id === f.id).length
+                {activeFolders.map(f => {
+                  const folderFileCount = allTabFiles.filter(x => x.folder_id === f.id).length
                   return (
                     <button
                       key={f.id}
@@ -4565,7 +4501,7 @@ function JobFilesPanel({ job }) {
           {visibleFiles.length > 0 && (
             <div>
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2">
-                {(activeFolders.length > 0 || btVirtualFolders.length > 0) ? 'Unorganized Files' : 'Files'}
+                {activeFolders.length > 0 ? 'Unorganized Files' : 'Files'}
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 {visibleFiles.map(f => (
@@ -5237,3 +5173,4 @@ function JobTasksPanel({ job }) {
     </div>
   )
 }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
