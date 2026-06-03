@@ -32,6 +32,7 @@ export default function OrgChartV2() {
   const [busy, setBusy] = useState(false)
   const [editingChartName, setEditingChartName] = useState(false)
   const [chartNameDraft, setChartNameDraft] = useState('')
+  const [zoom, setZoom] = useState(1)
 
   // ── Loaders ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -498,6 +499,33 @@ export default function OrgChartV2() {
         >
           {connectMode ? 'Cancel connect' : 'Connect →'}
         </button>
+        {/* Zoom controls */}
+        <div className="flex items-center gap-1 ml-1">
+          <button
+            type="button"
+            onClick={() => setZoom(z => Math.max(0.2, +(z - 0.1).toFixed(2)))}
+            className="text-sm px-2 py-1 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200"
+            title="Zoom out"
+          >
+            −
+          </button>
+          <button
+            type="button"
+            onClick={() => setZoom(1)}
+            className="text-xs px-2 py-1 rounded-md bg-slate-50 text-slate-600 hover:bg-slate-100 min-w-[3.25rem]"
+            title="Reset zoom to 100%"
+          >
+            {Math.round(zoom * 100)}%
+          </button>
+          <button
+            type="button"
+            onClick={() => setZoom(z => Math.min(3, +(z + 0.1).toFixed(2)))}
+            className="text-sm px-2 py-1 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200"
+            title="Zoom in"
+          >
+            +
+          </button>
+        </div>
         {selectedNodeId && (
           <button
             type="button"
@@ -531,7 +559,9 @@ export default function OrgChartV2() {
           <TierCanvas
             nodes={nodes}
             edges={edges}
-            nodeTypes={nodeTypes}            positionHolders={holderMap}
+            nodeTypes={nodeTypes}
+            positionHolders={holderMap}
+            zoom={zoom}
             selectedNodeId={selectedNodeId}
             selectedEdgeId={selectedEdgeId}
             onNodeClick={onNodeClick}

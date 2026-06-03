@@ -24,6 +24,7 @@ export default function TierCanvas({
   onNodeClick,
   onEdgeClick,
   onBackgroundClick,
+  zoom = 1,
 }) {
   const { laidOut, width, height } = layoutTiers(nodes)
   const typeById = new Map((nodeTypes || []).map(t => [t.id, t]))
@@ -35,15 +36,20 @@ export default function TierCanvas({
     return ak - bk
   })
 
+  // viewBox stays at the natural layout size; pixel width/height get
+  // multiplied by zoom so the SVG renders larger or smaller. Parent's
+  // overflow:auto provides pan/scroll when zoomed in past the viewport.
+  const vw = Math.max(width, 800)
+  const vh = Math.max(height, 400)
+
   return (
     <svg
-      width="100%"
-      viewBox={`0 0 ${Math.max(width, 800)} ${Math.max(height, 400)}`}
+      width={vw * zoom}
+      height={vh * zoom}
+      viewBox={`0 0 ${vw} ${vh}`}
       preserveAspectRatio="xMidYMin meet"
-      style={{ background: '#F8FAFC' }}
+      style={{ background: '#F8FAFC', display: 'block' }}
       onClick={e => {
-        // background click only — children stopPropagation isn't ideal, so
-        // we check the target instead
         if (e.target.tagName === 'svg') onBackgroundClick?.()
       }}
     >
