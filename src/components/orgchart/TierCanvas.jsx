@@ -13,7 +13,7 @@
 //
 // All coord math runs in SVG user-space via getScreenCTM().inverse().
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { layoutTiers, CANVAS_PAD_X, NODE_GAP } from './layout.js'
 import EdgeLayer from './EdgeLayer.jsx'
 import { CustomNode, PositionNode, ContainerNode } from './NodeRenderers.jsx'
@@ -34,14 +34,37 @@ export default function TierCanvas({
   zoom = 1,
 }) {
   const svgRef = useRef(null)
+  const wrapRef = useRef(null)
   const [drag, setDrag] = useState(null)
   // drag = { nodeId, startX, startY, dx, dy, dragging }
+  const [containerSize, setContainerSize] = useState({ w: 0, h: 0 })
+
+  // Watch the parent container so the SVG can always extend to its
+  // outer right/bottom edges — that way dragging a node toward the
+  // viewport border doesn't run out of canvas.
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+    const ro = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const cr = entry.contentRect
+        setContainerSize({ w: cr.width, h: cr.height })
+      }
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   const { laidOut, tiers, width, height } = layoutTiers(nodes)
   const typeById = new Map((nodeTypes || []).map(t => [t.id, t]))
 
-  const vw = Math.max(width, 800)
-  const vh = Math.max(height, 400)
+  // Coordinate space (viewBox) covers the larger of the layout size or
+  // the container size scaled by the inverse of zoom (so at zoom=1 the
+  // canvas always reaches the right/bottom of its container).
+  const minW = containerSize.w ? containerSize.w / zoom : 800
+  const minH = containerSize.h ? containerSize.h / zoom : 400
+  const vw = Math.max(width, minW)
+  const vh = Math.max(height, minH)
 
   function toSvgCoords(clientX, clientY) {
     const svg = svgRef.current
@@ -160,11 +183,12 @@ export default function TierCanvas({
   })
 
   return (
-    <svg
-      ref={svgRef}
-      width={vw * zoom}
-      height={vh * zoom}
-      viewBox={`0 0 ${vw} ${vh}`}
+    <div ref={wrapRef} style={{ width: '100%', height: '100%' }}>
+      <svg
+        ref={svgRef}
+        width={vw * zoom}
+        height={vh * zoom}
+        viewBox={`0 0 ${vw} ${vh}`}
       preserveAspectRatio="xMidYMin meet"
       style={{ background: '#F8FAFC', display: 'block', userSelect: 'none' }}
       onMouseMove={handleSvgMouseMove}
@@ -227,6 +251,7 @@ export default function TierCanvas({
           </g>
         )
       })}
-    </svg>
+      </svg>
+    </div>
   )
 }
