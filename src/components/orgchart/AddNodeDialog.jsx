@@ -1,34 +1,54 @@
-// Modal dialog for adding a new node (or child node). One dialog,
-// switches form based on the selected node kind. Returns the new node
-// payload via onSubmit({...}).
+// Modal dialog for adding or editing a node. One dialog, switches form
+// based on the selected node kind. Returns the new/updated payload via
+// onSubmit({...}).
 //
 // Props:
-//   - mode: 'new' | 'child'        (child: passes parentId for edge auto-create)
-//   - parentId: string | null
-//   - positions: [{ id, title }]   for the position-node dropdown
+//   - mode: 'new' | 'child' | 'edit'
+//   - parentId: string | null   (used when mode === 'child')
+//   - existing: node row | null (used when mode === 'edit'; pre-fills form)
+//   - positions: [{ id, title }]
 //   - onSubmit(payload), onClose
 
 import { useState } from 'react'
 import { CONTAINER_COLORS } from './palette.js'
 
-export default function AddNodeDialog({ mode, parentId, positions, onSubmit, onClose }) {
-  const [kind, setKind] = useState('position')
+export default function AddNodeDialog({
+  mode,
+  parentId,
+  existing,
+  positions,
+  onSubmit,
+  onClose,
+}) {
+  const isEdit = mode === 'edit' && existing
+  const [kind, setKind] = useState(isEdit ? existing.kind || 'custom' : 'position')
 
   // shared
-  const [label, setLabel] = useState('')
+  const [label, setLabel] = useState(isEdit ? existing.label || '' : '')
 
   // position
-  const [positionId, setPositionId] = useState('')
+  const [positionId, setPositionId] = useState(
+    isEdit && existing.position_id ? String(existing.position_id) : '',
+  )
 
   // container
-  const [heading, setHeading] = useState('Department')
-  const [bgColor, setBgColor] = useState(CONTAINER_COLORS[0].bg)
-  const [containerMode, setContainerMode] = useState('independent')
-  const [width, setWidth] = useState(360)
-  const [height, setHeight] = useState(140)
+  const [heading, setHeading] = useState(isEdit ? existing.heading || 'Department' : 'Department')
+  const [bgColor, setBgColor] = useState(
+    isEdit && existing.bg_color ? existing.bg_color : CONTAINER_COLORS[0].bg,
+  )
+  const [containerMode, setContainerMode] = useState(
+    isEdit ? existing.container_mode || 'independent' : 'independent',
+  )
+  const [width, setWidth] = useState(isEdit ? existing.width || 360 : 360)
+  const [height, setHeight] = useState(isEdit ? existing.height || 140 : 140)
 
   function handleSubmit() {
-    const base = { kind, parentId: mode === 'child' ? parentId : null }
+    const base = {
+      kind,
+      parentId: mode === 'child' ? parentId : null,
+      isEdit,
+      id: existing?.id,
+    }
     if (kind === 'position') {
       if (!positionId) return alert('Pick a position.')
       const p = positions.find(x => String(x.id) === String(positionId))
@@ -63,7 +83,11 @@ export default function AddNodeDialog({ mode, parentId, positions, onSubmit, onC
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-5">
         <h3 className="text-base font-semibold mb-3">
-          {mode === 'child' ? 'Add child node' : 'Add node'}
+          {mode === 'edit'
+            ? 'Edit node'
+            : mode === 'child'
+              ? 'Add child node'
+              : 'Add node'}
         </h3>
 
         <div className="flex gap-2 mb-4 text-sm">
@@ -71,12 +95,14 @@ export default function AddNodeDialog({ mode, parentId, positions, onSubmit, onC
             <button
               key={k}
               type="button"
-              onClick={() => setKind(k)}
+              onClick={() => !isEdit && setKind(k)}
+              disabled={isEdit}
+              title={isEdit ? "Can't change kind on an existing node" : ''}
               className={`flex-1 py-1.5 rounded-md border ${
                 kind === k
                   ? 'border-blue-600 bg-blue-50 text-blue-700 font-medium'
                   : 'border-gray-200 hover:bg-gray-50 text-gray-600'
-              }`}
+              } ${isEdit ? 'opacity-60 cursor-not-allowed' : ''}`}
             >
               {k[0].toUpperCase() + k.slice(1)}
             </button>
@@ -214,7 +240,7 @@ export default function AddNodeDialog({ mode, parentId, positions, onSubmit, onC
             onClick={handleSubmit}
             className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md"
           >
-            Add
+            {isEdit ? 'Save' : 'Add'}
           </button>
         </div>
       </div>

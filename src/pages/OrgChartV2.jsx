@@ -47,8 +47,10 @@ export default function OrgChartV2() {
   const [selectedEdgeId, setSelectedEdgeId] = useState(null)
   const [connectMode, setConnectMode] = useState(false)
   const [connectSource, setConnectSource] = useState(null)
-  const [dialog, setDialog] = useState(null) // { mode, parentId } or null
+  const [dialog, setDialog] = useState(null) // { mode, parentId, existing } or null
   const [busy, setBusy] = useState(false)
+  const [editingChartName, setEditingChartName] = useState(false)
+  const [chartNameDraft, setChartNameDraft] = useState('')
 
   // ── Loaders ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -104,6 +106,89 @@ export default function OrgChartV2() {
     if (error) return alert(error.message)
     setCharts(prev => [...prev, data])
     selectChart(data)
+  }
+
+  async function renameChart(newName) {
+    const trimmed = (newName || '').trim()
+    if (!chartId || !trimmed || trimmed === chartName) {
+      setEditingChartName(false)
+      return
+    }
+    setBusy(true)
+    const { error } = await supabase
+      .from('org_charts')
+      .update({ name: trimmed })
+      .eq('id', chartId)
+    setBusy(false)
+    setEditingChartName(false)
+    if (error) return alert(error.message)
+    setChartName(trimmed)
+    setCharts(prev => prev.map(c => (c.id === chartId ? { ...c, name: trimmed } : c)))
+  }
+
+  async function deleteChart() {
+    if (!chartId) return
+    if (
+      !confirm(
+        `Delete chart "${chartName}"? Every node, edge and node-type inside it will be removed. This cannot be undone.`,
+      )
+    )
+      return
+    setBusy(true)
+    try {
+      // FK cascades should handle nodes/edges/types if defined; explicit
+      // delete keeps us safe if they aren't.
+      await supabase.from('org_edges').delete().eq('chart_id', chartId)
+      await supabase.from('org_nodes').delete().eq('chart_id', chartId)
+      await supabase.from('org_node_types').delete().eq('chart_id', chartId)
+      await supabase.from('org_charts').delete().eq('id', chartId)
+      const remaining = charts.filter(c => c.id !== chartId)
+      setCharts(remaining)
+      setNodes([])
+      setEdges([])
+      setNodeTypes([])
+      setSelectedNodeId(null)
+      setSelectedEdgeId(null)
+      if (remaining.length) {
+        selectChart(remaining[0])
+      } else {
+        setChartId(null)
+        setChartName('')
+      }
+    } catch (e) {
+      alert(e.message || String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function saveNode(payload) {
+    if (!payload.id) return
+    setBusy(true)
+    try {
+      const update = {
+        label: payload.label,
+        position_id: payload.position_id || null,
+        heading: payload.heading || null,
+        bg_color: payload.bg_color || null,
+        container_mode: payload.container_mode || null,
+        width: payload.width || 200,
+        height: payload.height || 72,
+      }
+      const { data, error } = await supabase
+        .from('org_nodes')
+        .update(update)
+        .eq('id', payload.id)
+        .select()
+        .single()
+      if (error) throw error
+      setNodes(prev => prev.map(n => (n.id === data.id ? data : n)))
+      setDialog(null)
+    } catch (e) {
+      alert(e.message || String(e))
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function addNode(payload) {
@@ -274,21 +359,57 @@ export default function OrgChartV2() {
     <div className="h-full flex flex-col bg-slate-50">
       {/* Top bar */}
       <div className="flex items-center gap-3 px-4 py-3 bg-white border-b border-slate-200 shrink-0">
-        <select
-          value={chartId || ''}
-          onChange={e => {
-            const c = charts.find(x => x.id === e.target.value)
-            if (c) selectChart(c)
-          }}
-          className="text-sm border border-slate-300 rounded-md px-2 py-1"
-        >
-          <option value="">— Pick a chart —</option>
-          {charts.map(c => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+        {editingChartName ? (
+          <input
+            autoFocus
+            value={chartNameDraft}
+            onChange={e => setChartNameDraft(e.target.value)}
+            onBlur={() => renameChart(chartNameDraft)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') renameChart(chartNameDraft)
+              else if (e.key === 'Escape') setEditingChartName(false)
+            }}
+            className="text-sm border border-blue-400 rounded-md px-2 py-1 min-w-[14rem]"
+          />
+        ) : (
+          <select
+            value={chartId || ''}
+            onChange={e => {
+              const c = charts.find(x => x.id === e.target.value)
+              if (c) selectChart(c)
+            }}
+            className="text-sm border border-slate-300 rounded-md px-2 py-1"
+          >
+            <option value="">— Pick a chart —</option>
+            {charts.map(c => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        )}
+        {chartId && !editingChartName && (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                setChartNameDraft(chartName)
+                setEditingChartName(true)
+              }}
+              className="text-xs text-slate-500 hover:text-slate-800 underline"
+            >
+              rename
+            </button>
+            <button
+              type="button"
+              onClick={deleteChart}
+              disabled={busy}
+              className="text-xs text-red-500 hover:text-red-700 underline"
+            >
+              delete
+            </button>
+          </>
+        )}
         <button
           type="button"
           onClick={createChart}
@@ -307,13 +428,22 @@ export default function OrgChartV2() {
           + Node
         </button>
         {selectedNodeId && (
-          <button
-            type="button"
-            onClick={() => setDialog({ mode: 'child', parentId: selectedNodeId })}
-            className="text-sm px-3 py-1 rounded-md bg-blue-100 text-blue-700"
-          >
-            + Child of selected
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => setDialog({ mode: 'child', parentId: selectedNodeId })}
+              className="text-sm px-3 py-1 rounded-md bg-blue-100 text-blue-700"
+            >
+              + Child of selected
+            </button>
+            <button
+              type="button"
+              onClick={() => setDialog({ mode: 'edit', existing: selectedNode })}
+              className="text-sm px-3 py-1 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200"
+            >
+              Edit
+            </button>
+          </>
         )}
         <button
           type="button"
@@ -351,7 +481,6 @@ export default function OrgChartV2() {
         )}
       </div>
 
-      {/* Hint / connect-mode banner */}
       {connectMode && (
         <div className="bg-orange-50 border-b border-orange-200 px-4 py-1.5 text-xs text-orange-800">
           {connectSource
@@ -360,7 +489,6 @@ export default function OrgChartV2() {
         </div>
       )}
 
-      {/* Canvas */}
       <div className="flex-1 overflow-auto">
         {chartId ? (
           <TierCanvas
@@ -391,8 +519,9 @@ export default function OrgChartV2() {
         <AddNodeDialog
           mode={dialog.mode}
           parentId={dialog.parentId}
+          existing={dialog.existing}
           positions={positions}
-          onSubmit={addNode}
+          onSubmit={payload => (payload.isEdit ? saveNode(payload) : addNode(payload))}
           onClose={() => setDialog(null)}
         />
       )}
