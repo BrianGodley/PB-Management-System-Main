@@ -1,5 +1,5 @@
 // Modal dialog for adding or editing a node. One dialog, switches form
-// based on the selected node kind. Returns the new/updated payload via
+// based on selected node kind. Returns the new/updated payload via
 // onSubmit({...}).
 //
 // Props:
@@ -23,15 +23,12 @@ export default function AddNodeDialog({
   const isEdit = mode === 'edit' && existing
   const [kind, setKind] = useState(isEdit ? existing.kind || 'custom' : 'position')
 
-  // shared
   const [label, setLabel] = useState(isEdit ? existing.label || '' : '')
 
-  // position
   const [positionId, setPositionId] = useState(
     isEdit && existing.position_id ? String(existing.position_id) : '',
   )
 
-  // container
   const [heading, setHeading] = useState(isEdit ? existing.heading || 'Department' : 'Department')
   const [bgColor, setBgColor] = useState(
     isEdit && existing.bg_color ? existing.bg_color : CONTAINER_COLORS[0].bg,
@@ -39,8 +36,8 @@ export default function AddNodeDialog({
   const [containerMode, setContainerMode] = useState(
     isEdit ? existing.container_mode || 'independent' : 'independent',
   )
-  const [width, setWidth] = useState(isEdit ? existing.width || 360 : 360)
-  const [height, setHeight] = useState(isEdit ? existing.height || 140 : 140)
+  const [width, setWidth] = useState(isEdit ? existing.width || 180 : 180)
+  const [height, setHeight] = useState(isEdit ? existing.height || 70 : 70)
 
   function handleSubmit() {
     const base = {
@@ -56,8 +53,8 @@ export default function AddNodeDialog({
         ...base,
         position_id: Number(positionId),
         label: p?.title || '',
-        width: 200,
-        height: 72,
+        width: 110,
+        height: 40,
       })
     } else if (kind === 'container') {
       onSubmit({
@@ -73,8 +70,8 @@ export default function AddNodeDialog({
       onSubmit({
         ...base,
         label: label.trim() || 'Untitled',
-        width: 200,
-        height: 72,
+        width: 110,
+        height: 40,
       })
     }
   }
@@ -83,11 +80,7 @@ export default function AddNodeDialog({
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-5">
         <h3 className="text-base font-semibold mb-3">
-          {mode === 'edit'
-            ? 'Edit node'
-            : mode === 'child'
-              ? 'Add child node'
-              : 'Add node'}
+          {mode === 'edit' ? 'Edit node' : mode === 'child' ? 'Add child node' : 'Add node'}
         </h3>
 
         <div className="flex gap-2 mb-4 text-sm">
@@ -175,7 +168,7 @@ export default function AddNodeDialog({
                   value={width}
                   onChange={e => setWidth(Number(e.target.value) || 0)}
                   className="w-full border border-gray-300 rounded-md px-2 py-1 text-sm"
-                  min={120}
+                  min={80}
                   max={1200}
                 />
               </div>
@@ -186,7 +179,7 @@ export default function AddNodeDialog({
                   value={height}
                   onChange={e => setHeight(Number(e.target.value) || 0)}
                   className="w-full border border-gray-300 rounded-md px-2 py-1 text-sm"
-                  min={48}
+                  min={30}
                   max={600}
                 />
               </div>

@@ -1,14 +1,40 @@
-// Straight-arrow edge renderer. Edges are guaranteed by normalizeEdge
-// to be 'down' or 'across' — never up. Down arrows go bottom-center →
-// top-center, across arrows go right-edge → left-edge.
+// Orthogonal-arrow edge renderer. All edges are either:
+//   • 'down'   — parent to child. Routed bottom-center → vertical →
+//                horizontal across at midpoint → vertical → top-center
+//                of target. Pure vertical if both nodes share x.
+//   • 'across' — sibling to sibling. Strict horizontal: right-edge to
+//                left-edge at the shared tier baseline.
+// No diagonals anywhere.
 
-import { edgeAnchors, normalizeEdge } from './layout.js'
+import { normalizeEdge } from './layout.js'
+
+function buildPath(srcBox, tgtBox, direction) {
+  if (direction === 'across') {
+    const [a, b] = srcBox.x <= tgtBox.x ? [srcBox, tgtBox] : [tgtBox, srcBox]
+    const x1 = a.x + a.width
+    const y1 = a.y + a.height / 2
+    const x2 = b.x
+    return { d: `M ${x1} ${y1} L ${x2} ${y1}`, endX: x2, endY: y1 }
+  }
+  const x1 = srcBox.x + srcBox.width / 2
+  const y1 = srcBox.y + srcBox.height
+  const x2 = tgtBox.x + tgtBox.width / 2
+  const y2 = tgtBox.y
+  if (Math.abs(x1 - x2) < 0.5) {
+    return { d: `M ${x1} ${y1} L ${x2} ${y2}`, endX: x2, endY: y2 }
+  }
+  const midY = (y1 + y2) / 2
+  return {
+    d: `M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`,
+    endX: x2,
+    endY: y2,
+  }
+}
 
 export default function EdgeLayer({ edges, nodes, laidOut, selectedEdgeId, onEdgeClick }) {
   const byId = new Map(nodes.map(n => [n.id, n]))
   return (
     <g>
-      {/* Arrowhead marker, declared once */}
       <defs>
         <marker
           id="orgchart-arrowhead"
@@ -30,34 +56,24 @@ export default function EdgeLayer({ edges, nodes, laidOut, selectedEdgeId, onEdg
         const srcBox = laidOut.get(src.id)
         const tgtBox = laidOut.get(tgt.id)
         if (!srcBox || !tgtBox) return null
-        const { x1, y1, x2, y2 } = edgeAnchors(srcBox, tgtBox, direction)
+        const { d, endX, endY } = buildPath(srcBox, tgtBox, direction)
         const isSelected = e.id === selectedEdgeId
         return (
           <g key={e.id} onClick={() => onEdgeClick?.(e.id)} style={{ cursor: 'pointer' }}>
-            {/* invisible thick line for easy clicking */}
-            <line
-              x1={x1}
-              y1={y1}
-              x2={x2}
-              y2={y2}
-              stroke="transparent"
-              strokeWidth={14}
-            />
-            <line
-              x1={x1}
-              y1={y1}
-              x2={x2}
-              y2={y2}
+            <path d={d} stroke="transparent" strokeWidth={14} fill="none" />
+            <path
+              d={d}
               stroke={isSelected ? '#2563EB' : '#475569'}
               strokeWidth={isSelected ? 2.5 : 1.75}
+              fill="none"
               markerEnd="url(#orgchart-arrowhead)"
             />
             {e.label && (
               <text
-                x={(x1 + x2) / 2}
-                y={(y1 + y2) / 2 - 4}
+                x={endX}
+                y={endY - 6}
                 textAnchor="middle"
-                fontSize="11"
+                fontSize="9"
                 fill="#334155"
                 style={{ pointerEvents: 'none' }}
               >

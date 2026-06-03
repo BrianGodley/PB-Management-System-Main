@@ -1,10 +1,4 @@
-// SVG renderers for each node kind. Each renderer takes the node record,
-// its laid-out box, and a few flags. Kept in one file because they're
-// small and share a footer/select-outline.
-//
-// Position resolution (kind='position') happens upstream — the parent
-// passes a `displayName` string already resolved from position_holders.
-
+// SVG renderers for each node kind. Compact sizing (~25% of v1).
 import { pickTextColor } from './palette.js'
 
 function SelectOutline({ x, y, w, h, selected }) {
@@ -15,8 +9,8 @@ function SelectOutline({ x, y, w, h, selected }) {
       y={y - 3}
       width={w + 6}
       height={h + 6}
-      rx={12}
-      ry={12}
+      rx={10}
+      ry={10}
       fill="none"
       stroke="#2563EB"
       strokeWidth={2}
@@ -35,16 +29,16 @@ export function CustomNode({ node, box, color, selected, onClick }) {
         y={box.y}
         width={box.width}
         height={box.height}
-        rx={10}
-        ry={10}
+        rx={8}
+        ry={8}
         fill={fill}
       />
       <text
         x={box.x + box.width / 2}
-        y={box.y + box.height / 2 - (node.subtitle ? 8 : 0)}
+        y={box.y + box.height / 2 - (node.subtitle ? 5 : -3)}
         textAnchor="middle"
         fill="#FFFFFF"
-        fontSize="13"
+        fontSize="9"
         fontWeight="600"
       >
         {node.label}
@@ -52,10 +46,10 @@ export function CustomNode({ node, box, color, selected, onClick }) {
       {node.subtitle && (
         <text
           x={box.x + box.width / 2}
-          y={box.y + box.height / 2 + 12}
+          y={box.y + box.height / 2 + 8}
           textAnchor="middle"
           fill="#FFFFFF"
-          fontSize="11"
+          fontSize="8"
           opacity={0.85}
         >
           {node.subtitle}
@@ -65,7 +59,15 @@ export function CustomNode({ node, box, color, selected, onClick }) {
   )
 }
 
-export function PositionNode({ node, box, color, selected, onClick, displayName, positionTitle }) {
+export function PositionNode({
+  node,
+  box,
+  color,
+  selected,
+  onClick,
+  displayName,
+  positionTitle,
+}) {
   const fill = color || '#3A5038'
   return (
     <g onClick={onClick} style={{ cursor: 'pointer' }}>
@@ -75,26 +77,26 @@ export function PositionNode({ node, box, color, selected, onClick, displayName,
         y={box.y}
         width={box.width}
         height={box.height}
-        rx={10}
-        ry={10}
+        rx={8}
+        ry={8}
         fill={fill}
       />
       <text
         x={box.x + box.width / 2}
-        y={box.y + box.height / 2 - 8}
+        y={box.y + box.height / 2 - 4}
         textAnchor="middle"
         fill="#FFFFFF"
-        fontSize="13"
+        fontSize="9"
         fontWeight="700"
       >
         {positionTitle || node.label || '(no position)'}
       </text>
       <text
         x={box.x + box.width / 2}
-        y={box.y + box.height / 2 + 12}
+        y={box.y + box.height / 2 + 8}
         textAnchor="middle"
         fill="#FFFFFF"
-        fontSize="11"
+        fontSize="8"
         opacity={0.9}
       >
         {displayName || '(unassigned)'}
@@ -114,47 +116,44 @@ export function ContainerNode({ node, box, selected, onClick }) {
         y={box.y}
         width={box.width}
         height={box.height}
-        rx={12}
-        ry={12}
+        rx={10}
+        ry={10}
         fill={fill}
         stroke={textColor === '#FFFFFF' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}
         strokeWidth={1}
       />
-      {/* Heading (e.g. "Department") top-left */}
       {node.heading && (
         <text
-          x={box.x + 14}
-          y={box.y + 20}
+          x={box.x + 8}
+          y={box.y + 12}
           fill={textColor}
           opacity={0.7}
-          fontSize="10"
+          fontSize="7"
           fontWeight="600"
           letterSpacing="0.05em"
         >
           {String(node.heading).toUpperCase()}
         </text>
       )}
-      {/* Main label centered */}
       <text
         x={box.x + box.width / 2}
-        y={box.y + box.height / 2 + 4}
+        y={box.y + box.height / 2 + 3}
         textAnchor="middle"
         fill={textColor}
-        fontSize="18"
+        fontSize="12"
         fontWeight="700"
       >
         {node.label}
       </text>
-      {/* Mode badge bottom-right */}
       <text
-        x={box.x + box.width - 12}
-        y={box.y + box.height - 10}
+        x={box.x + box.width - 6}
+        y={box.y + box.height - 5}
         textAnchor="end"
         fill={textColor}
-        opacity={0.55}
-        fontSize="9"
+        opacity={0.5}
+        fontSize="6"
       >
-        {node.container_mode === 'implicit' ? '◰ implicit' : '◱ independent'}
+        {node.container_mode === 'implicit' ? '◰' : '◱'}
       </text>
     </g>
   )

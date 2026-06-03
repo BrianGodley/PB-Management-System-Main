@@ -1,21 +1,6 @@
 // OrgChart v2 — tier-based snap layout, three node kinds (custom,
-// position, container), straight-arrow edges that only go down or
-// across. Replaces OrgChart.jsx behind /org-chart once feature-flagged.
-//
-// Persistence model:
-//   • org_charts / org_nodes / org_edges (existing tables)
-//   • org_nodes.kind, position_id, heading, bg_color, tier, tier_order,
-//     container_mode added in supabase-orgchart-nodes-v2.sql
-//   • Reads position holders from the position_holders view also added
-//     in that migration.
-//
-// Interaction model:
-//   • Click a parent → "Add child" button appears → opens AddNodeDialog
-//     with parentId pre-filled. Child lands in parent.tier + 1 at the
-//     end of that tier.
-//   • Connect mode toggles arrow-creation; clicking two nodes draws an
-//     edge (auto-flipped down/across per the layout rule).
-//   • Selecting an edge lets you delete it or change its label.
+// position, container), orthogonal arrows (down/across, never up,
+// never diagonal). Replaces OrgChart.jsx at /org-chart.
 
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
@@ -28,26 +13,22 @@ const FG = '#3A5038'
 export default function OrgChartV2() {
   const { user } = useAuth()
 
-  // chart picker
   const [charts, setCharts] = useState([])
   const [chartId, setChartId] = useState(null)
   const [chartName, setChartName] = useState('')
 
-  // chart contents
   const [nodes, setNodes] = useState([])
   const [edges, setEdges] = useState([])
   const [nodeTypes, setNodeTypes] = useState([])
 
-  // lookups
   const [positions, setPositions] = useState([])
-  const [holders, setHolders] = useState([]) // rows from position_holders view
+  const [holders, setHolders] = useState([])
 
-  // interaction
   const [selectedNodeId, setSelectedNodeId] = useState(null)
   const [selectedEdgeId, setSelectedEdgeId] = useState(null)
   const [connectMode, setConnectMode] = useState(false)
   const [connectSource, setConnectSource] = useState(null)
-  const [dialog, setDialog] = useState(null) // { mode, parentId, existing } or null
+  const [dialog, setDialog] = useState(null) // { mode, parentId, existing }
   const [busy, setBusy] = useState(false)
   const [editingChartName, setEditingChartName] = useState(false)
   const [chartNameDraft, setChartNameDraft] = useState('')
@@ -84,7 +65,6 @@ export default function OrgChartV2() {
     setNodeTypes(t.data || [])
   }
 
-  // position_id → { positionTitle, displayName }
   const holderMap = useMemo(() => {
     const m = new Map()
     for (const h of holders) {
@@ -96,7 +76,7 @@ export default function OrgChartV2() {
     return m
   }, [holders])
 
-  // ── Mutations ───────────────────────────────────────────────────────
+  // ── Chart mutations ─────────────────────────────────────────────────
   async function createChart() {
     const { data, error } = await supabase
       .from('org_charts')
@@ -136,8 +116,6 @@ export default function OrgChartV2() {
       return
     setBusy(true)
     try {
-      // FK cascades should handle nodes/edges/types if defined; explicit
-      // delete keeps us safe if they aren't.
       await supabase.from('org_edges').delete().eq('chart_id', chartId)
       await supabase.from('org_nodes').delete().eq('chart_id', chartId)
       await supabase.from('org_node_types').delete().eq('chart_id', chartId)
@@ -149,9 +127,8 @@ export default function OrgChartV2() {
       setNodeTypes([])
       setSelectedNodeId(null)
       setSelectedEdgeId(null)
-      if (remaining.length) {
-        selectChart(remaining[0])
-      } else {
+      if (remaining.length) selectChart(remaining[0])
+      else {
         setChartId(null)
         setChartName('')
       }
@@ -162,35 +139,7 @@ export default function OrgChartV2() {
     }
   }
 
-  async function saveNode(payload) {
-    if (!payload.id) return
-    setBusy(true)
-    try {
-      const update = {
-        label: payload.label,
-        position_id: payload.position_id || null,
-        heading: payload.heading || null,
-        bg_color: payload.bg_color || null,
-        container_mode: payload.container_mode || null,
-        width: payload.width || 200,
-        height: payload.height || 72,
-      }
-      const { data, error } = await supabase
-        .from('org_nodes')
-        .update(update)
-        .eq('id', payload.id)
-        .select()
-        .single()
-      if (error) throw error
-      setNodes(prev => prev.map(n => (n.id === data.id ? data : n)))
-      setDialog(null)
-    } catch (e) {
-      alert(e.message || String(e))
-    } finally {
-      setBusy(false)
-    }
-  }
-
+  // ── Node mutations ──────────────────────────────────────────────────
   async function addNode(payload) {
     if (!chartId) return
     setBusy(true)
@@ -201,18 +150,14 @@ export default function OrgChartV2() {
         const parent = nodes.find(n => n.id === payload.parentId)
         if (parent) {
           tier = (parent.tier ?? 0) + 1
-          tier_order =
-            nodes.filter(n => (n.tier ?? 0) === tier).reduce(
-              (max, n) => Math.max(max, (n.tier_order ?? 0) + 1),
-              0,
-            )
+          tier_order = nodes
+            .filter(n => (n.tier ?? 0) === tier)
+            .reduce((max, n) => Math.max(max, (n.tier_order ?? 0) + 1), 0)
         }
       } else {
-        tier_order =
-          nodes.filter(n => (n.tier ?? 0) === 0).reduce(
-            (max, n) => Math.max(max, (n.tier_order ?? 0) + 1),
-            0,
-          )
+        tier_order = nodes
+          .filter(n => (n.tier ?? 0) === 0)
+          .reduce((max, n) => Math.max(max, (n.tier_order ?? 0) + 1), 0)
       }
       const insert = {
         chart_id: chartId,
@@ -222,8 +167,8 @@ export default function OrgChartV2() {
         heading: payload.heading || null,
         bg_color: payload.bg_color || null,
         container_mode: payload.container_mode || null,
-        width: payload.width || 200,
-        height: payload.height || 72,
+        width: payload.width || 110,
+        height: payload.height || 40,
         x: 0,
         y: 0,
         tier,
@@ -236,7 +181,6 @@ export default function OrgChartV2() {
         .single()
       if (error) throw error
       setNodes(prev => [...prev, data])
-      // If this was added as a child, draw the parent → child edge.
       if (payload.parentId) {
         const { data: edge, error: edgeErr } = await supabase
           .from('org_edges')
@@ -260,16 +204,48 @@ export default function OrgChartV2() {
     }
   }
 
+  async function saveNode(payload) {
+    if (!payload.id) return
+    setBusy(true)
+    try {
+      const update = {
+        label: payload.label,
+        position_id: payload.position_id || null,
+        heading: payload.heading || null,
+        bg_color: payload.bg_color || null,
+        container_mode: payload.container_mode || null,
+        width: payload.width || 110,
+        height: payload.height || 40,
+      }
+      const { data, error } = await supabase
+        .from('org_nodes')
+        .update(update)
+        .eq('id', payload.id)
+        .select()
+        .single()
+      if (error) throw error
+      setNodes(prev => prev.map(n => (n.id === data.id ? data : n)))
+      setDialog(null)
+    } catch (e) {
+      alert(e.message || String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function deleteSelectedNode() {
     if (!selectedNodeId) return
     if (!confirm('Delete this node? Connected arrows will be removed too.')) return
     setBusy(true)
     try {
-      await supabase.from('org_edges').delete().or(
-        `source_id.eq.${selectedNodeId},target_id.eq.${selectedNodeId}`,
-      )
+      await supabase
+        .from('org_edges')
+        .delete()
+        .or(`source_id.eq.${selectedNodeId},target_id.eq.${selectedNodeId}`)
       await supabase.from('org_nodes').delete().eq('id', selectedNodeId)
-      setEdges(prev => prev.filter(e => e.source_id !== selectedNodeId && e.target_id !== selectedNodeId))
+      setEdges(prev =>
+        prev.filter(e => e.source_id !== selectedNodeId && e.target_id !== selectedNodeId),
+      )
       setNodes(prev => prev.filter(n => n.id !== selectedNodeId))
       setSelectedNodeId(null)
     } catch (e) {
@@ -294,7 +270,39 @@ export default function OrgChartV2() {
     }
   }
 
-  // Connect-mode click handling: pick two nodes, create edge
+  // Swap tier_order with neighbor — left or right movement within tier.
+  async function moveNodeHoriz(direction) {
+    if (!selectedNodeId) return
+    const node = nodes.find(n => n.id === selectedNodeId)
+    if (!node) return
+    const tierSibs = nodes
+      .filter(n => (n.tier ?? 0) === (node.tier ?? 0))
+      .sort((a, b) => (a.tier_order ?? 0) - (b.tier_order ?? 0))
+    const idx = tierSibs.findIndex(n => n.id === node.id)
+    const swapIdx = direction === 'left' ? idx - 1 : idx + 1
+    if (idx < 0 || swapIdx < 0 || swapIdx >= tierSibs.length) return
+    const a = tierSibs[idx]
+    const b = tierSibs[swapIdx]
+    const aOrder = a.tier_order ?? idx
+    const bOrder = b.tier_order ?? swapIdx
+    setNodes(prev =>
+      prev.map(n => {
+        if (n.id === a.id) return { ...n, tier_order: bOrder }
+        if (n.id === b.id) return { ...n, tier_order: aOrder }
+        return n
+      }),
+    )
+    try {
+      await Promise.all([
+        supabase.from('org_nodes').update({ tier_order: bOrder }).eq('id', a.id),
+        supabase.from('org_nodes').update({ tier_order: aOrder }).eq('id', b.id),
+      ])
+    } catch (e) {
+      alert('Move failed: ' + (e.message || e))
+    }
+  }
+
+  // Connect-mode handling
   const onNodeClick = useCallback(
     nodeId => {
       if (connectMode) {
@@ -304,42 +312,23 @@ export default function OrgChartV2() {
           const src = nodes.find(n => n.id === connectSource)
           const tgt = nodes.find(n => n.id === nodeId)
           if (src && tgt) {
-            // Validate: edges only go down or across, never up.
             const st = src.tier ?? 0
             const tt = tgt.tier ?? 0
-            if (st > tt) {
-              // Silently flip so the arrow points down.
-              const tmp = src
-              ;(async () => {
-                const { data } = await supabase
-                  .from('org_edges')
-                  .insert({
-                    chart_id: chartId,
-                    source_id: tgt.id,
-                    target_id: tmp.id,
-                    relationship: 'reports_to',
-                    style: 'solid',
-                  })
-                  .select()
-                  .single()
-                if (data) setEdges(prev => [...prev, data])
-              })()
-            } else {
-              ;(async () => {
-                const { data } = await supabase
-                  .from('org_edges')
-                  .insert({
-                    chart_id: chartId,
-                    source_id: src.id,
-                    target_id: tgt.id,
-                    relationship: st === tt ? 'sibling' : 'reports_to',
-                    style: 'solid',
-                  })
-                  .select()
-                  .single()
-                if (data) setEdges(prev => [...prev, data])
-              })()
-            }
+            const [from, to] = st > tt ? [tgt, src] : [src, tgt]
+            ;(async () => {
+              const { data } = await supabase
+                .from('org_edges')
+                .insert({
+                  chart_id: chartId,
+                  source_id: from.id,
+                  target_id: to.id,
+                  relationship: (from.tier ?? 0) === (to.tier ?? 0) ? 'sibling' : 'reports_to',
+                  style: 'solid',
+                })
+                .select()
+                .single()
+              if (data) setEdges(prev => [...prev, data])
+            })()
           }
           setConnectSource(null)
           setConnectMode(false)
@@ -354,10 +343,8 @@ export default function OrgChartV2() {
 
   const selectedNode = nodes.find(n => n.id === selectedNodeId) || null
 
-  // ── Render ──────────────────────────────────────────────────────────
   return (
     <div className="h-full flex flex-col bg-slate-50">
-      {/* Top bar */}
       <div className="flex items-center gap-3 px-4 py-3 bg-white border-b border-slate-200 shrink-0">
         {editingChartName ? (
           <input
@@ -443,6 +430,22 @@ export default function OrgChartV2() {
             >
               Edit
             </button>
+            <button
+              type="button"
+              onClick={() => moveNodeHoriz('left')}
+              className="text-sm px-2 py-1 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200"
+              title="Move left in tier"
+            >
+              ←
+            </button>
+            <button
+              type="button"
+              onClick={() => moveNodeHoriz('right')}
+              className="text-sm px-2 py-1 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200"
+              title="Move right in tier"
+            >
+              →
+            </button>
           </>
         )}
         <button
@@ -483,9 +486,7 @@ export default function OrgChartV2() {
 
       {connectMode && (
         <div className="bg-orange-50 border-b border-orange-200 px-4 py-1.5 text-xs text-orange-800">
-          {connectSource
-            ? 'Click the second node to connect.'
-            : 'Click the source node first.'}
+          {connectSource ? 'Click the second node to connect.' : 'Click the source node first.'}
         </div>
       )}
 
