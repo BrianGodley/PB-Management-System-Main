@@ -144,12 +144,25 @@ export default function OrgChartV2() {
     if (!chartId) return
     setBusy(true)
     try {
+      // tier resolution:
+      //   parentId   → new node lands a tier BELOW the parent (child)
+      //   seniorOf   → new node lands a tier ABOVE the referent (senior)
+      //   neither    → new node lands at tier 0 (or the chart's current
+      //                top tier if nothing exists yet)
       let tier = 0
       let tier_order = 0
       if (payload.parentId) {
         const parent = nodes.find(n => n.id === payload.parentId)
         if (parent) {
           tier = (parent.tier ?? 0) + 1
+          tier_order = nodes
+            .filter(n => (n.tier ?? 0) === tier)
+            .reduce((max, n) => Math.max(max, (n.tier_order ?? 0) + 1), 0)
+        }
+      } else if (payload.seniorOf) {
+        const ref = nodes.find(n => n.id === payload.seniorOf)
+        if (ref) {
+          tier = (ref.tier ?? 0) - 1
           tier_order = nodes
             .filter(n => (n.tier ?? 0) === tier)
             .reduce((max, n) => Math.max(max, (n.tier_order ?? 0) + 1), 0)
@@ -432,6 +445,14 @@ export default function OrgChartV2() {
             </button>
             <button
               type="button"
+              onClick={() => setDialog({ mode: 'senior', seniorOf: selectedNodeId })}
+              className="text-sm px-3 py-1 rounded-md bg-indigo-100 text-indigo-700"
+              title="Add a senior node a tier above the selected one"
+            >
+              + Senior of selected
+            </button>
+            <button
+              type="button"
               onClick={() => setDialog({ mode: 'edit', existing: selectedNode })}
               className="text-sm px-3 py-1 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200"
             >
@@ -510,8 +531,7 @@ export default function OrgChartV2() {
           <TierCanvas
             nodes={nodes}
             edges={edges}
-            nodeTypes={nodeTypes}
-            positionHolders={holderMap}
+            nodeTypes={nodeTypes}            positionHolders={holderMap}
             selectedNodeId={selectedNodeId}
             selectedEdgeId={selectedEdgeId}
             onNodeClick={onNodeClick}
@@ -535,6 +555,7 @@ export default function OrgChartV2() {
         <AddNodeDialog
           mode={dialog.mode}
           parentId={dialog.parentId}
+          seniorOf={dialog.seniorOf}
           existing={dialog.existing}
           positions={positions}
           onSubmit={payload => (payload.isEdit ? saveNode(payload) : addNode(payload))}

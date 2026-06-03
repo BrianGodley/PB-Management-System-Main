@@ -15,6 +15,7 @@ import { CONTAINER_COLORS } from './palette.js'
 export default function AddNodeDialog({
   mode,
   parentId,
+  seniorOf,
   existing,
   positions,
   onSubmit,
@@ -43,6 +44,7 @@ export default function AddNodeDialog({
     const base = {
       kind,
       parentId: mode === 'child' ? parentId : null,
+      seniorOf: mode === 'senior' ? seniorOf : null,
       isEdit,
       id: existing?.id,
     }
@@ -80,7 +82,13 @@ export default function AddNodeDialog({
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-5">
         <h3 className="text-base font-semibold mb-3">
-          {mode === 'edit' ? 'Edit node' : mode === 'child' ? 'Add child node' : 'Add node'}
+          {mode === 'edit'
+            ? 'Edit node'
+            : mode === 'child'
+              ? 'Add child node'
+              : mode === 'senior'
+                ? 'Add senior node'
+                : 'Add node'}
         </h3>
 
         <div className="flex gap-2 mb-4 text-sm">
