@@ -40,7 +40,8 @@ const TimeClockPage = lazy(() => import('./pages/TimeClockPage'))
 const DailyLogsPage = lazy(() => import('./pages/DailyLogsPage'))
 const MasterEquipment = lazy(() => import('./pages/MasterEquipment'))
 const EquipmentTracking = lazy(() => import('./pages/EquipmentTracking'))
-const OrgChart = lazy(() => import('./pages/OrgChart'))
+const OrgChart   = lazy(() => import('./pages/OrgChart'))    // legacy free-drag
+const OrgChartV2 = lazy(() => import('./pages/OrgChartV2'))   // tier-snap layout
 const Help = lazy(() => import('./pages/Help'))
 const Documentation = lazy(() => import('./pages/Documentation'))
 const VideoGuides = lazy(() => import('./pages/VideoGuides'))
@@ -143,7 +144,8 @@ function AppRoutes() {
           <Route path="daily-logs" element={<DailyLogsPage />} />
           <Route path="master-equipment" element={<MasterEquipment />} />
           <Route path="equipment-tracking" element={<EquipmentTracking />} />
-          <Route path="org-chart" element={<OrgChart />} />
+          <Route path="org-chart" element={<OrgChartV2 />} />
+          <Route path="org-chart-legacy" element={<OrgChart />} />
           <Route path="help" element={<Help />} />
           <Route path="documentation" element={<Documentation />} />
           <Route path="video-guides" element={<VideoGuides />} />
