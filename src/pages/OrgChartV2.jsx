@@ -284,10 +284,55 @@ export default function OrgChartV2() {
     }
   }
 
-  // Visually nudge a node left/right by adjusting x_offset on the
-  // node row. Layout engine adds this to the auto-computed x so the
-  // node slides without disrupting tier flow. Holding shift takes
-  // bigger steps.
+  // Mouse-drag drop handler. Called by TierCanvas with the final tier +
+  // tier_order computed from the drop position. We renumber every other
+  // node in the destination tier so the dropped node lands cleanly at
+  // the requested slot.
+  async function handleNodeDropped(nodeId, newTier, newTierOrder) {
+    const node = nodes.find(n => n.id === nodeId)
+    if (!node) return
+    const sameTier = (node.tier ?? 0) === newTier
+    const samePos =
+      sameTier && (node.tier_order ?? 0) === newTierOrder
+    if (samePos) return
+    const otherSibs = nodes
+      .filter(n => n.id !== nodeId && (n.tier ?? 0) === newTier)
+      .sort((a, b) => (a.tier_order ?? 0) - (b.tier_order ?? 0))
+    const reordered = [
+      ...otherSibs.slice(0, newTierOrder),
+      node,
+      ...otherSibs.slice(newTierOrder),
+    ]
+    const updates = reordered.map((n, i) => ({
+      id: n.id,
+      tier: newTier,
+      tier_order: i,
+    }))
+    // Optimistic local update — also reset x_offset on the dropped node
+    setNodes(prev =>
+      prev.map(p => {
+        const u = updates.find(x => x.id === p.id)
+        if (!u) return p
+        if (p.id === nodeId) return { ...p, tier: u.tier, tier_order: u.tier_order, x_offset: 0 }
+        return { ...p, tier_order: u.tier_order }
+      }),
+    )
+    try {
+      await Promise.all(
+        updates.map(u => {
+          const extra = u.id === nodeId ? { x_offset: 0, tier: u.tier } : {}
+          return supabase
+            .from('org_nodes')
+            .update({ tier_order: u.tier_order, ...extra })
+            .eq('id', u.id)
+        }),
+      )
+    } catch (e) {
+      alert('Drop failed: ' + (e.message || e))
+    }
+  }
+
+  // Legacy keyboard-style nudge (kept available but not wired into UI).
   async function moveNodeHoriz(direction, big = false) {
     if (!selectedNodeId) return
     const node = nodes.find(n => n.id === selectedNodeId)
@@ -459,30 +504,6 @@ export default function OrgChartV2() {
             >
               Edit
             </button>
-            <button
-              type="button"
-              onClick={e => moveNodeHoriz('left', e.shiftKey)}
-              className="text-sm px-2 py-1 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200"
-              title="Nudge left (Shift = larger step)"
-            >
-              ←
-            </button>
-            <button
-              type="button"
-              onClick={e => moveNodeHoriz('right', e.shiftKey)}
-              className="text-sm px-2 py-1 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200"
-              title="Nudge right (Shift = larger step)"
-            >
-              →
-            </button>
-            <button
-              type="button"
-              onClick={resetNodeOffset}
-              className="text-xs px-2 py-1 rounded-md bg-slate-50 text-slate-500 hover:bg-slate-100"
-              title="Reset horizontal position"
-            >
-              reset
-            </button>
           </>
         )}
         <button
@@ -565,6 +586,7 @@ export default function OrgChartV2() {
             selectedNodeId={selectedNodeId}
             selectedEdgeId={selectedEdgeId}
             onNodeClick={onNodeClick}
+            onNodeDropped={handleNodeDropped}
             onEdgeClick={id => {
               setSelectedEdgeId(id)
               setSelectedNodeId(null)
