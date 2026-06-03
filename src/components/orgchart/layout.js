@@ -69,9 +69,12 @@ export function layoutTiers(nodes) {
     let cursorX = CANVAS_PAD_X
     for (const n of tierNodes) {
       const w = n.width || 180
+      // x_offset lets the user nudge a node horizontally without
+      // breaking the snap-tier flow — it just shifts the baseline x.
+      const xOff = Number.isFinite(n.x_offset) ? n.x_offset : 0
       laidOut.set(n.id, {
         id: n.id,
-        x: cursorX,
+        x: cursorX + xOff,
         y: cursorY,
         width: w,
         height: tierH,

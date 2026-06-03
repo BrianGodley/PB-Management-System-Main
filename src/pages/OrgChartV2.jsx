@@ -270,35 +270,42 @@ export default function OrgChartV2() {
     }
   }
 
-  // Swap tier_order with neighbor — left or right movement within tier.
-  async function moveNodeHoriz(direction) {
+  // Visually nudge a node left/right by adjusting x_offset on the
+  // node row. Layout engine adds this to the auto-computed x so the
+  // node slides without disrupting tier flow. Holding shift takes
+  // bigger steps.
+  async function moveNodeHoriz(direction, big = false) {
     if (!selectedNodeId) return
     const node = nodes.find(n => n.id === selectedNodeId)
     if (!node) return
-    const tierSibs = nodes
-      .filter(n => (n.tier ?? 0) === (node.tier ?? 0))
-      .sort((a, b) => (a.tier_order ?? 0) - (b.tier_order ?? 0))
-    const idx = tierSibs.findIndex(n => n.id === node.id)
-    const swapIdx = direction === 'left' ? idx - 1 : idx + 1
-    if (idx < 0 || swapIdx < 0 || swapIdx >= tierSibs.length) return
-    const a = tierSibs[idx]
-    const b = tierSibs[swapIdx]
-    const aOrder = a.tier_order ?? idx
-    const bOrder = b.tier_order ?? swapIdx
-    setNodes(prev =>
-      prev.map(n => {
-        if (n.id === a.id) return { ...n, tier_order: bOrder }
-        if (n.id === b.id) return { ...n, tier_order: aOrder }
-        return n
-      }),
-    )
+    const step = big ? 40 : 10
+    const cur = Number.isFinite(node.x_offset) ? node.x_offset : 0
+    const next = direction === 'left' ? cur - step : cur + step
+    setNodes(prev => prev.map(n => (n.id === node.id ? { ...n, x_offset: next } : n)))
     try {
-      await Promise.all([
-        supabase.from('org_nodes').update({ tier_order: bOrder }).eq('id', a.id),
-        supabase.from('org_nodes').update({ tier_order: aOrder }).eq('id', b.id),
-      ])
+      const { error } = await supabase
+        .from('org_nodes')
+        .update({ x_offset: next })
+        .eq('id', node.id)
+      if (error) throw error
     } catch (e) {
       alert('Move failed: ' + (e.message || e))
+    }
+  }
+
+  // Reset a node's x_offset to 0 (snap it back into the tier flow).
+  async function resetNodeOffset() {
+    if (!selectedNodeId) return
+    setNodes(prev =>
+      prev.map(n => (n.id === selectedNodeId ? { ...n, x_offset: 0 } : n)),
+    )
+    try {
+      await supabase
+        .from('org_nodes')
+        .update({ x_offset: 0 })
+        .eq('id', selectedNodeId)
+    } catch (e) {
+      alert('Reset failed: ' + (e.message || e))
     }
   }
 
@@ -432,19 +439,27 @@ export default function OrgChartV2() {
             </button>
             <button
               type="button"
-              onClick={() => moveNodeHoriz('left')}
+              onClick={e => moveNodeHoriz('left', e.shiftKey)}
               className="text-sm px-2 py-1 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200"
-              title="Move left in tier"
+              title="Nudge left (Shift = larger step)"
             >
               ←
             </button>
             <button
               type="button"
-              onClick={() => moveNodeHoriz('right')}
+              onClick={e => moveNodeHoriz('right', e.shiftKey)}
               className="text-sm px-2 py-1 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200"
-              title="Move right in tier"
+              title="Nudge right (Shift = larger step)"
             >
               →
+            </button>
+            <button
+              type="button"
+              onClick={resetNodeOffset}
+              className="text-xs px-2 py-1 rounded-md bg-slate-50 text-slate-500 hover:bg-slate-100"
+              title="Reset horizontal position"
+            >
+              reset
             </button>
           </>
         )}
