@@ -14,7 +14,7 @@
 // All coord math runs in SVG user-space via getScreenCTM().inverse().
 
 import { useRef, useState } from 'react'
-import { layoutTiers } from './layout.js'
+import { layoutTiers, CANVAS_PAD_X, NODE_GAP } from './layout.js'
 import EdgeLayer from './EdgeLayer.jsx'
 import { CustomNode, PositionNode, ContainerNode } from './NodeRenderers.jsx'
 
@@ -96,7 +96,22 @@ export default function TierCanvas({
     return slot
   }
 
-  function handleSvgMouseUp(e) {
+  // Natural X (no x_offset) the dragged node would have if it lived at
+  // slot `tierOrder` in `tier` once everyone else's tier_order is
+  // renumbered around it. Used to convert drop pixel position into a
+  // persistent x_offset.
+  function naturalXForSlot(tier, tierOrder, draggedId) {
+    const sibs = nodes
+      .filter(n => n.id !== draggedId && (n.tier ?? 0) === tier)
+      .sort((a, b) => (a.tier_order ?? 0) - (b.tier_order ?? 0))
+    let x = CANVAS_PAD_X
+    for (let i = 0; i < tierOrder && i < sibs.length; i++) {
+      x += (sibs[i].width || 110) + NODE_GAP
+    }
+    return x
+  }
+
+  function handleSvgMouseUp() {
     if (!drag) return
     if (!drag.dragging) {
       onNodeClick?.(drag.nodeId)
@@ -106,14 +121,37 @@ export default function TierCanvas({
     const node = nodes.find(n => n.id === drag.nodeId)
     const box = laidOut.get(drag.nodeId)
     if (node && box && onNodeDropped) {
-      const dropCenterX = box.x + drag.dx + box.width / 2
+      // Drop position of the node's TOP-LEFT corner (so x_offset math
+      // is a straight subtraction with the natural slot start).
+      const dropLeftX = box.x + drag.dx
       const dropCenterY = box.y + drag.dy + box.height / 2
       const newTier = findDropTier(dropCenterY)
+      const dropCenterX = dropLeftX + box.width / 2
       const newTierOrder = findDropSlot(newTier, dropCenterX, drag.nodeId)
-      onNodeDropped(drag.nodeId, newTier, newTierOrder)
+      const natural = naturalXForSlot(newTier, newTierOrder, drag.nodeId)
+      const newXOffset = Math.round(dropLeftX - natural)
+      onNodeDropped(drag.nodeId, newTier, newTierOrder, newXOffset)
     }
     setDrag(null)
   }
+
+  // For rendering, splice the dragged node's MOVED position into laidOut
+  // so the EdgeLayer sees up-to-date endpoints and arrows follow live.
+  const laidOutForRender =
+    drag && drag.dragging
+      ? (() => {
+          const cloned = new Map(laidOut)
+          const original = laidOut.get(drag.nodeId)
+          if (original) {
+            cloned.set(drag.nodeId, {
+              ...original,
+              x: original.x + drag.dx,
+              y: original.y + drag.dy,
+            })
+          }
+          return cloned
+        })()
+      : laidOut
 
   const ordered = [...nodes].sort((a, b) => {
     const ak = a.kind === 'container' ? 0 : 1
@@ -139,7 +177,7 @@ export default function TierCanvas({
       <EdgeLayer
         edges={edges}
         nodes={nodes}
-        laidOut={laidOut}
+        laidOut={laidOutForRender}
         selectedEdgeId={selectedEdgeId}
         onEdgeClick={onEdgeClick}
       />

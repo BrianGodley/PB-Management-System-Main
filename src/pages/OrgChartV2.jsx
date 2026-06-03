@@ -284,17 +284,16 @@ export default function OrgChartV2() {
     }
   }
 
-  // Mouse-drag drop handler. Called by TierCanvas with the final tier +
-  // tier_order computed from the drop position. We renumber every other
-  // node in the destination tier so the dropped node lands cleanly at
-  // the requested slot.
-  async function handleNodeDropped(nodeId, newTier, newTierOrder) {
+  // Mouse-drag drop handler. TierCanvas computes:
+  //   newTier       — from drop Y (which tier band)
+  //   newTierOrder  — from drop X (slot within tier)
+  //   newXOffset    — from drop X minus the natural slot start, so the
+  //                   node keeps the precise horizontal position the
+  //                   user dragged it to (matches the old arrow-button
+  //                   x_offset semantics).
+  async function handleNodeDropped(nodeId, newTier, newTierOrder, newXOffset) {
     const node = nodes.find(n => n.id === nodeId)
     if (!node) return
-    const sameTier = (node.tier ?? 0) === newTier
-    const samePos =
-      sameTier && (node.tier_order ?? 0) === newTierOrder
-    if (samePos) return
     const otherSibs = nodes
       .filter(n => n.id !== nodeId && (n.tier ?? 0) === newTier)
       .sort((a, b) => (a.tier_order ?? 0) - (b.tier_order ?? 0))
@@ -305,25 +304,34 @@ export default function OrgChartV2() {
     ]
     const updates = reordered.map((n, i) => ({
       id: n.id,
-      tier: newTier,
       tier_order: i,
     }))
-    // Optimistic local update — also reset x_offset on the dropped node
     setNodes(prev =>
       prev.map(p => {
         const u = updates.find(x => x.id === p.id)
         if (!u) return p
-        if (p.id === nodeId) return { ...p, tier: u.tier, tier_order: u.tier_order, x_offset: 0 }
+        if (p.id === nodeId) {
+          return { ...p, tier: newTier, tier_order: u.tier_order, x_offset: newXOffset || 0 }
+        }
         return { ...p, tier_order: u.tier_order }
       }),
     )
     try {
       await Promise.all(
         updates.map(u => {
-          const extra = u.id === nodeId ? { x_offset: 0, tier: u.tier } : {}
+          if (u.id === nodeId) {
+            return supabase
+              .from('org_nodes')
+              .update({
+                tier: newTier,
+                tier_order: u.tier_order,
+                x_offset: newXOffset || 0,
+              })
+              .eq('id', u.id)
+          }
           return supabase
             .from('org_nodes')
-            .update({ tier_order: u.tier_order, ...extra })
+            .update({ tier_order: u.tier_order })
             .eq('id', u.id)
         }),
       )
