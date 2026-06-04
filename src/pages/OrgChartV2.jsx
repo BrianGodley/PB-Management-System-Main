@@ -25,6 +25,7 @@ export default function OrgChartV2() {
 
   const [positions, setPositions] = useState([])
   const [employees, setEmployees] = useState([])
+  const [employeePositions, setEmployeePositions] = useState([]) // [{employee_id, position_id}]
 
   const [selectedNodeId, setSelectedNodeId] = useState(null)
   const [selectedEdgeId, setSelectedEdgeId] = useState(null)
@@ -48,19 +49,20 @@ export default function OrgChartV2() {
   // ── Loaders ─────────────────────────────────────────────────────────
   useEffect(() => {
     ;(async () => {
-      const [chartsRes, positionsRes, employeesRes] = await Promise.all([
+      const [chartsRes, positionsRes, employeesRes, epRes] = await Promise.all([
         supabase.from('org_charts').select('*').order('created_at'),
         supabase.from('positions').select('id, title').order('title'),
         supabase
           .from('employees')
-          .select('id, first_name, last_name, position_id, active')
-          .not('position_id', 'is', null)
+          .select('id, first_name, last_name, status')
           .order('last_name', { ascending: true })
           .order('first_name', { ascending: true }),
+        supabase.from('employee_positions').select('employee_id, position_id'),
       ])
       setCharts(chartsRes.data || [])
       setPositions(positionsRes.data || [])
       setEmployees(employeesRes.data || [])
+      setEmployeePositions(epRes.data || [])
       if (chartsRes.data?.length) selectChart(chartsRes.data[0])
     })()
   }, [])
@@ -84,23 +86,29 @@ export default function OrgChartV2() {
     setNodeTypes(t.data || [])
   }
 
+  // Build position_id → employees[] using the employee_positions join.
+  // PBS stores the relationship many-to-many: one employee can hold
+  // multiple positions, and one position can be held by multiple
+  // employees. "active" is derived from employees.status.
   const employeesByPosition = useMemo(() => {
+    const empById = new Map(employees.map(e => [e.id, e]))
     const m = new Map()
-    for (const e of employees) {
-      if (!e.position_id) continue
-      const arr = m.get(e.position_id) || []
+    for (const ep of employeePositions) {
+      const e = empById.get(ep.employee_id)
+      if (!e) continue
+      const arr = m.get(ep.position_id) || []
       arr.push({
         id: e.id,
         firstName: e.first_name,
         lastName: e.last_name,
-        active: e.active !== false,
+        active: (e.status || 'active') === 'active',
         displayName: `${e.first_name || ''} ${e.last_name || ''}`.trim() || '(unnamed)',
       })
-      m.set(e.position_id, arr)
+      m.set(ep.position_id, arr)
     }
     for (const arr of m.values()) arr.sort((a, b) => Number(b.active) - Number(a.active))
     return m
-  }, [employees])
+  }, [employees, employeePositions])
 
   // resolves both position-kind and container-kind nodes (containers
   // have an optional position_id "in charge")

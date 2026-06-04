@@ -211,18 +211,6 @@ export default function AddNodeDialog({
 
         {kind === 'container' && (
           <div className="space-y-3">
-            {/* Heading sits at the very top — labels the section type */}
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">
-                Heading (Department / Division / Section…)
-              </label>
-              <input
-                value={heading}
-                onChange={e => setHeading(e.target.value)}
-                placeholder="Department"
-                className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
-              />
-            </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">
                 Area name

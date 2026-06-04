@@ -140,19 +140,7 @@ export function ContainerNode({
         stroke={textColor === '#FFFFFF' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}
         strokeWidth={1}
       />
-      {node.heading && (
-        <text
-          x={box.x + 8}
-          y={box.y + 12}
-          fill={textColor}
-          opacity={0.7}
-          fontSize="7"
-          fontWeight="600"
-          letterSpacing="0.05em"
-        >
-          {String(node.heading).toUpperCase()}
-        </text>
-      )}
+      {/* Heading removed — Area name handles section labeling */}
       <text
         x={cx}
         y={labelY}
