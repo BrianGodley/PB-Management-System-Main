@@ -26,6 +26,7 @@ export default function TierCanvas({
   selectedNodeId,
   selectedEdgeId,
   onNodeClick,
+  onNodeDoubleClick,
   onEdgeClick,
   onBackgroundClick,
   onNodeDropped,
@@ -227,7 +228,7 @@ export default function TierCanvas({
           if (n.kind === 'container') {
             const ph = resolveNodeHolder ? resolveNodeHolder(n) : null
             return (
-              <g key={n.id} style={wrapStyle} onMouseDown={onMouseDown}>
+              <g key={n.id} style={wrapStyle} onMouseDown={onMouseDown} onDoubleClick={() => editable && onNodeDoubleClick && onNodeDoubleClick(n.id)}>
                 <ContainerNode
                   node={n}
                   box={box}
@@ -242,7 +243,7 @@ export default function TierCanvas({
           if (n.kind === 'position') {
             const ph = (resolveNodeHolder ? resolveNodeHolder(n) : null) || {}
             return (
-              <g key={n.id} style={wrapStyle} onMouseDown={onMouseDown}>
+              <g key={n.id} style={wrapStyle} onMouseDown={onMouseDown} onDoubleClick={() => editable && onNodeDoubleClick && onNodeDoubleClick(n.id)}>
                 <PositionNode
                   node={n}
                   box={box}
@@ -256,7 +257,7 @@ export default function TierCanvas({
             )
           }
           return (
-            <g key={n.id} style={wrapStyle} onMouseDown={onMouseDown}>
+            <g key={n.id} style={wrapStyle} onMouseDown={onMouseDown} onDoubleClick={() => editable && onNodeDoubleClick && onNodeDoubleClick(n.id)}>
               <CustomNode
                 node={n}
                 box={box}

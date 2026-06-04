@@ -588,6 +588,13 @@ export default function OrgChartV2() {
             selectedNodeId={selectedNodeId}
             selectedEdgeId={selectedEdgeId}
             onNodeClick={onNodeClick}
+            onNodeDoubleClick={nodeId => {
+              const n = nodes.find(x => x.id === nodeId)
+              if (!n) return
+              setSelectedNodeId(nodeId)
+              setContextMenu(null)
+              setDialog({ mode: 'edit', existing: n })
+            }}
             onNodeDropped={handleNodeDropped}
             onEdgeClick={id => {
               if (!editMode) return
@@ -665,6 +672,24 @@ export default function OrgChartV2() {
           employeesByPosition={employeesByPosition}
           onSubmit={payload => (payload.isEdit ? saveNode(payload) : addNode(payload))}
           onClose={() => setDialog(null)}
+          onAddChild={existing => {
+            setDialog({ mode: 'child', parentId: existing.id })
+          }}
+          onAddSenior={existing => {
+            setDialog({ mode: 'senior', seniorOf: existing.id })
+          }}
+          onConnect={existing => {
+            setSelectedNodeId(existing.id)
+            setConnectMode(true)
+            setConnectSource(existing.id)
+            setDialog(null)
+          }}
+          onDelete={existing => {
+            setSelectedNodeId(existing.id)
+            setDialog(null)
+            // chain the delete after state settles
+            setTimeout(() => deleteSelectedNode(), 0)
+          }}
         />
       )}
     </div>
@@ -691,6 +716,7 @@ function ItemContextMenu({
   return (
     <div
       className="fixed z-[1000] bg-white border border-slate-200 shadow-xl rounded-lg py-1 text-sm"
+      style={{ top, left, width: menuWidth }}
       onClick={e => e.stopPropagation()}
     >
       <MenuItem label="Connect Item" onClick={onConnect} />

@@ -34,6 +34,10 @@ export default function AddNodeDialog({
   employeesByPosition,
   onSubmit,
   onClose,
+  onConnect,
+  onDelete,
+  onAddSenior,
+  onAddChild,
 }) {
   const isEdit = mode === 'edit' && existing
   const [kind, setKind] = useState(isEdit ? existing.kind || 'custom' : 'position')
@@ -309,6 +313,51 @@ export default function AddNodeDialog({
               onChange={e => setLabel(e.target.value)}
               className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
             />
+          </div>
+        )}
+
+        {/* When editing, expose the same item actions the context menu
+            offers so the user can act on the item without closing the
+            dialog. Each action button closes the dialog and lets the
+            parent handle the action. */}
+        {isEdit && (
+          <div className="mt-5 pt-3 border-t border-gray-100 flex flex-wrap gap-2 text-xs">
+            {onAddChild && (
+              <button
+                type="button"
+                onClick={() => onAddChild(existing)}
+                className="px-2 py-1 rounded-md bg-blue-100 text-blue-700 hover:bg-blue-200"
+              >
+                + Add Child Item
+              </button>
+            )}
+            {onAddSenior && (
+              <button
+                type="button"
+                onClick={() => onAddSenior(existing)}
+                className="px-2 py-1 rounded-md bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
+              >
+                + Add Senior Item
+              </button>
+            )}
+            {onConnect && (
+              <button
+                type="button"
+                onClick={() => onConnect(existing)}
+                className="px-2 py-1 rounded-md bg-orange-100 text-orange-700 hover:bg-orange-200"
+              >
+                Connect →
+              </button>
+            )}
+            {onDelete && (
+              <button
+                type="button"
+                onClick={() => onDelete(existing)}
+                className="ml-auto px-2 py-1 rounded-md bg-red-100 text-red-700 hover:bg-red-200"
+              >
+                Delete
+              </button>
+            )}
           </div>
         )}
 
