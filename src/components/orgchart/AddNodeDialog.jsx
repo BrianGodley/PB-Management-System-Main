@@ -10,7 +10,8 @@
 //   - onSubmit(payload), onClose
 
 import { useState } from 'react'
-import { CONTAINER_COLORS, FULL_LIBRARY } from './palette.js'
+import { CONTAINER_COLORS } from './palette.js'
+import ColorLibraryPicker from '../ColorLibraryPicker.jsx'
 
 export default function AddNodeDialog({
   mode,
@@ -18,6 +19,7 @@ export default function AddNodeDialog({
   seniorOf,
   existing,
   positions,
+  employeesByPosition,
   onSubmit,
   onClose,
 }) {
@@ -28,6 +30,9 @@ export default function AddNodeDialog({
 
   const [positionId, setPositionId] = useState(
     isEdit && existing.position_id ? String(existing.position_id) : '',
+  )
+  const [employeeId, setEmployeeId] = useState(
+    isEdit && existing.employee_id ? String(existing.employee_id) : '',
   )
 
   const [heading, setHeading] = useState(isEdit ? existing.heading || 'Department' : 'Department')
@@ -54,6 +59,7 @@ export default function AddNodeDialog({
       onSubmit({
         ...base,
         position_id: Number(positionId),
+        employee_id: employeeId || null,
         label: p?.title || '',
         width: 110,
         height: 40,
@@ -115,7 +121,10 @@ export default function AddNodeDialog({
             <label className="block text-xs font-medium text-gray-500 mb-1">Position</label>
             <select
               value={positionId}
-              onChange={e => setPositionId(e.target.value)}
+              onChange={e => {
+                setPositionId(e.target.value)
+                setEmployeeId('') // reset employee pick when position changes
+              }}
               className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm mb-2"
             >
               <option value="">— Pick a position —</option>
@@ -125,9 +134,54 @@ export default function AddNodeDialog({
                 </option>
               ))}
             </select>
-            <p className="text-xs text-gray-500">
-              The assigned employee's name fills in automatically.
-            </p>
+            {(() => {
+              const candidates =
+                employeesByPosition?.get(Number(positionId)) || []
+              if (!positionId) {
+                return (
+                  <p className="text-xs text-gray-500">
+                    Pick a position; the assigned employee fills in automatically.
+                  </p>
+                )
+              }
+              if (candidates.length === 0) {
+                return (
+                  <p className="text-xs text-amber-600">
+                    No employees are currently assigned to this position. The card
+                    will show "(unassigned)".
+                  </p>
+                )
+              }
+              if (candidates.length === 1) {
+                return (
+                  <p className="text-xs text-gray-500">
+                    Holder: <span className="font-medium text-gray-700">
+                      {candidates[0].displayName}
+                    </span>
+                  </p>
+                )
+              }
+              return (
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                    Employee to show ({candidates.length} assigned)
+                  </label>
+                  <select
+                    value={employeeId}
+                    onChange={e => setEmployeeId(e.target.value)}
+                    className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
+                  >
+                    <option value="">— Auto (first active) —</option>
+                    {candidates.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.displayName}
+                        {c.active ? '' : ' (inactive)'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )
+            })()}
           </div>
         )}
 
@@ -153,36 +207,7 @@ export default function AddNodeDialog({
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Color</label>
-              {/* Full library grid: each row = one hue family,
-                  11 swatches from lightest → darkest left → right. */}
-              <div className="space-y-1">
-                {FULL_LIBRARY.map(fam => (
-                  <div key={fam.family} className="flex items-center gap-1">
-                    <span className="w-12 text-[10px] uppercase tracking-wide text-gray-400">
-                      {fam.family}
-                    </span>
-                    <div className="flex gap-0.5">
-                      {fam.shades.map(s => (
-                        <button
-                          key={s.id}
-                          type="button"
-                          onClick={() => setBgColor(s.hex)}
-                          title={`${s.id} • ${s.hex}`}
-                          style={{ backgroundColor: s.hex }}
-                          className={`w-4 h-4 rounded-sm border ${
-                            bgColor === s.hex
-                              ? 'border-blue-600 ring-1 ring-blue-400'
-                              : 'border-gray-200'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="text-[10px] text-gray-400 mt-1.5">
-                Selected: <span className="font-mono">{bgColor}</span>
-              </div>
+              <ColorLibraryPicker value={bgColor} onChange={setBgColor} compact />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
@@ -229,6 +254,10 @@ export default function AddNodeDialog({
                   </button>
                 ))}
               </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Color</label>
+              <ColorLibraryPicker value={bgColor} onChange={setBgColor} compact />
             </div>
           </div>
         )}

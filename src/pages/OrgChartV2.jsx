@@ -22,7 +22,7 @@ export default function OrgChartV2() {
   const [nodeTypes, setNodeTypes] = useState([])
 
   const [positions, setPositions] = useState([])
-  const [holders, setHolders] = useState([])
+  const [employees, setEmployees] = useState([]) // active employees with position_id
 
   const [selectedNodeId, setSelectedNodeId] = useState(null)
   const [selectedEdgeId, setSelectedEdgeId] = useState(null)
@@ -37,14 +37,21 @@ export default function OrgChartV2() {
   // ── Loaders ─────────────────────────────────────────────────────────
   useEffect(() => {
     ;(async () => {
-      const [chartsRes, positionsRes, holdersRes] = await Promise.all([
+      const [chartsRes, positionsRes, employeesRes] = await Promise.all([
         supabase.from('org_charts').select('*').order('created_at'),
         supabase.from('positions').select('id, title').order('title'),
-        supabase.from('position_holders').select('*'),
+        supabase
+          .from('employees')
+          .select('id, first_name, last_name, position_id, active')
+          .not('position_id', 'is', null)
+          .order('last_name', { ascending: true })
+          .order('first_name', { ascending: true }),
       ])
       setCharts(chartsRes.data || [])
       setPositions(positionsRes.data || [])
-      setHolders(holdersRes.data || [])
+      // Only active employees count for auto-resolution; the picker still
+      // shows everyone so an inactive person can be deliberately chosen.
+      setEmployees((employeesRes.data || []))
       if (chartsRes.data?.length) selectChart(chartsRes.data[0])
     })()
   }, [])
@@ -66,16 +73,47 @@ export default function OrgChartV2() {
     setNodeTypes(t.data || [])
   }
 
-  const holderMap = useMemo(() => {
+  // position_id → array of employees in that position (active first, then
+  // by last/first name). PositionNode and the dialog use this to pick
+  // which name to show + power the dropdown when there's more than one.
+  const employeesByPosition = useMemo(() => {
     const m = new Map()
-    for (const h of holders) {
-      m.set(h.position_id, {
-        positionTitle: h.position_title,
-        displayName: h.display_name,
+    for (const e of employees) {
+      if (!e.position_id) continue
+      const arr = m.get(e.position_id) || []
+      arr.push({
+        id: e.id,
+        firstName: e.first_name,
+        lastName: e.last_name,
+        active: e.active !== false,
+        displayName: `${e.first_name || ''} ${e.last_name || ''}`.trim() || '(unnamed)',
       })
+      m.set(e.position_id, arr)
+    }
+    for (const arr of m.values()) {
+      arr.sort((a, b) => Number(b.active) - Number(a.active))
     }
     return m
-  }, [holders])
+  }, [employees])
+
+  // position_id → { positionTitle, displayName } for the renderer. Picks
+  // the right employee per node based on org_node.employee_id (when set)
+  // or auto-resolves to the first/only active holder.
+  const resolveNodeHolder = (node) => {
+    const pos = positions.find(p => Number(p.id) === Number(node?.position_id))
+    if (!pos) return null
+    const candidates = employeesByPosition.get(pos.id) || []
+    let chosen = null
+    if (node?.employee_id) {
+      chosen = candidates.find(c => c.id === node.employee_id) || null
+    }
+    if (!chosen) chosen = candidates.find(c => c.active) || candidates[0] || null
+    return {
+      positionTitle: pos.title,
+      displayName: chosen ? chosen.displayName : '(unassigned)',
+      candidates,
+    }
+  }
 
   // ── Chart mutations ─────────────────────────────────────────────────
   async function createChart() {
@@ -178,6 +216,7 @@ export default function OrgChartV2() {
         kind: payload.kind,
         label: payload.label || '',
         position_id: payload.position_id || null,
+        employee_id: payload.employee_id || null,
         heading: payload.heading || null,
         bg_color: payload.bg_color || null,
         container_mode: payload.container_mode || null,
@@ -225,6 +264,7 @@ export default function OrgChartV2() {
       const update = {
         label: payload.label,
         position_id: payload.position_id || null,
+        employee_id: payload.employee_id || null,
         heading: payload.heading || null,
         bg_color: payload.bg_color || null,
         container_mode: payload.container_mode || null,
@@ -589,7 +629,7 @@ export default function OrgChartV2() {
             nodes={nodes}
             edges={edges}
             nodeTypes={nodeTypes}
-            positionHolders={holderMap}
+            resolveNodeHolder={resolveNodeHolder}
             zoom={zoom}
             selectedNodeId={selectedNodeId}
             selectedEdgeId={selectedEdgeId}
@@ -618,6 +658,7 @@ export default function OrgChartV2() {
           seniorOf={dialog.seniorOf}
           existing={dialog.existing}
           positions={positions}
+          employeesByPosition={employeesByPosition}
           onSubmit={payload => (payload.isEdit ? saveNode(payload) : addNode(payload))}
           onClose={() => setDialog(null)}
         />

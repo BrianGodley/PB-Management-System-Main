@@ -24,7 +24,7 @@ export default function TierCanvas({
   nodes,
   edges,
   nodeTypes,
-  positionHolders,
+  resolveNodeHolder,
   selectedNodeId,
   selectedEdgeId,
   onNodeClick,
@@ -224,7 +224,7 @@ export default function TierCanvas({
           )
         }
         if (n.kind === 'position') {
-          const ph = positionHolders?.get(n.position_id) || {}
+          const ph = (resolveNodeHolder ? resolveNodeHolder(n) : null) || {}
           return (
             <g key={n.id} style={wrapStyle} onMouseDown={onMouseDown}>
               <PositionNode
