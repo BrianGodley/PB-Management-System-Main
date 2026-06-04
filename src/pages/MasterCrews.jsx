@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useCachedData } from '../lib/useCachedData'
 import { COLOR_PALETTE } from './JobsList'
+import ColorLibraryPicker from '../components/ColorLibraryPicker.jsx'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Master Crews
@@ -257,22 +258,8 @@ function CrewModal({ crew, employees, usedLabels, onClose, onSave, onDelete }) {
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
               Crew Color
             </label>
-            <div className="flex flex-wrap gap-1.5 mb-2">
-              {COLOR_PALETTE.map(c => (
-                <button
-                  key={c}
-                  onClick={() => setCrewColor(c)}
-                  style={{ backgroundColor: c }}
-                  className={`w-7 h-7 rounded-full transition-transform ${
-                    crewColor === c
-                      ? 'ring-2 ring-offset-1 ring-gray-500 scale-110'
-                      : 'hover:scale-110'
-                  }`}
-                  title={c}
-                />
-              ))}
-            </div>
-            <div className="flex items-center gap-2">
+            <ColorLibraryPicker value={crewColor} onChange={setCrewColor} compact />
+            <div className="flex items-center gap-2 mt-2">
               <div
                 className="w-6 h-6 rounded-full border border-gray-200"
                 style={{ backgroundColor: crewColor }}
@@ -732,38 +719,30 @@ function CrewTypesTab() {
             />
 
             {editingId === ct.id ? (
-              <>
-                <input
-                  value={editName}
-                  onChange={e => setEditName(e.target.value)}
-                  className="input text-sm flex-1 py-1"
-                  autoFocus
-                />
-                <div className="flex gap-1 flex-shrink-0">
-                  {COLOR_OPTIONS.map(c => (
-                    <button
-                      key={c.value}
-                      onClick={() => setEditColor(c.value)}
-                      className={`w-5 h-5 rounded-full border-2 transition-all ${editColor === c.value ? 'border-gray-800 scale-125' : 'border-transparent'}`}
-                      style={{ backgroundColor: c.value }}
-                      title={c.label}
-                    />
-                  ))}
+              <div className="flex-1 flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    value={editName}
+                    onChange={e => setEditName(e.target.value)}
+                    className="input text-sm flex-1 py-1"
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => handleSaveEdit(ct.id)}
+                    disabled={saving}
+                    className="text-xs text-green-700 font-semibold hover:underline flex-shrink-0"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setEditingId(null)}
+                    className="text-xs text-gray-400 hover:underline flex-shrink-0"
+                  >
+                    Cancel
+                  </button>
                 </div>
-                <button
-                  onClick={() => handleSaveEdit(ct.id)}
-                  disabled={saving}
-                  className="text-xs text-green-700 font-semibold hover:underline flex-shrink-0"
-                >
-                  Save
-                </button>
-                <button
-                  onClick={() => setEditingId(null)}
-                  className="text-xs text-gray-400 hover:underline flex-shrink-0"
-                >
-                  Cancel
-                </button>
-              </>
+                <ColorLibraryPicker value={editColor} onChange={setEditColor} compact />
+              </div>
             ) : (
               <>
                 <span className="flex-1 text-sm font-medium text-gray-800">{ct.name}</span>
@@ -819,17 +798,7 @@ function CrewTypesTab() {
           />
           <div>
             <p className="text-xs text-gray-500 mb-1.5">Color</p>
-            <div className="flex gap-2 flex-wrap">
-              {COLOR_OPTIONS.map(c => (
-                <button
-                  key={c.value}
-                  onClick={() => setNewColor(c.value)}
-                  className={`w-7 h-7 rounded-full border-2 transition-all ${newColor === c.value ? 'border-gray-800 scale-110' : 'border-transparent'}`}
-                  style={{ backgroundColor: c.value }}
-                  title={c.label}
-                />
-              ))}
-            </div>
+            <ColorLibraryPicker value={newColor} onChange={setNewColor} compact />
           </div>
           <div className="flex gap-2">
             <button

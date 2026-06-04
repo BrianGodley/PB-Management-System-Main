@@ -255,10 +255,6 @@ export default function AddNodeDialog({
                 ))}
               </div>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Color</label>
-              <ColorLibraryPicker value={bgColor} onChange={setBgColor} compact />
-            </div>
           </div>
         )}
 
