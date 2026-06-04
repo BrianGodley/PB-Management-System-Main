@@ -10,7 +10,7 @@
 //   - onSubmit(payload), onClose
 
 import { useState } from 'react'
-import { CONTAINER_COLORS } from './palette.js'
+import { CONTAINER_COLORS, FULL_LIBRARY } from './palette.js'
 
 export default function AddNodeDialog({
   mode,
@@ -153,19 +153,35 @@ export default function AddNodeDialog({
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Color</label>
-              <div className="flex flex-wrap gap-1.5">
-                {CONTAINER_COLORS.map(c => (
-                  <button
-                    key={c.bg}
-                    type="button"
-                    onClick={() => setBgColor(c.bg)}
-                    title={c.name}
-                    style={{ backgroundColor: c.bg }}
-                    className={`w-7 h-7 rounded-md border-2 ${
-                      bgColor === c.bg ? 'border-blue-600' : 'border-transparent'
-                    }`}
-                  />
+              {/* Full library grid: each row = one hue family,
+                  11 swatches from lightest → darkest left → right. */}
+              <div className="space-y-1">
+                {FULL_LIBRARY.map(fam => (
+                  <div key={fam.family} className="flex items-center gap-1">
+                    <span className="w-12 text-[10px] uppercase tracking-wide text-gray-400">
+                      {fam.family}
+                    </span>
+                    <div className="flex gap-0.5">
+                      {fam.shades.map(s => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => setBgColor(s.hex)}
+                          title={`${s.id} • ${s.hex}`}
+                          style={{ backgroundColor: s.hex }}
+                          className={`w-4 h-4 rounded-sm border ${
+                            bgColor === s.hex
+                              ? 'border-blue-600 ring-1 ring-blue-400'
+                              : 'border-gray-200'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 ))}
+              </div>
+              <div className="text-[10px] text-gray-400 mt-1.5">
+                Selected: <span className="font-mono">{bgColor}</span>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">

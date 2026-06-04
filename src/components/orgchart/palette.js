@@ -1,18 +1,29 @@
-// Color palette for container node backgrounds. Picked to read well at
-// large card sizes and stay legible behind dark + light text.
-export const CONTAINER_COLORS = [
-  { name: 'Slate',    bg: '#1E293B', text: '#FFFFFF' },
-  { name: 'Forest',   bg: '#3A5038', text: '#FFFFFF' },
-  { name: 'Ocean',    bg: '#1E40AF', text: '#FFFFFF' },
-  { name: 'Plum',     bg: '#7E22CE', text: '#FFFFFF' },
-  { name: 'Amber',    bg: '#B45309', text: '#FFFFFF' },
-  { name: 'Crimson',  bg: '#B91C1C', text: '#FFFFFF' },
-  { name: 'Stone',    bg: '#F1F5F9', text: '#1E293B' },
-  { name: 'Sand',     bg: '#FEF3C7', text: '#1E293B' },
-  { name: 'Mint',     bg: '#DCFCE7', text: '#1E293B' },
-]
+// Re-exports of the app-wide color library for the org chart.
+// Kept as a thin shim so the rest of the orgchart code doesn't have to
+// know about the lib path, and so other modules can override what
+// "container colors" mean (e.g. if a tenant wants a curated subset).
+
+import {
+  COLOR_LIBRARY,
+  getColor,
+  getFamily,
+  pickTextColor as libPickTextColor,
+} from '../../lib/colorLibrary.js'
+
+// Backward-compat: older code expected a flat array of { name, bg, text }.
+// Keep that shape using the 500-level swatch of each family.
+export const CONTAINER_COLORS = COLOR_LIBRARY.map(fam => {
+  const s = getColor(fam.family, 500)
+  return {
+    name: fam.family[0].toUpperCase() + fam.family.slice(1),
+    bg: s.hex,
+    text: s.textColor,
+  }
+})
+
+export const FULL_LIBRARY = COLOR_LIBRARY
+export { getColor, getFamily }
 
 export function pickTextColor(bg) {
-  const match = CONTAINER_COLORS.find(c => c.bg.toLowerCase() === (bg || '').toLowerCase())
-  return match?.text || '#FFFFFF'
+  return libPickTextColor(bg)
 }
