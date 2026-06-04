@@ -1,8 +1,9 @@
-// OrgChart v2 — tier-based snap layout, three node kinds (custom,
-// position, container), orthogonal arrows (down/across, never up,
-// never diagonal). Replaces OrgChart.jsx at /org-chart.
+// OrgChart v2 — tier-based snap layout, three Item kinds (Custom, Org
+// Position, Org Chart Area), orthogonal arrows, drag-and-drop, edit
+// mode toggle, contextual item menu.
 
 import { useEffect, useMemo, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import TierCanvas from '../components/orgchart/TierCanvas.jsx'
@@ -22,17 +23,20 @@ export default function OrgChartV2() {
   const [nodeTypes, setNodeTypes] = useState([])
 
   const [positions, setPositions] = useState([])
-  const [employees, setEmployees] = useState([]) // active employees with position_id
+  const [employees, setEmployees] = useState([])
 
   const [selectedNodeId, setSelectedNodeId] = useState(null)
   const [selectedEdgeId, setSelectedEdgeId] = useState(null)
   const [connectMode, setConnectMode] = useState(false)
   const [connectSource, setConnectSource] = useState(null)
-  const [dialog, setDialog] = useState(null) // { mode, parentId, existing }
+  const [dialog, setDialog] = useState(null)
   const [busy, setBusy] = useState(false)
   const [editingChartName, setEditingChartName] = useState(false)
   const [chartNameDraft, setChartNameDraft] = useState('')
   const [zoom, setZoom] = useState(1)
+  const [editMode, setEditMode] = useState(false)
+  // contextMenu = { nodeId, screenRect } | null
+  const [contextMenu, setContextMenu] = useState(null)
 
   // ── Loaders ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -49,9 +53,7 @@ export default function OrgChartV2() {
       ])
       setCharts(chartsRes.data || [])
       setPositions(positionsRes.data || [])
-      // Only active employees count for auto-resolution; the picker still
-      // shows everyone so an inactive person can be deliberately chosen.
-      setEmployees((employeesRes.data || []))
+      setEmployees(employeesRes.data || [])
       if (chartsRes.data?.length) selectChart(chartsRes.data[0])
     })()
   }, [])
@@ -63,6 +65,8 @@ export default function OrgChartV2() {
     setSelectedEdgeId(null)
     setConnectMode(false)
     setConnectSource(null)
+    setContextMenu(null)
+    setEditMode(false) // open existing charts locked
     const [n, e, t] = await Promise.all([
       supabase.from('org_nodes').select('*').eq('chart_id', chart.id),
       supabase.from('org_edges').select('*').eq('chart_id', chart.id),
@@ -73,9 +77,6 @@ export default function OrgChartV2() {
     setNodeTypes(t.data || [])
   }
 
-  // position_id → array of employees in that position (active first, then
-  // by last/first name). PositionNode and the dialog use this to pick
-  // which name to show + power the dropdown when there's more than one.
   const employeesByPosition = useMemo(() => {
     const m = new Map()
     for (const e of employees) {
@@ -90,27 +91,23 @@ export default function OrgChartV2() {
       })
       m.set(e.position_id, arr)
     }
-    for (const arr of m.values()) {
-      arr.sort((a, b) => Number(b.active) - Number(a.active))
-    }
+    for (const arr of m.values()) arr.sort((a, b) => Number(b.active) - Number(a.active))
     return m
   }, [employees])
 
-  // position_id → { positionTitle, displayName } for the renderer. Picks
-  // the right employee per node based on org_node.employee_id (when set)
-  // or auto-resolves to the first/only active holder.
-  const resolveNodeHolder = (node) => {
-    const pos = positions.find(p => Number(p.id) === Number(node?.position_id))
+  // resolves both position-kind and container-kind nodes (containers
+  // have an optional position_id "in charge")
+  const resolveNodeHolder = node => {
+    if (!node?.position_id) return null
+    const pos = positions.find(p => Number(p.id) === Number(node.position_id))
     if (!pos) return null
     const candidates = employeesByPosition.get(pos.id) || []
     let chosen = null
-    if (node?.employee_id) {
-      chosen = candidates.find(c => c.id === node.employee_id) || null
-    }
+    if (node.employee_id) chosen = candidates.find(c => c.id === node.employee_id) || null
     if (!chosen) chosen = candidates.find(c => c.active) || candidates[0] || null
     return {
       positionTitle: pos.title,
-      displayName: chosen ? chosen.displayName : '(unassigned)',
+      displayName: chosen ? chosen.displayName : 'Held from Above',
       candidates,
     }
   }
@@ -124,7 +121,15 @@ export default function OrgChartV2() {
       .single()
     if (error) return alert(error.message)
     setCharts(prev => [...prev, data])
-    selectChart(data)
+    setChartId(data.id)
+    setChartName(data.name)
+    setNodes([])
+    setEdges([])
+    setNodeTypes([])
+    setSelectedNodeId(null)
+    setSelectedEdgeId(null)
+    setContextMenu(null)
+    setEditMode(true) // brand new charts start unlocked
   }
 
   async function renameChart(newName) {
@@ -147,11 +152,7 @@ export default function OrgChartV2() {
 
   async function deleteChart() {
     if (!chartId) return
-    if (
-      !confirm(
-        `Delete chart "${chartName}"? Every node, edge and node-type inside it will be removed. This cannot be undone.`,
-      )
-    )
+    if (!confirm(`Delete chart "${chartName}"? Every item inside will be removed. This cannot be undone.`))
       return
     setBusy(true)
     try {
@@ -178,16 +179,11 @@ export default function OrgChartV2() {
     }
   }
 
-  // ── Node mutations ──────────────────────────────────────────────────
+  // ── Node (Item) mutations ──────────────────────────────────────────
   async function addNode(payload) {
     if (!chartId) return
     setBusy(true)
     try {
-      // tier resolution:
-      //   parentId   → new node lands a tier BELOW the parent (child)
-      //   seniorOf   → new node lands a tier ABOVE the referent (senior)
-      //   neither    → new node lands at tier 0 (or the chart's current
-      //                top tier if nothing exists yet)
       let tier = 0
       let tier_order = 0
       if (payload.parentId) {
@@ -227,15 +223,11 @@ export default function OrgChartV2() {
         tier,
         tier_order,
       }
-      const { data, error } = await supabase
-        .from('org_nodes')
-        .insert(insert)
-        .select()
-        .single()
+      const { data, error } = await supabase.from('org_nodes').insert(insert).select().single()
       if (error) throw error
       setNodes(prev => [...prev, data])
       if (payload.parentId) {
-        const { data: edge, error: edgeErr } = await supabase
+        const { data: edge } = await supabase
           .from('org_edges')
           .insert({
             chart_id: chartId,
@@ -246,7 +238,6 @@ export default function OrgChartV2() {
           })
           .select()
           .single()
-        if (edgeErr) console.warn('Edge insert failed', edgeErr)
         if (edge) setEdges(prev => [...prev, edge])
       }
       setDialog(null)
@@ -289,7 +280,7 @@ export default function OrgChartV2() {
 
   async function deleteSelectedNode() {
     if (!selectedNodeId) return
-    if (!confirm('Delete this node? Connected arrows will be removed too.')) return
+    if (!confirm('Delete this item? Connected arrows will be removed too.')) return
     setBusy(true)
     try {
       await supabase
@@ -297,11 +288,10 @@ export default function OrgChartV2() {
         .delete()
         .or(`source_id.eq.${selectedNodeId},target_id.eq.${selectedNodeId}`)
       await supabase.from('org_nodes').delete().eq('id', selectedNodeId)
-      setEdges(prev =>
-        prev.filter(e => e.source_id !== selectedNodeId && e.target_id !== selectedNodeId),
-      )
+      setEdges(prev => prev.filter(e => e.source_id !== selectedNodeId && e.target_id !== selectedNodeId))
       setNodes(prev => prev.filter(n => n.id !== selectedNodeId))
       setSelectedNodeId(null)
+      setContextMenu(null)
     } catch (e) {
       alert(e.message)
     } finally {
@@ -324,13 +314,6 @@ export default function OrgChartV2() {
     }
   }
 
-  // Mouse-drag drop handler. TierCanvas computes:
-  //   newTier       — from drop Y (which tier band)
-  //   newTierOrder  — from drop X (slot within tier)
-  //   newXOffset    — from drop X minus the natural slot start, so the
-  //                   node keeps the precise horizontal position the
-  //                   user dragged it to (matches the old arrow-button
-  //                   x_offset semantics).
   async function handleNodeDropped(nodeId, newTier, newTierOrder, newXOffset) {
     const node = nodes.find(n => n.id === nodeId)
     if (!node) return
@@ -342,17 +325,13 @@ export default function OrgChartV2() {
       node,
       ...otherSibs.slice(newTierOrder),
     ]
-    const updates = reordered.map((n, i) => ({
-      id: n.id,
-      tier_order: i,
-    }))
+    const updates = reordered.map((n, i) => ({ id: n.id, tier_order: i }))
     setNodes(prev =>
       prev.map(p => {
         const u = updates.find(x => x.id === p.id)
         if (!u) return p
-        if (p.id === nodeId) {
+        if (p.id === nodeId)
           return { ...p, tier: newTier, tier_order: u.tier_order, x_offset: newXOffset || 0 }
-        }
         return { ...p, tier_order: u.tier_order }
       }),
     )
@@ -362,11 +341,7 @@ export default function OrgChartV2() {
           if (u.id === nodeId) {
             return supabase
               .from('org_nodes')
-              .update({
-                tier: newTier,
-                tier_order: u.tier_order,
-                x_offset: newXOffset || 0,
-              })
+              .update({ tier: newTier, tier_order: u.tier_order, x_offset: newXOffset || 0 })
               .eq('id', u.id)
           }
           return supabase
@@ -380,49 +355,11 @@ export default function OrgChartV2() {
     }
   }
 
-  // Legacy keyboard-style nudge (kept available but not wired into UI).
-  async function moveNodeHoriz(direction, big = false) {
-    if (!selectedNodeId) return
-    const node = nodes.find(n => n.id === selectedNodeId)
-    if (!node) return
-    const step = big ? 40 : 10
-    const cur = Number.isFinite(node.x_offset) ? node.x_offset : 0
-    const next = direction === 'left' ? cur - step : cur + step
-    setNodes(prev => prev.map(n => (n.id === node.id ? { ...n, x_offset: next } : n)))
-    try {
-      const { error } = await supabase
-        .from('org_nodes')
-        .update({ x_offset: next })
-        .eq('id', node.id)
-      if (error) throw error
-    } catch (e) {
-      alert('Move failed: ' + (e.message || e))
-    }
-  }
-
-  // Reset a node's x_offset to 0 (snap it back into the tier flow).
-  async function resetNodeOffset() {
-    if (!selectedNodeId) return
-    setNodes(prev =>
-      prev.map(n => (n.id === selectedNodeId ? { ...n, x_offset: 0 } : n)),
-    )
-    try {
-      await supabase
-        .from('org_nodes')
-        .update({ x_offset: 0 })
-        .eq('id', selectedNodeId)
-    } catch (e) {
-      alert('Reset failed: ' + (e.message || e))
-    }
-  }
-
-  // Connect-mode handling
   const onNodeClick = useCallback(
-    nodeId => {
+    (nodeId, screenRect) => {
       if (connectMode) {
-        if (!connectSource) {
-          setConnectSource(nodeId)
-        } else if (connectSource !== nodeId) {
+        if (!connectSource) setConnectSource(nodeId)
+        else if (connectSource !== nodeId) {
           const src = nodes.find(n => n.id === connectSource)
           const tgt = nodes.find(n => n.id === nodeId)
           if (src && tgt) {
@@ -451,35 +388,28 @@ export default function OrgChartV2() {
       }
       setSelectedNodeId(nodeId)
       setSelectedEdgeId(null)
+      // Show contextual menu only in edit mode
+      if (editMode && screenRect) setContextMenu({ nodeId, screenRect })
+      else setContextMenu(null)
     },
-    [connectMode, connectSource, nodes, chartId],
+    [connectMode, connectSource, nodes, chartId, editMode],
   )
 
   const selectedNode = nodes.find(n => n.id === selectedNodeId) || null
 
   return (
     <div className="h-full flex flex-col bg-slate-50">
-      <div className="flex items-center gap-3 px-4 py-3 bg-white border-b border-slate-200 shrink-0">
-        {editingChartName ? (
-          <input
-            autoFocus
-            value={chartNameDraft}
-            onChange={e => setChartNameDraft(e.target.value)}
-            onBlur={() => renameChart(chartNameDraft)}
-            onKeyDown={e => {
-              if (e.key === 'Enter') renameChart(chartNameDraft)
-              else if (e.key === 'Escape') setEditingChartName(false)
-            }}
-            className="text-sm border border-blue-400 rounded-md px-2 py-1 min-w-[14rem]"
-          />
-        ) : (
+      {/* Top bar: left controls, centered chart name, right zoom */}
+      <div className="grid grid-cols-3 items-center gap-3 px-4 py-3 bg-white border-b border-slate-200 shrink-0">
+        {/* LEFT */}
+        <div className="flex items-center gap-2">
           <select
             value={chartId || ''}
             onChange={e => {
               const c = charts.find(x => x.id === e.target.value)
               if (c) selectChart(c)
             }}
-            className="text-sm border border-slate-300 rounded-md px-2 py-1"
+            className="text-sm border border-slate-300 rounded-md px-2 py-1 max-w-[14rem]"
           >
             <option value="">— Pick a chart —</option>
             {charts.map(c => (
@@ -488,88 +418,88 @@ export default function OrgChartV2() {
               </option>
             ))}
           </select>
-        )}
-        {chartId && !editingChartName && (
-          <>
+          <button
+            type="button"
+            onClick={createChart}
+            className="text-sm px-3 py-1 rounded-md text-white"
+            style={{ background: FG }}
+          >
+            + Chart
+          </button>
+          {chartId && (
             <button
               type="button"
               onClick={() => {
-                setChartNameDraft(chartName)
-                setEditingChartName(true)
+                setEditMode(v => !v)
+                setContextMenu(null)
+                setConnectMode(false)
+                setConnectSource(null)
               }}
-              className="text-xs text-slate-500 hover:text-slate-800 underline"
+              className={`text-sm px-3 py-1 rounded-md ${
+                editMode
+                  ? 'bg-amber-500 text-white hover:bg-amber-600'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
             >
-              rename
+              {editMode ? 'Done editing' : 'Edit'}
             </button>
+          )}
+          {editMode && chartId && (
             <button
               type="button"
-              onClick={deleteChart}
-              disabled={busy}
-              className="text-xs text-red-500 hover:text-red-700 underline"
+              onClick={() => setDialog({ mode: 'new', parentId: null })}
+              className="text-sm px-3 py-1 rounded-md bg-blue-600 text-white"
             >
-              delete
+              + Item
             </button>
-          </>
-        )}
-        <button
-          type="button"
-          onClick={createChart}
-          className="text-sm px-3 py-1 rounded-md text-white"
-          style={{ background: FG }}
-        >
-          + Chart
-        </button>
-        <div className="flex-1" />
-        <button
-          type="button"
-          onClick={() => setDialog({ mode: 'new', parentId: null })}
-          disabled={!chartId}
-          className="text-sm px-3 py-1 rounded-md bg-blue-600 text-white disabled:opacity-50"
-        >
-          + Node
-        </button>
-        {selectedNodeId && (
-          <>
-            <button
-              type="button"
-              onClick={() => setDialog({ mode: 'child', parentId: selectedNodeId })}
-              className="text-sm px-3 py-1 rounded-md bg-blue-100 text-blue-700"
-            >
-              + Child of selected
-            </button>
-            <button
-              type="button"
-              onClick={() => setDialog({ mode: 'senior', seniorOf: selectedNodeId })}
-              className="text-sm px-3 py-1 rounded-md bg-indigo-100 text-indigo-700"
-              title="Add a senior node a tier above the selected one"
-            >
-              + Senior of selected
-            </button>
-            <button
-              type="button"
-              onClick={() => setDialog({ mode: 'edit', existing: selectedNode })}
-              className="text-sm px-3 py-1 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200"
-            >
-              Edit
-            </button>
-          </>
-        )}
-        <button
-          type="button"
-          onClick={() => {
-            setConnectMode(m => !m)
-            setConnectSource(null)
-          }}
-          className={`text-sm px-3 py-1 rounded-md ${
-            connectMode
-              ? 'bg-orange-500 text-white'
-              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-          }`}
-        >
-          {connectMode ? 'Cancel connect' : 'Connect →'}
-        </button>
-        {/* Zoom controls */}
-        <div className="flex items-center gap-1 ml-1">
+          )}
+        </div>
+
+        {/* CENTER */}
+        <div className="flex items-center justify-center gap-2">
+          {editingChartName ? (
+            <input
+              autoFocus
+              value={chartNameDraft}
+              onChange={e => setChartNameDraft(e.target.value)}
+              onBlur={() => renameChart(chartNameDraft)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') renameChart(chartNameDraft)
+                else if (e.key === 'Escape') setEditingChartName(false)
+              }}
+              className="text-base text-center font-semibold border border-blue-400 rounded-md px-3 py-1 min-w-[18rem]"
+            />
+          ) : (
+            <h1 className="text-base font-semibold text-slate-800 truncate max-w-[26rem] text-center">
+              {chartName || '—'}
+            </h1>
+          )}
+          {editMode && chartId && !editingChartName && (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setChartNameDraft(chartName)
+                  setEditingChartName(true)
+                }}
+                className="text-xs text-slate-500 hover:text-slate-800 underline"
+              >
+                rename
+              </button>
+              <button
+                type="button"
+                onClick={deleteChart}
+                disabled={busy}
+                className="text-xs text-red-500 hover:text-red-700 underline"
+              >
+                delete
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* RIGHT — zoom always available */}
+        <div className="flex items-center justify-end gap-1">
           <button
             type="button"
             onClick={() => setZoom(z => Math.max(0.2, +(z - 0.1).toFixed(2)))}
@@ -595,35 +525,15 @@ export default function OrgChartV2() {
             +
           </button>
         </div>
-        {selectedNodeId && (
-          <button
-            type="button"
-            onClick={deleteSelectedNode}
-            disabled={busy}
-            className="text-sm px-3 py-1 rounded-md bg-red-100 text-red-700"
-          >
-            Delete node
-          </button>
-        )}
-        {selectedEdgeId && (
-          <button
-            type="button"
-            onClick={deleteSelectedEdge}
-            disabled={busy}
-            className="text-sm px-3 py-1 rounded-md bg-red-100 text-red-700"
-          >
-            Delete connection
-          </button>
-        )}
       </div>
 
       {connectMode && (
         <div className="bg-orange-50 border-b border-orange-200 px-4 py-1.5 text-xs text-orange-800">
-          {connectSource ? 'Click the second node to connect.' : 'Click the source node first.'}
+          {connectSource ? 'Click the second item to connect.' : 'Click the source item first.'}
         </div>
       )}
 
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto relative">
         {chartId ? (
           <TierCanvas
             nodes={nodes}
@@ -631,17 +541,21 @@ export default function OrgChartV2() {
             nodeTypes={nodeTypes}
             resolveNodeHolder={resolveNodeHolder}
             zoom={zoom}
+            editable={editMode}
             selectedNodeId={selectedNodeId}
             selectedEdgeId={selectedEdgeId}
             onNodeClick={onNodeClick}
             onNodeDropped={handleNodeDropped}
             onEdgeClick={id => {
+              if (!editMode) return
               setSelectedEdgeId(id)
               setSelectedNodeId(null)
+              setContextMenu(null)
             }}
             onBackgroundClick={() => {
               setSelectedNodeId(null)
               setSelectedEdgeId(null)
+              setContextMenu(null)
             }}
           />
         ) : (
@@ -650,6 +564,53 @@ export default function OrgChartV2() {
           </div>
         )}
       </div>
+
+      {/* Contextual item menu — only in edit mode, only when a node is
+          selected and we have its screen rect. */}
+      {editMode && contextMenu && selectedNode &&
+        createPortal(
+          <ItemContextMenu
+            screenRect={contextMenu.screenRect}
+            onClose={() => setContextMenu(null)}
+            onConnect={() => {
+              setConnectMode(true)
+              setConnectSource(selectedNode.id)
+              setContextMenu(null)
+            }}
+            onAddChild={() => {
+              setDialog({ mode: 'child', parentId: selectedNode.id })
+              setContextMenu(null)
+            }}
+            onAddSenior={() => {
+              setDialog({ mode: 'senior', seniorOf: selectedNode.id })
+              setContextMenu(null)
+            }}
+            onEdit={() => {
+              setDialog({ mode: 'edit', existing: selectedNode })
+              setContextMenu(null)
+            }}
+            onDelete={() => {
+              deleteSelectedNode()
+            }}
+            canDeleteEdge={!!selectedEdgeId}
+            onDeleteEdge={deleteSelectedEdge}
+          />,
+          document.body,
+        )}
+
+      {/* Edge actions float at top when an edge is selected (no specific node anchor) */}
+      {editMode && selectedEdgeId && !contextMenu && (
+        <div className="fixed top-20 right-6 z-50 bg-white border border-slate-200 shadow-lg rounded-md px-2 py-1.5 flex items-center gap-2">
+          <span className="text-xs text-slate-500">Connection selected</span>
+          <button
+            type="button"
+            onClick={deleteSelectedEdge}
+            className="text-xs px-2 py-1 rounded bg-red-100 text-red-700"
+          >
+            Delete
+          </button>
+        </div>
+      )}
 
       {dialog && (
         <AddNodeDialog
@@ -664,5 +625,55 @@ export default function OrgChartV2() {
         />
       )}
     </div>
+  )
+}
+
+// Floating context menu shown next to a selected item.
+function ItemContextMenu({
+  screenRect,
+  onClose,
+  onConnect,
+  onAddChild,
+  onAddSenior,
+  onEdit,
+  onDelete,
+}) {
+  // Position to the right of the item if there's space; otherwise left.
+  const menuWidth = 170
+  const margin = 8
+  let left = screenRect.right + margin
+  if (left + menuWidth > window.innerWidth - 8) {
+    left = Math.max(8, screenRect.left - menuWidth - margin)
+  }
+  const top = Math.max(8, Math.min(window.innerHeight - 220, screenRect.top))
+  return (
+    <div
+      className="fixed z-[1000] bg-white border border-slate-200 shadow-xl rounded-lg py-1 text-sm"
+      style={{ top, left, width: menuWidth }}
+      onClick={e => e.stopPropagation()}
+    >
+      <MenuItem label="Connect Item" onClick={onConnect} />
+      <MenuItem label="Add Child" onClick={onAddChild} />
+      <MenuItem label="Add Senior" onClick={onAddSenior} />
+      <MenuItem label="Edit" onClick={onEdit} />
+      <div className="border-t border-slate-100 my-1" />
+      <MenuItem label="Delete" onClick={onDelete} danger />
+      <div className="border-t border-slate-100 my-1" />
+      <MenuItem label="Cancel" onClick={onClose} muted />
+    </div>
+  )
+}
+
+function MenuItem({ label, onClick, danger, muted }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full text-left px-3 py-1.5 hover:bg-slate-50 ${
+        danger ? 'text-red-600' : muted ? 'text-slate-500' : 'text-slate-700'
+      }`}
+    >
+      {label}
+    </button>
   )
 }

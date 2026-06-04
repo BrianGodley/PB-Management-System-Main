@@ -1,5 +1,7 @@
-// SVG renderers for each node kind. Compact sizing (~25% of v1).
+// SVG renderers for each node ("Item") kind. Compact sizing (~25% of v1).
 import { pickTextColor } from './palette.js'
+
+const UNASSIGNED_LABEL = 'Held from Above'
 
 function SelectOutline({ x, y, w, h, selected }) {
   if (!selected) return null
@@ -69,6 +71,7 @@ export function PositionNode({
   positionTitle,
 }) {
   const fill = color || '#3A5038'
+  const name = displayName || UNASSIGNED_LABEL
   return (
     <g onClick={onClick} style={{ cursor: 'pointer' }}>
       <SelectOutline x={box.x} y={box.y} w={box.width} h={box.height} selected={selected} />
@@ -99,15 +102,30 @@ export function PositionNode({
         fontSize="8"
         opacity={0.9}
       >
-        {displayName || '(unassigned)'}
+        {name}
       </text>
     </g>
   )
 }
 
-export function ContainerNode({ node, box, selected, onClick }) {
+// ContainerNode = "Org Chart Area" in the UI. Optional position-in-charge:
+//   - heading at the very top (e.g. "Department")
+//   - main label in the middle, slightly raised so the position info
+//     can sit beneath it
+//   - position title in larger text, employee name in smaller text under it
+export function ContainerNode({
+  node,
+  box,
+  selected,
+  onClick,
+  positionTitle,
+  displayName,
+}) {
   const fill = node.bg_color || '#1E293B'
   const textColor = pickTextColor(fill)
+  const cx = box.x + box.width / 2
+  const hasPosition = !!positionTitle
+  const labelY = hasPosition ? box.y + box.height / 2 - 12 : box.y + box.height / 2 + 3
   return (
     <g onClick={onClick} style={{ cursor: 'pointer' }}>
       <SelectOutline x={box.x} y={box.y} w={box.width} h={box.height} selected={selected} />
@@ -136,15 +154,40 @@ export function ContainerNode({ node, box, selected, onClick }) {
         </text>
       )}
       <text
-        x={box.x + box.width / 2}
-        y={box.y + box.height / 2 + 3}
+        x={cx}
+        y={labelY}
         textAnchor="middle"
         fill={textColor}
-        fontSize="12"
+        fontSize="14"
         fontWeight="700"
       >
         {node.label}
       </text>
+      {hasPosition && (
+        <>
+          <text
+            x={cx}
+            y={box.y + box.height / 2 + 6}
+            textAnchor="middle"
+            fill={textColor}
+            opacity={0.9}
+            fontSize="10"
+            fontWeight="600"
+          >
+            {positionTitle}
+          </text>
+          <text
+            x={cx}
+            y={box.y + box.height / 2 + 18}
+            textAnchor="middle"
+            fill={textColor}
+            opacity={0.75}
+            fontSize="8"
+          >
+            {displayName || UNASSIGNED_LABEL}
+          </text>
+        </>
+      )}
       <text
         x={box.x + box.width - 6}
         y={box.y + box.height - 5}

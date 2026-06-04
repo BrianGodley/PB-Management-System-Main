@@ -10924,7 +10924,6 @@ export default function Statistics() {
           className="fixed inset-0 z-50 bg-black/50 flex items-start sm:items-center justify-center p-3 pt-6 sm:p-4 sm:hidden"
           onClick={() => setShowMobileEditsModal(false)}
         >
-           >
           <div
             className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden"
             onClick={e => e.stopPropagation()}

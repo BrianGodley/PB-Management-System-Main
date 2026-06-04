@@ -1,17 +1,29 @@
-// Modal dialog for adding or editing a node. One dialog, switches form
-// based on selected node kind. Returns the new/updated payload via
-// onSubmit({...}).
+// Modal dialog for adding or editing a node ("Item" in the UI).
+// Switches form based on selected kind. Returns the new/updated payload
+// via onSubmit({...}).
+//
+// Kinds (DB → UI label):
+//   position  → "Org Position"
+//   container → "Org Chart Area"
+//   custom    → "Custom Item"
 //
 // Props:
-//   - mode: 'new' | 'child' | 'edit'
-//   - parentId: string | null   (used when mode === 'child')
-//   - existing: node row | null (used when mode === 'edit'; pre-fills form)
-//   - positions: [{ id, title }]
+//   - mode: 'new' | 'child' | 'senior' | 'edit'
+//   - parentId / seniorOf  (used by child / senior modes)
+//   - existing             (used by edit mode; pre-fills form)
+//   - positions            ([{ id, title }])
+//   - employeesByPosition  (Map<position_id, [{ id, displayName, active }]>)
 //   - onSubmit(payload), onClose
 
 import { useState } from 'react'
 import { CONTAINER_COLORS } from './palette.js'
 import ColorLibraryPicker from '../ColorLibraryPicker.jsx'
+
+const KIND_LABEL = {
+  position: 'Org Position',
+  container: 'Org Chart Area',
+  custom: 'Custom Item',
+}
 
 export default function AddNodeDialog({
   mode,
@@ -42,8 +54,8 @@ export default function AddNodeDialog({
   const [containerMode, setContainerMode] = useState(
     isEdit ? existing.container_mode || 'independent' : 'independent',
   )
-  const [width, setWidth] = useState(isEdit ? existing.width || 180 : 180)
-  const [height, setHeight] = useState(isEdit ? existing.height || 70 : 70)
+  const [width, setWidth] = useState(isEdit ? existing.width || 220 : 220)
+  const [height, setHeight] = useState(isEdit ? existing.height || 90 : 90)
 
   function handleSubmit() {
     const base = {
@@ -71,6 +83,8 @@ export default function AddNodeDialog({
         heading: heading.trim() || null,
         bg_color: bgColor,
         container_mode: containerMode,
+        position_id: positionId ? Number(positionId) : null,
+        employee_id: employeeId || null,
         width,
         height,
       })
@@ -84,17 +98,67 @@ export default function AddNodeDialog({
     }
   }
 
+  // Re-used: position-in-charge picker (used by both position and
+  // container kinds). Returns the form rows.
+  function renderPositionPicker(showAutoUnassigned = true) {
+    const candidates = employeesByPosition?.get(Number(positionId)) || []
+    if (!positionId) {
+      return showAutoUnassigned ? (
+        <p className="text-xs text-gray-500">
+          Pick a position; the assigned employee fills in automatically.
+        </p>
+      ) : null
+    }
+    if (candidates.length === 0) {
+      return (
+        <p className="text-xs text-amber-600">
+          No employees are currently assigned to this position. The card will
+          show "Held from Above".
+        </p>
+      )
+    }
+    if (candidates.length === 1) {
+      return (
+        <p className="text-xs text-gray-500">
+          Holder: <span className="font-medium text-gray-700">
+            {candidates[0].displayName}
+          </span>
+        </p>
+      )
+    }
+    return (
+      <div>
+        <label className="block text-xs font-medium text-gray-500 mb-1">
+          Employee to show ({candidates.length} assigned)
+        </label>
+        <select
+          value={employeeId}
+          onChange={e => setEmployeeId(e.target.value)}
+          className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
+        >
+          <option value="">— Auto (first active) —</option>
+          {candidates.map(c => (
+            <option key={c.id} value={c.id}>
+              {c.displayName}
+              {c.active ? '' : ' (inactive)'}
+            </option>
+          ))}
+        </select>
+      </div>
+    )
+  }
+
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-5">
         <h3 className="text-base font-semibold mb-3">
           {mode === 'edit'
-            ? 'Edit node'
+            ? 'Edit Item'
             : mode === 'child'
-              ? 'Add child node'
+              ? 'Add Child Item'
               : mode === 'senior'
-                ? 'Add senior node'
-                : 'Add node'}
+                ? 'Add Senior Item'
+                : 'Add Item'}
         </h3>
 
         <div className="flex gap-2 mb-4 text-sm">
@@ -104,14 +168,14 @@ export default function AddNodeDialog({
               type="button"
               onClick={() => !isEdit && setKind(k)}
               disabled={isEdit}
-              title={isEdit ? "Can't change kind on an existing node" : ''}
+              title={isEdit ? "Can't change kind on an existing item" : ''}
               className={`flex-1 py-1.5 rounded-md border ${
                 kind === k
                   ? 'border-blue-600 bg-blue-50 text-blue-700 font-medium'
                   : 'border-gray-200 hover:bg-gray-50 text-gray-600'
               } ${isEdit ? 'opacity-60 cursor-not-allowed' : ''}`}
             >
-              {k[0].toUpperCase() + k.slice(1)}
+              {KIND_LABEL[k]}
             </button>
           ))}
         </div>
@@ -123,7 +187,7 @@ export default function AddNodeDialog({
               value={positionId}
               onChange={e => {
                 setPositionId(e.target.value)
-                setEmployeeId('') // reset employee pick when position changes
+                setEmployeeId('')
               }}
               className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm mb-2"
             >
@@ -134,70 +198,28 @@ export default function AddNodeDialog({
                 </option>
               ))}
             </select>
-            {(() => {
-              const candidates =
-                employeesByPosition?.get(Number(positionId)) || []
-              if (!positionId) {
-                return (
-                  <p className="text-xs text-gray-500">
-                    Pick a position; the assigned employee fills in automatically.
-                  </p>
-                )
-              }
-              if (candidates.length === 0) {
-                return (
-                  <p className="text-xs text-amber-600">
-                    No employees are currently assigned to this position. The card
-                    will show "(unassigned)".
-                  </p>
-                )
-              }
-              if (candidates.length === 1) {
-                return (
-                  <p className="text-xs text-gray-500">
-                    Holder: <span className="font-medium text-gray-700">
-                      {candidates[0].displayName}
-                    </span>
-                  </p>
-                )
-              }
-              return (
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">
-                    Employee to show ({candidates.length} assigned)
-                  </label>
-                  <select
-                    value={employeeId}
-                    onChange={e => setEmployeeId(e.target.value)}
-                    className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
-                  >
-                    <option value="">— Auto (first active) —</option>
-                    {candidates.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.displayName}
-                        {c.active ? '' : ' (inactive)'}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )
-            })()}
+            {renderPositionPicker(true)}
           </div>
         )}
 
         {kind === 'container' && (
           <div className="space-y-3">
+            {/* Heading sits at the very top — labels the section type */}
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Heading</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">
+                Heading (Department / Division / Section…)
+              </label>
               <input
                 value={heading}
                 onChange={e => setHeading(e.target.value)}
-                placeholder="Department / Division / Section…"
+                placeholder="Department"
                 className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Title</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">
+                Area name
+              </label>
               <input
                 value={label}
                 onChange={e => setLabel(e.target.value)}
@@ -206,8 +228,29 @@ export default function AddNodeDialog({
               />
             </div>
             <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">
+                Position in charge (optional)
+              </label>
+              <select
+                value={positionId}
+                onChange={e => {
+                  setPositionId(e.target.value)
+                  setEmployeeId('')
+                }}
+                className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm mb-2"
+              >
+                <option value="">— None —</option>
+                {positions.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.title}
+                  </option>
+                ))}
+              </select>
+              {positionId && renderPositionPicker(false)}
+            </div>
+            <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Color</label>
-              <ColorLibraryPicker value={bgColor} onChange={setBgColor} compact />
+              <ColorLibraryPicker value={bgColor} onChange={setBgColor} />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
@@ -238,7 +281,7 @@ export default function AddNodeDialog({
               <div className="flex gap-2">
                 {[
                   { v: 'independent', label: 'Independent (decoration)' },
-                  { v: 'implicit', label: 'Implicit (owns nodes inside)' },
+                  { v: 'implicit', label: 'Implicit (owns items inside)' },
                 ].map(opt => (
                   <button
                     key={opt.v}
