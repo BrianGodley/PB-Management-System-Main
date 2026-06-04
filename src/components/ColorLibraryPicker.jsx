@@ -15,7 +15,7 @@
 
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { FULL_LIBRARY, findColor, pickTextColor } from '../lib/colorLibrary.js'
+import { COLOR_LIBRARY, findColor, pickTextColor } from '../lib/colorLibrary.js'
 
 export default function ColorLibraryPicker({
   value,
@@ -88,7 +88,7 @@ function ColorModal({ value, onSelect, onClose }) {
           </div>
         </div>
         <div className="space-y-2">
-          {FULL_LIBRARY.map(fam => (
+          {COLOR_LIBRARY.map(fam => (
             <div key={fam.family} className="flex items-center gap-3">
               <span className="w-16 text-[11px] uppercase tracking-wide text-gray-500 font-medium">
                 {fam.family}
