@@ -1050,7 +1050,9 @@ export default function EmployeeDetail() {
         {tab === 'profile' && (
           <div className="max-w-6xl space-y-3">
             <div className="bg-white rounded-xl border border-gray-200 p-4">
-              <div className="flex items-center justify-between mb-3">
+              {/* Sticky header — stays visible while scrolling the
+                  long list of profile fields below. */}
+              <div className="flex items-center justify-between mb-3 sticky top-0 z-10 bg-white -mx-4 px-4 py-2 border-b border-gray-100 rounded-t-xl">
                 <h3 className="font-semibold text-gray-800 text-sm">Employee Info</h3>
                 {!editing ? (
                   <button
@@ -2346,7 +2348,6 @@ function Field({ label, value, editing, onChange }) {
         value={value || ''}
         onChange={e => onChange(e.target.value)}
         disabled={!editing}
-        placeholder={editing ? '' : '—'}
         className={`w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500 ${
           !editing ? 'bg-gray-50 text-gray-700 cursor-default' : ''
         }`}
