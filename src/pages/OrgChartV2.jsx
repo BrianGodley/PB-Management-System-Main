@@ -458,6 +458,25 @@ export default function OrgChartV2() {
               )}
             </>
           )}
+          {chartId && (
+            <button
+              type="button"
+              onClick={() => {
+                setEditMode(v => !v)
+                setContextMenu(null)
+                setConnectMode(false)
+                setConnectSource(null)
+                setChartPickerOpen(false)
+              }}
+              className={`text-sm px-3 py-1 rounded-md whitespace-nowrap ${
+                editMode
+                  ? 'bg-amber-500 text-white hover:bg-amber-600'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              {editMode ? 'Save' : 'Edit'}
+            </button>
+          )}
           {editMode && chartId && (
             <button
               type="button"
@@ -487,25 +506,6 @@ export default function OrgChartV2() {
             <h1 className="text-base font-semibold text-slate-800 truncate max-w-[26rem] text-center">
               {chartName || '—'}
             </h1>
-          )}
-          {chartId && !editingChartName && (
-            <button
-              type="button"
-              onClick={() => {
-                setEditMode(v => !v)
-                setContextMenu(null)
-                setConnectMode(false)
-                setConnectSource(null)
-                setChartPickerOpen(false)
-              }}
-              className={`text-xs px-2 py-1 rounded-md whitespace-nowrap ${
-                editMode
-                  ? 'bg-amber-500 text-white hover:bg-amber-600'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              {editMode ? 'Save' : 'Edit'}
-            </button>
           )}
           {editMode && chartId && !editingChartName && (
             <>
