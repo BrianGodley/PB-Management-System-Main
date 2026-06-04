@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import TierCanvas from '../components/orgchart/TierCanvas.jsx'
 import AddNodeDialog from '../components/orgchart/AddNodeDialog.jsx'
+import { CANVAS_PAD_X, NODE_GAP } from '../components/orgchart/layout.js'
 
 const FG = '#3A5038'
 
@@ -190,9 +191,30 @@ export default function OrgChartV2() {
     if (!chartId) return
     setBusy(true)
     try {
+      // Helper: natural left edge X of a node at (tier, tier_order),
+      // ignoring its own x_offset. Sums prev siblings' widths + gaps.
+      const naturalXAt = (tierNum, tierOrderNum) => {
+        const sibs = nodes
+          .filter(n => (n.tier ?? 0) === tierNum && !n.parent_container_id)
+          .sort((a, b) => (a.tier_order ?? 0) - (b.tier_order ?? 0))
+        let x = CANVAS_PAD_X
+        for (const s of sibs) {
+          if ((s.tier_order ?? 0) < tierOrderNum) x += (s.width || 110) + NODE_GAP
+        }
+        return x
+      }
+      // Helper: display X of an existing node (natural + its x_offset).
+      const displayX = node => {
+        const nx = naturalXAt(node.tier ?? 0, node.tier_order ?? 0)
+        return nx + (Number.isFinite(node.x_offset) ? node.x_offset : 0)
+      }
+
       let tier = 0
       let tier_order = 0
       let parent_container_id = null
+      let x_offset = 0
+      let centerUnder = null // existing node whose center we want to align with
+      const newWidth = payload.width || 110
       if (payload.parentId) {
         const parent = nodes.find(n => n.id === payload.parentId)
         if (parent) {
@@ -210,6 +232,7 @@ export default function OrgChartV2() {
             tier_order = nodes
               .filter(n => (n.tier ?? 0) === tier && !n.parent_container_id)
               .reduce((max, n) => Math.max(max, (n.tier_order ?? 0) + 1), 0)
+            centerUnder = parent
           }
         }
       } else if (payload.seniorOf) {
@@ -217,13 +240,23 @@ export default function OrgChartV2() {
         if (ref) {
           tier = (ref.tier ?? 0) - 1
           tier_order = nodes
-            .filter(n => (n.tier ?? 0) === tier)
+            .filter(n => (n.tier ?? 0) === tier && !n.parent_container_id)
             .reduce((max, n) => Math.max(max, (n.tier_order ?? 0) + 1), 0)
+          centerUnder = ref
         }
       } else {
         tier_order = nodes
           .filter(n => (n.tier ?? 0) === 0)
           .reduce((max, n) => Math.max(max, (n.tier_order ?? 0) + 1), 0)
+      }
+      // Center the new item under its parent (or above its junior, for
+      // senior items) so the connector line is a single straight
+      // vertical. Skipped for sub-items (the container's column layout
+      // owns their position).
+      if (centerUnder && !parent_container_id) {
+        const parentCenterX = displayX(centerUnder) + (centerUnder.width || 110) / 2
+        const newNaturalX = naturalXAt(tier, tier_order)
+        x_offset = Math.round(parentCenterX - newNaturalX - newWidth / 2)
       }
       const insert = {
         chart_id: chartId,
@@ -237,6 +270,7 @@ export default function OrgChartV2() {
         parent_container_id,
         width: payload.width || 110,
         height: payload.height || 40,
+        x_offset,
         x: 0,
         y: 0,
         tier,
