@@ -186,13 +186,25 @@ export default function OrgChartV2() {
     try {
       let tier = 0
       let tier_order = 0
+      let parent_container_id = null
       if (payload.parentId) {
         const parent = nodes.find(n => n.id === payload.parentId)
         if (parent) {
-          tier = (parent.tier ?? 0) + 1
-          tier_order = nodes
-            .filter(n => (n.tier ?? 0) === tier)
-            .reduce((max, n) => Math.max(max, (n.tier_order ?? 0) + 1), 0)
+          // Special case: if the parent is an implicit container, the new
+          // item becomes a sub-item INSIDE it (column layout) instead of
+          // a child node a tier below.
+          if (parent.kind === 'container' && parent.container_mode === 'implicit') {
+            parent_container_id = parent.id
+            tier = parent.tier ?? 0
+            tier_order = nodes
+              .filter(n => n.parent_container_id === parent.id)
+              .reduce((max, n) => Math.max(max, (n.tier_order ?? 0) + 1), 0)
+          } else {
+            tier = (parent.tier ?? 0) + 1
+            tier_order = nodes
+              .filter(n => (n.tier ?? 0) === tier && !n.parent_container_id)
+              .reduce((max, n) => Math.max(max, (n.tier_order ?? 0) + 1), 0)
+          }
         }
       } else if (payload.seniorOf) {
         const ref = nodes.find(n => n.id === payload.seniorOf)
@@ -216,6 +228,7 @@ export default function OrgChartV2() {
         heading: payload.heading || null,
         bg_color: payload.bg_color || null,
         container_mode: payload.container_mode || null,
+        parent_container_id,
         width: payload.width || 110,
         height: payload.height || 40,
         x: 0,
@@ -226,7 +239,9 @@ export default function OrgChartV2() {
       const { data, error } = await supabase.from('org_nodes').insert(insert).select().single()
       if (error) throw error
       setNodes(prev => [...prev, data])
-      if (payload.parentId) {
+      // Skip the auto-edge when the new item is a sub-item inside an
+      // implicit container — the container itself implies ownership.
+      if (payload.parentId && !parent_container_id) {
         const { data: edge } = await supabase
           .from('org_edges')
           .insert({
@@ -676,7 +691,6 @@ function ItemContextMenu({
   return (
     <div
       className="fixed z-[1000] bg-white border border-slate-200 shadow-xl rounded-lg py-1 text-sm"
-      style={{ top, left, width: menuWidth }}
       onClick={e => e.stopPropagation()}
     >
       <MenuItem label="Connect Item" onClick={onConnect} />
