@@ -37,6 +37,12 @@ export default function OrgChartV2() {
   const [editMode, setEditMode] = useState(false)
   const [contextMenu, setContextMenu] = useState(null)
   const [chartPickerOpen, setChartPickerOpen] = useState(false)
+  // Change-mode state machine for rewiring existing connections.
+  // type: 'change_senior' | 'change_child' | 'change_connection' | null
+  // itemId   : the item whose connection is being changed
+  // edgeId   : (for change_child / change_connection) the specific
+  //            outgoing edge to rewire when the item has multiple
+  const [changeMode, setChangeMode] = useState(null)
 
   // ── Loaders ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -370,8 +376,148 @@ export default function OrgChartV2() {
     }
   }
 
+  // ── Connection change operations ────────────────────────────────────
+  // Each operation puts the chart into a "pick target" mode. The next
+  // node click is interpreted as the destination of the rewire, with
+  // conflict resolution if the new target already has a constraining
+  // edge.
+
+  async function rewireSenior(itemId, newSeniorId) {
+    if (newSeniorId === itemId) return alert('An item cannot be its own senior.')
+    setBusy(true)
+    try {
+      // delete all incoming edges to itemId
+      await supabase.from('org_edges').delete().eq('target_id', itemId)
+      // create new senior edge
+      const { data: edge } = await supabase
+        .from('org_edges')
+        .insert({
+          chart_id: chartId,
+          source_id: newSeniorId,
+          target_id: itemId,
+          relationship: 'reports_to',
+          style: 'solid',
+        })
+        .select()
+        .single()
+      setEdges(prev => {
+        const without = prev.filter(e => e.target_id !== itemId)
+        return edge ? [...without, edge] : without
+      })
+    } catch (e) {
+      alert('Change senior failed: ' + (e.message || e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function rewireChild(itemId, oldChildId, newChildId, edgeId) {
+    if (newChildId === itemId) return alert('An item cannot be its own junior.')
+    // Conflict check: does the new child already have a senior other
+    // than `itemId`? If so, ask the user what to do with that edge.
+    const conflicting = edges.filter(
+      e => e.target_id === newChildId && e.source_id !== itemId,
+    )
+    if (conflicting.length > 0) {
+      const proceed = confirm(
+        'The new junior already has a senior. Disconnect that existing senior?\n\n' +
+          'OK = disconnect existing senior(s) and make this the new senior.\n' +
+          'Cancel = keep both seniors (will leave a tangled chart).',
+      )
+      if (proceed) {
+        for (const c of conflicting) {
+          await supabase.from('org_edges').delete().eq('id', c.id)
+        }
+        setEdges(prev => prev.filter(e => !conflicting.some(c => c.id === e.id)))
+      }
+    }
+    setBusy(true)
+    try {
+      // Delete the specific outgoing edge being changed (or all out from itemId
+      // if no edgeId given)
+      if (edgeId) {
+        await supabase.from('org_edges').delete().eq('id', edgeId)
+        setEdges(prev => prev.filter(e => e.id !== edgeId))
+      } else if (oldChildId) {
+        await supabase
+          .from('org_edges')
+          .delete()
+          .eq('source_id', itemId)
+          .eq('target_id', oldChildId)
+        setEdges(prev => prev.filter(e => !(e.source_id === itemId && e.target_id === oldChildId)))
+      }
+      const { data: edge } = await supabase
+        .from('org_edges')
+        .insert({
+          chart_id: chartId,
+          source_id: itemId,
+          target_id: newChildId,
+          relationship: 'reports_to',
+          style: 'solid',
+        })
+        .select()
+        .single()
+      if (edge) setEdges(prev => [...prev, edge])
+    } catch (e) {
+      alert('Change junior failed: ' + (e.message || e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function startChangeMode(type, item) {
+    if (!item) return
+    if (type === 'change_child' || type === 'change_connection') {
+      const outgoing = edges.filter(e => e.source_id === item.id)
+      let edgeId = null
+      if (outgoing.length > 1) {
+        const list = outgoing
+          .map((e, i) => {
+            const tgt = nodes.find(n => n.id === e.target_id)
+            return `${i + 1}. ${tgt?.label || tgt?.id?.slice(0, 6) || '?'}`
+          })
+          .join('\n')
+        const choice = prompt(
+          `This item has ${outgoing.length} outgoing connections. Which one to change?\n${list}\n\nEnter number:`,
+          '1',
+        )
+        const idx = Number(choice) - 1
+        if (Number.isInteger(idx) && idx >= 0 && idx < outgoing.length) {
+          edgeId = outgoing[idx].id
+        } else {
+          return
+        }
+      } else if (outgoing.length === 1) {
+        edgeId = outgoing[0].id
+      } else if (type === 'change_child') {
+        return alert('This item has no junior to change. Use Add Junior Item instead.')
+      }
+      setChangeMode({ type, itemId: item.id, edgeId })
+    } else if (type === 'change_senior') {
+      setChangeMode({ type, itemId: item.id })
+    }
+    setDialog(null)
+    setContextMenu(null)
+  }
+
+  async function applyChangeMode(targetId) {
+    if (!changeMode) return
+    const { type, itemId, edgeId } = changeMode
+    if (type === 'change_senior') {
+      await rewireSenior(itemId, targetId)
+    } else if (type === 'change_child' || type === 'change_connection') {
+      const old = edges.find(e => e.id === edgeId)
+      await rewireChild(itemId, old?.target_id, targetId, edgeId)
+    }
+    setChangeMode(null)
+  }
+
   const onNodeClick = useCallback(
     (nodeId, screenRect) => {
+      if (changeMode) {
+        applyChangeMode(nodeId)
+        return
+      }
       if (connectMode) {
         if (!connectSource) setConnectSource(nodeId)
         else if (connectSource !== nodeId) {
@@ -571,8 +717,38 @@ export default function OrgChartV2() {
       </div>
 
       {connectMode && (
-        <div className="bg-orange-50 border-b border-orange-200 px-4 py-1.5 text-xs text-orange-800">
-          {connectSource ? 'Click the second item to connect.' : 'Click the source item first.'}
+        <div className="bg-orange-50 border-b border-orange-200 px-4 py-1.5 text-xs text-orange-800 flex items-center justify-between">
+          <span>
+            {connectSource ? 'Click the second item to connect.' : 'Click the source item first.'}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setConnectMode(false)
+              setConnectSource(null)
+            }}
+            className="text-orange-700 underline"
+          >
+            cancel
+          </button>
+        </div>
+      )}
+      {changeMode && (
+        <div className="bg-sky-50 border-b border-sky-200 px-4 py-1.5 text-xs text-sky-800 flex items-center justify-between">
+          <span>
+            {changeMode.type === 'change_senior'
+              ? 'Click the new senior item.'
+              : changeMode.type === 'change_child'
+                ? 'Click the new junior item.'
+                : 'Click the new connection target.'}
+          </span>
+          <button
+            type="button"
+            onClick={() => setChangeMode(null)}
+            className="text-sky-700 underline"
+          >
+            cancel
+          </button>
         </div>
       )}
 
@@ -615,8 +791,6 @@ export default function OrgChartV2() {
         )}
       </div>
 
-      {/* Contextual item menu — only in edit mode, only when a node is
-          selected and we have its screen rect. */}
       {editMode && contextMenu && selectedNode &&
         createPortal(
           <ItemContextMenu
@@ -635,6 +809,9 @@ export default function OrgChartV2() {
               setDialog({ mode: 'senior', seniorOf: selectedNode.id })
               setContextMenu(null)
             }}
+            onChangeSenior={() => startChangeMode('change_senior', selectedNode)}
+            onChangeChild={() => startChangeMode('change_child', selectedNode)}
+            onChangeConnection={() => startChangeMode('change_connection', selectedNode)}
             onEdit={() => {
               setDialog({ mode: 'edit', existing: selectedNode })
               setContextMenu(null)
@@ -642,13 +819,10 @@ export default function OrgChartV2() {
             onDelete={() => {
               deleteSelectedNode()
             }}
-            canDeleteEdge={!!selectedEdgeId}
-            onDeleteEdge={deleteSelectedEdge}
           />,
           document.body,
         )}
 
-      {/* Edge actions float at top when an edge is selected (no specific node anchor) */}
       {editMode && selectedEdgeId && !contextMenu && (
         <div className="fixed top-20 right-6 z-50 bg-white border border-slate-200 shadow-lg rounded-md px-2 py-1.5 flex items-center gap-2">
           <span className="text-xs text-slate-500">Connection selected</span>
@@ -684,10 +858,12 @@ export default function OrgChartV2() {
             setConnectSource(existing.id)
             setDialog(null)
           }}
+          onChangeSenior={existing => startChangeMode('change_senior', existing)}
+          onChangeChild={existing => startChangeMode('change_child', existing)}
+          onChangeConnection={existing => startChangeMode('change_connection', existing)}
           onDelete={existing => {
             setSelectedNodeId(existing.id)
             setDialog(null)
-            // chain the delete after state settles
             setTimeout(() => deleteSelectedNode(), 0)
           }}
         />
@@ -696,32 +872,39 @@ export default function OrgChartV2() {
   )
 }
 
-// Floating context menu shown next to a selected item.
 function ItemContextMenu({
   screenRect,
   onClose,
   onConnect,
   onAddChild,
   onAddSenior,
+  onChangeSenior,
+  onChangeChild,
+  onChangeConnection,
   onEdit,
   onDelete,
 }) {
-  const menuWidth = 170
+  const menuWidth = 180
   const margin = 8
   let left = screenRect.right + margin
   if (left + menuWidth > window.innerWidth - 8) {
     left = Math.max(8, screenRect.left - menuWidth - margin)
   }
-  const top = Math.max(8, Math.min(window.innerHeight - 220, screenRect.top))
+  const top = Math.max(8, Math.min(window.innerHeight - 260, screenRect.top))
   return (
     <div
       className="fixed z-[1000] bg-white border border-slate-200 shadow-xl rounded-lg py-1 text-sm"
       style={{ top, left, width: menuWidth }}
       onClick={e => e.stopPropagation()}
     >
-      <MenuItem label="Connect Item" onClick={onConnect} />
-      <MenuItem label="Add Child" onClick={onAddChild} />
+      <MenuItem label="New Item Connection" onClick={onConnect} />
+      <MenuItem label="Add Junior" onClick={onAddChild} />
       <MenuItem label="Add Senior" onClick={onAddSenior} />
+      <div className="border-t border-slate-100 my-1" />
+      <MenuItem label="Change Senior" onClick={onChangeSenior} />
+      <MenuItem label="Change Junior" onClick={onChangeChild} />
+      <MenuItem label="Change Connection" onClick={onChangeConnection} />
+      <div className="border-t border-slate-100 my-1" />
       <MenuItem label="Edit" onClick={onEdit} />
       <div className="border-t border-slate-100 my-1" />
       <MenuItem label="Delete" onClick={onDelete} danger />

@@ -38,6 +38,9 @@ export default function AddNodeDialog({
   onDelete,
   onAddSenior,
   onAddChild,
+  onChangeSenior,
+  onChangeChild,
+  onChangeConnection,
 }) {
   const isEdit = mode === 'edit' && existing
   const [kind, setKind] = useState(isEdit ? existing.kind || 'custom' : 'position')
@@ -159,7 +162,7 @@ export default function AddNodeDialog({
           {mode === 'edit'
             ? 'Edit Item'
             : mode === 'child'
-              ? 'Add Child Item'
+              ? 'Add Junior Item'
               : mode === 'senior'
                 ? 'Add Senior Item'
                 : 'Add Item'}
@@ -328,7 +331,7 @@ export default function AddNodeDialog({
                 onClick={() => onAddChild(existing)}
                 className="px-2 py-1 rounded-md bg-blue-100 text-blue-700 hover:bg-blue-200"
               >
-                + Add Child Item
+                + Add Junior Item
               </button>
             )}
             {onAddSenior && (
@@ -346,7 +349,34 @@ export default function AddNodeDialog({
                 onClick={() => onConnect(existing)}
                 className="px-2 py-1 rounded-md bg-orange-100 text-orange-700 hover:bg-orange-200"
               >
-                Connect →
+                New Item Connection
+              </button>
+            )}
+            {onChangeSenior && (
+              <button
+                type="button"
+                onClick={() => onChangeSenior(existing)}
+                className="px-2 py-1 rounded-md bg-sky-100 text-sky-700 hover:bg-sky-200"
+              >
+                Change Senior
+              </button>
+            )}
+            {onChangeChild && (
+              <button
+                type="button"
+                onClick={() => onChangeChild(existing)}
+                className="px-2 py-1 rounded-md bg-cyan-100 text-cyan-700 hover:bg-cyan-200"
+              >
+                Change Junior
+              </button>
+            )}
+            {onChangeConnection && (
+              <button
+                type="button"
+                onClick={() => onChangeConnection(existing)}
+                className="px-2 py-1 rounded-md bg-teal-100 text-teal-700 hover:bg-teal-200"
+              >
+                Change Connection
               </button>
             )}
             {onDelete && (
