@@ -66,8 +66,10 @@ export function layoutTiers(nodes) {
     }
   })
 
-  // ── 3. Top-level tier layout (skip sub-items) ────────────────────────
-  const topLevel = adjusted.filter(n => !n.parent_container_id)
+  // ── 3. Top-level tier layout (skip sub-items + assistants) ───────────
+  const topLevel = adjusted.filter(
+    n => !n.parent_container_id && n.kind !== 'assistant',
+  )
   const byTier = new Map()
   for (const n of topLevel) {
     const t = Number.isInteger(n.tier) ? n.tier : 0
@@ -131,6 +133,35 @@ export function layoutTiers(nodes) {
         height: childMaxH,
       })
     }
+  }
+
+  // ── 5. Lay out assistants beside their anchor's down-edge ───────────
+  // An assistant sits to the left or right of the vertical line that
+  // drops from its anchor (the senior item) at the midpoint of the
+  // inter-tier gap. EdgeLayer draws the short horizontal connector.
+  const ASSIST_GAP = 30
+  for (const n of nodes) {
+    if (n.kind !== 'assistant') continue
+    if (!n.attached_to_node_id) continue
+    const anchor = laidOut.get(n.attached_to_node_id)
+    if (!anchor) continue
+    const w = n.width || 110
+    const h = n.height || 40
+    const side = n.attachment_side || 'right'
+    // Vertical midpoint between anchor's bottom and the next tier's top
+    const yMid = anchor.y + anchor.height + TIER_GAP / 2
+    const x =
+      side === 'left'
+        ? anchor.x - ASSIST_GAP - w
+        : anchor.x + anchor.width + ASSIST_GAP
+    const xOff = Number.isFinite(n.x_offset) ? n.x_offset : 0
+    laidOut.set(n.id, {
+      id: n.id,
+      x: x + xOff,
+      y: yMid - h / 2,
+      width: w,
+      height: h,
+    })
   }
 
   return {

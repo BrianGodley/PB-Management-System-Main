@@ -276,6 +276,8 @@ export default function OrgChartV2() {
         bg_color: payload.bg_color || null,
         container_mode: payload.container_mode || null,
         parent_container_id,
+        attached_to_node_id: payload.attached_to_node_id || null,
+        attachment_side: payload.attachment_side || null,
         width: payload.width || 110,
         height: payload.height || 40,
         x_offset,
@@ -322,6 +324,8 @@ export default function OrgChartV2() {
         heading: payload.heading || null,
         bg_color: payload.bg_color || null,
         container_mode: payload.container_mode || null,
+        attached_to_node_id: payload.attached_to_node_id || null,
+        attachment_side: payload.attachment_side || null,
         width: payload.width || 110,
         height: payload.height || 40,
       }
@@ -886,6 +890,7 @@ export default function OrgChartV2() {
           existing={dialog.existing}
           positions={positions}
           employeesByPosition={employeesByPosition}
+          allItems={nodes}
           onSubmit={payload => (payload.isEdit ? saveNode(payload) : addNode(payload))}
           onClose={() => setDialog(null)}
           onAddChild={existing => {

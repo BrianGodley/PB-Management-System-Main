@@ -33,6 +33,20 @@ function buildPath(srcBox, tgtBox, direction) {
 
 export default function EdgeLayer({ edges, nodes, laidOut, selectedEdgeId, onEdgeClick }) {
   const byId = new Map(nodes.map(n => [n.id, n]))
+  // Collect assistant connectors: short horizontal line from each
+  // assistant's inner edge to its anchor's center X at the assistant's Y.
+  const assistantLines = []
+  for (const n of nodes) {
+    if (n.kind !== 'assistant' || !n.attached_to_node_id) continue
+    const aBox = laidOut.get(n.id)
+    const anchor = laidOut.get(n.attached_to_node_id)
+    if (!aBox || !anchor) continue
+    const anchorX = anchor.x + anchor.width / 2
+    const lineY = aBox.y + aBox.height / 2
+    const side = n.attachment_side || 'right'
+    const fromX = side === 'left' ? aBox.x + aBox.width : aBox.x
+    assistantLines.push({ id: n.id, x1: fromX, y1: lineY, x2: anchorX, y2: lineY })
+  }
   return (
     <g>
       <defs>
@@ -83,6 +97,19 @@ export default function EdgeLayer({ edges, nodes, laidOut, selectedEdgeId, onEdg
           </g>
         )
       })}
+      {assistantLines.map(l => (
+        <line
+          key={`asst-${l.id}`}
+          x1={l.x1}
+          y1={l.y1}
+          x2={l.x2}
+          y2={l.y2}
+          stroke="#475569"
+          strokeWidth={1.75}
+          strokeDasharray="4 3"
+          fill="none"
+        />
+      ))}
     </g>
   )
 }
