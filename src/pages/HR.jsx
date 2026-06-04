@@ -566,7 +566,7 @@ export default function HR() {
               </button>
             </>
           )}
-          {tab === 'positions' && !editingPosition && (
+          {tab === 'positions' && (
             <button
               onClick={openNewPosition}
               className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800"
@@ -868,9 +868,16 @@ export default function HR() {
         ) : /* ── POSITIONS TAB ── */
         tab === 'positions' ? (
           <div className="max-w-4xl">
-            {/* Position editor form */}
-            {editingPosition ? (
-              <div className="bg-white border border-gray-200 rounded-xl p-5 mb-5 shadow-sm">
+            {/* Position editor — modal overlay */}
+            {editingPosition && (
+              <div
+                className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center p-4 overflow-y-auto"
+                onClick={() => setEditingPosition(null)}
+              >
+                <div
+                  className="bg-white border border-gray-200 rounded-xl p-5 my-8 shadow-2xl w-full max-w-2xl"
+                  onClick={e => e.stopPropagation()}
+                >
                 <h3 className="font-semibold text-gray-900 mb-4">
                   {editingPosition === 'new' ? 'New Position' : `Edit: ${editingPosition.title}`}
                 </h3>
@@ -1029,20 +1036,12 @@ export default function HR() {
                         : 'Save Changes'}
                   </button>
                 </div>
-              </div>
-            ) : (
-              <div className="flex justify-end mb-3">
-                <button
-                  onClick={openNewPosition}
-                  className="px-4 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800"
-                >
-                  + New Position
-                </button>
+                </div>
               </div>
             )}
 
             {/* Positions list */}
-            {positions.length === 0 && !editingPosition ? (
+            {positions.length === 0 ? (
               <div className="bg-white border border-gray-200 rounded-xl p-10 text-center text-gray-400">
                 <p className="text-3xl mb-2">🏷️</p>
                 <p className="font-medium">No positions yet</p>
