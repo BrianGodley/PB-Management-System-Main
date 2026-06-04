@@ -35,8 +35,8 @@ export default function OrgChartV2() {
   const [chartNameDraft, setChartNameDraft] = useState('')
   const [zoom, setZoom] = useState(1)
   const [editMode, setEditMode] = useState(false)
-  // contextMenu = { nodeId, screenRect } | null
   const [contextMenu, setContextMenu] = useState(null)
+  const [chartPickerOpen, setChartPickerOpen] = useState(false)
 
   // ── Loaders ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -399,56 +399,55 @@ export default function OrgChartV2() {
 
   return (
     <div className="h-full flex flex-col bg-slate-50">
-      {/* Top bar: left controls, centered chart name, right zoom */}
+      {/* Top bar:
+            LEFT   — view mode: Select-charts popover
+                     edit mode: + Item
+            CENTER — chart name + Edit/Save (and rename/delete in edit mode)
+            RIGHT  — zoom + + Chart (view mode only) */}
       <div className="grid grid-cols-3 items-center gap-3 px-4 py-3 bg-white border-b border-slate-200 shrink-0">
         {/* LEFT */}
-        <div className="flex items-center gap-2">
-          <select
-            value={chartId || ''}
-            onChange={e => {
-              const c = charts.find(x => x.id === e.target.value)
-              if (c) selectChart(c)
-            }}
-            className="text-sm border border-slate-300 rounded-md px-2 py-1 max-w-[14rem]"
-          >
-            <option value="">— Pick a chart —</option>
-            {charts.map(c => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={createChart}
-            className="text-sm px-3 py-1 rounded-md text-white"
-            style={{ background: FG }}
-          >
-            + Chart
-          </button>
-          {chartId && (
-            <button
-              type="button"
-              onClick={() => {
-                setEditMode(v => !v)
-                setContextMenu(null)
-                setConnectMode(false)
-                setConnectSource(null)
-              }}
-              className={`text-sm px-3 py-1 rounded-md ${
-                editMode
-                  ? 'bg-amber-500 text-white hover:bg-amber-600'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              {editMode ? 'Done editing' : 'Edit'}
-            </button>
+        <div className="flex items-center gap-2 relative">
+          {!editMode && (
+            <>
+              <button
+                type="button"
+                onClick={() => setChartPickerOpen(v => !v)}
+                className="text-sm px-3 py-1 rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200 whitespace-nowrap"
+              >
+                Select ▾
+              </button>
+              {chartPickerOpen && (
+                <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 shadow-lg rounded-md z-50 min-w-[16rem] max-h-72 overflow-y-auto py-1">
+                  {charts.length === 0 ? (
+                    <p className="text-xs text-slate-400 px-3 py-2">
+                      No charts yet — use + Chart on the right.
+                    </p>
+                  ) : (
+                    charts.map(c => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => {
+                          selectChart(c)
+                          setChartPickerOpen(false)
+                        }}
+                        className={`block w-full text-left px-3 py-1.5 text-sm hover:bg-slate-50 ${
+                          c.id === chartId ? 'bg-slate-50 font-medium' : ''
+                        }`}
+                      >
+                        {c.name}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </>
           )}
           {editMode && chartId && (
             <button
               type="button"
               onClick={() => setDialog({ mode: 'new', parentId: null })}
-              className="text-sm px-3 py-1 rounded-md bg-blue-600 text-white"
+              className="text-sm px-3 py-1 rounded-md bg-blue-600 text-white whitespace-nowrap"
             >
               + Item
             </button>
@@ -456,7 +455,7 @@ export default function OrgChartV2() {
         </div>
 
         {/* CENTER */}
-        <div className="flex items-center justify-center gap-2">
+        <div className="flex items-center justify-center gap-2 flex-wrap">
           {editingChartName ? (
             <input
               autoFocus
@@ -474,6 +473,25 @@ export default function OrgChartV2() {
               {chartName || '—'}
             </h1>
           )}
+          {chartId && !editingChartName && (
+            <button
+              type="button"
+              onClick={() => {
+                setEditMode(v => !v)
+                setContextMenu(null)
+                setConnectMode(false)
+                setConnectSource(null)
+                setChartPickerOpen(false)
+              }}
+              className={`text-xs px-2 py-1 rounded-md whitespace-nowrap ${
+                editMode
+                  ? 'bg-amber-500 text-white hover:bg-amber-600'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              {editMode ? 'Save' : 'Edit'}
+            </button>
+          )}
           {editMode && chartId && !editingChartName && (
             <>
               <button
@@ -482,7 +500,7 @@ export default function OrgChartV2() {
                   setChartNameDraft(chartName)
                   setEditingChartName(true)
                 }}
-                className="text-xs text-slate-500 hover:text-slate-800 underline"
+                className="text-xs text-slate-500 hover:text-slate-800 underline whitespace-nowrap"
               >
                 rename
               </button>
@@ -490,7 +508,7 @@ export default function OrgChartV2() {
                 type="button"
                 onClick={deleteChart}
                 disabled={busy}
-                className="text-xs text-red-500 hover:text-red-700 underline"
+                className="text-xs text-red-500 hover:text-red-700 underline whitespace-nowrap"
               >
                 delete
               </button>
@@ -498,7 +516,7 @@ export default function OrgChartV2() {
           )}
         </div>
 
-        {/* RIGHT — zoom always available */}
+        {/* RIGHT — zoom always; + Chart in view mode only */}
         <div className="flex items-center justify-end gap-1">
           <button
             type="button"
@@ -524,6 +542,16 @@ export default function OrgChartV2() {
           >
             +
           </button>
+          {!editMode && (
+            <button
+              type="button"
+              onClick={createChart}
+              className="ml-2 text-sm px-3 py-1 rounded-md text-white whitespace-nowrap"
+              style={{ background: FG }}
+            >
+              + Chart
+            </button>
+          )}
         </div>
       </div>
 
@@ -638,7 +666,6 @@ function ItemContextMenu({
   onEdit,
   onDelete,
 }) {
-  // Position to the right of the item if there's space; otherwise left.
   const menuWidth = 170
   const margin = 8
   let left = screenRect.right + margin
