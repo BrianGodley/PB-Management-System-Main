@@ -350,7 +350,7 @@ export default function AddNodeDialog({
                 <input
                   type="number"
                   value={width}
-                  onChange={e => setWidth(Number(e.target.value) || 0)}
+                  onChange={e => setWidth(e.target.value === '' ? '' : Number(e.target.value))}
                   className="no-spin w-full border border-gray-300 rounded-md px-2 py-1 text-sm"
                   min={60}
                   max={600}
@@ -361,7 +361,7 @@ export default function AddNodeDialog({
                 <input
                   type="number"
                   value={height}
-                  onChange={e => setHeight(Number(e.target.value) || 0)}
+                  onChange={e => setHeight(e.target.value === '' ? '' : Number(e.target.value))}
                   className="no-spin w-full border border-gray-300 rounded-md px-2 py-1 text-sm"
                   min={30}
                   max={300}
@@ -514,7 +514,7 @@ export default function AddNodeDialog({
                 <input
                   type="number"
                   value={width}
-                  onChange={e => setWidth(Number(e.target.value) || 0)}
+                  onChange={e => setWidth(e.target.value === '' ? '' : Number(e.target.value))}
                   className="no-spin w-full border border-gray-300 rounded-md px-2 py-1 text-sm"
                   min={80}
                   max={1200}
@@ -525,7 +525,7 @@ export default function AddNodeDialog({
                 <input
                   type="number"
                   value={height}
-                  onChange={e => setHeight(Number(e.target.value) || 0)}
+                  onChange={e => setHeight(e.target.value === '' ? '' : Number(e.target.value))}
                   className="no-spin w-full border border-gray-300 rounded-md px-2 py-1 text-sm"
                   min={30}
                   max={600}
