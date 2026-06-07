@@ -8,7 +8,7 @@
 
 import { normalizeEdge } from './layout.js'
 
-function buildPath(srcBox, tgtBox, direction) {
+function buildPath(srcBox, tgtBox, direction, minBusY) {
   if (direction === 'across') {
     const [a, b] = srcBox.x <= tgtBox.x ? [srcBox, tgtBox] : [tgtBox, srcBox]
     const x1 = a.x + a.width
@@ -23,7 +23,11 @@ function buildPath(srcBox, tgtBox, direction) {
   if (Math.abs(x1 - x2) < 0.5) {
     return { d: `M ${x1} ${y1} L ${x2} ${y2}`, endX: x2, endY: y2 }
   }
-  const midY = (y1 + y2) / 2
+  // The horizontal "bus" sits at the gap midpoint, but when the source row
+  // has an assistant we push it below the assistant band so the assistant's
+  // own connector doesn't land on this line.
+  let midY = (y1 + y2) / 2
+  if (Number.isFinite(minBusY) && minBusY > midY) midY = Math.min(minBusY, y2 - 6)
   return {
     d: `M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`,
     endX: x2,
@@ -33,6 +37,16 @@ function buildPath(srcBox, tgtBox, direction) {
 
 export default function EdgeLayer({ edges, nodes, laidOut, selectedEdgeId, onEdgeClick }) {
   const byId = new Map(nodes.map(n => [n.id, n]))
+  // Bottom edge of the assistant attached to each anchor — used to route the
+  // senior→junior bus below the assistant band.
+  const assistantBottomByAnchor = new Map()
+  for (const n of nodes) {
+    if (n.kind !== 'assistant' || !n.attached_to_node_id) continue
+    const ab = laidOut.get(n.id)
+    if (!ab) continue
+    const cur = assistantBottomByAnchor.get(n.attached_to_node_id) || 0
+    assistantBottomByAnchor.set(n.attached_to_node_id, Math.max(cur, ab.y + ab.height))
+  }
   // Collect assistant connectors: short horizontal line from each
   // assistant's inner edge to its anchor's center X at the assistant's Y.
   const assistantLines = []
@@ -70,7 +84,9 @@ export default function EdgeLayer({ edges, nodes, laidOut, selectedEdgeId, onEdg
         const srcBox = laidOut.get(src.id)
         const tgtBox = laidOut.get(tgt.id)
         if (!srcBox || !tgtBox) return null
-        const { d, endX, endY } = buildPath(srcBox, tgtBox, direction)
+        const aBottom = assistantBottomByAnchor.get(src.id)
+        const minBusY = aBottom != null ? aBottom + 10 : undefined
+        const { d, endX, endY } = buildPath(srcBox, tgtBox, direction, minBusY)
         const isSelected = e.id === selectedEdgeId
         return (
           <g key={e.id} onClick={() => onEdgeClick?.(e.id)} style={{ cursor: 'pointer' }}>

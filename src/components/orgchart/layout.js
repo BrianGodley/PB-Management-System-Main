@@ -46,25 +46,11 @@ export function layoutTiers(nodes, rowSpacing = {}) {
     })
   }
 
-  // ── 2. Pre-size containers based on their children ───────────────────
-  // We mutate copies, not the originals. Implicit containers with
-  // children grow to fit the children as columns.
-  const adjusted = nodes.map(n => {
-    if (n.parent_container_id) return n // sub-items get sized later
-    if (n.kind !== 'container') return n
-    const kids = childrenByContainer.get(n.id) || []
-    if (kids.length === 0) return n
-    const childCount = kids.length
-    const childMaxH = kids.reduce((m, c) => Math.max(m, c.height || 40), 40)
-    const innerW = childCount * MIN_CHILD_COL + (childCount - 1) * CHILD_COL_GAP
-    const fitW = innerW + CONTAINER_SIDE_PAD * 2
-    const fitH = CONTAINER_HEADER + childMaxH + CONTAINER_BOTTOM_PAD
-    return {
-      ...n,
-      width: Math.max(n.width || 180, fitW),
-      height: Math.max(n.height || 90, fitH),
-    }
-  })
+  // ── 2. Containers keep their own size ────────────────────────────────
+  // Junior ("attached") areas now render as a row of columns directly
+  // BELOW the container (butted against its bottom edge), so the container
+  // is no longer grown to enclose them.
+  const adjusted = nodes
 
   // ── 3. Top-level tier layout (skip sub-items + assistants) ───────────
   const topLevel = adjusted.filter(
@@ -120,6 +106,17 @@ export function layoutTiers(nodes, rowSpacing = {}) {
     }
   }
 
+  // Reserve room for any junior-area column band that renders below a
+  // container, so the next row clears it.
+  for (const [containerId, kids] of childrenByContainer.entries()) {
+    const container = nodes.find(x => x.id === containerId)
+    if (!container) continue
+    const ct = Number.isInteger(container.tier) ? container.tier : 0
+    if (!gapByTier.has(ct)) continue
+    const childMaxH = kids.reduce((m, c) => Math.max(m, c.height || 40), 40)
+    gapByTier.set(ct, gapByTier.get(ct) + childMaxH + CHILD_COL_GAP)
+  }
+
   for (const t of tierKeys) {
     const tierNodes = byTier.get(t)
     const tierH = tierNodes.reduce((max, n) => Math.max(max, n.height || 64), 0)
@@ -142,21 +139,21 @@ export function layoutTiers(nodes, rowSpacing = {}) {
     cursorY += tierH + (gapByTier.get(t) ?? TIER_GAP)
   }
 
-  // ── 4. Lay out sub-items inside each container ───────────────────────
-  // Children stretch to fill their container's inner width equally.
+  // ── 4. Lay out junior areas as columns BELOW their container ─────────
+  // They butt directly against the container's bottom edge and split the
+  // container's full width equally (skinnier as more are added).
   for (const [containerId, kids] of childrenByContainer.entries()) {
     const cBox = laidOut.get(containerId)
     if (!cBox) continue
     const n = kids.length
-    const innerW = cBox.width - CONTAINER_SIDE_PAD * 2
-    const colW = (innerW - (n - 1) * CHILD_COL_GAP) / n
+    const colW = (cBox.width - (n - 1) * CHILD_COL_GAP) / n
     const childMaxH = kids.reduce((m, c) => Math.max(m, c.height || 40), 40)
-    const colTop = cBox.y + CONTAINER_HEADER
+    const colTop = cBox.y + cBox.height // directly under the container
     for (let i = 0; i < n; i++) {
       const child = kids[i]
       laidOut.set(child.id, {
         id: child.id,
-        x: cBox.x + CONTAINER_SIDE_PAD + i * (colW + CHILD_COL_GAP),
+        x: cBox.x + i * (colW + CHILD_COL_GAP),
         y: colTop,
         width: colW,
         height: childMaxH,
