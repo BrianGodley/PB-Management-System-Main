@@ -91,6 +91,22 @@ export function layoutTiers(nodes) {
   let cursorY = CANVAS_PAD_Y
   let maxWidth = 0
 
+  // Tiers that have an assistant attached to one of their nodes get a
+  // DOUBLED gap below them, so the assistant gets its own level (band)
+  // between tiers — sitting beside the connector lines rather than on
+  // top of them. The junior connector lines lengthen to span the bigger
+  // gap automatically (their tier is pushed further down).
+  const assistantAnchorIds = new Set(
+    nodes
+      .filter(n => n.kind === 'assistant' && n.attached_to_node_id)
+      .map(n => n.attached_to_node_id),
+  )
+  const gapByTier = new Map()
+  for (const t of tierKeys) {
+    const hasAssistant = byTier.get(t).some(node => assistantAnchorIds.has(node.id))
+    gapByTier.set(t, hasAssistant ? TIER_GAP * 2 : TIER_GAP)
+  }
+
   for (const t of tierKeys) {
     const tierNodes = byTier.get(t)
     const tierH = tierNodes.reduce((max, n) => Math.max(max, n.height || 64), 0)
@@ -110,7 +126,7 @@ export function layoutTiers(nodes) {
     const tierWidth = cursorX - NODE_GAP
     maxWidth = Math.max(maxWidth, tierWidth)
     tiers.push({ tier: t, y: cursorY, h: tierH, nodes: tierNodes })
-    cursorY += tierH + TIER_GAP
+    cursorY += tierH + (gapByTier.get(t) ?? TIER_GAP)
   }
 
   // ── 4. Lay out sub-items inside each container ───────────────────────
@@ -148,8 +164,13 @@ export function layoutTiers(nodes) {
     const w = n.width || 110
     const h = n.height || 40
     const side = n.attachment_side || 'right'
-    // Vertical midpoint between anchor's bottom and the next tier's top
-    const yMid = anchor.y + anchor.height + TIER_GAP / 2
+    // Vertical midpoint of the gap below the anchor's tier. When the
+    // anchor's tier carries an assistant that gap is doubled, so the
+    // assistant lands on its own level, clear of the connector lines.
+    const anchorNode = nodes.find(x => x.id === n.attached_to_node_id)
+    const anchorTier = Number.isInteger(anchorNode?.tier) ? anchorNode.tier : 0
+    const anchorGap = gapByTier.get(anchorTier) ?? TIER_GAP
+    const yMid = anchor.y + anchor.height + anchorGap / 2
     const x =
       side === 'left'
         ? anchor.x - ASSIST_GAP - w
