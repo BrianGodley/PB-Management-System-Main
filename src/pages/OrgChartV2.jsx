@@ -691,6 +691,7 @@ export default function OrgChartV2() {
     }
     setDialog(null)
     setContextMenu(null)
+    setSelectedNodeId(null) // source shows red via change-mode highlight, not blue
   }
 
   async function applyChangeMode(targetId) {
@@ -708,7 +709,11 @@ export default function OrgChartV2() {
   const onNodeClick = useCallback(
     (nodeId, screenRect) => {
       if (changeMode) {
-        applyChangeMode(nodeId)
+        // Pick the new target (don't apply yet) — the user confirms via the
+        // "Save new …" button in the banner. The regular menu stays hidden.
+        if (nodeId !== changeMode.itemId) {
+          setChangeMode(prev => ({ ...prev, targetId: nodeId }))
+        }
         return
       }
       if (connectMode) {
@@ -746,7 +751,7 @@ export default function OrgChartV2() {
       if (editMode && screenRect) setContextMenu({ nodeId, screenRect })
       else setContextMenu(null)
     },
-    [connectMode, connectSource, nodes, chartId, editMode],
+    [changeMode, connectMode, connectSource, nodes, chartId, editMode],
   )
 
   const selectedNode = nodes.find(n => n.id === selectedNodeId) || null
@@ -1014,24 +1019,44 @@ export default function OrgChartV2() {
           </button>
         </div>
       )}
-      {changeMode && (
-        <div className="bg-sky-50 border-b border-sky-200 px-4 py-1.5 text-xs text-sky-800 flex items-center justify-between">
-          <span>
-            {changeMode.type === 'change_senior'
-              ? 'Click the new senior item.'
-              : changeMode.type === 'change_child'
-                ? 'Click the new junior item.'
-                : 'Click the new connection target.'}
-          </span>
-          <button
-            type="button"
-            onClick={() => setChangeMode(null)}
-            className="text-sky-700 underline"
-          >
-            cancel
-          </button>
-        </div>
-      )}
+      {changeMode && (() => {
+        const what =
+          changeMode.type === 'change_senior'
+            ? 'senior'
+            : changeMode.type === 'change_child'
+              ? 'junior'
+              : 'connection'
+        const tgt = changeMode.targetId
+          ? nodes.find(n => n.id === changeMode.targetId)
+          : null
+        return (
+          <div className="bg-red-50 border-b border-red-200 px-4 py-1.5 text-xs text-red-800 flex items-center justify-between gap-2">
+            <span>
+              {!changeMode.targetId
+                ? `Select the new ${what} item.`
+                : `New ${what}: ${tgt?.label || 'selected item'} — click Save to apply.`}
+            </span>
+            <div className="flex items-center gap-3">
+              {changeMode.targetId && (
+                <button
+                  type="button"
+                  onClick={() => applyChangeMode(changeMode.targetId)}
+                  className="px-2 py-0.5 rounded bg-red-600 text-white font-medium hover:bg-red-700"
+                >
+                  Save new {what}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setChangeMode(null)}
+                className="text-red-700 underline"
+              >
+                cancel
+              </button>
+            </div>
+          </div>
+        )
+      })()}
 
       <div className="flex-1 overflow-auto relative">
         {chartId ? (
@@ -1054,6 +1079,7 @@ export default function OrgChartV2() {
             }}
             onNodeDropped={handleNodeDropped}
             rowSpacing={rowSpacing}
+            redNodeIds={changeMode ? [changeMode.itemId, changeMode.targetId].filter(Boolean) : []}
             onEdgeClick={id => {
               if (!editMode) return
               setSelectedEdgeId(id)
@@ -1089,6 +1115,7 @@ export default function OrgChartV2() {
         createPortal(
           <ItemContextMenu
             screenRect={contextMenu.screenRect}
+            kind={selectedNode.kind}
             onClose={() => setContextMenu(null)}
             onConnect={() => {
               setConnectMode(true)
@@ -1175,6 +1202,7 @@ export default function OrgChartV2() {
 
 function ItemContextMenu({
   screenRect,
+  kind,
   onClose,
   onConnect,
   onAddJuniorPosition,
@@ -1217,7 +1245,7 @@ function ItemContextMenu({
       <MenuItem label="Change Connection" onClick={onChangeConnection} />
       <MenuItem label="Add Junior Position" onClick={onAddJuniorPosition} />
       <MenuItem label="Add Junior Area" onClick={onAddJuniorArea} />
-      <MenuItem label="Add Assistant" onClick={onAddAssistant} />
+      {kind !== 'container' && <MenuItem label="Add Assistant" onClick={onAddAssistant} />}
       <div className="border-t border-slate-100 my-1" />
       <MenuItem label="Change Senior" onClick={onChangeSenior} />
       <MenuItem label="Change Junior" onClick={onChangeChild} />

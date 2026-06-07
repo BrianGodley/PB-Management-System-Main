@@ -31,6 +31,7 @@ export default function TierCanvas({
   onBackgroundClick,
   onNodeDropped,
   rowSpacing = {},
+  redNodeIds = [],
   zoom = 1,
   editable = true,
 }) {
@@ -278,6 +279,26 @@ export default function TierCanvas({
                 onClick={onClick}
               />
             </g>
+          )
+        })}
+        {/* Red highlight overlay for change-mode source/target items. */}
+        {(redNodeIds || []).map(id => {
+          const b = laidOut.get(id)
+          if (!b) return null
+          return (
+            <rect
+              key={`red-${id}`}
+              x={b.x - 3}
+              y={b.y - 3}
+              width={b.width + 6}
+              height={b.height + 6}
+              rx={10}
+              fill="none"
+              stroke="#dc2626"
+              strokeWidth={2.5}
+              strokeDasharray="6 4"
+              pointerEvents="none"
+            />
           )
         })}
       </svg>
