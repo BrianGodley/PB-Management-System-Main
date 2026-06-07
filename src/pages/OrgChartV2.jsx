@@ -62,7 +62,7 @@ export default function OrgChartV2() {
         supabase.from('positions').select('id, title').order('title'),
         supabase
           .from('employees')
-          .select('id, first_name, last_name, status')
+          .select('id, first_name, last_name, status, job_title')
           .order('last_name', { ascending: true })
           .order('first_name', { ascending: true }),
         supabase.from('employee_positions').select('employee_id, position_id'),
@@ -296,6 +296,18 @@ export default function OrgChartV2() {
           break
         }
       }
+    }
+    // Fallback: many roles are recorded as the employee's free-text job_title
+    // rather than a structured employee_positions row. Match those by title.
+    if (candidates.length === 0 && pos.title) {
+      const t = pos.title.trim().toLowerCase()
+      candidates = employees
+        .filter(e => (e.job_title || '').trim().toLowerCase() === t)
+        .map(e => ({
+          id: e.id,
+          active: (e.status || 'active') === 'active',
+          displayName: `${e.first_name || ''} ${e.last_name || ''}`.trim() || '(unnamed)',
+        }))
     }
     let chosen = null
     if (node.employee_id) chosen = candidates.find(c => c.id === node.employee_id) || null
