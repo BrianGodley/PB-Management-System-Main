@@ -120,23 +120,28 @@ export function layoutTiers(nodes, rowSpacing = {}, colSpacing = {}) {
   for (const t of tierKeys) {
     const tierNodes = byTier.get(t)
     const tierH = tierNodes.reduce((max, n) => Math.max(max, n.height || 64), 0)
-    // When a row has a column-spacing value set, items are auto-spaced
-    // left→right with that gap and manual x_offset nudges are ignored.
-    const autoSpace = Number.isFinite(colSpacing?.[t])
-    const colGap = autoSpace ? colSpacing[t] : NODE_GAP
+    // Column spacing config per row: { gap, auto } (a bare number = auto).
+    // Auto rows continuously space items left→right by `gap`, anchored on the
+    // leftmost item (which keeps its own x_offset so it can be dragged). The
+    // rest follow and ignore their own x_offset. Non-auto rows are manual.
+    const cfg = colSpacing?.[t]
+    const gapVal = typeof cfg === 'number' ? cfg : cfg?.gap
+    const auto = Number.isFinite(gapVal) && (typeof cfg === 'number' ? true : !!cfg?.auto)
+    const colGap = auto ? gapVal : NODE_GAP
     let cursorX = CANVAS_PAD_X
-    for (const n of tierNodes) {
+    tierNodes.forEach((n, i) => {
       const w = n.width || 180
-      const xOff = autoSpace ? 0 : Number.isFinite(n.x_offset) ? n.x_offset : 0
-      laidOut.set(n.id, {
-        id: n.id,
-        x: cursorX + xOff,
-        y: cursorY,
-        width: w,
-        height: tierH,
-      })
+      const off = Number.isFinite(n.x_offset) ? n.x_offset : 0
+      let x
+      if (auto) {
+        if (i === 0) cursorX += off // leftmost item keeps its position
+        x = cursorX
+      } else {
+        x = cursorX + off
+      }
+      laidOut.set(n.id, { id: n.id, x, y: cursorY, width: w, height: tierH })
       cursorX += w + colGap
-    }
+    })
     const tierWidth = cursorX - NODE_GAP
     maxWidth = Math.max(maxWidth, tierWidth)
     tiers.push({ tier: t, y: cursorY, h: tierH, nodes: tierNodes })

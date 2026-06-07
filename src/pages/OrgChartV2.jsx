@@ -88,14 +88,57 @@ export default function OrgChartV2() {
     }
   }
 
-  // Update the horizontal item gap for one row/tier and persist it.
-  async function updateColSpacing(tier, value) {
-    const next = { ...colSpacing, [tier]: value }
+  // Column-spacing config per tier, stored as { gap, auto } (a bare number
+  // counts as auto for backward compatibility).
+  function readColCfg(t) {
+    const c = colSpacing[t]
+    if (c == null) return { gap: '', auto: false }
+    if (typeof c === 'number') return { gap: c, auto: true }
+    return { gap: c.gap ?? '', auto: !!c.auto }
+  }
+  async function setColCfg(tier, cfg) {
+    const next = { ...colSpacing, [tier]: cfg }
     setColSpacing(next)
     try {
       await supabase.from('org_charts').update({ col_spacing: next }).eq('id', chartId)
     } catch (e) {
       alert('Could not save column spacing: ' + (e.message || e))
+    }
+  }
+  // One-time apply (non-auto): write x_offsets so the row spaces by `gap`
+  // starting from the leftmost item, after which items can be dragged freely.
+  async function applyColSpacingOnce(tier) {
+    const { gap } = readColCfg(tier)
+    if (!Number.isFinite(gap)) return
+    const rowItems = nodes
+      .filter(n => (n.tier ?? 0) === tier && !n.parent_container_id && n.kind !== 'assistant')
+      .sort((a, b) => (a.tier_order ?? 0) - (b.tier_order ?? 0))
+    if (!rowItems.length) return
+    let naturalX = CANVAS_PAD_X
+    let cursorTarget = 0
+    const updates = []
+    rowItems.forEach((n, i) => {
+      const w = n.width || 110
+      const targetX =
+        i === 0 ? naturalX + (Number.isFinite(n.x_offset) ? n.x_offset : 0) : cursorTarget + gap
+      updates.push({ id: n.id, x_offset: Math.round(targetX - naturalX) })
+      cursorTarget = targetX + w
+      naturalX += w + NODE_GAP
+    })
+    setNodes(prev =>
+      prev.map(p => {
+        const u = updates.find(x => x.id === p.id)
+        return u ? { ...p, x_offset: u.x_offset } : p
+      }),
+    )
+    try {
+      await Promise.all(
+        updates.map(u =>
+          supabase.from('org_nodes').update({ x_offset: u.x_offset }).eq('id', u.id),
+        ),
+      )
+    } catch (e) {
+      alert('Apply failed: ' + (e.message || e))
     }
   }
 
@@ -955,31 +998,59 @@ export default function OrgChartV2() {
                     {presentTiers.length === 0 ? (
                       <p className="text-xs text-slate-400 py-1">No rows yet.</p>
                     ) : (
-                      presentTiers.map(t => (
-                        <div key={t} className="flex items-center justify-between gap-2 py-1">
-                          <span className="text-xs text-slate-600">Row {t + 1}</span>
-                          <input
-                            type="number"
-                            min={0}
-                            max={400}
-                            value={
-                              colSpacing[t] === ''
-                                ? ''
-                                : Number.isFinite(colSpacing[t])
-                                  ? colSpacing[t]
-                                  : NODE_GAP
-                            }
-                            onChange={ev =>
-                              updateColSpacing(t, ev.target.value === '' ? '' : Number(ev.target.value))
-                            }
-                            className="no-spin w-20 border border-slate-300 rounded-md px-1 py-0.5 text-xs"
-                          />
-                        </div>
-                      ))
+                      presentTiers.map(t => {
+                        const { gap, auto } = readColCfg(t)
+                        return (
+                          <div key={t} className="py-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs text-slate-600">Row {t + 1}</span>
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={400}
+                                  value={gap === '' ? '' : gap}
+                                  placeholder={String(NODE_GAP)}
+                                  onChange={ev =>
+                                    setColCfg(t, {
+                                      gap: ev.target.value === '' ? '' : Number(ev.target.value),
+                                      auto,
+                                    })
+                                  }
+                                  className="no-spin w-16 border border-slate-300 rounded-md px-1 py-0.5 text-xs"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setColCfg(t, { gap, auto: !auto })}
+                                  title="Auto-space continuously from the leftmost item"
+                                  className={`px-1.5 py-0.5 rounded border text-[11px] ${
+                                    auto
+                                      ? 'border-green-600 bg-green-50 text-green-700 font-semibold'
+                                      : 'border-slate-300 text-slate-500'
+                                  }`}
+                                >
+                                  Auto
+                                </button>
+                              </div>
+                            </div>
+                            {!auto && Number.isFinite(gap) && (
+                              <div className="flex justify-end mt-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => applyColSpacingOnce(t)}
+                                  className="text-[11px] text-blue-600 hover:underline"
+                                >
+                                  Apply once
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })
                     )}
                     <p className="mt-1 text-[10px] text-slate-400 leading-snug">
-                      Sets the gap between items in each row and auto-spaces them from the
-                      left — overrides manual drag positions.
+                      Spacing starts from the leftmost item. <b>Auto</b> keeps re-spacing as you
+                      move that item; otherwise click <b>Apply once</b>, then drag freely.
                     </p>
                   </div>
                 )}
