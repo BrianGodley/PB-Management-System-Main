@@ -181,7 +181,12 @@ export function ContainerNode({
         const lh1 = t1Size + 2
         const lh2 = t2Size + 2
         const blockH = t1Lines.length * lh1 + t2Lines.length * lh2
-        let y = labelY - blockH / 2 + t1Size
+        // With a second title, pull the titles up to ~1/8" (12px) from the
+        // top so both fit cleanly; otherwise keep them centered.
+        let y =
+          t2Lines.length > 0
+            ? box.y + 12 + t1Size
+            : labelY - blockH / 2 + t1Size
         const rows = []
         t1Lines.forEach((ln, i) => {
           rows.push({ ln, y, size: t1Size, weight: 700, key: `t1-${i}` })

@@ -104,12 +104,15 @@ export default function OrgChartV2() {
   // multiple positions, and one position can be held by multiple
   // employees. "active" is derived from employees.status.
   const employeesByPosition = useMemo(() => {
-    const empById = new Map(employees.map(e => [e.id, e]))
+    const empById = new Map(employees.map(e => [String(e.id), e]))
     const m = new Map()
     for (const ep of employeePositions) {
-      const e = empById.get(ep.employee_id)
+      const e = empById.get(String(ep.employee_id))
       if (!e) continue
-      const arr = m.get(ep.position_id) || []
+      // Normalize the position_id key to a Number so lookups match
+      // regardless of whether Supabase returns bigint ids as strings.
+      const posKey = Number(ep.position_id)
+      const arr = m.get(posKey) || []
       arr.push({
         id: e.id,
         firstName: e.first_name,
@@ -117,7 +120,7 @@ export default function OrgChartV2() {
         active: (e.status || 'active') === 'active',
         displayName: `${e.first_name || ''} ${e.last_name || ''}`.trim() || '(unnamed)',
       })
-      m.set(ep.position_id, arr)
+      m.set(posKey, arr)
     }
     for (const arr of m.values()) arr.sort((a, b) => Number(b.active) - Number(a.active))
     return m
@@ -129,7 +132,7 @@ export default function OrgChartV2() {
     if (!node?.position_id) return null
     const pos = positions.find(p => Number(p.id) === Number(node.position_id))
     if (!pos) return null
-    const candidates = employeesByPosition.get(pos.id) || []
+    const candidates = employeesByPosition.get(Number(pos.id)) || []
     let chosen = null
     if (node.employee_id) chosen = candidates.find(c => c.id === node.employee_id) || null
     if (!chosen) chosen = candidates.find(c => c.active) || candidates[0] || null
