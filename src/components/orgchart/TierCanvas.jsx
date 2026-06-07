@@ -154,16 +154,24 @@ export default function TierCanvas({
     const node = nodes.find(n => n.id === drag.nodeId)
     const box = laidOut.get(drag.nodeId)
     if (node && box && onNodeDropped) {
-      const dropLeftX = box.x + drag.dx
-      // Items are locked to their level: dragging only changes left/right
-      // order within the same tier, never the tier itself. Use the Level
-      // field in the Add/Edit dialog to move an item up or down.
-      const newTier = node.tier ?? 0
-      const dropCenterX = dropLeftX + box.width / 2
-      const newTierOrder = findDropSlot(newTier, dropCenterX, drag.nodeId)
-      const natural = naturalXForSlot(newTier, newTierOrder, drag.nodeId)
-      const newXOffset = Math.round(dropLeftX - natural)
-      onNodeDropped(drag.nodeId, newTier, newTierOrder, newXOffset)
+      if (node.kind === 'assistant') {
+        // Assistants aren't part of a tier row — their position is
+        // anchor-relative. Dragging only nudges their horizontal offset,
+        // so the new offset is simply the old offset plus how far it moved.
+        const newXOffset = Math.round((node.x_offset || 0) + drag.dx)
+        onNodeDropped(drag.nodeId, node.tier ?? 0, 0, newXOffset)
+      } else {
+        const dropLeftX = box.x + drag.dx
+        // Items are locked to their level: dragging only changes left/right
+        // order within the same tier, never the tier itself. Use the Level
+        // field in the Add/Edit dialog to move an item up or down.
+        const newTier = node.tier ?? 0
+        const dropCenterX = dropLeftX + box.width / 2
+        const newTierOrder = findDropSlot(newTier, dropCenterX, drag.nodeId)
+        const natural = naturalXForSlot(newTier, newTierOrder, drag.nodeId)
+        const newXOffset = Math.round(dropLeftX - natural)
+        onNodeDropped(drag.nodeId, newTier, newTierOrder, newXOffset)
+      }
     }
     setDrag(null)
   }

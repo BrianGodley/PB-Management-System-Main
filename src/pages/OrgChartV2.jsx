@@ -407,6 +407,17 @@ export default function OrgChartV2() {
   async function handleNodeDropped(nodeId, newTier, newTierOrder, newXOffset) {
     const node = nodes.find(n => n.id === nodeId)
     if (!node) return
+    // Assistants live beside their anchor, not in a tier row — a drag only
+    // changes their horizontal offset. Skip the tier-sibling reordering.
+    if (node.kind === 'assistant') {
+      setNodes(prev => prev.map(p => (p.id === nodeId ? { ...p, x_offset: newXOffset } : p)))
+      try {
+        await supabase.from('org_nodes').update({ x_offset: newXOffset }).eq('id', nodeId)
+      } catch (e) {
+        alert('Move failed: ' + (e.message || e))
+      }
+      return
+    }
     const otherSibs = nodes
       .filter(n => n.id !== nodeId && (n.tier ?? 0) === newTier)
       .sort((a, b) => (a.tier_order ?? 0) - (b.tier_order ?? 0))
