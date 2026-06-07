@@ -8,7 +8,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import TierCanvas from '../components/orgchart/TierCanvas.jsx'
 import AddNodeDialog from '../components/orgchart/AddNodeDialog.jsx'
-import { CANVAS_PAD_X, NODE_GAP } from '../components/orgchart/layout.js'
+import { CANVAS_PAD_X, NODE_GAP, TIER_GAP } from '../components/orgchart/layout.js'
 
 const FG = '#3A5038'
 
@@ -38,6 +38,10 @@ export default function OrgChartV2() {
   const [zoom, setZoom] = useState(1)
   const [editMode, setEditMode] = useState(false)
   const [contextMenu, setContextMenu] = useState(null)
+  // Per-row (per-tier) spacing overrides for the current chart, keyed by
+  // tier number. Empty = use the system default for every row.
+  const [rowSpacing, setRowSpacing] = useState({})
+  const [rowSpacingOpen, setRowSpacingOpen] = useState(false)
   const [chartPickerOpen, setChartPickerOpen] = useState(false)
   // Change-mode state machine for rewiring existing connections.
   // type: 'change_senior' | 'change_child' | 'change_connection' | null
@@ -69,6 +73,27 @@ export default function OrgChartV2() {
     })()
   }, [])
 
+  // Update the spacing (gap below) for one row/tier and persist it.
+  async function updateRowSpacing(tier, value) {
+    const next = { ...rowSpacing, [tier]: value }
+    setRowSpacing(next)
+    try {
+      await supabase.from('org_charts').update({ row_spacing: next }).eq('id', chartId)
+    } catch (e) {
+      alert('Could not save row spacing: ' + (e.message || e))
+    }
+  }
+
+  // The tiers (rows) currently present, top to bottom, for the spacing panel.
+  const presentTiers = useMemo(() => {
+    const set = new Set(
+      nodes
+        .filter(n => !n.parent_container_id && n.kind !== 'assistant')
+        .map(n => (Number.isInteger(n.tier) ? n.tier : 0)),
+    )
+    return [...set].sort((a, b) => a - b)
+  }, [nodes])
+
   // Mark a chart as the single default that opens with the module.
   async function setDefaultChart(chart) {
     setCharts(prev => prev.map(c => ({ ...c, is_default: c.id === chart.id })))
@@ -83,6 +108,8 @@ export default function OrgChartV2() {
   async function selectChart(chart) {
     setChartId(chart.id)
     setChartName(chart.name)
+    setRowSpacing(chart.row_spacing || {})
+    setRowSpacingOpen(false)
     setSelectedNodeId(null)
     setSelectedEdgeId(null)
     setConnectMode(false)
@@ -762,6 +789,52 @@ export default function OrgChartV2() {
               >
                 + Assistant
               </button>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setRowSpacingOpen(v => !v)}
+                  className="text-sm px-3 py-1 rounded-md bg-slate-200 text-slate-700 hover:bg-slate-300 whitespace-nowrap"
+                >
+                  Row Spacing ▾
+                </button>
+                {rowSpacingOpen && (
+                  <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 shadow-lg rounded-md z-50 w-56 py-2 px-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-slate-500">Row spacing (px)</span>
+                      <button
+                        type="button"
+                        onClick={() => setRowSpacingOpen(false)}
+                        className="text-slate-400 hover:text-slate-700 text-sm leading-none"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    {presentTiers.length === 0 ? (
+                      <p className="text-xs text-slate-400 py-1">No rows yet.</p>
+                    ) : (
+                      presentTiers.map(t => (
+                        <div key={t} className="flex items-center justify-between gap-2 py-1">
+                          <span className="text-xs text-slate-600">Row {t + 1}</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={600}
+                            value={
+                              Number.isFinite(rowSpacing[t]) ? rowSpacing[t] : TIER_GAP
+                            }
+                            onChange={e => updateRowSpacing(t, Number(e.target.value) || 0)}
+                            className="w-20 border border-slate-300 rounded-md px-1 py-0.5 text-xs"
+                          />
+                        </div>
+                      ))
+                    )}
+                    <p className="mt-1 text-[10px] text-slate-400 leading-snug">
+                      Adjusts the gap below each row — connection lines and the
+                      rows below move closer or farther apart.
+                    </p>
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -913,6 +986,7 @@ export default function OrgChartV2() {
               setDialog({ mode: 'edit', existing: n })
             }}
             onNodeDropped={handleNodeDropped}
+            rowSpacing={rowSpacing}
             onEdgeClick={id => {
               if (!editMode) return
               setSelectedEdgeId(id)

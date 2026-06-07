@@ -30,6 +30,7 @@ export default function TierCanvas({
   onEdgeClick,
   onBackgroundClick,
   onNodeDropped,
+  rowSpacing = {},
   zoom = 1,
   editable = true,
 }) {
@@ -51,7 +52,7 @@ export default function TierCanvas({
     return () => ro.disconnect()
   }, [])
 
-  const { laidOut, tiers, width, height } = layoutTiers(nodes)
+  const { laidOut, tiers, width, height } = layoutTiers(nodes, rowSpacing)
   const typeById = new Map((nodeTypes || []).map(t => [t.id, t]))
 
   const minW = containerSize.w ? containerSize.w / zoom : 800

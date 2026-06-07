@@ -27,7 +27,7 @@ const MIN_CHILD_COL = 110       // each child column never narrower than this
  *             tiers: { tier: number, y: number, h: number, nodes: RawNode[] }[],
  *             width: number, height: number }}
  */
-export function layoutTiers(nodes) {
+export function layoutTiers(nodes, rowSpacing = {}) {
   // ── 1. Group sub-items by their container ────────────────────────────
   const childrenByContainer = new Map()
   for (const n of nodes) {
@@ -104,7 +104,13 @@ export function layoutTiers(nodes) {
   const gapByTier = new Map()
   for (const t of tierKeys) {
     const hasAssistant = byTier.get(t).some(node => assistantAnchorIds.has(node.id))
-    gapByTier.set(t, hasAssistant ? TIER_GAP * 2 : TIER_GAP)
+    // A user-set per-row spacing wins; otherwise default (doubled when the
+    // row carries an assistant so the assistant gets its own band).
+    const override = rowSpacing?.[t]
+    gapByTier.set(
+      t,
+      Number.isFinite(override) ? override : hasAssistant ? TIER_GAP * 2 : TIER_GAP,
+    )
   }
 
   for (const t of tierKeys) {
