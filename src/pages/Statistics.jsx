@@ -918,9 +918,20 @@ function BasicStatForm({
   onClose,
   onDelete,
   targetSource,
+  allStats,
   onOpenShares,
 }) {
   const { user } = useAuth()
+
+  // The base stat a target stat is built on. On creation it's passed in via
+  // targetSource; when editing an existing target stat we resolve it from the
+  // stored source_stat_id. Its name is shown read-only in the green banner and
+  // is independent of the target stat's own editable name.
+  const baseStat =
+    targetSource ||
+    (initialData?.source_stat_id
+      ? (allStats || []).find(s => s.id === initialData.source_stat_id)
+      : null)
 
   const [form, setForm] = useState({
     name: initialData?.name || (targetSource ? `${targetSource.name} Target` : ''),
@@ -1007,6 +1018,12 @@ function BasicStatForm({
         default_periods: form.default_periods !== '' ? parseInt(form.default_periods) : null,
         missing_value_display: form.missing_value_display,
         target_lines: targetLines.length > 0 ? targetLines : null,
+        // Target stats link back to the base stat they were created from, so
+        // the graph can copy/plot the base stat's values beneath the target
+        // line. This is independent of the target stat's own (editable) name.
+        source_stat_id: isTargetStat
+          ? targetSource?.id ?? initialData?.source_stat_id ?? null
+          : null,
       }
 
       console.log('[Statistics] saving payload:', payload)
@@ -1133,7 +1150,7 @@ function BasicStatForm({
           {isTargetStat && (
             <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 text-sm text-green-800 font-medium">
               🎯 Target Statistic — based on{' '}
-              <strong>{targetSource?.name || initialData?.name}</strong>
+              <strong>{baseStat?.name || '(base statistic)'}</strong>
             </div>
           )}
 
@@ -1244,43 +1261,47 @@ function BasicStatForm({
             </div>
             <div>
               <label className={lbl}>Assigned To</label>
-              <div className="flex gap-1 mt-1 mb-2">
-                {[
-                  ['user', 'User'],
-                  ['position', 'Position'],
-                ].map(([val, lab]) => (
-                  <button
-                    key={val}
-                    type="button"
-                    onClick={() => set('owner_type', val)}
-                    className={`px-3 py-1 text-xs rounded-lg border font-semibold transition-colors ${
-                      form.owner_type === val
-                        ? 'bg-green-700 text-white border-green-700'
-                        : 'bg-white text-gray-600 border-gray-300 hover:border-green-500'
-                    }`}
-                  >
-                    {lab}
-                  </button>
-                ))}
-              </div>
-              {form.owner_type === 'user' ? (
-                <select
-                  className={inp}
-                  value={form.owner_user_id}
-                  onChange={e => set('owner_user_id', e.target.value)}
-                >
-                  <option value="">— Select User —</option>
-                  {profiles.map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.full_name || p.email}
-                    </option>
+              <div className="flex items-center gap-2 mt-1">
+                <div className="flex gap-1 flex-shrink-0">
+                  {[
+                    ['user', 'User'],
+                    ['position', 'Position'],
+                  ].map(([val, lab]) => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => set('owner_type', val)}
+                      className={`px-3 py-1.5 text-xs rounded-lg border font-semibold transition-colors ${
+                        form.owner_type === val
+                          ? 'bg-green-700 text-white border-green-700'
+                          : 'bg-white text-gray-600 border-gray-300 hover:border-green-500'
+                      }`}
+                    >
+                      {lab}
+                    </button>
                   ))}
-                </select>
-              ) : (
-                <div className="text-xs text-gray-400 italic px-3 py-2 border border-dashed border-gray-300 rounded-lg">
-                  Position assignment coming soon
                 </div>
-              )}
+                <div className="flex-1 min-w-0">
+                  {form.owner_type === 'user' ? (
+                    <select
+                      className={inp}
+                      value={form.owner_user_id}
+                      onChange={e => set('owner_user_id', e.target.value)}
+                    >
+                      <option value="">— Select User —</option>
+                      {profiles.map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.full_name || p.email}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="text-xs text-gray-400 italic px-3 py-2 border border-dashed border-gray-300 rounded-lg">
+                      Position assignment coming soon
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -3232,37 +3253,41 @@ function EquationStatForm({
           {/* Owner */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">Owner</label>
-            <div className="flex gap-2 mb-2">
-              {['user', 'position'].map(t => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => set('owner_type', t)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-colors ${
-                    form.owner_type === t
-                      ? 'text-white border-transparent'
-                      : 'border-gray-200 text-gray-600 hover:border-green-500'
-                  }`}
-                  style={form.owner_type === t ? { backgroundColor: FG, borderColor: FG } : {}}
-                >
-                  {t === 'user' ? 'Person' : 'Position'}
-                </button>
-              ))}
-            </div>
-            {form.owner_type === 'user' && (
-              <select
-                value={form.owner_user_id}
-                onChange={e => set('owner_user_id', e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
-              >
-                <option value="">— select person —</option>
-                {(profiles || []).map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.full_name || p.email}
-                  </option>
+            <div className="flex items-center gap-2">
+              <div className="flex gap-2 flex-shrink-0">
+                {['user', 'position'].map(t => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => set('owner_type', t)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-colors ${
+                      form.owner_type === t
+                        ? 'text-white border-transparent'
+                        : 'border-gray-200 text-gray-600 hover:border-green-500'
+                    }`}
+                    style={form.owner_type === t ? { backgroundColor: FG, borderColor: FG } : {}}
+                  >
+                    {t === 'user' ? 'Person' : 'Position'}
+                  </button>
                 ))}
-              </select>
-            )}
+              </div>
+              <div className="flex-1 min-w-0">
+                {form.owner_type === 'user' && (
+                  <select
+                    value={form.owner_user_id}
+                    onChange={e => set('owner_user_id', e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                  >
+                    <option value="">— select person —</option>
+                    {(profiles || []).map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.full_name || p.email}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
           </div>
 
           {err && <p className="text-sm text-red-600 font-medium">{err}</p>}
@@ -3820,37 +3845,41 @@ function OverlayStatForm({
           {/* Owner */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">Owner</label>
-            <div className="flex gap-2 mb-2">
-              {['user', 'position'].map(t => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => set('owner_type', t)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-colors ${
-                    form.owner_type === t
-                      ? 'text-white border-transparent'
-                      : 'border-gray-200 text-gray-600 hover:border-green-500'
-                  }`}
-                  style={form.owner_type === t ? { backgroundColor: FG, borderColor: FG } : {}}
-                >
-                  {t === 'user' ? 'Person' : 'Position'}
-                </button>
-              ))}
-            </div>
-            {form.owner_type === 'user' && (
-              <select
-                value={form.owner_user_id}
-                onChange={e => set('owner_user_id', e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
-              >
-                <option value="">— select person —</option>
-                {(profiles || []).map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.full_name || p.email}
-                  </option>
+            <div className="flex items-center gap-2">
+              <div className="flex gap-2 flex-shrink-0">
+                {['user', 'position'].map(t => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => set('owner_type', t)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-colors ${
+                      form.owner_type === t
+                        ? 'text-white border-transparent'
+                        : 'border-gray-200 text-gray-600 hover:border-green-500'
+                    }`}
+                    style={form.owner_type === t ? { backgroundColor: FG, borderColor: FG } : {}}
+                  >
+                    {t === 'user' ? 'Person' : 'Position'}
+                  </button>
                 ))}
-              </select>
-            )}
+              </div>
+              <div className="flex-1 min-w-0">
+                {form.owner_type === 'user' && (
+                  <select
+                    value={form.owner_user_id}
+                    onChange={e => set('owner_user_id', e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                  >
+                    <option value="">— select person —</option>
+                    {(profiles || []).map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.full_name || p.email}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
           </div>
 
           {err && <p className="text-sm text-red-600 font-medium">{err}</p>}
@@ -4009,7 +4038,7 @@ function aggregateValues(sourceValues, outputTracking, method) {
   return result.sort((a, b) => a.period_date.localeCompare(b.period_date))
 }
 
-function SecondaryStatForm({ initialData, allStats, onSave, onClose, onDelete, onOpenShares }) {
+function SecondaryStatForm({ initialData, allStats, profiles, onSave, onClose, onDelete, onOpenShares }) {
   const { user } = useAuth()
 
   // Eligible source stats: basic stats only (not secondary/equation/overlay/target)
@@ -4027,6 +4056,7 @@ function SecondaryStatForm({ initialData, allStats, onSave, onClose, onDelete, o
     stat_type: initialData?.stat_type || 'currency',
     owner_type: initialData?.owner_type || 'user',
     owner_user_id: initialData?.owner_user_id || user?.id || '',
+    owner_position_id: initialData?.owner_position_id || '',
     default_periods: initialData?.default_periods ?? 12,
   })
 
@@ -4082,6 +4112,7 @@ function SecondaryStatForm({ initialData, allStats, onSave, onClose, onDelete, o
         aggregation_method: form.aggregation_method,
         owner_type: form.owner_type,
         owner_user_id: form.owner_type === 'user' ? form.owner_user_id || user?.id : null,
+        owner_position_id: form.owner_type === 'position' ? form.owner_position_id || null : null,
         default_periods: form.default_periods ? parseInt(form.default_periods) : 12,
         beginning_date: today(),
         missing_value_display: 'skip',
@@ -4300,6 +4331,50 @@ function SecondaryStatForm({ initialData, allStats, onSave, onClose, onDelete, o
               onChange={e => set('default_periods', e.target.value)}
               className="w-32 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
             />
+          </div>
+
+          {/* Assigned To — User / Position toggle with selector to the right */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Assigned To</label>
+            <div className="flex items-center gap-2">
+              <div className="flex gap-2 flex-shrink-0">
+                {['user', 'position'].map(t => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => set('owner_type', t)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-colors ${
+                      form.owner_type === t
+                        ? 'text-white border-transparent'
+                        : 'border-gray-200 text-gray-600 hover:border-green-500'
+                    }`}
+                    style={form.owner_type === t ? { backgroundColor: FG, borderColor: FG } : {}}
+                  >
+                    {t === 'user' ? 'User' : 'Position'}
+                  </button>
+                ))}
+              </div>
+              <div className="flex-1 min-w-0">
+                {form.owner_type === 'user' ? (
+                  <select
+                    value={form.owner_user_id}
+                    onChange={e => set('owner_user_id', e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                  >
+                    <option value="">— Select User —</option>
+                    {(profiles || []).map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.full_name || p.email}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="text-xs text-gray-400 italic px-3 py-2 border border-dashed border-gray-300 rounded-lg">
+                    Position assignment coming soon
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           {err && <p className="text-sm text-red-600 font-medium">{err}</p>}
@@ -4644,6 +4719,7 @@ function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete, onOpen
     stat_type: initialData?.stat_type || 'numeric',
     owner_type: initialData?.owner_type || 'user',
     owner_user_id: initialData?.owner_user_id || user?.id || '',
+    owner_position_id: initialData?.owner_position_id || '',
     default_periods: initialData?.default_periods ?? 12,
   })
 
@@ -4688,6 +4764,7 @@ function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete, onOpen
       stat_type: form.stat_type,
       owner_type: form.owner_type,
       owner_user_id: form.owner_type === 'user' ? form.owner_user_id || null : null,
+      owner_position_id: form.owner_type === 'position' ? form.owner_position_id || null : null,
       default_periods: Number(form.default_periods) || 12,
       data_source: ds,
       beginning_date: today(),
@@ -4909,18 +4986,44 @@ function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete, onOpen
                   <label className="block text-sm font-semibold text-gray-700 mb-1">
                     Assigned To
                   </label>
-                  <select
-                    value={form.owner_user_id}
-                    onChange={e => set('owner_user_id', e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
-                  >
-                    <option value="">— Anyone —</option>
-                    {profiles.map(p => (
-                      <option key={p.id} value={p.id}>
-                        {p.full_name || p.email}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex items-center gap-2">
+                    <div className="flex gap-1 flex-shrink-0">
+                      {['user', 'position'].map(t => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => set('owner_type', t)}
+                          className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border-2 transition-colors ${
+                            form.owner_type === t
+                              ? 'bg-blue-700 text-white border-blue-700'
+                              : 'border-gray-200 text-gray-600 hover:border-blue-500'
+                          }`}
+                        >
+                          {t === 'user' ? 'User' : 'Position'}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      {form.owner_type === 'user' ? (
+                        <select
+                          value={form.owner_user_id}
+                          onChange={e => set('owner_user_id', e.target.value)}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                        >
+                          <option value="">— Anyone —</option>
+                          {profiles.map(p => (
+                            <option key={p.id} value={p.id}>
+                              {p.full_name || p.email}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="text-xs text-gray-400 italic px-3 py-2 border border-dashed border-gray-300 rounded-lg">
+                          Position assignment coming soon
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             </>
@@ -8510,11 +8613,34 @@ export default function Statistics() {
           setToDate(today())
         }
       })
+    } else if (stat?.stat_category === 'target') {
+      // Target stats are a "duplicate" of their base stat: copy the base
+      // stat's values into this stat so the graph plots those values beneath
+      // the target line. The date range stays locked to the target line extent
+      // (handled in a separate effect).
+      setOverlayValues([])
+      syncTargetValues(stat).then(() => fetchValues(selectedId))
     } else {
       setOverlayValues([])
       fetchValues(selectedId)
     }
   }, [selectedId, stats])
+
+  async function syncTargetValues(stat) {
+    if (!stat?.source_stat_id) return null
+    const { data: srcVals } = await supabase
+      .from('statistic_values')
+      .select('period_date, value')
+      .eq('statistic_id', stat.source_stat_id)
+      .order('period_date')
+    if (!srcVals?.length) return null
+    // Mirror the base stat's values onto the target stat (idempotent upsert).
+    await supabase.from('statistic_values').upsert(
+      srcVals.map(r => ({ statistic_id: stat.id, period_date: r.period_date, value: r.value })),
+      { onConflict: 'statistic_id,period_date' }
+    )
+    return srcVals[0].period_date
+  }
 
   async function syncSecondaryValues(stat) {
     if (!stat?.source_stat_id) return null
@@ -8759,6 +8885,21 @@ export default function Statistics() {
     () => stats.find(s => s.id === selectedId) || null,
     [stats, selectedId]
   )
+
+  // A stat is editable only by its assignee (owner) or an admin. Users who can
+  // only see a stat because it was shared with them get read-only access — the
+  // Edit Statistic link is hidden for them.
+  const canEditSelectedStat = useMemo(() => {
+    if (!selectedStat) return false
+    if (isCurrentUserAdmin) return true
+    if (selectedStat.owner_user_id && selectedStat.owner_user_id === user?.id) return true
+    if (selectedStat.created_by && selectedStat.created_by === user?.id) return true
+    // Access is via a share row → read-only.
+    if (userShares[selectedStat.id]) return false
+    // Owned by this user (no explicit owner set falls through to creator check
+    // above); default to allowing edit for non-shared stats.
+    return selectedStat.owner_user_id === user?.id
+  }, [selectedStat, isCurrentUserAdmin, user?.id, userShares])
 
   // ── Print current chart ───────────────────────────────────────────────────
   function handlePrint() {
@@ -9627,12 +9768,14 @@ export default function Statistics() {
                   : 'Edit Value History'}
               </button>
             )}
-            <button
-              onClick={handleEditStat}
-              className="hidden sm:inline-flex text-sm font-medium text-blue-600 hover:text-blue-800 underline underline-offset-2 transition-colors flex-shrink-0"
-            >
-              Edit Statistic
-            </button>
+            {canEditSelectedStat && (
+              <button
+                onClick={handleEditStat}
+                className="hidden sm:inline-flex text-sm font-medium text-blue-600 hover:text-blue-800 underline underline-offset-2 transition-colors flex-shrink-0"
+              >
+                Edit Statistic
+              </button>
+            )}
             <button
               onClick={() => setShowNotesModal(true)}
               className="hidden sm:inline-flex text-sm font-medium text-amber-600 hover:text-amber-800 underline underline-offset-2 transition-colors flex-shrink-0 items-center gap-1"
@@ -10569,6 +10712,7 @@ export default function Statistics() {
             setTargetSourceStat(null)
           }}
           targetSource={targetSourceStat}
+          allStats={stats}
           onOpenShares={openShares}
         />
       )}
@@ -10970,16 +11114,18 @@ export default function Statistics() {
                   </span>
                 </button>
               )}
-              <button
-                onClick={() => {
-                  setShowMobileEditsModal(false)
-                  handleEditStat()
-                }}
-                className="w-full text-left px-3 py-3 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm font-semibold text-blue-700 flex items-center gap-2"
-              >
-                ✏️ Edit Statistic
-                <span className="text-xs text-gray-400 ml-auto">Name, type, sharing</span>
-              </button>
+              {canEditSelectedStat && (
+                <button
+                  onClick={() => {
+                    setShowMobileEditsModal(false)
+                    handleEditStat()
+                  }}
+                  className="w-full text-left px-3 py-3 rounded-lg border border-gray-200 hover:bg-gray-50 text-sm font-semibold text-blue-700 flex items-center gap-2"
+                >
+                  ✏️ Edit Statistic
+                  <span className="text-xs text-gray-400 ml-auto">Name, type, sharing</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
