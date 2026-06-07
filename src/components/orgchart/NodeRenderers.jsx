@@ -177,6 +177,8 @@ export function ContainerNode({
   const hasPosition = !!positionTitle
   const fs = node.font_sizes || {}
   const labelY = hasPosition ? box.y + box.height / 2 - 12 : box.y + box.height / 2 + 3
+  // A little breathing room below a second title before the position info.
+  const posShift = (node.heading || '').trim() ? 8 : 0
   return (
     <g onClick={onClick} style={{ cursor: 'pointer' }}>
       <SelectOutline x={box.x} y={box.y} w={box.width} h={box.height} selected={selected} />
@@ -239,7 +241,7 @@ export function ContainerNode({
         <>
           <text
             x={cx}
-            y={box.y + box.height / 2 + 6}
+            y={box.y + box.height / 2 + 6 + posShift}
             textAnchor="middle"
             fill={textColor}
             opacity={0.9}
@@ -250,7 +252,7 @@ export function ContainerNode({
           </text>
           <text
             x={cx}
-            y={box.y + box.height / 2 + 18}
+            y={box.y + box.height / 2 + 18 + posShift}
             textAnchor="middle"
             fill={textColor}
             opacity={0.75}
