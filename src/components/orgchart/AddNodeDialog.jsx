@@ -77,6 +77,31 @@ export default function AddNodeDialog({
   const [containerMode, setContainerMode] = useState(
     isEdit ? existing.container_mode || 'independent' : 'independent',
   )
+  // For junior Areas: 'direct' = contained column under the parent area,
+  // 'arrow' = a separate child connected by a reports-to arrow.
+  const [attachMode, setAttachMode] = useState('direct')
+
+  // Per-field font-size multipliers (1 = current default). Keys: 'label'
+  // (area name), 'title' (position title), 'name' (employee name).
+  const [fontSizes, setFontSizes] = useState(
+    isEdit && existing.font_sizes ? existing.font_sizes : {},
+  )
+  // Small inline size dropdown shown next to each displayed-text field.
+  const FontSize = ({ field }) => (
+    <select
+      value={fontSizes[field] ?? 1}
+      onChange={e =>
+        setFontSizes(prev => ({ ...prev, [field]: Number(e.target.value) }))
+      }
+      title="Font size"
+      className="border border-gray-300 rounded-md px-1 py-0.5 text-[11px] text-gray-600 bg-white"
+    >
+      <option value={1}>Default</option>
+      <option value={0.8}>Small</option>
+      <option value={1.25}>Large</option>
+      <option value={1.5}>X-Large</option>
+    </select>
+  )
   const [width, setWidth] = useState(isEdit ? existing.width || 220 : 220)
   const [height, setHeight] = useState(isEdit ? existing.height || 90 : 90)
   // Assistant kind state
@@ -112,6 +137,7 @@ export default function AddNodeDialog({
       isEdit,
       id: existing?.id,
       tier,
+      font_sizes: fontSizes,
     }
     if (kind === 'position') {
       if (!positionId) return alert('Pick a position.')
@@ -135,6 +161,7 @@ export default function AddNodeDialog({
         employee_id: employeeId || null,
         width,
         height,
+        attachDirect: mode === 'child' && attachMode === 'direct',
       })
     } else if (kind === 'assistant') {
       if (!attachedToNodeId) return alert('Pick an item to assist.')
@@ -289,6 +316,17 @@ export default function AddNodeDialog({
               </a>
             </p>
             {renderPositionPicker(true)}
+            <div className="mt-2 space-y-1">
+              <label className="block text-xs font-medium text-gray-500">Text sizes</label>
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <span className="w-24">Position title</span>
+                <FontSize field="title" />
+              </div>
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <span className="w-24">Employee name</span>
+                <FontSize field="name" />
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-2 mt-3">
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Box Width</label>
@@ -331,10 +369,44 @@ export default function AddNodeDialog({
 
         {kind === 'container' && (
           <div className="space-y-3">
+            {mode === 'child' && (
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  How to attach this junior area
+                </label>
+                <div className="flex gap-2">
+                  {[
+                    { v: 'direct', label: 'Attach directly' },
+                    { v: 'arrow', label: 'Connection arrow' },
+                  ].map(opt => (
+                    <button
+                      key={opt.v}
+                      type="button"
+                      onClick={() => setAttachMode(opt.v)}
+                      className={`flex-1 py-1.5 rounded-md border text-xs ${
+                        attachMode === opt.v
+                          ? 'border-blue-600 bg-blue-50 text-blue-700 font-medium'
+                          : 'border-gray-200 hover:bg-gray-50 text-gray-600'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1 text-[11px] text-gray-400">
+                  {attachMode === 'direct'
+                    ? 'Sits as a column contained under the parent area, centered (shifts as more are added).'
+                    : 'Appears as a separate area linked to the parent with a connection arrow.'}
+                </p>
+              </div>
+            )}
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">
-                Area name
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-medium text-gray-500">
+                  Area name
+                </label>
+                <FontSize field="label" />
+              </div>
               <input
                 value={label}
                 onChange={e => setLabel(e.target.value)}
@@ -362,6 +434,18 @@ export default function AddNodeDialog({
                 ))}
               </select>
               {positionId && renderPositionPicker(false)}
+              {positionId && (
+                <div className="mt-2 space-y-1">
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <span className="w-24">Position title</span>
+                    <FontSize field="title" />
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                    <span className="w-24">Employee name</span>
+                    <FontSize field="name" />
+                  </div>
+                </div>
+              )}
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Color</label>
@@ -426,28 +510,6 @@ export default function AddNodeDialog({
             >
               Reset to default Org Chart Area size (220 × 90)
             </button>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Grouping</label>
-              <div className="flex gap-2">
-                {[
-                  { v: 'independent', label: 'Independent' },
-                  { v: 'implicit', label: 'Has Junior Areas' },
-                ].map(opt => (
-                  <button
-                    key={opt.v}
-                    type="button"
-                    onClick={() => setContainerMode(opt.v)}
-                    className={`flex-1 py-1.5 rounded-md border text-xs ${
-                      containerMode === opt.v
-                        ? 'border-blue-600 bg-blue-50 text-blue-700 font-medium'
-                        : 'border-gray-200 hover:bg-gray-50 text-gray-600'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
         )}
 

@@ -246,10 +246,10 @@ export default function OrgChartV2() {
       if (payload.parentId) {
         const parent = nodes.find(n => n.id === payload.parentId)
         if (parent) {
-          // Special case: if the parent is an implicit container, the new
-          // item becomes a sub-item INSIDE it (column layout) instead of
-          // a child node a tier below.
-          if (parent.kind === 'container' && parent.container_mode === 'implicit') {
+          // "Attach directly" under an Area: the new item becomes a sub-item
+          // column INSIDE the parent (centered, auto-sized by the column
+          // layout) instead of a separate child a tier below with an arrow.
+          if (payload.attachDirect && parent.kind === 'container') {
             parent_container_id = parent.id
             tier = parent.tier ?? 0
             tier_order = nodes
@@ -310,6 +310,7 @@ export default function OrgChartV2() {
         attachment_side: payload.attachment_side || null,
         width: payload.width || 110,
         height: payload.height || 40,
+        font_sizes: payload.font_sizes || {},
         x_offset,
         x: 0,
         y: 0,
@@ -358,6 +359,7 @@ export default function OrgChartV2() {
         attachment_side: payload.attachment_side || null,
         width: payload.width || 110,
         height: payload.height || 40,
+        font_sizes: payload.font_sizes || {},
       }
       // Apply an explicit Level change. When the level actually changes,
       // move the item to the far-right of the new level and reset its
