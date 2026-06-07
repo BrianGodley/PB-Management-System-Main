@@ -162,8 +162,48 @@ export default function AddNodeDialog({
       </div>
     )
   }
-  const [width, setWidth] = useState(isEdit ? existing.width || 220 : 220)
-  const [height, setHeight] = useState(isEdit ? existing.height || 90 : 90)
+  // Horizontal/Vertical toggle for an area title. Choosing vertical for a
+  // junior (attached) area bumps its height to 180 so the rotated text fits.
+  const orientToggle = field => {
+    const vert = !!(textStyles[field] && textStyles[field].vertical)
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          const next = !vert
+          setTextStyles(prev => ({ ...prev, [field]: { ...(prev[field] || {}), vertical: next } }))
+          // Junior (attached) areas need extra height for vertical text.
+          const isJuniorArea =
+            kind === 'container' && (mode === 'child' || !!existing?.parent_container_id)
+          if (isJuniorArea) {
+            if (next && (height === 90 || height === '')) setHeight(180)
+            else if (!next && height === 180) {
+              const other = field === 'label' ? 'heading' : 'label'
+              if (!(textStyles[other] && textStyles[other].vertical)) setHeight(90)
+            }
+          }
+        }}
+        title="Display this title vertically"
+        className={`px-1.5 py-0.5 rounded border text-[11px] shrink-0 ${
+          vert
+            ? 'border-blue-600 bg-blue-50 text-blue-700 font-semibold'
+            : 'border-gray-300 text-gray-500'
+        }`}
+      >
+        {vert ? 'Vertical' : 'Horizontal'}
+      </button>
+    )
+  }
+  // Default box size by kind: areas 210×90, assistants 130×44, positions 110×40.
+  const sizeKind = isEdit ? existing?.kind : fixedKind
+  const defaultSize =
+    sizeKind === 'container'
+      ? { w: 210, h: 90 }
+      : sizeKind === 'assistant'
+        ? { w: 130, h: 44 }
+        : { w: 110, h: 40 }
+  const [width, setWidth] = useState(isEdit ? existing.width || defaultSize.w : defaultSize.w)
+  const [height, setHeight] = useState(isEdit ? existing.height || defaultSize.h : defaultSize.h)
   // Assistant kind state
   const [attachedToNodeId, setAttachedToNodeId] = useState(
     isEdit && existing.attached_to_node_id
@@ -491,6 +531,7 @@ export default function AddNodeDialog({
                   className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm"
                 />
                 {fieldStyle('label', 12, 'arial')}
+                {orientToggle('label')}
               </div>
             </div>
             <div>
@@ -505,6 +546,7 @@ export default function AddNodeDialog({
                   className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm"
                 />
                 {fieldStyle('heading', 14, 'sans', true)}
+                {orientToggle('heading')}
               </div>
             </div>
             <div>
@@ -642,12 +684,12 @@ export default function AddNodeDialog({
             <button
               type="button"
               onClick={() => {
-                setWidth(220)
+                setWidth(210)
                 setHeight(90)
               }}
               className="text-xs text-blue-600 hover:underline"
             >
-              Reset to default Org Chart Area size (220 × 90)
+              Reset to default Org Chart Area size (210 × 90)
             </button>
           </div>
         )}

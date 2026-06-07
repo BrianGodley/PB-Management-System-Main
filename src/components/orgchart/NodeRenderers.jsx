@@ -213,66 +213,75 @@ export function ContainerNode({
       {/* Two centered titles: the Area name (title 1) and an optional
           second title (stored in `heading`). Both wrap to fit the box. */}
       {(() => {
-        const t1Size = fs.label || 12
+        const ts = node.text_styles || {}
+        const t1 = (node.label || '').toString()
         const t2 = (node.heading || '').trim()
+        const t1Size = fs.label || 12
         const t2Size = fs.heading || 14
+        const t1Vert = !!(ts.label && ts.label.vertical)
+        const t2Vert = !!(ts.heading && ts.heading.vertical)
         const fit = sz => Math.max(4, Math.floor((box.width - 12) / (sz * 0.57)))
-        const isJunior = !!node.parent_container_id
-        const t1Lines = wrapLabel(node.label, fit(t1Size))
-        // For attached junior areas, the second title renders VERTICALLY
-        // (rotated) so it fits the narrow column without wrapping; only the
-        // name (title 1) stacks horizontally here.
-        const t2Lines = t2 && !isJunior ? wrapLabel(t2, fit(t2Size)) : []
-        const lh1 = t1Size + 2
-        const lh2 = t2Size + 2
-        const blockH = t1Lines.length * lh1 + t2Lines.length * lh2
-        // Pull the name toward the top when there's a second title (stacked or
-        // the junior's vertical one); otherwise keep it centered.
-        let y =
-          t2Lines.length > 0 || (isJunior && t2)
-            ? box.y + 12 + t1Size
-            : labelY - blockH / 2 + t1Size
-        const rows = []
-        t1Lines.forEach((ln, i) => {
-          rows.push({ ln, y, size: t1Size, field: 'label', family: 'arial', weight: 400, key: `t1-${i}` })
-          y += lh1
-        })
-        t2Lines.forEach((ln, i) => {
-          rows.push({ ln, y, size: t2Size, field: 'heading', family: 'sans', weight: 700, key: `t2-${i}` })
-          y += lh2
-        })
-        // Centre the vertical second title in the space below the name.
-        const vMidY = (y - lh1 / 2 + box.y + box.height) / 2
-        return (
-          <>
-            <text textAnchor="middle" fill={textColor}>
+
+        // Each title renders horizontally (stacked from the top) or vertically
+        // (rotated), independently, per its `vertical` setting.
+        const hTitles = []
+        if (t1 && !t1Vert) hTitles.push({ text: t1, size: t1Size, field: 'label', family: 'arial', weight: 400 })
+        if (t2 && !t2Vert) hTitles.push({ text: t2, size: t2Size, field: 'heading', family: 'sans', weight: 700 })
+        const vTitles = []
+        if (t1 && t1Vert) vTitles.push({ text: t1, size: t1Size, field: 'label', family: 'arial', weight: 400 })
+        if (t2 && t2Vert) vTitles.push({ text: t2, size: t2Size, field: 'heading', family: 'sans', weight: 700 })
+
+        const els = []
+        if (hTitles.length) {
+          const wrapped = hTitles.map(h => ({ ...h, lines: wrapLabel(h.text, fit(h.size)) }))
+          const blockH = wrapped.reduce((s, h) => s + h.lines.length * (h.size + 2), 0)
+          let y =
+            vTitles.length > 0 || hTitles.length > 1
+              ? box.y + 12 + wrapped[0].size
+              : labelY - blockH / 2 + wrapped[0].size
+          const rows = []
+          wrapped.forEach(h => {
+            h.lines.forEach((ln, i) => {
+              rows.push({ ln, y, h, key: `${h.field}-${i}-${Math.round(y)}` })
+              y += h.size + 2
+            })
+          })
+          els.push(
+            <text key="htitles" textAnchor="middle" fill={textColor}>
               {rows.map(r => (
                 <tspan
                   key={r.key}
                   x={cx}
                   y={r.y}
-                  fontSize={r.size}
-                  {...styleFor(node, r.field, { family: r.family, weight: r.weight })}
+                  fontSize={r.h.size}
+                  {...styleFor(node, r.h.field, { family: r.h.family, weight: r.h.weight })}
                 >
                   {r.ln}
                 </tspan>
               ))}
-            </text>
-            {isJunior && t2 && (
-              <text
-                x={cx}
-                y={vMidY}
-                textAnchor="middle"
-                fill={textColor}
-                fontSize={t2Size}
-                transform={`rotate(-90 ${cx} ${vMidY})`}
-                {...styleFor(node, 'heading', { family: 'sans', weight: 700 })}
-              >
-                {t2}
-              </text>
-            )}
-          </>
-        )
+            </text>,
+          )
+        }
+        vTitles.forEach((v, i) => {
+          const vx =
+            vTitles.length === 1 ? cx : box.x + box.width * (i === 0 ? 0.38 : 0.62)
+          const vy = box.y + box.height / 2 + (hTitles.length ? 8 : 0)
+          els.push(
+            <text
+              key={`v-${v.field}`}
+              x={vx}
+              y={vy}
+              textAnchor="middle"
+              fill={textColor}
+              fontSize={v.size}
+              transform={`rotate(-90 ${vx} ${vy})`}
+              {...styleFor(node, v.field, { family: v.family, weight: v.weight })}
+            >
+              {v.text}
+            </text>,
+          )
+        })
+        return <>{els}</>
       })()}
       {hasPosition && (
         <>

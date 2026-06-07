@@ -542,7 +542,15 @@ export default function OrgChartV2() {
       // matches the edited item rather than the tallest one.
       const prevNode = nodes.find(n => n.id === payload.id)
       const newHeight = payload.height || 40
-      if ((prevNode?.height ?? 40) !== newHeight) {
+      // Only row items propagate height. Junior areas (sub-items) and
+      // assistants share a tier with their parent/anchor but aren't in the
+      // row, so editing their height must NOT resize the main area or row.
+      if (
+        prevNode &&
+        !prevNode.parent_container_id &&
+        prevNode.kind !== 'assistant' &&
+        (prevNode.height ?? 40) !== newHeight
+      ) {
         const rowTier = update.tier ?? prevNode?.tier ?? 0
         const sibIds = nodes
           .filter(
