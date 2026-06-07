@@ -10,3 +10,9 @@ __pycache__/
 *.pyc
 supabase/.temp/
 scripts/bt-photo-download.checkpoint.json
+
+# Runtime checkpoints, corrupted backups, and scratch data (machine-local, not source)
+scripts/*.checkpoint.json
+scripts/*.checkpoint.*.bak
+scripts/bt-csv-inbox/
+scripts/jobs_*.txt
