@@ -8,6 +8,18 @@
   }
 }
 
+/* Number inputs with this class show no up/down spinner — just the editable
+   number. Used by the org chart's numeric fields. */
+.no-spin::-webkit-outer-spin-button,
+.no-spin::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.no-spin {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 @layer components {
   .btn-primary {
     @apply bg-green-700 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;

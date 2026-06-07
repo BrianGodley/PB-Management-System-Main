@@ -853,7 +853,7 @@ export default function OrgChartV2() {
                               max={600}
                               value={Number.isFinite(rowSpacing[key]) ? rowSpacing[key] : fallback}
                               onChange={e => updateRowSpacing(key, Number(e.target.value) || 0)}
-                              className="w-20 border border-slate-300 rounded-md px-1 py-0.5 text-xs"
+                              className="no-spin w-20 border border-slate-300 rounded-md px-1 py-0.5 text-xs"
                             />
                           </div>
                         )

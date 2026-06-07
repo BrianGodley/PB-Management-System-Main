@@ -99,7 +99,7 @@ export default function AddNodeDialog({
         setFontSizes(prev => ({ ...prev, [field]: Number(e.target.value) || base }))
       }
       title="Font size (points)"
-      className="w-16 border border-gray-300 rounded-md px-1 py-0.5 text-[11px] text-gray-600 bg-white"
+      className="no-spin w-16 border border-gray-300 rounded-md px-1 py-0.5 text-[11px] text-gray-600 bg-white"
     />
   )
   const [width, setWidth] = useState(isEdit ? existing.width || 220 : 220)
@@ -293,7 +293,7 @@ export default function AddNodeDialog({
             min={1}
             value={tier + 1}
             onChange={e => setTier(Math.max(0, (Number(e.target.value) || 1) - 1))}
-            className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
+            className="no-spin w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
           />
           <p className="mt-1 text-[11px] leading-snug text-gray-400">
             Level 1 is the top row. Items can only be dragged left and right — change the level here to move an item up or down.
@@ -351,7 +351,7 @@ export default function AddNodeDialog({
                   type="number"
                   value={width}
                   onChange={e => setWidth(Number(e.target.value) || 0)}
-                  className="w-full border border-gray-300 rounded-md px-2 py-1 text-sm"
+                  className="no-spin w-full border border-gray-300 rounded-md px-2 py-1 text-sm"
                   min={60}
                   max={600}
                 />
@@ -362,7 +362,7 @@ export default function AddNodeDialog({
                   type="number"
                   value={height}
                   onChange={e => setHeight(Number(e.target.value) || 0)}
-                  className="w-full border border-gray-300 rounded-md px-2 py-1 text-sm"
+                  className="no-spin w-full border border-gray-300 rounded-md px-2 py-1 text-sm"
                   min={30}
                   max={300}
                 />
@@ -515,7 +515,7 @@ export default function AddNodeDialog({
                   type="number"
                   value={width}
                   onChange={e => setWidth(Number(e.target.value) || 0)}
-                  className="w-full border border-gray-300 rounded-md px-2 py-1 text-sm"
+                  className="no-spin w-full border border-gray-300 rounded-md px-2 py-1 text-sm"
                   min={80}
                   max={1200}
                 />
@@ -526,7 +526,7 @@ export default function AddNodeDialog({
                   type="number"
                   value={height}
                   onChange={e => setHeight(Number(e.target.value) || 0)}
-                  className="w-full border border-gray-300 rounded-md px-2 py-1 text-sm"
+                  className="no-spin w-full border border-gray-300 rounded-md px-2 py-1 text-sm"
                   min={30}
                   max={600}
                 />
