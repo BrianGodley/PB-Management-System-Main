@@ -238,6 +238,20 @@ export default function AddNodeDialog({
     )
   }
 
+  // Auto-resolved holder name for the chosen position (read-only display),
+  // mirroring how the chart picks the holder.
+  const holderName = (() => {
+    if (!positionId) return ''
+    const candidates = employeesByPosition?.get(Number(positionId)) || []
+    const chosen = employeeId
+      ? candidates.find(c => String(c.id) === String(employeeId))
+      : null
+    return (
+      (chosen || candidates.find(c => c.active) || candidates[0])?.displayName ||
+      'Held from Above'
+    )
+  })()
+
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-5">
@@ -289,22 +303,25 @@ export default function AddNodeDialog({
         {kind === 'position' && (
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Position</label>
-            <select
-              value={positionId}
-              onChange={e => {
-                setPositionId(e.target.value)
-                setEmployeeId('')
-              }}
-              className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm mb-2"
-            >
-              <option value="">— Pick a position —</option>
-              {positions.map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.title}
-                </option>
-              ))}
-            </select>
-            <p className="text-[11px] text-gray-500 mb-2">
+            <div className="flex items-center gap-2">
+              <select
+                value={positionId}
+                onChange={e => {
+                  setPositionId(e.target.value)
+                  setEmployeeId('')
+                }}
+                className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm"
+              >
+                <option value="">— Pick a position —</option>
+                {positions.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.title}
+                  </option>
+                ))}
+              </select>
+              <FontSize field="title" base={9} />
+            </div>
+            <p className="text-[11px] text-gray-500 mt-2">
               Don't see the position you need?{' '}
               <a
                 href="/hr?addPosition=1"
@@ -315,15 +332,15 @@ export default function AddNodeDialog({
                 Add It In the HR Module
               </a>
             </p>
-            {renderPositionPicker(true)}
-            <div className="mt-2 space-y-1">
-              <label className="block text-xs font-medium text-gray-500">Text sizes</label>
-              <div className="flex items-center gap-2 text-xs text-gray-500">
-                <span className="w-24">Position title</span>
-                <FontSize field="title" base={9} />
-              </div>
-              <div className="flex items-center gap-2 text-xs text-gray-500">
-                <span className="w-24">Employee name</span>
+            <div className="mt-2">
+              <label className="block text-xs font-medium text-gray-500 mb-1">Holder</label>
+              <div className="flex items-center gap-2">
+                <input
+                  readOnly
+                  value={positionId ? holderName : ''}
+                  placeholder="Auto from position"
+                  className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-gray-50 text-gray-600"
+                />
                 <FontSize field="name" base={8} />
               </div>
             </div>
@@ -401,66 +418,70 @@ export default function AddNodeDialog({
               </div>
             )}
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-medium text-gray-500">
-                  Area name
-                </label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">
+                Area name
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  value={label}
+                  onChange={e => setLabel(e.target.value)}
+                  placeholder="Operations"
+                  className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm"
+                />
                 <FontSize field="label" base={14} />
               </div>
-              <input
-                value={label}
-                onChange={e => setLabel(e.target.value)}
-                placeholder="Operations"
-                className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
-              />
             </div>
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-medium text-gray-500">
-                  Second title (optional)
-                </label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">
+                Second title (optional)
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  value={heading}
+                  onChange={e => setHeading(e.target.value)}
+                  placeholder="e.g. Department"
+                  className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm"
+                />
                 <FontSize field="heading" base={12} />
               </div>
-              <input
-                value={heading}
-                onChange={e => setHeading(e.target.value)}
-                placeholder="e.g. Department"
-                className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
-              />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">
                 Position in charge (optional)
               </label>
-              <select
-                value={positionId}
-                onChange={e => {
-                  setPositionId(e.target.value)
-                  setEmployeeId('')
-                }}
-                className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm mb-2"
-              >
-                <option value="">— None —</option>
-                {positions.map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.title}
-                  </option>
-                ))}
-              </select>
-              {positionId && renderPositionPicker(false)}
-              {positionId && (
-                <div className="mt-2 space-y-1">
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <span className="w-24">Position title</span>
-                    <FontSize field="title" base={10} />
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <span className="w-24">Employee name</span>
-                    <FontSize field="name" base={8} />
-                  </div>
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                <select
+                  value={positionId}
+                  onChange={e => {
+                    setPositionId(e.target.value)
+                    setEmployeeId('')
+                  }}
+                  className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm"
+                >
+                  <option value="">— None —</option>
+                  {positions.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.title}
+                    </option>
+                  ))}
+                </select>
+                <FontSize field="title" base={10} />
+              </div>
             </div>
+            {positionId && (
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Holder</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    readOnly
+                    value={holderName}
+                    placeholder="Auto from position"
+                    className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-gray-50 text-gray-600"
+                  />
+                  <FontSize field="name" base={8} />
+                </div>
+              </div>
+            )}
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Color</label>
               <div className="flex items-center gap-2">
@@ -609,32 +630,6 @@ export default function AddNodeDialog({
                   className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
                 />
               </div>
-            )}
-          </div>
-        )}
-
-        {isEdit && (
-          <div className="mt-5 pt-3 border-t border-gray-100 flex flex-wrap gap-2 text-xs">
-            {onAddChild && (
-              <button type="button" onClick={() => onAddChild(existing)} className="px-2 py-1 rounded-md bg-blue-100 text-blue-700 hover:bg-blue-200">+ Add Junior Item</button>
-            )}
-            {onAddSenior && (
-              <button type="button" onClick={() => onAddSenior(existing)} className="px-2 py-1 rounded-md bg-indigo-100 text-indigo-700 hover:bg-indigo-200">+ Add Senior Item</button>
-            )}
-            {onConnect && (
-              <button type="button" onClick={() => onConnect(existing)} className="px-2 py-1 rounded-md bg-orange-100 text-orange-700 hover:bg-orange-200">New Item Connection</button>
-            )}
-            {onChangeSenior && (
-              <button type="button" onClick={() => onChangeSenior(existing)} className="px-2 py-1 rounded-md bg-sky-100 text-sky-700 hover:bg-sky-200">Change Senior</button>
-            )}
-            {onChangeChild && (
-              <button type="button" onClick={() => onChangeChild(existing)} className="px-2 py-1 rounded-md bg-cyan-100 text-cyan-700 hover:bg-cyan-200">Change Junior</button>
-            )}
-            {onChangeConnection && (
-              <button type="button" onClick={() => onChangeConnection(existing)} className="px-2 py-1 rounded-md bg-teal-100 text-teal-700 hover:bg-teal-200">Change Connection</button>
-            )}
-            {onDelete && (
-              <button type="button" onClick={() => onDelete(existing)} className="ml-auto px-2 py-1 rounded-md bg-red-100 text-red-700 hover:bg-red-200">Delete</button>
             )}
           </div>
         )}
