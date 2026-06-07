@@ -9704,7 +9704,7 @@ export default function Statistics() {
             screen — the list slides out of the way and the user gets back to
             it via the chart-header back arrow. Desktop keeps both visible. */}
           <aside
-            className={`${selectedStat ? 'hidden md:flex' : 'flex'} w-full md:w-64 xl:w-72 md:flex-shrink-0 flex-col bg-white border-r border-gray-200 overflow-hidden`}
+            className={`${selectedStat ? 'hidden md:flex' : 'flex'} w-full md:w-56 xl:w-64 md:flex-shrink-0 flex-col bg-white border-r border-gray-200 overflow-hidden`}
           >
             {/* Folder rows — hidden entirely when admin disables the archive folder */}
             {showStatArchiveFolder && (
@@ -9793,6 +9793,9 @@ export default function Statistics() {
                           ⚡
                         </span>
                       )}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+                      <span className="capitalize">{s.tracking}</span>
                       {s.owner_user_id === user?.id ? (
                         <span
                           className="text-[7px] bg-green-100 text-green-700 px-0.5 py-px rounded font-semibold flex-shrink-0"
@@ -9808,9 +9811,6 @@ export default function Statistics() {
                           Shared
                         </span>
                       ) : null}
-                    </div>
-                    <div className="text-xs text-gray-400 mt-0.5 capitalize">
-                      {s.tracking} · {s.stat_type}
                     </div>
                   </div>
                 </div>
