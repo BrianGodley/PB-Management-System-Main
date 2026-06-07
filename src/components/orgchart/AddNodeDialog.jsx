@@ -360,7 +360,29 @@ export default function AddNodeDialog({
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Color</label>
-              <ColorLibraryPicker value={bgColor} onChange={setBgColor} />
+              <div className="flex items-center gap-2">
+                {bgColor !== 'none' && (
+                  <ColorLibraryPicker value={bgColor} onChange={setBgColor} />
+                )}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setBgColor(bgColor === 'none' ? CONTAINER_COLORS[0].bg : 'none')
+                  }
+                  className={`px-2 py-1.5 rounded-md border text-xs ${
+                    bgColor === 'none'
+                      ? 'border-gray-800 bg-white text-gray-800 font-medium'
+                      : 'border-gray-200 hover:bg-gray-50 text-gray-600'
+                  }`}
+                >
+                  {bgColor === 'none' ? '✓ No color (outline only)' : 'No color'}
+                </button>
+              </div>
+              {bgColor === 'none' && (
+                <p className="mt-1 text-[11px] text-gray-400">
+                  The area shows as a black outline with no fill.
+                </p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>

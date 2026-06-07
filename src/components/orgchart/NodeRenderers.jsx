@@ -121,8 +121,11 @@ export function ContainerNode({
   positionTitle,
   displayName,
 }) {
-  const fill = node.bg_color || '#1E293B'
-  const textColor = pickTextColor(fill)
+  // "No color" areas render as a black outline with a transparent fill,
+  // so they read as just the frame of where the colored field would be.
+  const noColor = node.bg_color === 'none'
+  const fill = noColor ? 'none' : node.bg_color || '#1E293B'
+  const textColor = noColor ? '#111111' : pickTextColor(fill)
   const cx = box.x + box.width / 2
   const hasPosition = !!positionTitle
   const labelY = hasPosition ? box.y + box.height / 2 - 12 : box.y + box.height / 2 + 3
@@ -137,8 +140,9 @@ export function ContainerNode({
         rx={10}
         ry={10}
         fill={fill}
-        stroke={textColor === '#FFFFFF' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}
-        strokeWidth={1}
+        pointerEvents="all"
+        stroke={noColor ? '#111111' : textColor === '#FFFFFF' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}
+        strokeWidth={noColor ? 1.5 : 1}
       />
       {/* Heading removed — Area name handles section labeling */}
       <text
