@@ -568,6 +568,29 @@ export default function OrgChartV2() {
           await supabase.from('org_nodes').update({ height: newHeight }).in('id', sibIds)
         }
       }
+      // Attached junior areas form their own shared row: editing one junior's
+      // height applies to every junior whose parent is in the same tier.
+      if (
+        prevNode &&
+        prevNode.parent_container_id &&
+        (prevNode.height ?? 40) !== newHeight
+      ) {
+        const parent = nodes.find(n => n.id === prevNode.parent_container_id)
+        const parentTier = parent?.tier ?? 0
+        const sibIds = nodes
+          .filter(n => {
+            if (n.id === payload.id || !n.parent_container_id) return false
+            const p = nodes.find(x => x.id === n.parent_container_id)
+            return (p?.tier ?? 0) === parentTier
+          })
+          .map(n => n.id)
+        if (sibIds.length) {
+          setNodes(prev =>
+            prev.map(p => (sibIds.includes(p.id) ? { ...p, height: newHeight } : p)),
+          )
+          await supabase.from('org_nodes').update({ height: newHeight }).in('id', sibIds)
+        }
+      }
       setDialog(null)
     } catch (e) {
       alert(e.message || String(e))

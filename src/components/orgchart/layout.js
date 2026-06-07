@@ -27,6 +27,16 @@ const MIN_CHILD_COL = 110       // each child column never narrower than this
  *             tiers: { tier: number, y: number, h: number, nodes: RawNode[] }[],
  *             width: number, height: number }}
  */
+// Border thickness an Area renders, so attached junior areas can sit flush
+// against the main area's border without overlapping it.
+function borderWidthOf(node) {
+  if (!node || node.kind !== 'container') return 0
+  const noColor = node.bg_color === 'none'
+  const bs = node.box_style || {}
+  const solid = !noColor && bs.fill === 'solid'
+  return solid ? 1 : noColor ? 1.5 : Number.isFinite(bs.borderWidth) ? bs.borderWidth : 2
+}
+
 export function layoutTiers(nodes, rowSpacing = {}, colSpacing = {}) {
   // ── 1. Group sub-items by their container ────────────────────────────
   const childrenByContainer = new Map()
@@ -106,15 +116,19 @@ export function layoutTiers(nodes, rowSpacing = {}, colSpacing = {}) {
     }
   }
 
-  // Reserve room for any junior-area column band that renders below a
-  // container, so the next row clears it.
+  // Attached junior areas form one shared row beneath their tier: every
+  // junior across all parents in a tier uses the same (tallest) height, and
+  // the tier's gap reserves that band once.
+  const juniorRowHeightByTier = new Map()
   for (const [containerId, kids] of childrenByContainer.entries()) {
     const container = nodes.find(x => x.id === containerId)
     if (!container) continue
     const ct = Number.isInteger(container.tier) ? container.tier : 0
-    if (!gapByTier.has(ct)) continue
-    const childMaxH = kids.reduce((m, c) => Math.max(m, c.height || 40), 40)
-    gapByTier.set(ct, gapByTier.get(ct) + childMaxH + CHILD_COL_GAP)
+    const h = kids.reduce((m, c) => Math.max(m, c.height || 40), 40)
+    juniorRowHeightByTier.set(ct, Math.max(juniorRowHeightByTier.get(ct) || 0, h))
+  }
+  for (const [ct, h] of juniorRowHeightByTier.entries()) {
+    if (gapByTier.has(ct)) gapByTier.set(ct, gapByTier.get(ct) + h + CHILD_COL_GAP)
   }
 
   for (const t of tierKeys) {
@@ -157,8 +171,15 @@ export function layoutTiers(nodes, rowSpacing = {}, colSpacing = {}) {
     const n = kids.length
     // Columns butt together with no horizontal gap, splitting the full width.
     const colW = cBox.width / n
-    const childMaxH = kids.reduce((m, c) => Math.max(m, c.height || 40), 40)
-    const colTop = cBox.y + cBox.height // directly under the container
+    // All attached areas across the whole tier share one row height (tallest).
+    const container = nodes.find(x => x.id === containerId)
+    const ct = Number.isInteger(container?.tier) ? container.tier : 0
+    const childMaxH =
+      juniorRowHeightByTier.get(ct) || kids.reduce((m, c) => Math.max(m, c.height || 40), 40)
+    // Offset down by half the main + junior borders so they touch, not overlap.
+    const mainBW = borderWidthOf(container)
+    const juniorBW = kids.reduce((m, c) => Math.max(m, borderWidthOf(c)), 0)
+    const colTop = cBox.y + cBox.height + (mainBW + juniorBW) / 2
     for (let i = 0; i < n; i++) {
       const child = kids[i]
       laidOut.set(child.id, {
