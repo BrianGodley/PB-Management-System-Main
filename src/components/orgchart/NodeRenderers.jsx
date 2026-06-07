@@ -48,6 +48,19 @@ const FONT_FAMILY = {
   sans: 'ui-sans-serif, system-ui, -apple-system, sans-serif',
   serif: 'Georgia, "Times New Roman", serif',
   mono: 'ui-monospace, "Courier New", monospace',
+  arial: 'Arial, Helvetica, sans-serif',
+  helvetica: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+  verdana: 'Verdana, Geneva, sans-serif',
+  tahoma: 'Tahoma, Geneva, sans-serif',
+  trebuchet: '"Trebuchet MS", Tahoma, sans-serif',
+  calibri: 'Calibri, Candara, Segoe, sans-serif',
+  times: '"Times New Roman", Times, serif',
+  georgia: 'Georgia, serif',
+  garamond: 'Garamond, "Times New Roman", serif',
+  palatino: '"Palatino Linotype", "Book Antiqua", Palatino, serif',
+  courier: '"Courier New", Courier, monospace',
+  comic: '"Comic Sans MS", "Comic Sans", cursive',
+  impact: 'Impact, Haettenschweiler, sans-serif',
 }
 
 // Resolve per-field text styling (family / bold / italic) stored on a node.

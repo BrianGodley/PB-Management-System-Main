@@ -118,6 +118,19 @@ export default function AddNodeDialog({
           <option value="sans">Sans</option>
           <option value="serif">Serif</option>
           <option value="mono">Mono</option>
+          <option value="arial">Arial</option>
+          <option value="helvetica">Helvetica</option>
+          <option value="verdana">Verdana</option>
+          <option value="tahoma">Tahoma</option>
+          <option value="trebuchet">Trebuchet</option>
+          <option value="calibri">Calibri</option>
+          <option value="times">Times New Roman</option>
+          <option value="georgia">Georgia</option>
+          <option value="garamond">Garamond</option>
+          <option value="palatino">Palatino</option>
+          <option value="courier">Courier</option>
+          <option value="comic">Comic Sans</option>
+          <option value="impact">Impact</option>
         </select>
         <button type="button" onClick={() => patch({ bold: !st.bold })} title="Bold" className={toggleCls(st.bold)}>
           B
