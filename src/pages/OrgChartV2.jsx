@@ -59,13 +59,26 @@ export default function OrgChartV2() {
           .order('first_name', { ascending: true }),
         supabase.from('employee_positions').select('employee_id, position_id'),
       ])
-      setCharts(chartsRes.data || [])
+      const chartList = chartsRes.data || []
+      setCharts(chartList)
       setPositions(positionsRes.data || [])
       setEmployees(employeesRes.data || [])
       setEmployeePositions(epRes.data || [])
-      if (chartsRes.data?.length) selectChart(chartsRes.data[0])
+      // Open the default chart (falls back to the first one).
+      if (chartList.length) selectChart(chartList.find(c => c.is_default) || chartList[0])
     })()
   }, [])
+
+  // Mark a chart as the single default that opens with the module.
+  async function setDefaultChart(chart) {
+    setCharts(prev => prev.map(c => ({ ...c, is_default: c.id === chart.id })))
+    try {
+      await supabase.from('org_charts').update({ is_default: false }).neq('id', chart.id)
+      await supabase.from('org_charts').update({ is_default: true }).eq('id', chart.id)
+    } catch (e) {
+      alert('Could not set default: ' + (e.message || e))
+    }
+  }
 
   async function selectChart(chart) {
     setChartId(chart.id)
@@ -129,13 +142,20 @@ export default function OrgChartV2() {
 
   // ── Chart mutations ─────────────────────────────────────────────────
   async function createChart() {
+    // The first chart (or any time there's no default yet) becomes the default.
+    const makeDefault = !charts.some(c => c.is_default)
     const { data, error } = await supabase
       .from('org_charts')
-      .insert({ name: `Chart ${new Date().toLocaleDateString()}`, created_by: user?.id })
+      .insert({
+        name: `Chart ${new Date().toLocaleDateString()}`,
+        created_by: user?.id,
+        is_default: makeDefault,
+      })
       .select()
       .single()
     if (error) return alert(error.message)
     setCharts(prev => [...prev, data])
+    setChartPickerOpen(false)
     setChartId(data.id)
     setChartName(data.name)
     setNodes([])
@@ -658,50 +678,61 @@ export default function OrgChartV2() {
                 Select ▾
               </button>
               {chartPickerOpen && (
-                <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 shadow-lg rounded-md z-50 min-w-[16rem] max-h-72 overflow-y-auto py-1">
+                <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 shadow-lg rounded-md z-50 min-w-[18rem] max-h-80 overflow-y-auto py-1">
                   {charts.length === 0 ? (
                     <p className="text-xs text-slate-400 px-3 py-2">
-                      No charts yet — use + Chart on the right.
+                      No charts yet — use + New Chart below.
                     </p>
                   ) : (
-                    charts.map(c => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => {
-                          selectChart(c)
-                          setChartPickerOpen(false)
-                        }}
-                        className={`block w-full text-left px-3 py-1.5 text-sm hover:bg-slate-50 ${
-                          c.id === chartId ? 'bg-slate-50 font-medium' : ''
-                        }`}
-                      >
-                        {c.name}
-                      </button>
-                    ))
+                    <>
+                      <div className="flex items-center gap-2 px-3 pb-1 text-[10px] uppercase tracking-wide text-slate-400">
+                        <span className="w-8 text-center">Default</span>
+                        <span>Chart</span>
+                      </div>
+                      {charts.map(c => (
+                        <div
+                          key={c.id}
+                          className={`flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-slate-50 ${
+                            c.id === chartId ? 'bg-slate-50' : ''
+                          }`}
+                        >
+                          <span className="w-8 flex justify-center">
+                            <input
+                              type="radio"
+                              name="default-chart"
+                              checked={!!c.is_default}
+                              onChange={() => setDefaultChart(c)}
+                              title="Make this the default chart"
+                              className="accent-green-700 cursor-pointer"
+                            />
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              selectChart(c)
+                              setChartPickerOpen(false)
+                            }}
+                            className={`flex-1 text-left ${c.id === chartId ? 'font-medium' : ''}`}
+                          >
+                            {c.name}
+                          </button>
+                        </div>
+                      ))}
+                    </>
                   )}
+                  <div className="border-t border-slate-100 mt-1 pt-1">
+                    <button
+                      type="button"
+                      onClick={createChart}
+                      className="block w-full text-left px-3 py-1.5 text-sm font-medium hover:bg-slate-50"
+                      style={{ color: FG }}
+                    >
+                      + New Chart
+                    </button>
+                  </div>
                 </div>
               )}
             </>
-          )}
-          {chartId && (
-            <button
-              type="button"
-              onClick={() => {
-                setEditMode(v => !v)
-                setContextMenu(null)
-                setConnectMode(false)
-                setConnectSource(null)
-                setChartPickerOpen(false)
-              }}
-              className={`text-sm px-3 py-1 rounded-md whitespace-nowrap ${
-                editMode
-                  ? 'bg-amber-500 text-white hover:bg-amber-600'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              {editMode ? 'Save' : 'Edit'}
-            </button>
           )}
           {editMode && chartId && (
             <>
@@ -799,14 +830,23 @@ export default function OrgChartV2() {
           >
             +
           </button>
-          {!editMode && (
+          {chartId && (
             <button
               type="button"
-              onClick={createChart}
-              className="ml-2 text-sm px-3 py-1 rounded-md text-white whitespace-nowrap"
-              style={{ background: FG }}
+              onClick={() => {
+                setEditMode(v => !v)
+                setContextMenu(null)
+                setConnectMode(false)
+                setConnectSource(null)
+                setChartPickerOpen(false)
+              }}
+              className={`ml-2 text-sm px-3 py-1 rounded-md whitespace-nowrap ${
+                editMode
+                  ? 'bg-amber-500 text-white hover:bg-amber-600'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
             >
-              + Chart
+              {editMode ? 'Save' : 'Edit'}
             </button>
           )}
         </div>
@@ -881,8 +921,20 @@ export default function OrgChartV2() {
             }}
           />
         ) : (
-          <div className="h-full flex items-center justify-center text-slate-500">
-            Pick a chart above or click <b>+ Chart</b> to create one.
+          <div className="h-full flex flex-col items-center justify-center text-center gap-4 px-6">
+            <p className="text-2xl font-semibold text-slate-600">No org chart yet</p>
+            <p className="text-sm text-slate-400 max-w-sm">
+              You don't have a saved org chart. Click the button below to create one —
+              it becomes your default and opens automatically next time.
+            </p>
+            <button
+              type="button"
+              onClick={createChart}
+              className="text-lg px-8 py-4 rounded-xl text-white font-semibold shadow-md hover:opacity-90"
+              style={{ background: FG }}
+            >
+              + Chart
+            </button>
           </div>
         )}
       </div>
@@ -897,12 +949,16 @@ export default function OrgChartV2() {
               setConnectSource(selectedNode.id)
               setContextMenu(null)
             }}
-            onAddChild={() => {
-              setDialog({ mode: 'child', parentId: selectedNode.id })
+            onAddJuniorPosition={() => {
+              setDialog({ mode: 'child', parentId: selectedNode.id, fixedKind: 'position' })
               setContextMenu(null)
             }}
-            onAddSenior={() => {
-              setDialog({ mode: 'senior', seniorOf: selectedNode.id })
+            onAddJuniorArea={() => {
+              setDialog({ mode: 'child', parentId: selectedNode.id, fixedKind: 'container' })
+              setContextMenu(null)
+            }}
+            onAddAssistant={() => {
+              setDialog({ mode: 'new', fixedKind: 'assistant', anchorId: selectedNode.id })
               setContextMenu(null)
             }}
             onChangeSenior={() => startChangeMode('change_senior', selectedNode)}
@@ -938,6 +994,7 @@ export default function OrgChartV2() {
           parentId={dialog.parentId}
           seniorOf={dialog.seniorOf}
           fixedKind={dialog.fixedKind}
+          anchorId={dialog.anchorId}
           existing={dialog.existing}
           positions={positions}
           employeesByPosition={employeesByPosition}
@@ -974,8 +1031,9 @@ function ItemContextMenu({
   screenRect,
   onClose,
   onConnect,
-  onAddChild,
-  onAddSenior,
+  onAddJuniorPosition,
+  onAddJuniorArea,
+  onAddAssistant,
   onChangeSenior,
   onChangeChild,
   onChangeConnection,
@@ -995,19 +1053,29 @@ function ItemContextMenu({
       style={{ top, left, width: menuWidth }}
       onClick={e => e.stopPropagation()}
     >
+      <div className="flex items-center justify-between px-3 py-1 border-b border-slate-100">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+          Item
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          title="Close"
+          className="text-slate-400 hover:text-slate-700 leading-none px-1"
+        >
+          ✕
+        </button>
+      </div>
+      <MenuItem label="Edit" onClick={onEdit} />
       <MenuItem label="New Item Connection" onClick={onConnect} />
-      <MenuItem label="Add Junior" onClick={onAddChild} />
-      <MenuItem label="Add Senior" onClick={onAddSenior} />
+      <MenuItem label="Change Connection" onClick={onChangeConnection} />
+      <MenuItem label="Add Junior Position" onClick={onAddJuniorPosition} />
+      <MenuItem label="Add Junior Area" onClick={onAddJuniorArea} />
+      <MenuItem label="Add Assistant" onClick={onAddAssistant} />
       <div className="border-t border-slate-100 my-1" />
       <MenuItem label="Change Senior" onClick={onChangeSenior} />
       <MenuItem label="Change Junior" onClick={onChangeChild} />
-      <MenuItem label="Change Connection" onClick={onChangeConnection} />
-      <div className="border-t border-slate-100 my-1" />
-      <MenuItem label="Edit" onClick={onEdit} />
-      <div className="border-t border-slate-100 my-1" />
       <MenuItem label="Delete" onClick={onDelete} danger />
-      <div className="border-t border-slate-100 my-1" />
-      <MenuItem label="Cancel" onClick={onClose} muted />
     </div>
   )
 }

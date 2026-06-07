@@ -39,6 +39,7 @@ export default function AddNodeDialog({
   parentId,
   seniorOf,
   fixedKind,
+  anchorId,
   existing,
   positions,
   employeesByPosition,
@@ -55,10 +56,10 @@ export default function AddNodeDialog({
 }) {
   const isEdit = mode === 'edit' && existing
   const [kind, setKind] = useState(isEdit ? existing.kind || 'custom' : fixedKind || 'position')
-  // The kind picker only shows for the per-item Junior/Senior add flows
-  // (where the user genuinely chooses Position/Area/Assistant). Top-level
-  // adds come in with a fixedKind, and edits keep the existing kind.
-  const showKindPicker = mode === 'child' || mode === 'senior'
+  // The kind picker only shows for Junior/Senior add flows that DON'T come
+  // with a fixedKind. Menu items like "Add Junior Position" pass a fixedKind
+  // so they skip the picker; top-level adds and edits also skip it.
+  const showKindPicker = (mode === 'child' || mode === 'senior') && !fixedKind
 
   const [label, setLabel] = useState(isEdit ? existing.label || '' : '')
 
@@ -80,7 +81,9 @@ export default function AddNodeDialog({
   const [height, setHeight] = useState(isEdit ? existing.height || 90 : 90)
   // Assistant kind state
   const [attachedToNodeId, setAttachedToNodeId] = useState(
-    isEdit && existing.attached_to_node_id ? existing.attached_to_node_id : '',
+    isEdit && existing.attached_to_node_id
+      ? existing.attached_to_node_id
+      : anchorId || '',
   )
   const [attachmentSide, setAttachmentSide] = useState(
     isEdit ? existing.attachment_side || 'right' : 'right',
@@ -215,7 +218,9 @@ export default function AddNodeDialog({
           {mode === 'edit'
             ? `Edit ${TITLE_LABEL[kind] || 'Item'}`
             : mode === 'child'
-              ? 'Add Junior Item'
+              ? fixedKind
+                ? `Add Junior ${TITLE_LABEL[kind] || 'Item'}`
+                : 'Add Junior Item'
               : mode === 'senior'
                 ? 'Add Senior Item'
                 : `Add ${TITLE_LABEL[kind] || 'Item'}`}
