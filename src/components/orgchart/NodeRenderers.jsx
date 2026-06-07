@@ -217,15 +217,19 @@ export function ContainerNode({
         const t2 = (node.heading || '').trim()
         const t2Size = fs.heading || 12
         const fit = sz => Math.max(4, Math.floor((box.width - 12) / (sz * 0.57)))
+        const isJunior = !!node.parent_container_id
         const t1Lines = wrapLabel(node.label, fit(t1Size))
-        const t2Lines = t2 ? wrapLabel(t2, fit(t2Size)) : []
+        // For attached junior areas, the second title renders VERTICALLY
+        // (rotated) so it fits the narrow column without wrapping; only the
+        // name (title 1) stacks horizontally here.
+        const t2Lines = t2 && !isJunior ? wrapLabel(t2, fit(t2Size)) : []
         const lh1 = t1Size + 2
         const lh2 = t2Size + 2
         const blockH = t1Lines.length * lh1 + t2Lines.length * lh2
-        // With a second title, pull the titles up to ~1/8" (12px) from the
-        // top so both fit cleanly; otherwise keep them centered.
+        // Pull the name toward the top when there's a second title (stacked or
+        // the junior's vertical one); otherwise keep it centered.
         let y =
-          t2Lines.length > 0
+          t2Lines.length > 0 || (isJunior && t2)
             ? box.y + 12 + t1Size
             : labelY - blockH / 2 + t1Size
         const rows = []
@@ -237,20 +241,37 @@ export function ContainerNode({
           rows.push({ ln, y, size: t2Size, field: 'heading', family: 'sans', key: `t2-${i}` })
           y += lh2
         })
+        // Centre the vertical second title in the space below the name.
+        const vMidY = (y - lh1 / 2 + box.y + box.height) / 2
         return (
-          <text textAnchor="middle" fill={textColor}>
-            {rows.map(r => (
-              <tspan
-                key={r.key}
+          <>
+            <text textAnchor="middle" fill={textColor}>
+              {rows.map(r => (
+                <tspan
+                  key={r.key}
+                  x={cx}
+                  y={r.y}
+                  fontSize={r.size}
+                  {...styleFor(node, r.field, { family: r.family })}
+                >
+                  {r.ln}
+                </tspan>
+              ))}
+            </text>
+            {isJunior && t2 && (
+              <text
                 x={cx}
-                y={r.y}
-                fontSize={r.size}
-                {...styleFor(node, r.field, { family: r.family })}
+                y={vMidY}
+                textAnchor="middle"
+                fill={textColor}
+                fontSize={t2Size}
+                transform={`rotate(-90 ${cx} ${vMidY})`}
+                {...styleFor(node, 'heading', { family: 'sans' })}
               >
-                {r.ln}
-              </tspan>
-            ))}
-          </text>
+                {t2}
+              </text>
+            )}
+          </>
         )
       })()}
       {hasPosition && (
