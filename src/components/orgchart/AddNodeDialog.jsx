@@ -580,7 +580,10 @@ export default function AddNodeDialog({
                         max={12}
                         value={boxStyle.borderWidth ?? 2}
                         onChange={e =>
-                          setBoxStyle(s => ({ ...s, borderWidth: Number(e.target.value) || 2 }))
+                          setBoxStyle(s => ({
+                            ...s,
+                            borderWidth: e.target.value === '' ? '' : Number(e.target.value),
+                          }))
                         }
                         className="no-spin w-14 border border-gray-300 rounded-md px-1 py-0.5 text-[11px] text-gray-600 bg-white"
                       />
