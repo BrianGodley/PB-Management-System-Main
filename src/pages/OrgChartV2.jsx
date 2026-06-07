@@ -536,27 +536,6 @@ export default function OrgChartV2() {
     }
   }
 
-  // Recovery: clear every item's horizontal nudge so the whole chart snaps
-  // back to its natural row layout. Fixes items dragged off the left edge.
-  async function resetPositions() {
-    if (!chartId) return
-    if (
-      !confirm(
-        'Re-align all items to their rows? This clears manual left/right positioning and recovers any items dragged off-screen.',
-      )
-    )
-      return
-    setBusy(true)
-    try {
-      setNodes(prev => prev.map(n => ({ ...n, x_offset: 0 })))
-      await supabase.from('org_nodes').update({ x_offset: 0 }).eq('chart_id', chartId)
-    } catch (e) {
-      alert('Reset failed: ' + (e.message || e))
-    } finally {
-      setBusy(false)
-    }
-  }
-
   async function handleNodeDropped(nodeId, newTier, newTierOrder, newXOffset) {
     const node = nodes.find(n => n.id === nodeId)
     if (!node) return
@@ -1005,14 +984,6 @@ export default function OrgChartV2() {
                   </div>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={resetPositions}
-                title="Re-align every item to its row (recovers items dragged off-screen)"
-                className="text-sm px-3 py-1 rounded-md bg-slate-200 text-slate-700 hover:bg-slate-300 whitespace-nowrap"
-              >
-                Reset Positions
-              </button>
             </>
           )}
         </div>
