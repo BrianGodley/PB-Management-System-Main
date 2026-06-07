@@ -74,6 +74,13 @@ export default function AddNodeDialog({
   const [bgColor, setBgColor] = useState(
     isEdit && existing.bg_color ? existing.bg_color : CONTAINER_COLORS[0].bg,
   )
+  // Area fill style: 'solid' (colored fill) or 'border' (white fill + colored
+  // border of borderWidth). Defaults to border.
+  const [boxStyle, setBoxStyle] = useState(
+    isEdit && existing.box_style && Object.keys(existing.box_style).length
+      ? existing.box_style
+      : { fill: 'border', borderWidth: 2 },
+  )
   const [containerMode, setContainerMode] = useState(
     isEdit ? existing.container_mode || 'independent' : 'independent',
   )
@@ -190,6 +197,7 @@ export default function AddNodeDialog({
         label: label.trim() || 'Untitled',
         heading: heading.trim() || null,
         bg_color: bgColor,
+        box_style: boxStyle,
         container_mode: containerMode,
         position_id: positionId ? Number(positionId) : null,
         employee_id: employeeId || null,
@@ -542,6 +550,45 @@ export default function AddNodeDialog({
                 </p>
               )}
             </div>
+            {bgColor !== 'none' && (
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Fill style</label>
+                <div className="flex items-center gap-2">
+                  {[
+                    { v: 'solid', label: 'Solid' },
+                    { v: 'border', label: 'Border' },
+                  ].map(o => (
+                    <button
+                      key={o.v}
+                      type="button"
+                      onClick={() => setBoxStyle(s => ({ ...s, fill: o.v }))}
+                      className={`flex-1 py-1.5 rounded-md border text-xs ${
+                        boxStyle.fill === o.v
+                          ? 'border-blue-600 bg-blue-50 text-blue-700 font-medium'
+                          : 'border-gray-200 hover:bg-gray-50 text-gray-600'
+                      }`}
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+                  {boxStyle.fill === 'border' && (
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="text-[11px] text-gray-500">Thickness</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={12}
+                        value={boxStyle.borderWidth ?? 2}
+                        onChange={e =>
+                          setBoxStyle(s => ({ ...s, borderWidth: Number(e.target.value) || 2 }))
+                        }
+                        className="no-spin w-14 border border-gray-300 rounded-md px-1 py-0.5 text-[11px] text-gray-600 bg-white"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Box Width</label>

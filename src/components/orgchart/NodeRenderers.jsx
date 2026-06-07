@@ -163,12 +163,16 @@ export function ContainerNode({
   positionTitle,
   displayName,
 }) {
-  // The chosen color is now the BORDER; the fill is white (or transparent
-  // for "no color"). Text is dark so it reads on the light fill.
+  // Fill style: 'solid' = colored fill, 'border' (default) = white fill with
+  // a colored border of the chosen thickness. "No color" = black outline.
   const noColor = node.bg_color === 'none'
-  const borderColor = noColor ? '#111111' : node.bg_color || '#1E293B'
-  const fill = noColor ? 'none' : '#FFFFFF'
-  const textColor = '#1E293B'
+  const color = node.bg_color || '#1E293B'
+  const bs = node.box_style || {}
+  const solid = !noColor && bs.fill === 'solid'
+  const fill = noColor ? 'none' : solid ? color : '#FFFFFF'
+  const borderColor = noColor ? '#111111' : solid ? 'rgba(0,0,0,0.12)' : color
+  const borderW = solid ? 1 : noColor ? 1.5 : Number.isFinite(bs.borderWidth) ? bs.borderWidth : 2
+  const textColor = solid ? pickTextColor(color) : '#1E293B'
   const cx = box.x + box.width / 2
   const hasPosition = !!positionTitle
   const fs = node.font_sizes || {}
@@ -186,7 +190,7 @@ export function ContainerNode({
         fill={fill}
         pointerEvents="all"
         stroke={borderColor}
-        strokeWidth={2}
+        strokeWidth={borderW}
       />
       {/* Two centered titles: the Area name (title 1) and an optional
           second title (stored in `heading`). Both wrap to fit the box. */}
