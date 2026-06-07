@@ -100,7 +100,7 @@ export default function AddNodeDialog({
   )
   // Combined inline style controls for one displayed-text field: font family,
   // bold, italic and size. `base` is the field's default point size.
-  const fieldStyle = (field, base) => {
+  const fieldStyle = (field, base, defFamily = 'sans') => {
     const st = textStyles[field] || {}
     const patch = p => setTextStyles(prev => ({ ...prev, [field]: { ...(prev[field] || {}), ...p } }))
     const toggleCls = on =>
@@ -110,7 +110,7 @@ export default function AddNodeDialog({
     return (
       <div className="flex items-center gap-1 shrink-0">
         <select
-          value={st.family || 'sans'}
+          value={st.family || defFamily}
           onChange={e => patch({ family: e.target.value })}
           title="Font type"
           className="border border-gray-300 rounded-md px-1 py-0.5 text-[11px] text-gray-600 bg-white"
@@ -379,7 +379,7 @@ export default function AddNodeDialog({
                   </option>
                 ))}
               </select>
-              {fieldStyle('title', 9)}
+              {fieldStyle('title', 12, 'palatino')}
             </div>
             <p className="text-[11px] text-gray-500 mt-2">
               Don't see the position you need?{' '}
@@ -401,7 +401,7 @@ export default function AddNodeDialog({
                   placeholder="Auto from position"
                   className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-gray-50 text-gray-600"
                 />
-                {fieldStyle('name', 8)}
+                {fieldStyle('name', 10, 'sans')}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2 mt-3">
@@ -488,7 +488,7 @@ export default function AddNodeDialog({
                   placeholder="Operations"
                   className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm"
                 />
-                {fieldStyle('label', 14)}
+                {fieldStyle('label', 14, 'arial')}
               </div>
             </div>
             <div>
@@ -502,7 +502,7 @@ export default function AddNodeDialog({
                   placeholder="e.g. Department"
                   className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm"
                 />
-                {fieldStyle('heading', 12)}
+                {fieldStyle('heading', 12, 'sans')}
               </div>
             </div>
             <div>
@@ -525,7 +525,7 @@ export default function AddNodeDialog({
                     </option>
                   ))}
                 </select>
-                {fieldStyle('title', 10)}
+                {fieldStyle('title', 10, 'sans')}
               </div>
             </div>
             {positionId && (
@@ -538,7 +538,7 @@ export default function AddNodeDialog({
                     placeholder="Auto from position"
                     className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-gray-50 text-gray-600"
                   />
-                  {fieldStyle('name', 8)}
+                  {fieldStyle('name', 10, 'sans')}
                 </div>
               </div>
             )}

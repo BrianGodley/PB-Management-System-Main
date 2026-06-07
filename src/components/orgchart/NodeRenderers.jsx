@@ -63,13 +63,16 @@ const FONT_FAMILY = {
   impact: 'Impact, Haettenschweiler, sans-serif',
 }
 
-// Resolve per-field text styling (family / bold / italic) stored on a node.
-// naturalWeight is used when the user hasn't explicitly toggled bold.
-function styleFor(node, field, naturalWeight) {
+// Resolve per-field text styling (family / bold / italic) stored on a node,
+// applying per-field defaults when the user hasn't chosen. Defaults are all
+// non-bold / non-italic.
+function styleFor(node, field, opts = {}) {
+  const { family: defFamily = 'sans', weight: defWeight = 400 } = opts
   const s = (node.text_styles || {})[field] || {}
+  const famKey = s.family || defFamily
   return {
-    fontFamily: FONT_FAMILY[s.family] || undefined,
-    fontWeight: s.bold === true ? 700 : s.bold === false ? 400 : naturalWeight,
+    fontFamily: FONT_FAMILY[famKey] || undefined,
+    fontWeight: s.bold === true ? 700 : s.bold === false ? 400 : defWeight,
     fontStyle: s.italic ? 'italic' : 'normal',
   }
 }
@@ -143,8 +146,8 @@ export function PositionNode({
         y={box.y + box.height / 2 - 4}
         textAnchor="middle"
         fill="#FFFFFF"
-        fontSize={fs.title || 9}
-        {...styleFor(node, 'title', 700)}
+        fontSize={fs.title || 12}
+        {...styleFor(node, 'title', { family: 'palatino' })}
       >
         {positionTitle || node.label || '(no position)'}
       </text>
@@ -153,9 +156,9 @@ export function PositionNode({
         y={box.y + box.height / 2 + 8}
         textAnchor="middle"
         fill="#FFFFFF"
-        fontSize={fs.name || 8}
+        fontSize={fs.name || 10}
         opacity={0.9}
-        {...styleFor(node, 'name', 400)}
+        {...styleFor(node, 'name', { family: 'sans' })}
       >
         {name}
       </text>
@@ -227,11 +230,11 @@ export function ContainerNode({
             : labelY - blockH / 2 + t1Size
         const rows = []
         t1Lines.forEach((ln, i) => {
-          rows.push({ ln, y, size: t1Size, field: 'label', weight: 700, key: `t1-${i}` })
+          rows.push({ ln, y, size: t1Size, field: 'label', family: 'arial', key: `t1-${i}` })
           y += lh1
         })
         t2Lines.forEach((ln, i) => {
-          rows.push({ ln, y, size: t2Size, field: 'heading', weight: 600, key: `t2-${i}` })
+          rows.push({ ln, y, size: t2Size, field: 'heading', family: 'sans', key: `t2-${i}` })
           y += lh2
         })
         return (
@@ -242,7 +245,7 @@ export function ContainerNode({
                 x={cx}
                 y={r.y}
                 fontSize={r.size}
-                {...styleFor(node, r.field, r.weight)}
+                {...styleFor(node, r.field, { family: r.family })}
               >
                 {r.ln}
               </tspan>
@@ -259,7 +262,7 @@ export function ContainerNode({
             fill={textColor}
             opacity={0.9}
             fontSize={fs.title || 10}
-            {...styleFor(node, 'title', 600)}
+            {...styleFor(node, 'title', { family: 'sans' })}
           >
             {positionTitle}
           </text>
@@ -269,8 +272,8 @@ export function ContainerNode({
             textAnchor="middle"
             fill={textColor}
             opacity={0.75}
-            fontSize={fs.name || 8}
-            {...styleFor(node, 'name', 400)}
+            fontSize={fs.name || 10}
+            {...styleFor(node, 'name', { family: 'sans' })}
           >
             {displayName || UNASSIGNED_LABEL}
           </text>
