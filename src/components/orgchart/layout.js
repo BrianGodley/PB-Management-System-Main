@@ -146,14 +146,15 @@ export function layoutTiers(nodes, rowSpacing = {}) {
     const cBox = laidOut.get(containerId)
     if (!cBox) continue
     const n = kids.length
-    const colW = (cBox.width - (n - 1) * CHILD_COL_GAP) / n
+    // Columns butt together with no horizontal gap, splitting the full width.
+    const colW = cBox.width / n
     const childMaxH = kids.reduce((m, c) => Math.max(m, c.height || 40), 40)
     const colTop = cBox.y + cBox.height // directly under the container
     for (let i = 0; i < n; i++) {
       const child = kids[i]
       laidOut.set(child.id, {
         id: child.id,
-        x: cBox.x + i * (colW + CHILD_COL_GAP),
+        x: cBox.x + i * colW,
         y: colTop,
         width: colW,
         height: childMaxH,
