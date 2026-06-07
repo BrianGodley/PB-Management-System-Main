@@ -50,3 +50,14 @@ DROP TRIGGER IF EXISTS trg_positions_updated_at ON positions;
 CREATE TRIGGER trg_positions_updated_at
   BEFORE UPDATE ON positions
   FOR EACH ROW EXECUTE FUNCTION update_positions_updated_at();
+
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Data API grants (Supabase change effective 2026-10-30 — new tables in
+-- public are not exposed via PostgREST / supabase-js by default; this
+-- block makes them reachable. RLS policies (above) still control rows.
+-- ─────────────────────────────────────────────────────────────────────────
+GRANT ALL ON public.positions TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.positions TO authenticated;
+GRANT ALL ON public.position_courses TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.position_courses TO authenticated;

@@ -214,3 +214,30 @@ INSERT INTO acct_accounts (number, name, type, subtype, sort_order) VALUES
   ('6100', 'Utilities',                     'expense',   'operating',         690),
   ('6110', 'Wages & Salaries',              'expense',   'payroll',           700)
 ON CONFLICT DO NOTHING;
+
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Data API grants (Supabase change effective 2026-10-30 — new tables in
+-- public are not exposed via PostgREST / supabase-js by default; this
+-- block makes them reachable. RLS policies (above) still control rows.
+-- ─────────────────────────────────────────────────────────────────────────
+GRANT ALL ON public.acct_accounts TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.acct_accounts TO authenticated;
+GRANT ALL ON public.acct_journal_entries TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.acct_journal_entries TO authenticated;
+GRANT ALL ON public.acct_journal_lines TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.acct_journal_lines TO authenticated;
+GRANT ALL ON public.acct_invoices TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.acct_invoices TO authenticated;
+GRANT ALL ON public.acct_invoice_lines TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.acct_invoice_lines TO authenticated;
+GRANT ALL ON public.acct_bills TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.acct_bills TO authenticated;
+GRANT ALL ON public.acct_bill_lines TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.acct_bill_lines TO authenticated;
+GRANT ALL ON public.acct_payments TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.acct_payments TO authenticated;
+GRANT ALL ON public.acct_bank_accounts TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.acct_bank_accounts TO authenticated;
+GRANT ALL ON public.acct_bank_transactions TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.acct_bank_transactions TO authenticated;

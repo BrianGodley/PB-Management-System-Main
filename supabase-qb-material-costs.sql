@@ -369,3 +369,22 @@ FROM acct_item_receipt_lines l
 JOIN acct_item_receipts ir ON ir.id = l.receipt_id;
 
 COMMIT;
+
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Data API grants (Supabase change effective 2026-10-30 — new tables in
+-- public are not exposed via PostgREST / supabase-js by default; this
+-- block makes them reachable. RLS policies (above) still control rows.
+-- ─────────────────────────────────────────────────────────────────────────
+GRANT ALL ON public.acct_checks TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.acct_checks TO authenticated;
+GRANT ALL ON public.acct_check_lines TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.acct_check_lines TO authenticated;
+GRANT ALL ON public.acct_credit_card_charges TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.acct_credit_card_charges TO authenticated;
+GRANT ALL ON public.acct_credit_card_charge_lines TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.acct_credit_card_charge_lines TO authenticated;
+GRANT ALL ON public.acct_item_receipts TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.acct_item_receipts TO authenticated;
+GRANT ALL ON public.acct_item_receipt_lines TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.acct_item_receipt_lines TO authenticated;

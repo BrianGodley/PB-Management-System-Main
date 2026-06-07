@@ -46,3 +46,14 @@ CREATE POLICY "job_tasks_select" ON job_tasks FOR SELECT TO authenticated USING 
 CREATE POLICY "job_tasks_insert" ON job_tasks FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "job_tasks_update" ON job_tasks FOR UPDATE TO authenticated USING (true);
 CREATE POLICY "job_tasks_delete" ON job_tasks FOR DELETE TO authenticated USING (true);
+
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Data API grants (Supabase change effective 2026-10-30 — new tables in
+-- public are not exposed via PostgREST / supabase-js by default; this
+-- block makes them reachable. RLS policies (above) still control rows.
+-- ─────────────────────────────────────────────────────────────────────────
+GRANT ALL ON public.template_tasks TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.template_tasks TO authenticated;
+GRANT ALL ON public.job_tasks TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.job_tasks TO authenticated;

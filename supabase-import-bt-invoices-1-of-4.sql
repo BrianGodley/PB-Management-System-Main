@@ -2649,3 +2649,12 @@ INSERT INTO _bt_inv_stg VALUES
 (3342259,4312960,'BT-3342259','(SEE 999) Patio Cover Base Stonework',0.0,0.0,'2019-12-09',NULL,'Paid','paid'),
 (3342260,4312960,'BT-3342260','Pool Plaster Upgrade',4025.0,4025.0,'2019-12-09','2019-09-09','Paid','paid');
 COMMIT;
+
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Data API grants (Supabase change effective 2026-10-30 — new tables in
+-- public are not exposed via PostgREST / supabase-js by default; this
+-- block makes them reachable. RLS policies (above) still control rows.
+-- ─────────────────────────────────────────────────────────────────────────
+GRANT ALL ON public._bt_inv_stg TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public._bt_inv_stg TO authenticated;

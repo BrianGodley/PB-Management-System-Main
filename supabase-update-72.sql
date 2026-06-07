@@ -62,3 +62,16 @@ CREATE POLICY "job_folders_select" ON job_folders FOR SELECT TO authenticated US
 CREATE POLICY "job_folders_insert" ON job_folders FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "job_folders_update" ON job_folders FOR UPDATE TO authenticated USING (true);
 CREATE POLICY "job_folders_delete" ON job_folders FOR DELETE TO authenticated USING (true);
+
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Data API grants (Supabase change effective 2026-10-30 — new tables in
+-- public are not exposed via PostgREST / supabase-js by default; this
+-- block makes them reachable. RLS policies (above) still control rows.
+-- ─────────────────────────────────────────────────────────────────────────
+GRANT ALL ON public.job_templates TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.job_templates TO authenticated;
+GRANT ALL ON public.template_folders TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.template_folders TO authenticated;
+GRANT ALL ON public.job_folders TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.job_folders TO authenticated;

@@ -167,3 +167,30 @@ CREATE POLICY "lms_v2_auth" ON lms_quiz_attempts     FOR ALL TO authenticated US
 -- Supabase Storage Bucket (create manually in dashboard → Storage):
 --   "lms-documents"  — public bucket, for Read Item file uploads
 -- ─────────────────────────────────────────────────────────────────────────────
+
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Data API grants (Supabase change effective 2026-10-30 — new tables in
+-- public are not exposed via PostgREST / supabase-js by default; this
+-- block makes them reachable. RLS policies (above) still control rows.
+-- ─────────────────────────────────────────────────────────────────────────
+GRANT ALL ON public.lms_read_items TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.lms_read_items TO authenticated;
+GRANT ALL ON public.lms_learning_drills TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.lms_learning_drills TO authenticated;
+GRANT ALL ON public.lms_quizzes TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.lms_quizzes TO authenticated;
+GRANT ALL ON public.lms_tests TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.lms_tests TO authenticated;
+GRANT ALL ON public.lms_actions TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.lms_actions TO authenticated;
+GRANT ALL ON public.lms_courses TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.lms_courses TO authenticated;
+GRANT ALL ON public.lms_steps TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.lms_steps TO authenticated;
+GRANT ALL ON public.lms_assignments TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.lms_assignments TO authenticated;
+GRANT ALL ON public.lms_step_completions TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.lms_step_completions TO authenticated;
+GRANT ALL ON public.lms_quiz_attempts TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.lms_quiz_attempts TO authenticated;

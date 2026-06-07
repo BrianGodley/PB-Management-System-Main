@@ -12,3 +12,4 @@ ALTER TABLE company_settings
 INSERT INTO company_settings (key, value, label)
 VALUES ('default_schedule_color', '#15803d', 'Default Schedule Color')
 ON CONFLICT (key) DO NOTHING;
+

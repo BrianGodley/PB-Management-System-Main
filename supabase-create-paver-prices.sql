@@ -248,3 +248,12 @@ SELECT * FROM (VALUES
   ('Belgard', 'Belgard Urbana Square (80mm)', 6.43, 105.0, 6.43)
 ) AS t(brand, name, price_per_sf, sf_per_pallet, price_per_lf_vert)
 WHERE NOT EXISTS (SELECT 1 FROM paver_prices LIMIT 1);
+
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Data API grants (Supabase change effective 2026-10-30 — new tables in
+-- public are not exposed via PostgREST / supabase-js by default; this
+-- block makes them reachable. RLS policies (above) still control rows.
+-- ─────────────────────────────────────────────────────────────────────────
+GRANT ALL ON public.paver_prices TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.paver_prices TO authenticated;

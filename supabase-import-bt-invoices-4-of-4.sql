@@ -2665,3 +2665,12 @@ BEGIN
 END $$;
 DROP TABLE _bt_inv_stg;
 COMMIT;
+
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Data API grants (Supabase change effective 2026-10-30 — new tables in
+-- public are not exposed via PostgREST / supabase-js by default; this
+-- block makes them reachable. RLS policies (above) still control rows.
+-- ─────────────────────────────────────────────────────────────────────────
+GRANT ALL ON public._bt_inv_stg TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public._bt_inv_stg TO authenticated;

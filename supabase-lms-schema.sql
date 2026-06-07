@@ -70,3 +70,18 @@ CREATE INDEX IF NOT EXISTS lms_step_completions_assignment_idx ON lms_step_compl
 -- ALTER TABLE lms_steps            ENABLE ROW LEVEL SECURITY;
 -- ALTER TABLE lms_assignments      ENABLE ROW LEVEL SECURITY;
 -- ALTER TABLE lms_step_completions ENABLE ROW LEVEL SECURITY;
+
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Data API grants (Supabase change effective 2026-10-30 — new tables in
+-- public are not exposed via PostgREST / supabase-js by default; this
+-- block makes them reachable. RLS policies (above) still control rows.
+-- ─────────────────────────────────────────────────────────────────────────
+GRANT ALL ON public.lms_courses TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.lms_courses TO authenticated;
+GRANT ALL ON public.lms_steps TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.lms_steps TO authenticated;
+GRANT ALL ON public.lms_assignments TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.lms_assignments TO authenticated;
+GRANT ALL ON public.lms_step_completions TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.lms_step_completions TO authenticated;

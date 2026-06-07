@@ -107,6 +107,27 @@ SUPA_HEADERS = {
 }
 
 
+# ── Storage key sanitizer ──────────────────────────────────────────────────
+# Supabase Storage object names must match approximately:
+#   [a-zA-Z0-9 ! - _ . * ' ( ) /]
+# BT folder + file names regularly include commas (e.g. "Contract, Addendum"),
+# `#`, em-/en-dashes, `**`, `^`, `[]`, `{}`, `&`, smart quotes, and other
+# non-ASCII chars that storage rejects with a 400 InvalidKey error. This helper
+# replaces forbidden characters with `_` per path segment so the upload
+# succeeds. The DB rows still carry the original BT folder name / file name
+# for display.
+import re as _re
+_SAFE_KEY_RE = _re.compile(r"[^A-Za-z0-9!\-_.*'() ]")
+
+def _sanitize_storage_segment(name: str) -> str:
+    if not name:
+        return name
+    cleaned = _SAFE_KEY_RE.sub("_", name)
+    # Collapse runs of underscores and trim outer whitespace/underscores.
+    cleaned = _re.sub(r"_+", "_", cleaned).strip(" _")
+    return cleaned or "_"
+
+
 # ── Supabase helpers (same shape as photo downloader's) ────────────────────
 
 def supa_get(path: str, params: dict | None = None) -> list[dict]:
@@ -144,9 +165,14 @@ def supa_upload(object_path: str, blob: bytes, content_type: str) -> str:
 
 
 def upsert_job_file(job_id: str, *, bt_file_id: str, folder_path: str | None,
+                    folder_id: str | None,
                     file_name: str, storage_path: str, file_size: int | None,
                     mime_type: str | None) -> None:
     """Insert (or skip if exists) one job_files row keyed by (job_id, bt_file_id).
+
+    `folder_id` is the resolved job_folders.id for this file's path (built
+    via get_or_create_folder). `folder_path` is still stored as a
+    convenience / audit trail.
 
     The unique index added by supabase-add-bt-file-columns.sql guarantees
     we never duplicate. We don't UPDATE on conflict — once the file is in
@@ -171,6 +197,7 @@ def upsert_job_file(job_id: str, *, bt_file_id: str, folder_path: str | None,
             "bt_file_id":    bt_file_id,
             "file_name":     file_name,
             "folder_path":   folder_path,
+            "folder_id":     folder_id,
             "storage_path":  storage_path,
             "file_size":     file_size,
             "file_type":     mime_type,
@@ -182,6 +209,75 @@ def upsert_job_file(job_id: str, *, bt_file_id: str, folder_path: str | None,
     )
     if not r.ok:
         raise RuntimeError(f"insert job_files -> HTTP {r.status_code}: {r.text[:200]}")
+
+
+# ── job_folders helper — turn each BT folder_path into a real job_folders
+#    row (recursively for parents) so the existing rename/delete/move UI
+#    works on BT-imported folders. Cache lookups so a job with N files
+#    across F folders does at most F creates + (N - F) cache hits.
+
+_folder_cache: dict[tuple[str, str], str] = {}
+
+
+def get_or_create_folder(job_id: str, folder_path: str,
+                         folder_type: str = "document") -> str | None:
+    """Ensure a chain of job_folders rows exists for this slash-delimited
+    path (e.g. "3. Designs/Older Designs") and return the LEAF folder id.
+
+    Returns None if folder_path is empty (i.e. file lives at the root of
+    the job's Files area).
+    """
+    folder_path = (folder_path or "").strip("/")
+    if not folder_path:
+        return None
+    key = (job_id, folder_path)
+    if key in _folder_cache:
+        return _folder_cache[key]
+
+    segs = folder_path.split("/")
+    leaf_name = segs[-1]
+    parent_path = "/".join(segs[:-1])
+    parent_id = (
+        get_or_create_folder(job_id, parent_path, folder_type) if parent_path else None
+    )
+
+    # Find an existing row at this level so re-runs are idempotent.
+    params = {
+        "job_id":      f"eq.{job_id}",
+        "folder_name": f"eq.{leaf_name}",
+        "folder_type": f"eq.{folder_type}",
+        "select":      "id",
+        "limit":       "1",
+    }
+    if parent_id:
+        params["parent_folder_id"] = f"eq.{parent_id}"
+    else:
+        params["parent_folder_id"] = "is.null"
+    existing = supa_get("job_folders", params)
+    if existing:
+        folder_id = existing[0]["id"]
+    else:
+        r = requests.post(
+            f"{SUPABASE_URL}/rest/v1/job_folders",
+            headers={**SUPA_HEADERS, "Prefer": "return=representation"},
+            json={
+                "job_id":           job_id,
+                "folder_name":      leaf_name,
+                "folder_type":      folder_type,
+                "parent_folder_id": parent_id,
+                "sort_order":       0,
+                "source":           "buildertrend",
+            },
+            timeout=30,
+        )
+        if not r.ok:
+            raise RuntimeError(
+                f"insert job_folders -> HTTP {r.status_code}: {r.text[:200]}"
+            )
+        folder_id = r.json()[0]["id"]
+
+    _folder_cache[key] = folder_id
+    return folder_id
 
 
 # ── Checkpoint (atomic write, retry on Windows lock — same recipe as photo
@@ -470,6 +566,133 @@ def walk_files(page: Page, bt_job_id: str) -> list[dict]:
     return files
 
 
+# ── Wipe one job's existing files (for --rebuild-job) ─────────────────────
+#
+# Used when a previous run uploaded files with a broken storage layout
+# (e.g. before we URL-encoded the path properly) and we need to start
+# over for that one job. Removes:
+#   1. every job_files row whose source='buildertrend' for this job_id
+#   2. every storage object under job-files/<job_id>/
+# After this returns, process_job() will walk + re-upload the job from
+# scratch and the folder hierarchy lands correctly.
+
+def wipe_job_files(job_id: str) -> None:
+    print(f"  ⚠ wiping job_files + folders + storage for job_id={job_id}")
+    # Clear the in-process folder cache so the next process_job() does
+    # fresh lookups (the IDs of the folders we're about to delete will
+    # otherwise stay stale in memory).
+    _folder_cache.clear()
+
+    # 1. List existing job_files rows so we know their storage paths.
+    rows = supa_get(
+        "job_files",
+        {
+            "job_id": f"eq.{job_id}",
+            "source": "eq.buildertrend",
+            "select": "id,storage_path",
+            "limit":  "10000",
+        },
+    )
+    print(f"    found {len(rows)} job_files row(s)")
+
+    # 2. Delete the rows.
+    if rows:
+        r = requests.delete(
+            f"{SUPABASE_URL}/rest/v1/job_files",
+            headers=SUPA_HEADERS,
+            params={"job_id": f"eq.{job_id}", "source": "eq.buildertrend"},
+            timeout=30,
+        )
+        if not r.ok:
+            raise RuntimeError(
+                f"delete job_files -> HTTP {r.status_code}: {r.text[:300]}"
+            )
+        print(f"    deleted {len(rows)} job_files row(s)")
+
+    # 2b. Delete BT-imported job_folders rows (manual folders left intact).
+    r = requests.delete(
+        f"{SUPABASE_URL}/rest/v1/job_folders",
+        headers=SUPA_HEADERS,
+        params={"job_id": f"eq.{job_id}", "source": "eq.buildertrend"},
+        timeout=30,
+    )
+    if r.ok:
+        print("    cleared BT job_folders rows")
+    else:
+        # Don't fail the run if source column doesn't exist yet — the SQL
+        # migration may not have been applied. Print so it's noticed.
+        print(f"    ! could not clear BT job_folders ({r.status_code}: {r.text[:120]})")
+
+    # 3. Sweep every storage object under <bucket>/<job_id>/. The Storage
+    # API "remove" endpoint takes a list of object names, so we list and
+    # delete in pages.
+    list_url = f"{SUPABASE_URL}/storage/v1/object/list/{BUCKET}"
+    remove_url = f"{SUPABASE_URL}/storage/v1/object/{BUCKET}"
+    storage_headers = {
+        "apikey":        SERVICE_KEY,
+        "Authorization": f"Bearer {SERVICE_KEY}",
+        "Content-Type":  "application/json",
+    }
+
+    def list_objects(prefix: str) -> list[dict]:
+        # Recursive listing — list() returns top-level entries (files and
+        # folders); we DFS through folder entries to collect every file.
+        out: list[dict] = []
+        offset = 0
+        PAGE = 100
+        while True:
+            r = requests.post(
+                list_url,
+                headers=storage_headers,
+                json={
+                    "prefix": prefix,
+                    "limit":  PAGE,
+                    "offset": offset,
+                    "sortBy": {"column": "name", "order": "asc"},
+                },
+                timeout=30,
+            )
+            if not r.ok:
+                raise RuntimeError(
+                    f"list {prefix} -> HTTP {r.status_code}: {r.text[:200]}"
+                )
+            batch = r.json() or []
+            if not batch:
+                break
+            for entry in batch:
+                # Folder rows have id=None; recurse into them.
+                full_name = f"{prefix}/{entry['name']}" if prefix else entry["name"]
+                if entry.get("id") is None:
+                    out.extend(list_objects(full_name))
+                else:
+                    out.append({"name": full_name, **entry})
+            if len(batch) < PAGE:
+                break
+            offset += PAGE
+        return out
+
+    objs = list_objects(job_id)
+    if not objs:
+        print("    no storage objects to remove")
+        return
+    print(f"    removing {len(objs)} storage object(s)")
+    # Remove in chunks (the API accepts a list of paths).
+    CHUNK = 100
+    for i in range(0, len(objs), CHUNK):
+        chunk = [o["name"] for o in objs[i:i + CHUNK]]
+        r = requests.delete(
+            remove_url,
+            headers=storage_headers,
+            json={"prefixes": chunk},
+            timeout=60,
+        )
+        if not r.ok:
+            raise RuntimeError(
+                f"storage delete -> HTTP {r.status_code}: {r.text[:300]}"
+            )
+    print("    storage cleared")
+
+
 # ── Per-job processor ──────────────────────────────────────────────────────
 
 def process_job(page: Page, job: dict) -> int:
@@ -514,15 +737,31 @@ def process_job(page: Page, job: dict) -> int:
                 or mimetypes.guess_type(f["file_name"])[0]
                 or "application/octet-stream"
             )
-            # Path inside the bucket: <job_id>/<folder_path>/<filename> so the
-            # storage explorer shows BT's structure verbatim.
+            # Path inside the bucket: <job_id>/<folder_path>/<filename>.
+            # Supabase Storage rejects most non-ASCII chars + a bunch of
+            # punctuation (commas, #, ?, %, &, em-dashes, [], {}, *, ^,
+            # quotes). BT folder + file names use all of these freely, so
+            # we sanitize each path segment for storage while keeping the
+            # original display names in job_folders.folder_name and
+            # job_files.file_name.
             safe_folder = (f.get("folder_path") or "").strip("/")
-            storage_path = "/".join(p for p in [job["id"], safe_folder, f["file_name"]] if p)
+            storage_folder = "/".join(
+                _sanitize_storage_segment(seg) for seg in safe_folder.split("/") if seg
+            )
+            storage_file = _sanitize_storage_segment(f["file_name"])
+            storage_path = "/".join(
+                p for p in [job["id"], storage_folder, storage_file] if p
+            )
             supa_upload(storage_path, blob, ctype)
+            # Resolve (or create) the real job_folders chain for this
+            # path so the existing app UI's rename/delete/move handlers
+            # work on BT folders too.
+            folder_id = get_or_create_folder(job["id"], safe_folder, "document")
             upsert_job_file(
                 job_id       = job["id"],
                 bt_file_id   = f["bt_file_id"],
                 folder_path  = safe_folder or None,
+                folder_id    = folder_id,
                 file_name    = f["file_name"],
                 storage_path = storage_path,
                 file_size    = len(blob),
@@ -579,11 +818,51 @@ def pick_batch(cp: dict, batch: int, only_job: str | None) -> list[dict]:
     return remaining[:batch]
 
 
-# ── Main ───────────────────────────────────────────────────────────────────
-
-def run(headed: bool, batch: int, only_job: str | None, discover_url: str | None) -> None:
+def run(headed: bool, batch: int, only_job: str | None,
+        discover_url: str | None, rebuild_job: str | None = None,
+        rebuild_list: str | None = None) -> None:
     cp = load_checkpoint()
-    jobs = [] if discover_url else pick_batch(cp, batch, only_job)
+    if discover_url:
+        jobs = []
+    elif rebuild_job or rebuild_list:
+        # Resolve a list of bt_job_ids / UUIDs to rebuild. Single id from
+        # --rebuild-job, multiple from --rebuild-list (one id per line,
+        # comments / blank lines allowed).
+        targets: list[str] = []
+        if rebuild_job:
+            targets.append(str(rebuild_job).strip())
+        if rebuild_list:
+            path = Path(rebuild_list)
+            if not path.exists():
+                print(f"--rebuild-list file not found: {path}")
+                return
+            for line in path.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                targets.append(line)
+        targets = list(dict.fromkeys(targets))  # dedupe, preserve order
+        all_jobs = all_bt_jobs()
+        index_by_id = {str(j.get("id")): j for j in all_jobs}
+        index_by_bt = {str(j.get("bt_job_id")): j for j in all_jobs}
+        jobs = []
+        missing = []
+        for t in targets:
+            j = index_by_id.get(t) or index_by_bt.get(t)
+            if j:
+                jobs.append(j)
+            else:
+                missing.append(t)
+        if missing:
+            print(f"  ! {len(missing)} target(s) not found in jobs table: "
+                  f"{missing[:5]}{'…' if len(missing) > 5 else ''}")
+        if not jobs:
+            print("No rebuild targets matched any BT job.")
+            return
+        # Mark rebuild-mode for the loop below.
+        rebuild_job = "_list_" if rebuild_list else rebuild_job
+    else:
+        jobs = pick_batch(cp, batch, only_job)
     if not discover_url and not jobs:
         print("Nothing to do — every BT job is checkpointed.")
         return
@@ -599,6 +878,13 @@ def run(headed: bool, batch: int, only_job: str | None, discover_url: str | None
                 return
             for j in jobs:
                 try:
+                    if rebuild_job:
+                        wipe_job_files(j["id"])
+                        cp["done_jobs"] = [
+                            x for x in cp["done_jobs"]
+                            if str(x) != str(j["bt_job_id"])
+                        ]
+                        save_checkpoint(cp)
                     process_job(page, j)
                     cp["done_jobs"].append(str(j["bt_job_id"]))
                     save_checkpoint(cp)
@@ -621,6 +907,15 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--batch", type=int, default=DEFAULT_BATCH)
     ap.add_argument("--job", dest="only_job", default=None,
                     help="Process just one job by its UUID or bt_job_id.")
+    ap.add_argument("--rebuild-job", dest="rebuild_job", default=None,
+                    help="Wipe all source=buildertrend job_files + "
+                         "folders + storage objects for this job, then "
+)
+    ap.add_argument("--rebuild-list", dest="rebuild_list", default=None,
+                    help="Path to a text file containing one bt_job_id "
+                         "(or job UUID) per line. Wipes + re-walks each "
+                         "in a single Playwright session. # comments and "
+                         "blank lines are ignored.")
     ap.add_argument("--reset", action="store_true",
                     help="Delete the checkpoint and start over.")
     ap.add_argument("--headed", action="store_true",
@@ -645,7 +940,9 @@ def main(argv: list[str]) -> int:
         discover_url = BT_FILES_URL_FMT.format(bt_job_id=args.discover_job.strip())
 
     run(headed=args.headed, batch=args.batch,
-        only_job=args.only_job, discover_url=discover_url)
+        only_job=args.only_job, discover_url=discover_url,
+        rebuild_job=args.rebuild_job,
+        rebuild_list=args.rebuild_list)
     return 0
 
 

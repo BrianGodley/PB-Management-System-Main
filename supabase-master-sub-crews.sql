@@ -22,3 +22,12 @@ CREATE POLICY "master_sub_crews_select" ON master_sub_crews FOR SELECT TO authen
 CREATE POLICY "master_sub_crews_insert" ON master_sub_crews FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "master_sub_crews_update" ON master_sub_crews FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "master_sub_crews_delete" ON master_sub_crews FOR DELETE TO authenticated USING (true);
+
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Data API grants (Supabase change effective 2026-10-30 — new tables in
+-- public are not exposed via PostgREST / supabase-js by default; this
+-- block makes them reachable. RLS policies (above) still control rows.
+-- ─────────────────────────────────────────────────────────────────────────
+GRANT ALL ON public.master_sub_crews TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.master_sub_crews TO authenticated;

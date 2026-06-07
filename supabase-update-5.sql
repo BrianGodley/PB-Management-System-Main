@@ -33,3 +33,12 @@ INSERT INTO company_settings (key, value, label) VALUES
   ('gpmd',               '425', 'Gross Profit Per Man Day ($)'),
   ('labor_burden_pct',   '28',  'Labor Burden (%)')
 ON CONFLICT (key) DO NOTHING;
+
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Data API grants (Supabase change effective 2026-10-30 — new tables in
+-- public are not exposed via PostgREST / supabase-js by default; this
+-- block makes them reachable. RLS policies (above) still control rows.
+-- ─────────────────────────────────────────────────────────────────────────
+GRANT ALL ON public.company_settings TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.company_settings TO authenticated;

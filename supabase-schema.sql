@@ -164,3 +164,22 @@ CREATE POLICY "Authenticated users can delete actual_entries"
 -- ============================================================
 -- DONE! Schema created successfully.
 -- ============================================================
+
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Data API grants (Supabase change effective 2026-10-30 — new tables in
+-- public are not exposed via PostgREST / supabase-js by default; this
+-- block makes them reachable. RLS policies (above) still control rows.
+-- ─────────────────────────────────────────────────────────────────────────
+GRANT ALL ON public.company_settings TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.company_settings TO authenticated;
+GRANT ALL ON public.jobs TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.jobs TO authenticated;
+GRANT ALL ON public.projects TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.projects TO authenticated;
+GRANT ALL ON public.modules TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.modules TO authenticated;
+GRANT ALL ON public.change_orders TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.change_orders TO authenticated;
+GRANT ALL ON public.actual_entries TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.actual_entries TO authenticated;

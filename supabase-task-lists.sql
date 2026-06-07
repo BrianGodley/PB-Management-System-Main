@@ -42,3 +42,14 @@ CREATE POLICY "task_descriptions_all"
   ON task_descriptions FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
 COMMIT;
+
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Data API grants (Supabase change effective 2026-10-30 — new tables in
+-- public are not exposed via PostgREST / supabase-js by default; this
+-- block makes them reachable. RLS policies (above) still control rows.
+-- ─────────────────────────────────────────────────────────────────────────
+GRANT ALL ON public.task_categories TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.task_categories TO authenticated;
+GRANT ALL ON public.task_descriptions TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.task_descriptions TO authenticated;

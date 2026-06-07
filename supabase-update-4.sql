@@ -74,3 +74,16 @@ DROP POLICY IF EXISTS "Auth update subcontractor_rates" ON subcontractor_rates;
 CREATE POLICY "Auth update subcontractor_rates" ON subcontractor_rates FOR UPDATE USING (auth.role() = 'authenticated');
 DROP POLICY IF EXISTS "Auth delete subcontractor_rates" ON subcontractor_rates;
 CREATE POLICY "Auth delete subcontractor_rates" ON subcontractor_rates FOR DELETE USING (auth.role() = 'authenticated');
+
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Data API grants (Supabase change effective 2026-10-30 — new tables in
+-- public are not exposed via PostgREST / supabase-js by default; this
+-- block makes them reachable. RLS policies (above) still control rows.
+-- ─────────────────────────────────────────────────────────────────────────
+GRANT ALL ON public.material_rates TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.material_rates TO authenticated;
+GRANT ALL ON public.labor_rates TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.labor_rates TO authenticated;
+GRANT ALL ON public.subcontractor_rates TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.subcontractor_rates TO authenticated;

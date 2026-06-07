@@ -85,3 +85,12 @@ CREATE POLICY "perms_admin_all" ON user_permissions
 -- Users: can read their own permissions (so the app can enforce them client-side)
 CREATE POLICY "perms_select_own" ON user_permissions
   FOR SELECT USING (auth.uid() = user_id);
+
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Data API grants (Supabase change effective 2026-10-30 — new tables in
+-- public are not exposed via PostgREST / supabase-js by default; this
+-- block makes them reachable. RLS policies (above) still control rows.
+-- ─────────────────────────────────────────────────────────────────────────
+GRANT ALL ON public.user_permissions TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_permissions TO authenticated;

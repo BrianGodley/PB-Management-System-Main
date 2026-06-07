@@ -3648,3 +3648,12 @@ INSERT INTO _bt_pay_stg VALUES
 (14849337,8414885,4768888,2012.0,'2020-11-05','Check','Paid'),
 (14849338,8414885,4768903,5703.0,'2020-11-05','Check','Paid');
 COMMIT;
+
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Data API grants (Supabase change effective 2026-10-30 — new tables in
+-- public are not exposed via PostgREST / supabase-js by default; this
+-- block makes them reachable. RLS policies (above) still control rows.
+-- ─────────────────────────────────────────────────────────────────────────
+GRANT ALL ON public._bt_pay_stg TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public._bt_pay_stg TO authenticated;

@@ -23,3 +23,12 @@ DO $$ BEGIN
       USING (true) WITH CHECK (true);
   END IF;
 END $$;
+
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Data API grants (Supabase change effective 2026-10-30 — new tables in
+-- public are not exposed via PostgREST / supabase-js by default; this
+-- block makes them reachable. RLS policies (above) still control rows.
+-- ─────────────────────────────────────────────────────────────────────────
+GRANT ALL ON public.stat_notes TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.stat_notes TO authenticated;

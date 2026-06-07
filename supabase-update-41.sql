@@ -22,3 +22,12 @@ CREATE TABLE IF NOT EXISTS work_orders (
 );
 
 CREATE INDEX IF NOT EXISTS work_orders_job_id_idx ON work_orders(job_id);
+
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Data API grants (Supabase change effective 2026-10-30 — new tables in
+-- public are not exposed via PostgREST / supabase-js by default; this
+-- block makes them reachable. RLS policies (above) still control rows.
+-- ─────────────────────────────────────────────────────────────────────────
+GRANT ALL ON public.work_orders TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.work_orders TO authenticated;

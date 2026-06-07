@@ -61,3 +61,14 @@ CREATE POLICY "contacts_all" ON contacts
 DROP POLICY IF EXISTS "contact_comms_all" ON contact_communications;
 CREATE POLICY "contact_comms_all" ON contact_communications
   FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Data API grants (Supabase change effective 2026-10-30 — new tables in
+-- public are not exposed via PostgREST / supabase-js by default; this
+-- block makes them reachable. RLS policies (above) still control rows.
+-- ─────────────────────────────────────────────────────────────────────────
+GRANT ALL ON public.contacts TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.contacts TO authenticated;
+GRANT ALL ON public.contact_communications TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.contact_communications TO authenticated;

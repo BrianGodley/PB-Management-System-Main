@@ -230,3 +230,20 @@ CREATE POLICY "statistic_shares_delete" ON statistic_shares FOR DELETE
       SELECT id FROM statistics WHERE owner_user_id = auth.uid()
     )
   );
+
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Data API grants (Supabase change effective 2026-10-30 — new tables in
+-- public are not exposed via PostgREST / supabase-js by default; this
+-- block makes them reachable. RLS policies (above) still control rows.
+-- ─────────────────────────────────────────────────────────────────────────
+GRANT ALL ON public.profiles TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.profiles TO authenticated;
+GRANT ALL ON public.positions TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.positions TO authenticated;
+GRANT ALL ON public.statistics TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.statistics TO authenticated;
+GRANT ALL ON public.statistic_values TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.statistic_values TO authenticated;
+GRANT ALL ON public.statistic_shares TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.statistic_shares TO authenticated;

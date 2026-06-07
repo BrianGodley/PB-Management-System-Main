@@ -76,3 +76,18 @@ CREATE POLICY "Authenticated full access" ON collection_weeks     FOR ALL TO aut
 CREATE POLICY "Authenticated full access" ON collection_rows      FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Authenticated full access" ON collection_payables  FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Authenticated full access" ON collection_financial FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Data API grants (Supabase change effective 2026-10-30 — new tables in
+-- public are not exposed via PostgREST / supabase-js by default; this
+-- block makes them reachable. RLS policies (above) still control rows.
+-- ─────────────────────────────────────────────────────────────────────────
+GRANT ALL ON public.collection_weeks TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.collection_weeks TO authenticated;
+GRANT ALL ON public.collection_rows TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.collection_rows TO authenticated;
+GRANT ALL ON public.collection_payables TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.collection_payables TO authenticated;
+GRANT ALL ON public.collection_financial TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.collection_financial TO authenticated;

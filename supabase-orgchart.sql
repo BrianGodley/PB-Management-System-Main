@@ -51,3 +51,18 @@ CREATE TABLE IF NOT EXISTS org_edges (
 );
 ALTER TABLE org_edges ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "org_edges_all" ON org_edges FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Data API grants (Supabase change effective 2026-10-30 — new tables in
+-- public are not exposed via PostgREST / supabase-js by default; this
+-- block makes them reachable. RLS policies (above) still control rows.
+-- ─────────────────────────────────────────────────────────────────────────
+GRANT ALL ON public.org_charts TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.org_charts TO authenticated;
+GRANT ALL ON public.org_node_types TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.org_node_types TO authenticated;
+GRANT ALL ON public.org_nodes TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.org_nodes TO authenticated;
+GRANT ALL ON public.org_edges TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.org_edges TO authenticated;

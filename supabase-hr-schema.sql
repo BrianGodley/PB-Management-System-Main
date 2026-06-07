@@ -152,3 +152,22 @@ CREATE POLICY "public_apply" ON applicants FOR INSERT TO anon WITH CHECK (true);
 
 -- After running this SQL, also run the LMS schema (supabase-lms-schema.sql)
 -- which references the employees table created above.
+
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Data API grants (Supabase change effective 2026-10-30 — new tables in
+-- public are not exposed via PostgREST / supabase-js by default; this
+-- block makes them reachable. RLS policies (above) still control rows.
+-- ─────────────────────────────────────────────────────────────────────────
+GRANT ALL ON public.employees TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.employees TO authenticated;
+GRANT ALL ON public.employee_documents TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.employee_documents TO authenticated;
+GRANT ALL ON public.employee_certifications TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.employee_certifications TO authenticated;
+GRANT ALL ON public.applicants TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.applicants TO authenticated;
+GRANT ALL ON public.hr_review_forms TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.hr_review_forms TO authenticated;
+GRANT ALL ON public.hr_reviews TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.hr_reviews TO authenticated;
