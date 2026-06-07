@@ -213,9 +213,9 @@ export function ContainerNode({
       {/* Two centered titles: the Area name (title 1) and an optional
           second title (stored in `heading`). Both wrap to fit the box. */}
       {(() => {
-        const t1Size = fs.label || 14
+        const t1Size = fs.label || 12
         const t2 = (node.heading || '').trim()
-        const t2Size = fs.heading || 12
+        const t2Size = fs.heading || 14
         const fit = sz => Math.max(4, Math.floor((box.width - 12) / (sz * 0.57)))
         const isJunior = !!node.parent_container_id
         const t1Lines = wrapLabel(node.label, fit(t1Size))
@@ -234,11 +234,11 @@ export function ContainerNode({
             : labelY - blockH / 2 + t1Size
         const rows = []
         t1Lines.forEach((ln, i) => {
-          rows.push({ ln, y, size: t1Size, field: 'label', family: 'arial', key: `t1-${i}` })
+          rows.push({ ln, y, size: t1Size, field: 'label', family: 'arial', weight: 400, key: `t1-${i}` })
           y += lh1
         })
         t2Lines.forEach((ln, i) => {
-          rows.push({ ln, y, size: t2Size, field: 'heading', family: 'sans', key: `t2-${i}` })
+          rows.push({ ln, y, size: t2Size, field: 'heading', family: 'sans', weight: 700, key: `t2-${i}` })
           y += lh2
         })
         // Centre the vertical second title in the space below the name.
@@ -252,7 +252,7 @@ export function ContainerNode({
                   x={cx}
                   y={r.y}
                   fontSize={r.size}
-                  {...styleFor(node, r.field, { family: r.family })}
+                  {...styleFor(node, r.field, { family: r.family, weight: r.weight })}
                 >
                   {r.ln}
                 </tspan>
@@ -266,7 +266,7 @@ export function ContainerNode({
                 fill={textColor}
                 fontSize={t2Size}
                 transform={`rotate(-90 ${cx} ${vMidY})`}
-                {...styleFor(node, 'heading', { family: 'sans' })}
+                {...styleFor(node, 'heading', { family: 'sans', weight: 700 })}
               >
                 {t2}
               </text>

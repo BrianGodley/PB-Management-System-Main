@@ -100,8 +100,10 @@ export default function AddNodeDialog({
   )
   // Combined inline style controls for one displayed-text field: font family,
   // bold, italic and size. `base` is the field's default point size.
-  const fieldStyle = (field, base, defFamily = 'sans') => {
+  const fieldStyle = (field, base, defFamily = 'sans', defBold = false, defItalic = false) => {
     const st = textStyles[field] || {}
+    const bold = st.bold ?? defBold
+    const italic = st.italic ?? defItalic
     const patch = p => setTextStyles(prev => ({ ...prev, [field]: { ...(prev[field] || {}), ...p } }))
     const toggleCls = on =>
       `px-1.5 py-0.5 rounded border text-[11px] ${
@@ -132,14 +134,14 @@ export default function AddNodeDialog({
           <option value="comic">Comic Sans</option>
           <option value="impact">Impact</option>
         </select>
-        <button type="button" onClick={() => patch({ bold: !st.bold })} title="Bold" className={toggleCls(st.bold)}>
+        <button type="button" onClick={() => patch({ bold: !bold })} title="Bold" className={toggleCls(bold)}>
           B
         </button>
         <button
           type="button"
-          onClick={() => patch({ italic: !st.italic })}
+          onClick={() => patch({ italic: !italic })}
           title="Italic"
-          className={`${toggleCls(st.italic)} italic`}
+          className={`${toggleCls(italic)} italic`}
         >
           I
         </button>
@@ -488,7 +490,7 @@ export default function AddNodeDialog({
                   placeholder="Operations"
                   className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm"
                 />
-                {fieldStyle('label', 14, 'arial')}
+                {fieldStyle('label', 12, 'arial')}
               </div>
             </div>
             <div>
@@ -502,7 +504,7 @@ export default function AddNodeDialog({
                   placeholder="e.g. Department"
                   className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm"
                 />
-                {fieldStyle('heading', 12, 'sans')}
+                {fieldStyle('heading', 14, 'sans', true)}
               </div>
             </div>
             <div>
