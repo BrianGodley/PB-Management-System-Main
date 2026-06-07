@@ -155,8 +155,10 @@ export default function TierCanvas({
     const box = laidOut.get(drag.nodeId)
     if (node && box && onNodeDropped) {
       const dropLeftX = box.x + drag.dx
-      const dropCenterY = box.y + drag.dy + box.height / 2
-      const newTier = findDropTier(dropCenterY)
+      // Items are locked to their level: dragging only changes left/right
+      // order within the same tier, never the tier itself. Use the Level
+      // field in the Add/Edit dialog to move an item up or down.
+      const newTier = node.tier ?? 0
       const dropCenterX = dropLeftX + box.width / 2
       const newTierOrder = findDropSlot(newTier, dropCenterX, drag.nodeId)
       const natural = naturalXForSlot(newTier, newTierOrder, drag.nodeId)
@@ -175,7 +177,8 @@ export default function TierCanvas({
             cloned.set(drag.nodeId, {
               ...original,
               x: original.x + drag.dx,
-              y: original.y + drag.dy,
+              // Y is locked — items move left/right only, never up/down.
+              y: original.y,
             })
           }
           return cloned

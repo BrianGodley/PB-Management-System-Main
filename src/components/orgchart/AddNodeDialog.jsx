@@ -73,6 +73,21 @@ export default function AddNodeDialog({
     isEdit ? existing.attachment_side || 'right' : 'right',
   )
 
+  // Level (row) the item sits on. Stored 0-based as `tier`; shown 1-based.
+  // New items default to a sensible level based on their parent/senior.
+  const [tier, setTier] = useState(() => {
+    if (isEdit) return existing.tier ?? 0
+    if (mode === 'child' && parentId) {
+      const p = (allItems || []).find(n => n.id === parentId)
+      return (p?.tier ?? 0) + 1
+    }
+    if (mode === 'senior' && seniorOf) {
+      const r = (allItems || []).find(n => n.id === seniorOf)
+      return Math.max(0, (r?.tier ?? 0) - 1)
+    }
+    return 0
+  })
+
   function handleSubmit() {
     const base = {
       kind,
@@ -80,6 +95,7 @@ export default function AddNodeDialog({
       seniorOf: mode === 'senior' ? seniorOf : null,
       isEdit,
       id: existing?.id,
+      tier,
     }
     if (kind === 'position') {
       if (!positionId) return alert('Pick a position.')
@@ -209,6 +225,20 @@ export default function AddNodeDialog({
               {KIND_LABEL[k]}
             </button>
           ))}
+        </div>
+
+        <div className="mb-3">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Level (row)</label>
+          <input
+            type="number"
+            min={1}
+            value={tier + 1}
+            onChange={e => setTier(Math.max(0, (Number(e.target.value) || 1) - 1))}
+            className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
+          />
+          <p className="mt-1 text-[11px] leading-snug text-gray-400">
+            Level 1 is the top row. Items can only be dragged left and right — change the level here to move an item up or down.
+          </p>
         </div>
 
         {kind === 'position' && (

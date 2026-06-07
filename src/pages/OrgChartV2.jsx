@@ -266,6 +266,16 @@ export default function OrgChartV2() {
         const newNaturalX = naturalXAt(tier, tier_order)
         x_offset = Math.round(parentCenterX - newNaturalX - newWidth / 2)
       }
+      // Honor an explicit Level chosen in the dialog. The item is placed at
+      // the far-right of that level (skipped for container sub-items, whose
+      // position is owned by the container's column layout).
+      if (Number.isInteger(payload.tier) && !parent_container_id) {
+        tier = payload.tier
+        tier_order = nodes
+          .filter(n => (n.tier ?? 0) === tier && !n.parent_container_id)
+          .reduce((max, n) => Math.max(max, (n.tier_order ?? 0) + 1), 0)
+        x_offset = 0
+      }
       const insert = {
         chart_id: chartId,
         kind: payload.kind,
@@ -328,6 +338,19 @@ export default function OrgChartV2() {
         attachment_side: payload.attachment_side || null,
         width: payload.width || 110,
         height: payload.height || 40,
+      }
+      // Apply an explicit Level change. When the level actually changes,
+      // move the item to the far-right of the new level and reset its
+      // horizontal nudge so it lands cleanly in that row.
+      if (Number.isInteger(payload.tier)) {
+        update.tier = payload.tier
+        const current = nodes.find(n => n.id === payload.id)
+        if ((current?.tier ?? 0) !== payload.tier) {
+          update.tier_order = nodes
+            .filter(n => n.id !== payload.id && (n.tier ?? 0) === payload.tier && !n.parent_container_id)
+            .reduce((max, n) => Math.max(max, (n.tier_order ?? 0) + 1), 0)
+          update.x_offset = 0
+        }
       }
       const { data, error } = await supabase
         .from('org_nodes')
