@@ -970,11 +970,11 @@ function BasicStatForm({
       setErr('Statistic Name is required.')
       return
     }
-    if (!form.default_periods || parseInt(form.default_periods) < 1) {
+    const isTargetStat = !!(targetSource || initialData?.stat_category === 'target')
+    if (!isTargetStat && (!form.default_periods || parseInt(form.default_periods) < 1)) {
       setErr('Default # of Periods to Show is required.')
       return
     }
-    const isTargetStat = !!(targetSource || initialData?.stat_category === 'target')
     // For target stats, derive beginning_date from the first target line start date
     let effectiveBeginningDate = form.beginning_date
     if (isTargetStat) {
@@ -1214,17 +1214,19 @@ function BasicStatForm({
                 ]}
               />
             </div>
-            <div>
-              <label className={lbl}>Default # of Periods</label>
-              <input
-                type="number"
-                min="1"
-                className={inp}
-                value={form.default_periods}
-                onChange={e => set('default_periods', e.target.value)}
-                placeholder="e.g. 12"
-              />
-            </div>
+            {!isTargetStat && (
+              <div>
+                <label className={lbl}>Default # of Periods</label>
+                <input
+                  type="number"
+                  min="1"
+                  className={inp}
+                  value={form.default_periods}
+                  onChange={e => set('default_periods', e.target.value)}
+                  placeholder="e.g. 12"
+                />
+              </div>
+            )}
           </div>
 
           {/* Missing Values | Assignment — 2 col */}
@@ -9221,7 +9223,7 @@ export default function Statistics() {
   // ── Chart data with target line dates included ────────────────────────────
   const chartDataWithTargets = useMemo(() => {
     const tls = selectedStat?.target_lines
-    if (!tls?.length || !displayChartData.length) return displayChartData
+    if (!tls?.length) return displayChartData
     const tracking = selectedStat.tracking
     const extraLabels = new Set()
     tls.forEach(tl => {
@@ -9298,9 +9300,15 @@ export default function Statistics() {
 
   // Y-axis domain + ticks: compute clean round-number intervals like the reference app
   const { yDomain, yTicks } = useMemo(() => {
-    if (!displayChartData.length) return { yDomain: ['auto', 'auto'], yTicks: undefined }
-
     const vals = displayChartData.map(d => d.value).filter(v => v != null && isFinite(v))
+    // Include target-line values so the target line is visible even when there
+    // is no actual data plotted yet.
+    ;(selectedStat?.target_lines || []).forEach(tl => {
+      const sv = Number(tl.start_value)
+      const ev = Number(tl.end_value)
+      if (isFinite(sv)) vals.push(sv)
+      if (isFinite(ev)) vals.push(ev)
+    })
     if (!vals.length) return { yDomain: ['auto', 'auto'], yTicks: undefined }
 
     const dataMin = Math.min(...vals)
@@ -10247,8 +10255,8 @@ export default function Statistics() {
                     <div className="h-full flex items-center justify-center">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700"></div>
                     </div>
-                  ) : displayChartData.length === 0 ? (
-                    // Fully loaded, genuinely empty
+                  ) : chartDataWithTargets.length === 0 ? (
+                    // Fully loaded, genuinely empty (and no target line to show)
                     <div className="h-full flex items-center justify-center text-gray-400">
                       <div className="text-center">
                         <div className="text-3xl mb-2">📊</div>
