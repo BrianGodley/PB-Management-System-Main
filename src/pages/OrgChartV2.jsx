@@ -412,6 +412,29 @@ export default function OrgChartV2() {
         .single()
       if (error) throw error
       setNodes(prev => prev.map(n => (n.id === data.id ? data : n)))
+      // Per-row height: when an item's height changes, every other item on
+      // the same row adopts that exact height (even if smaller), so the row
+      // matches the edited item rather than the tallest one.
+      const prevNode = nodes.find(n => n.id === payload.id)
+      const newHeight = payload.height || 40
+      if ((prevNode?.height ?? 40) !== newHeight) {
+        const rowTier = update.tier ?? prevNode?.tier ?? 0
+        const sibIds = nodes
+          .filter(
+            n =>
+              n.id !== payload.id &&
+              !n.parent_container_id &&
+              n.kind !== 'assistant' &&
+              (n.tier ?? 0) === rowTier,
+          )
+          .map(n => n.id)
+        if (sibIds.length) {
+          setNodes(prev =>
+            prev.map(p => (sibIds.includes(p.id) ? { ...p, height: newHeight } : p)),
+          )
+          await supabase.from('org_nodes').update({ height: newHeight }).in('id', sibIds)
+        }
+      }
       setDialog(null)
     } catch (e) {
       alert(e.message || String(e))
