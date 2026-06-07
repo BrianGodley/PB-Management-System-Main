@@ -92,26 +92,32 @@ export function layoutTiers(nodes, rowSpacing = {}) {
   let cursorY = Number.isFinite(rowSpacing?.top) ? rowSpacing.top : CANVAS_PAD_Y
   let maxWidth = 0
 
-  // Tiers that have an assistant attached to one of their nodes get a
-  // DOUBLED gap below them, so the assistant gets its own level (band)
-  // between tiers — sitting beside the connector lines rather than on
-  // top of them. The junior connector lines lengthen to span the bigger
-  // gap automatically (their tier is pushed further down).
-  const assistantAnchorIds = new Set(
-    nodes
-      .filter(n => n.kind === 'assistant' && n.attached_to_node_id)
-      .map(n => n.attached_to_node_id),
-  )
+  // A tier that anchors an assistant gets its own ASSISTANT BAND between it
+  // and the next row. The gap below such a tier is split into three parts:
+  //   senior → assistant   (rowSpacing[`${t}_a`], default TIER_GAP/2)
+  //   the assistant band   (tallest assistant on that tier)
+  //   assistant → next row (rowSpacing[`${t}_b`], default TIER_GAP/2)
+  // Plain rows just use rowSpacing[t] (or the default TIER_GAP).
+  const assistantBandHByTier = new Map() // tier -> tallest assistant height
+  for (const n of nodes) {
+    if (n.kind !== 'assistant' || !n.attached_to_node_id) continue
+    const anchorNode = nodes.find(x => x.id === n.attached_to_node_id)
+    const at = Number.isInteger(anchorNode?.tier) ? anchorNode.tier : 0
+    assistantBandHByTier.set(at, Math.max(assistantBandHByTier.get(at) || 0, n.height || 40))
+  }
+  const HALF = TIER_GAP / 2
   const gapByTier = new Map()
+  const gapAboveByTier = new Map() // senior → assistant gap, for assistant tiers
   for (const t of tierKeys) {
-    const hasAssistant = byTier.get(t).some(node => assistantAnchorIds.has(node.id))
-    // A user-set per-row spacing wins; otherwise default (doubled when the
-    // row carries an assistant so the assistant gets its own band).
-    const override = rowSpacing?.[t]
-    gapByTier.set(
-      t,
-      Number.isFinite(override) ? override : hasAssistant ? TIER_GAP * 2 : TIER_GAP,
-    )
+    if (assistantBandHByTier.has(t)) {
+      const above = Number.isFinite(rowSpacing?.[`${t}_a`]) ? rowSpacing[`${t}_a`] : HALF
+      const below = Number.isFinite(rowSpacing?.[`${t}_b`]) ? rowSpacing[`${t}_b`] : HALF
+      gapAboveByTier.set(t, above)
+      gapByTier.set(t, above + assistantBandHByTier.get(t) + below)
+    } else {
+      const override = rowSpacing?.[t]
+      gapByTier.set(t, Number.isFinite(override) ? override : TIER_GAP)
+    }
   }
 
   for (const t of tierKeys) {
@@ -176,12 +182,11 @@ export function layoutTiers(nodes, rowSpacing = {}) {
     // assistant lands on its own level, clear of the connector lines.
     const anchorNode = nodes.find(x => x.id === n.attached_to_node_id)
     const anchorTier = Number.isInteger(anchorNode?.tier) ? anchorNode.tier : 0
-    const anchorGap = gapByTier.get(anchorTier) ?? TIER_GAP
-    // The junior connector "bus" line is routed at the middle of the gap
-    // (anchor bottom + gap/2). The assistant should sit ABOVE that bus,
-    // centered between the senior's bottom and the bus — i.e. a quarter of
-    // the way down the gap — not on the bus line itself.
-    const yMid = anchor.y + anchor.height + anchorGap / 4
+    // Centre the assistant within its own band: anchor bottom + the
+    // senior→assistant gap + half the band height.
+    const above = gapAboveByTier.get(anchorTier) ?? TIER_GAP / 2
+    const bandH = assistantBandHByTier.get(anchorTier) ?? (n.height || 40)
+    const yMid = anchor.y + anchor.height + above + bandH / 2
     const x =
       side === 'left'
         ? anchor.x - ASSIST_GAP - w

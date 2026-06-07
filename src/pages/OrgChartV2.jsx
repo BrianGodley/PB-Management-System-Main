@@ -94,6 +94,42 @@ export default function OrgChartV2() {
     return [...set].sort((a, b) => a - b)
   }, [nodes])
 
+  // Tiers that anchor an assistant — their gap is split into a senior→assistant
+  // part and an assistant→next-row part in the Row Spacing panel.
+  const assistantAnchorTiers = useMemo(() => {
+    const set = new Set()
+    for (const n of nodes) {
+      if (n.kind !== 'assistant' || !n.attached_to_node_id) continue
+      const a = nodes.find(x => x.id === n.attached_to_node_id)
+      if (a) set.add(Number.isInteger(a.tier) ? a.tier : 0)
+    }
+    return set
+  }, [nodes])
+
+  // The ordered list of adjustable spacing gaps shown in the Row Spacing
+  // panel — Top→Row 1, then each row→row gap, with assistant rows split into
+  // senior→assistant and assistant→next-row entries.
+  const spacingEntries = useMemo(() => {
+    const entries = []
+    presentTiers.forEach((t, idx) => {
+      if (idx === 0) {
+        entries.push({ key: 'top', label: `From Top to Row ${t + 1}`, fallback: CANVAS_PAD_Y })
+      }
+      const next = presentTiers[idx + 1]
+      if (assistantAnchorTiers.has(t)) {
+        entries.push({ key: `${t}_a`, label: `Row ${t + 1} to Assistant`, fallback: TIER_GAP / 2 })
+        entries.push({
+          key: `${t}_b`,
+          label: next != null ? `Assistant to Row ${next + 1}` : 'Assistant to bottom',
+          fallback: TIER_GAP / 2,
+        })
+      } else if (next != null) {
+        entries.push({ key: t, label: `Row ${t + 1} to Row ${next + 1}`, fallback: TIER_GAP })
+      }
+    })
+    return entries
+  }, [presentTiers, assistantAnchorTiers])
+
   // Mark a chart as the single default that opens with the module.
   async function setDefaultChart(chart) {
     setCharts(prev => prev.map(c => ({ ...c, is_default: c.id === chart.id })))
@@ -832,32 +868,22 @@ export default function OrgChartV2() {
                         ✕
                       </button>
                     </div>
-                    {presentTiers.length === 0 ? (
+                    {spacingEntries.length === 0 ? (
                       <p className="text-xs text-slate-400 py-1">No rows yet.</p>
                     ) : (
-                      presentTiers.map((t, idx) => {
-                        // First entry = gap from the top to Row 1; each later
-                        // entry = the gap between the previous row and this one.
-                        const isTop = idx === 0
-                        const key = isTop ? 'top' : presentTiers[idx - 1]
-                        const label = isTop
-                          ? `From Top to Row ${t + 1}`
-                          : `Row ${presentTiers[idx - 1] + 1} to Row ${t + 1}`
-                        const fallback = isTop ? CANVAS_PAD_Y : TIER_GAP
-                        return (
-                          <div key={key} className="flex items-center justify-between gap-2 py-1">
-                            <span className="text-xs text-slate-600">{label}</span>
-                            <input
-                              type="number"
-                              min={0}
-                              max={600}
-                              value={Number.isFinite(rowSpacing[key]) ? rowSpacing[key] : fallback}
-                              onChange={e => updateRowSpacing(key, Number(e.target.value) || 0)}
-                              className="no-spin w-20 border border-slate-300 rounded-md px-1 py-0.5 text-xs"
-                            />
-                          </div>
-                        )
-                      })
+                      spacingEntries.map(e => (
+                        <div key={e.key} className="flex items-center justify-between gap-2 py-1">
+                          <span className="text-xs text-slate-600">{e.label}</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={600}
+                            value={Number.isFinite(rowSpacing[e.key]) ? rowSpacing[e.key] : e.fallback}
+                            onChange={ev => updateRowSpacing(e.key, Number(ev.target.value) || 0)}
+                            className="no-spin w-20 border border-slate-300 rounded-md px-1 py-0.5 text-xs"
+                          />
+                        </div>
+                      ))
                     )}
                     <p className="mt-1 text-[10px] text-slate-400 leading-snug">
                       Adjusts each vertical gap — connection lines and the rows
