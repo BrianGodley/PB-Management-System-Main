@@ -148,7 +148,12 @@ export default function AddNodeDialog({
           min={6}
           max={48}
           value={fontSizes[field] ?? base}
-          onChange={e => setFontSizes(prev => ({ ...prev, [field]: Number(e.target.value) || base }))}
+          onChange={e =>
+            setFontSizes(prev => ({
+              ...prev,
+              [field]: e.target.value === '' ? '' : Number(e.target.value),
+            }))
+          }
           title="Font size (points)"
           className="no-spin w-14 border border-gray-300 rounded-md px-1 py-0.5 text-[11px] text-gray-600 bg-white"
         />
