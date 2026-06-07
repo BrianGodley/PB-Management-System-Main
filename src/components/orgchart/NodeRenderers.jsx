@@ -113,7 +113,7 @@ export function PositionNode({
         y={box.y + box.height / 2 - 4}
         textAnchor="middle"
         fill="#FFFFFF"
-        fontSize={9 * (fs.title || 1)}
+        fontSize={fs.title || 9}
         fontWeight="700"
       >
         {positionTitle || node.label || '(no position)'}
@@ -123,7 +123,7 @@ export function PositionNode({
         y={box.y + box.height / 2 + 8}
         textAnchor="middle"
         fill="#FFFFFF"
-        fontSize={8 * (fs.name || 1)}
+        fontSize={fs.name || 8}
         opacity={0.9}
       >
         {name}
@@ -169,23 +169,33 @@ export function ContainerNode({
         stroke={noColor ? '#111111' : textColor === '#FFFFFF' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}
         strokeWidth={noColor ? 1.5 : 1}
       />
-      {/* Heading removed — Area name handles section labeling. The name
-          wraps onto multiple lines when it doesn't fit the box width. */}
+      {/* Two centered titles: the Area name (title 1) and an optional
+          second title (stored in `heading`). Both wrap to fit the box. */}
       {(() => {
-        const labelSize = 14 * (fs.label || 1)
-        const lines = wrapLabel(node.label, Math.floor((box.width - 12) / (labelSize * 0.57)))
-        const lineH = labelSize + 2
-        const startY = labelY - ((lines.length - 1) * lineH) / 2
+        const t1Size = fs.label || 14
+        const t2 = (node.heading || '').trim()
+        const t2Size = fs.heading || 12
+        const fit = sz => Math.max(4, Math.floor((box.width - 12) / (sz * 0.57)))
+        const t1Lines = wrapLabel(node.label, fit(t1Size))
+        const t2Lines = t2 ? wrapLabel(t2, fit(t2Size)) : []
+        const lh1 = t1Size + 2
+        const lh2 = t2Size + 2
+        const blockH = t1Lines.length * lh1 + t2Lines.length * lh2
+        let y = labelY - blockH / 2 + t1Size
+        const rows = []
+        t1Lines.forEach((ln, i) => {
+          rows.push({ ln, y, size: t1Size, weight: 700, key: `t1-${i}` })
+          y += lh1
+        })
+        t2Lines.forEach((ln, i) => {
+          rows.push({ ln, y, size: t2Size, weight: 600, key: `t2-${i}` })
+          y += lh2
+        })
         return (
-          <text
-            textAnchor="middle"
-            fill={textColor}
-            fontSize={labelSize}
-            fontWeight="700"
-          >
-            {lines.map((ln, i) => (
-              <tspan key={i} x={cx} y={startY + i * lineH}>
-                {ln}
+          <text textAnchor="middle" fill={textColor}>
+            {rows.map(r => (
+              <tspan key={r.key} x={cx} y={r.y} fontSize={r.size} fontWeight={r.weight}>
+                {r.ln}
               </tspan>
             ))}
           </text>
@@ -199,7 +209,7 @@ export function ContainerNode({
             textAnchor="middle"
             fill={textColor}
             opacity={0.9}
-            fontSize={10 * (fs.title || 1)}
+            fontSize={fs.title || 10}
             fontWeight="600"
           >
             {positionTitle}
@@ -210,7 +220,7 @@ export function ContainerNode({
             textAnchor="middle"
             fill={textColor}
             opacity={0.75}
-            fontSize={8 * (fs.name || 1)}
+            fontSize={fs.name || 8}
           >
             {displayName || UNASSIGNED_LABEL}
           </text>

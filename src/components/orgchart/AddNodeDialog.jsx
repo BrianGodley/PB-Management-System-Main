@@ -70,7 +70,7 @@ export default function AddNodeDialog({
     isEdit && existing.employee_id ? String(existing.employee_id) : '',
   )
 
-  const [heading, setHeading] = useState(isEdit ? existing.heading || 'Department' : 'Department')
+  const [heading, setHeading] = useState(isEdit ? existing.heading || '' : '')
   const [bgColor, setBgColor] = useState(
     isEdit && existing.bg_color ? existing.bg_color : CONTAINER_COLORS[0].bg,
   )
@@ -81,26 +81,26 @@ export default function AddNodeDialog({
   // 'arrow' = a separate child connected by a reports-to arrow.
   const [attachMode, setAttachMode] = useState('direct')
 
-  // Per-field font-size multipliers (1 = current default). Keys: 'label'
-  // (area name), 'title' (position title), 'name' (employee name).
+  // Per-field font sizes in points. Keys: 'label' (area name), 'title'
+  // (position title), 'name' (employee name). Each defaults to that field's
+  // base size until the user types a different number.
   const [fontSizes, setFontSizes] = useState(
     isEdit && existing.font_sizes ? existing.font_sizes : {},
   )
-  // Small inline size dropdown shown next to each displayed-text field.
-  const FontSize = ({ field }) => (
-    <select
-      value={fontSizes[field] ?? 1}
+  // Small inline number box shown next to each displayed-text field. `base`
+  // is the field's default point size, shown until the user changes it.
+  const FontSize = ({ field, base }) => (
+    <input
+      type="number"
+      min={6}
+      max={48}
+      value={fontSizes[field] ?? base}
       onChange={e =>
-        setFontSizes(prev => ({ ...prev, [field]: Number(e.target.value) }))
+        setFontSizes(prev => ({ ...prev, [field]: Number(e.target.value) || base }))
       }
-      title="Font size"
-      className="border border-gray-300 rounded-md px-1 py-0.5 text-[11px] text-gray-600 bg-white"
-    >
-      <option value={1}>Default</option>
-      <option value={0.8}>Small</option>
-      <option value={1.25}>Large</option>
-      <option value={1.5}>X-Large</option>
-    </select>
+      title="Font size (points)"
+      className="w-16 border border-gray-300 rounded-md px-1 py-0.5 text-[11px] text-gray-600 bg-white"
+    />
   )
   const [width, setWidth] = useState(isEdit ? existing.width || 220 : 220)
   const [height, setHeight] = useState(isEdit ? existing.height || 90 : 90)
@@ -320,11 +320,11 @@ export default function AddNodeDialog({
               <label className="block text-xs font-medium text-gray-500">Text sizes</label>
               <div className="flex items-center gap-2 text-xs text-gray-500">
                 <span className="w-24">Position title</span>
-                <FontSize field="title" />
+                <FontSize field="title" base={9} />
               </div>
               <div className="flex items-center gap-2 text-xs text-gray-500">
                 <span className="w-24">Employee name</span>
-                <FontSize field="name" />
+                <FontSize field="name" base={8} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2 mt-3">
@@ -405,12 +405,26 @@ export default function AddNodeDialog({
                 <label className="block text-xs font-medium text-gray-500">
                   Area name
                 </label>
-                <FontSize field="label" />
+                <FontSize field="label" base={14} />
               </div>
               <input
                 value={label}
                 onChange={e => setLabel(e.target.value)}
                 placeholder="Operations"
+                className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
+              />
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-medium text-gray-500">
+                  Second title (optional)
+                </label>
+                <FontSize field="heading" base={12} />
+              </div>
+              <input
+                value={heading}
+                onChange={e => setHeading(e.target.value)}
+                placeholder="e.g. Department"
                 className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
               />
             </div>
@@ -438,11 +452,11 @@ export default function AddNodeDialog({
                 <div className="mt-2 space-y-1">
                   <div className="flex items-center gap-2 text-xs text-gray-500">
                     <span className="w-24">Position title</span>
-                    <FontSize field="title" />
+                    <FontSize field="title" base={10} />
                   </div>
                   <div className="flex items-center gap-2 text-xs text-gray-500">
                     <span className="w-24">Employee name</span>
-                    <FontSize field="name" />
+                    <FontSize field="name" base={8} />
                   </div>
                 </div>
               )}
