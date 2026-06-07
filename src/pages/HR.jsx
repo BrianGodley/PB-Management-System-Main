@@ -150,6 +150,7 @@ async function fetchHrData() {
     { data: posData },
     { data: pcData },
     { data: cData },
+    { data: epData },
   ] = await Promise.all([
     supabase.from('employees').select('*').order('last_name'),
     supabase.from('applicants').select('*').order('applied_at', { ascending: false }),
@@ -160,7 +161,16 @@ async function fetchHrData() {
     supabase.from('positions').select('*').order('title'),
     supabase.from('position_courses').select('position_id, course_id'),
     supabase.from('lms_courses').select('id, title, category').order('title'),
+    supabase.from('employee_positions').select('employee_id, position_id'),
   ])
+
+  // positionId -> Set<employee_id> (who is assigned to each position)
+  const positionEmployees = {}
+  ;(epData || []).forEach(r => {
+    const key = String(r.position_id)
+    if (!positionEmployees[key]) positionEmployees[key] = new Set()
+    positionEmployees[key].add(r.employee_id)
+  })
 
   // email -> role
   const profileRoles = {}
@@ -192,6 +202,7 @@ async function fetchHrData() {
     groupMembers,
     positions: posData || [],
     positionCourses,
+    positionEmployees,
     courses: cData || [],
   }
 }
@@ -217,6 +228,7 @@ export default function HR() {
   const groupMembers = hrData?.groupMembers ?? {}
   const positions = hrData?.positions ?? []
   const positionCourses = hrData?.positionCourses ?? {}
+  const positionEmployees = hrData?.positionEmployees ?? {}
   const courses = hrData?.courses ?? []
 
   const [appFilter, setAppFilter] = useState('all')
@@ -245,6 +257,7 @@ export default function HR() {
   })
   const [positionSaving, setPositionSaving] = useState(false)
   const [selectedCourses, setSelectedCourses] = useState(new Set())
+  const [selectedPosEmployees, setSelectedPosEmployees] = useState(new Set())
   const [posWriteUpFile, setPosWriteUpFile] = useState(null)
   const posWriteUpRef = useRef()
 
@@ -341,9 +354,21 @@ export default function HR() {
     })
   }
 
+  function togglefn(setter) {
+    return id =>
+      setter(prev => {
+        const next = new Set(prev)
+        if (next.has(id)) next.delete(id)
+        else next.add(id)
+        return next
+      })
+  }
+  const togglePosEmployee = togglefn(setSelectedPosEmployees)
+
   function openNewPosition() {
     setPositionForm({ title: '', description: '', vfp: '', write_up_url: '' })
     setSelectedCourses(new Set())
+    setSelectedPosEmployees(new Set())
     setPosWriteUpFile(null)
     setEditingPosition('new')
   }
@@ -356,6 +381,7 @@ export default function HR() {
       write_up_url: pos.write_up_url || '',
     })
     setSelectedCourses(new Set(positionCourses[pos.id] || []))
+    setSelectedPosEmployees(new Set(positionEmployees[String(pos.id)] || []))
     setPosWriteUpFile(null)
     setEditingPosition(pos)
   }
@@ -411,6 +437,18 @@ export default function HR() {
       if (selectedCourses.size > 0) {
         const rows = [...selectedCourses].map(cid => ({ position_id: positionId, course_id: cid }))
         await supabase.from('position_courses').insert(rows)
+      }
+
+      // Sync employee assignments for this position: replace the set with the
+      // chosen employees (this is the same employee_positions table the org
+      // chart and each employee's detail page use).
+      await supabase.from('employee_positions').delete().eq('position_id', positionId)
+      if (selectedPosEmployees.size > 0) {
+        const epRows = [...selectedPosEmployees].map(eid => ({
+          position_id: positionId,
+          employee_id: eid,
+        }))
+        await supabase.from('employee_positions').insert(epRows)
       }
 
       setEditingPosition(null)
@@ -1034,6 +1072,42 @@ export default function HR() {
                                   <p className="text-xs text-gray-400">{course.category}</p>
                                 )}
                               </div>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 block mb-2">
+                      Assigned Employees{' '}
+                      <span className="text-gray-400 font-normal">
+                        ({selectedPosEmployees.size} selected)
+                      </span>
+                    </label>
+                    {employees.length === 0 ? (
+                      <p className="text-sm text-gray-400 border border-gray-200 rounded-xl p-4">
+                        No employees found.
+                      </p>
+                    ) : (
+                      <div className="border border-gray-200 rounded-xl overflow-hidden max-h-60 overflow-y-auto">
+                        <div className="divide-y divide-gray-100">
+                          {employees.map(emp => (
+                            <label
+                              key={emp.id}
+                              className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedPosEmployees.has(emp.id)}
+                                onChange={() => togglePosEmployee(emp.id)}
+                                className="accent-green-700"
+                              />
+                              <p className="text-sm font-medium text-gray-900">
+                                {emp.first_name} {emp.last_name}
+                                {emp.status && emp.status !== 'active' ? ' (inactive)' : ''}
+                              </p>
                             </label>
                           ))}
                         </div>
