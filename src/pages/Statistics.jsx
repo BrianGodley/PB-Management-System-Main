@@ -9257,15 +9257,44 @@ export default function Statistics() {
     setToDate(to)
   }, [selectedStat?.id, selectedStat?.stat_category, selectedStat?.target_lines])
 
+  // For a target stat, the effective date window is always the span of its
+  // target line(s), no matter what fromDate/toDate currently hold. This keeps
+  // the mirrored base values clamped to the target range so the graph never
+  // shows extra values before the target's start (or after its end).
+  const targetWindow = useMemo(() => {
+    if (!selectedStat || selectedStat.stat_category !== 'target') return null
+    const tls = selectedStat.target_lines || []
+    const starts = tls.map(tl => tl.start_date).filter(Boolean)
+    if (!starts.length) return null
+    const ends = tls
+      .map(tl =>
+        computeTargetEndDate(
+          tl.start_date,
+          tl.end_mode,
+          tl.end_date,
+          tl.end_periods,
+          tl.end_unit || selectedStat.tracking
+        )
+      )
+      .filter(Boolean)
+    const from = starts.reduce((a, b) => (a < b ? a : b))
+    const to = ends.reduce((a, b) => (a > b ? a : b), from)
+    return { from, to }
+  }, [selectedStat])
+
   // Raw chart data — native values in date range, with optional zero-fill for missing periods
   const chartData = useMemo(() => {
     if (!selectedStat) return []
     const wed = weekEndingDay ?? 5
+    // Target stats clamp to their target window; everything else uses the
+    // user-controlled scrubber range.
+    const effFrom = targetWindow ? targetWindow.from : fromDate
+    const effTo = targetWindow ? targetWindow.to : toDate
 
     // Build a map of entered values keyed by canonical display date
     const entered = new Map()
     values
-      .filter(v => v.period_date >= fromDate && v.period_date <= toDate)
+      .filter(v => v.period_date >= effFrom && v.period_date <= effTo)
       .forEach(v => {
         const displayDate =
           selectedStat.tracking === 'weekly' && weekEndingDay !== null
@@ -9276,7 +9305,7 @@ export default function Statistics() {
 
     if (selectedStat.missing_value_display === 'zero') {
       // Generate every period in range and fill 0 where nothing was entered
-      const allPeriods = generatePeriods(fromDate, toDate, selectedStat.tracking, wed)
+      const allPeriods = generatePeriods(effFrom, effTo, selectedStat.tracking, wed)
       return allPeriods.map(p => ({
         label: periodLabel(p, selectedStat.tracking),
         value: entered.has(p) ? entered.get(p) : 0,
@@ -9288,7 +9317,7 @@ export default function Statistics() {
     return [...entered.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([date, value]) => ({ label: periodLabel(date, selectedStat.tracking), value, date }))
-  }, [values, fromDate, toDate, selectedStat, weekEndingDay])
+  }, [values, fromDate, toDate, targetWindow, selectedStat, weekEndingDay])
 
   // Aggregated display data — rolls up native values to viewPeriod buckets.
   // While values are in-flight for a different stat, we return the previous
@@ -9366,7 +9395,11 @@ export default function Statistics() {
     const tls = selectedStat?.target_lines
     if (!tls?.length) return displayChartData
     const tracking = selectedStat.tracking
-    const extraLabels = new Set()
+    // Keep each target endpoint's real ISO date alongside its display label so
+    // the merged series sorts chronologically. Storing the label in `date`
+    // (the old behaviour) made target points sort into their own cluster,
+    // detached from the actual values — they looked like two separate graphs.
+    const extraPairs = []
     tls.forEach(tl => {
       if (!tl.start_date) return
       const endDate = computeTargetEndDate(
@@ -9376,13 +9409,16 @@ export default function Statistics() {
         tl.end_periods,
         tl.end_unit || tracking
       )
-      extraLabels.add(periodLabel(tl.start_date, tracking))
-      extraLabels.add(periodLabel(endDate, tracking))
+      extraPairs.push({ date: tl.start_date, label: periodLabel(tl.start_date, tracking) })
+      if (endDate) extraPairs.push({ date: endDate, label: periodLabel(endDate, tracking) })
     })
     const existingLabels = new Set(displayChartData.map(d => d.label))
+    const seen = new Set()
     const extras = []
-    extraLabels.forEach(lbl => {
-      if (!existingLabels.has(lbl)) extras.push({ label: lbl, value: null, date: lbl })
+    extraPairs.forEach(p => {
+      if (existingLabels.has(p.label) || seen.has(p.label)) return
+      seen.add(p.label)
+      extras.push({ label: p.label, value: null, date: p.date })
     })
     if (!extras.length) return displayChartData
     return [...displayChartData, ...extras].sort((a, b) =>
