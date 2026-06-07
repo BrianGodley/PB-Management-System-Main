@@ -44,6 +44,23 @@ function SelectOutline({ x, y, w, h, selected }) {
   )
 }
 
+const FONT_FAMILY = {
+  sans: 'ui-sans-serif, system-ui, -apple-system, sans-serif',
+  serif: 'Georgia, "Times New Roman", serif',
+  mono: 'ui-monospace, "Courier New", monospace',
+}
+
+// Resolve per-field text styling (family / bold / italic) stored on a node.
+// naturalWeight is used when the user hasn't explicitly toggled bold.
+function styleFor(node, field, naturalWeight) {
+  const s = (node.text_styles || {})[field] || {}
+  return {
+    fontFamily: FONT_FAMILY[s.family] || undefined,
+    fontWeight: s.bold === true ? 700 : s.bold === false ? 400 : naturalWeight,
+    fontStyle: s.italic ? 'italic' : 'normal',
+  }
+}
+
 export function CustomNode({ node, box, color, selected, onClick }) {
   const fill = color || '#64748B'
   return (
@@ -114,7 +131,7 @@ export function PositionNode({
         textAnchor="middle"
         fill="#FFFFFF"
         fontSize={fs.title || 9}
-        fontWeight="700"
+        {...styleFor(node, 'title', 700)}
       >
         {positionTitle || node.label || '(no position)'}
       </text>
@@ -125,6 +142,7 @@ export function PositionNode({
         fill="#FFFFFF"
         fontSize={fs.name || 8}
         opacity={0.9}
+        {...styleFor(node, 'name', 400)}
       >
         {name}
       </text>
@@ -145,11 +163,12 @@ export function ContainerNode({
   positionTitle,
   displayName,
 }) {
-  // "No color" areas render as a black outline with a transparent fill,
-  // so they read as just the frame of where the colored field would be.
+  // The chosen color is now the BORDER; the fill is white (or transparent
+  // for "no color"). Text is dark so it reads on the light fill.
   const noColor = node.bg_color === 'none'
-  const fill = noColor ? 'none' : node.bg_color || '#1E293B'
-  const textColor = noColor ? '#111111' : pickTextColor(fill)
+  const borderColor = noColor ? '#111111' : node.bg_color || '#1E293B'
+  const fill = noColor ? 'none' : '#FFFFFF'
+  const textColor = '#1E293B'
   const cx = box.x + box.width / 2
   const hasPosition = !!positionTitle
   const fs = node.font_sizes || {}
@@ -166,8 +185,8 @@ export function ContainerNode({
         ry={10}
         fill={fill}
         pointerEvents="all"
-        stroke={noColor ? '#111111' : textColor === '#FFFFFF' ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)'}
-        strokeWidth={noColor ? 1.5 : 1}
+        stroke={borderColor}
+        strokeWidth={2}
       />
       {/* Two centered titles: the Area name (title 1) and an optional
           second title (stored in `heading`). Both wrap to fit the box. */}
@@ -189,17 +208,23 @@ export function ContainerNode({
             : labelY - blockH / 2 + t1Size
         const rows = []
         t1Lines.forEach((ln, i) => {
-          rows.push({ ln, y, size: t1Size, weight: 700, key: `t1-${i}` })
+          rows.push({ ln, y, size: t1Size, field: 'label', weight: 700, key: `t1-${i}` })
           y += lh1
         })
         t2Lines.forEach((ln, i) => {
-          rows.push({ ln, y, size: t2Size, weight: 600, key: `t2-${i}` })
+          rows.push({ ln, y, size: t2Size, field: 'heading', weight: 600, key: `t2-${i}` })
           y += lh2
         })
         return (
           <text textAnchor="middle" fill={textColor}>
             {rows.map(r => (
-              <tspan key={r.key} x={cx} y={r.y} fontSize={r.size} fontWeight={r.weight}>
+              <tspan
+                key={r.key}
+                x={cx}
+                y={r.y}
+                fontSize={r.size}
+                {...styleFor(node, r.field, r.weight)}
+              >
                 {r.ln}
               </tspan>
             ))}
@@ -215,7 +240,7 @@ export function ContainerNode({
             fill={textColor}
             opacity={0.9}
             fontSize={fs.title || 10}
-            fontWeight="600"
+            {...styleFor(node, 'title', 600)}
           >
             {positionTitle}
           </text>
@@ -226,6 +251,7 @@ export function ContainerNode({
             fill={textColor}
             opacity={0.75}
             fontSize={fs.name || 8}
+            {...styleFor(node, 'name', 400)}
           >
             {displayName || UNASSIGNED_LABEL}
           </text>

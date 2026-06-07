@@ -377,6 +377,7 @@ export default function OrgChartV2() {
         width: payload.width || 110,
         height: payload.height || 40,
         font_sizes: payload.font_sizes || {},
+        text_styles: payload.text_styles || {},
         x_offset,
         x: 0,
         y: 0,
@@ -426,6 +427,7 @@ export default function OrgChartV2() {
         width: payload.width || 110,
         height: payload.height || 40,
         font_sizes: payload.font_sizes || {},
+        text_styles: payload.text_styles || {},
       }
       // Apply an explicit Level change. When the level actually changes,
       // move the item to the far-right of the new level and reset its

@@ -87,21 +87,54 @@ export default function AddNodeDialog({
   const [fontSizes, setFontSizes] = useState(
     isEdit && existing.font_sizes ? existing.font_sizes : {},
   )
-  // Small inline number box shown next to each displayed-text field. `base`
-  // is the field's default point size, shown until the user changes it.
-  const FontSize = ({ field, base }) => (
-    <input
-      type="number"
-      min={6}
-      max={48}
-      value={fontSizes[field] ?? base}
-      onChange={e =>
-        setFontSizes(prev => ({ ...prev, [field]: Number(e.target.value) || base }))
-      }
-      title="Font size (points)"
-      className="no-spin w-16 border border-gray-300 rounded-md px-1 py-0.5 text-[11px] text-gray-600 bg-white"
-    />
+  // Per-field font family / bold / italic, e.g. { label: { family, bold, italic } }.
+  const [textStyles, setTextStyles] = useState(
+    isEdit && existing.text_styles ? existing.text_styles : {},
   )
+  // Combined inline style controls for one displayed-text field: font family,
+  // bold, italic and size. `base` is the field's default point size.
+  const fieldStyle = (field, base) => {
+    const st = textStyles[field] || {}
+    const patch = p => setTextStyles(prev => ({ ...prev, [field]: { ...(prev[field] || {}), ...p } }))
+    const toggleCls = on =>
+      `px-1.5 py-0.5 rounded border text-[11px] ${
+        on ? 'border-blue-600 bg-blue-50 text-blue-700 font-semibold' : 'border-gray-300 text-gray-500'
+      }`
+    return (
+      <div className="flex items-center gap-1 shrink-0">
+        <select
+          value={st.family || 'sans'}
+          onChange={e => patch({ family: e.target.value })}
+          title="Font type"
+          className="border border-gray-300 rounded-md px-1 py-0.5 text-[11px] text-gray-600 bg-white"
+        >
+          <option value="sans">Sans</option>
+          <option value="serif">Serif</option>
+          <option value="mono">Mono</option>
+        </select>
+        <button type="button" onClick={() => patch({ bold: !st.bold })} title="Bold" className={toggleCls(st.bold)}>
+          B
+        </button>
+        <button
+          type="button"
+          onClick={() => patch({ italic: !st.italic })}
+          title="Italic"
+          className={`${toggleCls(st.italic)} italic`}
+        >
+          I
+        </button>
+        <input
+          type="number"
+          min={6}
+          max={48}
+          value={fontSizes[field] ?? base}
+          onChange={e => setFontSizes(prev => ({ ...prev, [field]: Number(e.target.value) || base }))}
+          title="Font size (points)"
+          className="no-spin w-14 border border-gray-300 rounded-md px-1 py-0.5 text-[11px] text-gray-600 bg-white"
+        />
+      </div>
+    )
+  }
   const [width, setWidth] = useState(isEdit ? existing.width || 220 : 220)
   const [height, setHeight] = useState(isEdit ? existing.height || 90 : 90)
   // Assistant kind state
@@ -138,6 +171,7 @@ export default function AddNodeDialog({
       id: existing?.id,
       tier,
       font_sizes: fontSizes,
+      text_styles: textStyles,
     }
     if (kind === 'position') {
       if (!positionId) return alert('Pick a position.')
@@ -254,7 +288,7 @@ export default function AddNodeDialog({
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-5">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-5 max-h-[90vh] overflow-y-auto">
         <h3 className="text-base font-semibold mb-3">
           {mode === 'edit'
             ? `Edit ${TITLE_LABEL[kind] || 'Item'}`
@@ -319,7 +353,7 @@ export default function AddNodeDialog({
                   </option>
                 ))}
               </select>
-              <FontSize field="title" base={9} />
+              {fieldStyle('title', 9)}
             </div>
             <p className="text-[11px] text-gray-500 mt-2">
               Don't see the position you need?{' '}
@@ -341,7 +375,7 @@ export default function AddNodeDialog({
                   placeholder="Auto from position"
                   className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-gray-50 text-gray-600"
                 />
-                <FontSize field="name" base={8} />
+                {fieldStyle('name', 8)}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2 mt-3">
@@ -428,7 +462,7 @@ export default function AddNodeDialog({
                   placeholder="Operations"
                   className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm"
                 />
-                <FontSize field="label" base={14} />
+                {fieldStyle('label', 14)}
               </div>
             </div>
             <div>
@@ -442,7 +476,7 @@ export default function AddNodeDialog({
                   placeholder="e.g. Department"
                   className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm"
                 />
-                <FontSize field="heading" base={12} />
+                {fieldStyle('heading', 12)}
               </div>
             </div>
             <div>
@@ -465,7 +499,7 @@ export default function AddNodeDialog({
                     </option>
                   ))}
                 </select>
-                <FontSize field="title" base={10} />
+                {fieldStyle('title', 10)}
               </div>
             </div>
             {positionId && (
@@ -478,7 +512,7 @@ export default function AddNodeDialog({
                     placeholder="Auto from position"
                     className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-gray-50 text-gray-600"
                   />
-                  <FontSize field="name" base={8} />
+                  {fieldStyle('name', 8)}
                 </div>
               </div>
             )}
