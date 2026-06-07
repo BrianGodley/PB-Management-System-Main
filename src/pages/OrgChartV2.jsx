@@ -283,7 +283,20 @@ export default function OrgChartV2() {
     if (!node?.position_id) return null
     const pos = positions.find(p => Number(p.id) === Number(node.position_id))
     if (!pos) return null
-    const candidates = employeesByPosition.get(Number(pos.id)) || []
+    let candidates = employeesByPosition.get(Number(pos.id)) || []
+    // Fallback: some setups have duplicate position records (same title,
+    // different id). If the exact position has nobody assigned, look for any
+    // same-titled position that does.
+    if (candidates.length === 0 && pos.title) {
+      for (const p of positions) {
+        if (p.title !== pos.title || Number(p.id) === Number(pos.id)) continue
+        const c = employeesByPosition.get(Number(p.id))
+        if (c && c.length) {
+          candidates = c
+          break
+        }
+      }
+    }
     let chosen = null
     if (node.employee_id) chosen = candidates.find(c => c.id === node.employee_id) || null
     if (!chosen) chosen = candidates.find(c => c.active) || candidates[0] || null
@@ -878,9 +891,9 @@ export default function OrgChartV2() {
           ]
           posNodes.slice(0, 6).forEach(n => {
             const pos = positions.find(p => Number(p.id) === Number(n.position_id))
-            const cands = pos ? employeesByPosition.get(Number(pos.id)) || [] : []
+            const h = resolveNodeHolder(n)
             lines.push(
-              `node "${n.label || '?'}": position_id=${JSON.stringify(n.position_id)} posFound=${!!pos} holders=${cands.length}${cands[0] ? ' → ' + cands[0].displayName : ''}`,
+              `node "${n.label || '?'}": title="${pos?.title || '?'}" → ${h ? h.displayName : 'no position'}`,
             )
           })
           return lines.join('\n')
