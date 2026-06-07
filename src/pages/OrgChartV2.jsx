@@ -579,6 +579,16 @@ export default function OrgChartV2() {
     }
   }
 
+  // Persist a dragged connection line's vertical bus offset.
+  async function updateEdgeBus(edgeId, offset) {
+    setEdges(prev => prev.map(e => (e.id === edgeId ? { ...e, bus_offset: offset } : e)))
+    try {
+      await supabase.from('org_edges').update({ bus_offset: offset }).eq('id', edgeId)
+    } catch (e) {
+      alert('Could not save line position: ' + (e.message || e))
+    }
+  }
+
   async function handleNodeDropped(nodeId, newTier, newTierOrder, newXOffset) {
     const node = nodes.find(n => n.id === nodeId)
     if (!node) return
@@ -1226,6 +1236,7 @@ export default function OrgChartV2() {
               setDialog({ mode: 'edit', existing: n })
             }}
             onNodeDropped={handleNodeDropped}
+            onEdgeBusChange={updateEdgeBus}
             rowSpacing={rowSpacing}
             colSpacing={colSpacing}
             redNodeIds={changeMode ? [changeMode.itemId, changeMode.targetId].filter(Boolean) : []}

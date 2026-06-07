@@ -30,6 +30,7 @@ export default function TierCanvas({
   onEdgeClick,
   onBackgroundClick,
   onNodeDropped,
+  onEdgeBusChange,
   rowSpacing = {},
   colSpacing = {},
   redNodeIds = [],
@@ -230,6 +231,8 @@ export default function TierCanvas({
           laidOut={laidOutForRender}
           selectedEdgeId={selectedEdgeId}
           onEdgeClick={onEdgeClick}
+          editable={editable}
+          onEdgeBusChange={onEdgeBusChange}
         />
         {ordered.map(n => {
           let box = laidOut.get(n.id)
