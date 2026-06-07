@@ -27,7 +27,7 @@ const MIN_CHILD_COL = 110       // each child column never narrower than this
  *             tiers: { tier: number, y: number, h: number, nodes: RawNode[] }[],
  *             width: number, height: number }}
  */
-export function layoutTiers(nodes, rowSpacing = {}) {
+export function layoutTiers(nodes, rowSpacing = {}, colSpacing = {}) {
   // ── 1. Group sub-items by their container ────────────────────────────
   const childrenByContainer = new Map()
   for (const n of nodes) {
@@ -120,10 +120,14 @@ export function layoutTiers(nodes, rowSpacing = {}) {
   for (const t of tierKeys) {
     const tierNodes = byTier.get(t)
     const tierH = tierNodes.reduce((max, n) => Math.max(max, n.height || 64), 0)
+    // When a row has a column-spacing value set, items are auto-spaced
+    // left→right with that gap and manual x_offset nudges are ignored.
+    const autoSpace = Number.isFinite(colSpacing?.[t])
+    const colGap = autoSpace ? colSpacing[t] : NODE_GAP
     let cursorX = CANVAS_PAD_X
     for (const n of tierNodes) {
       const w = n.width || 180
-      const xOff = Number.isFinite(n.x_offset) ? n.x_offset : 0
+      const xOff = autoSpace ? 0 : Number.isFinite(n.x_offset) ? n.x_offset : 0
       laidOut.set(n.id, {
         id: n.id,
         x: cursorX + xOff,
@@ -131,7 +135,7 @@ export function layoutTiers(nodes, rowSpacing = {}) {
         width: w,
         height: tierH,
       })
-      cursorX += w + NODE_GAP
+      cursorX += w + colGap
     }
     const tierWidth = cursorX - NODE_GAP
     maxWidth = Math.max(maxWidth, tierWidth)

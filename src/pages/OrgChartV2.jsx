@@ -42,6 +42,10 @@ export default function OrgChartV2() {
   // tier number. Empty = use the system default for every row.
   const [rowSpacing, setRowSpacing] = useState({})
   const [rowSpacingOpen, setRowSpacingOpen] = useState(false)
+  // Per-row horizontal gap between items, keyed by tier. When set, items in
+  // that row auto-space from the left and ignore manual x_offset.
+  const [colSpacing, setColSpacing] = useState({})
+  const [colSpacingOpen, setColSpacingOpen] = useState(false)
   const [chartPickerOpen, setChartPickerOpen] = useState(false)
   // Change-mode state machine for rewiring existing connections.
   // type: 'change_senior' | 'change_child' | 'change_connection' | null
@@ -81,6 +85,17 @@ export default function OrgChartV2() {
       await supabase.from('org_charts').update({ row_spacing: next }).eq('id', chartId)
     } catch (e) {
       alert('Could not save row spacing: ' + (e.message || e))
+    }
+  }
+
+  // Update the horizontal item gap for one row/tier and persist it.
+  async function updateColSpacing(tier, value) {
+    const next = { ...colSpacing, [tier]: value }
+    setColSpacing(next)
+    try {
+      await supabase.from('org_charts').update({ col_spacing: next }).eq('id', chartId)
+    } catch (e) {
+      alert('Could not save column spacing: ' + (e.message || e))
     }
   }
 
@@ -146,6 +161,8 @@ export default function OrgChartV2() {
     setChartName(chart.name)
     setRowSpacing(chart.row_spacing || {})
     setRowSpacingOpen(false)
+    setColSpacing(chart.col_spacing || {})
+    setColSpacingOpen(false)
     setSelectedNodeId(null)
     setSelectedEdgeId(null)
     setConnectMode(false)
@@ -936,6 +953,58 @@ export default function OrgChartV2() {
                   </div>
                 )}
               </div>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setColSpacingOpen(v => !v)}
+                  className="text-sm px-3 py-1 rounded-md bg-slate-200 text-slate-700 hover:bg-slate-300 whitespace-nowrap"
+                >
+                  Column Spacing ▾
+                </button>
+                {colSpacingOpen && (
+                  <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 shadow-lg rounded-md z-50 w-60 py-2 px-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-slate-500">Item spacing per row (px)</span>
+                      <button
+                        type="button"
+                        onClick={() => setColSpacingOpen(false)}
+                        className="text-slate-400 hover:text-slate-700 text-sm leading-none"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    {presentTiers.length === 0 ? (
+                      <p className="text-xs text-slate-400 py-1">No rows yet.</p>
+                    ) : (
+                      presentTiers.map(t => (
+                        <div key={t} className="flex items-center justify-between gap-2 py-1">
+                          <span className="text-xs text-slate-600">Row {t + 1}</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={400}
+                            value={
+                              colSpacing[t] === ''
+                                ? ''
+                                : Number.isFinite(colSpacing[t])
+                                  ? colSpacing[t]
+                                  : NODE_GAP
+                            }
+                            onChange={ev =>
+                              updateColSpacing(t, ev.target.value === '' ? '' : Number(ev.target.value))
+                            }
+                            className="no-spin w-20 border border-slate-300 rounded-md px-1 py-0.5 text-xs"
+                          />
+                        </div>
+                      ))
+                    )}
+                    <p className="mt-1 text-[10px] text-slate-400 leading-snug">
+                      Sets the gap between items in each row and auto-spaces them from the
+                      left — overrides manual drag positions.
+                    </p>
+                  </div>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={resetPositions}
@@ -1116,6 +1185,7 @@ export default function OrgChartV2() {
             }}
             onNodeDropped={handleNodeDropped}
             rowSpacing={rowSpacing}
+            colSpacing={colSpacing}
             redNodeIds={changeMode ? [changeMode.itemId, changeMode.targetId].filter(Boolean) : []}
             onEdgeClick={id => {
               if (!editMode) return
