@@ -88,7 +88,8 @@ export function layoutTiers(nodes, rowSpacing = {}) {
   const tierKeys = [...byTier.keys()].sort((a, b) => a - b)
   const laidOut = new Map()
   const tiers = []
-  let cursorY = CANVAS_PAD_Y
+  // The 'top' override is the gap from the canvas top down to Row 1.
+  let cursorY = Number.isFinite(rowSpacing?.top) ? rowSpacing.top : CANVAS_PAD_Y
   let maxWidth = 0
 
   // Tiers that have an assistant attached to one of their nodes get a

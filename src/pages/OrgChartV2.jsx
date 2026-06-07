@@ -8,7 +8,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import TierCanvas from '../components/orgchart/TierCanvas.jsx'
 import AddNodeDialog from '../components/orgchart/AddNodeDialog.jsx'
-import { CANVAS_PAD_X, NODE_GAP, TIER_GAP } from '../components/orgchart/layout.js'
+import { CANVAS_PAD_X, CANVAS_PAD_Y, NODE_GAP, TIER_GAP } from '../components/orgchart/layout.js'
 
 const FG = '#3A5038'
 
@@ -835,25 +835,33 @@ export default function OrgChartV2() {
                     {presentTiers.length === 0 ? (
                       <p className="text-xs text-slate-400 py-1">No rows yet.</p>
                     ) : (
-                      presentTiers.map(t => (
-                        <div key={t} className="flex items-center justify-between gap-2 py-1">
-                          <span className="text-xs text-slate-600">Row {t + 1}</span>
-                          <input
-                            type="number"
-                            min={0}
-                            max={600}
-                            value={
-                              Number.isFinite(rowSpacing[t]) ? rowSpacing[t] : TIER_GAP
-                            }
-                            onChange={e => updateRowSpacing(t, Number(e.target.value) || 0)}
-                            className="w-20 border border-slate-300 rounded-md px-1 py-0.5 text-xs"
-                          />
-                        </div>
-                      ))
+                      presentTiers.map((t, idx) => {
+                        // First entry = gap from the top to Row 1; each later
+                        // entry = the gap between the previous row and this one.
+                        const isTop = idx === 0
+                        const key = isTop ? 'top' : presentTiers[idx - 1]
+                        const label = isTop
+                          ? `From Top to Row ${t + 1}`
+                          : `Row ${presentTiers[idx - 1] + 1} to Row ${t + 1}`
+                        const fallback = isTop ? CANVAS_PAD_Y : TIER_GAP
+                        return (
+                          <div key={key} className="flex items-center justify-between gap-2 py-1">
+                            <span className="text-xs text-slate-600">{label}</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={600}
+                              value={Number.isFinite(rowSpacing[key]) ? rowSpacing[key] : fallback}
+                              onChange={e => updateRowSpacing(key, Number(e.target.value) || 0)}
+                              className="w-20 border border-slate-300 rounded-md px-1 py-0.5 text-xs"
+                            />
+                          </div>
+                        )
+                      })
                     )}
                     <p className="mt-1 text-[10px] text-slate-400 leading-snug">
-                      Adjusts the gap below each row — connection lines and the
-                      rows below move closer or farther apart.
+                      Adjusts each vertical gap — connection lines and the rows
+                      move closer or farther apart.
                     </p>
                   </div>
                 )}
