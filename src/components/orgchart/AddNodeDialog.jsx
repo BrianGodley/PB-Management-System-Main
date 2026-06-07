@@ -253,6 +253,9 @@ export default function AddNodeDialog({
                   max={300}
                 />
               </div>
+              <p className="col-span-2 mt-1 text-[11px] leading-snug text-amber-600">
+                Note: height applies to the whole level — every item on the same row will match the tallest one.
+              </p>
             </div>
             <button
               type="button"
@@ -328,6 +331,9 @@ export default function AddNodeDialog({
                   max={600}
                 />
               </div>
+              <p className="col-span-2 mt-1 text-[11px] leading-snug text-amber-600">
+                Note: height applies to the whole level — every item on the same row will match the tallest one.
+              </p>
             </div>
             <button
               type="button"
