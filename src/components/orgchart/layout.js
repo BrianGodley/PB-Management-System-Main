@@ -170,7 +170,11 @@ export function layoutTiers(nodes) {
     const anchorNode = nodes.find(x => x.id === n.attached_to_node_id)
     const anchorTier = Number.isInteger(anchorNode?.tier) ? anchorNode.tier : 0
     const anchorGap = gapByTier.get(anchorTier) ?? TIER_GAP
-    const yMid = anchor.y + anchor.height + anchorGap / 2
+    // The junior connector "bus" line is routed at the middle of the gap
+    // (anchor bottom + gap/2). The assistant should sit ABOVE that bus,
+    // centered between the senior's bottom and the bus — i.e. a quarter of
+    // the way down the gap — not on the bus line itself.
+    const yMid = anchor.y + anchor.height + anchorGap / 4
     const x =
       side === 'left'
         ? anchor.x - ASSIST_GAP - w
