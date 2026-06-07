@@ -72,21 +72,6 @@ export default function OrgChartV2() {
       setPositions(positionsRes.data || [])
       setEmployees(employeesRes.data || [])
       setEmployeePositions(epRes.data || [])
-      // TEMP DIAGNOSTIC — remove once holder resolution is confirmed.
-      console.log('[OrgChart debug]', {
-        employees: employeesRes.data?.length,
-        employeePositions: epRes.data?.length,
-        epError: epRes.error?.message || null,
-        sampleEmployeePosition: epRes.data?.[0],
-        samplePosition: positionsRes.data?.[0],
-        sampleEmployee: employeesRes.data?.[0]
-          ? {
-              id: employeesRes.data[0].id,
-              idType: typeof employeesRes.data[0].id,
-              name: employeesRes.data[0].first_name,
-            }
-          : null,
-      })
       // Open the default chart (falls back to the first one).
       if (chartList.length) selectChart(chartList.find(c => c.is_default) || chartList[0])
     })()
@@ -235,19 +220,6 @@ export default function OrgChartV2() {
     setNodes(n.data || [])
     setEdges(e.data || [])
     setNodeTypes(t.data || [])
-    // TEMP DIAGNOSTIC — remove once holder resolution is confirmed.
-    console.log(
-      '[OrgChart debug] position nodes',
-      (n.data || [])
-        .filter(x => x.kind === 'position')
-        .slice(0, 5)
-        .map(x => ({
-          label: x.label,
-          position_id: x.position_id,
-          position_id_type: typeof x.position_id,
-          employee_id: x.employee_id,
-        })),
-    )
   }
 
   // Build position_id → employees[] using the employee_positions join.
@@ -889,28 +861,6 @@ export default function OrgChartV2() {
 
   return (
     <div className="h-full flex flex-col bg-slate-50">
-      {/* TEMP DIAGNOSTIC — remove once holder resolution is confirmed. */}
-      <div className="bg-yellow-50 border-b border-yellow-300 px-3 py-2 text-[11px] text-yellow-900 font-mono whitespace-pre-wrap">
-        {(() => {
-          const posNodes = nodes.filter(n => n.kind === 'position')
-          const epPosIds = [...new Set(employeePositions.map(ep => ep.position_id))].sort(
-            (a, b) => a - b,
-          )
-          const lines = [
-            `employee_positions rows loaded: ${employeePositions.length}  |  employees: ${employees.length}  |  positions: ${positions.length}`,
-            `position_ids WITH assignments: ${JSON.stringify(epPosIds)}`,
-            `sample employee_position: ${JSON.stringify(employeePositions[0] || null)}`,
-          ]
-          posNodes.slice(0, 6).forEach(n => {
-            const pos = positions.find(p => Number(p.id) === Number(n.position_id))
-            const h = resolveNodeHolder(n)
-            lines.push(
-              `node "${n.label || '?'}": title="${pos?.title || '?'}" → ${h ? h.displayName : 'no position'}`,
-            )
-          })
-          return lines.join('\n')
-        })()}
-      </div>
       {/* Top bar:
             LEFT   — view mode: Select-charts popover
                      edit mode: + Item

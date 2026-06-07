@@ -797,6 +797,20 @@ export default function EmployeeDetail() {
       return
     }
 
+    // Single source of truth: if the free-text Job Title matches a position
+    // the employee doesn't already hold, add that structured assignment so it
+    // shows in the Positions screen and the org chart (multiple roles allowed).
+    const jt = (draft.job_title || '').trim().toLowerCase()
+    if (jt) {
+      const match = positions.find(p => (p.title || '').trim().toLowerCase() === jt)
+      if (match && !empPositionIds.some(pid => Number(pid) === Number(match.id))) {
+        const { error: epErr } = await supabase
+          .from('employee_positions')
+          .insert({ employee_id: id, position_id: match.id })
+        if (!epErr) setEmpPositionIds(prev => [...prev, match.id])
+      }
+    }
+
     // Sync the email into auth.users + profiles via the admin RPC so
     // password reset, username login, and Supabase Auth all use the new
     // address (employees.email alone isn't enough — Supabase Auth has its
