@@ -26,10 +26,19 @@ const KIND_LABEL = {
   assistant: 'Assistant',
 }
 
+// Shorter labels used in modal titles ("Add Position", "Edit Area", …).
+const TITLE_LABEL = {
+  position: 'Position',
+  container: 'Area',
+  custom: 'Item',
+  assistant: 'Assistant',
+}
+
 export default function AddNodeDialog({
   mode,
   parentId,
   seniorOf,
+  fixedKind,
   existing,
   positions,
   employeesByPosition,
@@ -45,7 +54,11 @@ export default function AddNodeDialog({
   onChangeConnection,
 }) {
   const isEdit = mode === 'edit' && existing
-  const [kind, setKind] = useState(isEdit ? existing.kind || 'custom' : 'position')
+  const [kind, setKind] = useState(isEdit ? existing.kind || 'custom' : fixedKind || 'position')
+  // The kind picker only shows for the per-item Junior/Senior add flows
+  // (where the user genuinely chooses Position/Area/Assistant). Top-level
+  // adds come in with a fixedKind, and edits keep the existing kind.
+  const showKindPicker = mode === 'child' || mode === 'senior'
 
   const [label, setLabel] = useState(isEdit ? existing.label || '' : '')
 
@@ -200,32 +213,32 @@ export default function AddNodeDialog({
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-5">
         <h3 className="text-base font-semibold mb-3">
           {mode === 'edit'
-            ? 'Edit Item'
+            ? `Edit ${TITLE_LABEL[kind] || 'Item'}`
             : mode === 'child'
               ? 'Add Junior Item'
               : mode === 'senior'
                 ? 'Add Senior Item'
-                : 'Add Item'}
+                : `Add ${TITLE_LABEL[kind] || 'Item'}`}
         </h3>
 
-        <div className="flex gap-2 mb-4 text-sm">
-          {['position', 'container', 'custom', 'assistant'].map(k => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => !isEdit && setKind(k)}
-              disabled={isEdit}
-              title={isEdit ? "Can't change kind on an existing item" : ''}
-              className={`flex-1 py-1.5 rounded-md border ${
-                kind === k
-                  ? 'border-blue-600 bg-blue-50 text-blue-700 font-medium'
-                  : 'border-gray-200 hover:bg-gray-50 text-gray-600'
-              } ${isEdit ? 'opacity-60 cursor-not-allowed' : ''}`}
-            >
-              {KIND_LABEL[k]}
-            </button>
-          ))}
-        </div>
+        {showKindPicker && (
+          <div className="flex gap-2 mb-4 text-sm">
+            {['position', 'container', 'assistant'].map(k => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setKind(k)}
+                className={`flex-1 py-1.5 rounded-md border ${
+                  kind === k
+                    ? 'border-blue-600 bg-blue-50 text-blue-700 font-medium'
+                    : 'border-gray-200 hover:bg-gray-50 text-gray-600'
+                }`}
+              >
+                {KIND_LABEL[k]}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="mb-3">
           <label className="block text-xs font-medium text-gray-500 mb-1">Level (row)</label>
@@ -259,6 +272,17 @@ export default function AddNodeDialog({
                 </option>
               ))}
             </select>
+            <p className="text-[11px] text-gray-500 mb-2">
+              Don't see the position you need?{' '}
+              <a
+                href="/hr?addPosition=1"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 font-medium hover:underline"
+              >
+                Add It In the HR Module
+              </a>
+            </p>
             {renderPositionPicker(true)}
             <div className="grid grid-cols-2 gap-2 mt-3">
               <div>
@@ -379,8 +403,8 @@ export default function AddNodeDialog({
               <label className="block text-xs font-medium text-gray-500 mb-1">Grouping</label>
               <div className="flex gap-2">
                 {[
-                  { v: 'independent', label: 'Independent (decoration)' },
-                  { v: 'implicit', label: 'Implicit (owns items inside)' },
+                  { v: 'independent', label: 'Independent' },
+                  { v: 'implicit', label: 'Has Junior Areas' },
                 ].map(opt => (
                   <button
                     key={opt.v}

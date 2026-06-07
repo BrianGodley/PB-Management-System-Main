@@ -2,7 +2,7 @@
 // HR — Human Resources main page
 // Tabs: Employees | Applicants | Review Forms
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -251,6 +251,20 @@ export default function HR() {
   const isAdmin = (profiles || []).some(
     p => p.id === user?.id && (p.role === 'admin' || p.role === 'super_admin')
   )
+
+  // Deep link from the Org Chart "Add It In the HR Module" link. When the
+  // page is opened with ?addPosition=1, auto-open the Add Position modal
+  // for admins; non-admins get a rights message instead.
+  const [posRightsMsg, setPosRightsMsg] = useState(false)
+  const addPositionHandled = useRef(false)
+  useEffect(() => {
+    if (addPositionHandled.current || !hrData) return
+    const params = new URLSearchParams(window.location.search)
+    if (!params.get('addPosition')) return
+    addPositionHandled.current = true
+    if (isAdmin) openNewPosition()
+    else setPosRightsMsg(true)
+  }, [hrData, isAdmin])
 
   function openNewGroup() {
     setGroupForm({ name: '', description: '', color: '#16a34a' })
@@ -541,6 +555,17 @@ export default function HR() {
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="h-full flex flex-col">
+      {posRightsMsg && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[2000] bg-amber-50 border border-amber-300 text-amber-800 text-sm rounded-lg shadow-lg px-4 py-3 flex items-center gap-3">
+          <span>You don't have permission to add positions. Please contact an administrator.</span>
+          <button
+            onClick={() => setPosRightsMsg(false)}
+            className="text-amber-600 hover:text-amber-900 font-bold"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
         <h1 className="text-xl font-bold text-gray-900">Human Resources</h1>

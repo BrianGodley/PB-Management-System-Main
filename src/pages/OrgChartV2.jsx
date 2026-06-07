@@ -693,13 +693,29 @@ export default function OrgChartV2() {
             </button>
           )}
           {editMode && chartId && (
-            <button
-              type="button"
-              onClick={() => setDialog({ mode: 'new', parentId: null })}
-              className="text-sm px-3 py-1 rounded-md bg-blue-600 text-white whitespace-nowrap"
-            >
-              + Item
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => setDialog({ mode: 'new', parentId: null, fixedKind: 'position' })}
+                className="text-sm px-3 py-1 rounded-md bg-blue-600 text-white whitespace-nowrap"
+              >
+                + Position
+              </button>
+              <button
+                type="button"
+                onClick={() => setDialog({ mode: 'new', parentId: null, fixedKind: 'container' })}
+                className="text-sm px-3 py-1 rounded-md bg-indigo-600 text-white whitespace-nowrap"
+              >
+                + Area
+              </button>
+              <button
+                type="button"
+                onClick={() => setDialog({ mode: 'new', parentId: null, fixedKind: 'assistant' })}
+                className="text-sm px-3 py-1 rounded-md bg-sky-600 text-white whitespace-nowrap"
+              >
+                + Assistant
+              </button>
+            </>
           )}
         </div>
 
@@ -910,6 +926,7 @@ export default function OrgChartV2() {
           mode={dialog.mode}
           parentId={dialog.parentId}
           seniorOf={dialog.seniorOf}
+          fixedKind={dialog.fixedKind}
           existing={dialog.existing}
           positions={positions}
           employeesByPosition={employeesByPosition}
