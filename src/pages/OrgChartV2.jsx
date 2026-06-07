@@ -868,10 +868,13 @@ export default function OrgChartV2() {
       <div className="bg-yellow-50 border-b border-yellow-300 px-3 py-2 text-[11px] text-yellow-900 font-mono whitespace-pre-wrap">
         {(() => {
           const posNodes = nodes.filter(n => n.kind === 'position')
+          const epPosIds = [...new Set(employeePositions.map(ep => ep.position_id))].sort(
+            (a, b) => a - b,
+          )
           const lines = [
             `employee_positions rows loaded: ${employeePositions.length}  |  employees: ${employees.length}  |  positions: ${positions.length}`,
+            `position_ids WITH assignments: ${JSON.stringify(epPosIds)}`,
             `sample employee_position: ${JSON.stringify(employeePositions[0] || null)}`,
-            `sample position: ${JSON.stringify(positions[0] || null)}`,
           ]
           posNodes.slice(0, 6).forEach(n => {
             const pos = positions.find(p => Number(p.id) === Number(n.position_id))
