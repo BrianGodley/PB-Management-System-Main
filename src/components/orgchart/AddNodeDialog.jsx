@@ -71,15 +71,24 @@ export default function AddNodeDialog({
   )
 
   const [heading, setHeading] = useState(isEdit ? existing.heading || '' : '')
+  // A new junior area inherits its parent (senior) area's color by default.
+  const parentArea =
+    !isEdit && mode === 'child' && parentId
+      ? (allItems || []).find(n => n.id === parentId && n.kind === 'container')
+      : null
   const [bgColor, setBgColor] = useState(
-    isEdit && existing.bg_color ? existing.bg_color : CONTAINER_COLORS[0].bg,
+    isEdit && existing.bg_color
+      ? existing.bg_color
+      : parentArea?.bg_color || CONTAINER_COLORS[0].bg,
   )
   // Area fill style: 'solid' (colored fill) or 'border' (white fill + colored
   // border of borderWidth). Defaults to border.
   const [boxStyle, setBoxStyle] = useState(
     isEdit && existing.box_style && Object.keys(existing.box_style).length
       ? existing.box_style
-      : { fill: 'border', borderWidth: 2 },
+      : parentArea?.box_style && Object.keys(parentArea.box_style).length
+        ? { ...parentArea.box_style }
+        : { fill: 'border', borderWidth: 2 },
   )
   const [containerMode, setContainerMode] = useState(
     isEdit ? existing.container_mode || 'independent' : 'independent',
