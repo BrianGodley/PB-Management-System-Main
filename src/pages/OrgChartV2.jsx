@@ -534,7 +534,13 @@ export default function OrgChartV2() {
       return
     }
     const otherSibs = nodes
-      .filter(n => n.id !== nodeId && (n.tier ?? 0) === newTier)
+      .filter(
+        n =>
+          n.id !== nodeId &&
+          (n.tier ?? 0) === newTier &&
+          !n.parent_container_id &&
+          n.kind !== 'assistant',
+      )
       .sort((a, b) => (a.tier_order ?? 0) - (b.tier_order ?? 0))
     const reordered = [
       ...otherSibs.slice(0, newTierOrder),

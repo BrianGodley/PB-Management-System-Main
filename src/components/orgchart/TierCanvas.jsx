@@ -121,9 +121,13 @@ export default function TierCanvas({
     return tiers[tiers.length - 1].tier + 1
   }
 
+  // Only true row-mates count as siblings — exclude attached junior areas
+  // (sub-items) and assistants, which share a tier but aren't in the row.
+  const isRowMate = n => !n.parent_container_id && n.kind !== 'assistant'
+
   function findDropSlot(targetTier, xCenter, draggedId) {
     const siblingBoxes = nodes
-      .filter(n => n.id !== draggedId && (n.tier ?? 0) === targetTier)
+      .filter(n => n.id !== draggedId && isRowMate(n) && (n.tier ?? 0) === targetTier)
       .map(n => laidOut.get(n.id))
       .filter(Boolean)
       .sort((a, b) => a.x - b.x)
@@ -137,7 +141,7 @@ export default function TierCanvas({
 
   function naturalXForSlot(tier, tierOrder, draggedId) {
     const sibs = nodes
-      .filter(n => n.id !== draggedId && (n.tier ?? 0) === tier)
+      .filter(n => n.id !== draggedId && isRowMate(n) && (n.tier ?? 0) === tier)
       .sort((a, b) => (a.tier_order ?? 0) - (b.tier_order ?? 0))
     let x = CANVAS_PAD_X
     for (let i = 0; i < tierOrder && i < sibs.length; i++) {
