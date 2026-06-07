@@ -185,11 +185,25 @@ export function layoutTiers(nodes) {
     })
   }
 
+  // Canvas extent = the furthest right/bottom edge of any laid-out item,
+  // including x_offset (items dragged right) and assistants that stick out
+  // past the natural tier width. This way the working area grows to fit
+  // anything moved off to the right or bottom, and — because those
+  // positions are saved — it stays grown after a reload. The parent
+  // scroll container then shows scroll bars whenever this exceeds the
+  // viewport at the current zoom.
+  let contentRight = 0
+  let contentBottom = 0
+  for (const box of laidOut.values()) {
+    contentRight = Math.max(contentRight, box.x + box.width)
+    contentBottom = Math.max(contentBottom, box.y + box.height)
+  }
+
   return {
     laidOut,
     tiers,
-    width: maxWidth + CANVAS_PAD_X,
-    height: cursorY,
+    width: Math.max(maxWidth, contentRight) + CANVAS_PAD_X,
+    height: contentBottom + CANVAS_PAD_Y,
   }
 }
 
