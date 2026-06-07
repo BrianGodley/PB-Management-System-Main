@@ -160,17 +160,19 @@ export default function TierCanvas({
     const node = nodes.find(n => n.id === drag.nodeId)
     const box = laidOut.get(drag.nodeId)
     if (node && box && onNodeDropped) {
+      const MIN_LEFT = 4 // never let an item's left edge cross the margin
       if (node.kind === 'assistant') {
         // Assistants aren't part of a tier row — their position is
-        // anchor-relative. Dragging only nudges their horizontal offset,
-        // so the new offset is simply the old offset plus how far it moved.
-        const newXOffset = Math.round((node.x_offset || 0) + drag.dx)
+        // anchor-relative. Dragging only nudges their horizontal offset.
+        const base = box.x - (node.x_offset || 0)
+        let newXOffset = Math.round((node.x_offset || 0) + drag.dx)
+        if (base + newXOffset < MIN_LEFT) newXOffset = Math.round(MIN_LEFT - base)
         onNodeDropped(drag.nodeId, node.tier ?? 0, 0, newXOffset)
       } else {
-        const dropLeftX = box.x + drag.dx
         // Items are locked to their level: dragging only changes left/right
-        // order within the same tier, never the tier itself. Use the Level
-        // field in the Add/Edit dialog to move an item up or down.
+        // order within the same tier, never the tier itself. Clamp so the
+        // item can't be dropped off the left edge (where it can't be reached).
+        const dropLeftX = Math.max(MIN_LEFT, box.x + drag.dx)
         const newTier = node.tier ?? 0
         const dropCenterX = dropLeftX + box.width / 2
         const newTierOrder = findDropSlot(newTier, dropCenterX, drag.nodeId)
