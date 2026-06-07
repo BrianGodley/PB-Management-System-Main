@@ -938,13 +938,14 @@ export default function HR() {
                 onClick={() => setEditingPosition(null)}
               >
                 <div
-                  className="bg-white border border-gray-200 rounded-xl p-5 my-8 shadow-2xl w-full max-w-2xl"
+                  className="bg-white border border-gray-200 rounded-xl p-5 my-8 shadow-2xl w-full max-w-4xl"
                   onClick={e => e.stopPropagation()}
                 >
                 <h3 className="font-semibold text-gray-900 mb-4">
                   {editingPosition === 'new' ? 'New Position' : `Edit: ${editingPosition.title}`}
                 </h3>
-                <div className="space-y-3 mb-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-4">
+                  <div className="space-y-3">
                   <div>
                     <label className="text-xs font-medium text-gray-500 block mb-1">
                       Position Title *
@@ -1077,6 +1078,7 @@ export default function HR() {
                         </div>
                       </div>
                     )}
+                  </div>
                   </div>
 
                   <div>
