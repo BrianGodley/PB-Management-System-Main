@@ -402,7 +402,10 @@ export default function OrgChartV2() {
           // layout) instead of a separate child a tier below with an arrow.
           if (payload.attachDirect && parent.kind === 'container') {
             parent_container_id = parent.id
-            tier = parent.tier ?? 0
+            // Store one tier below the parent so the Level reads correctly and
+            // keeps incrementing as junior areas are nested. (Attached areas are
+            // positioned by their parent link, not by tier, so this is safe.)
+            tier = (parent.tier ?? 0) + 1
             tier_order = nodes
               .filter(n => n.parent_container_id === parent.id)
               .reduce((max, n) => Math.max(max, (n.tier_order ?? 0) + 1), 0)
