@@ -232,7 +232,7 @@ export default function AddNodeDialog({
             {renderPositionPicker(true)}
             <div className="grid grid-cols-2 gap-2 mt-3">
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Width (px)</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Width</label>
                 <input
                   type="number"
                   value={width}
@@ -243,7 +243,7 @@ export default function AddNodeDialog({
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Height (px)</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Height</label>
                 <input
                   type="number"
                   value={height}
@@ -307,7 +307,7 @@ export default function AddNodeDialog({
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Width (px)</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Width</label>
                 <input
                   type="number"
                   value={width}
@@ -318,7 +318,7 @@ export default function AddNodeDialog({
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Height (px)</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Height</label>
                 <input
                   type="number"
                   value={height}
