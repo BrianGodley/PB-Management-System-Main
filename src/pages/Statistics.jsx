@@ -914,6 +914,7 @@ function TargetLinesSection({ targetLines, setTargetLines, tracking }) {
 function BasicStatForm({
   initialData,
   profiles,
+  positions,
   onSave,
   onClose,
   onDelete,
@@ -1296,9 +1297,18 @@ function BasicStatForm({
                       ))}
                     </select>
                   ) : (
-                    <div className="text-xs text-gray-400 italic px-3 py-2 border border-dashed border-gray-300 rounded-lg">
-                      Position assignment coming soon
-                    </div>
+                    <select
+                      className={inp}
+                      value={form.owner_position_id}
+                      onChange={e => set('owner_position_id', e.target.value)}
+                    >
+                      <option value="">— Select Position —</option>
+                      {(positions || []).map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.title}
+                        </option>
+                      ))}
+                    </select>
                   )}
                 </div>
               </div>
@@ -3272,7 +3282,7 @@ function EquationStatForm({
                 ))}
               </div>
               <div className="flex-1 min-w-0">
-                {form.owner_type === 'user' && (
+                {form.owner_type === 'user' ? (
                   <select
                     value={form.owner_user_id}
                     onChange={e => set('owner_user_id', e.target.value)}
@@ -3282,6 +3292,19 @@ function EquationStatForm({
                     {(profiles || []).map(p => (
                       <option key={p.id} value={p.id}>
                         {p.full_name || p.email}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <select
+                    value={form.owner_position_id}
+                    onChange={e => set('owner_position_id', e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                  >
+                    <option value="">— select position —</option>
+                    {(positions || []).map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.title}
                       </option>
                     ))}
                   </select>
@@ -3864,7 +3887,7 @@ function OverlayStatForm({
                 ))}
               </div>
               <div className="flex-1 min-w-0">
-                {form.owner_type === 'user' && (
+                {form.owner_type === 'user' ? (
                   <select
                     value={form.owner_user_id}
                     onChange={e => set('owner_user_id', e.target.value)}
@@ -3874,6 +3897,19 @@ function OverlayStatForm({
                     {(profiles || []).map(p => (
                       <option key={p.id} value={p.id}>
                         {p.full_name || p.email}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <select
+                    value={form.owner_position_id}
+                    onChange={e => set('owner_position_id', e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                  >
+                    <option value="">— select position —</option>
+                    {(positions || []).map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.title}
                       </option>
                     ))}
                   </select>
@@ -4038,7 +4074,7 @@ function aggregateValues(sourceValues, outputTracking, method) {
   return result.sort((a, b) => a.period_date.localeCompare(b.period_date))
 }
 
-function SecondaryStatForm({ initialData, allStats, profiles, onSave, onClose, onDelete, onOpenShares }) {
+function SecondaryStatForm({ initialData, allStats, profiles, positions, onSave, onClose, onDelete, onOpenShares }) {
   const { user } = useAuth()
 
   // Eligible source stats: basic stats only (not secondary/equation/overlay/target)
@@ -4369,9 +4405,18 @@ function SecondaryStatForm({ initialData, allStats, profiles, onSave, onClose, o
                     ))}
                   </select>
                 ) : (
-                  <div className="text-xs text-gray-400 italic px-3 py-2 border border-dashed border-gray-300 rounded-lg">
-                    Position assignment coming soon
-                  </div>
+                  <select
+                    value={form.owner_position_id}
+                    onChange={e => set('owner_position_id', e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
+                  >
+                    <option value="">— Select Position —</option>
+                    {(positions || []).map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.title}
+                      </option>
+                    ))}
+                  </select>
                 )}
               </div>
             </div>
@@ -4696,7 +4741,7 @@ const AUTO_SOURCE_MAP = Object.fromEntries(
 )
 
 // ── AutoStatForm ──────────────────────────────────────────────────────────────
-function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete, onOpenShares }) {
+function AutoStatForm({ initialData, profiles, positions, onSave, onClose, onDelete, onOpenShares }) {
   const { user } = useAuth()
   const isEdit = !!initialData?.id
 
@@ -5018,9 +5063,18 @@ function AutoStatForm({ initialData, profiles, onSave, onClose, onDelete, onOpen
                           ))}
                         </select>
                       ) : (
-                        <div className="text-xs text-gray-400 italic px-3 py-2 border border-dashed border-gray-300 rounded-lg">
-                          Position assignment coming soon
-                        </div>
+                        <select
+                          value={form.owner_position_id}
+                          onChange={e => set('owner_position_id', e.target.value)}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                        >
+                          <option value="">— Select Position —</option>
+                          {(positions || []).map(p => (
+                            <option key={p.id} value={p.id}>
+                              {p.title}
+                            </option>
+                          ))}
+                        </select>
                       )}
                     </div>
                   </div>
@@ -8289,6 +8343,7 @@ export default function Statistics() {
   const [values, setValues] = useState([]) // values for selectedStat
   const [valuesStatId, setValuesStatId] = useState(null) // which stat id the values belong to
   const [profiles, setProfiles] = useState([])
+  const [positions, setPositions] = useState([])
   // Admin flag derived from profiles.role for the current user. Used to
   // gate admin-only UI like the Master tab in Settings.
   const isCurrentUserAdmin = (profiles || []).some(
@@ -8468,7 +8523,7 @@ export default function Statistics() {
 
   async function fetchAll() {
     setLoading(true)
-    const [profRes, stsRes, settingsRes, grpRes] = await Promise.all([
+    const [profRes, stsRes, settingsRes, grpRes, posRes] = await Promise.all([
       supabase.from('profiles').select('id, email, full_name, role').order('full_name'),
       supabase
         .from('statistics')
@@ -8484,8 +8539,10 @@ export default function Statistics() {
         .select('*')
         .order('sort_order', { ascending: true })
         .order('name'),
+      supabase.from('positions').select('id, title').order('title'),
     ])
     setStatGroups(grpRes.data || [])
+    setPositions(posRes.data || [])
     console.log(
       '[Statistics] fetchAll — stats result:',
       stsRes.data?.length ?? 'null',
@@ -10740,6 +10797,7 @@ export default function Statistics() {
         <BasicStatForm
           initialData={editingData}
           profiles={profiles}
+          positions={positions}
           onSave={handleSaveForm}
           onDelete={handleDeleteStat}
           onClose={() => {
@@ -10756,6 +10814,7 @@ export default function Statistics() {
         <EquationStatForm
           initialData={editingData}
           profiles={profiles}
+          positions={positions}
           allStats={stats}
           onSave={handleSaveForm}
           onDelete={handleDeleteStat}
@@ -10770,6 +10829,7 @@ export default function Statistics() {
         <OverlayStatForm
           initialData={editingData}
           profiles={profiles}
+          positions={positions}
           allStats={stats}
           onSave={handleSaveForm}
           onDelete={handleDeleteStat}
@@ -10784,6 +10844,7 @@ export default function Statistics() {
         <SecondaryStatForm
           initialData={editingData}
           profiles={profiles}
+          positions={positions}
           allStats={stats}
           onSave={handleSaveForm}
           onDelete={handleDeleteStat}
@@ -10798,6 +10859,7 @@ export default function Statistics() {
         <AutoStatForm
           initialData={editingData}
           profiles={profiles}
+          positions={positions}
           onSave={handleSaveForm}
           onDelete={handleDeleteStat}
           onClose={() => {

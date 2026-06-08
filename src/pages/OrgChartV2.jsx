@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import TierCanvas from '../components/orgchart/TierCanvas.jsx'
 import AddNodeDialog from '../components/orgchart/AddNodeDialog.jsx'
+import ItemInfoModal from '../components/orgchart/InfoModals.jsx'
 import { CANVAS_PAD_X, CANVAS_PAD_Y, NODE_GAP, TIER_GAP } from '../components/orgchart/layout.js'
 
 const FG = '#3A5038'
@@ -38,6 +39,10 @@ export default function OrgChartV2() {
   const [zoom, setZoom] = useState(1)
   const [editMode, setEditMode] = useState(false)
   const [contextMenu, setContextMenu] = useState(null)
+  // Item-info modal: clicking an item (in either mode) opens a read-only info
+  // view. For positions it shows the holder + assigned stats; for areas it
+  // shows an expanded view with drill-down into junior items.
+  const [infoNodeId, setInfoNodeId] = useState(null)
   // Per-row (per-tier) spacing overrides for the current chart, keyed by
   // tier number. Empty = use the system default for every row.
   const [rowSpacing, setRowSpacing] = useState({})
@@ -594,6 +599,79 @@ export default function OrgChartV2() {
           await supabase.from('org_nodes').update({ height: newHeight }).in('id', sibIds)
         }
       }
+
+      // Per-row WIDTH: when a position/area width changes, every other object
+      // on the same main row adopts that exact width. Junior areas are sized
+      // automatically by the layout, so they're not part of width propagation.
+      const newWidth = payload.width || 110
+      if (
+        prevNode &&
+        !prevNode.parent_container_id &&
+        prevNode.kind !== 'assistant' &&
+        (prevNode.width ?? 110) !== newWidth
+      ) {
+        const rowTier = update.tier ?? prevNode?.tier ?? 0
+        const sibIds = nodes
+          .filter(
+            n =>
+              n.id !== payload.id &&
+              !n.parent_container_id &&
+              n.kind !== 'assistant' &&
+              (n.tier ?? 0) === rowTier,
+          )
+          .map(n => n.id)
+        if (sibIds.length) {
+          setNodes(prev => prev.map(p => (sibIds.includes(p.id) ? { ...p, width: newWidth } : p)))
+          await supabase.from('org_nodes').update({ width: newWidth }).in('id', sibIds)
+        }
+      }
+
+      // Per-row border THICKNESS: when an area's border thickness changes,
+      // every other AREA sharing its row adopts the same thickness — both the
+      // main row and, for attached juniors, the shared junior-area row. Each
+      // sibling keeps the rest of its box_style (fill, etc.); only borderWidth
+      // is overwritten.
+      const newThickness = payload.box_style ? payload.box_style.borderWidth : undefined
+      if (
+        prevNode &&
+        Number.isFinite(newThickness) &&
+        (prevNode.box_style?.borderWidth) !== newThickness
+      ) {
+        let sibs
+        if (!prevNode.parent_container_id) {
+          const rowTier = update.tier ?? prevNode?.tier ?? 0
+          sibs = nodes.filter(
+            n =>
+              n.id !== payload.id &&
+              !n.parent_container_id &&
+              (n.tier ?? 0) === rowTier,
+          )
+        } else {
+          const parent = nodes.find(n => n.id === prevNode.parent_container_id)
+          const parentTier = parent?.tier ?? 0
+          sibs = nodes.filter(n => {
+            if (n.id === payload.id || !n.parent_container_id) return false
+            const p = nodes.find(x => x.id === n.parent_container_id)
+            return (p?.tier ?? 0) === parentTier
+          })
+        }
+        sibs = sibs.filter(n => n.kind === 'container')
+        if (sibs.length) {
+          const updated = sibs.map(n => ({
+            id: n.id,
+            box_style: { ...(n.box_style || {}), borderWidth: newThickness },
+          }))
+          setNodes(prev =>
+            prev.map(p => {
+              const u = updated.find(x => x.id === p.id)
+              return u ? { ...p, box_style: u.box_style } : p
+            }),
+          )
+          for (const u of updated) {
+            await supabase.from('org_nodes').update({ box_style: u.box_style }).eq('id', u.id)
+          }
+        }
+      }
       setDialog(null)
     } catch (e) {
       alert(e.message || String(e))
@@ -884,12 +962,21 @@ export default function OrgChartV2() {
       }
       setSelectedNodeId(nodeId)
       setSelectedEdgeId(null)
-      // Show contextual menu only in edit mode
-      if (editMode && screenRect) setContextMenu({ nodeId, screenRect })
-      else setContextMenu(null)
+      // A plain click on an item opens its info modal in BOTH modes. The edit
+      // menu is reached separately via the pencil icon (onNodeEditIconClick).
+      setContextMenu(null)
+      setInfoNodeId(nodeId)
     },
     [changeMode, connectMode, connectSource, nodes, chartId, editMode],
   )
+
+  // Pencil-icon click (edit mode only): open the item's edit/context menu.
+  const onNodeEditIconClick = useCallback((nodeId, screenRect) => {
+    setSelectedNodeId(nodeId)
+    setSelectedEdgeId(null)
+    setInfoNodeId(null)
+    if (screenRect) setContextMenu({ nodeId, screenRect })
+  }, [])
 
   const selectedNode = nodes.find(n => n.id === selectedNodeId) || null
 
@@ -1287,6 +1374,7 @@ export default function OrgChartV2() {
             selectedNodeId={selectedNodeId}
             selectedEdgeId={selectedEdgeId}
             onNodeClick={onNodeClick}
+            onNodeEditIconClick={onNodeEditIconClick}
             onNodeDoubleClick={nodeId => {
               const n = nodes.find(x => x.id === nodeId)
               if (!n) return
@@ -1415,6 +1503,21 @@ export default function OrgChartV2() {
           }}
         />
       )}
+
+      {infoNodeId != null &&
+        (() => {
+          const infoNode = nodes.find(n => n.id === infoNodeId)
+          if (!infoNode) return null
+          return createPortal(
+            <ItemInfoModal
+              node={infoNode}
+              nodes={nodes}
+              resolveNodeHolder={resolveNodeHolder}
+              onClose={() => setInfoNodeId(null)}
+            />,
+            document.body,
+          )
+        })()}
     </div>
   )
 }

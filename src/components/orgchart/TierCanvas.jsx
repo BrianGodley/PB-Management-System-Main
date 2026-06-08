@@ -26,6 +26,7 @@ export default function TierCanvas({
   selectedNodeId,
   selectedEdgeId,
   onNodeClick,
+  onNodeEditIconClick,
   onNodeDoubleClick,
   onEdgeClick,
   onBackgroundClick,
@@ -89,6 +90,32 @@ export default function TierCanvas({
     const a = tl.matrixTransform(ctm)
     const b = br.matrixTransform(ctm)
     return { left: a.x, top: a.y, right: b.x, bottom: b.y, width: b.x - a.x, height: b.y - a.y }
+  }
+
+  // Edit affordance: in edit mode, a small pencil button sits in each node's
+  // lower-right corner. Clicking it opens the item's edit menu (instead of the
+  // info modal that a plain click on the body shows). stopPropagation keeps it
+  // from starting a drag or triggering the body click.
+  function renderEditIcon(box, nodeId) {
+    if (!editable || !onNodeEditIconClick) return null
+    const ix = box.x + box.width - 17
+    const iy = box.y + box.height - 17
+    return (
+      <g
+        style={{ cursor: 'pointer' }}
+        onMouseDown={e => {
+          e.stopPropagation()
+          e.preventDefault()
+          onNodeEditIconClick(nodeId, nodeScreenRect(nodeId))
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <rect x={ix} y={iy} width={15} height={15} rx={4} fill="#ffffff" stroke="#94a3b8" strokeWidth={1} />
+        <text x={ix + 7.5} y={iy + 11} textAnchor="middle" fontSize="10" fill="#475569" pointerEvents="none">
+          ✎
+        </text>
+      </g>
+    )
   }
 
   function handleNodeMouseDown(e, nodeId) {
@@ -260,6 +287,7 @@ export default function TierCanvas({
                   positionTitle={ph?.positionTitle}
                   displayName={ph?.displayName}
                 />
+                {renderEditIcon(box, n.id)}
               </g>
             )
           }
@@ -276,6 +304,7 @@ export default function TierCanvas({
                   positionTitle={ph.positionTitle}
                   displayName={ph.displayName}
                 />
+                {renderEditIcon(box, n.id)}
               </g>
             )
           }
@@ -288,6 +317,7 @@ export default function TierCanvas({
                 selected={selected}
                 onClick={onClick}
               />
+              {renderEditIcon(box, n.id)}
             </g>
           )
         })}
