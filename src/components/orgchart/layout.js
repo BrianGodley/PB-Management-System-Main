@@ -165,7 +165,27 @@ export function layoutTiers(nodes, rowSpacing = {}, colSpacing = {}) {
   // ── 4. Lay out junior areas as columns BELOW their container ─────────
   // They butt directly against the container's bottom edge and split the
   // container's full width equally (skinnier as more are added).
-  for (const [containerId, kids] of childrenByContainer.entries()) {
+  //
+  // Process parents before children (by nesting depth) so that nested junior
+  // areas — e.g. sections attached under a department that is itself attached
+  // under a division — are positioned only after their own container's box has
+  // been laid out. Without this, a deeper junior whose container appeared first
+  // in the data was silently dropped (its container box wasn't set yet).
+  const depthOfContainer = id => {
+    let d = 0
+    let cur = nodes.find(x => x.id === id)
+    const seen = new Set()
+    while (cur && cur.parent_container_id && !seen.has(cur.id)) {
+      seen.add(cur.id)
+      cur = nodes.find(x => x.id === cur.parent_container_id)
+      d++
+    }
+    return d
+  }
+  const orderedContainers = [...childrenByContainer.entries()].sort(
+    (a, b) => depthOfContainer(a[0]) - depthOfContainer(b[0]),
+  )
+  for (const [containerId, kids] of orderedContainers) {
     const cBox = laidOut.get(containerId)
     if (!cBox) continue
     const n = kids.length
