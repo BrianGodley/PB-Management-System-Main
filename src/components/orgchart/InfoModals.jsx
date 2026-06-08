@@ -146,7 +146,7 @@ function PositionView({ node, resolveNodeHolder }) {
                   </div>
                   <div className="mt-1 text-xs text-slate-600">
                     <span className="font-semibold" style={{ color: FG }}>
-                      🤖 Sam:{' '}
+                      Sam:{' '}
                     </span>
                     {syn.loading ? (
                       <span className="text-slate-400 italic">thinking…</span>

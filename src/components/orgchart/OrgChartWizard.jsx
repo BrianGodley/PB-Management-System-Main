@@ -13,6 +13,35 @@ import { CONTAINER_COLORS } from './palette.js'
 
 const FG = '#16491b'
 
+// The "Sam" assistant icon (same mark as the app header), for inline use on
+// buttons. A faint border keeps the white circle visible on light backgrounds.
+function SamIcon({ size = 18 }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 40 40"
+      aria-hidden="true"
+      style={{ display: 'inline-block', verticalAlign: 'middle' }}
+    >
+      <circle cx="20" cy="20" r="19" fill="#FFFFFF" stroke="#E2E8F0" />
+      <rect x="6" y="9" width="28" height="18" rx="5" fill="#FAC775" />
+      <path d="M11 26 L9 32 L17 27 Z" fill="#FAC775" />
+      <text
+        x="20"
+        y="22"
+        textAnchor="middle"
+        fontFamily="Arial, sans-serif"
+        fontWeight="700"
+        fontSize="11"
+        fill="#412402"
+      >
+        Sam
+      </text>
+    </svg>
+  )
+}
+
 // Ask Sam (the agent-chat edge function) a one-shot question; returns the reply.
 async function askSam(message) {
   const {
@@ -325,6 +354,22 @@ export default function OrgChartWizard({
     })
   }
 
+  const TOTAL = 7
+  const canProceed =
+    step === 2
+      ? !!name.trim()
+      : step === 5
+        ? !!topTitle.trim()
+        : step === 6
+          ? filledDivisions.length > 0
+          : true
+
+  // Shared big-lettering styles for the one-question-per-step modals.
+  const qHeading = 'text-2xl font-bold text-slate-800'
+  const qHelp = 'mt-3 text-base text-slate-500 leading-snug'
+  const bigInput =
+    'w-full border-2 border-slate-300 rounded-xl px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-green-600'
+
   return (
     <div
       className="fixed inset-0 z-[80] bg-black/40 flex items-center justify-center p-4"
@@ -332,75 +377,92 @@ export default function OrgChartWizard({
     >
       <div
         onClick={e => e.stopPropagation()}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh] overflow-hidden"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl min-h-[72vh] max-h-[94vh] flex flex-col overflow-hidden"
       >
-        <div className="flex items-center justify-between px-6 py-3" style={{ backgroundColor: FG }}>
-          <h2 className="text-base font-bold text-white">🧭 Org Chart Wizard — Step {step} of 3</h2>
-          <button onClick={onClose} className="text-white/70 hover:text-white text-xl leading-none">
-            ✕
-          </button>
+        <div className="flex items-center justify-between px-6 py-4" style={{ backgroundColor: FG }}>
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <SamIcon size={22} /> Org Chart Wizard
+          </h2>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-white/80">
+              Step {step} of {TOTAL}
+            </span>
+            <button onClick={onClose} className="text-white/70 hover:text-white text-2xl leading-none">
+              ✕
+            </button>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+        <div className="flex-1 overflow-y-auto px-8 py-8">
+          {/* Step 1 — kind of chart */}
           {step === 1 && (
-            <>
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">
-                  What kind of chart do you want?
-                </label>
-                <div className="flex gap-2">
-                  {[
-                    ['positions', 'Positions only', 'A hierarchy of job positions connected by reporting lines.'],
-                    ['areas', 'Functions / areas only', 'Boxes for the areas/functions of the business — no individual positions.'],
-                    ['combination', 'Combination', 'Business areas, each led by a position, with junior roles inside.'],
-                  ].map(([v, lab]) => (
-                    <button
-                      key={v}
-                      type="button"
-                      onClick={() => setChartType(v)}
-                      className={`flex-1 py-1.5 px-2 rounded-md border text-xs font-medium ${
-                        chartType === v
-                          ? 'border-green-600 bg-green-50 text-green-700'
-                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+            <div>
+              <h3 className={qHeading}>What kind of chart do you want?</h3>
+              <div className="mt-5 space-y-3">
+                {[
+                  ['positions', 'Positions only', 'A hierarchy of job positions connected by reporting lines.'],
+                  ['areas', 'Functions / areas only', 'Boxes for the areas/functions of the business — no individual positions.'],
+                  ['combination', 'Combination', 'Business areas, each led by a position, with junior roles inside.'],
+                ].map(([v, lab, desc]) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setChartType(v)}
+                    className={`w-full text-left px-5 py-4 rounded-xl border-2 transition-colors ${
+                      chartType === v
+                        ? 'border-green-600 bg-green-50'
+                        : 'border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span
+                      className={`block text-lg font-semibold ${
+                        chartType === v ? 'text-green-800' : 'text-slate-800'
                       }`}
                     >
                       {lab}
-                    </button>
-                  ))}
-                </div>
-                <p className="mt-2 text-xs text-slate-500 leading-snug">
-                  {
-                    {
-                      positions: 'A hierarchy of job positions connected by reporting lines.',
-                      areas:
-                        'Boxes for the areas/functions of the business — no individual positions.',
-                      combination:
-                        'Business areas, each led by a position, with junior roles inside.',
-                    }[chartType]
-                  }
+                    </span>
+                    <span className="block text-sm text-slate-500 mt-0.5">{desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Step 2 — chart name */}
+          {step === 2 && (
+            <div>
+              <h3 className={qHeading}>What should we name this chart?</h3>
+              <input
+                autoFocus
+                value={name}
+                onChange={e => setName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && canProceed && setStep(s => s + 1)}
+                placeholder="e.g. Operations 2026"
+                className={`mt-5 ${bigInput}`}
+              />
+            </div>
+          )}
+
+          {/* Step 3 — industry + sub-sector */}
+          {step === 3 && (
+            <div>
+              <h3 className={qHeading}>What industry is this for?</h3>
+              <p className={qHelp}>Helps Sam tailor its suggestions. Optional.</p>
+              {industries.length === 0 ? (
+                <p className="mt-5 text-base text-slate-400 italic">
+                  No industries set up yet — you can add them in Org Chart → Settings.
                 </p>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Chart name</label>
-                <input
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
-                />
-              </div>
-              {industries.length > 0 && (
-                <div className="grid grid-cols-2 gap-3">
+              ) : (
+                <div className="mt-5 space-y-4">
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">
-                      Industry (helps Sam tailor suggestions)
-                    </label>
+                    <label className="block text-base font-semibold text-slate-700 mb-1">Industry</label>
                     <select
                       value={industryId}
                       onChange={e => {
                         setIndustryId(e.target.value)
-                        setSubcategoryId('') // reset subcategory when industry changes
+                        setSubcategoryId('')
                       }}
-                      className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+                      className={bigInput}
                     >
                       <option value="">— Any / not specified —</option>
                       {industries.map(c => (
@@ -411,14 +473,14 @@ export default function OrgChartWizard({
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">
-                      Sub-sector (optional)
+                    <label className="block text-base font-semibold text-slate-700 mb-1">
+                      Sub-sector
                     </label>
                     <select
                       value={subcategoryId}
                       onChange={e => setSubcategoryId(e.target.value)}
                       disabled={!industryId || subsForIndustry.length === 0}
-                      className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+                      className={`${bigInput} disabled:bg-slate-50 disabled:text-slate-400`}
                     >
                       <option value="">
                         {!industryId
@@ -436,82 +498,94 @@ export default function OrgChartWizard({
                   </div>
                 </div>
               )}
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">
-                  Describe your company (helps Sam suggest a structure)
-                </label>
-                <textarea
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                  rows={2}
-                  placeholder="e.g. a residential landscaping company with ~40 staff"
-                  className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">
-                  {chartType === 'areas' ? 'Top area / function' : 'Top leadership position'}
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    value={topTitle}
-                    onChange={e => setTopTitle(e.target.value)}
-                    placeholder={chartType === 'areas' ? 'e.g. Organization' : 'e.g. President'}
-                    className="flex-1 border border-slate-300 rounded-md px-2 py-1.5 text-sm"
-                  />
-                  <button
-                    type="button"
-                    onClick={samSuggestTop}
-                    disabled={samBusy}
-                    className="px-3 py-1.5 text-sm rounded-md border border-green-600 text-green-700 hover:bg-green-50 disabled:opacity-50 whitespace-nowrap"
-                  >
-                    🤖 Ask Sam
-                  </button>
-                </div>
-              </div>
-            </>
+            </div>
           )}
 
-          {step === 2 && (
-            <>
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-slate-700">
+          {/* Step 4 — description */}
+          {step === 4 && (
+            <div>
+              <h3 className={qHeading}>Describe your business</h3>
+              <p className={qHelp}>
+                A sentence or two gives Sam context for its suggestions. Optional.
+              </p>
+              <textarea
+                autoFocus
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                rows={4}
+                placeholder="e.g. a mid-sized firm of about 40 staff with field crews and an office team"
+                className={`mt-5 ${bigInput}`}
+              />
+            </div>
+          )}
+
+          {/* Step 5 — top of the org */}
+          {step === 5 && (
+            <div>
+              <h3 className={qHeading}>
+                {chartType === 'areas' ? 'What is the top area / function?' : 'Who is at the top?'}
+              </h3>
+              <div className="mt-5 flex gap-3">
+                <input
+                  autoFocus
+                  value={topTitle}
+                  onChange={e => setTopTitle(e.target.value)}
+                  placeholder={chartType === 'areas' ? 'e.g. Organization' : 'e.g. President'}
+                  className={`flex-1 ${bigInput}`}
+                />
+                <button
+                  type="button"
+                  onClick={samSuggestTop}
+                  disabled={samBusy}
+                  className="px-4 rounded-xl border-2 border-green-600 text-green-700 hover:bg-green-50 disabled:opacity-50 whitespace-nowrap inline-flex items-center gap-2 text-base font-medium"
+                >
+                  <SamIcon size={20} /> Ask Sam
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 6 — divisions / roles */}
+          {step === 6 && (
+            <div>
+              <div className="flex items-start justify-between gap-3">
+                <h3 className={qHeading}>
                   {chartType === 'positions'
                     ? 'Positions & reporting'
                     : chartType === 'areas'
                       ? 'Functions / areas'
                       : 'Divisions & roles'}
-                </p>
-                <div className="flex gap-2">
+                </h3>
+                <div className="flex gap-2 flex-shrink-0">
                   {lastDraft && (
                     <button
                       type="button"
                       onClick={samRefineDivisions}
                       disabled={samBusy}
-                      className="px-3 py-1.5 text-sm rounded-md border border-green-600 text-green-700 hover:bg-green-50 disabled:opacity-50"
+                      className="px-3 py-2 text-sm rounded-md border border-green-600 text-green-700 hover:bg-green-50 disabled:opacity-50 inline-flex items-center gap-1.5"
                       title="Send Sam your edits and let it refine the whole structure"
                     >
-                      🤖 Refine with my changes
+                      <SamIcon size={16} /> Refine with my changes
                     </button>
                   )}
                   <button
                     type="button"
                     onClick={samDraftDivisions}
                     disabled={samBusy}
-                    className="px-3 py-1.5 text-sm rounded-md border border-green-600 text-green-700 hover:bg-green-50 disabled:opacity-50"
+                    className="px-3 py-2 text-sm rounded-md border border-green-600 text-green-700 hover:bg-green-50 disabled:opacity-50 inline-flex items-center gap-1.5"
                   >
-                    {samBusy ? 'Asking Sam…' : '🤖 Ask Sam to draft these'}
+                    <SamIcon size={16} /> {samBusy ? 'Asking Sam…' : 'Ask Sam to draft these'}
                   </button>
                 </div>
               </div>
-              <p className="text-[11px] text-slate-400">
+              <p className={qHelp}>
                 {chartType === 'positions'
                   ? 'Each row is a position reporting to the top. List the positions reporting to it (comma-separated).'
                   : chartType === 'areas'
                     ? 'Each row is a business function/area. List its sub-functions (comma-separated).'
                     : 'Each division becomes an area led by the manager you name, with its junior roles attached beneath it (comma-separated).'}
               </p>
-              <div className="space-y-3">
+              <div className="mt-4 space-y-3">
                 {divisions.map((d, i) => (
                   <div key={i} className="border border-slate-200 rounded-lg p-3 space-y-2">
                     <div className="flex gap-2">
@@ -525,12 +599,12 @@ export default function OrgChartWizard({
                               ? 'Function / area name (e.g. Operations)'
                               : 'Division / area name (e.g. Operations)'
                         }
-                        className="flex-1 border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+                        className="flex-1 border border-slate-300 rounded-md px-3 py-2 text-base"
                       />
                       <button
                         type="button"
                         onClick={() => removeDiv(i)}
-                        className="text-red-500 hover:text-red-700 text-xs px-2"
+                        className="text-red-500 hover:text-red-700 text-sm px-2"
                       >
                         Remove
                       </button>
@@ -540,7 +614,7 @@ export default function OrgChartWizard({
                         value={d.lead}
                         onChange={e => setDiv(i, { lead: e.target.value })}
                         placeholder="Lead position (e.g. Operations Manager)"
-                        className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+                        className="w-full border border-slate-300 rounded-md px-3 py-2 text-base"
                       />
                     )}
                     <input
@@ -553,7 +627,7 @@ export default function OrgChartWizard({
                             ? 'Sub-functions, comma-separated (e.g. Scheduling, Dispatch)'
                             : 'Junior roles, comma-separated (e.g. Foreman, Crew Lead)'
                       }
-                      className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+                      className="w-full border border-slate-300 rounded-md px-3 py-2 text-base"
                     />
                   </div>
                 ))}
@@ -561,7 +635,7 @@ export default function OrgChartWizard({
               <button
                 type="button"
                 onClick={addDiv}
-                className="text-sm font-medium hover:underline"
+                className="mt-3 text-base font-medium hover:underline"
                 style={{ color: FG }}
               >
                 {chartType === 'positions'
@@ -570,13 +644,14 @@ export default function OrgChartWizard({
                     ? '+ Add function'
                     : '+ Add division'}
               </button>
-            </>
+            </div>
           )}
 
-          {step === 3 && (
-            <>
-              <p className="text-sm font-semibold text-slate-700">Review</p>
-              <div className="text-sm text-slate-700 space-y-2">
+          {/* Step 7 — review */}
+          {step === 7 && (
+            <div>
+              <h3 className={qHeading}>Review &amp; create</h3>
+              <div className="mt-5 text-base text-slate-700 space-y-2">
                 <p>
                   <span className="text-slate-400">Chart:</span> <b>{name || '(unnamed)'}</b>
                 </p>
@@ -590,37 +665,35 @@ export default function OrgChartWizard({
                         {d.name}
                         {d.lead ? <span className="text-slate-500"> — {d.lead}</span> : null}
                       </p>
-                      {d.juniors?.trim() && (
-                        <p className="text-xs text-slate-500">{d.juniors}</p>
-                      )}
+                      {d.juniors?.trim() && <p className="text-sm text-slate-500">{d.juniors}</p>}
                     </li>
                   ))}
                 </ul>
               </div>
-              <p className="text-[11px] text-amber-600 leading-snug">
+              <p className="mt-4 text-sm text-amber-600 leading-snug">
                 When the chart is created, any positions here that aren't in your HR positions
                 list will be added (you'll get a confirmation first).
               </p>
-            </>
+            </div>
           )}
 
-          {samError && <p className="text-xs text-amber-600">{samError}</p>}
+          {samError && <p className="mt-4 text-sm text-amber-600">{samError}</p>}
         </div>
 
-        <div className="flex items-center justify-between px-6 py-3 border-t border-slate-100">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100">
           <button
             type="button"
             onClick={() => (step === 1 ? onClose() : setStep(s => s - 1))}
-            className="px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-md"
+            className="px-4 py-2 text-base text-slate-600 hover:bg-slate-100 rounded-md"
           >
             {step === 1 ? 'Cancel' : 'Back'}
           </button>
-          {step < 3 ? (
+          {step < TOTAL ? (
             <button
               type="button"
               onClick={() => setStep(s => s + 1)}
-              disabled={step === 1 && (!name.trim() || !topTitle.trim())}
-              className="px-4 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50"
+              disabled={!canProceed}
+              className="px-6 py-2 text-base bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50"
             >
               Next
             </button>
@@ -629,7 +702,7 @@ export default function OrgChartWizard({
               type="button"
               onClick={finish}
               disabled={!canFinish}
-              className="px-4 py-1.5 text-sm text-white rounded-md disabled:opacity-50"
+              className="px-6 py-2 text-base text-white rounded-md disabled:opacity-50"
               style={{ backgroundColor: FG }}
             >
               Create Chart

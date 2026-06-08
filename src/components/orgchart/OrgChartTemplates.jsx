@@ -73,7 +73,7 @@ export function NewChartModal({ templates, categories, subcategories, onClose, o
                 [
                   'wizard',
                   'Org Chart Wizard',
-                  'Answer a few guided questions (with Ask Sam suggestions) and the wizard builds your starting chart.',
+                  "Answer a few guided questions (with Sam's suggestions) and the wizard builds your starting chart.",
                 ],
               ].map(([v, lab]) => (
                 <button
@@ -98,7 +98,7 @@ export function NewChartModal({ templates, categories, subcategories, onClose, o
                   template:
                     'Start from one of your saved templates, pre-filled with its structure.',
                   wizard:
-                    'Answer a few guided questions (with Ask Sam suggestions) and the wizard builds your starting chart.',
+                    "Answer a few guided questions (with Sam's suggestions) and the wizard builds your starting chart.",
                 }[source]
               }
             </p>
