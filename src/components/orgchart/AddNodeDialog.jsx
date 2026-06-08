@@ -479,7 +479,7 @@ export default function AddNodeDialog({
                 />
               </div>
               <p className="col-span-2 mt-1 text-[11px] leading-snug text-amber-600">
-                Note: height applies to the whole level — every item on the same row will match this height, even if it's smaller than the others.
+                Note: height and width apply to the whole level — every item on the same row will match this height and width, even if they're smaller than the others.
               </p>
             </div>
             <button
@@ -687,7 +687,7 @@ export default function AddNodeDialog({
                 />
               </div>
               <p className="col-span-2 mt-1 text-[11px] leading-snug text-amber-600">
-                Note: height applies to the whole level — every item on the same row will match this height, even if it's smaller than the others.
+                Note: height and width apply to the whole level — every item on the same row will match this height and width, even if they're smaller than the others.
               </p>
             </div>
             <button

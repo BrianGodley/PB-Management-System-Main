@@ -12,8 +12,20 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { ContainerNode, PositionNode, CustomNode } from './NodeRenderers.jsx'
 
 const FG = '#16491b'
+
+// Force every title to render horizontally regardless of the node's saved
+// orientation, by clearing the per-field `vertical` flags. Used in the area
+// info modal so the expanded view always reads left-to-right.
+function horizontalize(node) {
+  const ts = { ...(node.text_styles || {}) }
+  for (const k of Object.keys(ts)) {
+    if (ts[k] && ts[k].vertical) ts[k] = { ...ts[k], vertical: false }
+  }
+  return { ...node, text_styles: ts }
+}
 
 // ── Sam synopsis ─────────────────────────────────────────────────────────────
 // Calls the same agent-chat Edge Function SamChat uses, with a fresh (no
@@ -154,64 +166,93 @@ function PositionView({ node, resolveNodeHolder }) {
   )
 }
 
+// Render a single org-chart node (area / position / assistant) into SVG at the
+// given box, exactly as it appears on the chart — but with horizontal text.
+function ChartNode({ node, box, resolveNodeHolder, onClick }) {
+  const n = horizontalize(node)
+  const ph = (resolveNodeHolder ? resolveNodeHolder(n) : null) || {}
+  if (n.kind === 'container') {
+    return (
+      <ContainerNode
+        node={n}
+        box={box}
+        selected={false}
+        onClick={onClick}
+        positionTitle={ph.positionTitle}
+        displayName={ph.displayName}
+      />
+    )
+  }
+  if (n.kind === 'position' || n.kind === 'assistant') {
+    return (
+      <PositionNode
+        node={n}
+        box={box}
+        color="#3A5038"
+        selected={false}
+        onClick={onClick}
+        positionTitle={ph.positionTitle}
+        displayName={ph.displayName}
+      />
+    )
+  }
+  return <CustomNode node={n} box={box} selected={false} onClick={onClick} />
+}
+
 // ── Area view ────────────────────────────────────────────────────────────────
+// Shows the area exactly like the org chart (just larger), with its attached
+// junior items butted up beneath it as equal columns. Clicking a junior drills
+// into it. All text is forced horizontal here regardless of chart orientation.
 function AreaView({ node, nodes, resolveNodeHolder, onDrill }) {
   const juniors = (nodes || []).filter(n => n.parent_container_id === node.id)
-  const ph = (resolveNodeHolder ? resolveNodeHolder(node) : null) || {}
+
+  const PAD = 24
+  const areaW = node.width || 210
+  const areaH = node.height || 90
+  const areaX = PAD
+  const areaY = PAD
+
+  let contentW = areaW
+  let contentH = areaH
+  let juniorBoxes = []
+  if (juniors.length) {
+    const rowH = juniors.reduce((m, j) => Math.max(m, j.height || 90), 0)
+    const colW = areaW / juniors.length
+    juniorBoxes = juniors.map((j, i) => ({
+      node: j,
+      box: {
+        x: areaX + i * colW,
+        y: areaY + areaH, // borders touch the area's bottom edge
+        width: colW,
+        height: rowH,
+      },
+    }))
+    contentH = areaH + rowH
+  }
+
+  const vbW = contentW + PAD * 2
+  const vbH = contentH + PAD * 2
 
   return (
-    <div className="space-y-4">
-      <div
-        className="rounded-xl border-2 px-4 py-3"
-        style={{ borderColor: node.bg_color && node.bg_color !== 'none' ? node.bg_color : '#cbd5e1' }}
+    <div className="space-y-3">
+      <svg
+        viewBox={`0 0 ${vbW} ${vbH}`}
+        width="100%"
+        style={{ maxHeight: '64vh', display: 'block', background: '#F8FAFC', borderRadius: 12 }}
+        preserveAspectRatio="xMidYMin meet"
       >
-        <p className="text-xs uppercase tracking-wide text-slate-400 font-semibold">Area</p>
-        <p className="text-lg font-bold text-slate-800">{node.label || '(unnamed area)'}</p>
-        {node.heading ? <p className="text-sm text-slate-600">{node.heading}</p> : null}
-        {ph.positionTitle ? (
-          <p className="text-xs text-slate-500 mt-1">
-            In charge: <span className="font-medium">{ph.positionTitle}</span>
-            {ph.displayName ? ` — ${ph.displayName}` : ''}
-          </p>
-        ) : null}
-      </div>
-
-      <div>
-        <p className="text-sm font-bold text-slate-700 mb-2">
-          Junior items ({juniors.length})
+        <ChartNode node={node} box={{ x: areaX, y: areaY, width: areaW, height: areaH }} resolveNodeHolder={resolveNodeHolder} onClick={() => {}} />
+        {juniorBoxes.map(jb => (
+          <g key={jb.node.id} style={{ cursor: 'pointer' }} onClick={() => onDrill(jb.node)}>
+            <ChartNode node={jb.node} box={jb.box} resolveNodeHolder={resolveNodeHolder} onClick={() => onDrill(jb.node)} />
+          </g>
+        ))}
+      </svg>
+      {juniors.length > 0 && (
+        <p className="text-[11px] text-slate-400 text-center">
+          Click a junior item to open its expanded view.
         </p>
-        {juniors.length === 0 ? (
-          <p className="text-sm text-slate-400 italic">This area has no junior items.</p>
-        ) : (
-          <div className="grid grid-cols-2 gap-2">
-            {juniors.map(j => {
-              const jph = (resolveNodeHolder ? resolveNodeHolder(j) : null) || {}
-              const isArea = j.kind === 'container'
-              return (
-                <button
-                  key={j.id}
-                  type="button"
-                  onClick={() => onDrill(j)}
-                  className="text-left rounded-lg border border-slate-200 px-3 py-2 hover:border-slate-400 hover:bg-slate-50 transition-colors"
-                >
-                  <span className="text-[10px] uppercase tracking-wide text-slate-400 font-semibold">
-                    {isArea ? 'Area' : j.kind === 'assistant' ? 'Assistant' : 'Position'}
-                  </span>
-                  <p className="text-sm font-semibold text-slate-800 truncate">
-                    {isArea ? j.label || '(unnamed)' : jph.positionTitle || j.label || '(no position)'}
-                  </p>
-                  {!isArea && jph.displayName ? (
-                    <p className="text-xs text-slate-500 truncate">{jph.displayName}</p>
-                  ) : null}
-                  <p className="text-[11px] mt-1" style={{ color: FG }}>
-                    Open →
-                  </p>
-                </button>
-              )
-            })}
-          </div>
-        )}
-      </div>
+      )}
     </div>
   )
 }
@@ -233,7 +274,9 @@ export default function ItemInfoModal({ node, nodes, resolveNodeHolder, onClose 
   return (
     <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[88vh] flex flex-col overflow-hidden"
+        className={`bg-white rounded-2xl shadow-2xl w-full max-h-[92vh] flex flex-col overflow-hidden ${
+          isArea ? 'max-w-4xl' : 'max-w-lg'
+        }`}
         onClick={e => e.stopPropagation()}
       >
         <div

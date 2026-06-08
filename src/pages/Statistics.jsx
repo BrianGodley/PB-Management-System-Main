@@ -2757,6 +2757,7 @@ function MultipleEntryView({ stats, weekEndingDay }) {
 function EquationStatForm({
   initialData,
   profiles,
+  positions,
   onSave,
   onClose,
   onDelete,
@@ -3404,6 +3405,7 @@ function EquationStatForm({
 function OverlayStatForm({
   initialData,
   profiles,
+  positions,
   onSave,
   onClose,
   onDelete,
