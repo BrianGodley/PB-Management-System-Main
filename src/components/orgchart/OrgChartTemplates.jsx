@@ -36,9 +36,9 @@ export function NewChartModal({ templates, categories, onClose, onCreate }) {
 
   return (
     <Backdrop onClose={onClose}>
-      <Panel className="max-w-3xl">
+      <Panel className="max-w-5xl min-h-[80vh]">
         <Header title="New Org Chart" onClose={onClose} />
-        <div className="px-6 py-5 space-y-5 overflow-y-auto">
+        <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1 min-h-0">
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">Chart name</label>
             <input
@@ -55,6 +55,7 @@ export function NewChartModal({ templates, categories, onClose, onCreate }) {
               {[
                 ['scratch', 'Blank chart'],
                 ['template', 'A template'],
+                ['wizard', 'Org Chart Wizard'],
               ].map(([v, lab]) => (
                 <button
                   key={v}
@@ -81,7 +82,7 @@ export function NewChartModal({ templates, categories, onClose, onCreate }) {
                   No templates yet — create one from an existing chart's edit menu.
                 </p>
               ) : (
-                <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-md divide-y divide-slate-100">
+                <div className="max-h-[48vh] overflow-y-auto border border-slate-200 rounded-md divide-y divide-slate-100">
                   {groups.map(g => (
                     <div key={g.name} className="py-1">
                       <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
@@ -692,18 +693,22 @@ function TemplateEditModal({ template, categories, subcategories, onClose, onSav
 
 // ── Small shared building blocks ─────────────────────────────────────────────
 function Backdrop({ onClose, children }) {
+  // The panel is the DIRECT centered flex child (no extra wrapper), so its
+  // `w-full max-w-*` actually resolves against the viewport — otherwise the
+  // modal collapses to its content width and ignores the max-width.
   return (
     <div
       className="fixed inset-0 z-[80] bg-black/40 flex items-center justify-center p-4"
       onClick={onClose}
     >
-      <div onClick={e => e.stopPropagation()}>{children}</div>
+      {children}
     </div>
   )
 }
 function Panel({ className = '', children }) {
   return (
     <div
+      onClick={e => e.stopPropagation()}
       className={`bg-white rounded-2xl shadow-2xl w-full flex flex-col max-h-[90vh] overflow-hidden ${className}`}
     >
       {children}

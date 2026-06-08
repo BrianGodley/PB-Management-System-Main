@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext'
 import TierCanvas from '../components/orgchart/TierCanvas.jsx'
 import AddNodeDialog from '../components/orgchart/AddNodeDialog.jsx'
 import ItemInfoModal from '../components/orgchart/InfoModals.jsx'
+import OrgChartWizard from '../components/orgchart/OrgChartWizard.jsx'
 import {
   NewChartModal,
   RenameChartModal,
@@ -63,6 +64,7 @@ export default function OrgChartV2() {
   const [chartNameMenu, setChartNameMenu] = useState(null) // { anchorRect }
   const [showNewChartNotice, setShowNewChartNotice] = useState(false)
   const [pendingDefaultChart, setPendingDefaultChart] = useState(null) // chart awaiting default-change confirm
+  const [wizardName, setWizardName] = useState(null) // non-null = wizard open, carries the chart name
   // Per-row (per-tier) spacing overrides for the current chart, keyed by
   // tier number. Empty = use the system default for every row.
   const [rowSpacing, setRowSpacing] = useState({})
@@ -361,11 +363,26 @@ export default function OrgChartV2() {
   // New Chart modal submit: blank chart, or a chart instantiated from a template.
   async function handleCreateChart({ name, source, template }) {
     setShowNewChartModal(false)
+    if (source === 'wizard') {
+      // Defer chart creation to the wizard's completion step.
+      setWizardName(name)
+      return
+    }
     const chart = await createChart(name)
     if (!chart) return
     if (source === 'template' && template) {
       await instantiateFromTemplate(chart.id, template)
     }
+    setShowNewChartNotice(true)
+  }
+
+  // Wizard finished — build the chart from the snapshot it produced (reusing
+  // the template instantiation path, which also handles HR position sync).
+  async function handleWizardComplete(name, snapshot) {
+    setWizardName(null)
+    const chart = await createChart(name)
+    if (!chart) return
+    await instantiateFromTemplate(chart.id, { data: snapshot })
     setShowNewChartNotice(true)
   }
 
@@ -1907,6 +1924,16 @@ export default function OrgChartV2() {
           onCreate={handleCreateChart}
         />
       )}
+
+      {wizardName != null &&
+        createPortal(
+          <OrgChartWizard
+            initialName={wizardName}
+            onClose={() => setWizardName(null)}
+            onComplete={handleWizardComplete}
+          />,
+          document.body,
+        )}
 
       {showRenameModal && (
         <RenameChartModal
