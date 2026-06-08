@@ -65,6 +65,7 @@ export default function OrgChartV2() {
   const [showTemplateSettings, setShowTemplateSettings] = useState(false)
   const [chartNameMenu, setChartNameMenu] = useState(null) // { anchorRect }
   const [showRecategorize, setShowRecategorize] = useState(false)
+  const [deleteChartStep, setDeleteChartStep] = useState(0) // 0 none | 1 first warning | 2 positions warning
   const [pendingDefaultChart, setPendingDefaultChart] = useState(null) // chart awaiting default-change confirm
   const [wizardName, setWizardName] = useState(null) // non-null = wizard open, carries the chart name
   // Per-row (per-tier) spacing overrides for the current chart, keyed by
@@ -788,23 +789,17 @@ export default function OrgChartV2() {
     )
   }
 
-  async function deleteChart() {
+  // Is the chart currently being deleted the one tied to the MAIN positions
+  // list? Main = the default chart (its positions live in Main / null).
+  const deleteIsMainChart = !!charts.find(c => c.id === chartId)?.is_default
+  const deleteOwnedPositions = positions.filter(p => p.source_chart_id === chartId)
+
+  // Actual deletion — runs after the two-step confirmation modal.
+  async function performDeleteChart() {
     if (!chartId) return
-    const current = charts.find(c => c.id === chartId)
-    const isMainChart = !!current?.is_default
-    const ownedPositions = positions.filter(p => p.source_chart_id === chartId)
-    // Build a confirmation that explains what happens to this chart's positions.
-    let msg = `Delete chart "${chartName}"? Every item inside will be removed. This cannot be undone.`
-    if (isMainChart) {
-      msg +=
-        `\n\nNote: your MAIN positions list will NOT be deleted — it stays because it is ` +
-        `linked to your Statistics. Only the chart itself is removed.`
-    } else if (ownedPositions.length) {
-      msg +=
-        `\n\nThis chart's separate positions list (HR → Positions → "${chartName}", ` +
-        `${ownedPositions.length} position${ownedPositions.length !== 1 ? 's' : ''}) will also be deleted.`
-    }
-    if (!confirm(msg)) return
+    const isMainChart = deleteIsMainChart
+    const ownedIds = deleteOwnedPositions.map(p => p.id)
+    setDeleteChartStep(0)
     setBusy(true)
     try {
       await supabase.from('org_edges').delete().eq('chart_id', chartId)
@@ -812,11 +807,14 @@ export default function OrgChartV2() {
       await supabase.from('org_node_types').delete().eq('chart_id', chartId)
       // Delete this chart's OWN positions list (and their assignments) — but
       // never the main list (those have no source_chart_id). Done BEFORE the
-      // chart delete so the FK doesn't just null them back into Main.
-      if (!isMainChart && ownedPositions.length) {
-        const ids = ownedPositions.map(p => p.id)
-        await supabase.from('employee_positions').delete().in('position_id', ids)
-        await supabase.from('positions').delete().eq('source_chart_id', chartId)
+      // chart delete so the FK (ON DELETE SET NULL) doesn't null them into Main.
+      if (!isMainChart && ownedIds.length) {
+        await supabase.from('employee_positions').delete().in('position_id', ownedIds)
+        const { error: posErr } = await supabase
+          .from('positions')
+          .delete()
+          .eq('source_chart_id', chartId)
+        if (posErr) throw posErr
         setPositions(prev => prev.filter(p => p.source_chart_id !== chartId))
       }
       await supabase.from('org_charts').delete().eq('id', chartId)
@@ -2106,6 +2104,90 @@ export default function OrgChartV2() {
           )
         })()}
 
+      {deleteChartStep > 0 &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[80] bg-black/40 flex items-center justify-center p-4"
+            onClick={() => setDeleteChartStep(0)}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="px-5 py-3 bg-red-600">
+                <h2 className="text-base font-bold text-white">
+                  {deleteChartStep === 1 ? '⚠️ Delete this chart?' : '⚠️ One more thing…'}
+                </h2>
+              </div>
+              {deleteChartStep === 1 ? (
+                <>
+                  <div className="px-5 py-4 text-sm text-slate-700 space-y-2">
+                    <p>
+                      Delete the chart <b>“{chartName}”</b>? Every item inside it will be removed.
+                      This cannot be undone.
+                    </p>
+                  </div>
+                  <div className="flex justify-end gap-2 px-5 py-3 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setDeleteChartStep(0)}
+                      className="px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-md"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteChartStep(2)}
+                      className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md"
+                    >
+                      Continue
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="px-5 py-4 text-sm text-slate-700 space-y-2">
+                    {deleteIsMainChart ? (
+                      <p>
+                        You're deleting the <b>main org chart</b>. Its positions list will
+                        <b> not</b> be deleted — it may be used for reference in other modules
+                        (HR, Statistics). Only the chart will be removed.
+                      </p>
+                    ) : (
+                      <p>
+                        The positions list connected to this chart
+                        {deleteOwnedPositions.length
+                          ? ` (HR → Positions → “${chartName}”, ${deleteOwnedPositions.length} position${
+                              deleteOwnedPositions.length !== 1 ? 's' : ''
+                            })`
+                          : ''}{' '}
+                        will <b>also be deleted</b>.
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex justify-end gap-2 px-5 py-3 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setDeleteChartStep(0)}
+                      className="px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-md"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={performDeleteChart}
+                      className="px-3 py-1.5 text-sm bg-red-600 hover:bg-red-700 text-white rounded-md"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
+
       {showCreateTemplateModal && (
         <CreateTemplateModal
           categories={templateCategories}
@@ -2134,7 +2216,7 @@ export default function OrgChartV2() {
             }}
             onDelete={() => {
               setChartNameMenu(null)
-              deleteChart()
+              setDeleteChartStep(1)
             }}
           />,
           document.body,
