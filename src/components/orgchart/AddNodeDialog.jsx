@@ -397,6 +397,14 @@ export default function AddNodeDialog({
           </div>
         )}
 
+        {(kind === 'position' || kind === 'container') && (
+          <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-snug text-amber-700">
+            Note: changes to fonts (size, family, bold/italic, and vertical/horizontal
+            orientation), border thickness, and box height and width apply to the whole
+            level — every item on the same row is made to match.
+          </div>
+        )}
+
         <div className="mb-3">
           <label className="block text-xs font-medium text-gray-500 mb-1">Level (row)</label>
           <input
@@ -478,9 +486,6 @@ export default function AddNodeDialog({
                   max={300}
                 />
               </div>
-              <p className="col-span-2 mt-1 text-[11px] leading-snug text-amber-600">
-                Note: height and width apply to the whole level — every item on the same row will match this height and width, even if they're smaller than the others.
-              </p>
             </div>
             <button
               type="button"
@@ -686,20 +691,7 @@ export default function AddNodeDialog({
                   max={600}
                 />
               </div>
-              <p className="col-span-2 mt-1 text-[11px] leading-snug text-amber-600">
-                Note: height and width apply to the whole level — every item on the same row will match this height and width, even if they're smaller than the others.
-              </p>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setWidth(210)
-                setHeight(90)
-              }}
-              className="text-xs text-blue-600 hover:underline"
-            >
-              Reset to default Org Chart Area size (210 × 90)
-            </button>
           </div>
         )}
 

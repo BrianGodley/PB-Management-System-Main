@@ -672,6 +672,51 @@ export default function OrgChartV2() {
           }
         }
       }
+
+      // Per-row FONTS & ORIENTATION: changing an area's font sizes, families,
+      // bold/italic, or vertical/horizontal title orientation makes every other
+      // AREA on the same row match it exactly (main row, and the shared
+      // junior-area row for attached juniors).
+      const newFontSizes = payload.font_sizes || {}
+      const newTextStyles = payload.text_styles || {}
+      const fontsChanged =
+        JSON.stringify(prevNode?.font_sizes || {}) !== JSON.stringify(newFontSizes) ||
+        JSON.stringify(prevNode?.text_styles || {}) !== JSON.stringify(newTextStyles)
+      if (prevNode && prevNode.kind === 'container' && fontsChanged) {
+        let sibs
+        if (!prevNode.parent_container_id) {
+          const rowTier = update.tier ?? prevNode?.tier ?? 0
+          sibs = nodes.filter(
+            n =>
+              n.id !== payload.id &&
+              !n.parent_container_id &&
+              n.kind === 'container' &&
+              (n.tier ?? 0) === rowTier,
+          )
+        } else {
+          const parent = nodes.find(n => n.id === prevNode.parent_container_id)
+          const parentTier = parent?.tier ?? 0
+          sibs = nodes.filter(n => {
+            if (n.id === payload.id || !n.parent_container_id || n.kind !== 'container') return false
+            const p = nodes.find(x => x.id === n.parent_container_id)
+            return (p?.tier ?? 0) === parentTier
+          })
+        }
+        if (sibs.length) {
+          const sibIds = sibs.map(s => s.id)
+          setNodes(prev =>
+            prev.map(p =>
+              sibIds.includes(p.id)
+                ? { ...p, font_sizes: newFontSizes, text_styles: newTextStyles }
+                : p,
+            ),
+          )
+          await supabase
+            .from('org_nodes')
+            .update({ font_sizes: newFontSizes, text_styles: newTextStyles })
+            .in('id', sibIds)
+        }
+      }
       setDialog(null)
     } catch (e) {
       alert(e.message || String(e))
