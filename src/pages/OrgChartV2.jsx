@@ -533,7 +533,7 @@ export default function OrgChartV2() {
       if (!ok) return
       const { data: created, error } = await supabase
         .from('positions')
-        .insert(missing.map(t => ({ title: t })))
+        .insert(missing.map(t => ({ title: t, source_chart_id: newChartId })))
         .select()
       if (error) {
         alert(error.message)

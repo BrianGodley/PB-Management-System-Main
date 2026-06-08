@@ -151,6 +151,7 @@ async function fetchHrData() {
     { data: pcData },
     { data: cData },
     { data: epData },
+    { data: chartData },
   ] = await Promise.all([
     supabase.from('employees').select('*').order('last_name'),
     supabase.from('applicants').select('*').order('applied_at', { ascending: false }),
@@ -162,6 +163,7 @@ async function fetchHrData() {
     supabase.from('position_courses').select('position_id, course_id'),
     supabase.from('lms_courses').select('id, title, category').order('title'),
     supabase.from('employee_positions').select('employee_id, position_id'),
+    supabase.from('org_charts').select('id, name').order('created_at'),
   ])
 
   // positionId -> Set<employee_id> (who is assigned to each position)
@@ -204,6 +206,7 @@ async function fetchHrData() {
     positionCourses,
     positionEmployees,
     courses: cData || [],
+    charts: chartData || [],
   }
 }
 
@@ -230,6 +233,20 @@ export default function HR() {
   const positionCourses = hrData?.positionCourses ?? {}
   const positionEmployees = hrData?.positionEmployees ?? {}
   const courses = hrData?.courses ?? []
+  const charts = hrData?.charts ?? []
+
+  // Positions sub-tabs: "Main" = positions not tied to a chart; one tab per
+  // chart that has added positions (via a template/wizard). 'main' | chartId.
+  const [posSubTab, setPosSubTab] = useState('main')
+  const chartName = id => charts.find(c => c.id === id)?.name || `Chart #${id}`
+  // chart ids that introduced positions, in a stable order
+  const chartPosGroups = [
+    ...new Set(positions.map(p => p.source_chart_id).filter(Boolean)),
+  ]
+  const shownPositions =
+    posSubTab === 'main'
+      ? positions.filter(p => !p.source_chart_id)
+      : positions.filter(p => p.source_chart_id === posSubTab)
 
   const [appFilter, setAppFilter] = useState('all')
   const [search, setSearch] = useState('')
@@ -1151,8 +1168,44 @@ export default function HR() {
                 </p>
               </div>
             ) : (
+              <>
+                {/* Sub-tabs: Main + one per chart that added positions */}
+                {chartPosGroups.length > 0 && (
+                  <div className="flex gap-1 mb-3 border-b border-gray-200 flex-wrap">
+                    {[['main', `Main (${positions.filter(p => !p.source_chart_id).length})`]]
+                      .concat(
+                        chartPosGroups.map(id => [
+                          id,
+                          `${chartName(id)} (${positions.filter(p => p.source_chart_id === id).length})`,
+                        ]),
+                      )
+                      .map(([key, label]) => (
+                        <button
+                          key={String(key)}
+                          onClick={() => setPosSubTab(key)}
+                          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                            posSubTab === key
+                              ? 'border-green-700 text-green-800'
+                              : 'border-transparent text-gray-500 hover:text-gray-800'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                  </div>
+                )}
+                {posSubTab !== 'main' && (
+                  <p className="text-xs text-gray-400 mb-2">
+                    Positions added by the chart “{chartName(posSubTab)}”.
+                  </p>
+                )}
+                {shownPositions.length === 0 ? (
+                  <p className="text-sm text-gray-400 border border-gray-200 rounded-xl p-6 text-center">
+                    No positions in this group.
+                  </p>
+                ) : (
               <div className="space-y-3">
-                {positions.map(pos => {
+                {shownPositions.map(pos => {
                   const reqCourseIds = [...(positionCourses[pos.id] || [])]
                   const reqCourses = courses.filter(c => reqCourseIds.includes(c.id))
                   const assignedCount = employees.filter(
@@ -1226,6 +1279,8 @@ export default function HR() {
                   )
                 })}
               </div>
+                )}
+              </>
             )}
           </div>
         ) : /* ── SETTINGS TAB ── */
