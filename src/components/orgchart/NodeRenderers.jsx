@@ -190,8 +190,20 @@ export function ContainerNode({
   const borderW = solid ? 1 : noColor ? 1.5 : Number.isFinite(bs.borderWidth) ? bs.borderWidth : 2
   const textColor = solid ? pickTextColor(color) : '#1E293B'
   const cx = box.x + box.width / 2
-  const hasPosition = !!positionTitle
   const fs = node.font_sizes || {}
+  // Junior (attached) areas can be squeezed very narrow when several share a
+  // parent's width. If the in-charge title or the employee name can't fit the
+  // box width, don't display EITHER (better blank than overflowing/truncated).
+  // Top-level areas always show their in-charge.
+  const isJunior = !!node.parent_container_id
+  const holderFits = (() => {
+    if (!positionTitle) return false
+    const avail = box.width - 8
+    const titleW = String(positionTitle).length * (fs.title || 10) * 0.58
+    const nameW = String(displayName || UNASSIGNED_LABEL).length * (fs.name || 10) * 0.58
+    return titleW <= avail && nameW <= avail
+  })()
+  const hasPosition = !!positionTitle && (!isJunior || holderFits)
   const labelY = hasPosition ? box.y + box.height / 2 - 12 : box.y + box.height / 2 + 3
   // A little breathing room below a second title before the position info.
   const posShift = (node.heading || '').trim() ? 8 : 0
