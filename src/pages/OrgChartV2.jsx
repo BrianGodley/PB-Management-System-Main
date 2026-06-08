@@ -470,7 +470,12 @@ export default function OrgChartV2() {
       ref: n.id, // local reference for remapping parent/attachment/edges
       kind: n.kind,
       label: n.label || '',
-      position_title: n.position_id ? titleById.get(Number(n.position_id)) || null : null,
+      // Capture the position title from the linked position record, and for
+      // position/assistant nodes fall back to the node's own label so titles
+      // shown without a linked position record still get created.
+      position_title:
+        (n.position_id ? titleById.get(Number(n.position_id)) || null : null) ||
+        (['position', 'assistant'].includes(n.kind) ? n.label || null : null),
       heading: n.heading || null,
       bg_color: n.bg_color || null,
       box_style: n.box_style || {},
