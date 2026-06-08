@@ -129,8 +129,8 @@ export function NewChartModal({ templates, categories, subcategories, onClose, o
           </div>
           {source === 'template' && (
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1 uppercase">
-                Template type
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Template Type
               </label>
               <div className="flex gap-2">
                 {[
@@ -144,7 +144,7 @@ export function NewChartModal({ templates, categories, subcategories, onClose, o
                       setTemplateKind(v)
                       setTemplateId('')
                     }}
-                    className={`flex-1 py-1.5 rounded-md border text-sm uppercase ${
+                    className={`flex-1 py-1.5 rounded-md border text-sm ${
                       templateKind === v
                         ? 'border-blue-600 bg-blue-50 text-blue-700 font-medium'
                         : 'border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -218,8 +218,8 @@ export function NewChartModal({ templates, categories, subcategories, onClose, o
           )}
           {source === 'template' && templateKind === 'created' && (
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1 uppercase">
-                Choose a created template
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Choose a Created Template
               </label>
               {createdTemplatesList.length === 0 ? (
                 <p className="text-sm text-slate-400 italic">
@@ -254,8 +254,8 @@ export function NewChartModal({ templates, categories, subcategories, onClose, o
           )}
           {source === 'template' && templateKind === 'sample' && (
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1 uppercase">
-                Choose a sample template
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Choose a Sample Template
               </label>
               {!categoryId ? (
                 <p className="text-sm text-slate-400 italic">Pick a category above to begin.</p>
