@@ -79,6 +79,7 @@ export default function SamChat() {
   const [greeting, setGreeting] = useState(DEFAULT_GREETING)
   const [messages, setMessages] = useState([{ role: 'assistant', content: DEFAULT_GREETING }])
   const [input, setInput] = useState('')
+  const [composerExpanded, setComposerExpanded] = useState(false)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   // Pending attachments — files the user has selected but not yet sent.
@@ -281,6 +282,7 @@ export default function SamChat() {
     if ((!text && pending.length === 0) || sending) return
     setError('')
     setInput('')
+    setComposerExpanded(false) // collapse the composer back down after sending
     const pendingSnap = pending // capture for both upload + optimistic render
     setPending([])
     // Optimistic user-bubble render — show the message AND any pending
@@ -518,15 +520,22 @@ export default function SamChat() {
               <textarea
                 value={input}
                 onChange={e => setInput(e.target.value)}
+                onFocus={() => setComposerExpanded(true)}
+                onBlur={() => {
+                  // Collapse again when the user clicks away and hasn't typed.
+                  if (!input.trim()) setComposerExpanded(false)
+                }}
                 onKeyDown={e => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault()
                     send()
                   }
                 }}
-                rows={1}
-                placeholder="Ask Sam, or attach a photo/document…"
-                className="flex-1 resize-none border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700/30 focus:border-green-700 max-h-40"
+                rows={composerExpanded ? 8 : 1}
+                placeholder="Ask Sam, or attach a photo/document…  (Shift+Enter for a new line)"
+                className={`flex-1 resize-none border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700/30 focus:border-green-700 transition-all ${
+                  composerExpanded ? 'max-h-72' : 'max-h-40'
+                }`}
               />
               <button
                 onClick={send}
