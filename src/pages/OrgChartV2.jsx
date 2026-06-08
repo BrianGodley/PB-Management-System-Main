@@ -433,6 +433,27 @@ export default function OrgChartV2() {
   // template is portable and we can match/create positions on instantiation.
   function buildTemplateSnapshot() {
     const titleById = new Map(positions.map(p => [Number(p.id), p.title]))
+    // Bake the current left-to-right order into tier_order so the new chart
+    // reproduces it exactly (otherwise siblings with equal tier_order fall back
+    // to database id, which differs in the new chart and reorders columns).
+    const orderByNode = new Map()
+    const groupKey = n => n.parent_container_id || `tier:${n.tier ?? 0}`
+    const groups = new Map()
+    for (const n of nodes) {
+      const k = groupKey(n)
+      if (!groups.has(k)) groups.set(k, [])
+      groups.get(k).push(n)
+    }
+    for (const arr of groups.values()) {
+      arr
+        .slice()
+        .sort(
+          (a, b) =>
+            (a.tier_order ?? 0) - (b.tier_order ?? 0) ||
+            String(a.id).localeCompare(String(b.id)),
+        )
+        .forEach((n, idx) => orderByNode.set(n.id, idx))
+    }
     const tplNodes = nodes.map(n => ({
       ref: n.id, // local reference for remapping parent/attachment/edges
       kind: n.kind,
@@ -451,7 +472,7 @@ export default function OrgChartV2() {
       text_styles: n.text_styles || {},
       x_offset: n.x_offset || 0,
       tier: n.tier ?? 0,
-      tier_order: n.tier_order ?? 0,
+      tier_order: orderByNode.get(n.id) ?? n.tier_order ?? 0,
     }))
     const tplEdges = edges.map(e => ({
       source_ref: e.source_id,
@@ -460,7 +481,8 @@ export default function OrgChartV2() {
       style: e.style || 'solid',
       bus_offset: e.bus_offset ?? null,
     }))
-    return { nodes: tplNodes, edges: tplEdges }
+    // Carry the chart's spacing config so the new chart lays out identically.
+    return { nodes: tplNodes, edges: tplEdges, row_spacing: rowSpacing, col_spacing: colSpacing }
   }
 
   async function createTemplateFromCurrentChart({
@@ -653,6 +675,17 @@ export default function OrgChartV2() {
 
     setNodes(insertedNodes.map(x => x.row))
     setEdges(edgeRows)
+
+    // Apply the template's saved spacing so the new chart lays out like the
+    // original (otherwise it uses defaults / leftover spacing and misaligns).
+    const rs = data.row_spacing || {}
+    const cs = data.col_spacing || {}
+    await supabase.from('org_charts').update({ row_spacing: rs, col_spacing: cs }).eq('id', newChartId)
+    setRowSpacing(rs)
+    setColSpacing(cs)
+    setCharts(prev =>
+      prev.map(c => (c.id === newChartId ? { ...c, row_spacing: rs, col_spacing: cs } : c)),
+    )
   }
 
   // Template / category CRUD used by the admin Settings modal.
