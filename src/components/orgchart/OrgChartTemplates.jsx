@@ -191,7 +191,7 @@ export function CreateTemplateModal({ categories, subcategories, onClose, onSave
 
   return (
     <Backdrop onClose={onClose}>
-      <Panel className="max-w-sm">
+      <Panel className="max-w-md">
         <Header title="Create Template" onClose={onClose} />
         <div className="px-5 py-4 space-y-3">
           <div>
