@@ -162,11 +162,19 @@ export function RenameChartModal({ initialName, onClose, onSave }) {
 }
 
 // ── Create Template modal ────────────────────────────────────────────────────
-export function CreateTemplateModal({ categories, onClose, onSave }) {
+export function CreateTemplateModal({ categories, subcategories, onClose, onSave }) {
   const [name, setName] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [newCategory, setNewCategory] = useState('')
+  const [subcategoryId, setSubcategoryId] = useState('')
+  const [newSubcategory, setNewSubcategory] = useState('')
   const usingNew = categoryId === '__new__'
+  const usingNewSub = subcategoryId === '__new__'
+  // Subcategories available for the chosen (existing) category.
+  const subsForCategory =
+    !usingNew && categoryId
+      ? (subcategories || []).filter(s => String(s.category_id) === String(categoryId))
+      : []
 
   const submit = () => {
     if (!name.trim()) return
@@ -176,6 +184,8 @@ export function CreateTemplateModal({ categories, onClose, onSave }) {
       name: name.trim(),
       categoryId: usingNew ? null : Number(categoryId),
       newCategoryName: usingNew ? newCategory.trim() : null,
+      subcategoryId: usingNewSub || !subcategoryId ? null : Number(subcategoryId),
+      newSubcategoryName: usingNewSub ? newSubcategory.trim() : null,
     })
   }
 
@@ -215,6 +225,32 @@ export function CreateTemplateModal({ categories, onClose, onSave }) {
               value={newCategory}
               onChange={e => setNewCategory(e.target.value)}
               placeholder="New category name"
+              className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+            />
+          )}
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">
+              Subcategory (optional)
+            </label>
+            <select
+              value={subcategoryId}
+              onChange={e => setSubcategoryId(e.target.value)}
+              className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+            >
+              <option value="">— None —</option>
+              {subsForCategory.map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+              <option value="__new__">+ New subcategory…</option>
+            </select>
+          </div>
+          {usingNewSub && (
+            <input
+              value={newSubcategory}
+              onChange={e => setNewSubcategory(e.target.value)}
+              placeholder="New subcategory name"
               className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
             />
           )}
@@ -272,6 +308,7 @@ export function ChartNameMenu({ anchorRect, onClose, onRename, onCreateTemplate,
 export function TemplatesSettingsView({
   templates,
   categories,
+  subcategories,
   onClose,
   onDeleteTemplate,
   onRenameTemplate,
@@ -279,10 +316,16 @@ export function TemplatesSettingsView({
   onAddCategory,
   onRenameCategory,
   onDeleteCategory,
+  onAddSubcategory,
+  onRenameSubcategory,
+  onDeleteSubcategory,
 }) {
   const [tab, setTab] = useState('templates')
   const [newCat, setNewCat] = useState('')
+  const [selectedCatId, setSelectedCatId] = useState(null)
+  const [newSub, setNewSub] = useState('')
   const catName = id => categories.find(c => c.id === id)?.name || 'Uncategorized'
+  const subsForSelected = (subcategories || []).filter(s => s.category_id === selectedCatId)
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
@@ -290,7 +333,7 @@ export function TemplatesSettingsView({
         <div className="flex">
           {[
             ['templates', 'Templates'],
-            ['categories', 'Categories'],
+            ['categories', 'Categories & Subcategories'],
           ].map(([v, lab]) => (
             <button
               key={v}
@@ -381,58 +424,151 @@ export function TemplatesSettingsView({
               </table>
             )
           ) : (
-            <div className="space-y-3">
-              <div className="flex gap-2">
-                <input
-                  value={newCat}
-                  onChange={e => setNewCat(e.target.value)}
-                  placeholder="New category name"
-                  className="flex-1 border border-slate-300 rounded-md px-2 py-1.5 text-sm"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (newCat.trim()) {
-                      onAddCategory(newCat.trim())
-                      setNewCat('')
-                    }
-                  }}
-                  className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md"
-                >
-                  Add
-                </button>
+            <div className="grid grid-cols-2 gap-5">
+              {/* Left — categories (click to select and reveal its subcategories) */}
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">
+                  Categories
+                </p>
+                <div className="flex gap-2 mb-2">
+                  <input
+                    value={newCat}
+                    onChange={e => setNewCat(e.target.value)}
+                    placeholder="New category name"
+                    className="flex-1 border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (newCat.trim()) {
+                        onAddCategory(newCat.trim())
+                        setNewCat('')
+                      }
+                    }}
+                    className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md"
+                  >
+                    Add
+                  </button>
+                </div>
+                {(categories || []).length === 0 ? (
+                  <p className="text-sm text-slate-400 italic">No categories yet.</p>
+                ) : (
+                  <ul className="divide-y divide-slate-100 border border-slate-200 rounded-md">
+                    {categories.map(c => (
+                      <li
+                        key={c.id}
+                        onClick={() => setSelectedCatId(c.id)}
+                        className={`flex items-center justify-between px-3 py-1.5 text-sm cursor-pointer ${
+                          selectedCatId === c.id ? 'bg-green-50' : 'hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className="flex-1 truncate text-slate-800">{c.name}</span>
+                        <span className="flex items-center gap-2 flex-shrink-0">
+                          <button
+                            type="button"
+                            title="Rename"
+                            onClick={e => {
+                              e.stopPropagation()
+                              const n = prompt('Rename category', c.name)
+                              if (n && n.trim()) onRenameCategory(c.id, n.trim())
+                            }}
+                            className="text-slate-400 hover:text-slate-700"
+                          >
+                            ✎
+                          </button>
+                          <button
+                            type="button"
+                            onClick={e => {
+                              e.stopPropagation()
+                              if (
+                                confirm(
+                                  `Delete category "${c.name}"? Its subcategories are removed and its templates become Uncategorized.`,
+                                )
+                              )
+                                onDeleteCategory(c.id)
+                            }}
+                            className="text-red-500 hover:text-red-700 text-xs"
+                          >
+                            Delete
+                          </button>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
-              {(categories || []).length === 0 ? (
-                <p className="text-sm text-slate-400 italic">No categories yet.</p>
-              ) : (
-                <ul className="divide-y divide-slate-100 border border-slate-200 rounded-md">
-                  {categories.map(c => (
-                    <li key={c.id} className="flex items-center justify-between px-3 py-1.5 text-sm">
+
+              {/* Right — subcategories of the selected category */}
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">
+                  Subcategories
+                  {selectedCatId
+                    ? ` — ${categories.find(c => c.id === selectedCatId)?.name || ''}`
+                    : ''}
+                </p>
+                {!selectedCatId ? (
+                  <p className="text-sm text-slate-400 italic">
+                    Select a category on the left to manage its subcategories.
+                  </p>
+                ) : (
+                  <>
+                    <div className="flex gap-2 mb-2">
+                      <input
+                        value={newSub}
+                        onChange={e => setNewSub(e.target.value)}
+                        placeholder="New subcategory name"
+                        className="flex-1 border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+                      />
                       <button
                         type="button"
                         onClick={() => {
-                          const n = prompt('Rename category', c.name)
-                          if (n && n.trim()) onRenameCategory(c.id, n.trim())
+                          if (newSub.trim()) {
+                            onAddSubcategory(selectedCatId, newSub.trim())
+                            setNewSub('')
+                          }
                         }}
-                        className="text-slate-800 hover:underline"
-                        title="Click to rename"
+                        className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md"
                       >
-                        {c.name}
+                        Add
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (confirm(`Delete category "${c.name}"? Templates in it become Uncategorized.`))
-                            onDeleteCategory(c.id)
-                        }}
-                        className="text-red-500 hover:text-red-700 text-xs"
-                      >
-                        Delete
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+                    </div>
+                    {subsForSelected.length === 0 ? (
+                      <p className="text-sm text-slate-400 italic">No subcategories yet.</p>
+                    ) : (
+                      <ul className="divide-y divide-slate-100 border border-slate-200 rounded-md">
+                        {subsForSelected.map(s => (
+                          <li
+                            key={s.id}
+                            className="flex items-center justify-between px-3 py-1.5 text-sm"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const n = prompt('Rename subcategory', s.name)
+                                if (n && n.trim()) onRenameSubcategory(s.id, n.trim())
+                              }}
+                              className="text-slate-800 hover:underline"
+                              title="Click to rename"
+                            >
+                              {s.name}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (confirm(`Delete subcategory "${s.name}"?`))
+                                  onDeleteSubcategory(s.id)
+                              }}
+                              className="text-red-500 hover:text-red-700 text-xs"
+                            >
+                              Delete
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           )}
         </div>

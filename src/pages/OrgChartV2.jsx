@@ -54,6 +54,7 @@ export default function OrgChartV2() {
   // ── Template library state ──────────────────────────────────────────
   const [templates, setTemplates] = useState([])
   const [templateCategories, setTemplateCategories] = useState([])
+  const [templateSubcategories, setTemplateSubcategories] = useState([])
   const [isAdmin, setIsAdmin] = useState(false)
   const [showNewChartModal, setShowNewChartModal] = useState(false)
   const [showRenameModal, setShowRenameModal] = useState(false)
@@ -81,7 +82,7 @@ export default function OrgChartV2() {
   // ── Loaders ─────────────────────────────────────────────────────────
   useEffect(() => {
     ;(async () => {
-      const [chartsRes, positionsRes, employeesRes, epRes, tplRes, catRes, profRes] =
+      const [chartsRes, positionsRes, employeesRes, epRes, tplRes, catRes, subcatRes, profRes] =
         await Promise.all([
           supabase.from('org_charts').select('*').order('created_at'),
           supabase.from('positions').select('id, title').order('title'),
@@ -93,6 +94,7 @@ export default function OrgChartV2() {
           supabase.from('employee_positions').select('employee_id, position_id'),
           supabase.from('org_chart_templates').select('*').order('name'),
           supabase.from('org_chart_template_categories').select('*').order('name'),
+          supabase.from('org_chart_template_subcategories').select('*').order('name'),
           user?.id
             ? supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
             : Promise.resolve({ data: null }),
@@ -104,6 +106,7 @@ export default function OrgChartV2() {
       setEmployeePositions(epRes.data || [])
       setTemplates(tplRes.data || [])
       setTemplateCategories(catRes.data || [])
+      setTemplateSubcategories(subcatRes.data || [])
       setIsAdmin((profRes.data?.role || '').toLowerCase() === 'admin')
       // Open the default chart (falls back to the first one).
       if (chartList.length) selectChart(chartList.find(c => c.is_default) || chartList[0])
@@ -402,7 +405,13 @@ export default function OrgChartV2() {
     return { nodes: tplNodes, edges: tplEdges }
   }
 
-  async function createTemplateFromCurrentChart({ name, categoryId, newCategoryName }) {
+  async function createTemplateFromCurrentChart({
+    name,
+    categoryId,
+    newCategoryName,
+    subcategoryId,
+    newSubcategoryName,
+  }) {
     setShowCreateTemplateModal(false)
     try {
       let catId = categoryId
@@ -416,9 +425,21 @@ export default function OrgChartV2() {
         catId = cat.id
         setTemplateCategories(prev => [...prev, cat])
       }
+      let subId = subcategoryId
+      if (!subId && newSubcategoryName && catId) {
+        const { data: sub, error: sErr } = await supabase
+          .from('org_chart_template_subcategories')
+          .insert({ name: newSubcategoryName, category_id: catId, created_by: user?.id })
+          .select()
+          .single()
+        if (sErr) throw sErr
+        subId = sub.id
+        setTemplateSubcategories(prev => [...prev, sub])
+      }
       const payload = {
         name,
         category_id: catId || null,
+        subcategory_id: subId || null,
         data: buildTemplateSnapshot(),
         created_by: user?.id,
       }
@@ -574,7 +595,34 @@ export default function OrgChartV2() {
   async function deleteTemplateCategory(id) {
     await supabase.from('org_chart_template_categories').delete().eq('id', id)
     setTemplateCategories(prev => prev.filter(c => c.id !== id))
-    setTemplates(prev => prev.map(t => (t.category_id === id ? { ...t, category_id: null } : t)))
+    // Subcategories cascade-delete in the DB; mirror that locally and detach
+    // any templates that pointed at this category or its subcategories.
+    const goneSubIds = templateSubcategories.filter(s => s.category_id === id).map(s => s.id)
+    setTemplateSubcategories(prev => prev.filter(s => s.category_id !== id))
+    setTemplates(prev =>
+      prev.map(t =>
+        t.category_id === id || goneSubIds.includes(t.subcategory_id)
+          ? { ...t, category_id: t.category_id === id ? null : t.category_id, subcategory_id: null }
+          : t,
+      ),
+    )
+  }
+  async function addTemplateSubcategory(categoryId, name) {
+    const { data } = await supabase
+      .from('org_chart_template_subcategories')
+      .insert({ name, category_id: categoryId, created_by: user?.id })
+      .select()
+      .single()
+    if (data) setTemplateSubcategories(prev => [...prev, data])
+  }
+  async function renameTemplateSubcategory(id, name) {
+    await supabase.from('org_chart_template_subcategories').update({ name }).eq('id', id)
+    setTemplateSubcategories(prev => prev.map(s => (s.id === id ? { ...s, name } : s)))
+  }
+  async function deleteTemplateSubcategory(id) {
+    await supabase.from('org_chart_template_subcategories').delete().eq('id', id)
+    setTemplateSubcategories(prev => prev.filter(s => s.id !== id))
+    setTemplates(prev => prev.map(t => (t.subcategory_id === id ? { ...t, subcategory_id: null } : t)))
   }
 
   async function renameChart(newName) {
@@ -1674,6 +1722,7 @@ export default function OrgChartV2() {
         <TemplatesSettingsView
           templates={templates}
           categories={templateCategories}
+          subcategories={templateSubcategories}
           onClose={() => setShowTemplateSettings(false)}
           onDeleteTemplate={deleteTemplate}
           onRenameTemplate={renameTemplate}
@@ -1681,6 +1730,9 @@ export default function OrgChartV2() {
           onAddCategory={addTemplateCategory}
           onRenameCategory={renameTemplateCategory}
           onDeleteCategory={deleteTemplateCategory}
+          onAddSubcategory={addTemplateSubcategory}
+          onRenameSubcategory={renameTemplateSubcategory}
+          onDeleteSubcategory={deleteTemplateSubcategory}
         />
       ) : (
       <div className="flex-1 overflow-auto relative">
@@ -1858,6 +1910,7 @@ export default function OrgChartV2() {
       {showCreateTemplateModal && (
         <CreateTemplateModal
           categories={templateCategories}
+          subcategories={templateSubcategories}
           onClose={() => setShowCreateTemplateModal(false)}
           onSave={createTemplateFromCurrentChart}
         />
