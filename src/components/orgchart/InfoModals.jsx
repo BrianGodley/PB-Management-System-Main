@@ -199,55 +199,114 @@ function ChartNode({ node, box, resolveNodeHolder, onClick }) {
   return <CustomNode node={n} box={box} selected={false} onClick={onClick} />
 }
 
+// Rough width (in SVG units) needed to fit a string on one line at a given
+// font size. ContainerNode wraps text once it no longer fits its box, so we
+// size each box generously (factor 0.62 vs the renderer's 0.57) to guarantee
+// titles stay on one line — no wrapping, no truncation.
+function textWidth(str, size) {
+  return String(str || '').length * size * 0.62
+}
+
+function neededWidth(node, resolveNodeHolder) {
+  const fs = node.font_sizes || {}
+  const ph = (resolveNodeHolder ? resolveNodeHolder(node) : null) || {}
+  let widest
+  if (node.kind === 'container') {
+    widest = Math.max(
+      textWidth(node.label, fs.label || 12),
+      textWidth(node.heading, fs.heading || 14),
+      textWidth(ph.positionTitle, fs.title || 10),
+      textWidth(ph.displayName, fs.name || 10),
+      60,
+    )
+  } else {
+    widest = Math.max(
+      textWidth(ph.positionTitle || node.label, fs.title || 12),
+      textWidth(ph.displayName, fs.name || 10),
+      70,
+    )
+  }
+  return Math.ceil(widest + 20)
+}
+
 // ── Area view ────────────────────────────────────────────────────────────────
 // Shows the area exactly like the org chart (just larger), with its attached
-// junior items butted up beneath it as equal columns. Clicking a junior drills
-// into it. All text is forced horizontal here regardless of chart orientation.
+// junior items butted up beneath it. Each box is sized wide enough that its
+// horizontal text fits on one line (no wrap / no truncation), and the whole
+// thing is rendered at a comfortable scale (scrolling if it's very wide).
+// Clicking a junior drills into it.
 function AreaView({ node, nodes, resolveNodeHolder, onDrill }) {
   const juniors = (nodes || []).filter(n => n.parent_container_id === node.id)
 
   const PAD = 24
-  const areaW = node.width || 210
-  const areaH = node.height || 90
+  const SCALE = 2.2 // render the SVG units this many CSS px each → large & crisp
+
+  const areaNeeded = neededWidth(node, resolveNodeHolder)
+  let juniorWidths = juniors.map(j => neededWidth(j, resolveNodeHolder))
+  const juniorsTotal = juniorWidths.reduce((a, b) => a + b, 0)
+
+  // Area width is the widest of: its saved width, its own text need, or the
+  // combined width its juniors need. When the area is wider than the juniors
+  // need, expand each junior proportionally so they still span it edge-to-edge.
+  let areaW = Math.max(node.width || 210, areaNeeded, juniorsTotal)
+  if (juniors.length && juniorsTotal > 0 && juniorsTotal < areaW) {
+    const k = areaW / juniorsTotal
+    juniorWidths = juniorWidths.map(w => w * k)
+  } else if (juniors.length) {
+    areaW = Math.max(areaW, juniorsTotal)
+  }
+
+  const areaH = Math.max(node.height || 90, 70)
   const areaX = PAD
   const areaY = PAD
 
-  let contentW = areaW
   let contentH = areaH
   let juniorBoxes = []
   if (juniors.length) {
-    const rowH = juniors.reduce((m, j) => Math.max(m, j.height || 90), 0)
-    const colW = areaW / juniors.length
-    juniorBoxes = juniors.map((j, i) => ({
-      node: j,
-      box: {
-        x: areaX + i * colW,
-        y: areaY + areaH, // borders touch the area's bottom edge
-        width: colW,
-        height: rowH,
-      },
-    }))
+    const rowH = Math.max(
+      juniors.reduce((m, j) => Math.max(m, j.height || 90), 0),
+      70,
+    )
+    let x = areaX
+    juniorBoxes = juniors.map((j, i) => {
+      const box = { x, y: areaY + areaH, width: juniorWidths[i], height: rowH }
+      x += juniorWidths[i]
+      return { node: j, box }
+    })
     contentH = areaH + rowH
   }
 
-  const vbW = contentW + PAD * 2
+  const vbW = areaW + PAD * 2
   const vbH = contentH + PAD * 2
 
   return (
     <div className="space-y-3">
-      <svg
-        viewBox={`0 0 ${vbW} ${vbH}`}
-        width="100%"
-        style={{ maxHeight: '64vh', display: 'block', background: '#F8FAFC', borderRadius: 12 }}
-        preserveAspectRatio="xMidYMin meet"
-      >
-        <ChartNode node={node} box={{ x: areaX, y: areaY, width: areaW, height: areaH }} resolveNodeHolder={resolveNodeHolder} onClick={() => {}} />
-        {juniorBoxes.map(jb => (
-          <g key={jb.node.id} style={{ cursor: 'pointer' }} onClick={() => onDrill(jb.node)}>
-            <ChartNode node={jb.node} box={jb.box} resolveNodeHolder={resolveNodeHolder} onClick={() => onDrill(jb.node)} />
-          </g>
-        ))}
-      </svg>
+      <div className="overflow-auto" style={{ maxHeight: '66vh' }}>
+        <svg
+          viewBox={`0 0 ${vbW} ${vbH}`}
+          width={Math.round(vbW * SCALE)}
+          height={Math.round(vbH * SCALE)}
+          style={{ display: 'block', background: '#F8FAFC', borderRadius: 12, margin: '0 auto' }}
+          preserveAspectRatio="xMidYMin meet"
+        >
+          <ChartNode
+            node={node}
+            box={{ x: areaX, y: areaY, width: areaW, height: areaH }}
+            resolveNodeHolder={resolveNodeHolder}
+            onClick={() => {}}
+          />
+          {juniorBoxes.map(jb => (
+            <g key={jb.node.id} style={{ cursor: 'pointer' }} onClick={() => onDrill(jb.node)}>
+              <ChartNode
+                node={jb.node}
+                box={jb.box}
+                resolveNodeHolder={resolveNodeHolder}
+                onClick={() => onDrill(jb.node)}
+              />
+            </g>
+          ))}
+        </svg>
+      </div>
       {juniors.length > 0 && (
         <p className="text-[11px] text-slate-400 text-center">
           Click a junior item to open its expanded view.
