@@ -75,7 +75,7 @@ export function NewChartModal({ templates, categories, subcategories, onClose, o
         <Header title="New Org Chart" onClose={onClose} />
         <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1 min-h-0">
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1 uppercase">
+            <label className="block text-xs font-medium text-slate-500 mb-1">
               Chart Name
             </label>
             <input
@@ -87,13 +87,13 @@ export function NewChartModal({ templates, categories, subcategories, onClose, o
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1 uppercase">
+            <label className="block text-xs font-medium text-slate-500 mb-1">
               Start From
             </label>
             <div className="flex gap-2">
               {[
-                ['scratch', 'Blank chart', 'Start with an empty chart and build every item yourself.'],
-                ['template', 'A template', "Start from one of your saved templates, pre-filled with its structure."],
+                ['scratch', 'Blank Chart', 'Start with an empty chart and build every item yourself.'],
+                ['template', 'Template', "Start from one of your saved templates, pre-filled with its structure."],
                 [
                   'wizard',
                   'Org Chart Wizard',
@@ -104,7 +104,7 @@ export function NewChartModal({ templates, categories, subcategories, onClose, o
                   key={v}
                   type="button"
                   onClick={() => setSource(v)}
-                  className={`flex-1 py-1.5 rounded-md border text-sm uppercase ${
+                  className={`flex-1 py-1.5 rounded-md border text-sm ${
                     source === v
                       ? 'border-blue-600 bg-blue-50 text-blue-700 font-medium'
                       : 'border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -167,7 +167,7 @@ export function NewChartModal({ templates, categories, subcategories, onClose, o
             (categories || []).length > 0 && (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1 uppercase">
+                <label className="block text-xs font-medium text-slate-500 mb-1">
                   Category
                 </label>
                 <select
@@ -188,7 +188,7 @@ export function NewChartModal({ templates, categories, subcategories, onClose, o
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1 uppercase">
+                <label className="block text-xs font-medium text-slate-500 mb-1">
                   Subcategory
                 </label>
                 <select
