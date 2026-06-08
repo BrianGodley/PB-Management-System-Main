@@ -47,15 +47,13 @@ function blankDivision() {
   return { name: '', lead: '', juniors: '' }
 }
 
-// Build the template-shaped snapshot from the collected answers.
-function buildSnapshot({ topTitle, divisions }) {
-  const nodes = []
-  const edges = []
-  nodes.push({
-    ref: 'top',
+// Node factory with sensible defaults.
+function mk(over) {
+  return {
+    ref: '',
     kind: 'position',
     label: '',
-    position_title: (topTitle || '').trim() || 'Leader',
+    position_title: null,
     heading: null,
     bg_color: null,
     box_style: {},
@@ -70,65 +68,69 @@ function buildSnapshot({ topTitle, divisions }) {
     x_offset: 0,
     tier: 0,
     tier_order: 0,
+    ...over,
+  }
+}
+const areaBox = i => ({
+  kind: 'container',
+  bg_color: CONTAINER_COLORS[i % CONTAINER_COLORS.length].bg,
+  box_style: { fill: 'border', borderWidth: 2 },
+  container_mode: 'independent',
+  width: 210,
+  height: 90,
+})
+const splitJuniors = j =>
+  (j || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+
+// Build the template-shaped snapshot from the collected answers, honoring the
+// chosen chart type: 'positions' (people only), 'areas' (business functions
+// only), or 'combination' (areas led by positions, with junior roles).
+function buildSnapshot(chartType, { topTitle, divisions }) {
+  const nodes = []
+  const edges = []
+  const rows = divisions.filter(d => (d.name || '').trim() || (d.lead || '').trim())
+  const topRef = 'top'
+
+  if (chartType === 'areas') {
+    nodes.push(mk({ ref: topRef, ...areaBox(0), label: (topTitle || '').trim() || 'Organization', tier: 0 }))
+  } else {
+    nodes.push(mk({ ref: topRef, kind: 'position', position_title: (topTitle || '').trim() || 'Leader', tier: 0 }))
+  }
+
+  rows.forEach((d, i) => {
+    const dref = `n${i}`
+    if (chartType === 'positions') {
+      nodes.push(
+        mk({ ref: dref, kind: 'position', position_title: (d.name || d.lead || '').trim(), tier: 1, tier_order: i }),
+      )
+      edges.push({ source_ref: topRef, target_ref: dref, relationship: 'reports_to', style: 'solid', bus_offset: null })
+      splitJuniors(d.juniors).forEach((j, k) => {
+        const jref = `${dref}_j${k}`
+        nodes.push(mk({ ref: jref, kind: 'position', position_title: j, tier: 2, tier_order: k }))
+        // Positions-only: juniors connect by a reports-to line (no container).
+        edges.push({ source_ref: dref, target_ref: jref, relationship: 'reports_to', style: 'solid', bus_offset: null })
+      })
+    } else if (chartType === 'areas') {
+      nodes.push(mk({ ref: dref, ...areaBox(i), label: (d.name || '').trim(), tier: 1, tier_order: i }))
+      edges.push({ source_ref: topRef, target_ref: dref, relationship: 'reports_to', style: 'solid', bus_offset: null })
+      splitJuniors(d.juniors).forEach((j, k) => {
+        // Areas-only: sub-functions are junior areas attached beneath.
+        nodes.push(mk({ ref: `${dref}_j${k}`, ...areaBox(i), label: j, parent_ref: dref, tier: 2, tier_order: k }))
+      })
+    } else {
+      // combination
+      nodes.push(
+        mk({ ref: dref, ...areaBox(i), label: (d.name || '').trim(), position_title: (d.lead || '').trim() || null, tier: 1, tier_order: i }),
+      )
+      edges.push({ source_ref: topRef, target_ref: dref, relationship: 'reports_to', style: 'solid', bus_offset: null })
+      splitJuniors(d.juniors).forEach((j, k) => {
+        nodes.push(mk({ ref: `${dref}_j${k}`, kind: 'position', position_title: j, parent_ref: dref, tier: 2, tier_order: k }))
+      })
+    }
   })
-  divisions
-    .filter(d => (d.name || '').trim())
-    .forEach((d, i) => {
-      const dref = `div${i}`
-      nodes.push({
-        ref: dref,
-        kind: 'container',
-        label: d.name.trim(),
-        position_title: (d.lead || '').trim() || null,
-        heading: null,
-        bg_color: CONTAINER_COLORS[i % CONTAINER_COLORS.length].bg,
-        box_style: { fill: 'border', borderWidth: 2 },
-        container_mode: 'independent',
-        parent_ref: null,
-        attached_ref: null,
-        attachment_side: null,
-        width: 210,
-        height: 90,
-        font_sizes: {},
-        text_styles: {},
-        x_offset: 0,
-        tier: 1,
-        tier_order: i,
-      })
-      edges.push({
-        source_ref: 'top',
-        target_ref: dref,
-        relationship: 'reports_to',
-        style: 'solid',
-        bus_offset: null,
-      })
-      ;(d.juniors || '')
-        .split(',')
-        .map(s => s.trim())
-        .filter(Boolean)
-        .forEach((j, k) => {
-          nodes.push({
-            ref: `${dref}_j${k}`,
-            kind: 'position',
-            label: '',
-            position_title: j,
-            heading: null,
-            bg_color: null,
-            box_style: {},
-            container_mode: null,
-            parent_ref: dref,
-            attached_ref: null,
-            attachment_side: null,
-            width: 110,
-            height: 40,
-            font_sizes: {},
-            text_styles: {},
-            x_offset: 0,
-            tier: 2,
-            tier_order: k,
-          })
-        })
-    })
   return { nodes, edges }
 }
 
@@ -142,6 +144,7 @@ export default function OrgChartWizard({
   const [step, setStep] = useState(1)
   const [name, setName] = useState(initialName || '')
   const [description, setDescription] = useState('')
+  const [chartType, setChartType] = useState('combination') // 'positions' | 'areas' | 'combination'
   const [topTitle, setTopTitle] = useState('')
   const [divisions, setDivisions] = useState([blankDivision()])
   const [samBusy, setSamBusy] = useState(false)
@@ -151,10 +154,30 @@ export default function OrgChartWizard({
   // the corrections next time.
   const [lastDraft, setLastDraft] = useState(null)
 
+  // Keep Sam industry-agnostic — this is a general-purpose SaaS org-chart tool,
+  // so it must not assume any particular business (e.g. landscaping) and should
+  // rely only on the user's description. Also tells Sam the chosen chart type.
+  const genericPreamble = () => {
+    const typeLine = {
+      positions:
+        'Chart type: POSITIONS ONLY — list job positions and reporting lines. For each item use {"name":"Position title","juniors":["Subordinate position", ...]} and omit "lead".',
+      areas:
+        'Chart type: FUNCTIONS/AREAS ONLY — list areas of the business (no individual people). For each item use {"name":"Function/Area name","juniors":["Sub-function", ...]} and omit "lead".',
+      combination:
+        'Chart type: COMBINATION — business areas, each led by a manager position, with junior roles. For each item use {"name":"Area name","lead":"Manager position title","juniors":["Role", ...]}.',
+    }[chartType]
+    return (
+      `You are helping design a generic organizational chart for an arbitrary business in a ` +
+      `general-purpose org-chart product. Do NOT assume any specific industry; rely only on the ` +
+      `description the user provides and keep titles generic unless the description specifies ` +
+      `otherwise.\n${typeLine}`
+    )
+  }
+
   // Grounding context handed to Sam so its suggestions reuse your real position
   // titles and follow how you've structured past charts.
   const groundingContext = () => {
-    const parts = []
+    const parts = [genericPreamble()]
     if (positionTitles.length) {
       parts.push(
         `Reuse these EXISTING position titles verbatim wherever they fit (avoid near-duplicates): ${positionTitles
@@ -183,8 +206,10 @@ export default function OrgChartWizard({
     setSamError('')
     try {
       const reply = await askSam(
-        `For ${description || 'this company'}, what is the single most senior leadership ` +
-          `position title at the top of its org chart? Reply with ONLY the title, no extra words.`,
+        `For a general business described as "${description || 'a company'}", what is the single ` +
+          `most senior ${chartType === 'areas' ? 'top-level area/function name' : 'leadership position title'} ` +
+          `at the top of its org chart? Do not assume any specific industry. Reply with ONLY the ` +
+          `name, no extra words.`,
       )
       const t = reply.split('\n')[0].replace(/[".]/g, '').trim()
       if (t) setTopTitle(t)
@@ -259,14 +284,14 @@ export default function OrgChartWizard({
     }
   }
 
-  const filledDivisions = divisions.filter(d => (d.name || '').trim())
+  const filledDivisions = divisions.filter(d => (d.name || '').trim() || (d.lead || '').trim())
   const canFinish = !!name.trim() && !!topTitle.trim() && filledDivisions.length > 0
 
   const finish = () => {
     if (!canFinish) return
-    const finalStruct = { topTitle: topTitle.trim(), divisions: filledDivisions }
+    const finalStruct = { chartType, topTitle: topTitle.trim(), divisions: filledDivisions }
     // Pass the draft-vs-final feedback so it can be stored for future learning.
-    onComplete(name.trim(), buildSnapshot({ topTitle, divisions }), {
+    onComplete(name.trim(), buildSnapshot(chartType, { topTitle, divisions }), {
       description: description.trim() || null,
       draft: lastDraft,
       final: finalStruct,
@@ -293,6 +318,42 @@ export default function OrgChartWizard({
           {step === 1 && (
             <>
               <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">
+                  What kind of chart do you want?
+                </label>
+                <div className="flex gap-2">
+                  {[
+                    ['positions', 'Positions only', 'A hierarchy of job positions connected by reporting lines.'],
+                    ['areas', 'Functions / areas only', 'Boxes for the areas/functions of the business — no individual positions.'],
+                    ['combination', 'Combination', 'Business areas, each led by a position, with junior roles inside.'],
+                  ].map(([v, lab]) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setChartType(v)}
+                      className={`flex-1 py-1.5 px-2 rounded-md border text-xs font-medium ${
+                        chartType === v
+                          ? 'border-green-600 bg-green-50 text-green-700'
+                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {lab}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-slate-500 leading-snug">
+                  {
+                    {
+                      positions: 'A hierarchy of job positions connected by reporting lines.',
+                      areas:
+                        'Boxes for the areas/functions of the business — no individual positions.',
+                      combination:
+                        'Business areas, each led by a position, with junior roles inside.',
+                    }[chartType]
+                  }
+                </p>
+              </div>
+              <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1">Chart name</label>
                 <input
                   value={name}
@@ -314,13 +375,13 @@ export default function OrgChartWizard({
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1">
-                  Top leadership position
+                  {chartType === 'areas' ? 'Top area / function' : 'Top leadership position'}
                 </label>
                 <div className="flex gap-2">
                   <input
                     value={topTitle}
                     onChange={e => setTopTitle(e.target.value)}
-                    placeholder="e.g. President"
+                    placeholder={chartType === 'areas' ? 'e.g. Organization' : 'e.g. President'}
                     className="flex-1 border border-slate-300 rounded-md px-2 py-1.5 text-sm"
                   />
                   <button
@@ -339,7 +400,13 @@ export default function OrgChartWizard({
           {step === 2 && (
             <>
               <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-slate-700">Divisions &amp; roles</p>
+                <p className="text-sm font-semibold text-slate-700">
+                  {chartType === 'positions'
+                    ? 'Positions & reporting'
+                    : chartType === 'areas'
+                      ? 'Functions / areas'
+                      : 'Divisions & roles'}
+                </p>
                 <div className="flex gap-2">
                   {lastDraft && (
                     <button
@@ -363,8 +430,11 @@ export default function OrgChartWizard({
                 </div>
               </div>
               <p className="text-[11px] text-slate-400">
-                Each division becomes an area led by the manager you name, with its junior roles
-                attached beneath it. Separate junior roles with commas.
+                {chartType === 'positions'
+                  ? 'Each row is a position reporting to the top. List the positions reporting to it (comma-separated).'
+                  : chartType === 'areas'
+                    ? 'Each row is a business function/area. List its sub-functions (comma-separated).'
+                    : 'Each division becomes an area led by the manager you name, with its junior roles attached beneath it (comma-separated).'}
               </p>
               <div className="space-y-3">
                 {divisions.map((d, i) => (
@@ -373,7 +443,13 @@ export default function OrgChartWizard({
                       <input
                         value={d.name}
                         onChange={e => setDiv(i, { name: e.target.value })}
-                        placeholder="Division / area name (e.g. Operations)"
+                        placeholder={
+                          chartType === 'positions'
+                            ? 'Position title (e.g. Operations Manager)'
+                            : chartType === 'areas'
+                              ? 'Function / area name (e.g. Operations)'
+                              : 'Division / area name (e.g. Operations)'
+                        }
                         className="flex-1 border border-slate-300 rounded-md px-2 py-1.5 text-sm"
                       />
                       <button
@@ -384,16 +460,24 @@ export default function OrgChartWizard({
                         Remove
                       </button>
                     </div>
-                    <input
-                      value={d.lead}
-                      onChange={e => setDiv(i, { lead: e.target.value })}
-                      placeholder="Lead position (e.g. Operations Manager)"
-                      className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
-                    />
+                    {chartType === 'combination' && (
+                      <input
+                        value={d.lead}
+                        onChange={e => setDiv(i, { lead: e.target.value })}
+                        placeholder="Lead position (e.g. Operations Manager)"
+                        className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+                      />
+                    )}
                     <input
                       value={d.juniors}
                       onChange={e => setDiv(i, { juniors: e.target.value })}
-                      placeholder="Junior roles, comma-separated (e.g. Foreman, Crew Lead)"
+                      placeholder={
+                        chartType === 'positions'
+                          ? 'Reports to this position, comma-separated (e.g. Foreman, Crew Lead)'
+                          : chartType === 'areas'
+                            ? 'Sub-functions, comma-separated (e.g. Scheduling, Dispatch)'
+                            : 'Junior roles, comma-separated (e.g. Foreman, Crew Lead)'
+                      }
                       className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
                     />
                   </div>
@@ -405,7 +489,11 @@ export default function OrgChartWizard({
                 className="text-sm font-medium hover:underline"
                 style={{ color: FG }}
               >
-                + Add division
+                {chartType === 'positions'
+                  ? '+ Add position'
+                  : chartType === 'areas'
+                    ? '+ Add function'
+                    : '+ Add division'}
               </button>
             </>
           )}
