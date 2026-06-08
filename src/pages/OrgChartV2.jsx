@@ -85,8 +85,17 @@ export default function OrgChartV2() {
   // ── Loaders ─────────────────────────────────────────────────────────
   useEffect(() => {
     ;(async () => {
-      const [chartsRes, positionsRes, employeesRes, epRes, tplRes, catRes, subcatRes, profRes] =
-        await Promise.all([
+      const [
+        chartsRes,
+        positionsRes,
+        employeesRes,
+        epRes,
+        tplRes,
+        catRes,
+        subcatRes,
+        profRes,
+        wizRes,
+      ] = await Promise.all([
           supabase.from('org_charts').select('*').order('created_at'),
           supabase.from('positions').select('id, title').order('title'),
           supabase
@@ -115,6 +124,7 @@ export default function OrgChartV2() {
       setTemplates(tplRes.data || [])
       setTemplateCategories(catRes.data || [])
       setTemplateSubcategories(subcatRes.data || [])
+      setWizardExamples((wizRes.data || []).map(r => r.final).filter(Boolean))
       setIsAdmin((profRes.data?.role || '').toLowerCase() === 'admin')
       // Open the default chart (falls back to the first one).
       if (chartList.length) selectChart(chartList.find(c => c.is_default) || chartList[0])
@@ -384,11 +394,25 @@ export default function OrgChartV2() {
 
   // Wizard finished — build the chart from the snapshot it produced (reusing
   // the template instantiation path, which also handles HR position sync).
-  async function handleWizardComplete(name, snapshot) {
+  async function handleWizardComplete(name, snapshot, feedback) {
     setWizardName(null)
     const chart = await createChart(name)
     if (!chart) return
     await instantiateFromTemplate(chart.id, { data: snapshot })
+    // Store the draft-vs-final so Sam can learn from the edits next time.
+    if (feedback) {
+      try {
+        await supabase.from('org_chart_wizard_feedback').insert({
+          description: feedback.description || null,
+          draft: feedback.draft || null,
+          final: feedback.final || null,
+          created_by: user?.id,
+        })
+        if (feedback.final) setWizardExamples(prev => [feedback.final, ...prev].slice(0, 3))
+      } catch {
+        /* non-fatal */
+      }
+    }
     setShowNewChartNotice(true)
   }
 
@@ -1935,6 +1959,8 @@ export default function OrgChartV2() {
         createPortal(
           <OrgChartWizard
             initialName={wizardName}
+            positionTitles={positions.map(p => p.title).filter(Boolean)}
+            priorExamples={wizardExamples}
             onClose={() => setWizardName(null)}
             onComplete={handleWizardComplete}
           />,
