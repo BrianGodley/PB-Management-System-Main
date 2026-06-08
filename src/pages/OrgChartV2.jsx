@@ -66,6 +66,7 @@ export default function OrgChartV2() {
   const [chartNameMenu, setChartNameMenu] = useState(null) // { anchorRect }
   const [showRecategorize, setShowRecategorize] = useState(false)
   const [deleteChartStep, setDeleteChartStep] = useState(0) // 0 none | 1 first warning | 2 positions warning
+  const [creatingChart, setCreatingChart] = useState(false) // loading overlay while building from a template
   const [pendingDefaultChart, setPendingDefaultChart] = useState(null) // chart awaiting default-change confirm
   const [wizardName, setWizardName] = useState(null) // non-null = wizard open, carries the chart name
   // Per-row (per-tier) spacing overrides for the current chart, keyed by
@@ -391,10 +392,15 @@ export default function OrgChartV2() {
     const chart = await createChart(name, { categoryId, subcategoryId })
     if (!chart) return
     if (source === 'template' && template) {
-      await instantiateFromTemplate(chart.id, template, {
-        isMain: !!chart.is_default,
-        chartName: chart.name,
-      })
+      setCreatingChart(true)
+      try {
+        await instantiateFromTemplate(chart.id, template, {
+          isMain: !!chart.is_default,
+          chartName: chart.name,
+        })
+      } finally {
+        setCreatingChart(false)
+      }
     }
   }
 
@@ -407,11 +413,16 @@ export default function OrgChartV2() {
       subcategoryId: feedback?.subcategoryId ?? null,
     })
     if (!chart) return
-    await instantiateFromTemplate(
-      chart.id,
-      { data: snapshot },
-      { isMain: !!chart.is_default, chartName: chart.name },
-    )
+    setCreatingChart(true)
+    try {
+      await instantiateFromTemplate(
+        chart.id,
+        { data: snapshot },
+        { isMain: !!chart.is_default, chartName: chart.name },
+      )
+    } finally {
+      setCreatingChart(false)
+    }
     // Store the draft-vs-final so Sam can learn from the edits next time.
     if (feedback) {
       try {
@@ -2050,6 +2061,28 @@ export default function OrgChartV2() {
             document.body,
           )
         })()}
+
+      {creatingChart &&
+        createPortal(
+          <div className="fixed inset-0 z-[90] bg-black/40 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl px-8 py-7 flex flex-col items-center gap-4">
+              <div
+                className="h-10 w-10 rounded-full border-4 border-slate-200 animate-spin"
+                style={{ borderTopColor: FG }}
+              />
+              <p className="text-base font-semibold text-slate-800 flex items-center">
+                Creating your chart
+                <span className="ml-1 inline-flex">
+                  <span className="animate-bounce" style={{ animationDelay: '0ms' }}>.</span>
+                  <span className="animate-bounce" style={{ animationDelay: '150ms' }}>.</span>
+                  <span className="animate-bounce" style={{ animationDelay: '300ms' }}>.</span>
+                </span>
+              </p>
+              <p className="text-xs text-slate-500">Building positions and items — one moment.</p>
+            </div>
+          </div>,
+          document.body,
+        )}
 
       {showNewChartModal && (
         <NewChartModal
