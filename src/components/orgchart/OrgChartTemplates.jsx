@@ -26,14 +26,18 @@ export function NewChartModal({ templates, categories, subcategories, onClose, o
   const [templateId, setTemplateId] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [subcategoryId, setSubcategoryId] = useState('')
+  const [templateKind, setTemplateKind] = useState('') // '' | 'created' | 'sample'
   const subsForCategory = categoryId
     ? (subcategories || []).filter(s => String(s.category_id) === String(categoryId))
     : []
-  // Templates available once a category AND subcategory are chosen.
-  const templatesForSelection =
+  // Created templates: everything made via "Create New Template" (not samples).
+  const createdTemplatesList = (templates || []).filter(t => !t.is_sample)
+  // Sample templates for the chosen category + subcategory.
+  const sampleTemplatesForSelection =
     categoryId && subcategoryId
       ? (templates || []).filter(
           t =>
+            t.is_sample &&
             String(t.category_id) === String(categoryId) &&
             String(t.subcategory_id) === String(subcategoryId),
         )
@@ -48,8 +52,20 @@ export function NewChartModal({ templates, categories, subcategories, onClose, o
       name: name.trim(),
       source,
       template,
-      categoryId: categoryId ? Number(categoryId) : null,
-      subcategoryId: subcategoryId ? Number(subcategoryId) : null,
+      // For a template, the new chart inherits the template's own category;
+      // for a blank chart, use the category the user picked.
+      categoryId:
+        source === 'template'
+          ? template?.category_id ?? null
+          : categoryId
+            ? Number(categoryId)
+            : null,
+      subcategoryId:
+        source === 'template'
+          ? template?.subcategory_id ?? null
+          : subcategoryId
+            ? Number(subcategoryId)
+            : null,
     })
   }
 
@@ -111,7 +127,44 @@ export function NewChartModal({ templates, categories, subcategories, onClose, o
               }
             </p>
           </div>
-          {source !== 'wizard' && (categories || []).length > 0 && (
+          {source === 'template' && (
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1 uppercase">
+                Template type
+              </label>
+              <div className="flex gap-2">
+                {[
+                  ['created', 'Created Templates'],
+                  ['sample', 'Sample Templates'],
+                ].map(([v, lab]) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => {
+                      setTemplateKind(v)
+                      setTemplateId('')
+                    }}
+                    className={`flex-1 py-1.5 rounded-md border text-sm uppercase ${
+                      templateKind === v
+                        ? 'border-blue-600 bg-blue-50 text-blue-700 font-medium'
+                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    {lab}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-sm text-slate-500 leading-snug">
+                {templateKind === 'created'
+                  ? 'Charts you saved as templates from the org chart edit menu.'
+                  : templateKind === 'sample'
+                    ? 'Built-in starter templates, organized by industry category and subcategory.'
+                    : 'Choose which set of templates to start from.'}
+              </p>
+            </div>
+          )}
+          {(source === 'scratch' || (source === 'template' && templateKind === 'sample')) &&
+            (categories || []).length > 0 && (
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1 uppercase">
@@ -163,10 +216,46 @@ export function NewChartModal({ templates, categories, subcategories, onClose, o
               </div>
             </div>
           )}
-          {source === 'template' && (
+          {source === 'template' && templateKind === 'created' && (
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1 uppercase">
-                Choose a template
+                Choose a created template
+              </label>
+              {createdTemplatesList.length === 0 ? (
+                <p className="text-sm text-slate-400 italic">
+                  No created templates yet — save one from an org chart's edit menu (Create New
+                  Template).
+                </p>
+              ) : (
+                <div className="max-h-[40vh] overflow-y-auto border border-slate-200 rounded-md divide-y divide-slate-100">
+                  {createdTemplatesList.map(t => (
+                    <label
+                      key={t.id}
+                      className="flex items-start gap-2 px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer"
+                    >
+                      <input
+                        type="radio"
+                        name="template"
+                        checked={String(templateId) === String(t.id)}
+                        onChange={() => setTemplateId(t.id)}
+                        className="accent-blue-600 mt-1"
+                      />
+                      <span>
+                        <span className="font-medium text-slate-800">{t.name}</span>
+                        {t.description && (
+                          <span className="block text-xs text-slate-500">{t.description}</span>
+                        )}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {source === 'template' && templateKind === 'sample' && (
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1 uppercase">
+                Choose a sample template
               </label>
               {!categoryId ? (
                 <p className="text-sm text-slate-400 italic">Pick a category above to begin.</p>
@@ -174,13 +263,13 @@ export function NewChartModal({ templates, categories, subcategories, onClose, o
                 <p className="text-sm text-slate-400 italic">
                   Now pick a subcategory above to see its templates.
                 </p>
-              ) : templatesForSelection.length === 0 ? (
+              ) : sampleTemplatesForSelection.length === 0 ? (
                 <p className="text-sm text-slate-400 italic">
-                  No templates for this subcategory yet.
+                  No sample templates for this subcategory yet.
                 </p>
               ) : (
                 <div className="max-h-[40vh] overflow-y-auto border border-slate-200 rounded-md divide-y divide-slate-100">
-                  {templatesForSelection.map(t => (
+                  {sampleTemplatesForSelection.map(t => (
                     <label
                       key={t.id}
                       className="flex items-start gap-2 px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer"
