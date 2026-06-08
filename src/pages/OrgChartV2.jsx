@@ -1007,10 +1007,16 @@ export default function OrgChartV2() {
       }
       setSelectedNodeId(nodeId)
       setSelectedEdgeId(null)
-      // A plain click on an item opens its info modal in BOTH modes. The edit
-      // menu is reached separately via the pencil icon (onNodeEditIconClick).
       setContextMenu(null)
-      setInfoNodeId(nodeId)
+      // In edit mode a plain click opens the edit detail modal directly. In
+      // view mode it opens the read-only expanded info popup. (The pencil icon
+      // still opens the context menu for the other actions.)
+      if (editMode) {
+        const n = nodes.find(x => x.id === nodeId)
+        if (n) setDialog({ mode: 'edit', existing: n })
+      } else {
+        setInfoNodeId(nodeId)
+      }
     },
     [changeMode, connectMode, connectSource, nodes, chartId, editMode],
   )
@@ -1490,10 +1496,6 @@ export default function OrgChartV2() {
             onChangeSenior={() => startChangeMode('change_senior', selectedNode)}
             onChangeChild={() => startChangeMode('change_child', selectedNode)}
             onChangeConnection={() => startChangeMode('change_connection', selectedNode)}
-            onEdit={() => {
-              setDialog({ mode: 'edit', existing: selectedNode })
-              setContextMenu(null)
-            }}
           />,
           document.body,
         )}
@@ -1577,7 +1579,6 @@ function ItemContextMenu({
   onChangeSenior,
   onChangeChild,
   onChangeConnection,
-  onEdit,
 }) {
   const menuWidth = 180
   const margin = 8
@@ -1634,7 +1635,6 @@ function ItemContextMenu({
           ✕
         </button>
       </div>
-      <MenuItem label="Edit" onClick={onEdit} />
       <MenuItem label="New Item Connection" onClick={onConnect} />
       <MenuItem label="Change Connection" onClick={onChangeConnection} />
       <MenuItem label="Add Junior Position" onClick={onAddJuniorPosition} />
