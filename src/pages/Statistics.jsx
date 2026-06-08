@@ -8346,6 +8346,13 @@ export default function Statistics() {
   const [valuesStatId, setValuesStatId] = useState(null) // which stat id the values belong to
   const [profiles, setProfiles] = useState([])
   const [positions, setPositions] = useState([])
+  // For position-based stat ownership: who the logged-in user is as an employee,
+  // every employee→position assignment, and the default org chart's structure
+  // (used to roll a vacant position's stats up to the next occupied position).
+  const [myEmployeeId, setMyEmployeeId] = useState(null)
+  const [allEmployeePositions, setAllEmployeePositions] = useState([]) // [{employee_id, position_id}]
+  const [orgNodes, setOrgNodes] = useState([])
+  const [orgEdges, setOrgEdges] = useState([])
   // Admin flag derived from profiles.role for the current user. Used to
   // gate admin-only UI like the Master tab in Settings.
   const isCurrentUserAdmin = (profiles || []).some(
@@ -9173,18 +9180,119 @@ export default function Statistics() {
     }
   }, [user?.id])
 
+  // Load the data needed for position-based ownership: the logged-in user's
+  // employee record, all employee→position assignments, and the default org
+  // chart's nodes/edges (the reporting hierarchy used for HFA roll-up).
+  useEffect(() => {
+    if (!user?.id) return
+    let cancelled = false
+    ;(async () => {
+      const [empRes, epRes, chartRes] = await Promise.all([
+        supabase.from('employees').select('id').eq('user_id', user.id).maybeSingle(),
+        supabase.from('employee_positions').select('employee_id, position_id'),
+        supabase.from('org_charts').select('id').eq('is_default', true).maybeSingle(),
+      ])
+      if (cancelled) return
+      setMyEmployeeId(empRes.data?.id ?? null)
+      setAllEmployeePositions(epRes.data || [])
+      const chartId = chartRes.data?.id
+      if (chartId) {
+        const [nRes, eRes] = await Promise.all([
+          supabase
+            .from('org_nodes')
+            .select('id, position_id, parent_container_id')
+            .eq('chart_id', chartId),
+          supabase
+            .from('org_edges')
+            .select('source_id, target_id, relationship')
+            .eq('chart_id', chartId),
+        ])
+        if (cancelled) return
+        setOrgNodes(nRes.data || [])
+        setOrgEdges(eRes.data || [])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [user?.id])
+
+  // Map each stat to how the logged-in user owns it (if at all):
+  //   'owner'      — a position the user holds directly owns the stat
+  //   'owner-hfa'  — the stat's position is vacant and rolls up (through the
+  //                  default org chart) to a position the user holds
+  const positionOwnership = useMemo(() => {
+    const map = {}
+    if (!myEmployeeId) return map
+    const occupied = new Set(allEmployeePositions.map(ep => Number(ep.position_id)))
+    const mine = new Set(
+      allEmployeePositions
+        .filter(ep => ep.employee_id === myEmployeeId)
+        .map(ep => Number(ep.position_id)),
+    )
+    const nodesById = new Map(orgNodes.map(n => [n.id, n]))
+    const nodeForPosition = new Map()
+    for (const n of orgNodes) {
+      if (n.position_id != null && !nodeForPosition.has(Number(n.position_id)))
+        nodeForPosition.set(Number(n.position_id), n)
+    }
+    const seniorNodeOf = node => {
+      const e = orgEdges.find(
+        ed => ed.target_id === node.id && (ed.relationship || 'reports_to') === 'reports_to',
+      )
+      if (e) return nodesById.get(e.source_id) || null
+      if (node.parent_container_id) return nodesById.get(node.parent_container_id) || null
+      return null
+    }
+    // Walk up from a vacant position to the nearest occupied position id.
+    const inheritorOf = startPid => {
+      let node = nodeForPosition.get(Number(startPid))
+      const seen = new Set()
+      while (node && !seen.has(node.id)) {
+        seen.add(node.id)
+        const senior = seniorNodeOf(node)
+        if (!senior) return null
+        const pid = senior.position_id != null ? Number(senior.position_id) : null
+        if (pid != null && occupied.has(pid)) return pid
+        node = senior
+      }
+      return null
+    }
+    for (const s of stats) {
+      if (s.owner_type !== 'position' || s.owner_position_id == null) continue
+      const P = Number(s.owner_position_id)
+      if (occupied.has(P)) {
+        if (mine.has(P)) map[s.id] = 'owner'
+      } else {
+        const inh = inheritorOf(P)
+        if (inh != null && mine.has(inh)) map[s.id] = 'owner-hfa'
+      }
+    }
+    return map
+  }, [stats, myEmployeeId, allEmployeePositions, orgNodes, orgEdges])
+
   // Stat groupings:
   //   • myStats        = stats this user owns
   //   • sharedStats    = stats explicitly shared with this user (statistic_shares)
   //   • accessibleStats = my + shared (the single flat list shown in the sidebar)
   //   • archivedStats  = archived stats (regardless of ownership) — own folder
   const myStats = useMemo(
-    () => stats.filter(s => !s.archived && s.owner_user_id === user?.id),
-    [stats, user]
+    () =>
+      stats.filter(
+        s => !s.archived && (s.owner_user_id === user?.id || !!positionOwnership[s.id]),
+      ),
+    [stats, user, positionOwnership]
   )
   const sharedStats = useMemo(
-    () => stats.filter(s => !s.archived && s.owner_user_id !== user?.id && userShares[s.id]),
-    [stats, user, userShares]
+    () =>
+      stats.filter(
+        s =>
+          !s.archived &&
+          s.owner_user_id !== user?.id &&
+          !positionOwnership[s.id] &&
+          userShares[s.id],
+      ),
+    [stats, user, userShares, positionOwnership]
   )
   // Combined list — sorted by the same sort_order the user controls via
   // drag-and-drop. Without this `[...myStats, ...sharedStats]` partition,
@@ -10042,12 +10150,19 @@ export default function Statistics() {
                     </div>
                     <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
                       <span className="capitalize">{s.tracking}</span>
-                      {s.owner_user_id === user?.id ? (
+                      {s.owner_user_id === user?.id || positionOwnership[s.id] === 'owner' ? (
                         <span
                           className="text-[7px] bg-green-100 text-green-700 px-0.5 py-px rounded font-semibold flex-shrink-0"
                           title="You own this stat"
                         >
                           Owner
+                        </span>
+                      ) : positionOwnership[s.id] === 'owner-hfa' ? (
+                        <span
+                          className="text-[7px] bg-green-100 text-green-700 px-0.5 py-px rounded font-semibold flex-shrink-0"
+                          title="Held From Above — rolled up to you from a vacant position"
+                        >
+                          Owner - HFA
                         </span>
                       ) : userShares[s.id] ? (
                         <span
