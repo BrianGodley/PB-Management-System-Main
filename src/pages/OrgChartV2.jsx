@@ -407,6 +407,7 @@ export default function OrgChartV2() {
 
   async function createTemplateFromCurrentChart({
     name,
+    description,
     categoryId,
     newCategoryName,
     subcategoryId,
@@ -438,6 +439,7 @@ export default function OrgChartV2() {
       }
       const payload = {
         name,
+        description: description || null,
         category_id: catId || null,
         subcategory_id: subId || null,
         data: buildTemplateSnapshot(),
@@ -579,6 +581,17 @@ export default function OrgChartV2() {
   async function changeTemplateCategory(id, category_id) {
     await supabase.from('org_chart_templates').update({ category_id }).eq('id', id)
     setTemplates(prev => prev.map(t => (t.id === id ? { ...t, category_id } : t)))
+  }
+  // Edit any of a template's fields from the row edit modal.
+  async function updateTemplate(id, fields) {
+    const patch = {
+      name: fields.name,
+      description: fields.description ?? null,
+      category_id: fields.category_id ?? null,
+      subcategory_id: fields.subcategory_id ?? null,
+    }
+    await supabase.from('org_chart_templates').update(patch).eq('id', id)
+    setTemplates(prev => prev.map(t => (t.id === id ? { ...t, ...patch } : t)))
   }
   async function addTemplateCategory(name) {
     const { data } = await supabase
@@ -1725,8 +1738,7 @@ export default function OrgChartV2() {
           subcategories={templateSubcategories}
           onClose={() => setShowTemplateSettings(false)}
           onDeleteTemplate={deleteTemplate}
-          onRenameTemplate={renameTemplate}
-          onChangeTemplateCategory={changeTemplateCategory}
+          onUpdateTemplate={updateTemplate}
           onAddCategory={addTemplateCategory}
           onRenameCategory={renameTemplateCategory}
           onDeleteCategory={deleteTemplateCategory}

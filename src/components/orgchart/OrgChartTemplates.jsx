@@ -164,6 +164,7 @@ export function RenameChartModal({ initialName, onClose, onSave }) {
 // ── Create Template modal ────────────────────────────────────────────────────
 export function CreateTemplateModal({ categories, subcategories, onClose, onSave }) {
   const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [newCategory, setNewCategory] = useState('')
   const [subcategoryId, setSubcategoryId] = useState('')
@@ -182,6 +183,7 @@ export function CreateTemplateModal({ categories, subcategories, onClose, onSave
     if (!cat) return
     onSave({
       name: name.trim(),
+      description: description.trim() || null,
       categoryId: usingNew ? null : Number(categoryId),
       newCategoryName: usingNew ? newCategory.trim() : null,
       subcategoryId: usingNewSub || !subcategoryId ? null : Number(subcategoryId),
@@ -201,6 +203,18 @@ export function CreateTemplateModal({ categories, subcategories, onClose, onSave
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="e.g. Standard Division Structure"
+              className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">
+              Description (optional)
+            </label>
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              rows={2}
+              placeholder="What this template is for…"
               className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
             />
           </div>
@@ -311,8 +325,7 @@ export function TemplatesSettingsView({
   subcategories,
   onClose,
   onDeleteTemplate,
-  onRenameTemplate,
-  onChangeTemplateCategory,
+  onUpdateTemplate,
   onAddCategory,
   onRenameCategory,
   onDeleteCategory,
@@ -324,7 +337,9 @@ export function TemplatesSettingsView({
   const [newCat, setNewCat] = useState('')
   const [selectedCatId, setSelectedCatId] = useState(null)
   const [newSub, setNewSub] = useState('')
-  const catName = id => categories.find(c => c.id === id)?.name || 'Uncategorized'
+  const [editingTemplate, setEditingTemplate] = useState(null)
+  const catName = id => categories.find(c => c.id === id)?.name || '—'
+  const subName = id => (subcategories || []).find(s => s.id === id)?.name || '—'
   const subsForSelected = (subcategories || []).filter(s => s.category_id === selectedCatId)
 
   return (
@@ -364,50 +379,34 @@ export function TemplatesSettingsView({
             (templates || []).length === 0 ? (
               <p className="text-sm text-slate-400 italic">No templates yet.</p>
             ) : (
-              <table className="w-full text-sm">
+              <table className="w-full text-sm border border-slate-200 rounded-md overflow-hidden">
                 <thead>
-                  <tr className="text-left text-[11px] uppercase tracking-wide text-slate-400">
-                    <th className="py-1 pr-2">Name</th>
-                    <th className="py-1 pr-2">Category</th>
-                    <th className="py-1 pr-2 w-10"></th>
+                  <tr className="bg-slate-50 text-left text-[11px] uppercase tracking-wide text-slate-500">
+                    <th className="px-3 py-2 font-semibold">Name</th>
+                    <th className="px-3 py-2 font-semibold">Description</th>
+                    <th className="px-3 py-2 font-semibold">Category</th>
+                    <th className="px-3 py-2 font-semibold">Subcategory</th>
+                    <th className="px-3 py-2 font-semibold text-right w-24">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {templates.map(t => (
-                    <tr key={t.id}>
-                      <td className="py-1.5 pr-2">
+                    <tr key={t.id} className="hover:bg-slate-50">
+                      <td className="px-3 py-2 font-medium text-slate-800">{t.name}</td>
+                      <td className="px-3 py-2 text-slate-500 max-w-xs truncate" title={t.description || ''}>
+                        {t.description || '—'}
+                      </td>
+                      <td className="px-3 py-2 text-slate-600">{catName(t.category_id)}</td>
+                      <td className="px-3 py-2 text-slate-600">{subName(t.subcategory_id)}</td>
+                      <td className="px-3 py-2 text-right whitespace-nowrap">
                         <button
                           type="button"
-                          onClick={() => {
-                            const n = prompt('Rename template', t.name)
-                            if (n && n.trim()) onRenameTemplate(t.id, n.trim())
-                          }}
-                          className="text-slate-800 hover:underline"
-                          title="Click to rename"
+                          title="Edit"
+                          onClick={() => setEditingTemplate(t)}
+                          className="text-slate-500 hover:text-slate-800 mr-3"
                         >
-                          {t.name}
+                          ✎
                         </button>
-                      </td>
-                      <td className="py-1.5 pr-2">
-                        <select
-                          value={t.category_id ?? ''}
-                          onChange={e =>
-                            onChangeTemplateCategory(
-                              t.id,
-                              e.target.value === '' ? null : Number(e.target.value),
-                            )
-                          }
-                          className="border border-slate-300 rounded-md px-1 py-0.5 text-xs"
-                        >
-                          <option value="">Uncategorized</option>
-                          {categories.map(c => (
-                            <option key={c.id} value={c.id}>
-                              {c.name}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="py-1.5 pr-2 text-right">
                         <button
                           type="button"
                           onClick={() => {
@@ -573,7 +572,121 @@ export function TemplatesSettingsView({
           )}
         </div>
       </div>
+
+      {editingTemplate && (
+        <TemplateEditModal
+          template={editingTemplate}
+          categories={categories}
+          subcategories={subcategories}
+          onClose={() => setEditingTemplate(null)}
+          onSave={fields => {
+            onUpdateTemplate(editingTemplate.id, fields)
+            setEditingTemplate(null)
+          }}
+        />
+      )}
     </div>
+  )
+}
+
+// ── Template row edit modal (name / description / category / subcategory) ─────
+function TemplateEditModal({ template, categories, subcategories, onClose, onSave }) {
+  const [name, setName] = useState(template.name || '')
+  const [description, setDescription] = useState(template.description || '')
+  const [categoryId, setCategoryId] = useState(
+    template.category_id != null ? String(template.category_id) : '',
+  )
+  const [subcategoryId, setSubcategoryId] = useState(
+    template.subcategory_id != null ? String(template.subcategory_id) : '',
+  )
+  const subs = categoryId
+    ? (subcategories || []).filter(s => String(s.category_id) === String(categoryId))
+    : []
+
+  return (
+    <Backdrop onClose={onClose}>
+      <Panel className="max-w-md">
+        <Header title="Edit Template" onClose={onClose} />
+        <div className="px-5 py-4 space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Name</label>
+            <input
+              autoFocus
+              value={name}
+              onChange={e => setName(e.target.value)}
+              className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Description</label>
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              rows={2}
+              className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Category</label>
+            <select
+              value={categoryId}
+              onChange={e => {
+                setCategoryId(e.target.value)
+                setSubcategoryId('') // reset subcategory when category changes
+              }}
+              className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+            >
+              <option value="">— Uncategorized —</option>
+              {(categories || []).map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Subcategory</label>
+            <select
+              value={subcategoryId}
+              onChange={e => setSubcategoryId(e.target.value)}
+              disabled={!categoryId}
+              className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+            >
+              <option value="">— None —</option>
+              {subs.map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <Footer>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-md"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              name.trim() &&
+              onSave({
+                name: name.trim(),
+                description: description.trim() || null,
+                category_id: categoryId ? Number(categoryId) : null,
+                subcategory_id: subcategoryId ? Number(subcategoryId) : null,
+              })
+            }
+            className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md"
+          >
+            Save
+          </button>
+        </Footer>
+      </Panel>
+    </Backdrop>
   )
 }
 
