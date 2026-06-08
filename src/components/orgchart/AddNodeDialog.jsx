@@ -275,7 +275,10 @@ export default function AddNodeDialog({
     if (rowTemplate.text_styles) setTextStyles(rowTemplate.text_styles)
     if (rowTemplate.width) setWidth(rowTemplate.width)
     if (rowTemplate.height) setHeight(rowTemplate.height)
-    if (rowTemplate.bg_color) setBgColor(rowTemplate.bg_color)
+    // Coloring for a junior area is always drawn from its parent (handled by the
+    // parentArea-based initial state), so we DON'T copy the row's bg_color in
+    // child mode — only top-level new areas adopt the row's color.
+    if (rowTemplate.bg_color && mode !== 'child') setBgColor(rowTemplate.bg_color)
     if (rowTemplate.box_style && Object.keys(rowTemplate.box_style).length) {
       setBoxStyle({ ...rowTemplate.box_style })
     }
