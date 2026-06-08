@@ -65,7 +65,6 @@ export default function OrgChartV2() {
   const [showTemplateSettings, setShowTemplateSettings] = useState(false)
   const [chartNameMenu, setChartNameMenu] = useState(null) // { anchorRect }
   const [showRecategorize, setShowRecategorize] = useState(false)
-  const [showNewChartNotice, setShowNewChartNotice] = useState(false)
   const [pendingDefaultChart, setPendingDefaultChart] = useState(null) // chart awaiting default-change confirm
   const [wizardName, setWizardName] = useState(null) // non-null = wizard open, carries the chart name
   // Per-row (per-tier) spacing overrides for the current chart, keyed by
@@ -391,9 +390,11 @@ export default function OrgChartV2() {
     const chart = await createChart(name, { categoryId, subcategoryId })
     if (!chart) return
     if (source === 'template' && template) {
-      await instantiateFromTemplate(chart.id, template)
+      await instantiateFromTemplate(chart.id, template, {
+        isMain: !!chart.is_default,
+        chartName: chart.name,
+      })
     }
-    setShowNewChartNotice(true)
   }
 
   // Wizard finished — build the chart from the snapshot it produced (reusing
@@ -405,7 +406,11 @@ export default function OrgChartV2() {
       subcategoryId: feedback?.subcategoryId ?? null,
     })
     if (!chart) return
-    await instantiateFromTemplate(chart.id, { data: snapshot })
+    await instantiateFromTemplate(
+      chart.id,
+      { data: snapshot },
+      { isMain: !!chart.is_default, chartName: chart.name },
+    )
     // Store the draft-vs-final so Sam can learn from the edits next time.
     if (feedback) {
       try {
@@ -420,7 +425,6 @@ export default function OrgChartV2() {
         /* non-fatal */
       }
     }
-    setShowNewChartNotice(true)
   }
 
   // ── Template helpers ────────────────────────────────────────────────
@@ -515,36 +519,64 @@ export default function OrgChartV2() {
   // Build a chart from a template: ensure positions exist (add missing ones,
   // after telling the user), insert nodes (remapping local refs to new ids),
   // patch parent/attachment links, then insert edges.
-  async function instantiateFromTemplate(newChartId, template) {
+  async function instantiateFromTemplate(newChartId, template, opts = {}) {
+    const { isMain = false, chartName = 'this chart' } = opts
     const data = template?.data || {}
     const tplNodes = data.nodes || []
     const tplEdges = data.edges || []
+    const lower = x => String(x || '').toLowerCase().trim()
 
-    // 1) Position sync — match by title (case-insensitive); add any missing.
+    // 1) Positions.
     const titles = [...new Set(tplNodes.map(n => n.position_title).filter(Boolean))]
-    const byTitle = new Map(positions.map(p => [String(p.title).toLowerCase().trim(), p]))
-    const missing = titles.filter(t => !byTitle.has(t.toLowerCase().trim()))
-    if (missing.length) {
-      const ok = confirm(
-        `These positions on this template are not in your Human Resources positions list and will be added:\n\n` +
-          missing.join('\n') +
-          `\n\nContinue?`,
-      )
-      if (!ok) return
-      const { data: created, error } = await supabase
-        .from('positions')
-        .insert(missing.map(t => ({ title: t, source_chart_id: newChartId })))
-        .select()
-      if (error) {
-        alert(error.message)
-        return
+    const byTitle = new Map()
+    if (isMain) {
+      // The main (first/default) chart draws from the MAIN positions list:
+      // reuse existing main positions and add any missing ones to it.
+      positions
+        .filter(p => !p.source_chart_id)
+        .forEach(p => byTitle.set(lower(p.title), p))
+      const missing = titles.filter(t => !byTitle.has(lower(t)))
+      if (missing.length) {
+        const ok = confirm(
+          `These positions will be added to your main HR positions list:\n\n` +
+            missing.join('\n') +
+            `\n\nContinue?`,
+        )
+        if (!ok) return
+        const { data: created, error } = await supabase
+          .from('positions')
+          .insert(missing.map(t => ({ title: t })))
+          .select()
+        if (error) {
+          alert(error.message)
+          return
+        }
+        setPositions(prev => [...prev, ...(created || [])])
+        for (const p of created || []) byTitle.set(lower(p.title), p)
       }
-      const newPositions = created || []
-      setPositions(prev => [...prev, ...newPositions])
-      for (const p of newPositions) byTitle.set(String(p.title).toLowerCase().trim(), p)
+    } else {
+      // Every additional chart gets its OWN positions list (a separate sub-tab
+      // in HR > Positions named after the chart). It does not touch Main.
+      if (titles.length) {
+        const ok = confirm(
+          `A separate positions list will be created for this chart.\n\n` +
+            `You'll find it in HR → Positions → "${chartName}". It won't change your ` +
+            `main positions list.\n\nContinue?`,
+        )
+        if (!ok) return
+        const { data: created, error } = await supabase
+          .from('positions')
+          .insert(titles.map(t => ({ title: t, source_chart_id: newChartId })))
+          .select()
+        if (error) {
+          alert(error.message)
+          return
+        }
+        setPositions(prev => [...prev, ...(created || [])])
+        for (const p of created || []) byTitle.set(lower(p.title), p)
+      }
     }
-    const posIdForTitle = t =>
-      t ? byTitle.get(String(t).toLowerCase().trim())?.id || null : null
+    const posIdForTitle = t => (t ? byTitle.get(lower(t))?.id || null : null)
 
     // 2) Insert nodes (links nulled for now), tracking ref → new id.
     const refToId = new Map()
@@ -725,13 +757,35 @@ export default function OrgChartV2() {
 
   async function deleteChart() {
     if (!chartId) return
-    if (!confirm(`Delete chart "${chartName}"? Every item inside will be removed. This cannot be undone.`))
-      return
+    const current = charts.find(c => c.id === chartId)
+    const isMainChart = !!current?.is_default
+    const ownedPositions = positions.filter(p => p.source_chart_id === chartId)
+    // Build a confirmation that explains what happens to this chart's positions.
+    let msg = `Delete chart "${chartName}"? Every item inside will be removed. This cannot be undone.`
+    if (isMainChart) {
+      msg +=
+        `\n\nNote: your MAIN positions list will NOT be deleted — it stays because it is ` +
+        `linked to your Statistics. Only the chart itself is removed.`
+    } else if (ownedPositions.length) {
+      msg +=
+        `\n\nThis chart's separate positions list (HR → Positions → "${chartName}", ` +
+        `${ownedPositions.length} position${ownedPositions.length !== 1 ? 's' : ''}) will also be deleted.`
+    }
+    if (!confirm(msg)) return
     setBusy(true)
     try {
       await supabase.from('org_edges').delete().eq('chart_id', chartId)
       await supabase.from('org_nodes').delete().eq('chart_id', chartId)
       await supabase.from('org_node_types').delete().eq('chart_id', chartId)
+      // Delete this chart's OWN positions list (and their assignments) — but
+      // never the main list (those have no source_chart_id). Done BEFORE the
+      // chart delete so the FK doesn't just null them back into Main.
+      if (!isMainChart && ownedPositions.length) {
+        const ids = ownedPositions.map(p => p.id)
+        await supabase.from('employee_positions').delete().in('position_id', ids)
+        await supabase.from('positions').delete().eq('source_chart_id', chartId)
+        setPositions(prev => prev.filter(p => p.source_chart_id !== chartId))
+      }
       await supabase.from('org_charts').delete().eq('id', chartId)
       const remaining = charts.filter(c => c.id !== chartId)
       setCharts(remaining)
@@ -2050,44 +2104,6 @@ export default function OrgChartV2() {
               deleteChart()
             }}
           />,
-          document.body,
-        )}
-
-      {showNewChartNotice &&
-        createPortal(
-          <div
-            className="fixed inset-0 z-[80] bg-black/40 flex items-center justify-center p-4"
-            onClick={() => setShowNewChartNotice(false)}
-          >
-            <div
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="px-5 py-3" style={{ backgroundColor: FG }}>
-                <h2 className="text-base font-bold text-white">Heads up — charts & HR positions</h2>
-              </div>
-              <div className="px-5 py-4 text-sm text-slate-700 space-y-2">
-                <p>
-                  You can keep as many org charts as you like, but <b>only the chart marked
-                  default draws from (and feeds) the Human Resources positions list.</b>
-                </p>
-                <p>
-                  If you build charts from templates and later make one of them the default, you
-                  may need to create additional positions to cover it — and those new positions
-                  could duplicate the function of positions already in the table.
-                </p>
-              </div>
-              <div className="flex justify-end px-5 py-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowNewChartNotice(false)}
-                  className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md"
-                >
-                  Got it
-                </button>
-              </div>
-            </div>
-          </div>,
           document.body,
         )}
 

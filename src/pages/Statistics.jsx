@@ -8548,7 +8548,9 @@ export default function Statistics() {
         .select('*')
         .order('sort_order', { ascending: true })
         .order('name'),
-      supabase.from('positions').select('id, title').order('title'),
+      // Stats can only be linked to the MAIN positions list (source_chart_id
+      // null); per-chart position lists are excluded from stat assignment.
+      supabase.from('positions').select('id, title').is('source_chart_id', null).order('title'),
     ])
     setStatGroups(grpRes.data || [])
     setPositions(posRes.data || [])
