@@ -2,7 +2,7 @@
 // Position, Org Chart Area), orthogonal arrows, drag-and-drop, edit
 // mode toggle, contextual item menu.
 
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -1422,6 +1422,7 @@ export default function OrgChartV2() {
         createPortal(
           <ItemContextMenu
             screenRect={contextMenu.screenRect}
+            nodeId={contextMenu.nodeId}
             kind={selectedNode.kind}
             onClose={() => setContextMenu(null)}
             onConnect={() => {
@@ -1447,9 +1448,6 @@ export default function OrgChartV2() {
             onEdit={() => {
               setDialog({ mode: 'edit', existing: selectedNode })
               setContextMenu(null)
-            }}
-            onDelete={() => {
-              deleteSelectedNode()
             }}
           />,
           document.body,
@@ -1524,6 +1522,7 @@ export default function OrgChartV2() {
 
 function ItemContextMenu({
   screenRect,
+  nodeId,
   kind,
   onClose,
   onConnect,
@@ -1534,19 +1533,47 @@ function ItemContextMenu({
   onChangeChild,
   onChangeConnection,
   onEdit,
-  onDelete,
 }) {
   const menuWidth = 180
   const margin = 8
-  let left = screenRect.right + margin
-  if (left + menuWidth > window.innerWidth - 8) {
-    left = Math.max(8, screenRect.left - menuWidth - margin)
-  }
-  const top = Math.max(8, Math.min(window.innerHeight - 260, screenRect.top))
+  const menuRef = useRef(null)
+  const [pos, setPos] = useState({ top: screenRect.top, left: screenRect.right + margin })
+
+  // Keep the menu pinned to its item: recompute position from the item's live
+  // on-screen rect whenever the page/canvas scrolls or resizes (so the menu
+  // tracks the item), and clamp it vertically so a menu near the bottom of a
+  // tall chart is nudged up to stay fully on screen.
+  useLayoutEffect(() => {
+    const reposition = () => {
+      let rect = screenRect
+      if (nodeId != null) {
+        const el = document.querySelector(`[data-node-id="${nodeId}"]`)
+        if (el) rect = el.getBoundingClientRect()
+      }
+      let left = rect.right + margin
+      if (left + menuWidth > window.innerWidth - 8) {
+        left = Math.max(8, rect.left - menuWidth - margin)
+      }
+      const h = menuRef.current?.offsetHeight || 260
+      let top = rect.top
+      if (top + h > window.innerHeight - 8) top = window.innerHeight - h - 8
+      if (top < 8) top = 8
+      setPos({ top, left })
+    }
+    reposition()
+    window.addEventListener('scroll', reposition, true)
+    window.addEventListener('resize', reposition)
+    return () => {
+      window.removeEventListener('scroll', reposition, true)
+      window.removeEventListener('resize', reposition)
+    }
+  }, [nodeId, screenRect])
+
   return (
     <div
+      ref={menuRef}
       className="fixed z-[1000] bg-white border border-slate-200 shadow-xl rounded-lg py-1 text-sm"
-      style={{ top, left, width: menuWidth }}
+      style={{ top: pos.top, left: pos.left, width: menuWidth }}
       onClick={e => e.stopPropagation()}
     >
       <div className="flex items-center justify-between px-3 py-1 border-b border-slate-100">
@@ -1571,7 +1598,6 @@ function ItemContextMenu({
       <div className="border-t border-slate-100 my-1" />
       <MenuItem label="Change Senior" onClick={onChangeSenior} />
       <MenuItem label="Change Junior" onClick={onChangeChild} />
-      <MenuItem label="Delete" onClick={onDelete} danger />
     </div>
   )
 }

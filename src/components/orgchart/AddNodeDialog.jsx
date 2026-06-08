@@ -530,13 +530,13 @@ export default function AddNodeDialog({
             )}
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">
-                Area name
+                Area Description
               </label>
               <div className="flex items-center gap-2">
                 <input
                   value={label}
                   onChange={e => setLabel(e.target.value)}
-                  placeholder="Operations"
+                  placeholder="Department"
                   className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm"
                 />
                 {fieldStyle('label', 12, 'arial')}
@@ -545,13 +545,13 @@ export default function AddNodeDialog({
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">
-                Second title (optional)
+                Area Name (optional)
               </label>
               <div className="flex items-center gap-2">
                 <input
                   value={heading}
                   onChange={e => setHeading(e.target.value)}
-                  placeholder="e.g. Department"
+                  placeholder="Operations"
                   className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm"
                 />
                 {fieldStyle('heading', 14, 'sans', true)}
@@ -789,9 +789,20 @@ export default function AddNodeDialog({
           </div>
         )}
 
-        <div className="flex justify-end gap-2 mt-5">
-          <button type="button" onClick={onClose} className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-md">Cancel</button>
-          <button type="button" onClick={handleSubmit} className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md">{isEdit ? 'Save' : 'Add'}</button>
+        <div className="flex items-center mt-5">
+          {isEdit && onDelete && (
+            <button
+              type="button"
+              onClick={() => onDelete(existing)}
+              className="px-3 py-1.5 text-sm text-red-600 border border-red-200 hover:bg-red-50 rounded-md"
+            >
+              Delete
+            </button>
+          )}
+          <div className="ml-auto flex gap-2">
+            <button type="button" onClick={onClose} className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-md">Cancel</button>
+            <button type="button" onClick={handleSubmit} className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md">{isEdit ? 'Save' : 'Add'}</button>
+          </div>
         </div>
       </div>
     </div>
