@@ -138,11 +138,13 @@ export default function OrgChartWizard({
   initialName,
   positionTitles = [],
   priorExamples = [],
+  industries = [],
   onClose,
   onComplete,
 }) {
   const [step, setStep] = useState(1)
   const [name, setName] = useState(initialName || '')
+  const [industry, setIndustry] = useState('')
   const [description, setDescription] = useState('')
   const [chartType, setChartType] = useState('combination') // 'positions' | 'areas' | 'combination'
   const [topTitle, setTopTitle] = useState('')
@@ -166,11 +168,12 @@ export default function OrgChartWizard({
       combination:
         'Chart type: COMBINATION — business areas, each led by a manager position, with junior roles. For each item use {"name":"Area name","lead":"Manager position title","juniors":["Role", ...]}.',
     }[chartType]
+    const industryLine = industry
+      ? `The business operates in the "${industry}" industry — tailor names to that industry while keeping them professional and widely understood.`
+      : `Do NOT assume any specific industry; rely only on the description the user provides and keep titles generic.`
     return (
-      `You are helping design a generic organizational chart for an arbitrary business in a ` +
-      `general-purpose org-chart product. Do NOT assume any specific industry; rely only on the ` +
-      `description the user provides and keep titles generic unless the description specifies ` +
-      `otherwise.\n${typeLine}`
+      `You are helping design an organizational chart in a general-purpose org-chart product. ` +
+      `${industryLine}\n${typeLine}`
     )
   }
 
@@ -206,10 +209,11 @@ export default function OrgChartWizard({
     setSamError('')
     try {
       const reply = await askSam(
-        `For a general business described as "${description || 'a company'}", what is the single ` +
-          `most senior ${chartType === 'areas' ? 'top-level area/function name' : 'leadership position title'} ` +
-          `at the top of its org chart? Do not assume any specific industry. Reply with ONLY the ` +
-          `name, no extra words.`,
+        `For a business${industry ? ` in the "${industry}" industry` : ''} described as ` +
+          `"${description || 'a company'}", what is the single most senior ` +
+          `${chartType === 'areas' ? 'top-level area/function name' : 'leadership position title'} ` +
+          `at the top of its org chart?${industry ? '' : ' Do not assume any specific industry.'} ` +
+          `Reply with ONLY the name, no extra words.`,
       )
       const t = reply.split('\n')[0].replace(/[".]/g, '').trim()
       if (t) setTopTitle(t)
@@ -289,7 +293,7 @@ export default function OrgChartWizard({
 
   const finish = () => {
     if (!canFinish) return
-    const finalStruct = { chartType, topTitle: topTitle.trim(), divisions: filledDivisions }
+    const finalStruct = { chartType, industry: industry || null, topTitle: topTitle.trim(), divisions: filledDivisions }
     // Pass the draft-vs-final feedback so it can be stored for future learning.
     onComplete(name.trim(), buildSnapshot(chartType, { topTitle, divisions }), {
       description: description.trim() || null,
@@ -361,6 +365,25 @@ export default function OrgChartWizard({
                   className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
                 />
               </div>
+              {industries.length > 0 && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">
+                    Industry (helps Sam tailor suggestions)
+                  </label>
+                  <select
+                    value={industry}
+                    onChange={e => setIndustry(e.target.value)}
+                    className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+                  >
+                    <option value="">— Any / not specified —</option>
+                    {industries.map(n => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1">
                   Describe your company (helps Sam suggest a structure)
