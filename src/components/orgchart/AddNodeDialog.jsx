@@ -15,7 +15,7 @@
 //   - employeesByPosition  (Map<position_id, [{ id, displayName, active }]>)
 //   - onSubmit(payload), onClose
 
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { CONTAINER_COLORS } from './palette.js'
 import ColorLibraryPicker from '../ColorLibraryPicker.jsx'
 
@@ -237,6 +237,50 @@ export default function AddNodeDialog({
     }
     return 0
   })
+
+  // When adding a NEW item to a row that already has items of the same kind,
+  // the modal defaults to that row's existing parameters — font sizes /
+  // families / bold / italic / orientation, box width & height, and (for
+  // areas) solid-vs-border fill and border thickness. We pick a representative
+  // row-mate as the template; for a junior area with no sibling juniors yet we
+  // fall back to its parent area (so it still inherits the parent's look).
+  const newKind = fixedKind || kind
+  const rowTemplate = useMemo(() => {
+    if (isEdit) return null
+    const items = allItems || []
+    if (mode === 'child' && parentId) {
+      const parent = items.find(n => n.id === parentId)
+      const pTier = parent?.tier ?? 0
+      const sibling = items.find(n => {
+        if (!n.parent_container_id || n.kind !== newKind) return false
+        const par = items.find(x => x.id === n.parent_container_id)
+        return (par?.tier ?? 0) === pTier
+      })
+      return sibling || (parent?.kind === 'container' ? parent : null)
+    }
+    // Top-level add: a same-kind item already sitting on the chosen row.
+    return (
+      items.find(
+        n => !n.parent_container_id && n.kind === newKind && (n.tier ?? 0) === tier,
+      ) || null
+    )
+  }, [isEdit, allItems, mode, parentId, newKind, tier])
+
+  // Apply the row template's styling to the new item (style only — never its
+  // label / position / employee). Re-runs if the chosen row changes (e.g. the
+  // user edits the Level field), so the defaults track the target row.
+  useEffect(() => {
+    if (isEdit || !rowTemplate) return
+    if (rowTemplate.font_sizes) setFontSizes(rowTemplate.font_sizes)
+    if (rowTemplate.text_styles) setTextStyles(rowTemplate.text_styles)
+    if (rowTemplate.width) setWidth(rowTemplate.width)
+    if (rowTemplate.height) setHeight(rowTemplate.height)
+    if (rowTemplate.bg_color) setBgColor(rowTemplate.bg_color)
+    if (rowTemplate.box_style && Object.keys(rowTemplate.box_style).length) {
+      setBoxStyle({ ...rowTemplate.box_style })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowTemplate?.id])
 
   function handleSubmit() {
     const base = {
