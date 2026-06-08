@@ -14,7 +14,7 @@ import {
   RenameChartModal,
   CreateTemplateModal,
   ChartNameMenu,
-  TemplatesSettingsModal,
+  TemplatesSettingsView,
 } from '../components/orgchart/OrgChartTemplates.jsx'
 import { CANVAS_PAD_X, CANVAS_PAD_Y, NODE_GAP, TIER_GAP } from '../components/orgchart/layout.js'
 
@@ -1667,6 +1667,19 @@ export default function OrgChartV2() {
         )
       })()}
 
+      {showTemplateSettings && isAdmin ? (
+        <TemplatesSettingsView
+          templates={templates}
+          categories={templateCategories}
+          onClose={() => setShowTemplateSettings(false)}
+          onDeleteTemplate={deleteTemplate}
+          onRenameTemplate={renameTemplate}
+          onChangeTemplateCategory={changeTemplateCategory}
+          onAddCategory={addTemplateCategory}
+          onRenameCategory={renameTemplateCategory}
+          onDeleteCategory={deleteTemplateCategory}
+        />
+      ) : (
       <div className="flex-1 overflow-auto relative">
         {chartId ? (
           <TierCanvas
@@ -1722,6 +1735,7 @@ export default function OrgChartV2() {
           </div>
         )}
       </div>
+      )}
 
       {editMode && contextMenu && selectedNode &&
         createPortal(
@@ -1867,19 +1881,6 @@ export default function OrgChartV2() {
           document.body,
         )}
 
-      {showTemplateSettings && isAdmin && (
-        <TemplatesSettingsModal
-          templates={templates}
-          categories={templateCategories}
-          onClose={() => setShowTemplateSettings(false)}
-          onDeleteTemplate={deleteTemplate}
-          onRenameTemplate={renameTemplate}
-          onChangeTemplateCategory={changeTemplateCategory}
-          onAddCategory={addTemplateCategory}
-          onRenameCategory={renameTemplateCategory}
-          onDeleteCategory={deleteTemplateCategory}
-        />
-      )}
     </div>
   )
 }

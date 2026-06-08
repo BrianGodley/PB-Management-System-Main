@@ -36,9 +36,9 @@ export function NewChartModal({ templates, categories, onClose, onCreate }) {
 
   return (
     <Backdrop onClose={onClose}>
-      <Panel className="max-w-lg">
+      <Panel className="max-w-3xl">
         <Header title="New Org Chart" onClose={onClose} />
-        <div className="px-5 py-4 space-y-4 overflow-y-auto">
+        <div className="px-6 py-5 space-y-5 overflow-y-auto">
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">Chart name</label>
             <input
@@ -269,7 +269,7 @@ export function ChartNameMenu({ anchorRect, onClose, onRename, onCreateTemplate,
 }
 
 // ── Admin Settings: templates table + categories management ──────────────────
-export function TemplatesSettingsModal({
+export function TemplatesSettingsView({
   templates,
   categories,
   onClose,
@@ -285,10 +285,9 @@ export function TemplatesSettingsModal({
   const catName = id => categories.find(c => c.id === id)?.name || 'Uncategorized'
 
   return (
-    <Backdrop onClose={onClose}>
-      <Panel className="max-w-3xl">
-        <Header title="Org Chart Template Settings" onClose={onClose} />
-        <div className="px-5 pt-3 flex gap-2 border-b border-slate-100">
+    <div className="flex-1 flex flex-col min-h-0">
+      <div className="flex border-b border-gray-200 bg-white px-6 items-center justify-between flex-shrink-0">
+        <div className="flex">
           {[
             ['templates', 'Templates'],
             ['categories', 'Categories'],
@@ -297,18 +296,27 @@ export function TemplatesSettingsModal({
               key={v}
               type="button"
               onClick={() => setTab(v)}
-              className={`px-3 py-1.5 text-sm rounded-t-md border-b-2 -mb-px ${
+              className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
                 tab === v
-                  ? 'border-blue-600 text-blue-700 font-semibold'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
+                  ? 'border-green-700 text-green-800'
+                  : 'border-transparent text-gray-500 hover:text-gray-800'
               }`}
             >
               {lab}
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-sm text-gray-500 hover:text-gray-800 px-2"
+        >
+          ✕ Close
+        </button>
+      </div>
 
-        <div className="px-5 py-4 overflow-y-auto" style={{ maxHeight: '60vh' }}>
+      <div className="bg-gray-50 px-6 py-6 flex-1 overflow-y-auto">
+        <div className="bg-white border border-gray-200 rounded-xl p-5 max-w-4xl">
           {tab === 'templates' ? (
             (templates || []).length === 0 ? (
               <p className="text-sm text-slate-400 italic">No templates yet.</p>
@@ -428,13 +436,8 @@ export function TemplatesSettingsModal({
             </div>
           )}
         </div>
-        <Footer>
-          <button type="button" onClick={onClose} className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md">
-            Done
-          </button>
-        </Footer>
-      </Panel>
-    </Backdrop>
+      </div>
+    </div>
   )
 }
 
