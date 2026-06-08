@@ -56,6 +56,7 @@ export default function OrgChartV2() {
   const [templates, setTemplates] = useState([])
   const [templateCategories, setTemplateCategories] = useState([])
   const [templateSubcategories, setTemplateSubcategories] = useState([])
+  const [wizardExamples, setWizardExamples] = useState([]) // recent accepted wizard structures (for Sam grounding)
   const [isAdmin, setIsAdmin] = useState(false)
   const [showNewChartModal, setShowNewChartModal] = useState(false)
   const [showRenameModal, setShowRenameModal] = useState(false)
@@ -100,6 +101,11 @@ export default function OrgChartV2() {
           user?.id
             ? supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
             : Promise.resolve({ data: null }),
+          supabase
+            .from('org_chart_wizard_feedback')
+            .select('description, final')
+            .order('created_at', { ascending: false })
+            .limit(3),
         ])
       const chartList = chartsRes.data || []
       setCharts(chartList)
