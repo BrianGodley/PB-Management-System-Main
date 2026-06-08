@@ -705,7 +705,8 @@ export default function OrgChartV2() {
     )
 
     // Size every row to fit its longest text so template titles don't overflow.
-    await autoFitChart(insertedNodes.map(x => x.row))
+    // Pass the positions we just created/matched (state may not be updated yet).
+    await autoFitChart(insertedNodes.map(x => x.row), [...byTitle.values()])
   }
 
   // ── Auto-fit: size rows to text, detach overflowing attached items ──
@@ -714,17 +715,23 @@ export default function OrgChartV2() {
   //    re-connected as reports-to children with command lines.
   // 2) Every row is then sized to the largest text it must show. Runs after a
   //    template/wizard build and via the "Fit Text" button.
-  async function autoFitChart(listArg) {
+  async function autoFitChart(listArg, extraPositions = []) {
     const base = listArg || nodes
     if (!base.length) return
     const textW = (s, sz) => Math.ceil(String(s || '').length * (sz || 12) * 0.62)
     const isVert = (n, f) => !!(n.text_styles && n.text_styles[f] && n.text_styles[f].vertical)
+    // Resolve position titles from current state PLUS any just-created positions
+    // (state may not have updated yet right after a template build).
+    const posTitle = new Map(
+      [...positions, ...(extraPositions || [])].map(p => [Number(p.id), p.title]),
+    )
+    const holderName = n => ((resolveNodeHolder ? resolveNodeHolder(n) : null) || {}).displayName || ''
+    const inChargeTitle = n => (n.position_id ? posTitle.get(Number(n.position_id)) || '' : '')
 
     // Own text-based size for a single node (ignores its junior columns).
     const ownReq = n => {
       const fs = n.font_sizes || {}
       if (n.kind === 'container') {
-        const ph = (resolveNodeHolder ? resolveNodeHolder(n) : null) || {}
         const t1 = (n.label || '').trim()
         const t2 = (n.heading || '').trim()
         const szL = fs.label || 12
@@ -751,17 +758,17 @@ export default function OrgChartV2() {
             h += szH + 4
           }
         }
-        if (ph.positionTitle) {
-          w = Math.max(w, textW(ph.positionTitle, szT), textW(ph.displayName, szN))
+        const inCharge = inChargeTitle(n)
+        if (inCharge) {
+          w = Math.max(w, textW(inCharge, szT), textW(holderName(n), szN))
           h += szT + szN + 8
         }
         return { w: Math.max(w + 20, 110), h: Math.max(h, 70) }
       }
-      const ph = (resolveNodeHolder ? resolveNodeHolder(n) : null) || {}
       const szT = fs.title || 12
       const szN = fs.name || 10
-      const title = ph.positionTitle || n.label || ''
-      const name = ph.displayName || ''
+      const title = inChargeTitle(n) || n.label || ''
+      const name = holderName(n)
       return {
         w: Math.max(textW(title, szT), textW(name, szN), 80) + 16,
         h: Math.max(szT + szN + 18, 40),

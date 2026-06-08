@@ -71,62 +71,80 @@ declare
           {"type":"position","title":"Equipment Operator"}]},
         {"type":"position","title":"Agronomist"},
         {"type":"position","title":"Bookkeeper"}]}},
-    {"subcategory":"Livestock & Ranching","name":"Cattle Ranch","description":"Flat ranch hierarchy — owner over a foreman who directs the ranch hands.","tree":
+    {"subcategory":"Livestock & Ranching","name":"Cattle Ranch","description":"Owner → ranch manager → foremen → field crews (4 levels).","tree":
       {"type":"position","title":"Ranch Owner","children":[
-        {"type":"position","title":"Ranch Foreman","children":[
-          {"type":"position","title":"Ranch Hand"},
-          {"type":"position","title":"Cowhand"},
-          {"type":"position","title":"Wrangler"}]}]}},
-    {"subcategory":"Dairy","name":"Dairy Farm","description":"Function areas with a nested milking-shift structure inside Milking Operations.","tree":
-      {"type":"position","title":"Dairy Owner / Manager","children":[
-        {"type":"area","name":"Herd Management","lead":"Herd Manager","children":[
-          {"type":"position","title":"Herdsman"},{"type":"position","title":"Breeding Technician"}]},
-        {"type":"area","name":"Milking Operations","lead":"Parlor Supervisor","children":[
-          {"type":"area","name":"Day Shift","children":[
-            {"type":"position","title":"Milker"},{"type":"position","title":"Cow Pusher"}]},
-          {"type":"area","name":"Night Shift","children":[{"type":"position","title":"Milker"}]}]},
-        {"type":"area","name":"Feed & Nutrition","lead":"Feed Manager","children":[{"type":"position","title":"Feeder"}]},
+        {"type":"position","title":"Ranch Manager","children":[
+          {"type":"position","title":"Cattle Foreman","children":[
+            {"type":"position","title":"Ranch Hand"},
+            {"type":"position","title":"Cowhand"}]},
+          {"type":"position","title":"Horse Operations Lead","children":[
+            {"type":"position","title":"Wrangler"}]}]},
+        {"type":"position","title":"Office Manager","children":[
+          {"type":"position","title":"Bookkeeper"}]}]}},
+    {"subcategory":"Dairy","name":"Dairy Farm","description":"Owner → operations manager → function areas → nested milking shifts → crew (5 levels).","tree":
+      {"type":"position","title":"Dairy Owner","children":[
+        {"type":"position","title":"Operations Manager","children":[
+          {"type":"area","name":"Herd Management","lead":"Herd Manager","children":[
+            {"type":"position","title":"Herdsman"},{"type":"position","title":"Breeding Technician"}]},
+          {"type":"area","name":"Milking Operations","lead":"Parlor Supervisor","children":[
+            {"type":"area","name":"Day Shift","children":[
+              {"type":"position","title":"Milker"},{"type":"position","title":"Cow Pusher"}]},
+            {"type":"area","name":"Night Shift","children":[{"type":"position","title":"Milker"}]}]},
+          {"type":"area","name":"Feed & Nutrition","lead":"Feed Manager","children":[{"type":"position","title":"Feeder"}]}]},
         {"type":"area","name":"Administration","lead":"Office Manager","children":[{"type":"position","title":"Bookkeeper"}]}]}},
-    {"subcategory":"Aquaculture & Fisheries","name":"Aquaculture Farm","description":"Area-based around the production cycle: hatchery, grow-out, health, harvest.","tree":
+    {"subcategory":"Aquaculture & Fisheries","name":"Aquaculture Farm","description":"GM → production director → grow-out areas → system sub-areas → roles (5 levels).","tree":
       {"type":"position","title":"General Manager","children":[
-        {"type":"area","name":"Hatchery","lead":"Hatchery Manager","children":[{"type":"position","title":"Hatchery Technician"}]},
-        {"type":"area","name":"Grow-Out Operations","lead":"Production Manager","children":[
-          {"type":"position","title":"Farm Technician"},{"type":"position","title":"Feeder"}]},
+        {"type":"position","title":"Production Director","children":[
+          {"type":"area","name":"Hatchery","lead":"Hatchery Manager","children":[{"type":"position","title":"Hatchery Technician"}]},
+          {"type":"area","name":"Grow-Out Operations","lead":"Grow-Out Manager","children":[
+            {"type":"area","name":"Pond Systems","children":[{"type":"position","title":"Farm Technician"}]},
+            {"type":"area","name":"Recirculating Systems","children":[{"type":"position","title":"Farm Technician"},{"type":"position","title":"Feeder"}]}]},
+          {"type":"area","name":"Harvest & Processing","lead":"Harvest Manager","children":[{"type":"position","title":"Processing Worker"}]}]},
         {"type":"area","name":"Water Quality & Health","lead":"Fish Health Lead","children":[
           {"type":"position","title":"Biologist"},{"type":"position","title":"Lab Technician"}]},
-        {"type":"area","name":"Harvest & Processing","lead":"Harvest Manager","children":[{"type":"position","title":"Processing Worker"}]},
         {"type":"area","name":"Sales & Admin","lead":"Office Manager","children":[{"type":"position","title":"Sales Representative"}]}]}},
-    {"subcategory":"Forestry & Logging","name":"Forestry & Logging Operation","description":"Position hierarchy: a forester and a logging foreman directing field crews.","tree":
+    {"subcategory":"Forestry & Logging","name":"Forestry & Logging Operation","description":"GM → operations manager → harvest superintendent → foreman → crew (5 levels).","tree":
       {"type":"position","title":"General Manager","children":[
-        {"type":"position","title":"Forester","children":[{"type":"position","title":"Forest Technician"}]},
-        {"type":"position","title":"Logging Foreman","children":[
-          {"type":"position","title":"Faller"},{"type":"position","title":"Equipment Operator"},{"type":"position","title":"Log Truck Driver"}]},
+        {"type":"position","title":"Operations Manager","children":[
+          {"type":"position","title":"Forester","children":[{"type":"position","title":"Forest Technician"}]},
+          {"type":"position","title":"Harvest Superintendent","children":[
+            {"type":"position","title":"Logging Foreman","children":[
+              {"type":"position","title":"Faller"},{"type":"position","title":"Equipment Operator"},{"type":"position","title":"Log Truck Driver"}]}]}]},
         {"type":"position","title":"Office Manager","children":[{"type":"position","title":"Bookkeeper"}]}]}},
-    {"subcategory":"Horticulture & Nurseries","name":"Wholesale Nursery","description":"Production-focused areas with a strong growing function and sales/shipping.","tree":
+    {"subcategory":"Horticulture & Nurseries","name":"Wholesale Nursery","description":"GM → operations manager → production area → growing sub-areas → workers (5 levels).","tree":
       {"type":"position","title":"General Manager","children":[
-        {"type":"area","name":"Production / Growing","lead":"Nursery Manager","children":[
-          {"type":"position","title":"Grower"},{"type":"position","title":"Propagation Technician"},{"type":"position","title":"Nursery Worker"}]},
-        {"type":"area","name":"Sales & Shipping","lead":"Sales Manager","children":[
-          {"type":"position","title":"Account Representative"},{"type":"position","title":"Shipping Lead"},{"type":"position","title":"Driver"}]},
-        {"type":"area","name":"Administration","lead":"Office Manager","children":[{"type":"position","title":"Bookkeeper"}]}]}},
-    {"subcategory":"AgTech","name":"AgTech Company","description":"Corporate three-tier: CEO over VPs/chiefs, each leading their own team.","tree":
+        {"type":"position","title":"Operations Manager","children":[
+          {"type":"area","name":"Production / Growing","lead":"Nursery Manager","children":[
+            {"type":"area","name":"Propagation","children":[{"type":"position","title":"Propagation Technician"}]},
+            {"type":"area","name":"Container Yard","children":[{"type":"position","title":"Grower"},{"type":"position","title":"Nursery Worker"}]}]},
+          {"type":"area","name":"Shipping","lead":"Shipping Lead","children":[
+            {"type":"position","title":"Order Puller"},{"type":"position","title":"Driver"}]}]},
+        {"type":"position","title":"Sales Manager","children":[
+          {"type":"position","title":"Account Representative"}]},
+        {"type":"position","title":"Office Manager","children":[{"type":"position","title":"Bookkeeper"}]}]}},
+    {"subcategory":"AgTech","name":"AgTech Company","description":"CEO → VPs/chiefs → directors → managers → individual contributors (5 levels).","tree":
       {"type":"position","title":"Chief Executive Officer","children":[
         {"type":"position","title":"VP of Engineering","children":[
-          {"type":"position","title":"Software Engineer"},{"type":"position","title":"Hardware Engineer"},{"type":"position","title":"Data Scientist"}]},
+          {"type":"position","title":"Director of Engineering","children":[
+            {"type":"position","title":"Engineering Manager","children":[
+              {"type":"position","title":"Software Engineer"},{"type":"position","title":"Hardware Engineer"},{"type":"position","title":"Data Scientist"}]}]}]},
         {"type":"position","title":"VP of Product","children":[
-          {"type":"position","title":"Product Manager"},{"type":"position","title":"UX Designer"}]},
-        {"type":"position","title":"Chief Agronomist","children":[{"type":"position","title":"Research Scientist"}]},
-        {"type":"position","title":"Sales Director","children":[
-          {"type":"position","title":"Account Executive"},{"type":"position","title":"Sales Development Rep"}]},
-        {"type":"position","title":"Chief Financial Officer","children":[{"type":"position","title":"Controller"}]}]}},
-    {"subcategory":"Farm Services & Supply","name":"Farm Supply Co-op","description":"Cooperative governance: Board → General Manager → function areas with staff.","tree":
+          {"type":"position","title":"Product Manager","children":[
+            {"type":"position","title":"UX Designer"}]}]},
+        {"type":"position","title":"Chief Revenue Officer","children":[
+          {"type":"position","title":"Sales Director","children":[
+            {"type":"position","title":"Account Executive"},{"type":"position","title":"Sales Development Rep"}]}]},
+        {"type":"position","title":"Chief Financial Officer","children":[
+          {"type":"position","title":"Controller"}]}]}},
+    {"subcategory":"Farm Services & Supply","name":"Farm Supply Co-op","description":"Board → GM → operations director → function areas → staff (5 levels).","tree":
       {"type":"position","title":"Board of Directors","children":[
         {"type":"position","title":"General Manager","children":[
-          {"type":"area","name":"Retail / Supply","lead":"Store Manager","children":[
-            {"type":"position","title":"Sales Associate"},{"type":"position","title":"Counter Clerk"}]},
-          {"type":"area","name":"Agronomy Services","lead":"Agronomy Manager","children":[
-            {"type":"position","title":"Crop Advisor"},{"type":"position","title":"Applicator"}]},
-          {"type":"area","name":"Energy / Fuel","lead":"Energy Manager","children":[{"type":"position","title":"Delivery Driver"}]},
+          {"type":"position","title":"Operations Director","children":[
+            {"type":"area","name":"Retail / Supply","lead":"Store Manager","children":[
+              {"type":"position","title":"Sales Associate"},{"type":"position","title":"Counter Clerk"}]},
+            {"type":"area","name":"Agronomy Services","lead":"Agronomy Manager","children":[
+              {"type":"position","title":"Crop Advisor"},{"type":"position","title":"Applicator"}]},
+            {"type":"area","name":"Energy / Fuel","lead":"Energy Manager","children":[{"type":"position","title":"Delivery Driver"}]}]},
           {"type":"area","name":"Finance","lead":"Controller","children":[{"type":"position","title":"Accountant"}]}]}]}}
   ]
   $json$;
