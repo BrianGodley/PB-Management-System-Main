@@ -239,21 +239,21 @@ function AreaView({ node, nodes, resolveNodeHolder, onDrill }) {
   const juniors = (nodes || []).filter(n => n.parent_container_id === node.id)
 
   const PAD = 24
-  const SCALE = 2.2 // render the SVG units this many CSS px each → large & crisp
 
+  // Every attached junior gets the SAME width — the width of the junior whose
+  // text is longest (so none wrap). If the main item's own text is wider than
+  // all juniors side by side, widen each junior evenly so they still span it.
   const areaNeeded = neededWidth(node, resolveNodeHolder)
-  let juniorWidths = juniors.map(j => neededWidth(j, resolveNodeHolder))
-  const juniorsTotal = juniorWidths.reduce((a, b) => a + b, 0)
-
-  // Area width is the widest of: its saved width, its own text need, or the
-  // combined width its juniors need. When the area is wider than the juniors
-  // need, expand each junior proportionally so they still span it edge-to-edge.
-  let areaW = Math.max(node.width || 210, areaNeeded, juniorsTotal)
-  if (juniors.length && juniorsTotal > 0 && juniorsTotal < areaW) {
-    const k = areaW / juniorsTotal
-    juniorWidths = juniorWidths.map(w => w * k)
-  } else if (juniors.length) {
-    areaW = Math.max(areaW, juniorsTotal)
+  let areaW = Math.max(node.width || 210, areaNeeded)
+  let uniformJuniorW = 0
+  if (juniors.length) {
+    uniformJuniorW = juniors.reduce(
+      (m, j) => Math.max(m, neededWidth(j, resolveNodeHolder)),
+      0,
+    )
+    uniformJuniorW = Math.max(uniformJuniorW, Math.ceil(areaW / juniors.length))
+    // The main item reflects the overall width of its junior row.
+    areaW = uniformJuniorW * juniors.length
   }
 
   const areaH = Math.max(node.height || 90, 70)
@@ -267,48 +267,47 @@ function AreaView({ node, nodes, resolveNodeHolder, onDrill }) {
       juniors.reduce((m, j) => Math.max(m, j.height || 90), 0),
       70,
     )
-    let x = areaX
-    juniorBoxes = juniors.map((j, i) => {
-      const box = { x, y: areaY + areaH, width: juniorWidths[i], height: rowH }
-      x += juniorWidths[i]
-      return { node: j, box }
-    })
+    juniorBoxes = juniors.map((j, i) => ({
+      node: j,
+      box: { x: areaX + i * uniformJuniorW, y: areaY + areaH, width: uniformJuniorW, height: rowH },
+    }))
     contentH = areaH + rowH
   }
 
   const vbW = areaW + PAD * 2
   const vbH = contentH + PAD * 2
 
+  // The SVG fills the (large) modal body and scales its contents to fit with
+  // preserveAspectRatio "meet" — so the whole area + junior row is always
+  // visible with no scrolling, just sized to the available space.
   return (
-    <div className="space-y-3">
-      <div className="overflow-auto" style={{ maxHeight: '66vh' }}>
-        <svg
-          viewBox={`0 0 ${vbW} ${vbH}`}
-          width={Math.round(vbW * SCALE)}
-          height={Math.round(vbH * SCALE)}
-          style={{ display: 'block', background: '#F8FAFC', borderRadius: 12, margin: '0 auto' }}
-          preserveAspectRatio="xMidYMin meet"
-        >
-          <ChartNode
-            node={node}
-            box={{ x: areaX, y: areaY, width: areaW, height: areaH }}
-            resolveNodeHolder={resolveNodeHolder}
-            onClick={() => {}}
-          />
-          {juniorBoxes.map(jb => (
-            <g key={jb.node.id} style={{ cursor: 'pointer' }} onClick={() => onDrill(jb.node)}>
-              <ChartNode
-                node={jb.node}
-                box={jb.box}
-                resolveNodeHolder={resolveNodeHolder}
-                onClick={() => onDrill(jb.node)}
-              />
-            </g>
-          ))}
-        </svg>
-      </div>
+    <div className="w-full h-full flex flex-col">
+      <svg
+        viewBox={`0 0 ${vbW} ${vbH}`}
+        width="100%"
+        height="100%"
+        preserveAspectRatio="xMidYMid meet"
+        style={{ flex: 1, minHeight: 0, background: '#F8FAFC', borderRadius: 12 }}
+      >
+        <ChartNode
+          node={node}
+          box={{ x: areaX, y: areaY, width: areaW, height: areaH }}
+          resolveNodeHolder={resolveNodeHolder}
+          onClick={() => {}}
+        />
+        {juniorBoxes.map(jb => (
+          <g key={jb.node.id} style={{ cursor: 'pointer' }} onClick={() => onDrill(jb.node)}>
+            <ChartNode
+              node={jb.node}
+              box={jb.box}
+              resolveNodeHolder={resolveNodeHolder}
+              onClick={() => onDrill(jb.node)}
+            />
+          </g>
+        ))}
+      </svg>
       {juniors.length > 0 && (
-        <p className="text-[11px] text-slate-400 text-center">
+        <p className="mt-2 flex-shrink-0 text-[11px] text-slate-400 text-center">
           Click a junior item to open its expanded view.
         </p>
       )}
@@ -333,8 +332,8 @@ export default function ItemInfoModal({ node, nodes, resolveNodeHolder, onClose 
   return (
     <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className={`bg-white rounded-2xl shadow-2xl w-full max-h-[92vh] flex flex-col overflow-hidden ${
-          isArea ? 'max-w-4xl' : 'max-w-lg'
+        className={`bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden ${
+          isArea ? 'w-[92vw] max-w-[1400px] h-[90vh]' : 'w-full max-w-lg max-h-[92vh]'
         }`}
         onClick={e => e.stopPropagation()}
       >
@@ -359,7 +358,7 @@ export default function ItemInfoModal({ node, nodes, resolveNodeHolder, onClose 
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-4">
+        <div className={isArea ? 'flex-1 min-h-0 overflow-hidden p-4' : 'flex-1 overflow-y-auto px-5 py-4'}>
           {isArea ? (
             <AreaView
               node={current}
