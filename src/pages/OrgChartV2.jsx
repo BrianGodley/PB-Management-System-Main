@@ -60,6 +60,8 @@ export default function OrgChartV2() {
   const [showCreateTemplateModal, setShowCreateTemplateModal] = useState(false)
   const [showTemplateSettings, setShowTemplateSettings] = useState(false)
   const [chartNameMenu, setChartNameMenu] = useState(null) // { anchorRect }
+  const [showNewChartNotice, setShowNewChartNotice] = useState(false)
+  const [pendingDefaultChart, setPendingDefaultChart] = useState(null) // chart awaiting default-change confirm
   // Per-row (per-tier) spacing overrides for the current chart, keyed by
   // tier number. Empty = use the system default for every row.
   const [rowSpacing, setRowSpacing] = useState({})
@@ -361,6 +363,7 @@ export default function OrgChartV2() {
     if (source === 'template' && template) {
       await instantiateFromTemplate(chart.id, template)
     }
+    setShowNewChartNotice(true)
   }
 
   // ── Template helpers ────────────────────────────────────────────────
@@ -1325,7 +1328,7 @@ export default function OrgChartV2() {
                               type="radio"
                               name="default-chart"
                               checked={!!c.is_default}
-                              onChange={() => setDefaultChart(c)}
+                              onChange={() => setPendingDefaultChart(c)}
                               title="Make this the default chart"
                               className="accent-green-700 cursor-pointer"
                             />
@@ -1878,6 +1881,95 @@ export default function OrgChartV2() {
               deleteChart()
             }}
           />,
+          document.body,
+        )}
+
+      {showNewChartNotice &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[80] bg-black/40 flex items-center justify-center p-4"
+            onClick={() => setShowNewChartNotice(false)}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="px-5 py-3" style={{ backgroundColor: FG }}>
+                <h2 className="text-base font-bold text-white">Heads up — charts & HR positions</h2>
+              </div>
+              <div className="px-5 py-4 text-sm text-slate-700 space-y-2">
+                <p>
+                  You can keep as many org charts as you like, but <b>only the chart marked
+                  default draws from (and feeds) the Human Resources positions list.</b>
+                </p>
+                <p>
+                  If you build charts from templates and later make one of them the default, you
+                  may need to create additional positions to cover it — and those new positions
+                  could duplicate the function of positions already in the table.
+                </p>
+              </div>
+              <div className="flex justify-end px-5 py-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowNewChartNotice(false)}
+                  className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md"
+                >
+                  Got it
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {pendingDefaultChart &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[80] bg-black/40 flex items-center justify-center p-4"
+            onClick={() => setPendingDefaultChart(null)}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="px-5 py-3 bg-amber-500">
+                <h2 className="text-base font-bold text-white">⚠️ Change default chart?</h2>
+              </div>
+              <div className="px-5 py-4 text-sm text-slate-700 space-y-2">
+                <p>
+                  When you change the default chart, you must ensure that <b>all positions on
+                  the new default chart exist in the Human Resources positions table.</b>
+                </p>
+                <p>
+                  Any positions you create to accommodate the new chart may duplicate the
+                  function of positions already in the table.
+                </p>
+                <p className="font-semibold">
+                  Are you sure you want to make “{pendingDefaultChart.name}” the default chart?
+                </p>
+              </div>
+              <div className="flex justify-end gap-2 px-5 py-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setPendingDefaultChart(null)}
+                  className="px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-md"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const c = pendingDefaultChart
+                    setPendingDefaultChart(null)
+                    setDefaultChart(c)
+                  }}
+                  className="px-3 py-1.5 text-sm bg-amber-500 hover:bg-amber-600 text-white rounded-md"
+                >
+                  Change
+                </button>
+              </div>
+            </div>
+          </div>,
           document.body,
         )}
 
