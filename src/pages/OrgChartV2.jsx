@@ -703,6 +703,128 @@ export default function OrgChartV2() {
     setCharts(prev =>
       prev.map(c => (c.id === newChartId ? { ...c, row_spacing: rs, col_spacing: cs } : c)),
     )
+
+    // Size every row to fit its longest text so template titles don't overflow.
+    await autoFitChart(insertedNodes.map(x => x.row))
+  }
+
+  // ── Auto-fit: size each row's boxes to fit the largest text ──────────
+  // Estimates the width/height each box needs for its text (handles vertical
+  // titles and junior columns), then grows every row to the largest in that
+  // row. Runs after building from a template, and via the "Fit Text" button.
+  async function autoFitChart(listArg) {
+    const arr = listArg || nodes
+    if (!arr.length) return
+    const textW = (s, sz) => Math.ceil(String(s || '').length * (sz || 12) * 0.62)
+    const isVert = (n, f) => !!(n.text_styles && n.text_styles[f] && n.text_styles[f].vertical)
+
+    // Own text-based size for a single node (ignores junior columns).
+    const ownReq = n => {
+      const fs = n.font_sizes || {}
+      if (n.kind === 'container') {
+        const ph = (resolveNodeHolder ? resolveNodeHolder(n) : null) || {}
+        const t1 = (n.label || '').trim()
+        const t2 = (n.heading || '').trim()
+        const szL = fs.label || 12
+        const szH = fs.heading || 14
+        const szT = fs.title || 10
+        const szN = fs.name || 10
+        let w = 0
+        let h = 14
+        if (t1) {
+          if (isVert(n, 'label')) {
+            h = Math.max(h, textW(t1, szL) + 16)
+            w += szL + 8
+          } else {
+            w = Math.max(w, textW(t1, szL))
+            h += szL + 4
+          }
+        }
+        if (t2) {
+          if (isVert(n, 'heading')) {
+            h = Math.max(h, textW(t2, szH) + 16)
+            w += szH + 8
+          } else {
+            w = Math.max(w, textW(t2, szH))
+            h += szH + 4
+          }
+        }
+        if (ph.positionTitle) {
+          w = Math.max(w, textW(ph.positionTitle, szT), textW(ph.displayName, szN))
+          h += szT + szN + 8
+        }
+        return { w: Math.max(w + 20, 110), h: Math.max(h, 70) }
+      }
+      // position / assistant
+      const ph = (resolveNodeHolder ? resolveNodeHolder(n) : null) || {}
+      const szT = fs.title || 12
+      const szN = fs.name || 10
+      const title = ph.positionTitle || n.label || ''
+      const name = ph.displayName || ''
+      return {
+        w: Math.max(textW(title, szT), textW(name, szN), 80) + 16,
+        h: Math.max(szT + szN + 18, 40),
+      }
+    }
+
+    // A container also needs to be wide enough for its junior columns.
+    const effReq = n => {
+      const r = ownReq(n)
+      if (n.kind === 'container') {
+        const kids = arr.filter(x => x.parent_container_id === n.id)
+        if (kids.length) {
+          const sum = kids.reduce((s, k) => s + ownReq(k).w, 0)
+          r.w = Math.max(r.w, sum)
+        }
+      }
+      return r
+    }
+
+    // Group into rows: main rows by tier; junior rows by their parent's tier.
+    const groups = new Map()
+    const tierOf = id => arr.find(x => x.id === id)?.tier ?? 0
+    for (const n of arr) {
+      if (n.kind === 'assistant') {
+        groups.set('a:' + n.id, [n.id])
+      } else if (n.parent_container_id) {
+        groups.set('j:' + tierOf(n.parent_container_id), [
+          ...(groups.get('j:' + tierOf(n.parent_container_id)) || []),
+          n.id,
+        ])
+      } else {
+        groups.set('m:' + (n.tier ?? 0), [...(groups.get('m:' + (n.tier ?? 0)) || []), n.id])
+      }
+    }
+
+    const sized = new Map() // id -> {width,height}
+    for (const ids of groups.values()) {
+      let w = 0
+      let h = 0
+      for (const id of ids) {
+        const r = effReq(arr.find(x => x.id === id))
+        w = Math.max(w, r.w)
+        h = Math.max(h, r.h)
+      }
+      for (const id of ids) sized.set(id, { width: Math.round(w), height: Math.round(h) })
+    }
+
+    const changed = []
+    for (const n of arr) {
+      const s = sized.get(n.id)
+      if (s && ((n.width || 0) !== s.width || (n.height || 0) !== s.height)) {
+        changed.push({ id: n.id, ...s })
+      }
+    }
+    if (!changed.length) return
+    setNodes(prev =>
+      prev.map(p => {
+        const c = changed.find(x => x.id === p.id)
+        return c ? { ...p, width: c.width, height: c.height } : p
+      }),
+    )
+    for (const c of changed) {
+      await supabase.from('org_nodes').update({ width: c.width, height: c.height }).eq('id', c.id)
+    }
   }
 
   // Template / category CRUD used by the admin Settings modal.
@@ -1748,6 +1870,14 @@ export default function OrgChartV2() {
                   </div>
                 )}
               </div>
+              <button
+                type="button"
+                onClick={() => autoFitChart()}
+                title="Resize each row to fit its longest text (areas and positions)"
+                className="text-sm px-3 py-1 rounded-md bg-slate-200 text-slate-700 hover:bg-slate-300 whitespace-nowrap"
+              >
+                Fit Text
+              </button>
             </>
           )}
         </div>
