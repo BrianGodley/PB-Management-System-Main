@@ -40,7 +40,9 @@ export function NewChartModal({ templates, categories, onClose, onCreate }) {
         <Header title="New Org Chart" onClose={onClose} />
         <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1 min-h-0">
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Chart name</label>
+            <label className="block text-xs font-medium text-slate-500 mb-1 uppercase">
+              Chart Name
+            </label>
             <input
               autoFocus
               value={name}
@@ -50,18 +52,24 @@ export function NewChartModal({ templates, categories, onClose, onCreate }) {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Start from</label>
+            <label className="block text-xs font-medium text-slate-500 mb-1 uppercase">
+              Start From
+            </label>
             <div className="flex gap-2">
               {[
-                ['scratch', 'Blank chart'],
-                ['template', 'A template'],
-                ['wizard', 'Org Chart Wizard'],
+                ['scratch', 'Blank chart', 'Start with an empty chart and build every item yourself.'],
+                ['template', 'A template', "Start from one of your saved templates, pre-filled with its structure."],
+                [
+                  'wizard',
+                  'Org Chart Wizard',
+                  'Answer a few guided questions (with Ask Sam suggestions) and the wizard builds your starting chart.',
+                ],
               ].map(([v, lab]) => (
                 <button
                   key={v}
                   type="button"
                   onClick={() => setSource(v)}
-                  className={`flex-1 py-1.5 rounded-md border text-sm ${
+                  className={`flex-1 py-1.5 rounded-md border text-sm uppercase ${
                     source === v
                       ? 'border-blue-600 bg-blue-50 text-blue-700 font-medium'
                       : 'border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -71,6 +79,18 @@ export function NewChartModal({ templates, categories, onClose, onCreate }) {
                 </button>
               ))}
             </div>
+            {/* Description of the currently selected "start from" option. */}
+            <p className="mt-2 text-xs text-slate-500 leading-snug">
+              {
+                {
+                  scratch: 'Start with an empty chart and build every item yourself.',
+                  template:
+                    'Start from one of your saved templates, pre-filled with its structure.',
+                  wizard:
+                    'Answer a few guided questions (with Ask Sam suggestions) and the wizard builds your starting chart.',
+                }[source]
+              }
+            </p>
           </div>
           {source === 'template' && (
             <div>
@@ -111,14 +131,14 @@ export function NewChartModal({ templates, categories, onClose, onCreate }) {
           )}
         </div>
         <Footer>
-          <button type="button" onClick={onClose} className="px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-md">
+          <button type="button" onClick={onClose} className="px-3 py-1.5 text-sm uppercase text-slate-600 hover:bg-slate-100 rounded-md">
             Cancel
           </button>
           <button
             type="button"
             onClick={submit}
             disabled={!name.trim() || (source === 'template' && !templateId)}
-            className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50"
+            className="px-3 py-1.5 text-sm uppercase bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50"
           >
             Create
           </button>
