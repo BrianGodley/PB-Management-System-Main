@@ -314,11 +314,14 @@ export default function OrgChartWizard({
       topTitle: topTitle.trim(),
       divisions: filledDivisions,
     }
-    // Pass the draft-vs-final feedback so it can be stored for future learning.
+    // Pass the draft-vs-final feedback (for learning) plus the chosen
+    // category/subcategory ids so the new chart can be classified.
     onComplete(name.trim(), buildSnapshot(chartType, { topTitle, divisions }), {
       description: description.trim() || null,
       draft: lastDraft,
       final: finalStruct,
+      categoryId: industryId ? Number(industryId) : null,
+      subcategoryId: subcategoryId ? Number(subcategoryId) : null,
     })
   }
 

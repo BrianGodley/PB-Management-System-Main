@@ -20,18 +20,29 @@ function groupByCategory(templates, categories) {
 }
 
 // ── New Chart modal ──────────────────────────────────────────────────────────
-export function NewChartModal({ templates, categories, onClose, onCreate }) {
+export function NewChartModal({ templates, categories, subcategories, onClose, onCreate }) {
   const [name, setName] = useState('')
   const [source, setSource] = useState('scratch')
   const [templateId, setTemplateId] = useState('')
+  const [categoryId, setCategoryId] = useState('')
+  const [subcategoryId, setSubcategoryId] = useState('')
   const groups = groupByCategory(templates || [], categories || [])
+  const subsForCategory = categoryId
+    ? (subcategories || []).filter(s => String(s.category_id) === String(categoryId))
+    : []
 
   const submit = () => {
     if (!name.trim()) return
     if (source === 'template' && !templateId) return
     const template =
       source === 'template' ? (templates || []).find(t => String(t.id) === String(templateId)) : null
-    onCreate({ name: name.trim(), source, template })
+    onCreate({
+      name: name.trim(),
+      source,
+      template,
+      categoryId: categoryId ? Number(categoryId) : null,
+      subcategoryId: subcategoryId ? Number(subcategoryId) : null,
+    })
   }
 
   return (
@@ -92,6 +103,54 @@ export function NewChartModal({ templates, categories, onClose, onCreate }) {
               }
             </p>
           </div>
+          {source !== 'wizard' && (categories || []).length > 0 && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1 uppercase">
+                  Category
+                </label>
+                <select
+                  value={categoryId}
+                  onChange={e => {
+                    setCategoryId(e.target.value)
+                    setSubcategoryId('')
+                  }}
+                  className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+                >
+                  <option value="">— None —</option>
+                  {(categories || []).map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1 uppercase">
+                  Subcategory
+                </label>
+                <select
+                  value={subcategoryId}
+                  onChange={e => setSubcategoryId(e.target.value)}
+                  disabled={!categoryId || subsForCategory.length === 0}
+                  className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+                >
+                  <option value="">
+                    {!categoryId
+                      ? '— Pick a category first —'
+                      : subsForCategory.length === 0
+                        ? '— None available —'
+                        : '— None —'}
+                  </option>
+                  {subsForCategory.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
           {source === 'template' && (
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">
@@ -307,7 +366,14 @@ export function CreateTemplateModal({ categories, subcategories, onClose, onSave
 }
 
 // ── Chart-name edit menu (rename / create template / delete) ─────────────────
-export function ChartNameMenu({ anchorRect, onClose, onRename, onCreateTemplate, onDelete }) {
+export function ChartNameMenu({
+  anchorRect,
+  onClose,
+  onRename,
+  onRecategorize,
+  onCreateTemplate,
+  onDelete,
+}) {
   const ref = useRef(null)
   const [pos, setPos] = useState({ top: anchorRect.bottom + 4, left: anchorRect.left })
   useEffect(() => {
@@ -332,10 +398,96 @@ export function ChartNameMenu({ anchorRect, onClose, onRename, onCreateTemplate,
       style={{ top: pos.top, left: pos.left, width: 200 }}
     >
       <MenuRow label="Rename" onClick={onRename} />
+      <MenuRow label="Recategorize" onClick={onRecategorize} />
       <MenuRow label="Create New Template" onClick={onCreateTemplate} />
       <div className="border-t border-slate-100 my-1" />
       <MenuRow label="Delete" onClick={onDelete} danger />
     </div>
+  )
+}
+
+// ── Recategorize a chart (set its industry category / sub-sector) ────────────
+export function RecategorizeChartModal({
+  initialCategoryId,
+  initialSubcategoryId,
+  categories,
+  subcategories,
+  onClose,
+  onSave,
+}) {
+  const [categoryId, setCategoryId] = useState(
+    initialCategoryId != null ? String(initialCategoryId) : '',
+  )
+  const [subcategoryId, setSubcategoryId] = useState(
+    initialSubcategoryId != null ? String(initialSubcategoryId) : '',
+  )
+  const subs = categoryId
+    ? (subcategories || []).filter(s => String(s.category_id) === String(categoryId))
+    : []
+
+  return (
+    <Backdrop onClose={onClose}>
+      <Panel className="max-w-md">
+        <Header title="Recategorize Chart" onClose={onClose} />
+        <div className="px-5 py-4 space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Category</label>
+            <select
+              value={categoryId}
+              onChange={e => {
+                setCategoryId(e.target.value)
+                setSubcategoryId('')
+              }}
+              className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+            >
+              <option value="">— None —</option>
+              {(categories || []).map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Subcategory</label>
+            <select
+              value={subcategoryId}
+              onChange={e => setSubcategoryId(e.target.value)}
+              disabled={!categoryId || subs.length === 0}
+              className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+            >
+              <option value="">— None —</option>
+              {subs.map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <Footer>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-md"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              onSave({
+                category_id: categoryId ? Number(categoryId) : null,
+                subcategory_id: subcategoryId ? Number(subcategoryId) : null,
+              })
+            }
+            className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md"
+          >
+            Save
+          </button>
+        </Footer>
+      </Panel>
+    </Backdrop>
   )
 }
 

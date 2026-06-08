@@ -15,6 +15,7 @@ import {
   RenameChartModal,
   CreateTemplateModal,
   ChartNameMenu,
+  RecategorizeChartModal,
   TemplatesSettingsView,
 } from '../components/orgchart/OrgChartTemplates.jsx'
 import { CANVAS_PAD_X, CANVAS_PAD_Y, NODE_GAP, TIER_GAP } from '../components/orgchart/layout.js'
@@ -63,6 +64,7 @@ export default function OrgChartV2() {
   const [showCreateTemplateModal, setShowCreateTemplateModal] = useState(false)
   const [showTemplateSettings, setShowTemplateSettings] = useState(false)
   const [chartNameMenu, setChartNameMenu] = useState(null) // { anchorRect }
+  const [showRecategorize, setShowRecategorize] = useState(false)
   const [showNewChartNotice, setShowNewChartNotice] = useState(false)
   const [pendingDefaultChart, setPendingDefaultChart] = useState(null) // chart awaiting default-change confirm
   const [wizardName, setWizardName] = useState(null) // non-null = wizard open, carries the chart name
@@ -346,7 +348,7 @@ export default function OrgChartV2() {
   }
 
   // ── Chart mutations ─────────────────────────────────────────────────
-  async function createChart(nameArg) {
+  async function createChart(nameArg, extra = {}) {
     // The first chart (or any time there's no default yet) becomes the default.
     const makeDefault = !charts.some(c => c.is_default)
     const { data, error } = await supabase
@@ -355,6 +357,8 @@ export default function OrgChartV2() {
         name: (nameArg && nameArg.trim()) || `Chart ${new Date().toLocaleDateString()}`,
         created_by: user?.id,
         is_default: makeDefault,
+        category_id: extra.categoryId ?? null,
+        subcategory_id: extra.subcategoryId ?? null,
       })
       .select()
       .single()
@@ -377,14 +381,14 @@ export default function OrgChartV2() {
   }
 
   // New Chart modal submit: blank chart, or a chart instantiated from a template.
-  async function handleCreateChart({ name, source, template }) {
+  async function handleCreateChart({ name, source, template, categoryId, subcategoryId }) {
     setShowNewChartModal(false)
     if (source === 'wizard') {
       // Defer chart creation to the wizard's completion step.
       setWizardName(name)
       return
     }
-    const chart = await createChart(name)
+    const chart = await createChart(name, { categoryId, subcategoryId })
     if (!chart) return
     if (source === 'template' && template) {
       await instantiateFromTemplate(chart.id, template)
@@ -396,7 +400,10 @@ export default function OrgChartV2() {
   // the template instantiation path, which also handles HR position sync).
   async function handleWizardComplete(name, snapshot, feedback) {
     setWizardName(null)
-    const chart = await createChart(name)
+    const chart = await createChart(name, {
+      categoryId: feedback?.categoryId ?? null,
+      subcategoryId: feedback?.subcategoryId ?? null,
+    })
     if (!chart) return
     await instantiateFromTemplate(chart.id, { data: snapshot })
     // Store the draft-vs-final so Sam can learn from the edits next time.
@@ -701,6 +708,19 @@ export default function OrgChartV2() {
     if (error) return alert(error.message)
     setChartName(trimmed)
     setCharts(prev => prev.map(c => (c.id === chartId ? { ...c, name: trimmed } : c)))
+  }
+
+  // Update the current chart's industry category / sub-sector.
+  async function recategorizeChart({ category_id, subcategory_id }) {
+    if (!chartId) return
+    const { error } = await supabase
+      .from('org_charts')
+      .update({ category_id, subcategory_id })
+      .eq('id', chartId)
+    if (error) return alert(error.message)
+    setCharts(prev =>
+      prev.map(c => (c.id === chartId ? { ...c, category_id, subcategory_id } : c)),
+    )
   }
 
   async function deleteChart() {
@@ -1950,6 +1970,7 @@ export default function OrgChartV2() {
         <NewChartModal
           templates={templates}
           categories={templateCategories}
+          subcategories={templateSubcategories}
           onClose={() => setShowNewChartModal(false)}
           onCreate={handleCreateChart}
         />
@@ -1980,6 +2001,24 @@ export default function OrgChartV2() {
         />
       )}
 
+      {showRecategorize &&
+        (() => {
+          const c = charts.find(x => x.id === chartId)
+          return (
+            <RecategorizeChartModal
+              initialCategoryId={c?.category_id ?? null}
+              initialSubcategoryId={c?.subcategory_id ?? null}
+              categories={templateCategories}
+              subcategories={templateSubcategories}
+              onClose={() => setShowRecategorize(false)}
+              onSave={fields => {
+                setShowRecategorize(false)
+                recategorizeChart(fields)
+              }}
+            />
+          )
+        })()}
+
       {showCreateTemplateModal && (
         <CreateTemplateModal
           categories={templateCategories}
@@ -1997,6 +2036,10 @@ export default function OrgChartV2() {
             onRename={() => {
               setChartNameMenu(null)
               setShowRenameModal(true)
+            }}
+            onRecategorize={() => {
+              setChartNameMenu(null)
+              setShowRecategorize(true)
             }}
             onCreateTemplate={() => {
               setChartNameMenu(null)
