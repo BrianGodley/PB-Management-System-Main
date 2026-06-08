@@ -9,6 +9,13 @@ import { useAuth } from '../contexts/AuthContext'
 import TierCanvas from '../components/orgchart/TierCanvas.jsx'
 import AddNodeDialog from '../components/orgchart/AddNodeDialog.jsx'
 import ItemInfoModal from '../components/orgchart/InfoModals.jsx'
+import {
+  NewChartModal,
+  RenameChartModal,
+  CreateTemplateModal,
+  ChartNameMenu,
+  TemplatesSettingsModal,
+} from '../components/orgchart/OrgChartTemplates.jsx'
 import { CANVAS_PAD_X, CANVAS_PAD_Y, NODE_GAP, TIER_GAP } from '../components/orgchart/layout.js'
 
 const FG = '#3A5038'
@@ -43,6 +50,16 @@ export default function OrgChartV2() {
   // view. For positions it shows the holder + assigned stats; for areas it
   // shows an expanded view with drill-down into junior items.
   const [infoNodeId, setInfoNodeId] = useState(null)
+
+  // ── Template library state ──────────────────────────────────────────
+  const [templates, setTemplates] = useState([])
+  const [templateCategories, setTemplateCategories] = useState([])
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [showNewChartModal, setShowNewChartModal] = useState(false)
+  const [showRenameModal, setShowRenameModal] = useState(false)
+  const [showCreateTemplateModal, setShowCreateTemplateModal] = useState(false)
+  const [showTemplateSettings, setShowTemplateSettings] = useState(false)
+  const [chartNameMenu, setChartNameMenu] = useState(null) // { anchorRect }
   // Per-row (per-tier) spacing overrides for the current chart, keyed by
   // tier number. Empty = use the system default for every row.
   const [rowSpacing, setRowSpacing] = useState({})
@@ -62,21 +79,30 @@ export default function OrgChartV2() {
   // ── Loaders ─────────────────────────────────────────────────────────
   useEffect(() => {
     ;(async () => {
-      const [chartsRes, positionsRes, employeesRes, epRes] = await Promise.all([
-        supabase.from('org_charts').select('*').order('created_at'),
-        supabase.from('positions').select('id, title').order('title'),
-        supabase
-          .from('employees')
-          .select('id, first_name, last_name, status, job_title')
-          .order('last_name', { ascending: true })
-          .order('first_name', { ascending: true }),
-        supabase.from('employee_positions').select('employee_id, position_id'),
-      ])
+      const [chartsRes, positionsRes, employeesRes, epRes, tplRes, catRes, profRes] =
+        await Promise.all([
+          supabase.from('org_charts').select('*').order('created_at'),
+          supabase.from('positions').select('id, title').order('title'),
+          supabase
+            .from('employees')
+            .select('id, first_name, last_name, status, job_title')
+            .order('last_name', { ascending: true })
+            .order('first_name', { ascending: true }),
+          supabase.from('employee_positions').select('employee_id, position_id'),
+          supabase.from('org_chart_templates').select('*').order('name'),
+          supabase.from('org_chart_template_categories').select('*').order('name'),
+          user?.id
+            ? supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+            : Promise.resolve({ data: null }),
+        ])
       const chartList = chartsRes.data || []
       setCharts(chartList)
       setPositions(positionsRes.data || [])
       setEmployees(employeesRes.data || [])
       setEmployeePositions(epRes.data || [])
+      setTemplates(tplRes.data || [])
+      setTemplateCategories(catRes.data || [])
+      setIsAdmin((profRes.data?.role || '').toLowerCase() === 'admin')
       // Open the default chart (falls back to the first one).
       if (chartList.length) selectChart(chartList.find(c => c.is_default) || chartList[0])
     })()
@@ -297,19 +323,22 @@ export default function OrgChartV2() {
   }
 
   // ── Chart mutations ─────────────────────────────────────────────────
-  async function createChart() {
+  async function createChart(nameArg) {
     // The first chart (or any time there's no default yet) becomes the default.
     const makeDefault = !charts.some(c => c.is_default)
     const { data, error } = await supabase
       .from('org_charts')
       .insert({
-        name: `Chart ${new Date().toLocaleDateString()}`,
+        name: (nameArg && nameArg.trim()) || `Chart ${new Date().toLocaleDateString()}`,
         created_by: user?.id,
         is_default: makeDefault,
       })
       .select()
       .single()
-    if (error) return alert(error.message)
+    if (error) {
+      alert(error.message)
+      return null
+    }
     setCharts(prev => [...prev, data])
     setChartPickerOpen(false)
     setChartId(data.id)
@@ -321,6 +350,228 @@ export default function OrgChartV2() {
     setSelectedEdgeId(null)
     setContextMenu(null)
     setEditMode(true) // brand new charts start unlocked
+    return data
+  }
+
+  // New Chart modal submit: blank chart, or a chart instantiated from a template.
+  async function handleCreateChart({ name, source, template }) {
+    setShowNewChartModal(false)
+    const chart = await createChart(name)
+    if (!chart) return
+    if (source === 'template' && template) {
+      await instantiateFromTemplate(chart.id, template)
+    }
+  }
+
+  // ── Template helpers ────────────────────────────────────────────────
+  // Snapshot the current chart's nodes/edges into a portable template payload.
+  // Employees are stripped; positions are stored by TITLE (not id) so the
+  // template is portable and we can match/create positions on instantiation.
+  function buildTemplateSnapshot() {
+    const titleById = new Map(positions.map(p => [Number(p.id), p.title]))
+    const tplNodes = nodes.map(n => ({
+      ref: n.id, // local reference for remapping parent/attachment/edges
+      kind: n.kind,
+      label: n.label || '',
+      position_title: n.position_id ? titleById.get(Number(n.position_id)) || null : null,
+      heading: n.heading || null,
+      bg_color: n.bg_color || null,
+      box_style: n.box_style || {},
+      container_mode: n.container_mode || null,
+      parent_ref: n.parent_container_id || null,
+      attached_ref: n.attached_to_node_id || null,
+      attachment_side: n.attachment_side || null,
+      width: n.width || null,
+      height: n.height || null,
+      font_sizes: n.font_sizes || {},
+      text_styles: n.text_styles || {},
+      x_offset: n.x_offset || 0,
+      tier: n.tier ?? 0,
+      tier_order: n.tier_order ?? 0,
+    }))
+    const tplEdges = edges.map(e => ({
+      source_ref: e.source_id,
+      target_ref: e.target_id,
+      relationship: e.relationship || 'reports_to',
+      style: e.style || 'solid',
+      bus_offset: e.bus_offset ?? null,
+    }))
+    return { nodes: tplNodes, edges: tplEdges }
+  }
+
+  async function createTemplateFromCurrentChart({ name, categoryId, newCategoryName }) {
+    setShowCreateTemplateModal(false)
+    try {
+      let catId = categoryId
+      if (!catId && newCategoryName) {
+        const { data: cat, error: cErr } = await supabase
+          .from('org_chart_template_categories')
+          .insert({ name: newCategoryName, created_by: user?.id })
+          .select()
+          .single()
+        if (cErr) throw cErr
+        catId = cat.id
+        setTemplateCategories(prev => [...prev, cat])
+      }
+      const payload = {
+        name,
+        category_id: catId || null,
+        data: buildTemplateSnapshot(),
+        created_by: user?.id,
+      }
+      const { data, error } = await supabase
+        .from('org_chart_templates')
+        .insert(payload)
+        .select()
+        .single()
+      if (error) throw error
+      setTemplates(prev => [...prev, data])
+      alert(`Template "${name}" created.`)
+    } catch (e) {
+      alert(e.message || String(e))
+    }
+  }
+
+  // Build a chart from a template: ensure positions exist (add missing ones,
+  // after telling the user), insert nodes (remapping local refs to new ids),
+  // patch parent/attachment links, then insert edges.
+  async function instantiateFromTemplate(newChartId, template) {
+    const data = template?.data || {}
+    const tplNodes = data.nodes || []
+    const tplEdges = data.edges || []
+
+    // 1) Position sync — match by title (case-insensitive); add any missing.
+    const titles = [...new Set(tplNodes.map(n => n.position_title).filter(Boolean))]
+    const byTitle = new Map(positions.map(p => [String(p.title).toLowerCase().trim(), p]))
+    const missing = titles.filter(t => !byTitle.has(t.toLowerCase().trim()))
+    if (missing.length) {
+      const ok = confirm(
+        `These positions on this template are not in your Human Resources positions list and will be added:\n\n` +
+          missing.join('\n') +
+          `\n\nContinue?`,
+      )
+      if (!ok) return
+      const { data: created, error } = await supabase
+        .from('positions')
+        .insert(missing.map(t => ({ title: t })))
+        .select()
+      if (error) {
+        alert(error.message)
+        return
+      }
+      const newPositions = created || []
+      setPositions(prev => [...prev, ...newPositions])
+      for (const p of newPositions) byTitle.set(String(p.title).toLowerCase().trim(), p)
+    }
+    const posIdForTitle = t =>
+      t ? byTitle.get(String(t).toLowerCase().trim())?.id || null : null
+
+    // 2) Insert nodes (links nulled for now), tracking ref → new id.
+    const refToId = new Map()
+    const insertedNodes = []
+    for (const n of tplNodes) {
+      const { data: row, error } = await supabase
+        .from('org_nodes')
+        .insert({
+          chart_id: newChartId,
+          kind: n.kind,
+          label: n.label || '',
+          position_id: posIdForTitle(n.position_title),
+          employee_id: null,
+          heading: n.heading || null,
+          bg_color: n.bg_color || null,
+          box_style: n.box_style || {},
+          container_mode: n.container_mode || null,
+          parent_container_id: null,
+          attached_to_node_id: null,
+          attachment_side: n.attachment_side || null,
+          width: n.width || 110,
+          height: n.height || 40,
+          font_sizes: n.font_sizes || {},
+          text_styles: n.text_styles || {},
+          x_offset: n.x_offset || 0,
+          x: 0,
+          y: 0,
+          tier: n.tier ?? 0,
+          tier_order: n.tier_order ?? 0,
+        })
+        .select()
+        .single()
+      if (error) {
+        alert(error.message)
+        return
+      }
+      refToId.set(n.ref, row.id)
+      insertedNodes.push({ row, src: n })
+    }
+
+    // 3) Patch parent_container_id / attached_to_node_id using the ref map.
+    for (const { row, src } of insertedNodes) {
+      const patch = {}
+      if (src.parent_ref && refToId.has(src.parent_ref))
+        patch.parent_container_id = refToId.get(src.parent_ref)
+      if (src.attached_ref && refToId.has(src.attached_ref))
+        patch.attached_to_node_id = refToId.get(src.attached_ref)
+      if (Object.keys(patch).length) {
+        await supabase.from('org_nodes').update(patch).eq('id', row.id)
+        Object.assign(row, patch)
+      }
+    }
+
+    // 4) Insert edges with remapped endpoints.
+    const edgeRows = []
+    for (const e of tplEdges) {
+      const source_id = refToId.get(e.source_ref)
+      const target_id = refToId.get(e.target_ref)
+      if (!source_id || !target_id) continue
+      const { data: edge } = await supabase
+        .from('org_edges')
+        .insert({
+          chart_id: newChartId,
+          source_id,
+          target_id,
+          relationship: e.relationship || 'reports_to',
+          style: e.style || 'solid',
+          bus_offset: e.bus_offset ?? null,
+        })
+        .select()
+        .single()
+      if (edge) edgeRows.push(edge)
+    }
+
+    setNodes(insertedNodes.map(x => x.row))
+    setEdges(edgeRows)
+  }
+
+  // Template / category CRUD used by the admin Settings modal.
+  async function deleteTemplate(id) {
+    await supabase.from('org_chart_templates').delete().eq('id', id)
+    setTemplates(prev => prev.filter(t => t.id !== id))
+  }
+  async function renameTemplate(id, name) {
+    await supabase.from('org_chart_templates').update({ name }).eq('id', id)
+    setTemplates(prev => prev.map(t => (t.id === id ? { ...t, name } : t)))
+  }
+  async function changeTemplateCategory(id, category_id) {
+    await supabase.from('org_chart_templates').update({ category_id }).eq('id', id)
+    setTemplates(prev => prev.map(t => (t.id === id ? { ...t, category_id } : t)))
+  }
+  async function addTemplateCategory(name) {
+    const { data } = await supabase
+      .from('org_chart_template_categories')
+      .insert({ name, created_by: user?.id })
+      .select()
+      .single()
+    if (data) setTemplateCategories(prev => [...prev, data])
+  }
+  async function renameTemplateCategory(id, name) {
+    await supabase.from('org_chart_template_categories').update({ name }).eq('id', id)
+    setTemplateCategories(prev => prev.map(c => (c.id === id ? { ...c, name } : c)))
+  }
+  async function deleteTemplateCategory(id) {
+    await supabase.from('org_chart_template_categories').delete().eq('id', id)
+    setTemplateCategories(prev => prev.filter(c => c.id !== id))
+    setTemplates(prev => prev.map(t => (t.category_id === id ? { ...t, category_id: null } : t)))
   }
 
   async function renameChart(newName) {
@@ -1096,7 +1347,10 @@ export default function OrgChartV2() {
                   <div className="border-t border-slate-100 mt-1 pt-1">
                     <button
                       type="button"
-                      onClick={createChart}
+                      onClick={() => {
+                        setChartPickerOpen(false)
+                        setShowNewChartModal(true)
+                      }}
                       className="block w-full text-left px-3 py-1.5 text-sm font-medium hover:bg-slate-50"
                       style={{ color: FG }}
                     >
@@ -1286,26 +1540,16 @@ export default function OrgChartV2() {
             </h1>
           )}
           {editMode && chartId && !editingChartName && (
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  setChartNameDraft(chartName)
-                  setEditingChartName(true)
-                }}
-                className="text-xs text-slate-500 hover:text-slate-800 underline whitespace-nowrap"
-              >
-                rename
-              </button>
-              <button
-                type="button"
-                onClick={deleteChart}
-                disabled={busy}
-                className="text-xs text-red-500 hover:text-red-700 underline whitespace-nowrap"
-              >
-                delete
-              </button>
-            </>
+            <button
+              type="button"
+              title="Chart options"
+              onClick={e =>
+                setChartNameMenu({ anchorRect: e.currentTarget.getBoundingClientRect() })
+              }
+              className="text-slate-400 hover:text-slate-700 border border-slate-200 rounded-md px-1.5 py-0.5 text-xs leading-none"
+            >
+              ✎
+            </button>
           )}
         </div>
 
@@ -1352,6 +1596,16 @@ export default function OrgChartV2() {
               }`}
             >
               {editMode ? 'Save' : 'Edit'}
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              type="button"
+              title="Template settings"
+              onClick={() => setShowTemplateSettings(true)}
+              className="text-slate-500 hover:text-slate-800 text-base px-2 py-1 rounded-md hover:bg-slate-100"
+            >
+              ⚙️
             </button>
           )}
         </div>
@@ -1459,7 +1713,7 @@ export default function OrgChartV2() {
             </p>
             <button
               type="button"
-              onClick={createChart}
+              onClick={() => setShowNewChartModal(true)}
               className="text-lg px-8 py-4 rounded-xl text-white font-semibold shadow-md hover:opacity-90"
               style={{ background: FG }}
             >
@@ -1563,6 +1817,69 @@ export default function OrgChartV2() {
             document.body,
           )
         })()}
+
+      {showNewChartModal && (
+        <NewChartModal
+          templates={templates}
+          categories={templateCategories}
+          onClose={() => setShowNewChartModal(false)}
+          onCreate={handleCreateChart}
+        />
+      )}
+
+      {showRenameModal && (
+        <RenameChartModal
+          initialName={chartName}
+          onClose={() => setShowRenameModal(false)}
+          onSave={name => {
+            setShowRenameModal(false)
+            renameChart(name)
+          }}
+        />
+      )}
+
+      {showCreateTemplateModal && (
+        <CreateTemplateModal
+          categories={templateCategories}
+          onClose={() => setShowCreateTemplateModal(false)}
+          onSave={createTemplateFromCurrentChart}
+        />
+      )}
+
+      {chartNameMenu &&
+        createPortal(
+          <ChartNameMenu
+            anchorRect={chartNameMenu.anchorRect}
+            onClose={() => setChartNameMenu(null)}
+            onRename={() => {
+              setChartNameMenu(null)
+              setShowRenameModal(true)
+            }}
+            onCreateTemplate={() => {
+              setChartNameMenu(null)
+              setShowCreateTemplateModal(true)
+            }}
+            onDelete={() => {
+              setChartNameMenu(null)
+              deleteChart()
+            }}
+          />,
+          document.body,
+        )}
+
+      {showTemplateSettings && isAdmin && (
+        <TemplatesSettingsModal
+          templates={templates}
+          categories={templateCategories}
+          onClose={() => setShowTemplateSettings(false)}
+          onDeleteTemplate={deleteTemplate}
+          onRenameTemplate={renameTemplate}
+          onChangeTemplateCategory={changeTemplateCategory}
+          onAddCategory={addTemplateCategory}
+          onRenameCategory={renameTemplateCategory}
+          onDeleteCategory={deleteTemplateCategory}
+        />
+      )}
     </div>
   )
 }
