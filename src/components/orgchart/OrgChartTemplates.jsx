@@ -506,21 +506,35 @@ export function TemplatesSettingsView({
   onRenameSubcategory,
   onDeleteSubcategory,
 }) {
-  const [tab, setTab] = useState('templates')
+  const [tab, setTab] = useState('sample')
   const [newCat, setNewCat] = useState('')
   const [selectedCatId, setSelectedCatId] = useState(null)
   const [newSub, setNewSub] = useState('')
   const [editingTemplate, setEditingTemplate] = useState(null)
+  // Separate selection state for the 3-column Sample Templates browser.
+  const [sampleCatId, setSampleCatId] = useState(null)
+  const [sampleSubId, setSampleSubId] = useState(null)
   const catName = id => categories.find(c => c.id === id)?.name || '—'
   const subName = id => (subcategories || []).find(s => s.id === id)?.name || '—'
   const subsForSelected = (subcategories || []).filter(s => s.category_id === selectedCatId)
+  const createdTemplates = (templates || []).filter(t => !t.is_sample)
+  const sampleTemplates = (templates || []).filter(t => t.is_sample)
+  const sampleSubs = sampleCatId
+    ? (subcategories || []).filter(s => s.category_id === sampleCatId)
+    : []
+  const sampleTemplatesShown = sampleTemplates.filter(
+    t =>
+      t.category_id === sampleCatId &&
+      (sampleSubId == null || t.subcategory_id === sampleSubId),
+  )
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <div className="flex border-b border-gray-200 bg-white px-6 items-center justify-between flex-shrink-0">
         <div className="flex">
           {[
-            ['templates', 'Templates'],
+            ['sample', 'Sample Templates'],
+            ['created', 'Created Templates'],
             ['categories', 'Categories & Subcategories'],
           ].map(([v, lab]) => (
             <button
@@ -547,10 +561,12 @@ export function TemplatesSettingsView({
       </div>
 
       <div className="bg-gray-50 px-6 py-6 flex-1 overflow-y-auto">
-        <div className="bg-white border border-gray-200 rounded-xl p-5 max-w-4xl">
-          {tab === 'templates' ? (
-            (templates || []).length === 0 ? (
-              <p className="text-sm text-slate-400 italic">No templates yet.</p>
+        <div className="bg-white border border-gray-200 rounded-xl p-5 max-w-6xl">
+          {tab === 'created' ? (
+            createdTemplates.length === 0 ? (
+              <p className="text-sm text-slate-400 italic">
+                No created templates yet — make one from a chart's edit menu (Create New Template).
+              </p>
             ) : (
               <table className="w-full text-sm border border-slate-200 rounded-md overflow-hidden">
                 <thead>
@@ -563,7 +579,7 @@ export function TemplatesSettingsView({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {templates.map(t => (
+                  {createdTemplates.map(t => (
                     <tr key={t.id} className="hover:bg-slate-50">
                       <td className="px-3 py-2 font-medium text-slate-800">{t.name}</td>
                       <td className="px-3 py-2 text-slate-500 max-w-xs truncate" title={t.description || ''}>
@@ -595,7 +611,7 @@ export function TemplatesSettingsView({
                 </tbody>
               </table>
             )
-          ) : (
+          ) : tab === 'categories' ? (
             <div className="grid grid-cols-2 gap-5">
               {/* Left — categories (click to select and reveal its subcategories) */}
               <div>
@@ -739,6 +755,103 @@ export function TemplatesSettingsView({
                       </ul>
                     )}
                   </>
+                )}
+              </div>
+            </div>
+          ) : (
+            // ── Sample Templates: categories → subcategories → templates ──
+            <div className="grid grid-cols-3 gap-5">
+              {/* Column 1 — categories */}
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">
+                  Categories
+                </p>
+                {(categories || []).length === 0 ? (
+                  <p className="text-sm text-slate-400 italic">No categories yet.</p>
+                ) : (
+                  <ul className="divide-y divide-slate-100 border border-slate-200 rounded-md">
+                    {categories.map(c => (
+                      <li
+                        key={c.id}
+                        onClick={() => {
+                          setSampleCatId(c.id)
+                          setSampleSubId(null)
+                        }}
+                        className={`px-3 py-1.5 text-sm cursor-pointer truncate ${
+                          sampleCatId === c.id ? 'bg-green-50 text-green-800' : 'hover:bg-slate-50 text-slate-800'
+                        }`}
+                      >
+                        {c.name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {/* Column 2 — subcategories of the selected category */}
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">
+                  Subcategories
+                </p>
+                {!sampleCatId ? (
+                  <p className="text-sm text-slate-400 italic">Pick a category.</p>
+                ) : sampleSubs.length === 0 ? (
+                  <p className="text-sm text-slate-400 italic">No subcategories.</p>
+                ) : (
+                  <ul className="divide-y divide-slate-100 border border-slate-200 rounded-md">
+                    <li
+                      onClick={() => setSampleSubId(null)}
+                      className={`px-3 py-1.5 text-sm cursor-pointer ${
+                        sampleSubId == null ? 'bg-green-50 text-green-800' : 'hover:bg-slate-50 text-slate-600'
+                      }`}
+                    >
+                      All in category
+                    </li>
+                    {sampleSubs.map(s => (
+                      <li
+                        key={s.id}
+                        onClick={() => setSampleSubId(s.id)}
+                        className={`px-3 py-1.5 text-sm cursor-pointer truncate ${
+                          sampleSubId === s.id ? 'bg-green-50 text-green-800' : 'hover:bg-slate-50 text-slate-800'
+                        }`}
+                      >
+                        {s.name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {/* Column 3 — sample templates in the selected category/subcategory */}
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">
+                  Templates
+                </p>
+                {!sampleCatId ? (
+                  <p className="text-sm text-slate-400 italic">Pick a category.</p>
+                ) : sampleTemplatesShown.length === 0 ? (
+                  <p className="text-sm text-slate-400 italic">No sample templates here yet.</p>
+                ) : (
+                  <ul className="divide-y divide-slate-100 border border-slate-200 rounded-md">
+                    {sampleTemplatesShown.map(t => (
+                      <li
+                        key={t.id}
+                        className="flex items-center justify-between px-3 py-1.5 text-sm"
+                      >
+                        <span className="flex-1 truncate text-slate-800" title={t.description || ''}>
+                          {t.name}
+                        </span>
+                        <button
+                          type="button"
+                          title="Edit"
+                          onClick={() => setEditingTemplate(t)}
+                          className="text-slate-400 hover:text-slate-700 ml-2 flex-shrink-0"
+                        >
+                          ✎
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </div>
             </div>
