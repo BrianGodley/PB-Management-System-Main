@@ -26,10 +26,18 @@ export function NewChartModal({ templates, categories, subcategories, onClose, o
   const [templateId, setTemplateId] = useState('')
   const [categoryId, setCategoryId] = useState('')
   const [subcategoryId, setSubcategoryId] = useState('')
-  const groups = groupByCategory(templates || [], categories || [])
   const subsForCategory = categoryId
     ? (subcategories || []).filter(s => String(s.category_id) === String(categoryId))
     : []
+  // Templates available once a category AND subcategory are chosen.
+  const templatesForSelection =
+    categoryId && subcategoryId
+      ? (templates || []).filter(
+          t =>
+            String(t.category_id) === String(categoryId) &&
+            String(t.subcategory_id) === String(subcategoryId),
+        )
+      : []
 
   const submit = () => {
     if (!name.trim()) return
@@ -114,6 +122,7 @@ export function NewChartModal({ templates, categories, subcategories, onClose, o
                   onChange={e => {
                     setCategoryId(e.target.value)
                     setSubcategoryId('')
+                    setTemplateId('')
                   }}
                   className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
                 >
@@ -131,7 +140,10 @@ export function NewChartModal({ templates, categories, subcategories, onClose, o
                 </label>
                 <select
                   value={subcategoryId}
-                  onChange={e => setSubcategoryId(e.target.value)}
+                  onChange={e => {
+                    setSubcategoryId(e.target.value)
+                    setTemplateId('')
+                  }}
                   disabled={!categoryId || subsForCategory.length === 0}
                   className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm disabled:bg-slate-50 disabled:text-slate-400"
                 >
@@ -153,36 +165,40 @@ export function NewChartModal({ templates, categories, subcategories, onClose, o
           )}
           {source === 'template' && (
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">
+              <label className="block text-xs font-medium text-slate-500 mb-1 uppercase">
                 Choose a template
               </label>
-              {groups.length === 0 ? (
+              {!categoryId ? (
+                <p className="text-sm text-slate-400 italic">Pick a category above to begin.</p>
+              ) : !subcategoryId ? (
                 <p className="text-sm text-slate-400 italic">
-                  No templates yet — create one from an existing chart's edit menu.
+                  Now pick a subcategory above to see its templates.
+                </p>
+              ) : templatesForSelection.length === 0 ? (
+                <p className="text-sm text-slate-400 italic">
+                  No templates for this subcategory yet.
                 </p>
               ) : (
-                <div className="max-h-[48vh] overflow-y-auto border border-slate-200 rounded-md divide-y divide-slate-100">
-                  {groups.map(g => (
-                    <div key={g.name} className="py-1">
-                      <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                        {g.name}
-                      </p>
-                      {g.items.map(t => (
-                        <label
-                          key={t.id}
-                          className="flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-slate-50 cursor-pointer"
-                        >
-                          <input
-                            type="radio"
-                            name="template"
-                            checked={String(templateId) === String(t.id)}
-                            onChange={() => setTemplateId(t.id)}
-                            className="accent-blue-600"
-                          />
-                          {t.name}
-                        </label>
-                      ))}
-                    </div>
+                <div className="max-h-[40vh] overflow-y-auto border border-slate-200 rounded-md divide-y divide-slate-100">
+                  {templatesForSelection.map(t => (
+                    <label
+                      key={t.id}
+                      className="flex items-start gap-2 px-3 py-2 text-sm hover:bg-slate-50 cursor-pointer"
+                    >
+                      <input
+                        type="radio"
+                        name="template"
+                        checked={String(templateId) === String(t.id)}
+                        onChange={() => setTemplateId(t.id)}
+                        className="accent-blue-600 mt-1"
+                      />
+                      <span>
+                        <span className="font-medium text-slate-800">{t.name}</span>
+                        {t.description && (
+                          <span className="block text-xs text-slate-500">{t.description}</span>
+                        )}
+                      </span>
+                    </label>
                   ))}
                 </div>
               )}
