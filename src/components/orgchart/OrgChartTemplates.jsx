@@ -80,7 +80,7 @@ export function NewChartModal({ templates, categories, onClose, onCreate }) {
               ))}
             </div>
             {/* Description of the currently selected "start from" option. */}
-            <p className="mt-2 text-xs text-slate-500 leading-snug">
+            <p className="mt-4 text-sm text-slate-800 leading-snug">
               {
                 {
                   scratch: 'Start with an empty chart and build every item yourself.',
