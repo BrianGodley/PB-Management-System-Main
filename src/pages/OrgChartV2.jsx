@@ -1961,7 +1961,8 @@ export default function OrgChartV2() {
             initialName={wizardName}
             positionTitles={positions.map(p => p.title).filter(Boolean)}
             priorExamples={wizardExamples}
-            industries={templateCategories.map(c => c.name).filter(Boolean)}
+            industries={templateCategories}
+            subcategories={templateSubcategories}
             onClose={() => setWizardName(null)}
             onComplete={handleWizardComplete}
           />,

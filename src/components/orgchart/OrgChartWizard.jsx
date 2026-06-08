@@ -138,15 +138,23 @@ export default function OrgChartWizard({
   initialName,
   positionTitles = [],
   priorExamples = [],
-  industries = [],
+  industries = [], // [{ id, name }]
+  subcategories = [], // [{ id, name, category_id }]
   onClose,
   onComplete,
 }) {
   const [step, setStep] = useState(1)
   const [name, setName] = useState(initialName || '')
-  const [industry, setIndustry] = useState('')
+  const [industryId, setIndustryId] = useState('') // selected category id (string)
+  const [subcategoryId, setSubcategoryId] = useState('') // selected subcategory id (string)
   const [description, setDescription] = useState('')
   const [chartType, setChartType] = useState('combination') // 'positions' | 'areas' | 'combination'
+
+  const industryName = industries.find(c => String(c.id) === industryId)?.name || ''
+  const subsForIndustry = industryId
+    ? subcategories.filter(s => String(s.category_id) === industryId)
+    : []
+  const subName = subsForIndustry.find(s => String(s.id) === subcategoryId)?.name || ''
   const [topTitle, setTopTitle] = useState('')
   const [divisions, setDivisions] = useState([blankDivision()])
   const [samBusy, setSamBusy] = useState(false)
@@ -168,8 +176,11 @@ export default function OrgChartWizard({
       combination:
         'Chart type: COMBINATION — business areas, each led by a manager position, with junior roles. For each item use {"name":"Area name","lead":"Manager position title","juniors":["Role", ...]}.',
     }[chartType]
-    const industryLine = industry
-      ? `The business operates in the "${industry}" industry — tailor names to that industry while keeping them professional and widely understood.`
+    const industryLine = industryName
+      ? `The business operates in the "${industryName}" industry${
+          subName ? `, specifically the "${subName}" sub-sector` : ''
+        } — tailor names to that ${subName ? 'sub-sector' : 'industry'} while keeping them ` +
+        `professional and widely understood.`
       : `Do NOT assume any specific industry; rely only on the description the user provides and keep titles generic.`
     return (
       `You are helping design an organizational chart in a general-purpose org-chart product. ` +
@@ -208,11 +219,14 @@ export default function OrgChartWizard({
     setSamBusy(true)
     setSamError('')
     try {
+      const sector = subName
+        ? `${industryName} (${subName})`
+        : industryName
       const reply = await askSam(
-        `For a business${industry ? ` in the "${industry}" industry` : ''} described as ` +
+        `For a business${sector ? ` in the "${sector}" sector` : ''} described as ` +
           `"${description || 'a company'}", what is the single most senior ` +
           `${chartType === 'areas' ? 'top-level area/function name' : 'leadership position title'} ` +
-          `at the top of its org chart?${industry ? '' : ' Do not assume any specific industry.'} ` +
+          `at the top of its org chart?${sector ? '' : ' Do not assume any specific industry.'} ` +
           `Reply with ONLY the name, no extra words.`,
       )
       const t = reply.split('\n')[0].replace(/[".]/g, '').trim()
@@ -293,7 +307,13 @@ export default function OrgChartWizard({
 
   const finish = () => {
     if (!canFinish) return
-    const finalStruct = { chartType, industry: industry || null, topTitle: topTitle.trim(), divisions: filledDivisions }
+    const finalStruct = {
+      chartType,
+      industry: industryName || null,
+      subcategory: subName || null,
+      topTitle: topTitle.trim(),
+      divisions: filledDivisions,
+    }
     // Pass the draft-vs-final feedback so it can be stored for future learning.
     onComplete(name.trim(), buildSnapshot(chartType, { topTitle, divisions }), {
       description: description.trim() || null,
@@ -366,22 +386,51 @@ export default function OrgChartWizard({
                 />
               </div>
               {industries.length > 0 && (
-                <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1">
-                    Industry (helps Sam tailor suggestions)
-                  </label>
-                  <select
-                    value={industry}
-                    onChange={e => setIndustry(e.target.value)}
-                    className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
-                  >
-                    <option value="">— Any / not specified —</option>
-                    {industries.map(n => (
-                      <option key={n} value={n}>
-                        {n}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">
+                      Industry (helps Sam tailor suggestions)
+                    </label>
+                    <select
+                      value={industryId}
+                      onChange={e => {
+                        setIndustryId(e.target.value)
+                        setSubcategoryId('') // reset subcategory when industry changes
+                      }}
+                      className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm"
+                    >
+                      <option value="">— Any / not specified —</option>
+                      {industries.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">
+                      Sub-sector (optional)
+                    </label>
+                    <select
+                      value={subcategoryId}
+                      onChange={e => setSubcategoryId(e.target.value)}
+                      disabled={!industryId || subsForIndustry.length === 0}
+                      className="w-full border border-slate-300 rounded-md px-2 py-1.5 text-sm disabled:bg-slate-50 disabled:text-slate-400"
+                    >
+                      <option value="">
+                        {!industryId
+                          ? '— Pick an industry first —'
+                          : subsForIndustry.length === 0
+                            ? '— None available —'
+                            : '— Any / not specified —'}
                       </option>
-                    ))}
-                  </select>
+                      {subsForIndustry.map(s => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               )}
               <div>
