@@ -7557,6 +7557,7 @@ function StatisticsSettingsView({
   onWeekEndingDayChange,
   stats,
   profiles,
+  positions,
   isAdmin,
   onEditStat,
   onRestored,
@@ -7606,10 +7607,16 @@ function StatisticsSettingsView({
     ...(isAdmin ? [{ key: 'archive', label: '📦 Archive' }] : []),
   ]
 
-  // Helper for the Master tab: turn a stat's owner_user_id into a display name.
+  // Helper for the Master tab: turn a stat's owner reference into a
+  // display name. Stats can be owned by either an employee (user) or a
+  // position (role). We look up positions by id from the parent list.
   function ownerLabel(stat) {
-    if (stat?.owner_type === 'position' && stat.owner_position_id)
-      return 'Position #' + stat.owner_position_id
+    if (stat?.owner_type === 'position' && stat.owner_position_id) {
+      const pos = (positions || []).find(
+        x => Number(x.id) === Number(stat.owner_position_id),
+      )
+      return pos?.title || `Position #${stat.owner_position_id}`
+    }
     if (!stat?.owner_user_id) return '—'
     const p = (profiles || []).find(x => x.id === stat.owner_user_id)
     return p?.full_name || (p?.email ? p.email.split('@')[0] : '—')
@@ -10028,6 +10035,7 @@ export default function Statistics() {
           onWeekEndingDayChange={day => setWeekEndingDay(day)}
           stats={stats}
           profiles={profiles}
+          positions={positions}
           isAdmin={isCurrentUserAdmin}
           onEditStat={editStatById}
           onRestored={() => {
@@ -11428,9 +11436,6 @@ export default function Statistics() {
           return (
             <StatSharesModal
               statId={target.id}
-              statName={target.name}
-              ownerUserId={realOwner}
-              initialShares={sharesTarget?.initialShares}
               onLocalSave={sharesTarget?.onLocalSave}
               onClose={() => {
                 setShowShares(false)
