@@ -350,29 +350,35 @@ export function ContainerNode({
           : (hasPosition ? box.y + box.height / 2 + 30 + posShift : box.y + box.height / 2) + cpSize
         const avail = box.width - 8
         const limit = box.y + box.height - cpSize - 2
-        // Same rule as the area head: only show a holder line if it fits the box
-        // both horizontally and vertically; anything that would overlap an edge
-        // is hidden. So they hide on the small main-view boxes and show in the
-        // expanded view, where the box is grown to fit them.
-        const lines = containedPositions
-          .map(cp => (cp.name ? `${cp.title} — ${cp.name}` : cp.title))
-          .filter(t => t.length * cpSize * 0.55 <= avail)
+        // Flatten the main → junior tree into lines (juniors shown distinctly:
+        // indented marker, smaller, lighter). Same fit rule as the area head:
+        // only lines that fit the box (horizontally + vertically) are shown, so
+        // they hide on the small main-view boxes and appear in the expanded view.
+        const flat = []
+        containedPositions.forEach(cp => {
+          flat.push({ text: cp.name ? `${cp.title} — ${cp.name}` : cp.title, junior: false })
+          ;(cp.juniors || []).forEach(j =>
+            flat.push({ text: j.name ? `${j.title} — ${j.name}` : j.title, junior: true }),
+          )
+        })
+        const vis = flat
+          .filter(it => it.text.length * cpSize * 0.55 <= avail)
           .filter((_, i) => startY + i * lineH <= limit)
-        if (!lines.length) return null
+        if (!vis.length) return null
         return (
           <g>
-            {lines.map((t, i) => (
+            {vis.map((it, i) => (
               <text
                 key={i}
                 x={cx}
                 y={startY + i * lineH}
                 textAnchor="middle"
                 fill={textColor}
-                opacity={0.92}
-                fontSize={cpSize}
-                {...styleFor(node, 'title', { family: 'sans' })}
+                opacity={it.junior ? 0.7 : 0.92}
+                fontSize={it.junior ? Math.max(7, cpSize - 1) : cpSize}
+                {...styleFor(node, 'title', { family: 'sans', weight: it.junior ? 400 : 600 })}
               >
-                {t}
+                {it.junior ? `› ${it.text}` : it.text}
               </text>
             ))}
           </g>

@@ -241,12 +241,26 @@ function neededWidth(node, resolveNodeHolder) {
 // Positions "contained in" an area (rendered inside its box), resolved to
 // { title, name } for display.
 function containedFor(areaNode, nodes, resolveNodeHolder) {
-  return (nodes || [])
-    .filter(n => n.parent_container_id === areaNode.id && n.kind === 'position')
-    .map(n => {
-      const ph = (resolveNodeHolder ? resolveNodeHolder(n) : null) || {}
-      return { title: ph.positionTitle || n.label || '', name: ph.displayName || '' }
-    })
+  const all = nodes || []
+  const resolve = n => {
+    const ph = (resolveNodeHolder ? resolveNodeHolder(n) : null) || {}
+    return { title: ph.positionTitle || n.label || '', name: ph.displayName || '' }
+  }
+  const byOrder = (a, b) =>
+    (a.tier_order ?? 0) - (b.tier_order ?? 0) || String(a.id).localeCompare(String(b.id))
+  // Mains = contained positions with no senior; each carries its junior positions.
+  return all
+    .filter(
+      n => n.parent_container_id === areaNode.id && n.kind === 'position' && !n.senior_node_id,
+    )
+    .sort(byOrder)
+    .map(m => ({
+      ...resolve(m),
+      juniors: all
+        .filter(n => n.senior_node_id === m.id)
+        .sort(byOrder)
+        .map(resolve),
+    }))
 }
 
 function AreaView({ node, nodes, resolveNodeHolder, onDrill }) {
@@ -268,14 +282,17 @@ function AreaView({ node, nodes, resolveNodeHolder, onDrill }) {
 
   const PAD = 24
 
-  // Width a box needs to fit its widest contained-position line on one row.
+  // A contained position contributes one line for itself plus one per junior.
+  const lineText = cp => (cp.name ? `${cp.title} — ${cp.name}` : cp.title)
+  const lineCount = list => list.reduce((s, cp) => s + 1 + (cp.juniors?.length || 0), 0)
+  // Width a box needs to fit its widest contained line (main or junior).
   const containedTextW = list =>
-    list.reduce(
-      (m, cp) => Math.max(m, textWidth(cp.name ? `${cp.title} — ${cp.name}` : cp.title, 11)),
-      0,
-    )
-  // Extra height to fit a contained-position list (stacked under the top-
-  // anchored in-charge), ~24px per row plus a little padding.
+    list.reduce((m, cp) => {
+      const jw = (cp.juniors || []).reduce((mm, j) => Math.max(mm, textWidth(lineText(j), 11)), 0)
+      return Math.max(m, textWidth(lineText(cp), 11), jw)
+    }, 0)
+  // Extra height to fit the contained list (stacked under the top-anchored
+  // in-charge), ~24px per line plus a little padding.
   const containedHeight = n => (n ? 24 * n + 24 : 0)
 
   // Every attached junior gets the SAME width — the width of the junior whose
@@ -305,7 +322,7 @@ function AreaView({ node, nodes, resolveNodeHolder, onDrill }) {
   // plus room for any contained positions.
   const bothTitles = !!(node.label || '').trim() && !!(node.heading || '').trim()
   const areaH =
-    Math.max(node.height || 90, 90) + (bothTitles ? 18 : 0) + containedHeight(contained.length)
+    Math.max(node.height || 90, 90) + (bothTitles ? 18 : 0) + containedHeight(lineCount(contained))
   const areaX = PAD
   const areaY = PAD
 
@@ -315,7 +332,7 @@ function AreaView({ node, nodes, resolveNodeHolder, onDrill }) {
     // The junior row is tall enough for the junior with the most contained
     // positions, so none get clipped.
     const maxJuniorContained = juniors.reduce(
-      (m, j) => Math.max(m, (juniorContained.get(j.id) || []).length),
+      (m, j) => Math.max(m, lineCount(juniorContained.get(j.id) || [])),
       0,
     )
     const rowH =

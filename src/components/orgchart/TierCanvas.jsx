@@ -277,12 +277,16 @@ export default function TierCanvas({
           }
           if (n.kind === 'container') {
             const ph = resolveNodeHolder ? resolveNodeHolder(n) : null
+            const resolveCp = x => {
+              const xh = (resolveNodeHolder ? resolveNodeHolder(x) : null) || {}
+              return { title: xh.positionTitle || x.label || '', name: xh.displayName || '' }
+            }
             const contained = nodes
-              .filter(x => x.parent_container_id === n.id && x.kind === 'position')
-              .map(x => {
-                const xh = (resolveNodeHolder ? resolveNodeHolder(x) : null) || {}
-                return { title: xh.positionTitle || x.label || '', name: xh.displayName || '' }
-              })
+              .filter(x => x.parent_container_id === n.id && x.kind === 'position' && !x.senior_node_id)
+              .map(m => ({
+                ...resolveCp(m),
+                juniors: nodes.filter(x => x.senior_node_id === m.id).map(resolveCp),
+              }))
             return (
               <g key={n.id} data-node-id={n.id} style={wrapStyle} onMouseDown={onMouseDown} onDoubleClick={() => editable && onNodeDoubleClick && onNodeDoubleClick(n.id)}>
                 <ContainerNode

@@ -124,6 +124,8 @@ export default function AddNodeDialog({
   const [holders, setHolders] = useState(
     isEdit && existing.employee_id ? [String(existing.employee_id)] : [''],
   )
+  // Junior positions for a contained position: each { positionId, holderId }.
+  const [juniorPositions, setJuniorPositions] = useState([])
 
   const [heading, setHeading] = useState(isEdit ? existing.heading || '' : '')
   // A new junior area inherits its parent (senior) area's color by default.
@@ -380,6 +382,17 @@ export default function AddNodeDialog({
           posEmployeeId = chosen[0] ?? null
         }
       }
+      // Junior positions (only meaningful for contained positions).
+      const juniors =
+        posPlacement === 'contained'
+          ? juniorPositions
+              .filter(j => j.positionId)
+              .map(j => {
+                const jEmps = employeesByPosition?.get(Number(j.positionId)) || []
+                const emp = jEmps.find(e => String(e.id) === String(j.holderId))
+                return { position_id: Number(j.positionId), employee_id: emp ? emp.id : null }
+              })
+          : []
       onSubmit({
         ...base,
         position_id: Number(positionId),
@@ -389,6 +402,7 @@ export default function AddNodeDialog({
         height: height || 40,
         contained_in_area_id: containedArea ? containedArea.id : null,
         employee_ids: posEmployeeIds,
+        juniors: juniors.length ? juniors : null,
       })
     } else if (kind === 'container') {
       onSubmit({
@@ -739,6 +753,81 @@ export default function AddNodeDialog({
                   />
                   {fieldStyle('name', 10, 'sans')}
                 </div>
+              </div>
+            )}
+            {/* Junior positions that report to this contained position. */}
+            {posPlacement === 'contained' && positionId && (
+              <div className="mt-3 border-t border-gray-200 pt-2">
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Junior positions (optional)
+                </label>
+                {juniorPositions.length === 0 && (
+                  <p className="text-[11px] text-gray-400 mb-1">
+                    Add one or more positions that report to this one — they show
+                    indented under it in the expanded view.
+                  </p>
+                )}
+                {juniorPositions.map((jp, i) => {
+                  const jEmps = employeesByPosition?.get(Number(jp.positionId)) || []
+                  return (
+                    <div key={i} className="flex items-center gap-1 mb-1">
+                      <select
+                        value={jp.positionId}
+                        onChange={e =>
+                          setJuniorPositions(prev =>
+                            prev.map((x, j) =>
+                              j === i ? { positionId: e.target.value, holderId: '' } : x,
+                            ),
+                          )
+                        }
+                        className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1 text-sm"
+                      >
+                        <option value="">— Position —</option>
+                        {positions.map(p => (
+                          <option key={p.id} value={p.id}>
+                            {p.title}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={jp.holderId}
+                        disabled={!jp.positionId}
+                        onChange={e =>
+                          setJuniorPositions(prev =>
+                            prev.map((x, j) => (j === i ? { ...x, holderId: e.target.value } : x)),
+                          )
+                        }
+                        className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1 text-sm disabled:bg-gray-50"
+                      >
+                        <option value="">Auto</option>
+                        {jEmps.map(em => (
+                          <option key={em.id} value={String(em.id)}>
+                            {em.displayName}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setJuniorPositions(prev => prev.filter((_, j) => j !== i))
+                        }
+                        className="text-gray-400 hover:text-red-600 text-lg leading-none px-1"
+                        title="Remove junior position"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )
+                })}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setJuniorPositions(prev => [...prev, { positionId: '', holderId: '' }])
+                  }
+                  className="mt-1 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+                >
+                  + Add Junior Position
+                </button>
               </div>
             )}
             <div className="grid grid-cols-2 gap-2 mt-3">

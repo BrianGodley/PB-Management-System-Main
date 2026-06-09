@@ -228,6 +228,7 @@ export default function OrgChartV2() {
           ...n,
           parent_container_id: null,
           attached_to_node_id: null,
+          senior_node_id: null,
         }))
         await supabase.from('org_nodes').upsert(stripped)
         await supabase.from('org_nodes').upsert(snap.nodes)
@@ -1208,20 +1209,47 @@ export default function OrgChartV2() {
         tier,
         tier_order,
       }
-      // Multiple employees in one contained position: create one box per chosen
-      // employee (same position, different holder), then we're done.
-      if (Array.isArray(payload.employee_ids) && payload.employee_ids.length) {
-        const rows = payload.employee_ids.map((empId, i) => ({
+      // Contained position with multiple holders and/or junior positions:
+      // create the main box(es), then any juniors reporting to each main.
+      const hasMulti = Array.isArray(payload.employee_ids) && payload.employee_ids.length
+      const hasJuniors = Array.isArray(payload.juniors) && payload.juniors.length
+      if (parent_container_id && (hasMulti || hasJuniors)) {
+        const mainEmpIds = hasMulti ? payload.employee_ids : [payload.employee_id || null]
+        const mainRows = mainEmpIds.map((empId, i) => ({
           ...insert,
           employee_id: empId,
           tier_order: tier_order + i,
         }))
-        const { data: many, error: manyErr } = await supabase
+        const { data: mains, error: mErr } = await supabase
           .from('org_nodes')
-          .insert(rows)
+          .insert(mainRows)
           .select()
-        if (manyErr) throw manyErr
-        setNodes(prev => [...prev, ...(many || [])])
+        if (mErr) throw mErr
+        let created = [...(mains || [])]
+        if (hasJuniors) {
+          const juniorRows = []
+          ;(mains || []).forEach(main => {
+            payload.juniors.forEach((jp, k) => {
+              juniorRows.push({
+                ...insert,
+                position_id: jp.position_id,
+                employee_id: jp.employee_id || null,
+                label: '',
+                senior_node_id: main.id,
+                tier_order: k,
+              })
+            })
+          })
+          if (juniorRows.length) {
+            const { data: jr, error: jErr } = await supabase
+              .from('org_nodes')
+              .insert(juniorRows)
+              .select()
+            if (jErr) throw jErr
+            created = [...created, ...(jr || [])]
+          }
+        }
+        setNodes(prev => [...prev, ...created])
         setDialog(null)
         return
       }
