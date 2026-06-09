@@ -875,7 +875,55 @@ export default function OrgChartV2() {
       }
     }
 
-    // 2) Size each row (main rows by tier; remaining junior rows by parent tier).
+    // 2) Reduce crossings: order each top-level row left→right to match the
+    //    average position of each item's parents (barycenter heuristic), so the
+    //    reports-to / command-channel lines stop crossing. Only items whose
+    //    order actually changes are moved (their manual x-offset is cleared).
+    {
+      const edgeList = [...edges, ...newEdges]
+      const parentsOf = id =>
+        edgeList.filter(e => e.target_id === id).map(e => e.source_id)
+      const topByTier = new Map()
+      for (const n of work) {
+        if (n.parent_container_id || n.kind === 'assistant') continue
+        const t = n.tier ?? 0
+        topByTier.set(t, [...(topByTier.get(t) || []), n])
+      }
+      const orderIndex = new Map()
+      const baryc = n => {
+        const idxs = parentsOf(n.id)
+          .map(pid => orderIndex.get(pid))
+          .filter(v => v != null)
+        if (!idxs.length) return n.tier_order ?? 0
+        return idxs.reduce((s, v) => s + v, 0) / idxs.length
+      }
+      const tierKeys = [...topByTier.keys()].sort((a, b) => a - b)
+      tierKeys.forEach((t, ti) => {
+        const arr = topByTier.get(t).slice()
+        if (ti === 0) {
+          arr.sort((a, b) => (a.tier_order ?? 0) - (b.tier_order ?? 0))
+        } else {
+          arr.sort((a, b) => {
+            const d = baryc(a) - baryc(b)
+            return d !== 0 ? d : (a.tier_order ?? 0) - (b.tier_order ?? 0)
+          })
+        }
+        arr.forEach((n, i) => {
+          orderIndex.set(n.id, i)
+          if ((n.tier_order ?? 0) !== i) {
+            n.tier_order = i
+            n.x_offset = 0
+            const prev = struct.get(n.id) || {
+              parent_container_id: n.parent_container_id,
+              tier: n.tier,
+            }
+            struct.set(n.id, { ...prev, tier_order: i, x_offset: 0 })
+          }
+        })
+      })
+    }
+
+    // 3) Size each row (main rows by tier; remaining junior rows by parent tier).
     const groups = new Map()
     const tierOf = id => byId(id)?.tier ?? 0
     for (const n of work) {
@@ -907,7 +955,7 @@ export default function OrgChartV2() {
       }
     }
 
-    // 3) Persist: new connector edges, then node struct/size changes.
+    // 4) Persist: new connector edges, then node struct/size changes.
     const insertedEdges = []
     for (const e of newEdges) {
       const { data } = await supabase
