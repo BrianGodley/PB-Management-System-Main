@@ -8961,20 +8961,27 @@ export default function Statistics() {
     [stats, selectedId]
   )
 
-  // A stat is editable only by its assignee (owner) or an admin. Users who can
-  // only see a stat because it was shared with them get read-only access — the
-  // Edit Statistic link is hidden for them.
+  // A stat is editable by:
+  //   • admins,
+  //   • its direct owner (owner_user_id matches the current user),
+  //   • a position owner — i.e. the current user holds the position the
+  //     stat is assigned to (positionOwnership = 'owner' or 'owner-hfa'),
+  //   • a shared user whose share carries 'edit' permission.
+  //
+  // Plain viewers (share level 'view') and everyone else get read-only.
+  // The Edit Statistic / Edit Value History links are hidden when this
+  // returns false.
   const canEditSelectedStat = useMemo(() => {
     if (!selectedStat) return false
     if (isCurrentUserAdmin) return true
     if (selectedStat.owner_user_id && selectedStat.owner_user_id === user?.id) return true
+    if (positionOwnership[selectedStat.id]) return true
+    const share = userShares[selectedStat.id]
+    if (share === 'edit') return true
+    if (share) return false // 'view' share → read-only
     if (selectedStat.created_by && selectedStat.created_by === user?.id) return true
-    // Access is via a share row → read-only.
-    if (userShares[selectedStat.id]) return false
-    // Owned by this user (no explicit owner set falls through to creator check
-    // above); default to allowing edit for non-shared stats.
-    return selectedStat.owner_user_id === user?.id
-  }, [selectedStat, isCurrentUserAdmin, user?.id, userShares])
+    return false
+  }, [selectedStat, isCurrentUserAdmin, user?.id, userShares, positionOwnership])
 
   // ── Print current chart ───────────────────────────────────────────────────
   function handlePrint() {
@@ -11436,6 +11443,8 @@ export default function Statistics() {
           return (
             <StatSharesModal
               statId={target.id}
+              statName={target.name}
+              ownerUserId={realOwner}
               onLocalSave={sharesTarget?.onLocalSave}
               onClose={() => {
                 setShowShares(false)
