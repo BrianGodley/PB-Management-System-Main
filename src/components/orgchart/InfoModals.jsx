@@ -261,18 +261,39 @@ function AreaView({ node, nodes, resolveNodeHolder, onDrill }) {
       return String(a.id).localeCompare(String(b.id))
     })
   const contained = containedFor(node, nodes, resolveNodeHolder)
+  const juniorContained = new Map(
+    juniors.map(j => [j.id, containedFor(j, nodes, resolveNodeHolder)]),
+  )
 
   const PAD = 24
 
+  // Width a box needs to fit its widest contained-position line on one row.
+  const containedTextW = list =>
+    list.reduce(
+      (m, cp) => Math.max(m, textWidth(cp.name ? `${cp.title} — ${cp.name}` : cp.title, 11)),
+      0,
+    )
+  // Extra height to fit a contained-position list. The list sits below the
+  // center-anchored in-charge line, so the box must be tall enough that
+  // center + offset + N rows clears the bottom edge (~36px per row).
+  const containedHeight = n => (n ? 36 * n + 24 : 0)
+
   // Every attached junior gets the SAME width — the width of the junior whose
-  // text is longest (so none wrap). If the main item's own text is wider than
-  // all juniors side by side, widen each junior evenly so they still span it.
-  const areaNeeded = neededWidth(node, resolveNodeHolder)
+  // text is longest (so none wrap), now also accounting for contained positions.
+  const areaNeeded = Math.max(
+    neededWidth(node, resolveNodeHolder),
+    containedTextW(contained) + 24,
+  )
   let areaW = Math.max(node.width || 210, areaNeeded)
   let uniformJuniorW = 0
   if (juniors.length) {
     uniformJuniorW = juniors.reduce(
-      (m, j) => Math.max(m, neededWidth(j, resolveNodeHolder)),
+      (m, j) =>
+        Math.max(
+          m,
+          neededWidth(j, resolveNodeHolder),
+          containedTextW(juniorContained.get(j.id) || []) + 24,
+        ),
       0,
     )
     uniformJuniorW = Math.max(uniformJuniorW, Math.ceil(areaW / juniors.length))
@@ -280,21 +301,26 @@ function AreaView({ node, nodes, resolveNodeHolder, onDrill }) {
     areaW = uniformJuniorW * juniors.length
   }
 
-  // Give the main area box extra height: the expanded view adds breathing room
-  // between the two titles, and we want the in-charge line to stay clear of them.
+  // Give the main area box extra height: breathing room between the two titles
+  // plus room for any contained positions.
   const bothTitles = !!(node.label || '').trim() && !!(node.heading || '').trim()
-  const containedH = contained.length ? contained.length * 18 + 16 : 0
-  const areaH = Math.max(node.height || 90, 90) + (bothTitles ? 18 : 0) + containedH
+  const areaH =
+    Math.max(node.height || 90, 90) + (bothTitles ? 18 : 0) + containedHeight(contained.length)
   const areaX = PAD
   const areaY = PAD
 
   let contentH = areaH
   let juniorBoxes = []
   if (juniors.length) {
-    const rowH = Math.max(
-      juniors.reduce((m, j) => Math.max(m, j.height || 90), 0),
-      70,
+    // The junior row is tall enough for the junior with the most contained
+    // positions, so none get clipped.
+    const maxJuniorContained = juniors.reduce(
+      (m, j) => Math.max(m, (juniorContained.get(j.id) || []).length),
+      0,
     )
+    const rowH =
+      Math.max(juniors.reduce((m, j) => Math.max(m, j.height || 90), 0), 70) +
+      containedHeight(maxJuniorContained)
     juniorBoxes = juniors.map((j, i) => ({
       node: j,
       box: { x: areaX + i * uniformJuniorW, y: areaY + areaH, width: uniformJuniorW, height: rowH },

@@ -330,34 +330,37 @@ export function ContainerNode({
       {/* Positions "contained in" this area render INSIDE the box as a stacked
           list, clipped to the box so they never spill out. */}
       {containedPositions.length > 0 && (() => {
-        const clipId = `contain-${node.id}`
         const cpSize = Math.max(8, Math.min(13, fs.title || 11))
         const lineH = cpSize + 6
-        // Start below the title/in-charge block; fall back to upper third.
         const startY =
-          (hasPosition ? box.y + box.height / 2 + 30 + posShift : box.y + box.height / 2) +
-          cpSize
+          (hasPosition ? box.y + box.height / 2 + 30 + posShift : box.y + box.height / 2) + cpSize
+        const avail = box.width - 8
+        const limit = box.y + box.height - cpSize - 2
+        // Same rule as the area head: only show a holder line if it fits the box
+        // both horizontally and vertically; anything that would overlap an edge
+        // is hidden. So they hide on the small main-view boxes and show in the
+        // expanded view, where the box is grown to fit them.
+        const lines = containedPositions
+          .map(cp => (cp.name ? `${cp.title} — ${cp.name}` : cp.title))
+          .filter(t => t.length * cpSize * 0.55 <= avail)
+          .filter((_, i) => startY + i * lineH <= limit)
+        if (!lines.length) return null
         return (
           <g>
-            <clipPath id={clipId}>
-              <rect x={box.x + 2} y={box.y + 2} width={box.width - 4} height={box.height - 4} rx={9} />
-            </clipPath>
-            <g clipPath={`url(#${clipId})`}>
-              {containedPositions.map((cp, i) => (
-                <text
-                  key={i}
-                  x={cx}
-                  y={startY + i * lineH}
-                  textAnchor="middle"
-                  fill={textColor}
-                  opacity={0.92}
-                  fontSize={cpSize}
-                  {...styleFor(node, 'title', { family: 'sans' })}
-                >
-                  {cp.name ? `${cp.title} — ${cp.name}` : cp.title}
-                </text>
-              ))}
-            </g>
+            {lines.map((t, i) => (
+              <text
+                key={i}
+                x={cx}
+                y={startY + i * lineH}
+                textAnchor="middle"
+                fill={textColor}
+                opacity={0.92}
+                fontSize={cpSize}
+                {...styleFor(node, 'title', { family: 'sans' })}
+              >
+                {t}
+              </text>
+            ))}
           </g>
         )
       })()}
