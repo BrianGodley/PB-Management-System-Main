@@ -117,10 +117,13 @@ export default function AddNodeDialog({
   const [containedAreaId, setContainedAreaId] = useState(
     isEdit && existing.parent_container_id ? String(existing.parent_container_id) : '',
   )
-  // For a contained position whose HR position has multiple assigned employees:
-  // optionally add one box per chosen employee.
+  // For a contained position: one box per "holder" slot. Each slot holds an
+  // employee id ('' = auto / first active). Single by default; the user can add
+  // Holder #2, #3, … to create multiple boxes of the same position.
   const [multiContained, setMultiContained] = useState(false)
-  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState([])
+  const [holders, setHolders] = useState(
+    isEdit && existing.employee_id ? [String(existing.employee_id)] : [''],
+  )
 
   const [heading, setHeading] = useState(isEdit ? existing.heading || '' : '')
   // A new junior area inherits its parent (senior) area's color by default.
@@ -360,21 +363,32 @@ export default function AddNodeDialog({
           ? areaOptions.find(a => String(a.id) === String(containedAreaId))
           : null
       const empCandidates = employeesByPosition?.get(Number(positionId)) || []
-      const chosenEmpIds =
-        posPlacement === 'contained' && multiContained && selectedEmployeeIds.length
-          ? empCandidates
-              .filter(e => selectedEmployeeIds.includes(String(e.id)))
-              .map(e => e.id)
-          : null
+      const rawEmpId = hid => {
+        if (!hid) return null
+        const e = empCandidates.find(x => String(x.id) === String(hid))
+        return e ? e.id : null
+      }
+      // Contained holders: one or many. Multi → one box per chosen holder.
+      let posEmployeeId = employeeId || null
+      let posEmployeeIds = null
+      if (posPlacement === 'contained') {
+        const chosen = holders.map(rawEmpId).filter(v => v != null)
+        if (multiContained) {
+          posEmployeeIds = chosen.length ? chosen : null
+          posEmployeeId = null
+        } else {
+          posEmployeeId = chosen[0] ?? null
+        }
+      }
       onSubmit({
         ...base,
         position_id: Number(positionId),
-        employee_id: employeeId || null,
+        employee_id: posEmployeeId,
         label: p?.title || '',
         width: width || 110,
         height: height || 40,
         contained_in_area_id: containedArea ? containedArea.id : null,
-        employee_ids: chosenEmpIds,
+        employee_ids: posEmployeeIds,
       })
     } else if (kind === 'container') {
       onSubmit({
@@ -597,6 +611,8 @@ export default function AddNodeDialog({
                 onChange={e => {
                   setPositionId(e.target.value)
                   setEmployeeId('')
+                  setHolders([''])
+                  setMultiContained(false)
                 }}
                 className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm"
               >
@@ -620,68 +636,111 @@ export default function AddNodeDialog({
                 Add It In the HR Module
               </a>
             </p>
-            <div className="mt-2">
-              <label className="block text-xs font-medium text-gray-500 mb-1">Holder</label>
-              <div className="flex items-center gap-2">
-                <input
-                  readOnly
-                  value={positionId ? holderName : ''}
-                  placeholder="Auto from position"
-                  className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-gray-50 text-gray-600"
-                />
-                {fieldStyle('name', 10, 'sans')}
-              </div>
-            </div>
-            {/* Contained positions can be added once per assigned employee when
-                the HR position has more than one person in it. */}
-            {posPlacement === 'contained' && positionId && (() => {
-              const emps = employeesByPosition?.get(Number(positionId)) || []
-              if (emps.length < 2) return null
-              return (
-                <div className="mt-3 rounded-md border border-gray-200 p-2">
-                  <label className="flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={multiContained}
-                      onChange={e => {
-                        setMultiContained(e.target.checked)
-                        if (!e.target.checked) setSelectedEmployeeIds([])
-                      }}
-                    />
-                    Add more than one of this position
-                  </label>
-                  {multiContained && (
-                    <div className="mt-2">
-                      <p className="text-[11px] text-gray-500 mb-1">
-                        Pick the employees to add — one box is created for each:
-                      </p>
-                      <div className="max-h-40 overflow-y-auto space-y-1">
-                        {emps.map(emp => {
-                          const checked = selectedEmployeeIds.includes(String(emp.id))
-                          return (
-                            <label key={emp.id} className="flex items-center gap-2 text-sm text-gray-700">
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={e =>
-                                  setSelectedEmployeeIds(prev =>
-                                    e.target.checked
-                                      ? [...prev, String(emp.id)]
-                                      : prev.filter(x => x !== String(emp.id)),
-                                  )
-                                }
-                              />
-                              {emp.displayName}
-                              {emp.active ? '' : ' (inactive)'}
-                            </label>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
+            {posPlacement === 'contained' ? (
+              (() => {
+                const emps = employeesByPosition?.get(Number(positionId)) || []
+                if (!positionId) {
+                  return (
+                    <p className="mt-2 text-[11px] text-gray-400">
+                      Pick a position to choose its holder(s).
+                    </p>
+                  )
+                }
+                if (emps.length === 0) {
+                  return (
+                    <p className="mt-2 text-xs text-amber-600">
+                      No employees are assigned to this position — the box will show
+                      "Held from Above".
+                    </p>
+                  )
+                }
+                const setHolderAt = (i, val) =>
+                  setHolders(prev => prev.map((h, j) => (j === i ? val : h)))
+                const removeHolderAt = i =>
+                  setHolders(prev => prev.filter((_, j) => j !== i))
+                const canAddMore = multiContained && holders.length < emps.length
+                return (
+                  <div className="mt-2 space-y-2">
+                    {holders.map((h, i) => {
+                      // Each slot's options exclude employees chosen in OTHER slots.
+                      const takenElsewhere = new Set(
+                        holders.filter((_, j) => j !== i).filter(Boolean),
+                      )
+                      const opts = emps.filter(e => !takenElsewhere.has(String(e.id)))
+                      return (
+                        <div key={i}>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">
+                            {multiContained ? `Holder #${i + 1}` : 'Holder'}
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={h}
+                              onChange={e => setHolderAt(i, e.target.value)}
+                              className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm"
+                            >
+                              <option value="">— Auto (first active) —</option>
+                              {opts.map(e => (
+                                <option key={e.id} value={String(e.id)}>
+                                  {e.displayName}
+                                  {e.active ? '' : ' (inactive)'}
+                                </option>
+                              ))}
+                            </select>
+                            {i === 0 && fieldStyle('name', 10, 'sans')}
+                            {multiContained && holders.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => removeHolderAt(i)}
+                                className="text-gray-400 hover:text-red-600 text-lg leading-none px-1"
+                                title="Remove this holder"
+                              >
+                                ×
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {emps.length > 1 && (
+                      <label className="flex items-center gap-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={multiContained}
+                          onChange={e => {
+                            const on = e.target.checked
+                            setMultiContained(on)
+                            if (!on) setHolders(prev => [prev[0] || ''])
+                          }}
+                        />
+                        Add more than one of this position
+                      </label>
+                    )}
+                    {canAddMore && (
+                      <button
+                        type="button"
+                        onClick={() => setHolders(prev => [...prev, ''])}
+                        className="text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+                      >
+                        + Add Holder #{holders.length + 1}
+                      </button>
+                    )}
+                  </div>
+                )
+              })()
+            ) : (
+              <div className="mt-2">
+                <label className="block text-xs font-medium text-gray-500 mb-1">Holder</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    readOnly
+                    value={positionId ? holderName : ''}
+                    placeholder="Auto from position"
+                    className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm bg-gray-50 text-gray-600"
+                  />
+                  {fieldStyle('name', 10, 'sans')}
                 </div>
-              )
-            })()}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-2 mt-3">
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Box Width</label>
