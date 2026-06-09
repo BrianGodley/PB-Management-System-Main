@@ -289,6 +289,7 @@ export function ContainerNode({
               x={vx}
               y={vy}
               textAnchor="middle"
+              dominantBaseline="central"
               fill={textColor}
               fontSize={v.size}
               transform={`rotate(-90 ${vx} ${vy})`}
