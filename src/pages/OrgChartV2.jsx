@@ -48,6 +48,10 @@ export default function OrgChartV2() {
   const [zoom, setZoom] = useState(1)
   const [editMode, setEditMode] = useState(false)
   const [contextMenu, setContextMenu] = useState(null)
+  // Undo history: snapshots of {nodes, edges} taken BEFORE each edit, with a
+  // description of the change. Capped at the 5 most recent (newest last).
+  const [history, setHistory] = useState([])
+  const [undoOpen, setUndoOpen] = useState(false)
   // Item-info modal: clicking an item (in either mode) opens a read-only info
   // view. For positions it shows the holder + assigned stats; for areas it
   // shows an expanded view with drill-down into junior items.
@@ -197,6 +201,66 @@ export default function OrgChartV2() {
     } catch (e) {
       alert('Apply failed: ' + (e.message || e))
     }
+  }
+
+  // ── Undo history ────────────────────────────────────────────────────────
+  // Capture the current chart state BEFORE a change, tagged with a description.
+  // Keeps only the 5 most recent snapshots.
+  function pushHistory(desc) {
+    const snapNodes = nodes.map(n => ({ ...n }))
+    const snapEdges = edges.map(e => ({ ...e }))
+    setHistory(h =>
+      [...h, { id: Date.now() + Math.random(), desc, nodes: snapNodes, edges: snapEdges }].slice(-5),
+    )
+  }
+
+  // Restore a snapshot to the database and state: re-add anything deleted, undo
+  // edits/moves, and remove anything added since. Two-pass node upsert avoids
+  // self-referential FK ordering issues (parent_container_id / attached_to).
+  async function applySnapshot(snap) {
+    if (!chartId) return
+    setBusy(true)
+    try {
+      const curNodes = nodes
+      const curEdges = edges
+      if (snap.nodes.length) {
+        const stripped = snap.nodes.map(n => ({
+          ...n,
+          parent_container_id: null,
+          attached_to_node_id: null,
+        }))
+        await supabase.from('org_nodes').upsert(stripped)
+        await supabase.from('org_nodes').upsert(snap.nodes)
+      }
+      if (snap.edges.length) await supabase.from('org_edges').upsert(snap.edges)
+      const snapNodeIds = new Set(snap.nodes.map(n => n.id))
+      const snapEdgeIds = new Set(snap.edges.map(e => e.id))
+      const delEdges = curEdges.filter(e => !snapEdgeIds.has(e.id)).map(e => e.id)
+      const delNodes = curNodes.filter(n => !snapNodeIds.has(n.id)).map(n => n.id)
+      if (delEdges.length) await supabase.from('org_edges').delete().in('id', delEdges)
+      if (delNodes.length) await supabase.from('org_nodes').delete().in('id', delNodes)
+      setNodes(snap.nodes)
+      setEdges(snap.edges)
+    } catch (e) {
+      alert('Undo failed: ' + (e.message || String(e)))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Undo the most recent change (cycle arrow): restore the newest snapshot.
+  async function undoMostRecent() {
+    if (!history.length) return
+    await applySnapshot(history[history.length - 1])
+    setHistory(h => h.slice(0, -1))
+  }
+
+  // Undo a specific listed change: restore that snapshot and drop it + newer.
+  async function undoToIndex(i) {
+    if (i < 0 || i >= history.length) return
+    await applySnapshot(history[i])
+    setHistory(h => h.slice(0, i))
+    if (i === 0) setUndoOpen(false)
   }
 
   // The tiers (rows) currently present, top to bottom, for the spacing panel.
@@ -1029,6 +1093,7 @@ export default function OrgChartV2() {
   // ── Node (Item) mutations ──────────────────────────────────────────
   async function addNode(payload) {
     if (!chartId) return
+    pushHistory(`Add ${payload.kind === 'container' ? 'area' : payload.kind || 'item'}`)
     setBusy(true)
     try {
       // Helper: natural left edge X of a node at (tier, tier_order),
@@ -1172,6 +1237,7 @@ export default function OrgChartV2() {
 
   async function saveNode(payload) {
     if (!payload.id) return
+    pushHistory(`Edit ${payload.label || 'item'}`)
     setBusy(true)
     try {
       const update = {
@@ -1404,6 +1470,8 @@ export default function OrgChartV2() {
   async function deleteSelectedNode() {
     if (!selectedNodeId) return
     if (!confirm('Delete this item? Connected arrows will be removed too.')) return
+    const delNode = nodes.find(n => n.id === selectedNodeId)
+    pushHistory(`Delete ${delNode?.heading?.trim() || delNode?.label || 'item'}`)
     setBusy(true)
     try {
       await supabase
@@ -1450,6 +1518,7 @@ export default function OrgChartV2() {
   async function handleNodeDropped(nodeId, newTier, newTierOrder, newXOffset) {
     const node = nodes.find(n => n.id === nodeId)
     if (!node) return
+    pushHistory(`Move ${node.heading?.trim() || node.label || 'item'}`)
     // Assistants live beside their anchor, not in a tier row — a drag only
     // changes their horizontal offset. Skip the tier-sibling reordering.
     if (node.kind === 'assistant') {
@@ -1943,12 +2012,74 @@ export default function OrgChartV2() {
               </div>
               <button
                 type="button"
-                onClick={() => autoFitChart()}
+                onClick={() => {
+                  pushHistory('Fit text')
+                  autoFitChart()
+                }}
                 title="Resize each row to fit its longest text (areas and positions)"
                 className="text-sm px-3 py-1 rounded-md bg-slate-200 text-slate-700 hover:bg-slate-300 whitespace-nowrap"
               >
                 Fit Text
               </button>
+
+              {/* Undo: opens a list of the last 5 changes. The arrow cycles
+                  down (undo most recent each click); each row can undo directly. */}
+              <div className="relative">
+                <button
+                  type="button"
+                  disabled={!history.length}
+                  onClick={() => setUndoOpen(o => !o)}
+                  title="Undo recent changes"
+                  className={`text-sm px-3 py-1 rounded-md whitespace-nowrap flex items-center gap-1 ${
+                    history.length
+                      ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                      : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                  }`}
+                >
+                  ↶ Undo{history.length ? ` (${history.length})` : ''}
+                </button>
+                {undoOpen && history.length > 0 && (
+                  <div className="absolute z-50 mt-1 right-0 w-72 bg-white rounded-lg shadow-xl border border-slate-200 overflow-hidden">
+                    <div className="flex items-center justify-between px-3 py-2 bg-slate-50 border-b border-slate-100">
+                      <span className="text-xs font-semibold text-slate-600">
+                        Recent changes
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => undoMostRecent()}
+                        title="Undo the most recent change"
+                        className="text-sm px-2 py-0.5 rounded bg-emerald-600 text-white hover:bg-emerald-700"
+                      >
+                        ↶ Undo last
+                      </button>
+                    </div>
+                    <ul className="max-h-64 overflow-y-auto">
+                      {history
+                        .map((h, i) => ({ h, i }))
+                        .reverse()
+                        .map(({ h, i }, displayIdx) => (
+                          <li
+                            key={h.id}
+                            className="flex items-center justify-between gap-2 px-3 py-2 text-sm border-b border-slate-50 last:border-0"
+                          >
+                            <span className="min-w-0 truncate text-slate-700">
+                              <span className="text-slate-400 mr-1">{displayIdx + 1}.</span>
+                              {h.desc}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => undoToIndex(i)}
+                              title="Undo this change (and any after it)"
+                              className="flex-shrink-0 text-xs px-2 py-0.5 rounded bg-slate-200 text-slate-700 hover:bg-slate-300"
+                            >
+                              Undo
+                            </button>
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>

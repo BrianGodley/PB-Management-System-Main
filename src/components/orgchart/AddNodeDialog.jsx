@@ -544,11 +544,15 @@ export default function AddNodeDialog({
                     <option value="">— Pick an area —</option>
                     {areaGroups.map(g => (
                       <optgroup key={g.tier} label={g.label}>
-                        {g.areas.map(a => (
-                          <option key={a.id} value={a.id}>
-                            {a.heading?.trim() || a.label || '(untitled area)'}
-                          </option>
-                        ))}
+                        {g.areas.map(a => {
+                          const title = (a.label || '').trim() // Area Description, e.g. "Dept. 1"
+                          const name = (a.heading || '').trim() // Area Name, e.g. "Communications"
+                          return (
+                            <option key={a.id} value={a.id}>
+                              {title && name ? `${title} — ${name}` : name || title || '(untitled area)'}
+                            </option>
+                          )
+                        })}
                       </optgroup>
                     ))}
                   </select>
