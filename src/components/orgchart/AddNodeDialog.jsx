@@ -353,6 +353,19 @@ export default function AddNodeDialog({
       if (posPlacement === 'contained' && !containedAreaId)
         return alert('Pick an area to contain this position in.')
       const p = positions.find(x => String(x.id) === String(positionId))
+      // Resolve the real id types from the source objects (node ids and
+      // employee ids may not be plain numbers — never coerce with Number()).
+      const containedArea =
+        posPlacement === 'contained' && containedAreaId
+          ? areaOptions.find(a => String(a.id) === String(containedAreaId))
+          : null
+      const empCandidates = employeesByPosition?.get(Number(positionId)) || []
+      const chosenEmpIds =
+        posPlacement === 'contained' && multiContained && selectedEmployeeIds.length
+          ? empCandidates
+              .filter(e => selectedEmployeeIds.includes(String(e.id)))
+              .map(e => e.id)
+          : null
       onSubmit({
         ...base,
         position_id: Number(positionId),
@@ -360,12 +373,8 @@ export default function AddNodeDialog({
         label: p?.title || '',
         width: width || 110,
         height: height || 40,
-        contained_in_area_id:
-          posPlacement === 'contained' && containedAreaId ? Number(containedAreaId) : null,
-        employee_ids:
-          posPlacement === 'contained' && multiContained && selectedEmployeeIds.length
-            ? selectedEmployeeIds.map(Number)
-            : null,
+        contained_in_area_id: containedArea ? containedArea.id : null,
+        employee_ids: chosenEmpIds,
       })
     } else if (kind === 'container') {
       onSubmit({

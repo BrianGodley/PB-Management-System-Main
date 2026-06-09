@@ -250,8 +250,16 @@ function containedFor(areaNode, nodes, resolveNodeHolder) {
 
 function AreaView({ node, nodes, resolveNodeHolder, onDrill }) {
   // Junior AREAS render as columns below; contained POSITIONS render inside.
+  // Order juniors left→right by tier_order (same as the chart), not DB order.
   const children = (nodes || []).filter(n => n.parent_container_id === node.id)
-  const juniors = children.filter(n => n.kind === 'container')
+  const juniors = children
+    .filter(n => n.kind === 'container')
+    .sort((a, b) => {
+      const ao = Number.isInteger(a.tier_order) ? a.tier_order : 0
+      const bo = Number.isInteger(b.tier_order) ? b.tier_order : 0
+      if (ao !== bo) return ao - bo
+      return String(a.id).localeCompare(String(b.id))
+    })
   const contained = containedFor(node, nodes, resolveNodeHolder)
 
   const PAD = 24
