@@ -870,6 +870,19 @@ export default function AddNodeDialog({
                 )}
                 {juniorPositions.map((jp, i) => {
                   const jEmps = employeesByPosition?.get(Number(jp.positionId)) || []
+                  // Employees already assigned to OTHER junior rows of the same
+                  // position are removed from this row's available pool.
+                  const takenForPos = new Set(
+                    juniorPositions
+                      .filter(
+                        (x, j) =>
+                          j !== i &&
+                          String(x.positionId) === String(jp.positionId) &&
+                          x.holderId,
+                      )
+                      .map(x => String(x.holderId)),
+                  )
+                  const availEmps = jEmps.filter(em => !takenForPos.has(String(em.id)))
                   return (
                     <div key={i} className="flex items-center gap-1 mb-1">
                       <select
@@ -901,7 +914,7 @@ export default function AddNodeDialog({
                         className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1 text-sm disabled:bg-gray-50"
                       >
                         <option value="">Auto</option>
-                        {jEmps.map(em => (
+                        {availEmps.map(em => (
                           <option key={em.id} value={String(em.id)}>
                             {em.displayName}
                           </option>
