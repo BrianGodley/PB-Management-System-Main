@@ -74,6 +74,32 @@ export default function AddNodeDialog({
   // inside that area's box). "Contained" = the position's parent_container_id
   // points to the chosen area.
   const areaOptions = (allItems || []).filter(n => n.kind === 'container')
+  // Group the picker by row (tier). Each group is headed by the common first
+  // word of that row's Area Descriptions (e.g. "Divisions", "Depts"), or the
+  // level number when the row's areas don't share a common title.
+  const areaGroups = (() => {
+    const byTier = new Map()
+    for (const a of areaOptions) {
+      const t = Number.isInteger(a.tier) ? a.tier : 0
+      if (!byTier.has(t)) byTier.set(t, [])
+      byTier.get(t).push(a)
+    }
+    const groupLabel = (areas, tier) => {
+      const words = areas
+        .map(a => (a.label || '').trim().split(/\s+/)[0].replace(/[^A-Za-z]/g, ''))
+        .filter(Boolean)
+      const same = words.length && words.every(w => w.toLowerCase() === words[0].toLowerCase())
+      if (same) {
+        let w = words[0].charAt(0).toUpperCase() + words[0].slice(1)
+        if (!/s$/i.test(w)) w += 's'
+        return `${w} (Level ${tier + 1})`
+      }
+      return `Level ${tier + 1}`
+    }
+    return [...byTier.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([tier, areas]) => ({ tier, label: groupLabel(areas, tier), areas }))
+  })()
   const [posPlacement, setPosPlacement] = useState(
     isEdit && existing.parent_container_id ? 'contained' : 'independent',
   )
@@ -516,10 +542,14 @@ export default function AddNodeDialog({
                     className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
                   >
                     <option value="">— Pick an area —</option>
-                    {areaOptions.map(a => (
-                      <option key={a.id} value={a.id}>
-                        {a.heading?.trim() || a.label || '(untitled area)'}
-                      </option>
+                    {areaGroups.map(g => (
+                      <optgroup key={g.tier} label={g.label}>
+                        {g.areas.map(a => (
+                          <option key={a.id} value={a.id}>
+                            {a.heading?.trim() || a.label || '(untitled area)'}
+                          </option>
+                        ))}
+                      </optgroup>
                     ))}
                   </select>
                   <p className="mt-1 text-[11px] leading-snug text-gray-400">
