@@ -168,7 +168,7 @@ function PositionView({ node, resolveNodeHolder }) {
 
 // Render a single org-chart node (area / position / assistant) into SVG at the
 // given box, exactly as it appears on the chart — but with horizontal text.
-function ChartNode({ node, box, resolveNodeHolder, onClick }) {
+function ChartNode({ node, box, resolveNodeHolder, onClick, containedPositions = [] }) {
   const n = horizontalize(node)
   const ph = (resolveNodeHolder ? resolveNodeHolder(n) : null) || {}
   if (n.kind === 'container') {
@@ -180,6 +180,8 @@ function ChartNode({ node, box, resolveNodeHolder, onClick }) {
         onClick={onClick}
         positionTitle={ph.positionTitle}
         displayName={ph.displayName}
+        titleSpacing={12}
+        containedPositions={containedPositions}
       />
     )
   }
@@ -235,8 +237,22 @@ function neededWidth(node, resolveNodeHolder) {
 // horizontal text fits on one line (no wrap / no truncation), and the whole
 // thing is rendered at a comfortable scale (scrolling if it's very wide).
 // Clicking a junior drills into it.
+// Positions "contained in" an area (rendered inside its box), resolved to
+// { title, name } for display.
+function containedFor(areaNode, nodes, resolveNodeHolder) {
+  return (nodes || [])
+    .filter(n => n.parent_container_id === areaNode.id && n.kind === 'position')
+    .map(n => {
+      const ph = (resolveNodeHolder ? resolveNodeHolder(n) : null) || {}
+      return { title: ph.positionTitle || n.label || '', name: ph.displayName || '' }
+    })
+}
+
 function AreaView({ node, nodes, resolveNodeHolder, onDrill }) {
-  const juniors = (nodes || []).filter(n => n.parent_container_id === node.id)
+  // Junior AREAS render as columns below; contained POSITIONS render inside.
+  const children = (nodes || []).filter(n => n.parent_container_id === node.id)
+  const juniors = children.filter(n => n.kind === 'container')
+  const contained = containedFor(node, nodes, resolveNodeHolder)
 
   const PAD = 24
 
@@ -256,7 +272,11 @@ function AreaView({ node, nodes, resolveNodeHolder, onDrill }) {
     areaW = uniformJuniorW * juniors.length
   }
 
-  const areaH = Math.max(node.height || 90, 70)
+  // Give the main area box extra height: the expanded view adds breathing room
+  // between the two titles, and we want the in-charge line to stay clear of them.
+  const bothTitles = !!(node.label || '').trim() && !!(node.heading || '').trim()
+  const containedH = contained.length ? contained.length * 18 + 16 : 0
+  const areaH = Math.max(node.height || 90, 90) + (bothTitles ? 18 : 0) + containedH
   const areaX = PAD
   const areaY = PAD
 
@@ -294,6 +314,7 @@ function AreaView({ node, nodes, resolveNodeHolder, onDrill }) {
           box={{ x: areaX, y: areaY, width: areaW, height: areaH }}
           resolveNodeHolder={resolveNodeHolder}
           onClick={() => {}}
+          containedPositions={contained}
         />
         {juniorBoxes.map(jb => (
           <g key={jb.node.id} style={{ cursor: 'pointer' }} onClick={() => onDrill(jb.node)}>
@@ -302,6 +323,7 @@ function AreaView({ node, nodes, resolveNodeHolder, onDrill }) {
               box={jb.box}
               resolveNodeHolder={resolveNodeHolder}
               onClick={() => onDrill(jb.node)}
+              containedPositions={containedFor(jb.node, nodes, resolveNodeHolder)}
             />
           </g>
         ))}

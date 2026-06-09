@@ -1055,7 +1055,16 @@ export default function OrgChartV2() {
       let x_offset = 0
       let centerUnder = null // existing node whose center we want to align with
       const newWidth = payload.width || 110
-      if (payload.parentId) {
+      if (payload.contained_in_area_id) {
+        // A position "contained in" an area: it lives inside that area's box
+        // (rendered by ContainerNode), so it gets no separate row/edge.
+        const area = nodes.find(n => n.id === payload.contained_in_area_id)
+        parent_container_id = payload.contained_in_area_id
+        tier = (area?.tier ?? 0) + 1
+        tier_order = nodes
+          .filter(n => n.parent_container_id === payload.contained_in_area_id)
+          .reduce((max, n) => Math.max(max, (n.tier_order ?? 0) + 1), 0)
+      } else if (payload.parentId) {
         const parent = nodes.find(n => n.id === payload.parentId)
         if (parent) {
           // "Attach directly" under an Area: the new item becomes a sub-item
@@ -1180,10 +1189,21 @@ export default function OrgChartV2() {
         font_sizes: payload.font_sizes || {},
         text_styles: payload.text_styles || {},
       }
+      // Position placement: independent (top-level) vs contained in an area.
+      // Contained positions live inside the area box; their tier follows the
+      // area, and the explicit-Level move below is skipped for them.
+      const isContained = payload.kind === 'position' && !!payload.contained_in_area_id
+      if (payload.kind === 'position') {
+        update.parent_container_id = payload.contained_in_area_id || null
+        if (isContained) {
+          const area = nodes.find(n => n.id === payload.contained_in_area_id)
+          update.tier = (area?.tier ?? 0) + 1
+        }
+      }
       // Apply an explicit Level change. When the level actually changes,
       // move the item to the far-right of the new level and reset its
       // horizontal nudge so it lands cleanly in that row.
-      if (Number.isInteger(payload.tier)) {
+      if (Number.isInteger(payload.tier) && !isContained) {
         update.tier = payload.tier
         const current = nodes.find(n => n.id === payload.id)
         if ((current?.tier ?? 0) !== payload.tier) {

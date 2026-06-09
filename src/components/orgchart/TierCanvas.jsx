@@ -277,6 +277,12 @@ export default function TierCanvas({
           }
           if (n.kind === 'container') {
             const ph = resolveNodeHolder ? resolveNodeHolder(n) : null
+            const contained = nodes
+              .filter(x => x.parent_container_id === n.id && x.kind === 'position')
+              .map(x => {
+                const xh = (resolveNodeHolder ? resolveNodeHolder(x) : null) || {}
+                return { title: xh.positionTitle || x.label || '', name: xh.displayName || '' }
+              })
             return (
               <g key={n.id} data-node-id={n.id} style={wrapStyle} onMouseDown={onMouseDown} onDoubleClick={() => editable && onNodeDoubleClick && onNodeDoubleClick(n.id)}>
                 <ContainerNode
@@ -286,6 +292,7 @@ export default function TierCanvas({
                   onClick={onClick}
                   positionTitle={ph?.positionTitle}
                   displayName={ph?.displayName}
+                  containedPositions={contained}
                 />
                 {renderEditIcon(box, n.id)}
               </g>

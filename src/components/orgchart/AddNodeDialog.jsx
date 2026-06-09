@@ -70,6 +70,17 @@ export default function AddNodeDialog({
     isEdit && existing.employee_id ? String(existing.employee_id) : '',
   )
 
+  // A Position is either Independent (top-level) or Contained in an Area (drawn
+  // inside that area's box). "Contained" = the position's parent_container_id
+  // points to the chosen area.
+  const areaOptions = (allItems || []).filter(n => n.kind === 'container')
+  const [posPlacement, setPosPlacement] = useState(
+    isEdit && existing.parent_container_id ? 'contained' : 'independent',
+  )
+  const [containedAreaId, setContainedAreaId] = useState(
+    isEdit && existing.parent_container_id ? String(existing.parent_container_id) : '',
+  )
+
   const [heading, setHeading] = useState(isEdit ? existing.heading || '' : '')
   // A new junior area inherits its parent (senior) area's color by default.
   const parentArea =
@@ -298,6 +309,8 @@ export default function AddNodeDialog({
     }
     if (kind === 'position') {
       if (!positionId) return alert('Pick a position.')
+      if (posPlacement === 'contained' && !containedAreaId)
+        return alert('Pick an area to contain this position in.')
       const p = positions.find(x => String(x.id) === String(positionId))
       onSubmit({
         ...base,
@@ -306,6 +319,8 @@ export default function AddNodeDialog({
         label: p?.title || '',
         width: width || 110,
         height: height || 40,
+        contained_in_area_id:
+          posPlacement === 'contained' && containedAreaId ? Number(containedAreaId) : null,
       })
     } else if (kind === 'container') {
       onSubmit({
@@ -468,6 +483,51 @@ export default function AddNodeDialog({
 
         {kind === 'position' && (
           <div>
+            {/* Independent vs Contained-in-Area placement. */}
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-500 mb-1">Placement</label>
+              <div className="flex gap-2">
+                {[
+                  { v: 'independent', label: 'Independent Position' },
+                  { v: 'contained', label: 'Contained in Area' },
+                ].map(opt => (
+                  <button
+                    key={opt.v}
+                    type="button"
+                    onClick={() => setPosPlacement(opt.v)}
+                    className={`flex-1 px-3 py-1.5 rounded-md text-sm border ${
+                      posPlacement === opt.v
+                        ? 'border-emerald-600 bg-emerald-50 text-emerald-800 font-medium'
+                        : 'border-gray-300 text-gray-600'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              {posPlacement === 'contained' && (
+                <div className="mt-2">
+                  <label className="block text-xs font-medium text-gray-500 mb-1">
+                    Area to contain this position in
+                  </label>
+                  <select
+                    value={containedAreaId}
+                    onChange={e => setContainedAreaId(e.target.value)}
+                    className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
+                  >
+                    <option value="">— Pick an area —</option>
+                    {areaOptions.map(a => (
+                      <option key={a.id} value={a.id}>
+                        {a.heading?.trim() || a.label || '(untitled area)'}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-[11px] leading-snug text-gray-400">
+                    The position will appear inside the selected area's box.
+                  </p>
+                </div>
+              )}
+            </div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Position</label>
             <div className="flex items-center gap-2">
               <select

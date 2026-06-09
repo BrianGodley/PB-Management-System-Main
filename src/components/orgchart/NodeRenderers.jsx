@@ -178,6 +178,8 @@ export function ContainerNode({
   onClick,
   positionTitle,
   displayName,
+  titleSpacing = 0,
+  containedPositions = [],
 }) {
   // Fill style: 'solid' = colored fill, 'border' (default) = white fill with
   // a colored border of the chosen thickness. "No color" = black outline.
@@ -246,13 +248,16 @@ export function ContainerNode({
         const els = []
         if (hTitles.length) {
           const wrapped = hTitles.map(h => ({ ...h, lines: wrapLabel(h.text, fit(h.size)) }))
-          const blockH = wrapped.reduce((s, h) => s + h.lines.length * (h.size + 2), 0)
+          const blockH =
+            wrapped.reduce((s, h) => s + h.lines.length * (h.size + 2), 0) +
+            titleSpacing * Math.max(0, wrapped.length - 1)
           let y =
             vTitles.length > 0 || hTitles.length > 1
               ? box.y + 12 + wrapped[0].size
               : labelY - blockH / 2 + wrapped[0].size
           const rows = []
-          wrapped.forEach(h => {
+          wrapped.forEach((h, hi) => {
+            if (hi > 0) y += titleSpacing // breathing room between the two titles
             h.lines.forEach((ln, i) => {
               rows.push({ ln, y, h, key: `${h.field}-${i}-${Math.round(y)}` })
               y += h.size + 2
@@ -321,6 +326,40 @@ export function ContainerNode({
           </text>
         </>
       )}
+      {/* Positions "contained in" this area render INSIDE the box as a stacked
+          list, clipped to the box so they never spill out. */}
+      {containedPositions.length > 0 && (() => {
+        const clipId = `contain-${node.id}`
+        const cpSize = Math.max(8, Math.min(13, fs.title || 11))
+        const lineH = cpSize + 6
+        // Start below the title/in-charge block; fall back to upper third.
+        const startY =
+          (hasPosition ? box.y + box.height / 2 + 30 + posShift : box.y + box.height / 2) +
+          cpSize
+        return (
+          <g>
+            <clipPath id={clipId}>
+              <rect x={box.x + 2} y={box.y + 2} width={box.width - 4} height={box.height - 4} rx={9} />
+            </clipPath>
+            <g clipPath={`url(#${clipId})`}>
+              {containedPositions.map((cp, i) => (
+                <text
+                  key={i}
+                  x={cx}
+                  y={startY + i * lineH}
+                  textAnchor="middle"
+                  fill={textColor}
+                  opacity={0.92}
+                  fontSize={cpSize}
+                  {...styleFor(node, 'title', { family: 'sans' })}
+                >
+                  {cp.name ? `${cp.title} — ${cp.name}` : cp.title}
+                </text>
+              ))}
+            </g>
+          </g>
+        )
+      })()}
       <text
         x={box.x + box.width - 6}
         y={box.y + box.height - 5}
