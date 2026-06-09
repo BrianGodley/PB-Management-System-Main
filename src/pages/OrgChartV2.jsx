@@ -1097,6 +1097,44 @@ export default function OrgChartV2() {
     pushHistory(`Add ${payload.kind === 'container' ? 'area' : payload.kind || 'item'}`)
     setBusy(true)
     try {
+      // Junior-position mode: create one or more junior positions under an
+      // existing standard contained position (no main box of its own).
+      if (payload.juniorMode) {
+        const area = nodes.find(n => n.id === payload.contained_in_area_id)
+        const baseTier = (area?.tier ?? 0) + 1
+        let ord = nodes
+          .filter(n => n.senior_node_id === payload.senior_node_id)
+          .reduce((max, n) => Math.max(max, (n.tier_order ?? 0) + 1), 0)
+        const rows = payload.juniors.map((jp, k) => ({
+          chart_id: chartId,
+          kind: 'position',
+          label: '',
+          position_id: jp.position_id,
+          employee_id: jp.employee_id || null,
+          heading: null,
+          bg_color: null,
+          box_style: {},
+          container_mode: null,
+          parent_container_id: payload.contained_in_area_id,
+          senior_node_id: payload.senior_node_id,
+          attached_to_node_id: null,
+          attachment_side: null,
+          width: 110,
+          height: 40,
+          font_sizes: payload.font_sizes || {},
+          text_styles: payload.text_styles || {},
+          x_offset: 0,
+          x: 0,
+          y: 0,
+          tier: baseTier,
+          tier_order: ord + k,
+        }))
+        const { data, error } = await supabase.from('org_nodes').insert(rows).select()
+        if (error) throw error
+        setNodes(prev => [...prev, ...(data || [])])
+        setDialog(null)
+        return
+      }
       // Helper: natural left edge X of a node at (tier, tier_order),
       // ignoring its own x_offset. Sums prev siblings' widths + gaps.
       const naturalXAt = (tierNum, tierOrderNum) => {

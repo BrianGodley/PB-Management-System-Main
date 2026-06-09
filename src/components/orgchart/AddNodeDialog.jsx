@@ -126,6 +126,10 @@ export default function AddNodeDialog({
   )
   // Junior positions for a contained position: each { positionId, holderId }.
   const [juniorPositions, setJuniorPositions] = useState([])
+  // A contained position is either a Standard position (lives in the area) or a
+  // Junior position (sits under a chosen standard position in that area).
+  const [containedKind, setContainedKind] = useState('standard')
+  const [seniorStandardId, setSeniorStandardId] = useState('')
 
   const [heading, setHeading] = useState(isEdit ? existing.heading || '' : '')
   // A new junior area inherits its parent (senior) area's color by default.
@@ -354,27 +358,52 @@ export default function AddNodeDialog({
       text_styles: textStyles,
     }
     if (kind === 'position') {
+      const resolveEmp = (posId, hid) => {
+        if (!hid) return null
+        const e = (employeesByPosition?.get(Number(posId)) || []).find(
+          x => String(x.id) === String(hid),
+        )
+        return e ? e.id : null
+      }
+      // ── Junior mode: add one or more junior positions under a standard one ──
+      if (isJuniorMode) {
+        if (!containedAreaId) return alert('Pick an area.')
+        if (!seniorStandardId)
+          return alert('Pick the standard position to contain these under.')
+        const juniors = juniorPositions
+          .filter(j => j.positionId)
+          .map(j => ({
+            position_id: Number(j.positionId),
+            employee_id: resolveEmp(j.positionId, j.holderId),
+          }))
+        if (!juniors.length) return alert('Add at least one junior position.')
+        const containedArea = areaOptions.find(a => String(a.id) === String(containedAreaId))
+        const seniorNode = standardPositionsInArea.find(
+          n => String(n.id) === String(seniorStandardId),
+        )
+        onSubmit({
+          ...base,
+          juniorMode: true,
+          contained_in_area_id: containedArea ? containedArea.id : null,
+          senior_node_id: seniorNode ? seniorNode.id : null,
+          juniors,
+        })
+        return
+      }
+      // ── Standard / independent position ──
       if (!positionId) return alert('Pick a position.')
       if (posPlacement === 'contained' && !containedAreaId)
         return alert('Pick an area to contain this position in.')
       const p = positions.find(x => String(x.id) === String(positionId))
-      // Resolve the real id types from the source objects (node ids and
-      // employee ids may not be plain numbers — never coerce with Number()).
       const containedArea =
         posPlacement === 'contained' && containedAreaId
           ? areaOptions.find(a => String(a.id) === String(containedAreaId))
           : null
-      const empCandidates = employeesByPosition?.get(Number(positionId)) || []
-      const rawEmpId = hid => {
-        if (!hid) return null
-        const e = empCandidates.find(x => String(x.id) === String(hid))
-        return e ? e.id : null
-      }
       // Contained holders: one or many. Multi → one box per chosen holder.
       let posEmployeeId = employeeId || null
       let posEmployeeIds = null
       if (posPlacement === 'contained') {
-        const chosen = holders.map(rawEmpId).filter(v => v != null)
+        const chosen = holders.map(h => resolveEmp(positionId, h)).filter(v => v != null)
         if (multiContained) {
           posEmployeeIds = chosen.length ? chosen : null
           posEmployeeId = null
@@ -382,17 +411,6 @@ export default function AddNodeDialog({
           posEmployeeId = chosen[0] ?? null
         }
       }
-      // Junior positions (only meaningful for contained positions).
-      const juniors =
-        posPlacement === 'contained'
-          ? juniorPositions
-              .filter(j => j.positionId)
-              .map(j => {
-                const jEmps = employeesByPosition?.get(Number(j.positionId)) || []
-                const emp = jEmps.find(e => String(e.id) === String(j.holderId))
-                return { position_id: Number(j.positionId), employee_id: emp ? emp.id : null }
-              })
-          : []
       onSubmit({
         ...base,
         position_id: Number(positionId),
@@ -402,7 +420,6 @@ export default function AddNodeDialog({
         height: height || 40,
         contained_in_area_id: containedArea ? containedArea.id : null,
         employee_ids: posEmployeeIds,
-        juniors: juniors.length ? juniors : null,
       })
     } else if (kind === 'container') {
       onSubmit({
@@ -507,6 +524,25 @@ export default function AddNodeDialog({
     )
   })()
 
+  // Standard positions already in the chosen area (a junior position is nested
+  // under one of these). Labelled by their title + holder.
+  const standardPositionsInArea = (allItems || []).filter(
+    n =>
+      n.kind === 'position' &&
+      String(n.parent_container_id) === String(containedAreaId) &&
+      !n.senior_node_id,
+  )
+  const posNodeLabel = n => {
+    const t =
+      positions.find(p => String(p.id) === String(n.position_id))?.title || n.label || 'Position'
+    const emps = employeesByPosition?.get(Number(n.position_id)) || []
+    const emp = emps.find(e => String(e.id) === String(n.employee_id))
+    return emp ? `${t} — ${emp.displayName}` : t
+  }
+  // Junior mode: the form collects junior positions under a standard position
+  // instead of a single standard position with its own holder.
+  const isJuniorMode = posPlacement === 'contained' && containedKind === 'junior'
+
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-5 max-h-[90vh] overflow-y-auto">
@@ -541,27 +577,31 @@ export default function AddNodeDialog({
           </div>
         )}
 
-        {(kind === 'position' || kind === 'container') && (
-          <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-snug text-amber-700">
-            Note: changes to fonts (size, family, bold/italic, and vertical/horizontal
-            orientation), border thickness, and box height and width apply to the whole
-            level — every item on the same row is made to match.
+        {(kind === 'position' || kind === 'container') &&
+          !(kind === 'position' && posPlacement === 'contained') && (
+            <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-snug text-amber-700">
+              Note: changes to fonts (size, family, bold/italic, and vertical/horizontal
+              orientation), border thickness, and box height and width apply to the whole
+              level — every item on the same row is made to match.
+            </div>
+          )}
+
+        {/* Level doesn't apply to a contained position (it lives inside an area). */}
+        {!(kind === 'position' && posPlacement === 'contained') && (
+          <div className="mb-3">
+            <label className="block text-xs font-medium text-gray-500 mb-1">Level (row)</label>
+            <input
+              type="number"
+              min={1}
+              value={tier + 1}
+              onChange={e => setTier(Math.max(0, (Number(e.target.value) || 1) - 1))}
+              className="no-spin w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
+            />
+            <p className="mt-1 text-[11px] leading-snug text-gray-400">
+              Level 1 is the top row. Items can only be dragged left and right — change the level here to move an item up or down.
+            </p>
           </div>
         )}
-
-        <div className="mb-3">
-          <label className="block text-xs font-medium text-gray-500 mb-1">Level (row)</label>
-          <input
-            type="number"
-            min={1}
-            value={tier + 1}
-            onChange={e => setTier(Math.max(0, (Number(e.target.value) || 1) - 1))}
-            className="no-spin w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
-          />
-          <p className="mt-1 text-[11px] leading-snug text-gray-400">
-            Level 1 is the top row. Items can only be dragged left and right — change the level here to move an item up or down.
-          </p>
-        </div>
 
         {kind === 'position' && (
           <div>
@@ -588,69 +628,130 @@ export default function AddNodeDialog({
                 ))}
               </div>
               {posPlacement === 'contained' && (
-                <div className="mt-2">
-                  <label className="block text-xs font-medium text-gray-500 mb-1">
-                    Area to contain this position in
-                  </label>
-                  <select
-                    value={containedAreaId}
-                    onChange={e => setContainedAreaId(e.target.value)}
-                    className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
-                  >
-                    <option value="">— Pick an area —</option>
-                    {areaGroups.map(g => (
-                      <optgroup key={g.tier} label={g.label}>
-                        {g.areas.map(a => {
-                          const title = (a.label || '').trim() // Area Description, e.g. "Dept. 1"
-                          const name = (a.heading || '').trim() // Area Name, e.g. "Communications"
-                          return (
-                            <option key={a.id} value={a.id}>
-                              {title && name ? `${title} — ${name}` : name || title || '(untitled area)'}
-                            </option>
-                          )
-                        })}
-                      </optgroup>
-                    ))}
-                  </select>
-                  <p className="mt-1 text-[11px] leading-snug text-gray-400">
-                    The position will appear inside the selected area's box.
-                  </p>
-                </div>
+                <>
+                  <div className="mt-2">
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      Area to contain this position in
+                    </label>
+                    <select
+                      value={containedAreaId}
+                      onChange={e => {
+                        setContainedAreaId(e.target.value)
+                        setSeniorStandardId('')
+                      }}
+                      className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
+                    >
+                      <option value="">— Pick an area —</option>
+                      {areaGroups.map(g => (
+                        <optgroup key={g.tier} label={g.label}>
+                          {g.areas.map(a => {
+                            const title = (a.label || '').trim() // Area Description, e.g. "Dept. 1"
+                            const name = (a.heading || '').trim() // Area Name, e.g. "Communications"
+                            return (
+                              <option key={a.id} value={a.id}>
+                                {title && name ? `${title} — ${name}` : name || title || '(untitled area)'}
+                              </option>
+                            )
+                          })}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </div>
+                  {containedAreaId && (
+                    <div className="mt-2">
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Position type
+                      </label>
+                      <div className="flex gap-2">
+                        {[
+                          { v: 'standard', label: 'Standard Position' },
+                          { v: 'junior', label: 'Junior Position' },
+                        ].map(opt => (
+                          <button
+                            key={opt.v}
+                            type="button"
+                            onClick={() => setContainedKind(opt.v)}
+                            className={`flex-1 px-3 py-1.5 rounded-md text-sm border ${
+                              containedKind === opt.v
+                                ? 'border-emerald-600 bg-emerald-50 text-emerald-800 font-medium'
+                                : 'border-gray-300 text-gray-600'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="mt-1 text-[11px] leading-snug text-gray-400">
+                        <b>Standard</b> sits directly in the area.{' '}
+                        <b>Junior</b> sits under a standard position you pick, indented beneath it
+                        in the expanded view.
+                      </p>
+                      {containedKind === 'junior' && (
+                        <div className="mt-2">
+                          <label className="block text-xs font-medium text-gray-500 mb-1">
+                            Standard position to contain these under
+                          </label>
+                          <select
+                            value={seniorStandardId}
+                            onChange={e => setSeniorStandardId(e.target.value)}
+                            className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm"
+                          >
+                            <option value="">— Pick a standard position —</option>
+                            {standardPositionsInArea.map(n => (
+                              <option key={n.id} value={n.id}>
+                                {posNodeLabel(n)}
+                              </option>
+                            ))}
+                          </select>
+                          {standardPositionsInArea.length === 0 && (
+                            <p className="mt-1 text-[11px] text-amber-600">
+                              This area has no standard positions yet — add one first.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Position</label>
-            <div className="flex items-center gap-2">
-              <select
-                value={positionId}
-                onChange={e => {
-                  setPositionId(e.target.value)
-                  setEmployeeId('')
-                  setHolders([''])
-                  setMultiContained(false)
-                }}
-                className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm"
-              >
-                <option value="">— Pick a position —</option>
-                {positions.map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.title}
-                  </option>
-                ))}
-              </select>
-              {fieldStyle('title', 12, 'palatino')}
-            </div>
-            <p className="text-[11px] text-gray-500 mt-2">
-              Don't see the position you need?{' '}
-              <a
-                href="/hr?addPosition=1"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 font-medium hover:underline"
-              >
-                Add It In the HR Module
-              </a>
-            </p>
-            {posPlacement === 'contained' ? (
+            {!isJuniorMode && (
+              <>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Position</label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={positionId}
+                    onChange={e => {
+                      setPositionId(e.target.value)
+                      setEmployeeId('')
+                      setHolders([''])
+                      setMultiContained(false)
+                    }}
+                    className="flex-1 min-w-0 border border-gray-300 rounded-md px-2 py-1.5 text-sm"
+                  >
+                    <option value="">— Pick a position —</option>
+                    {positions.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.title}
+                      </option>
+                    ))}
+                  </select>
+                  {fieldStyle('title', 12, 'palatino')}
+                </div>
+                <p className="text-[11px] text-gray-500 mt-2">
+                  Don't see the position you need?{' '}
+                  <a
+                    href="/hr?addPosition=1"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 font-medium hover:underline"
+                  >
+                    Add It In the HR Module
+                  </a>
+                </p>
+              </>
+            )}
+            {isJuniorMode ? null : posPlacement === 'contained' ? (
               (() => {
                 const emps = employeesByPosition?.get(Number(positionId)) || []
                 if (!positionId) {
@@ -755,16 +856,16 @@ export default function AddNodeDialog({
                 </div>
               </div>
             )}
-            {/* Junior positions that report to this contained position. */}
-            {posPlacement === 'contained' && positionId && (
+            {/* Junior positions that sit under the chosen standard position. */}
+            {isJuniorMode && seniorStandardId && (
               <div className="mt-3 border-t border-gray-200 pt-2">
                 <label className="block text-xs font-medium text-gray-500 mb-1">
-                  Junior positions (optional)
+                  Junior positions
                 </label>
                 {juniorPositions.length === 0 && (
                   <p className="text-[11px] text-gray-400 mb-1">
-                    Add one or more positions that report to this one — they show
-                    indented under it in the expanded view.
+                    Add one or more positions to sit under the standard position — they
+                    show indented beneath it in the expanded view.
                   </p>
                 )}
                 {juniorPositions.map((jp, i) => {
