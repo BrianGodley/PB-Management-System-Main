@@ -182,6 +182,7 @@ function ChartNode({ node, box, resolveNodeHolder, onClick, containedPositions =
         displayName={ph.displayName}
         titleSpacing={12}
         containedPositions={containedPositions}
+        topAnchored
       />
     )
   }
@@ -273,10 +274,9 @@ function AreaView({ node, nodes, resolveNodeHolder, onDrill }) {
       (m, cp) => Math.max(m, textWidth(cp.name ? `${cp.title} — ${cp.name}` : cp.title, 11)),
       0,
     )
-  // Extra height to fit a contained-position list. The list sits below the
-  // center-anchored in-charge line, so the box must be tall enough that
-  // center + offset + N rows clears the bottom edge (~36px per row).
-  const containedHeight = n => (n ? 36 * n + 24 : 0)
+  // Extra height to fit a contained-position list (stacked under the top-
+  // anchored in-charge), ~24px per row plus a little padding.
+  const containedHeight = n => (n ? 24 * n + 24 : 0)
 
   // Every attached junior gets the SAME width — the width of the junior whose
   // text is longest (so none wrap), now also accounting for contained positions.

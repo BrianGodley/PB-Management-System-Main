@@ -180,6 +180,7 @@ export function ContainerNode({
   displayName,
   titleSpacing = 0,
   containedPositions = [],
+  topAnchored = false,
 }) {
   // Fill style: 'solid' = colored fill, 'border' (default) = white fill with
   // a colored border of the chosen thickness. "No color" = black outline.
@@ -209,6 +210,18 @@ export function ContainerNode({
   const labelY = hasPosition ? box.y + box.height / 2 - 12 : box.y + box.height / 2 + 3
   // A little breathing room below a second title before the position info.
   const posShift = (node.heading || '').trim() ? 8 : 0
+  // In the expanded view boxes are tall, so the in-charge is anchored just below
+  // the area titles (top) instead of being vertically centered in the box.
+  const szL = fs.label || 12
+  const szH = fs.heading || 14
+  const titleStackH =
+    12 +
+    ((node.label || '').trim() ? szL + titleSpacing : 0) +
+    ((node.heading || '').trim() ? szH + titleSpacing + 4 : 0)
+  const headTitleY = topAnchored
+    ? box.y + titleStackH + 8
+    : box.y + box.height / 2 + 6 + posShift
+  const headNameY = topAnchored ? headTitleY + (fs.title || 10) + 4 : box.y + box.height / 2 + 18 + posShift
   return (
     <g onClick={onClick} style={{ cursor: 'pointer' }}>
       <SelectOutline x={box.x} y={box.y} w={box.width} h={box.height} selected={selected} />
@@ -305,7 +318,7 @@ export function ContainerNode({
         <>
           <text
             x={cx}
-            y={box.y + box.height / 2 + 6 + posShift}
+            y={headTitleY}
             textAnchor="middle"
             fill={textColor}
             opacity={0.9}
@@ -316,7 +329,7 @@ export function ContainerNode({
           </text>
           <text
             x={cx}
-            y={box.y + box.height / 2 + 18 + posShift}
+            y={headNameY}
             textAnchor="middle"
             fill={textColor}
             opacity={0.75}
@@ -332,8 +345,9 @@ export function ContainerNode({
       {containedPositions.length > 0 && (() => {
         const cpSize = Math.max(8, Math.min(13, fs.title || 11))
         const lineH = cpSize + 6
-        const startY =
-          (hasPosition ? box.y + box.height / 2 + 30 + posShift : box.y + box.height / 2) + cpSize
+        const startY = topAnchored
+          ? (hasPosition ? headNameY + cpSize + 10 : box.y + titleStackH + 16 + cpSize)
+          : (hasPosition ? box.y + box.height / 2 + 30 + posShift : box.y + box.height / 2) + cpSize
         const avail = box.width - 8
         const limit = box.y + box.height - cpSize - 2
         // Same rule as the area head: only show a holder line if it fits the box
