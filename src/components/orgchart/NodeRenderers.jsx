@@ -384,16 +384,6 @@ export function ContainerNode({
           </g>
         )
       })()}
-      <text
-        x={box.x + box.width - 6}
-        y={box.y + box.height - 5}
-        textAnchor="end"
-        fill={textColor}
-        opacity={0.5}
-        fontSize="6"
-      >
-        {node.container_mode === 'implicit' ? '◰' : '◱'}
-      </text>
     </g>
   )
 }
