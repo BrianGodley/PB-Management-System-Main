@@ -1208,6 +1208,23 @@ export default function OrgChartV2() {
         tier,
         tier_order,
       }
+      // Multiple employees in one contained position: create one box per chosen
+      // employee (same position, different holder), then we're done.
+      if (Array.isArray(payload.employee_ids) && payload.employee_ids.length) {
+        const rows = payload.employee_ids.map((empId, i) => ({
+          ...insert,
+          employee_id: empId,
+          tier_order: tier_order + i,
+        }))
+        const { data: many, error: manyErr } = await supabase
+          .from('org_nodes')
+          .insert(rows)
+          .select()
+        if (manyErr) throw manyErr
+        setNodes(prev => [...prev, ...(many || [])])
+        setDialog(null)
+        return
+      }
       const { data, error } = await supabase.from('org_nodes').insert(insert).select().single()
       if (error) throw error
       setNodes(prev => [...prev, data])

@@ -117,6 +117,10 @@ export default function AddNodeDialog({
   const [containedAreaId, setContainedAreaId] = useState(
     isEdit && existing.parent_container_id ? String(existing.parent_container_id) : '',
   )
+  // For a contained position whose HR position has multiple assigned employees:
+  // optionally add one box per chosen employee.
+  const [multiContained, setMultiContained] = useState(false)
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState([])
 
   const [heading, setHeading] = useState(isEdit ? existing.heading || '' : '')
   // A new junior area inherits its parent (senior) area's color by default.
@@ -358,6 +362,10 @@ export default function AddNodeDialog({
         height: height || 40,
         contained_in_area_id:
           posPlacement === 'contained' && containedAreaId ? Number(containedAreaId) : null,
+        employee_ids:
+          posPlacement === 'contained' && multiContained && selectedEmployeeIds.length
+            ? selectedEmployeeIds.map(Number)
+            : null,
       })
     } else if (kind === 'container') {
       onSubmit({
@@ -615,6 +623,56 @@ export default function AddNodeDialog({
                 {fieldStyle('name', 10, 'sans')}
               </div>
             </div>
+            {/* Contained positions can be added once per assigned employee when
+                the HR position has more than one person in it. */}
+            {posPlacement === 'contained' && positionId && (() => {
+              const emps = employeesByPosition?.get(Number(positionId)) || []
+              if (emps.length < 2) return null
+              return (
+                <div className="mt-3 rounded-md border border-gray-200 p-2">
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={multiContained}
+                      onChange={e => {
+                        setMultiContained(e.target.checked)
+                        if (!e.target.checked) setSelectedEmployeeIds([])
+                      }}
+                    />
+                    Add more than one of this position
+                  </label>
+                  {multiContained && (
+                    <div className="mt-2">
+                      <p className="text-[11px] text-gray-500 mb-1">
+                        Pick the employees to add — one box is created for each:
+                      </p>
+                      <div className="max-h-40 overflow-y-auto space-y-1">
+                        {emps.map(emp => {
+                          const checked = selectedEmployeeIds.includes(String(emp.id))
+                          return (
+                            <label key={emp.id} className="flex items-center gap-2 text-sm text-gray-700">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={e =>
+                                  setSelectedEmployeeIds(prev =>
+                                    e.target.checked
+                                      ? [...prev, String(emp.id)]
+                                      : prev.filter(x => x !== String(emp.id)),
+                                  )
+                                }
+                              />
+                              {emp.displayName}
+                              {emp.active ? '' : ' (inactive)'}
+                            </label>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
             <div className="grid grid-cols-2 gap-2 mt-3">
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Box Width</label>
