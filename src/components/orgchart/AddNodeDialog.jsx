@@ -98,7 +98,18 @@ export default function AddNodeDialog({
     }
     return [...byTier.entries()]
       .sort((a, b) => a[0] - b[0])
-      .map(([tier, areas]) => ({ tier, label: groupLabel(areas, tier), areas }))
+      .map(([tier, areas]) => ({
+        tier,
+        label: groupLabel(areas, tier),
+        // Sort each section alphanumerically by Area Description (e.g. Dept. 1,
+        // Dept. 2, … Dept. 10), numeric-aware so 10 follows 2.
+        areas: [...areas].sort((x, y) =>
+          String(x.label || '').localeCompare(String(y.label || ''), undefined, {
+            numeric: true,
+            sensitivity: 'base',
+          }),
+        ),
+      }))
   })()
   const [posPlacement, setPosPlacement] = useState(
     isEdit && existing.parent_container_id ? 'contained' : 'independent',
