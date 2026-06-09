@@ -10,9 +10,16 @@ import {
   pickTextColor as libPickTextColor,
 } from '../../lib/colorLibrary.js'
 
+// Families hidden from the org-chart color picker because they read as near
+// duplicates of others (brown ≈ orange/amber, coral ≈ red, mono ≈ slate/gray).
+const HIDDEN_FAMILIES = new Set(['brown', 'coral', 'mono'])
+const PICKER_FAMILIES = COLOR_LIBRARY.filter(
+  fam => !HIDDEN_FAMILIES.has(fam.family.toLowerCase()),
+)
+
 // Backward-compat: older code expected a flat array of { name, bg, text }.
 // Keep that shape using the 500-level swatch of each family.
-export const CONTAINER_COLORS = COLOR_LIBRARY.map(fam => {
+export const CONTAINER_COLORS = PICKER_FAMILIES.map(fam => {
   const s = getColor(fam.family, 500)
   return {
     name: fam.family[0].toUpperCase() + fam.family.slice(1),
@@ -21,7 +28,7 @@ export const CONTAINER_COLORS = COLOR_LIBRARY.map(fam => {
   }
 })
 
-export const FULL_LIBRARY = COLOR_LIBRARY
+export const FULL_LIBRARY = PICKER_FAMILIES
 export { getColor, getFamily }
 
 export function pickTextColor(bg) {
