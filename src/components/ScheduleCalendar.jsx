@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { fetchAllPaginated } from '../lib/fetchAll'
-import { COLOR_PALETTE } from '../pages/JobsList'
+import { COLOR_PALETTE } from '../lib/colors'
 import ReopenJobModal from './ReopenJobModal'
 
 // ── Color Dropdown Picker ─────────────────────────────────────

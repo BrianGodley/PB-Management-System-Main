@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useCachedData } from '../lib/useCachedData'
-import { COLOR_PALETTE } from './JobsList'
+import { COLOR_PALETTE } from '../lib/colors'
 import ColorLibraryPicker from '../components/ColorLibraryPicker.jsx'
 
 // ─────────────────────────────────────────────────────────────────────────────

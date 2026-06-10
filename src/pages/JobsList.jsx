@@ -22,6 +22,7 @@ import StartLocationsCard from '../components/StartLocationsCard'
 import SupervisorPositionsCard from '../components/SupervisorPositionsCard'
 import InvoiceCommPositionCard from '../components/InvoiceCommPositionCard'
 import { fetchAllPaginated } from '../lib/fetchAll'
+import { COLOR_PALETTE } from '../lib/colors'
 
 function MoveJobModal({ job, stages, onMove, onClose }) {
   const [selected, setSelected] = useState(job.stage_id || '__none__')
@@ -3010,58 +3011,6 @@ function JobDetail({ job, onDelete, price, onEdit }) {
 }
 
 // ── 50-color palette (exported for use in MasterCrews + ScheduleCalendar) ────
-export const COLOR_PALETTE = [
-  '#ef4444',
-  '#dc2626',
-  '#b91c1c',
-  '#f97316',
-  '#ea580c',
-  '#c2410c',
-  '#f59e0b',
-  '#d97706',
-  '#b45309',
-  '#eab308',
-  '#ca8a04',
-  '#92400e',
-  '#84cc16',
-  '#65a30d',
-  '#4d7c0f',
-  '#22c55e',
-  '#16a34a',
-  '#166534',
-  '#10b981',
-  '#059669',
-  '#065f46',
-  '#14b8a6',
-  '#0d9488',
-  '#0f766e',
-  '#06b6d4',
-  '#0891b2',
-  '#155e75',
-  '#0ea5e9',
-  '#0284c7',
-  '#075985',
-  '#3b82f6',
-  '#2563eb',
-  '#1d4ed8',
-  '#6366f1',
-  '#4f46e5',
-  '#4338ca',
-  '#8b5cf6',
-  '#7c3aed',
-  '#6d28d9',
-  '#a855f7',
-  '#9333ea',
-  '#7e22ce',
-  '#d946ef',
-  '#c026d3',
-  '#a21caf',
-  '#ec4899',
-  '#db2777',
-  '#be185d',
-  '#f43f5e',
-  '#000000',
-]
 
 // ── Color Dropdown Picker ─────────────────────────────────────────────────────
 function ColorDropdown({ value, onChange }) {
