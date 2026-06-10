@@ -8961,6 +8961,60 @@ export default function Statistics() {
     [stats, selectedId]
   )
 
+  // Map each stat to how the logged-in user owns it (if at all):
+  //   'owner'      — a position the user holds directly owns the stat
+  //   'owner-hfa'  — the stat's position is vacant and rolls up (through the
+  //                  default org chart) to a position the user holds
+  const positionOwnership = useMemo(() => {
+    const map = {}
+    if (!myEmployeeId) return map
+    const occupied = new Set(allEmployeePositions.map(ep => Number(ep.position_id)))
+    const mine = new Set(
+      allEmployeePositions
+        .filter(ep => ep.employee_id === myEmployeeId)
+        .map(ep => Number(ep.position_id)),
+    )
+    const nodesById = new Map(orgNodes.map(n => [n.id, n]))
+    const nodeForPosition = new Map()
+    for (const n of orgNodes) {
+      if (n.position_id != null && !nodeForPosition.has(Number(n.position_id)))
+        nodeForPosition.set(Number(n.position_id), n)
+    }
+    const seniorNodeOf = node => {
+      const e = orgEdges.find(
+        ed => ed.target_id === node.id && (ed.relationship || 'reports_to') === 'reports_to',
+      )
+      if (e) return nodesById.get(e.source_id) || null
+      if (node.parent_container_id) return nodesById.get(node.parent_container_id) || null
+      return null
+    }
+    // Walk up from a vacant position to the nearest occupied position id.
+    const inheritorOf = startPid => {
+      let node = nodeForPosition.get(Number(startPid))
+      const seen = new Set()
+      while (node && !seen.has(node.id)) {
+        seen.add(node.id)
+        const senior = seniorNodeOf(node)
+        if (!senior) return null
+        const pid = senior.position_id != null ? Number(senior.position_id) : null
+        if (pid != null && occupied.has(pid)) return pid
+        node = senior
+      }
+      return null
+    }
+    for (const s of stats) {
+      if (s.owner_type !== 'position' || s.owner_position_id == null) continue
+      const P = Number(s.owner_position_id)
+      if (occupied.has(P)) {
+        if (mine.has(P)) map[s.id] = 'owner'
+      } else {
+        const inh = inheritorOf(P)
+        if (inh != null && mine.has(inh)) map[s.id] = 'owner-hfa'
+      }
+    }
+    return map
+  }, [stats, myEmployeeId, allEmployeePositions, orgNodes, orgEdges])
+
   // A stat is editable by:
   //   • admins,
   //   • its direct owner (owner_user_id matches the current user),
@@ -9232,60 +9286,6 @@ export default function Statistics() {
       cancelled = true
     }
   }, [user?.id])
-
-  // Map each stat to how the logged-in user owns it (if at all):
-  //   'owner'      — a position the user holds directly owns the stat
-  //   'owner-hfa'  — the stat's position is vacant and rolls up (through the
-  //                  default org chart) to a position the user holds
-  const positionOwnership = useMemo(() => {
-    const map = {}
-    if (!myEmployeeId) return map
-    const occupied = new Set(allEmployeePositions.map(ep => Number(ep.position_id)))
-    const mine = new Set(
-      allEmployeePositions
-        .filter(ep => ep.employee_id === myEmployeeId)
-        .map(ep => Number(ep.position_id)),
-    )
-    const nodesById = new Map(orgNodes.map(n => [n.id, n]))
-    const nodeForPosition = new Map()
-    for (const n of orgNodes) {
-      if (n.position_id != null && !nodeForPosition.has(Number(n.position_id)))
-        nodeForPosition.set(Number(n.position_id), n)
-    }
-    const seniorNodeOf = node => {
-      const e = orgEdges.find(
-        ed => ed.target_id === node.id && (ed.relationship || 'reports_to') === 'reports_to',
-      )
-      if (e) return nodesById.get(e.source_id) || null
-      if (node.parent_container_id) return nodesById.get(node.parent_container_id) || null
-      return null
-    }
-    // Walk up from a vacant position to the nearest occupied position id.
-    const inheritorOf = startPid => {
-      let node = nodeForPosition.get(Number(startPid))
-      const seen = new Set()
-      while (node && !seen.has(node.id)) {
-        seen.add(node.id)
-        const senior = seniorNodeOf(node)
-        if (!senior) return null
-        const pid = senior.position_id != null ? Number(senior.position_id) : null
-        if (pid != null && occupied.has(pid)) return pid
-        node = senior
-      }
-      return null
-    }
-    for (const s of stats) {
-      if (s.owner_type !== 'position' || s.owner_position_id == null) continue
-      const P = Number(s.owner_position_id)
-      if (occupied.has(P)) {
-        if (mine.has(P)) map[s.id] = 'owner'
-      } else {
-        const inh = inheritorOf(P)
-        if (inh != null && mine.has(inh)) map[s.id] = 'owner-hfa'
-      }
-    }
-    return map
-  }, [stats, myEmployeeId, allEmployeePositions, orgNodes, orgEdges])
 
   // Stat groupings:
   //   • myStats        = stats this user owns
