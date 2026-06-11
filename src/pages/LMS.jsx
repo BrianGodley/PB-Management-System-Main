@@ -8,22 +8,38 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import ChecksheetBuilder from '../components/lms/ChecksheetBuilder'
 import CoursePlayer from '../components/lms/CoursePlayer'
-import ReadItemsManager from '../components/lms/admin/ReadItemsManager'
 import LearningDrillsManager from '../components/lms/admin/LearningDrillsManager'
 import QuizzesManager from '../components/lms/admin/QuizzesManager'
 import TestsManager from '../components/lms/admin/TestsManager'
 import ActionsManager from '../components/lms/admin/ActionsManager'
 import CourseAssignmentsManager from '../components/lms/admin/CourseAssignmentsManager'
+import VideoLibraryManager from '../components/lms/admin/VideoLibraryManager'
+import DocumentsLibraryManager from '../components/lms/admin/DocumentsLibraryManager'
+import CategoriesManager from '../components/lms/admin/CategoriesManager'
 
-const ADMIN_TABS = [
-  { key: 'checksheets', label: 'Checksheets', icon: '📋' },
-  { key: 'assignments', label: 'Course Assignments', icon: '🎯' },
-  { key: 'read_items', label: 'Read Items', icon: '📖' },
-  { key: 'drills', label: 'Learning Drills', icon: '🔁' },
-  { key: 'quizzes', label: 'Quizzes', icon: '📝' },
-  { key: 'tests', label: 'Final Tests', icon: '🎓' },
-  { key: 'actions', label: 'Actions', icon: '⚡' },
-  { key: 'progress', label: 'Progress', icon: '📊' },
+// Left Settings menu, grouped: a Training section and a Libraries section
+// (all content libraries live here, category-driven).
+const ADMIN_GROUPS = [
+  {
+    label: 'Training',
+    tabs: [
+      { key: 'checksheets', label: 'Checksheets', icon: '📋' },
+      { key: 'assignments', label: 'Course Assignments', icon: '🎯' },
+      { key: 'progress', label: 'Progress', icon: '📊' },
+    ],
+  },
+  {
+    label: 'Libraries',
+    tabs: [
+      { key: 'categories', label: 'Categories', icon: '🏷️' },
+      { key: 'videos', label: 'Video Library', icon: '🎬' },
+      { key: 'documents', label: 'Documents Library', icon: '📄' },
+      { key: 'drills', label: 'Learning Drills', icon: '🔁' },
+      { key: 'quizzes', label: 'Quizzes', icon: '📝' },
+      { key: 'tests', label: 'Final Tests', icon: '🎓' },
+      { key: 'actions', label: 'Actions', icon: '⚡' },
+    ],
+  },
 ]
 
 function fmt(dateStr) {
@@ -623,19 +639,26 @@ export default function LMS() {
       {mainTab === 'admin' && isAdmin && (
         <div className="flex gap-6 pt-4">
           <div className="w-52 flex-shrink-0">
-            <nav className="space-y-0.5">
-              {ADMIN_TABS.map(tab => (
-                <button
-                  key={tab.key}
-                  onClick={() => setAdminTab(tab.key)}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-left transition-colors ${
-                    adminTab === tab.key
-                      ? 'bg-green-50 text-green-800'
-                      : 'text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  <span>{tab.icon}</span> {tab.label}
-                </button>
+            <nav className="space-y-4">
+              {ADMIN_GROUPS.map(group => (
+                <div key={group.label} className="space-y-0.5">
+                  <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                    {group.label}
+                  </p>
+                  {group.tabs.map(tab => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setAdminTab(tab.key)}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-left transition-colors ${
+                        adminTab === tab.key
+                          ? 'bg-green-50 text-green-800'
+                          : 'text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      <span>{tab.icon}</span> {tab.label}
+                    </button>
+                  ))}
+                </div>
               ))}
             </nav>
           </div>
@@ -643,7 +666,9 @@ export default function LMS() {
           <div className="flex-1 min-w-0 bg-white rounded-2xl border border-gray-200 p-6">
             {adminTab === 'checksheets' && renderChecksheets()}
             {adminTab === 'assignments' && <CourseAssignmentsManager />}
-            {adminTab === 'read_items' && <ReadItemsManager />}
+            {adminTab === 'categories' && <CategoriesManager />}
+            {adminTab === 'videos' && <VideoLibraryManager />}
+            {adminTab === 'documents' && <DocumentsLibraryManager />}
             {adminTab === 'drills' && <LearningDrillsManager />}
             {adminTab === 'quizzes' && <QuizzesManager />}
             {adminTab === 'tests' && <TestsManager />}
