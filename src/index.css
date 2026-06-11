@@ -3,17 +3,18 @@
 @tailwind utilities;
 
 @layer base {
-  /* Lock the mobile viewport horizontally: no left/right scroll and no
-     rubber-band overscroll. On iOS Safari the page would otherwise drag off
-     the screen edges (showing margin) and snap back. Vertical scroll is
-     unaffected; inner scroll areas (e.g. the org-chart canvas) keep their own
-     horizontal scrolling because this only clips the page root. */
+  /* Lock the mobile viewport: no horizontal scroll and no rubber-band
+     overscroll on EITHER axis. On iOS Safari the page would otherwise drag
+     off the screen edges (showing margin) and snap back. Normal vertical
+     scrolling within the page still works; inner scroll areas (e.g. the
+     org-chart canvas) keep their own scrolling since this only governs the
+     page root's overscroll. */
   html,
   body,
   #root {
     max-width: 100%;
     overflow-x: hidden;
-    overscroll-behavior-x: none;
+    overscroll-behavior: none;
   }
   body {
     @apply bg-gray-50 text-gray-900;
