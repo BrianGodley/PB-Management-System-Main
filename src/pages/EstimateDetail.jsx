@@ -1792,9 +1792,9 @@ export default function EstimateDetail() {
 
       {/* ── Module Type Picker Modal ── */}
       {showModulePicker && !selectedType && pickerStep === 1 && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-x-0 top-0 h-[100dvh] z-50 flex items-center justify-center py-4">
           <div className="absolute inset-0 bg-black/40" onClick={closeModuleFlow} />
-          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-3xl mx-4 p-6 max-h-[90dvh] overflow-y-auto">
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-3xl mx-4 p-6 max-h-[90dvh] overflow-y-auto overscroll-contain">
             <div className="mb-4">
               <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-0.5">
                 Add Module
@@ -1838,9 +1838,9 @@ export default function EstimateDetail() {
           user can just hit Continue, or override with a custom name like
           "Front Yard Patio" or "Pool Coping — phase 2". */}
       {showModulePicker && selectedType && pickerStep === 2 && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-x-0 top-0 h-[100dvh] z-50 flex items-center justify-center py-4">
           <div className="absolute inset-0 bg-black/40" onClick={closeModuleFlow} />
-          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6 max-h-[90dvh] overflow-y-auto">
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6 max-h-[90dvh] overflow-y-auto overscroll-contain">
             <div className="mb-4">
               <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-0.5">
                 Add Module · Step 2 of 2
@@ -1890,7 +1890,7 @@ export default function EstimateDetail() {
       )}
 
       {selectedType && pickerStep === 3 && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-x-0 top-0 h-[100dvh] z-50 flex items-center justify-center py-4">
           <div className="absolute inset-0 bg-black/40" onClick={closeModuleFlow} />
 
           {/* Wide scrollable modal for module-specific forms */}
@@ -1995,7 +1995,7 @@ export default function EstimateDetail() {
                   ✕
                 </button>
               </div>
-              <div className="overflow-y-auto px-6 pb-6 flex-1">
+              <div className="overflow-y-auto overscroll-contain px-6 pb-6 flex-1">
                 <Suspense
                   fallback={
                     <div className="flex items-center justify-center py-12 text-sm text-gray-400">
@@ -2170,7 +2170,7 @@ export default function EstimateDetail() {
             </div>
           ) : (
             /* Generic form for all other module types (placeholder until built) */
-            <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl mx-4 p-6 max-h-[90dvh] overflow-y-auto">
+            <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl mx-4 p-6 max-h-[90dvh] overflow-y-auto overscroll-contain">
               <div className="mb-5">
                 <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-0.5">
                   {editingModule ? 'Edit Module' : 'Add Module'}
