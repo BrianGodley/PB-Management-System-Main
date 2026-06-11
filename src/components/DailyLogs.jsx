@@ -885,6 +885,7 @@ function LogModal({
 // ── Lightbox ─────────────────────────────────────────────────
 function Lightbox({ photos, index, onClose }) {
   const [cur, setCur] = useState(index)
+  const multiple = photos.length > 1
 
   function prev() {
     setCur(i => (i - 1 + photos.length) % photos.length)
@@ -903,48 +904,96 @@ function Lightbox({ photos, index, onClose }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  // Swipe left/right to change photo (mobile). A swipe is not treated as a
+  // backdrop tap, so it won't accidentally close the viewer.
+  const touch = useRef({ x: 0, y: 0, swiped: false })
+  function onTouchStart(e) {
+    const t = e.changedTouches[0]
+    touch.current = { x: t.clientX, y: t.clientY, swiped: false }
+  }
+  function onTouchEnd(e) {
+    const t = e.changedTouches[0]
+    const dx = t.clientX - touch.current.x
+    const dy = t.clientY - touch.current.y
+    if (multiple && Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) {
+      touch.current.swiped = true
+      if (dx < 0) next()
+      else prev()
+    }
+  }
+  function onBackdropClick() {
+    // Ignore the click that follows a swipe gesture.
+    if (touch.current.swiped) {
+      touch.current.swiped = false
+      return
+    }
+    onClose()
+  }
+
+  const arrowCls =
+    'absolute top-1/2 -translate-y-1/2 flex items-center justify-center w-12 h-12 ' +
+    'rounded-full bg-black/50 text-white text-3xl leading-none shadow-lg ' +
+    'active:bg-black/70 hover:bg-black/70'
+
   return (
     <div
-      className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center"
-      onClick={onClose}
+      className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center select-none"
+      onClick={onBackdropClick}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+      style={{ touchAction: 'pan-y' }}
     >
-      <button
-        onClick={e => {
-          e.stopPropagation()
-          prev()
-        }}
-        className="absolute left-4 top-1/2 -translate-y-1/2 text-white/60 hover:text-white p-2 text-3xl"
-      >
-        ‹
-      </button>
+      {multiple && (
+        <button
+          onClick={e => {
+            e.stopPropagation()
+            prev()
+          }}
+          aria-label="Previous photo"
+          className={`${arrowCls} left-3`}
+        >
+          ‹
+        </button>
+      )}
 
       <img
         src={getPublicUrl(photos[cur].storage_path)}
         alt={photos[cur].file_name || ''}
         className="max-h-[85vh] max-w-[90vw] object-contain rounded-lg shadow-2xl"
         onClick={e => e.stopPropagation()}
+        draggable={false}
       />
+
+      {multiple && (
+        <button
+          onClick={e => {
+            e.stopPropagation()
+            next()
+          }}
+          aria-label="Next photo"
+          className={`${arrowCls} right-3`}
+        >
+          ›
+        </button>
+      )}
 
       <button
         onClick={e => {
           e.stopPropagation()
-          next()
+          onClose()
         }}
-        className="absolute right-4 top-1/2 -translate-y-1/2 text-white/60 hover:text-white p-2 text-3xl"
-      >
-        ›
-      </button>
-
-      <button
-        onClick={onClose}
-        className="absolute top-4 right-4 text-white/60 hover:text-white text-2xl p-2"
+        aria-label="Close"
+        className="absolute top-4 right-4 flex items-center justify-center w-11 h-11 rounded-full bg-black/50 text-white text-xl shadow-lg active:bg-black/70 hover:bg-black/70"
       >
         ✕
       </button>
 
-      <p className="absolute bottom-4 text-white/50 text-sm">
-        {cur + 1} / {photos.length}
-      </p>
+      {multiple && (
+        <p className="absolute bottom-5 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/50 text-white text-sm">
+          {cur + 1} / {photos.length}
+          <span className="hidden sm:inline text-white/60">  ·  swipe or use arrows</span>
+        </p>
+      )}
     </div>
   )
 }
