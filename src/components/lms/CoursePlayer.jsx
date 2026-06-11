@@ -179,8 +179,10 @@ function DocViewer({ readItem, onRead, onClose }) {
 
 // ── YouTube viewer modal ────────────────────────────────────────────────────
 function VideoViewer({ step, onComplete, onClose }) {
-  const videoId = getYouTubeId(step.youtube_url)
   const libUrl = step.video?.video_url
+  const libYt = getYouTubeId(libUrl)
+  const ytId = libYt || getYouTubeId(step.youtube_url)
+  const fileUrl = libUrl && !libYt ? libUrl : null
   return (
     <div className="fixed inset-0 bg-black/90 z-[70] flex flex-col">
       <div className="flex items-center gap-3 px-5 py-3 bg-black/50 flex-shrink-0">
@@ -190,19 +192,19 @@ function VideoViewer({ step, onComplete, onClose }) {
         <h3 className="font-semibold text-white flex-1 truncate">{step.title}</h3>
       </div>
       <div className="flex-1 min-h-0 flex items-center justify-center p-4">
-        {libUrl ? (
+        {fileUrl ? (
           <video
-            src={libUrl}
+            src={fileUrl}
             controls
             autoPlay
             className="w-full max-w-4xl rounded-xl bg-black"
             style={{ aspectRatio: '16/9' }}
           />
-        ) : videoId ? (
+        ) : ytId ? (
           <iframe
             className="w-full max-w-4xl rounded-xl"
             style={{ aspectRatio: '16/9' }}
-            src={`https://www.youtube.com/embed/${videoId}?rel=0`}
+            src={`https://www.youtube.com/embed/${ytId}?rel=0`}
             title={step.title}
             allowFullScreen
           />

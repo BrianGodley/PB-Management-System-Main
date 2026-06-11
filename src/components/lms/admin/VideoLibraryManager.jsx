@@ -2,9 +2,16 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../contexts/AuthContext'
 
-// Video Library — category-driven video store (lms_videos). Files live in the
-// lms-videos bucket; optional thumbnail in lms-images. The checksheet builder
-// pulls these in via a "watch/video" step.
+// Pull a YouTube video id from common URL shapes (watch, youtu.be, embed, shorts).
+function getYouTubeId(url) {
+  if (!url) return null
+  const m = String(url).match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([A-Za-z0-9_-]{11})/)
+  return m ? m[1] : null
+}
+
+// Video Library — category-driven videos (lms_videos). Each entry is either an
+// uploaded file (lms-videos bucket) OR a YouTube / external video link. The
+// checksheet builder pulls these in via a "watch" step.
 export default function VideoLibraryManager() {
   const { user } = useAuth()
   const [cats, setCats] = useState([])
@@ -14,6 +21,8 @@ export default function VideoLibraryManager() {
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState({ title: '', description: '', category: 'General' })
+  const [sourceMode, setSourceMode] = useState('upload') // 'upload' | 'link'
+  const [linkUrl, setLinkUrl] = useState('')
   const [file, setFile] = useState(null)
   const [thumb, setThumb] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -34,14 +43,20 @@ export default function VideoLibraryManager() {
   }, [])
   useEffect(() => { load() }, [load])
 
+  // An entry is a "link" video when it has a URL but no uploaded file_name.
+  const isLink = it => !!it.video_url && !it.file_name
+
   const openAdd = () => {
     setEditing(null)
     setForm({ title: '', description: '', category: filter !== 'all' ? filter : (cats[0]?.name || 'General') })
-    setFile(null); setThumb(null); setShowModal(true)
+    setSourceMode('upload'); setLinkUrl(''); setFile(null); setThumb(null); setShowModal(true)
   }
   const openEdit = it => {
     setEditing(it)
     setForm({ title: it.title, description: it.description || '', category: it.category || 'General' })
+    const link = isLink(it)
+    setSourceMode(link ? 'link' : 'upload')
+    setLinkUrl(link ? it.video_url : '')
     setFile(null); setThumb(null); setShowModal(true)
   }
 
@@ -54,24 +69,32 @@ export default function VideoLibraryManager() {
 
   const save = async () => {
     if (!form.title.trim()) return
+    if (sourceMode === 'link' && !linkUrl.trim()) return
+    if (sourceMode === 'upload' && !file && !editing?.file_name) return
     setSaving(true)
     let video_url = editing?.video_url || null
     let file_name = editing?.file_name || null
     let mime_type = editing?.mime_type || null
     let size_bytes = editing?.size_bytes || null
     let thumbnail_url = editing?.thumbnail_url || null
-    if (file || thumb) {
+
+    if (sourceMode === 'link') {
+      // Pasted YouTube/external link — no file upload.
+      video_url = linkUrl.trim(); file_name = null; mime_type = null; size_bytes = null
+    }
+    if (sourceMode === 'upload' && file) {
       setUploading(true)
-      if (file) {
-        const url = await uploadTo('lms-videos', 'videos', file)
-        if (url) { video_url = url; file_name = file.name; mime_type = file.type; size_bytes = file.size }
-      }
-      if (thumb) {
-        const url = await uploadTo('lms-images', 'video-thumbs', thumb)
-        if (url) thumbnail_url = url
-      }
+      const url = await uploadTo('lms-videos', 'videos', file)
+      if (url) { video_url = url; file_name = file.name; mime_type = file.type; size_bytes = file.size }
       setUploading(false)
     }
+    if (thumb) {
+      setUploading(true)
+      const url = await uploadTo('lms-images', 'video-thumbs', thumb)
+      if (url) thumbnail_url = url
+      setUploading(false)
+    }
+
     const payload = {
       title: form.title.trim(), description: form.description.trim() || null,
       category: form.category || 'General', video_url, file_name, mime_type, size_bytes, thumbnail_url,
@@ -86,7 +109,7 @@ export default function VideoLibraryManager() {
 
   const del = async it => {
     if (!confirm(`Delete "${it.title}"?`)) return
-    if (it.video_url) {
+    if (!isLink(it) && it.video_url) {
       const p = it.video_url.split('/lms-videos/')[1]
       if (p) await supabase.storage.from('lms-videos').remove([decodeURIComponent(p)]).catch(() => {})
     }
@@ -102,7 +125,7 @@ export default function VideoLibraryManager() {
         <div>
           <h3 className="font-semibold text-gray-800">Video Library</h3>
           <p className="text-xs text-gray-500 mt-0.5">
-            Category-driven training videos you can drop into a checksheet step.
+            Category-driven training videos — upload a file or paste a YouTube link — to drop into a checksheet step.
           </p>
         </div>
         <button onClick={openAdd} className="px-3 py-1.5 bg-green-700 text-white text-sm rounded-lg hover:bg-green-800">
@@ -129,8 +152,13 @@ export default function VideoLibraryManager() {
               <button onClick={() => it.video_url && setPlay(it)} className="block w-full h-28 bg-black/80 relative">
                 {it.thumbnail_url
                   ? <img src={it.thumbnail_url} alt="" className="w-full h-full object-cover opacity-80" />
-                  : <div className="w-full h-full bg-gradient-to-br from-slate-700 to-slate-900" />}
+                  : getYouTubeId(it.video_url)
+                    ? <img src={`https://img.youtube.com/vi/${getYouTubeId(it.video_url)}/hqdefault.jpg`} alt="" className="w-full h-full object-cover opacity-80" />
+                    : <div className="w-full h-full bg-gradient-to-br from-slate-700 to-slate-900" />}
                 <span className="absolute inset-0 flex items-center justify-center text-white text-3xl">▶</span>
+                {getYouTubeId(it.video_url) && (
+                  <span className="absolute top-1.5 right-1.5 text-[9px] font-bold uppercase bg-red-600 text-white rounded px-1.5 py-0.5">YouTube</span>
+                )}
               </button>
               <div className="p-4">
                 <span className="inline-block text-[10px] font-semibold uppercase tracking-wide text-green-700 bg-green-50 rounded px-2 py-0.5 mb-1.5">
@@ -151,7 +179,17 @@ export default function VideoLibraryManager() {
       {play && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setPlay(null)}>
           <div className="w-full max-w-3xl" onClick={e => e.stopPropagation()}>
-            <video src={play.video_url} controls autoPlay className="w-full rounded-xl bg-black" />
+            {getYouTubeId(play.video_url) ? (
+              <iframe
+                className="w-full rounded-xl"
+                style={{ aspectRatio: '16/9' }}
+                src={`https://www.youtube.com/embed/${getYouTubeId(play.video_url)}?rel=0`}
+                title={play.title}
+                allowFullScreen
+              />
+            ) : (
+              <video src={play.video_url} controls autoPlay className="w-full rounded-xl bg-black" />
+            )}
             <p className="text-white text-sm mt-2">{play.title}</p>
           </div>
         </div>
@@ -176,22 +214,44 @@ export default function VideoLibraryManager() {
               <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2}
                 className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-green-500 resize-none" />
             </Field>
-            <Field label="Video File">
-              {editing?.video_url && !file && <p className="text-xs text-gray-500 mb-2">Current: {editing.file_name || 'uploaded video'}</p>}
-              <div onClick={() => fileRef.current?.click()}
-                className="flex flex-col items-center justify-center h-24 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-green-400 hover:bg-green-50 transition-colors">
-                {file ? <div className="text-center"><p className="text-xl mb-0.5">🎬</p><p className="text-xs font-medium text-gray-700">{file.name}</p><p className="text-xs text-gray-400">Click to change</p></div>
-                      : <div className="text-center text-gray-400"><p className="text-2xl mb-0.5">🎬</p><p className="text-xs">Click to upload (MP4, MOV, WebM)</p></div>}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Video Source</label>
+              <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-2">
+                <button onClick={() => setSourceMode('upload')}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${sourceMode === 'upload' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                  ⬆️ Upload File
+                </button>
+                <button onClick={() => setSourceMode('link')}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${sourceMode === 'link' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                  🔗 YouTube / Link
+                </button>
               </div>
-              <input ref={fileRef} type="file" accept="video/*" className="sr-only" onChange={e => setFile(e.target.files?.[0] || null)} />
-            </Field>
+              {sourceMode === 'link' ? (
+                <input value={linkUrl} onChange={e => setLinkUrl(e.target.value)}
+                  placeholder="https://www.youtube.com/watch?v=…"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-green-500" />
+              ) : (
+                <>
+                  {editing?.file_name && !file && <p className="text-xs text-gray-500 mb-2">Current: {editing.file_name}</p>}
+                  <div onClick={() => fileRef.current?.click()}
+                    className="flex flex-col items-center justify-center h-24 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-green-400 hover:bg-green-50 transition-colors">
+                    {file ? <div className="text-center"><p className="text-xl mb-0.5">🎬</p><p className="text-xs font-medium text-gray-700">{file.name}</p><p className="text-xs text-gray-400">Click to change</p></div>
+                          : <div className="text-center text-gray-400"><p className="text-2xl mb-0.5">🎬</p><p className="text-xs">Click to upload (MP4, MOV, WebM)</p></div>}
+                  </div>
+                  <input ref={fileRef} type="file" accept="video/*" className="sr-only" onChange={e => setFile(e.target.files?.[0] || null)} />
+                </>
+              )}
+            </div>
+
             <Field label="Thumbnail (optional)">
               <div onClick={() => thumbRef.current?.click()}
                 className="flex items-center gap-2 h-12 px-3 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-green-400 hover:bg-green-50 text-xs text-gray-500">
-                🖼️ {thumb ? thumb.name : (editing?.thumbnail_url ? 'Replace thumbnail image' : 'Click to upload an image')}
+                🖼️ {thumb ? thumb.name : (editing?.thumbnail_url ? 'Replace thumbnail image' : 'Click to upload an image (YouTube links auto-thumbnail)')}
               </div>
               <input ref={thumbRef} type="file" accept="image/*" className="sr-only" onChange={e => setThumb(e.target.files?.[0] || null)} />
             </Field>
+
             <div className="flex gap-3 pt-2">
               <button onClick={save} disabled={saving || uploading || !form.title.trim()}
                 className="flex-1 py-2.5 bg-green-700 text-white rounded-xl font-medium hover:bg-green-800 disabled:opacity-50">
