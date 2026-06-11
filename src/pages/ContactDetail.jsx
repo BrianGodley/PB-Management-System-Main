@@ -747,14 +747,13 @@ export default function ContactDetail() {
       {/* Padded wrapper — exposes the main background around the slate block */}
       <div className="flex-1 min-h-0 p-3">
         {/* Rounded slate container */}
-        <div className="h-full bg-slate-200 rounded-xl overflow-hidden">
-          {/* 3-column layout */}
-          <div
-            className="h-full overflow-hidden grid"
-            style={{ gridTemplateColumns: '23rem minmax(0,1fr) 15rem' }}
-          >
+        <div className="h-full bg-slate-200 rounded-xl overflow-y-auto lg:overflow-hidden">
+          {/* 3-column on desktop; stacks to a single scrolling column on mobile
+              (the fixed 3-col widths were wider than a phone, cutting off the
+              right side). */}
+          <div className="grid grid-cols-1 lg:grid-cols-[23rem_minmax(0,1fr)_15rem] lg:h-full lg:overflow-hidden">
             {/* ── LEFT COLUMN ───────────────────────────────────────────────── */}
-            <div className="border-r border-slate-300 bg-slate-200 overflow-y-auto">
+            <div className="lg:border-r border-slate-300 bg-slate-200 lg:overflow-y-auto">
               <div className="p-3 space-y-2">
                 {/* Card 1: Identity */}
                 <div className="bg-white border border-slate-300 rounded-xl p-4 shadow-sm">
@@ -1257,7 +1256,7 @@ export default function ContactDetail() {
             </div>
 
             {/* ── MIDDLE COLUMN: Communication Log ──────────────────────────── */}
-            <div className="flex flex-col bg-slate-200 p-3">
+            <div className="flex flex-col bg-slate-200 p-3 min-h-[70vh] lg:min-h-0">
               {/* Rounded card — same style as pipeline/activity cards */}
               <div className="flex flex-col flex-1 min-h-0 bg-white border border-slate-300 rounded-xl shadow-sm overflow-hidden">
                 {/* Title + type selector buttons in the header */}
@@ -1398,7 +1397,7 @@ export default function ContactDetail() {
             </div>
 
             {/* ── RIGHT COLUMN: Pipeline & Activity ─────────────────────────── */}
-            <div className="border-l border-slate-300 bg-slate-200 overflow-y-auto">
+            <div className="lg:border-l border-slate-300 bg-slate-200 lg:overflow-y-auto">
               <div className="p-3 space-y-2">
                 {/* Pipeline card */}
                 <div className="bg-white border border-slate-300 rounded-xl p-3 shadow-sm">
