@@ -180,6 +180,7 @@ function DocViewer({ readItem, onRead, onClose }) {
 // ── YouTube viewer modal ────────────────────────────────────────────────────
 function VideoViewer({ step, onComplete, onClose }) {
   const videoId = getYouTubeId(step.youtube_url)
+  const libUrl = step.video?.video_url
   return (
     <div className="fixed inset-0 bg-black/90 z-[70] flex flex-col">
       <div className="flex items-center gap-3 px-5 py-3 bg-black/50 flex-shrink-0">
@@ -189,7 +190,15 @@ function VideoViewer({ step, onComplete, onClose }) {
         <h3 className="font-semibold text-white flex-1 truncate">{step.title}</h3>
       </div>
       <div className="flex-1 min-h-0 flex items-center justify-center p-4">
-        {videoId ? (
+        {libUrl ? (
+          <video
+            src={libUrl}
+            controls
+            autoPlay
+            className="w-full max-w-4xl rounded-xl bg-black"
+            style={{ aspectRatio: '16/9' }}
+          />
+        ) : videoId ? (
           <iframe
             className="w-full max-w-4xl rounded-xl"
             style={{ aspectRatio: '16/9' }}
@@ -244,6 +253,7 @@ export default function CoursePlayer({ assignment, onClose }) {
         .select(
           `*,
           read_item:lms_read_items(*),
+          video:lms_videos(*),
           learning_drill:lms_learning_drills(*),
           quiz:lms_quizzes(*),
           test:lms_tests(*),

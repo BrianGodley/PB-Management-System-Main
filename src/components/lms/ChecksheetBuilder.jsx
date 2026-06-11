@@ -55,6 +55,7 @@ export default function ChecksheetBuilder({ course: initialCourse, onClose, onSa
   const [quizzes, setQuizzes] = useState([])
   const [tests, setTests] = useState([])
   const [actions, setActions] = useState([])
+  const [videos, setVideos] = useState([])
   const [loadingLibs, setLoadingLibs] = useState(true)
 
   const [editingStep, setEditingStep] = useState(null)
@@ -69,18 +70,20 @@ export default function ChecksheetBuilder({ course: initialCourse, onClose, onSa
   useEffect(() => {
     const loadAll = async () => {
       setLoadingLibs(true)
-      const [ri, dr, qu, te, ac] = await Promise.all([
+      const [ri, dr, qu, te, ac, vi] = await Promise.all([
         supabase.from('lms_read_items').select('id, title').order('title'),
         supabase.from('lms_learning_drills').select('id, title').order('title'),
         supabase.from('lms_quizzes').select('id, title').order('title'),
         supabase.from('lms_tests').select('id, title').order('title'),
         supabase.from('lms_actions').select('id, title').order('title'),
+        supabase.from('lms_videos').select('id, title, category').order('title'),
       ])
       setReadItems(ri.data || [])
       setDrills(dr.data || [])
       setQuizzes(qu.data || [])
       setTests(te.data || [])
       setActions(ac.data || [])
+      setVideos(vi.data || [])
 
       if (initialCourse?.id) {
         const { data } = await supabase
@@ -101,6 +104,7 @@ export default function ChecksheetBuilder({ course: initialCourse, onClose, onSa
     youtube_url: '',
     instructions: '',
     read_item_id: '',
+    video_id: '',
     learning_drill_id: '',
     quiz_id: '',
     test_id: '',
@@ -125,6 +129,7 @@ export default function ChecksheetBuilder({ course: initialCourse, onClose, onSa
       quiz_id: step.quiz_id || '',
       test_id: step.test_id || '',
       action_id: step.action_id || '',
+      video_id: step.video_id || '',
     })
     setUploadFile(null)
     setUploadMode('library')
@@ -260,6 +265,7 @@ export default function ChecksheetBuilder({ course: initialCourse, onClose, onSa
           quiz_id: s.quiz_id || null,
           test_id: s.test_id || null,
           action_id: s.action_id || null,
+          video_id: s.video_id || null,
         }))
       )
     }
@@ -342,10 +348,10 @@ export default function ChecksheetBuilder({ course: initialCourse, onClose, onSa
               </div>
             ) : (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Read Item *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Document *</label>
                 {readItems.length === 0 ? (
                   warn(
-                    'No read items yet — upload a document above, or create items in the Read Items tab.'
+                    'No documents yet — upload one above, or add them in the Documents Library.'
                   )
                 ) : (
                   <select
@@ -353,7 +359,7 @@ export default function ChecksheetBuilder({ course: initialCourse, onClose, onSa
                     onChange={e => setSF('read_item_id', e.target.value)}
                     className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-green-500"
                   >
-                    <option value="">— Select a Read Item —</option>
+                    <option value="">— Select a Document —</option>
                     {readItems.map(r => (
                       <option key={r.id} value={r.id}>
                         {r.title}
@@ -367,14 +373,36 @@ export default function ChecksheetBuilder({ course: initialCourse, onClose, onSa
         )
       case 'watch':
         return (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">YouTube URL *</label>
-            <input
-              value={sf.youtube_url}
-              onChange={e => setSF('youtube_url', e.target.value)}
-              placeholder="https://www.youtube.com/watch?v=..."
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-green-500"
-            />
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Video from Library</label>
+              {videos.length === 0 ? (
+                warn('No videos yet — add some in the Video Library, or paste a YouTube URL below.')
+              ) : (
+                <select
+                  value={sf.video_id}
+                  onChange={e => setSF('video_id', e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-green-500"
+                >
+                  <option value="">— Select a video —</option>
+                  {videos.map(v => (
+                    <option key={v.id} value={v.id}>
+                      {v.title}{v.category ? ` (${v.category})` : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">or YouTube URL</label>
+              <input
+                value={sf.youtube_url}
+                onChange={e => setSF('youtube_url', e.target.value)}
+                placeholder="https://www.youtube.com/watch?v=..."
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-green-500"
+              />
+            </div>
+            <p className="text-xs text-gray-400">Pick a library video or paste a YouTube link.</p>
           </div>
         )
       case 'special_drill':
