@@ -2000,7 +2000,7 @@ export default function EstimateDetail() {
                   ✕
                 </button>
               </div>
-              <div className="overflow-y-auto overscroll-contain px-6 pb-6 flex-1">
+              <div className="overflow-y-auto overscroll-contain px-6 pb-6 flex-1 min-h-0">
                 <Suspense
                   fallback={
                     <div className="flex items-center justify-center py-12 text-sm text-gray-400">
