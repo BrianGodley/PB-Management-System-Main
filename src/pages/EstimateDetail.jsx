@@ -1312,6 +1312,16 @@ export default function EstimateDetail() {
             )}
           </div>
 
+          {allModules.length > 0 && (
+            <button
+              onClick={() => setWhatIfOpen(true)}
+              className="text-sm px-4 py-1.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 font-semibold hover:bg-amber-100 hover:border-amber-400 transition-colors"
+              title="Run a what-if analysis: tweak GPMD, overall price, or per-project / per-module overrides"
+            >
+              💡 What If?
+            </button>
+          )}
+
           <button
             onClick={deleteEstimate}
             disabled={statusLoading}
@@ -1330,15 +1340,6 @@ export default function EstimateDetail() {
             <p className="text-xs font-bold uppercase tracking-wider text-gray-500">
               Estimate Totals
             </p>
-            {allModules.length > 0 && (
-              <button
-                onClick={() => setWhatIfOpen(true)}
-                className="px-3 py-1 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 text-[11px] font-semibold hover:bg-amber-100 hover:border-amber-400 transition-colors"
-                title="Run a what-if analysis: tweak GPMD, overall price, or per-project / per-module overrides"
-              >
-                💡 What If?
-              </button>
-            )}
           </div>
           <p className="text-xs text-gray-400">
             {allModules.length} module{allModules.length !== 1 ? 's' : ''}
