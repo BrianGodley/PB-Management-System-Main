@@ -842,10 +842,10 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
                       )}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-[11px] font-semibold text-green-700 hover:underline"
+                      className="flex items-center gap-1 text-sm font-semibold text-green-700 hover:underline"
                       title="Open in Maps"
                     >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                         <circle cx="12" cy="10" r="3" />
                       </svg>
@@ -1206,7 +1206,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
                             {(clientForm.phone || '').trim() && (
                               <a
                                 href={`tel:${(clientForm.phone || '').replace(/[^\d+]/g, '')}`}
-                                className="text-[11px] font-semibold text-green-700 hover:underline"
+                                className="text-sm font-semibold text-green-700 hover:underline"
                                 title="Call"
                               >
                                 📞 Call
@@ -1230,7 +1230,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
                             {(clientForm.cell || '').trim() && (
                               <a
                                 href={`tel:${(clientForm.cell || '').replace(/[^\d+]/g, '')}`}
-                                className="text-[11px] font-semibold text-green-700 hover:underline"
+                                className="text-sm font-semibold text-green-700 hover:underline"
                                 title="Call"
                               >
                                 📞 Call
@@ -1254,7 +1254,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
                             {(clientForm.email || '').trim() && (
                               <a
                                 href={`mailto:${(clientForm.email || '').trim()}`}
-                                className="text-[11px] font-semibold text-green-700 hover:underline"
+                                className="text-sm font-semibold text-green-700 hover:underline"
                                 title="Email"
                               >
                                 ✉️ Email
