@@ -1780,7 +1780,7 @@ export default function EstimateDetail() {
 
       {/* ── Module Type Picker Modal ── */}
       {showModulePicker && !selectedType && pickerStep === 1 && (
-        <div className="fixed inset-x-0 top-0 h-[100dvh] z-50 flex items-center justify-center py-4">
+        <div className="fixed inset-x-0 top-0 h-[100dvh] z-[60] flex items-center justify-center py-4">
           <div className="absolute inset-0 bg-black/40" onClick={closeModuleFlow} />
           <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-3xl mx-4 max-h-[90dvh] flex flex-col overflow-hidden">
             {/* Header (pinned) */}
@@ -1831,7 +1831,7 @@ export default function EstimateDetail() {
           user can just hit Continue, or override with a custom name like
           "Front Yard Patio" or "Pool Coping — phase 2". */}
       {showModulePicker && selectedType && pickerStep === 2 && (
-        <div className="fixed inset-x-0 top-0 h-[100dvh] z-50 flex items-center justify-center py-4">
+        <div className="fixed inset-x-0 top-0 h-[100dvh] z-[60] flex items-center justify-center py-4">
           <div className="absolute inset-0 bg-black/40" onClick={closeModuleFlow} />
           <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6 max-h-[90dvh] overflow-y-auto overscroll-contain">
             <div className="mb-4">
@@ -1883,7 +1883,7 @@ export default function EstimateDetail() {
       )}
 
       {selectedType && pickerStep === 3 && (
-        <div className="fixed inset-x-0 top-0 h-[100dvh] z-50 flex items-center justify-center py-4">
+        <div className="fixed inset-x-0 top-0 h-[100dvh] z-[60] flex items-center justify-center py-4">
           <div className="absolute inset-0 bg-black/40" onClick={closeModuleFlow} />
 
           {/* Wide scrollable modal for module-specific forms */}
