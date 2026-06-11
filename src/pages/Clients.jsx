@@ -1408,7 +1408,9 @@ export default function Clients() {
       </div>
 
       {/* ── Active / Inactive / Settings tabs ── */}
-      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0">
+      {/* The strip scrolls horizontally on its own (mobile) so the tabs never
+          push the page wide; tabs don't shrink or wrap. */}
+      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0 overflow-x-auto">
         {[
           { key: 'individuals', label: '👤 Individuals', count: tabCounts.individuals },
           { key: 'companies',   label: '🏢 Companies',   count: tabCounts.companies },
@@ -1422,7 +1424,7 @@ export default function Clients() {
               setTab(t.key)
               setSearch('')
             }}
-            className={`flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex flex-shrink-0 whitespace-nowrap items-center gap-1.5 px-3 sm:px-5 py-3 text-sm font-medium border-b-2 transition-colors ${
               tab === t.key
                 ? 'border-green-700 text-green-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
