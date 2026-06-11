@@ -1194,7 +1194,7 @@ export default function Contacts() {
           </div>
 
           {/* Scrollable table + pagination */}
-          <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="flex-1 flex flex-col min-h-0">
             {/* Table */}
             {isIndividuals ? (
               loading ? (
@@ -1202,7 +1202,7 @@ export default function Contacts() {
               ) : error ? (
                 <div className="text-red-500 text-sm py-8 text-center">{error}</div>
               ) : (
-                <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto overscroll-x-contain">
+                <div className="bg-white rounded-xl border border-gray-200 flex-1 min-h-0 overflow-auto overscroll-contain">
                   <table className="w-full text-xs min-w-[900px] table-fixed">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200">
@@ -1326,7 +1326,7 @@ export default function Contacts() {
             ) : companiesError ? (
               <div className="text-red-500 text-sm py-8 text-center">{companiesError}</div>
             ) : (
-              <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto overscroll-x-contain">
+              <div className="bg-white rounded-xl border border-gray-200 flex-1 min-h-0 overflow-auto overscroll-contain">
                 <table className="w-full text-xs min-w-[700px] table-fixed">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
@@ -1431,7 +1431,7 @@ export default function Contacts() {
 
             {/* Pagination */}
             {totalCount > 0 && (
-              <div className="flex items-center justify-between mt-3">
+              <div className="flex items-center justify-between mt-3 flex-shrink-0">
                 <p className="text-xs text-gray-400">
                   {rangeStart}–{rangeEnd} of {totalCount.toLocaleString()}{' '}
                   {isIndividuals ? 'contact' : 'compan'}
