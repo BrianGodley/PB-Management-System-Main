@@ -544,8 +544,46 @@ export default function CoursePlayer({ assignment, onClose }) {
         </div>
       </div>
 
-      {/* Step content */}
-      <div className="flex-1 overflow-y-auto p-6">
+      {/* Body: ordered checklist rail + step content */}
+      <div className="flex-1 flex min-h-0">
+        {/* Ordered checklist rail (desktop) */}
+        <aside className="hidden md:block w-72 flex-shrink-0 bg-white border-r border-gray-200 overflow-y-auto p-3">
+          <p className="px-2 mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Checksheet Items</p>
+          <ol className="space-y-1">
+            {steps.map((s, i) => {
+              const done = isComplete(s.id)
+              const cur = i === currentIdx
+              const meta = TYPE_META[s.step_type] || {}
+              return (
+                <li key={s.id}>
+                  <button
+                    onClick={() => setCurrentIdx(i)}
+                    className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-left transition-colors ${cur ? 'bg-green-50' : 'hover:bg-gray-50'}`}
+                  >
+                    <span
+                      className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border-2 ${
+                        done
+                          ? 'bg-green-600 border-green-600 text-white'
+                          : cur
+                            ? 'border-green-500 text-green-700'
+                            : 'border-gray-300 text-gray-400'
+                      }`}
+                    >
+                      {done ? '✓' : i + 1}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className={`block text-sm truncate ${cur ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>{s.title}</span>
+                      <span className="block text-[11px] text-gray-400">{meta.icon} {meta.label}</span>
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
+          </ol>
+        </aside>
+
+        {/* Step content */}
+        <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-2xl mx-auto">
           {/* Step header */}
           <div className="mb-6">
@@ -577,6 +615,7 @@ export default function CoursePlayer({ assignment, onClose }) {
             </div>
           )}
         </div>
+      </div>
       </div>
 
       {/* Document viewer modal */}
