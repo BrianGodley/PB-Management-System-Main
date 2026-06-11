@@ -863,10 +863,32 @@ export default function SubsVendors() {
                             </td>
                           )}
                           <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                            {sub.cell || <span className="text-gray-300">—</span>}
+                            {sub.cell ? (
+                              <a
+                                href={`tel:${String(sub.cell).replace(/[^\d+]/g, '')}`}
+                                onClick={e => e.stopPropagation()}
+                                className="inline-flex items-center gap-1 text-green-700 hover:underline"
+                              >
+                                <span aria-hidden="true">📞</span>
+                                {sub.cell}
+                              </a>
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                            {sub.phone || <span className="text-gray-300">—</span>}
+                            {sub.phone ? (
+                              <a
+                                href={`tel:${String(sub.phone).replace(/[^\d+]/g, '')}`}
+                                onClick={e => e.stopPropagation()}
+                                className="inline-flex items-center gap-1 text-green-700 hover:underline"
+                              >
+                                <span aria-hidden="true">📞</span>
+                                {sub.phone}
+                              </a>
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -947,9 +969,25 @@ export default function SubsVendors() {
                           {st.label}
                         </span>
                       </div>
-                      <div className="flex gap-4 mt-3 text-xs text-gray-500">
-                        {sub.cell && <span>📱 {sub.cell}</span>}
-                        {sub.phone && <span>📞 {sub.phone}</span>}
+                      <div className="flex gap-4 mt-3 text-xs">
+                        {sub.cell && (
+                          <a
+                            href={`tel:${String(sub.cell).replace(/[^\d+]/g, '')}`}
+                            onClick={e => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 text-green-700"
+                          >
+                            📱 {sub.cell}
+                          </a>
+                        )}
+                        {sub.phone && (
+                          <a
+                            href={`tel:${String(sub.phone).replace(/[^\d+]/g, '')}`}
+                            onClick={e => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 text-green-700"
+                          >
+                            📞 {sub.phone}
+                          </a>
+                        )}
                       </div>
                       {(liabExp || wcExp) && (
                         <p className="text-xs text-red-500 mt-2 font-medium">
