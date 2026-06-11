@@ -67,11 +67,10 @@ const US_STATES = [
 const COLUMNS = [
   { key: 'name', label: 'Name', always: true, defaultOn: true },
   { key: 'type', label: 'Type', always: false, defaultOn: true },
-  { key: 'company_name', label: 'Company', always: false, defaultOn: true },
   { key: 'phone', label: 'Phone', always: false, defaultOn: true },
   { key: 'email', label: 'Email', always: false, defaultOn: true },
-  { key: 'street', label: 'Street', always: false, defaultOn: true },
-  { key: 'city_state', label: 'City / State', always: false, defaultOn: true },
+  { key: 'street', label: 'Street', always: false, defaultOn: true, mobileHide: true },
+  { key: 'city_state', label: 'City / State', always: false, defaultOn: true, mobileHide: true },
   { key: 'notes', label: 'Notes', always: false, defaultOn: false },
 ]
 
@@ -1558,7 +1557,7 @@ export default function Clients() {
           </div>
 
           {/* ── Client table ── */}
-          <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="flex-1 flex flex-col min-h-0">
             {loading ? (
               <div className="flex items-center justify-center py-20">
                 <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-700" />
@@ -1587,20 +1586,20 @@ export default function Clients() {
                 )}
               </div>
             ) : (
-              <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-                <table className="w-full text-xs min-w-[900px]">
+              <div className="bg-white rounded-xl border border-gray-200 flex-1 min-h-0 overflow-x-hidden overflow-y-auto lg:overflow-auto overscroll-contain">
+                <table className="w-full text-xs table-fixed lg:table-auto lg:min-w-[900px]">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
                       {activeCols.map((col, ci) => (
                         <th
                           key={col.key}
-                          className={`px-4 py-2 text-left font-semibold text-gray-600 uppercase truncate ${ci === 0 ? 'sticky left-0 bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]' : ''}`}
+                          className={`px-4 py-2 text-left font-semibold text-gray-600 uppercase truncate ${col.mobileHide ? 'hidden lg:table-cell ' : ''}${ci === 0 ? 'lg:sticky lg:left-0 bg-gray-50 z-10 lg:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]' : ''}`}
                           style={{ width: colWidth(col.key) }}
                         >
                           {col.label}
                         </th>
                       ))}
-                      <th className="px-4 py-2 w-16" />
+                      {tab === 'past' && <th className="px-4 py-2 w-16" />}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -1612,45 +1611,29 @@ export default function Clients() {
                         {activeCols.map((col, ci) => (
                           <td
                             key={col.key}
-                            className={`px-4 py-2 min-w-0 max-w-0 overflow-hidden text-gray-600 ${ci === 0 ? 'sticky left-0 bg-white group-hover:bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]' : ''}`}
+                            className={`px-4 py-2 min-w-0 max-w-0 overflow-hidden text-gray-600 ${col.mobileHide ? 'hidden lg:table-cell ' : ''}${ci === 0 ? 'lg:sticky lg:left-0 bg-white group-hover:bg-gray-50 z-10 lg:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]' : ''}`}
                           >
                             {cellContent(col, client)}
                           </td>
                         ))}
-                        <td className="px-4 py-2 w-28">
-                          <div className="flex items-center justify-end gap-2">
-                            <Link
-                              to={`/clients/${client.id}`}
-                              className="text-gray-500 hover:text-gray-700 whitespace-nowrap text-xs"
-                            >
-                              View →
-                            </Link>
-                            {tab !== 'past' ? (
+                        {tab === 'past' && (
+                          <td className="px-4 py-2 w-28">
+                            <div className="flex items-center justify-end gap-2">
                               <button
-                                onClick={() => setClientStatus(client.id, 'inactive')}
-                                className="text-xs text-gray-400 hover:text-yellow-600 whitespace-nowrap"
-                                title="Mark inactive"
+                                onClick={() => setClientStatus(client.id, 'active')}
+                                className="text-xs text-green-600 hover:text-green-800 whitespace-nowrap"
                               >
-                                Deactivate
+                                Reactivate
                               </button>
-                            ) : (
-                              <>
-                                <button
-                                  onClick={() => setClientStatus(client.id, 'active')}
-                                  className="text-xs text-green-600 hover:text-green-800 whitespace-nowrap"
-                                >
-                                  Reactivate
-                                </button>
-                                <button
-                                  onClick={() => deleteClient(client.id)}
-                                  className="text-red-300 hover:text-red-500 text-xs"
-                                >
-                                  ✕
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </td>
+                              <button
+                                onClick={() => deleteClient(client.id)}
+                                className="text-red-300 hover:text-red-500 text-xs"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
