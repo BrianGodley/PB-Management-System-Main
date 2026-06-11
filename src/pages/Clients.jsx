@@ -66,10 +66,9 @@ const US_STATES = [
 // Column definitions — key matches the render switch below
 const COLUMNS = [
   { key: 'name', label: 'Name', always: true, defaultOn: true },
-  { key: 'type', label: 'Type', always: false, defaultOn: true },
   { key: 'phone', label: 'Phone', always: false, defaultOn: true },
   { key: 'email', label: 'Email', always: false, defaultOn: true },
-  { key: 'street', label: 'Street', always: false, defaultOn: true, mobileHide: true },
+  { key: 'street', label: 'Address', always: false, defaultOn: true, mobileHide: true },
   { key: 'city_state', label: 'City / State', always: false, defaultOn: true, mobileHide: true },
   { key: 'notes', label: 'Notes', always: false, defaultOn: false },
 ]
