@@ -1355,7 +1355,7 @@ export default function JobsList() {
           narrow on phones). Hidden on desktop where the header tabs show. */}
       <div className="lg:hidden -mx-2 mb-2 border-b border-gray-200 bg-white overflow-x-auto">
         <div className="flex gap-0.5 px-3 w-max">
-          {TABS.filter(t => t.key !== 'info').map(t => (
+          {TABS.filter(t => !['info', 'timeclock', 'daily-logs', 'settings'].includes(t.key)).map(t => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
