@@ -677,12 +677,13 @@ export default function HR() {
             icon: '👤',
           },
           { key: 'applicants', label: `Applicants (${applicants.length})`, icon: '📋' },
-          { key: 'positions', label: `Positions (${positions.length})`, icon: '🏷️' },
-          { key: 'forms', label: `Review Forms (${reviewForms.length})`, icon: '⭐' },
+          { key: 'positions', label: `Positions (${positions.length})`, icon: '🏷️', mobileHide: true },
+          { key: 'forms', label: `Review Forms (${reviewForms.length})`, icon: '⭐', mobileHide: true },
           {
             key: 'archive',
             label: `Archive (${employees.filter(e => e.status === 'archived').length})`,
             icon: '📦',
+            mobileHide: true,
           },
           ...(isAdmin ? [{ key: 'settings', label: 'Settings', icon: '⚙️' }] : []),
         ].map(t => (
@@ -692,7 +693,7 @@ export default function HR() {
               setTab(t.key)
               setSearch('')
             }}
-            className={`flex flex-shrink-0 whitespace-nowrap items-center gap-1.5 px-2.5 sm:px-5 py-2 sm:py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors ${
+            className={`${t.mobileHide ? 'hidden lg:flex' : 'flex'} flex-shrink-0 whitespace-nowrap items-center gap-1.5 px-2.5 sm:px-5 py-2 sm:py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors ${
               tab === t.key
                 ? 'border-green-700 text-green-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
