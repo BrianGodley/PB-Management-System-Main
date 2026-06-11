@@ -1212,11 +1212,7 @@ export default function Contacts() {
                         >
                           Name{arrow('last_name')}
                         </th>
-                        <th className={thCls} onClick={() => toggleSort('ghl_assigned_to')}>
-                          Assigned To{arrow('ghl_assigned_to')}
-                        </th>
-                        <th className={thCls}>Phone</th>
-                        <th className={thCls}>Cell</th>
+                        <th className={thCls}>Cell Phone</th>
                         <th className={thCls}>Email</th>
                         <th className={thCls} onClick={() => toggleSort('street_address')}>
                           Address{arrow('street_address')}
@@ -1227,6 +1223,9 @@ export default function Contacts() {
                         <th className={thCls} onClick={() => toggleSort('stage')}>
                           Stage{arrow('stage')}
                         </th>
+                        <th className={thCls} onClick={() => toggleSort('ghl_assigned_to')}>
+                          Assigned To{arrow('ghl_assigned_to')}
+                        </th>
                         <th className={thCls} onClick={() => toggleSort('created_at')}>
                           Created{arrow('created_at')}
                         </th>
@@ -1235,7 +1234,7 @@ export default function Contacts() {
                     <tbody className="divide-y divide-gray-100">
                       {contacts.length === 0 ? (
                         <tr>
-                          <td colSpan={9} className="px-4 py-10 text-center text-gray-400">
+                          <td colSpan={8} className="px-4 py-10 text-center text-gray-400">
                             {search
                               ? 'No contacts match your search.'
                               : 'No contacts yet — add your first one.'}
@@ -1252,18 +1251,6 @@ export default function Contacts() {
                                 {c.last_name}
                                 {c.first_name ? `, ${c.first_name}` : ''}
                               </button>
-                            </td>
-                            <td className="px-4 py-2 text-gray-600">
-                              {c.ghl_assigned_to || <span className="text-gray-300">—</span>}
-                            </td>
-                            <td className="px-4 py-2 text-gray-600">
-                              {c.phone ? (
-                                <a href={`tel:${c.phone}`} className="hover:text-green-700">
-                                  {c.phone}
-                                </a>
-                              ) : (
-                                <span className="text-gray-300">—</span>
-                              )}
                             </td>
                             <td className="px-4 py-2 text-gray-600">
                               {c.cell ? (
@@ -1305,6 +1292,9 @@ export default function Contacts() {
                                 '—'
                               )}
                             </td>
+                            <td className="px-4 py-2 text-gray-600">
+                              {c.ghl_assigned_to || <span className="text-gray-300">—</span>}
+                            </td>
                             <td className="px-4 py-2 text-gray-400 whitespace-nowrap">
                               {c.created_at
                                 ? new Date(c.created_at).toLocaleDateString('en-US', {
@@ -1336,9 +1326,6 @@ export default function Contacts() {
                       >
                         Company Name{arrow('company_name')}
                       </th>
-                      <th className={thCls} onClick={() => toggleSort('ghl_assigned_to')}>
-                        Assigned To{arrow('ghl_assigned_to')}
-                      </th>
                       <th className={thCls}>Phone</th>
                       <th className={thCls}>Email</th>
                       <th className={thCls} onClick={() => toggleSort('company_city')}>
@@ -1346,6 +1333,9 @@ export default function Contacts() {
                       </th>
                       <th className={thCls} onClick={() => toggleSort('stage')}>
                         Stage{arrow('stage')}
+                      </th>
+                      <th className={thCls} onClick={() => toggleSort('ghl_assigned_to')}>
+                        Assigned To{arrow('ghl_assigned_to')}
                       </th>
                       <th className={thCls} onClick={() => toggleSort('created_at')}>
                         Created{arrow('created_at')}
@@ -1371,9 +1361,6 @@ export default function Contacts() {
                             >
                               {c.company_name}
                             </button>
-                          </td>
-                          <td className="px-4 py-2 text-gray-600">
-                            {c.ghl_assigned_to || <span className="text-gray-300">—</span>}
                           </td>
                           <td className="px-4 py-2 text-gray-600">
                             {c.phone ? (
@@ -1411,6 +1398,9 @@ export default function Contacts() {
                             ) : (
                               '—'
                             )}
+                          </td>
+                          <td className="px-4 py-2 text-gray-600">
+                            {c.ghl_assigned_to || <span className="text-gray-300">—</span>}
                           </td>
                           <td className="px-4 py-2 text-gray-400 whitespace-nowrap">
                             {c.created_at

@@ -145,6 +145,21 @@ async function sendViaMessageBird(creds: Record<string, string>, toNumber: strin
   return { success: true, id: data?.id || null, status: 'sent', raw: data }
 }
 
+// ── Phone normalization ───────────────────────────────────────────────────────
+// Accepts any stored format — "1 (555) 123-4567", "(555) 123-4567",
+// "5551234567", "+15551234567" — and returns clean E.164 (+1AAANNNNNNN).
+// Every provider below either takes E.164 directly or strips it down further
+// (e.g. SimpleTexting's stPhone), so normalizing once here is enough.
+function toE164(raw: string): string {
+  const s = String(raw ?? '').trim()
+  if (s.startsWith('+')) return s                       // already E.164
+  const d = s.replace(/\D/g, '')
+  if (d.length === 11 && d.startsWith('1')) return '+' + d   // 1 + 10-digit US
+  if (d.length === 10) return '+1' + d                       // bare 10-digit US
+  if (d.length > 11) return '+' + d                          // already has a country code
+  return '+1' + d                                            // fallback: assume US
+}
+
 // ── Router ────────────────────────────────────────────────────────────────────
 const PROVIDERS: Record<string, (creds: Record<string, string>, to: string, msg: string) => Promise<Record<string, unknown>>> = {
   simpletexting: sendViaSimpleTexting,
@@ -161,7 +176,7 @@ serve(async (req) => {
 
   try {
     const { to, message } = await req.json()
-    const toNumber = to.startsWith('+') ? to : '+1' + to.replace(/\D/g, '')
+    const toNumber = toE164(to)
 
     const smsConfig = await loadSmsConfig()
     const activeProvider = smsConfig?.active_provider || 'twilio'
