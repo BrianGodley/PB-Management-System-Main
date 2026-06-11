@@ -1,14 +1,25 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { fetchAllPaginated } from '../lib/fetchAll'
 import { useLang } from '../contexts/LanguageContext'
+import { useAuth } from '../contexts/AuthContext'
 import TimeClock from '../components/TimeClock'
+
+const today = () => new Date().toISOString().split('T')[0]
 
 export default function TimeClockPage() {
   const { t } = useLang()
+  const { user } = useAuth()
   const [jobs, setJobs] = useState([])
   const [selectedJob, setSelectedJob] = useState('all')
   const [loading, setLoading] = useState(true)
+
+  // Searchable job picker state.
+  const [query, setQuery] = useState('')
+  const [showList, setShowList] = useState(false)
+  const autoApplied = useRef(false) // only auto-pick the scheduled job once
+
+  const jobLabel = j => j.name || j.client_name || 'Untitled job'
 
   useEffect(() => {
     // Server max-rows is 1k; paginate to get all 2k+ jobs.
@@ -20,29 +31,113 @@ export default function TimeClockPage() {
     })
   }, [])
 
+  // Auto-select the job this user is scheduled on TODAY (from the calendar).
+  // If they're on more than one, default to the first; the user can override
+  // by picking a different job in the searchable field below.
+  useEffect(() => {
+    if (autoApplied.current || loading || !jobs.length || !user?.id) return
+    let cancelled = false
+    ;(async () => {
+      // Resolve the user's display name to match schedule_items.assignees.
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, full_name, display_name, name')
+        .eq('id', user.id)
+        .single()
+      const name =
+        (prof &&
+          ([prof.first_name, prof.last_name].filter(Boolean).join(' ') ||
+            prof.full_name ||
+            prof.display_name ||
+            prof.name)) ||
+        ''
+      if (cancelled || !name.trim()) return
+
+      const d = today()
+      const { data: sched } = await supabase
+        .from('schedule_items')
+        .select('job_id, start_date, end_date, assignees')
+        .lte('start_date', d)
+        .gte('end_date', d)
+        .ilike('assignees', `%${name.trim()}%`)
+        .order('start_date', { ascending: true })
+
+      if (cancelled) return
+      autoApplied.current = true
+      const hit = (sched || []).find(s => s.job_id && jobs.some(j => j.id === s.job_id))
+      // Only auto-fill if the user hasn't already chosen a job.
+      if (hit && selectedJob === 'all') {
+        const j = jobs.find(x => x.id === hit.job_id)
+        setSelectedJob(hit.job_id)
+        if (j) setQuery(jobLabel(j))
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, jobs, user?.id])
+
+  function selectJob(j) {
+    setSelectedJob(j.id)
+    setQuery(jobLabel(j))
+    setShowList(false)
+  }
+
+  const q = query.trim().toLowerCase()
+  const matches = (q ? jobs.filter(j => jobLabel(j).toLowerCase().includes(q)) : jobs).slice(0, 50)
+
   return (
     <div className="flex flex-col h-full">
-      {/* Minimal header with job filter */}
+      {/* Minimal header with searchable job picker */}
       <div className="flex-shrink-0 mb-4">
         <h1 className="text-lg font-bold text-gray-900 mb-3">{t('timeClockTitle')}</h1>
         {!loading && (
-          <>
-            <select
-              value={selectedJob}
-              onChange={e => setSelectedJob(e.target.value)}
+          <div className="relative">
+            <input
+              type="text"
+              value={query}
+              onChange={e => {
+                setQuery(e.target.value)
+                setShowList(true)
+                if (selectedJob !== 'all') setSelectedJob('all')
+              }}
+              onFocus={() => setShowList(true)}
+              onBlur={() => setTimeout(() => setShowList(false), 150)}
+              placeholder={t('selectJob') || 'Search for a job…'}
               className={`input text-sm w-full ${selectedJob === 'all' ? 'border-red-300' : ''}`}
-            >
-              <option value="all">{t('selectJob')}</option>
-              {jobs.map(j => (
-                <option key={j.id} value={j.id}>
-                  {j.name || j.client_name}
-                </option>
-              ))}
-            </select>
+            />
+            {showList && (
+              <ul className="absolute z-30 left-0 right-0 mt-1 max-h-72 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+                {matches.length === 0 ? (
+                  <li className="px-3 py-2 text-sm text-gray-400">No matching jobs</li>
+                ) : (
+                  matches.map(j => (
+                    <li key={j.id}>
+                      <button
+                        type="button"
+                        onMouseDown={e => e.preventDefault()}
+                        onClick={() => selectJob(j)}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-green-50 ${
+                          String(selectedJob) === String(j.id) ? 'bg-green-50 font-semibold' : ''
+                        }`}
+                      >
+                        {jobLabel(j)}
+                      </button>
+                    </li>
+                  ))
+                )}
+                {!q && jobs.length > 50 && (
+                  <li className="px-3 py-1.5 text-[11px] text-gray-400 border-t border-gray-100">
+                    Showing first 50 — type to search all {jobs.length} jobs
+                  </li>
+                )}
+              </ul>
+            )}
             {selectedJob === 'all' && (
               <p className="text-xs text-red-500 mt-1.5 px-0.5">{t('jobRequired')}</p>
             )}
-          </>
+          </div>
         )}
       </div>
 
