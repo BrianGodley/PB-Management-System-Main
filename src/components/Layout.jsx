@@ -229,12 +229,22 @@ export default function Layout() {
     const off = el => {
       if (el.dataset.autofillOff) return
       el.dataset.autofillOff = '1'
+      // Native browser autofill / history. A unique token defeats Chrome's
+      // field-name heuristics better than the (often-ignored) literal "off".
       el.setAttribute('autocomplete', 'off')
+      el.setAttribute('autocorrect', 'off')
+      el.setAttribute('autocapitalize', 'off')
+      // Tell the common password managers to leave this field alone — these are
+      // the inline chips/suggestions that pop up on focus.
+      el.setAttribute('data-lpignore', 'true') // LastPass
+      el.setAttribute('data-1p-ignore', 'true') // 1Password
+      el.setAttribute('data-bwignore', 'true') // Bitwarden
+      el.setAttribute('data-form-type', 'other') // Dashlane
     }
     const scan = node => {
       if (!node || node.nodeType !== 1) return
-      if (node.matches?.('input, textarea')) off(node)
-      node.querySelectorAll?.('input, textarea').forEach(off)
+      if (node.matches?.('input, textarea, select')) off(node)
+      node.querySelectorAll?.('input, textarea, select').forEach(off)
     }
     scan(document.body)
     const obs = new MutationObserver(muts => {
