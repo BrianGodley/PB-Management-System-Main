@@ -19,6 +19,14 @@ export default function Info() {
   const [selectedId, setSelectedId] = useState('')
   const [job, setJob] = useState(null) // full row for the selected job
   const [loadingJob, setLoadingJob] = useState(false)
+  const [jobFilter, setJobFilter] = useState('open') // 'open' | 'closed'
+  const [query, setQuery] = useState('') // type-to-search text
+  const [showList, setShowList] = useState(false) // dropdown open
+
+  // Open = active jobs; Closed = everything else (completed, etc.).
+  const visibleJobs = jobs.filter(j =>
+    jobFilter === 'open' ? j.status === 'active' : j.status !== 'active',
+  )
 
   // Lightweight job list for the dropdown (active first, then alpha).
   useEffect(() => {
@@ -72,8 +80,15 @@ export default function Info() {
     return true
   }
 
-  const jobLabel = j =>
-    `${j.name || j.client_name || 'Untitled job'}${j.status && j.status !== 'active' ? ` (${j.status})` : ''}`
+  const jobLabel = j => {
+    const base = j.name || j.client_name || 'Untitled job'
+    return j.status && j.status !== 'active' ? base + ' (' + j.status + ')' : base
+  }
+
+  // Searchable picker: filter the visible jobs by the typed query.
+  const matches = query.trim()
+    ? visibleJobs.filter(j => jobLabel(j).toLowerCase().includes(query.trim().toLowerCase()))
+    : visibleJobs
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -81,20 +96,76 @@ export default function Info() {
         Info
       </h1>
 
-      <div className="mb-4">
-        <label className="block text-xs font-medium text-gray-500 mb-1">Select a job</label>
-        <select
-          value={selectedId}
-          onChange={e => setSelectedId(e.target.value)}
+      {/* Open / Closed job filter */}
+      <div className="mb-3 flex gap-2">
+        {[
+          { v: 'open', label: 'Open Jobs' },
+          { v: 'closed', label: 'Closed Jobs' },
+        ].map(opt => (
+          <button
+            key={opt.v}
+            type="button"
+            onClick={() => {
+              if (opt.v === jobFilter) return
+              setJobFilter(opt.v)
+              setSelectedId('') // lists are disjoint — clear the picked job
+              setQuery('')
+              setShowList(false)
+            }}
+            className={`flex-1 px-3 py-2 rounded-lg text-sm font-semibold border ${
+              jobFilter === opt.v
+                ? 'border-green-700 bg-green-50 text-green-800'
+                : 'border-gray-300 text-gray-600'
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="mb-4 relative">
+        <label className="block text-xs font-medium text-gray-500 mb-1">Search a job</label>
+        <input
+          type="text"
+          value={query}
+          onChange={e => {
+            setQuery(e.target.value)
+            setShowList(true)
+            if (selectedId) setSelectedId('')
+          }}
+          onFocus={() => setShowList(true)}
+          onBlur={() => setTimeout(() => setShowList(false), 150)}
+          placeholder={loading ? 'Loading jobs…' : 'Type to search ' + jobFilter + ' jobs…'}
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
-        >
-          <option value="">{loading ? 'Loading jobs…' : '— Pick a job —'}</option>
-          {jobs.map(j => (
-            <option key={j.id} value={j.id}>
-              {jobLabel(j)}
-            </option>
-          ))}
-        </select>
+        />
+        {showList && (
+          <ul className="absolute z-20 left-0 right-0 mt-1 max-h-72 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+            {matches.length === 0 ? (
+              <li className="px-3 py-2 text-sm text-gray-400">
+                {loading ? 'Loading…' : 'No ' + jobFilter + ' jobs match'}
+              </li>
+            ) : (
+              matches.map(j => (
+                <li key={j.id}>
+                  <button
+                    type="button"
+                    onMouseDown={e => e.preventDefault()}
+                    onClick={() => {
+                      setSelectedId(j.id)
+                      setQuery(jobLabel(j))
+                      setShowList(false)
+                    }}
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-green-50 ${
+                      String(selectedId) === String(j.id) ? 'bg-green-50 font-semibold' : ''
+                    }`}
+                  >
+                    {jobLabel(j)}
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+        )}
       </div>
 
       {!selectedId ? (
