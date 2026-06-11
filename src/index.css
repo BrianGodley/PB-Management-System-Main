@@ -70,31 +70,10 @@
    the viewport removes horizontal scroll entirely. Full data is one tap away in
    the contact detail view. Desktop (lg) shows every column. */
 @media (max-width: 1023px) {
-  /* Individuals columns: 1 Name, 2 Cell Phone, 3 Email, 4 Address, 5 City/State,
-     6 Stage, 7 Assigned To, 8 Created. Keep 1–3, hide 4–8. */
-  .contacts-ind-table th:nth-child(4),
-  .contacts-ind-table td:nth-child(4),
-  .contacts-ind-table th:nth-child(5),
-  .contacts-ind-table td:nth-child(5),
-  .contacts-ind-table th:nth-child(6),
-  .contacts-ind-table td:nth-child(6),
-  .contacts-ind-table th:nth-child(7),
-  .contacts-ind-table td:nth-child(7),
-  .contacts-ind-table th:nth-child(8),
-  .contacts-ind-table td:nth-child(8),
-  /* Companies columns: 1 Name, 2 Phone, 3 Email, 4 City/State, 5 Stage,
-     6 Assigned To, 7 Created. Keep 1–3, hide 4–7. */
-  .contacts-co-table th:nth-child(4),
-  .contacts-co-table td:nth-child(4),
-  .contacts-co-table th:nth-child(5),
-  .contacts-co-table td:nth-child(5),
-  .contacts-co-table th:nth-child(6),
-  .contacts-co-table td:nth-child(6),
-  .contacts-co-table th:nth-child(7),
-  .contacts-co-table td:nth-child(7) {
-    display: none;
-  }
-  /* Give the Name column the bulk of the width; the rest split what remains. */
+  /* Column hiding on mobile is handled per-column in the table markup
+     (`hidden lg:table-cell`), so it stays correct even when columns are
+     toggled in the picker. Here we only give the always-first Name column
+     the bulk of the width; the remaining visible columns split the rest. */
   .contacts-ind-table th:nth-child(1) {
     width: 42%;
   }

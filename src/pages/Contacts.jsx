@@ -919,6 +919,28 @@ export default function Contacts() {
   const [assignees, setAssignees] = useState([])
   const reqId = useRef(0)
 
+  // Column show/hide picker (shared across both tabs).
+  const [visibleCols, setVisibleCols] = useState(
+    () => new Set(['cell', 'phone', 'email', 'address', 'city_state', 'stage', 'assigned', 'created'])
+  )
+  const [colPickerOpen, setColPickerOpen] = useState(false)
+  const colPickerRef = useRef(null)
+  function toggleCol(key) {
+    setVisibleCols(prev => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
+  }
+  useEffect(() => {
+    if (!colPickerOpen) return
+    const handler = e => {
+      if (colPickerRef.current && !colPickerRef.current.contains(e.target)) setColPickerOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [colPickerOpen])
+
   async function fetchContacts() {
     const myReq = ++reqId.current
     setLoading(true)
@@ -1081,6 +1103,203 @@ export default function Contacts() {
 
   const isIndividuals = activeTab === 'individuals'
 
+  // ── Column show/hide (like Opportunities) ──────────────────────────────────
+  // Columns flagged mobileHide collapse on phones (class-based) regardless of
+  // this picker, which governs desktop visibility. `always` columns can't be
+  // hidden. The two tabs have different column sets but share a visibility set;
+  // shared keys (email, stage, …) toggle together.
+  const dash = <span className="text-gray-300">—</span>
+  const emailCell = c =>
+    c.email ? (
+      <a
+        href={`mailto:${c.email}`}
+        className="hover:text-green-700 truncate max-w-[180px] block"
+      >
+        {c.email}
+      </a>
+    ) : (
+      dash
+    )
+  const stageCell = c =>
+    stageMap[c.stage] ? (
+      <span
+        className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold border ${stageMap[c.stage].cls}`}
+      >
+        {stageMap[c.stage].label}
+      </span>
+    ) : (
+      '—'
+    )
+  const createdCell = c => (
+    <span className="text-gray-400 whitespace-nowrap">
+      {c.created_at
+        ? new Date(c.created_at).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          })
+        : '—'}
+    </span>
+  )
+
+  const indCols = [
+    {
+      key: 'name',
+      label: 'Name',
+      always: true,
+      sort: 'last_name',
+      render: c => (
+        <button
+          onClick={() => navigate(`/contacts/${c.id}`)}
+          className="font-semibold text-green-700 hover:text-green-900 hover:underline text-left"
+        >
+          {c.last_name}
+          {c.first_name ? `, ${c.first_name}` : ''}
+        </button>
+      ),
+    },
+    {
+      key: 'cell',
+      label: 'Cell Phone',
+      render: c =>
+        c.cell ? (
+          <a href={`tel:${c.cell}`} className="hover:text-green-700">
+            {c.cell}
+          </a>
+        ) : (
+          dash
+        ),
+    },
+    { key: 'email', label: 'Email', render: emailCell },
+    {
+      key: 'address',
+      label: 'Address',
+      mobileHide: true,
+      sort: 'street_address',
+      render: c => c.street_address || dash,
+    },
+    {
+      key: 'city_state',
+      label: 'City / State',
+      mobileHide: true,
+      sort: 'city',
+      render: c => [c.city, c.state].filter(Boolean).join(', ') || dash,
+    },
+    { key: 'stage', label: 'Stage', mobileHide: true, sort: 'stage', render: stageCell },
+    {
+      key: 'assigned',
+      label: 'Assigned To',
+      mobileHide: true,
+      sort: 'ghl_assigned_to',
+      render: c => c.ghl_assigned_to || dash,
+    },
+    { key: 'created', label: 'Created', mobileHide: true, sort: 'created_at', render: createdCell },
+  ]
+
+  const coCols = [
+    {
+      key: 'name',
+      label: 'Name',
+      always: true,
+      sort: 'company_name',
+      render: c => (
+        <button
+          onClick={() => navigate(`/companies/${c.id}`)}
+          className="font-semibold text-green-700 hover:text-green-900 hover:underline text-left"
+        >
+          {c.company_name}
+        </button>
+      ),
+    },
+    {
+      key: 'phone',
+      label: 'Phone',
+      render: c =>
+        c.phone ? (
+          <a href={`tel:${c.phone}`} className="hover:text-green-700">
+            {c.phone}
+          </a>
+        ) : (
+          dash
+        ),
+    },
+    { key: 'email', label: 'Email', render: emailCell },
+    {
+      key: 'city_state',
+      label: 'City / State',
+      mobileHide: true,
+      sort: 'company_city',
+      render: c => [c.company_city, c.company_state].filter(Boolean).join(', ') || dash,
+    },
+    { key: 'stage', label: 'Stage', mobileHide: true, sort: 'stage', render: stageCell },
+    {
+      key: 'assigned',
+      label: 'Assigned To',
+      mobileHide: true,
+      sort: 'ghl_assigned_to',
+      render: c => c.ghl_assigned_to || dash,
+    },
+    { key: 'created', label: 'Created', mobileHide: true, sort: 'created_at', render: createdCell },
+  ]
+
+  const colDefs = isIndividuals ? indCols : coCols
+  const tableClass = isIndividuals ? 'contacts-ind-table' : 'contacts-co-table'
+  const minWClass = isIndividuals ? 'lg:min-w-[900px]' : 'lg:min-w-[700px]'
+  const activeCols = colDefs.filter(c => c.always || visibleCols.has(c.key))
+
+  function renderTable(rows) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 flex-1 min-h-0 overflow-x-hidden overflow-y-auto lg:overflow-auto overscroll-contain">
+        <table className={`${tableClass} w-full text-xs table-fixed ${minWClass}`}>
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-200">
+              {activeCols.map((col, ci) => (
+                <th
+                  key={col.key}
+                  onClick={col.sort ? () => toggleSort(col.sort) : undefined}
+                  className={`${thCls} ${col.sort ? '' : 'cursor-default hover:text-gray-600'} ${
+                    col.mobileHide ? 'hidden lg:table-cell ' : ''
+                  }${ci === 0 ? 'lg:sticky lg:left-0 bg-gray-50 z-10 lg:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]' : ''}`}
+                >
+                  {col.label}
+                  {col.sort ? arrow(col.sort) : ''}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={activeCols.length} className="px-4 py-10 text-center text-gray-400">
+                  {search
+                    ? `No ${isIndividuals ? 'contacts' : 'companies'} match your search.`
+                    : `No ${isIndividuals ? 'contacts' : 'companies'} yet — add your first one.`}
+                </td>
+              </tr>
+            ) : (
+              rows.map(c => (
+                <tr key={c.id} className="group hover:bg-gray-50 transition-colors">
+                  {activeCols.map((col, ci) => (
+                    <td
+                      key={col.key}
+                      className={`px-4 py-2 ${col.mobileHide ? 'hidden lg:table-cell ' : ''}${
+                        ci === 0
+                          ? 'lg:sticky lg:left-0 bg-white group-hover:bg-gray-50 z-10 lg:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]'
+                          : 'text-gray-600'
+                      }`}
+                    >
+                      {col.render(c)}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -1179,8 +1398,8 @@ export default function Contacts() {
             + {isIndividuals ? 'Add Contact' : 'Add Company'}
           </button>
 
-          {/* Search */}
-          <div className="mb-4 mt-4 flex-shrink-0">
+          {/* Search + column picker */}
+          <div className="mb-4 mt-4 flex-shrink-0 flex items-center justify-between gap-3">
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -1189,8 +1408,63 @@ export default function Contacts() {
                   ? 'Search name, email, phone, city…'
                   : 'Search company name, email, phone, city…'
               }
-              className="w-full max-w-md border border-gray-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600"
+              className="flex-1 max-w-md border border-gray-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600"
             />
+
+            <div className="relative flex-shrink-0" ref={colPickerRef}>
+              <button
+                onClick={() => setColPickerOpen(o => !o)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                  colPickerOpen
+                    ? 'border-green-600 text-green-700 bg-green-50'
+                    : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                  />
+                </svg>
+                <span className="hidden sm:inline">Columns</span>
+                <svg
+                  className={`w-3 h-3 transition-transform ${colPickerOpen ? 'rotate-180' : ''}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {colPickerOpen && (
+                <div className="absolute right-0 top-full mt-1.5 z-20 bg-white border border-gray-200 rounded-xl shadow-lg py-2 w-44">
+                  <p className="px-3 pb-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wide border-b border-gray-100 mb-1">
+                    Show / Hide Columns
+                  </p>
+                  {colDefs.map(col => (
+                    <label
+                      key={col.key}
+                      className={`flex items-center gap-2.5 px-3 py-1.5 text-sm cursor-pointer select-none transition-colors ${
+                        col.always ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={col.always || visibleCols.has(col.key)}
+                        disabled={col.always}
+                        onChange={() => !col.always && toggleCol(col.key)}
+                        className="w-3.5 h-3.5 rounded accent-green-600 flex-shrink-0"
+                      />
+                      {col.label}
+                      {col.always && <span className="ml-auto text-xs text-gray-300">always</span>}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Scrollable table + pagination */}
@@ -1202,221 +1476,14 @@ export default function Contacts() {
               ) : error ? (
                 <div className="text-red-500 text-sm py-8 text-center">{error}</div>
               ) : (
-                <div className="bg-white rounded-xl border border-gray-200 flex-1 min-h-0 overflow-x-hidden overflow-y-auto lg:overflow-auto overscroll-contain">
-                  <table className="contacts-ind-table w-full text-xs table-fixed lg:min-w-[900px]">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        <th
-                          className={`${thCls} lg:sticky lg:left-0 bg-gray-50 z-10 lg:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]`}
-                          onClick={() => toggleSort('last_name')}
-                        >
-                          Name{arrow('last_name')}
-                        </th>
-                        <th className={thCls}>Cell Phone</th>
-                        <th className={thCls}>Email</th>
-                        <th className={thCls} onClick={() => toggleSort('street_address')}>
-                          Address{arrow('street_address')}
-                        </th>
-                        <th className={thCls} onClick={() => toggleSort('city')}>
-                          City / State{arrow('city')}
-                        </th>
-                        <th className={thCls} onClick={() => toggleSort('stage')}>
-                          Stage{arrow('stage')}
-                        </th>
-                        <th className={thCls} onClick={() => toggleSort('ghl_assigned_to')}>
-                          Assigned To{arrow('ghl_assigned_to')}
-                        </th>
-                        <th className={thCls} onClick={() => toggleSort('created_at')}>
-                          Created{arrow('created_at')}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {contacts.length === 0 ? (
-                        <tr>
-                          <td colSpan={8} className="px-4 py-10 text-center text-gray-400">
-                            {search
-                              ? 'No contacts match your search.'
-                              : 'No contacts yet — add your first one.'}
-                          </td>
-                        </tr>
-                      ) : (
-                        paginated.map(c => (
-                          <tr key={c.id} className="group hover:bg-gray-50 transition-colors">
-                            <td className="px-4 py-2 lg:sticky lg:left-0 bg-white group-hover:bg-gray-50 z-10 lg:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]">
-                              <button
-                                onClick={() => navigate(`/contacts/${c.id}`)}
-                                className="font-semibold text-green-700 hover:text-green-900 hover:underline text-left"
-                              >
-                                {c.last_name}
-                                {c.first_name ? `, ${c.first_name}` : ''}
-                              </button>
-                            </td>
-                            <td className="px-4 py-2 text-gray-600">
-                              {c.cell ? (
-                                <a href={`tel:${c.cell}`} className="hover:text-green-700">
-                                  {c.cell}
-                                </a>
-                              ) : (
-                                <span className="text-gray-300">—</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-2 text-gray-600">
-                              {c.email ? (
-                                <a
-                                  href={`mailto:${c.email}`}
-                                  className="hover:text-green-700 truncate max-w-[180px] block"
-                                >
-                                  {c.email}
-                                </a>
-                              ) : (
-                                <span className="text-gray-300">—</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-2 text-gray-600">
-                              {c.street_address || <span className="text-gray-300">—</span>}
-                            </td>
-                            <td className="px-4 py-2 text-gray-600">
-                              {[c.city, c.state].filter(Boolean).join(', ') || (
-                                <span className="text-gray-300">—</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-2">
-                              {stageMap[c.stage] ? (
-                                <span
-                                  className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold border ${stageMap[c.stage].cls}`}
-                                >
-                                  {stageMap[c.stage].label}
-                                </span>
-                              ) : (
-                                '—'
-                              )}
-                            </td>
-                            <td className="px-4 py-2 text-gray-600">
-                              {c.ghl_assigned_to || <span className="text-gray-300">—</span>}
-                            </td>
-                            <td className="px-4 py-2 text-gray-400 whitespace-nowrap">
-                              {c.created_at
-                                ? new Date(c.created_at).toLocaleDateString('en-US', {
-                                    month: 'short',
-                                    day: 'numeric',
-                                    year: 'numeric',
-                                  })
-                                : '—'}
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                renderTable(paginated)
               )
             ) : companiesLoading ? (
               <div className="flex items-center justify-center py-20 text-gray-400">Loading…</div>
             ) : companiesError ? (
               <div className="text-red-500 text-sm py-8 text-center">{companiesError}</div>
             ) : (
-              <div className="bg-white rounded-xl border border-gray-200 flex-1 min-h-0 overflow-x-hidden overflow-y-auto lg:overflow-auto overscroll-contain">
-                <table className="contacts-co-table w-full text-xs table-fixed lg:min-w-[700px]">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th
-                        className={`${thCls} lg:sticky lg:left-0 bg-gray-50 z-10 lg:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]`}
-                        onClick={() => toggleSort('company_name')}
-                      >
-                        Company Name{arrow('company_name')}
-                      </th>
-                      <th className={thCls}>Phone</th>
-                      <th className={thCls}>Email</th>
-                      <th className={thCls} onClick={() => toggleSort('company_city')}>
-                        City / State{arrow('company_city')}
-                      </th>
-                      <th className={thCls} onClick={() => toggleSort('stage')}>
-                        Stage{arrow('stage')}
-                      </th>
-                      <th className={thCls} onClick={() => toggleSort('ghl_assigned_to')}>
-                        Assigned To{arrow('ghl_assigned_to')}
-                      </th>
-                      <th className={thCls} onClick={() => toggleSort('created_at')}>
-                        Created{arrow('created_at')}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {companies.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="px-4 py-10 text-center text-gray-400">
-                          {search
-                            ? 'No companies match your search.'
-                            : 'No companies yet — add your first one.'}
-                        </td>
-                      </tr>
-                    ) : (
-                      paginated.map(c => (
-                        <tr key={c.id} className="group hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-2 lg:sticky lg:left-0 bg-white group-hover:bg-gray-50 z-10 lg:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]">
-                            <button
-                              onClick={() => navigate(`/companies/${c.id}`)}
-                              className="font-semibold text-green-700 hover:text-green-900 hover:underline text-left"
-                            >
-                              {c.company_name}
-                            </button>
-                          </td>
-                          <td className="px-4 py-2 text-gray-600">
-                            {c.phone ? (
-                              <a href={`tel:${c.phone}`} className="hover:text-green-700">
-                                {c.phone}
-                              </a>
-                            ) : (
-                              <span className="text-gray-300">—</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-2 text-gray-600">
-                            {c.email ? (
-                              <a
-                                href={`mailto:${c.email}`}
-                                className="hover:text-green-700 truncate max-w-[180px] block"
-                              >
-                                {c.email}
-                              </a>
-                            ) : (
-                              <span className="text-gray-300">—</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-2 text-gray-600">
-                            {[c.company_city, c.company_state].filter(Boolean).join(', ') || (
-                              <span className="text-gray-300">—</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-2">
-                            {stageMap[c.stage] ? (
-                              <span
-                                className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold border ${stageMap[c.stage].cls}`}
-                              >
-                                {stageMap[c.stage].label}
-                              </span>
-                            ) : (
-                              '—'
-                            )}
-                          </td>
-                          <td className="px-4 py-2 text-gray-600">
-                            {c.ghl_assigned_to || <span className="text-gray-300">—</span>}
-                          </td>
-                          <td className="px-4 py-2 text-gray-400 whitespace-nowrap">
-                            {c.created_at
-                              ? new Date(c.created_at).toLocaleDateString('en-US', {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  year: 'numeric',
-                                })
-                              : '—'}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              renderTable(paginated)
             )}
 
             {/* Pagination */}
