@@ -16,3 +16,10 @@ scripts/*.checkpoint.json
 scripts/*.checkpoint.*.bak
 scripts/bt-csv-inbox/
 scripts/jobs_*.txt
+
+# One-off org-chart SQL run manually in Supabase (not part of the app build)
+supabase_sample_templates_*.sql
+supabase_diagnose_*.sql
+supabase_construction_subcategories.sql
+supabase_make_*.sql
+supabase_fix_tiers.sql
