@@ -3,6 +3,17 @@
 @tailwind utilities;
 
 @layer base {
+  /* Prevent iOS Safari from auto-zooming (which visibly jitters/shifts the
+     layout) when a form field is focused. Safari only zooms when the focused
+     field's font-size is under 16px, so we bump fields to 16px on phones. */
+  @media (max-width: 640px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px;
+    }
+  }
+
   /* Lock the mobile viewport: no horizontal scroll and no rubber-band
      overscroll on EITHER axis. On iOS Safari the page would otherwise drag
      off the screen edges (showing margin) and snap back. Normal vertical

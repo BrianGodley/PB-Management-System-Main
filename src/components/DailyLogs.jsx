@@ -661,7 +661,7 @@ function LogModal({
         </div>
 
         {/* ── Scrollable body ── */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
           <div className="flex flex-col sm:flex-row sm:min-h-full">
             {/* Left column */}
             <div className="w-full sm:w-64 flex-shrink-0 px-5 py-4 border-b sm:border-b-0 sm:border-r border-gray-100 space-y-4">
