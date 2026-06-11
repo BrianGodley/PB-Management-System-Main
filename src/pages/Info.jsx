@@ -93,7 +93,7 @@ export default function Info() {
   return (
     <div className="max-w-3xl mx-auto">
       <h1 className="text-xl font-bold mb-4" style={{ color: FG }}>
-        Info
+        Job Info
       </h1>
 
       {/* Open / Closed job filter */}

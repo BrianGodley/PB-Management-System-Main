@@ -83,7 +83,7 @@ export default function Layout() {
   const DOCK_ITEMS = [
     { to: '/daily-logs', label: t('dailyLogs'), icon: '📋' },
     { to: '/timeclock', label: t('timeClock'), icon: '⏱️' },
-    { to: '/info', label: t('info'), icon: 'ℹ️' },
+    { to: '/info', label: 'Job Info', icon: 'ℹ️' },
     { key: 'main', label: t('main'), icon: '⊞' },
   ]
 
@@ -220,6 +220,29 @@ export default function Layout() {
   useEffect(() => {
     setShowMainMenu(false)
   }, [location.pathname])
+
+  // Turn off the browser's autofill / contact-suggestion overlay on every form
+  // field in the app (it kept popping up over inputs on mobile). Applies to
+  // fields that exist now and any added later (e.g. modals). Login lives
+  // outside this Layout, so its autofill is unaffected.
+  useEffect(() => {
+    const off = el => {
+      if (el.dataset.autofillOff) return
+      el.dataset.autofillOff = '1'
+      el.setAttribute('autocomplete', 'off')
+    }
+    const scan = node => {
+      if (!node || node.nodeType !== 1) return
+      if (node.matches?.('input, textarea')) off(node)
+      node.querySelectorAll?.('input, textarea').forEach(off)
+    }
+    scan(document.body)
+    const obs = new MutationObserver(muts => {
+      for (const m of muts) m.addedNodes.forEach(scan)
+    })
+    obs.observe(document.body, { childList: true, subtree: true })
+    return () => obs.disconnect()
+  }, [])
 
   const handleSignOut = async () => {
     await signOut()
