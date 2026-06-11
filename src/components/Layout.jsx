@@ -477,7 +477,10 @@ export default function Layout() {
         </aside>
 
         {/* MAIN CONTENT */}
-        <main className="flex-1 min-w-0 overflow-y-auto p-6 pb-24 lg:pb-6">
+        {/* overflow-x-hidden: a too-wide page (e.g. a detail view) can't push the
+            layout — and the fixed bottom dock — wider than the screen.
+            overscroll-none: the scroll box stops rubber-banding off the header. */}
+        <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden overscroll-none p-6 pb-24 lg:pb-6">
           <Outlet />
         </main>
       </div>
