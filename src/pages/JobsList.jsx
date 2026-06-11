@@ -1326,10 +1326,12 @@ export default function JobsList() {
         </select>
       </div>
 
-      {/* ── Tabs — portalled into the green app header bar ── */}
+      {/* ── Tabs — portalled into the green app header bar (desktop only; the
+             header slot is too cramped on phones, so mobile gets a full-width
+             scrollable strip in the page body below). ── */}
       {headerSlot &&
         createPortal(
-          <div className="flex items-center gap-0.5 overflow-x-auto max-w-full">
+          <div className="hidden lg:flex items-center gap-0.5 overflow-x-auto max-w-full">
             {TABS.map(t => (
               <button
                 key={t.key}
@@ -1348,6 +1350,26 @@ export default function JobsList() {
           </div>,
           headerSlot
         )}
+
+      {/* Mobile tab strip — full-width, scrollable (the header slot is too
+          narrow on phones). Hidden on desktop where the header tabs show. */}
+      <div className="lg:hidden -mx-6 mb-2 border-b border-gray-200 bg-white overflow-x-auto">
+        <div className="flex gap-0.5 px-3 w-max">
+          {TABS.filter(t => t.key !== 'info').map(t => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`px-3 py-2 text-xs font-semibold whitespace-nowrap flex-shrink-0 border-b-2 transition-colors ${
+                tab === t.key
+                  ? 'border-green-700 text-green-700'
+                  : 'border-transparent text-gray-500'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Settings panel — full-width, no sidebar */}
       {tab === 'settings' && (
