@@ -745,7 +745,7 @@ export default function HR() {
       )}
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto p-3 sm:p-6">
+      <div className="flex-1 overflow-y-auto py-3 sm:p-6">
         {loading ? (
           <div className="flex items-center justify-center py-12 text-gray-400">Loading…</div>
         ) : /* ── EMPLOYEES TAB ── */
@@ -762,7 +762,7 @@ export default function HR() {
               </button>
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+            <div className="bg-white overflow-x-auto -mx-6 sm:mx-0 sm:rounded-xl border-y sm:border border-gray-200">
               <table className="w-full text-xs min-w-[860px]">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
