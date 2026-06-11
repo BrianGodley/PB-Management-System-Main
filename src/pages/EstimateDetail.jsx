@@ -1234,18 +1234,6 @@ export default function EstimateDetail() {
               </button>
             </div>
           )}
-          {estimate.type && (
-            <span
-              className={`text-xs font-semibold px-3 py-1 rounded-full ${TYPE_COLORS[estimate.type] || 'bg-gray-100 text-gray-700'}`}
-            >
-              {estimate.type}
-            </span>
-          )}
-          <span
-            className={`text-xs font-semibold px-3 py-1 rounded-full ${STATUS_BADGE[estimate.status] || STATUS_BADGE.pending}`}
-          >
-            {estimate.status?.charAt(0).toUpperCase() + estimate.status?.slice(1) || 'Pending'}
-          </span>
           {dirty && (
             <span className="text-[11px] font-bold uppercase tracking-wide bg-amber-100 text-amber-800 border border-amber-300 rounded-full px-2 py-0.5">
               Unsaved draft
