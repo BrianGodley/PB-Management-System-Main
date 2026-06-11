@@ -1794,15 +1794,17 @@ export default function EstimateDetail() {
       {showModulePicker && !selectedType && pickerStep === 1 && (
         <div className="fixed inset-x-0 top-0 h-[100dvh] z-50 flex items-center justify-center py-4">
           <div className="absolute inset-0 bg-black/40" onClick={closeModuleFlow} />
-          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-3xl mx-4 p-6 max-h-[90dvh] overflow-y-auto overscroll-contain">
-            <div className="mb-4">
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-3xl mx-4 max-h-[90dvh] flex flex-col overflow-hidden">
+            {/* Header (pinned) */}
+            <div className="px-6 pt-6 pb-3 flex-shrink-0">
               <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-0.5">
                 Add Module
               </p>
               <h2 className="text-xl font-bold text-gray-900">{selectedProject?.project_name}</h2>
               <p className="text-sm text-gray-500 mt-0.5">Select a module type</p>
             </div>
-            <div className="space-y-4">
+            {/* Scrollable list */}
+            <div className="px-6 flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-4">
               {MODULE_GROUPS.map(({ label, items }) => (
                 <div key={label}>
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5 px-0.5">
@@ -1826,9 +1828,12 @@ export default function EstimateDetail() {
                 </div>
               ))}
             </div>
-            <button onClick={closeModuleFlow} className="btn-secondary w-full mt-4 text-sm">
-              Cancel
-            </button>
+            {/* Footer (pinned) — Cancel always visible */}
+            <div className="px-6 py-4 flex-shrink-0 border-t border-gray-100">
+              <button onClick={closeModuleFlow} className="btn-secondary w-full text-sm">
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
