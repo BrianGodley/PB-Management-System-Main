@@ -557,7 +557,7 @@ export default function HR() {
 
   function SortTh({ col, label, className = '', sticky = false }) {
     const stickyCls = sticky
-      ? 'sticky left-0 bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]'
+      ? 'lg:sticky lg:left-0 bg-gray-50 z-10 lg:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]'
       : ''
     return (
       <th
@@ -762,7 +762,7 @@ export default function HR() {
               </button>
             </div>
           ) : (
-            <div className="bg-white overflow-x-auto -mx-2 sm:mx-0 sm:rounded-xl border-y sm:border border-gray-200">
+            <div className="bg-white overflow-x-hidden lg:overflow-x-auto -mx-2 sm:mx-0 sm:rounded-xl border-y sm:border border-gray-200">
               <table className="hr-emp-table w-full text-xs table-fixed lg:table-auto lg:min-w-[860px]">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
@@ -789,7 +789,7 @@ export default function HR() {
                         className="group hover:bg-gray-50 transition-colors cursor-pointer"
                         onClick={() => navigate(`/hr/employee/${emp.id}`)}
                       >
-                        <td className="px-4 py-2 sticky left-0 bg-white group-hover:bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]">
+                        <td className="px-4 py-2 lg:sticky lg:left-0 bg-white group-hover:bg-gray-50 z-10 lg:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]">
                           <button className="text-green-700 hover:underline font-medium">
                             {emp.last_name}, {emp.first_name}
                           </button>
