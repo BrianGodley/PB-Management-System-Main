@@ -23,6 +23,24 @@
   }
 }
 
+/* Job Info read-only fields: a filled value shows dark + bold (overriding the
+   washed-out grey iOS gives disabled inputs), while an empty field keeps its
+   light-grey placeholder. Only applies to disabled (read-mode) fields. */
+.jobinfo-fields input:disabled,
+.jobinfo-fields select:disabled,
+.jobinfo-fields textarea:disabled {
+  -webkit-text-fill-color: #111827;
+  color: #111827;
+  opacity: 1;
+  font-weight: 600;
+}
+.jobinfo-fields input:disabled::placeholder,
+.jobinfo-fields textarea:disabled::placeholder {
+  -webkit-text-fill-color: #9ca3af;
+  color: #9ca3af;
+  font-weight: 400;
+}
+
 /* Number inputs with this class show no up/down spinner — just the editable
    number. Used by the org chart's numeric fields. */
 .no-spin::-webkit-outer-spin-button,

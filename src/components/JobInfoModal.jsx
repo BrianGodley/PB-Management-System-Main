@@ -747,7 +747,7 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
       </div>
 
       {/* Tab content */}
-      <div className="overflow-y-auto flex-1">
+      <div className="overflow-y-auto flex-1 jobinfo-fields">
         {/* ── Job Details tab ── */}
         {activeTab === 'info' && (
           <div className="px-5 py-4 space-y-5">
@@ -833,7 +833,26 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
 
               {/* Row 2: Street Address */}
               <div className="mb-3">
-                <label className="block text-xs text-gray-500 mb-1">Job Street Address</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs text-gray-500">Job Street Address</label>
+                  {[address, city, state, zip].some(v => (v || '').trim()) && (
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                        [address, city, state, zip].map(s => (s || '').trim()).filter(Boolean).join(', ')
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-[11px] font-semibold text-green-700 hover:underline"
+                      title="Open in Maps"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                        <circle cx="12" cy="10" r="3" />
+                      </svg>
+                      Map
+                    </a>
+                  )}
+                </div>
                 <input
                   type="text"
                   value={address}
@@ -1182,7 +1201,18 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
                           these read as part of Client/Company Details now. */}
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                         <div>
-                          <label className="block text-xs text-gray-500 mb-1">Phone</label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-xs text-gray-500">Phone</label>
+                            {(clientForm.phone || '').trim() && (
+                              <a
+                                href={`tel:${(clientForm.phone || '').replace(/[^\d+]/g, '')}`}
+                                className="text-[11px] font-semibold text-green-700 hover:underline"
+                                title="Call"
+                              >
+                                📞 Call
+                              </a>
+                            )}
+                          </div>
                           <input
                             type="tel"
                             value={clientForm.phone || ''}
@@ -1195,7 +1225,18 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
                           />
                         </div>
                         <div>
-                          <label className="block text-xs text-gray-500 mb-1">Cell</label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-xs text-gray-500">Cell</label>
+                            {(clientForm.cell || '').trim() && (
+                              <a
+                                href={`tel:${(clientForm.cell || '').replace(/[^\d+]/g, '')}`}
+                                className="text-[11px] font-semibold text-green-700 hover:underline"
+                                title="Call"
+                              >
+                                📞 Call
+                              </a>
+                            )}
+                          </div>
                           <input
                             type="tel"
                             value={clientForm.cell || ''}
@@ -1208,7 +1249,18 @@ export default function JobInfoModal({ job, onClose, onSave, onDelete, inline = 
                           />
                         </div>
                         <div>
-                          <label className="block text-xs text-gray-500 mb-1">Email</label>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="block text-xs text-gray-500">Email</label>
+                            {(clientForm.email || '').trim() && (
+                              <a
+                                href={`mailto:${(clientForm.email || '').trim()}`}
+                                className="text-[11px] font-semibold text-green-700 hover:underline"
+                                title="Email"
+                              >
+                                ✉️ Email
+                              </a>
+                            )}
+                          </div>
                           <input
                             type="email"
                             value={clientForm.email || ''}
