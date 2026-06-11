@@ -1296,12 +1296,12 @@ function SubModal({
   }
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50"
+      className="fixed inset-x-0 top-0 h-[100dvh] z-50 flex items-end sm:items-center justify-center bg-black/50"
       onMouseDown={e => {
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-[560px] flex flex-col max-h-[95vh]">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-[560px] flex flex-col max-h-[95dvh]">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
           <h2 className="text-base font-bold text-gray-900">
@@ -1322,7 +1322,7 @@ function SubModal({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-5 space-y-4">
           {/* Company name */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
