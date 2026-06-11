@@ -1794,7 +1794,7 @@ export default function EstimateDetail() {
       {showModulePicker && !selectedType && pickerStep === 1 && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={closeModuleFlow} />
-          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-3xl mx-4 p-6">
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-3xl mx-4 p-6 max-h-[90dvh] overflow-y-auto">
             <div className="mb-4">
               <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-0.5">
                 Add Module
@@ -1840,7 +1840,7 @@ export default function EstimateDetail() {
       {showModulePicker && selectedType && pickerStep === 2 && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={closeModuleFlow} />
-          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6 max-h-[90dvh] overflow-y-auto">
             <div className="mb-4">
               <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-0.5">
                 Add Module · Step 2 of 2
@@ -1915,9 +1915,9 @@ export default function EstimateDetail() {
           selectedType === 'Steps' ? (
             <div
               className={`relative bg-white rounded-2xl shadow-xl w-full mx-4 flex flex-col ${selectedType === 'Pavers' || selectedType === 'Pool' ? 'max-w-6xl' : 'max-w-5xl'}`}
-              style={{ maxHeight: '90vh' }}
+              style={{ maxHeight: '90dvh' }}
             >
-              <div className="flex items-start justify-between px-6 pt-5 pb-3 border-b border-gray-200">
+              <div className="flex items-start justify-between px-6 pt-5 pb-3 border-b border-gray-200 flex-shrink-0">
                 <div className="flex-1">
                   <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-0.5">
                     {editingModule ? 'Edit Module' : 'Add Module'}
@@ -2170,7 +2170,7 @@ export default function EstimateDetail() {
             </div>
           ) : (
             /* Generic form for all other module types (placeholder until built) */
-            <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl mx-4 p-6">
+            <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl mx-4 p-6 max-h-[90dvh] overflow-y-auto">
               <div className="mb-5">
                 <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-0.5">
                   {editingModule ? 'Edit Module' : 'Add Module'}
