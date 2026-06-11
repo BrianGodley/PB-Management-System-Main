@@ -379,34 +379,47 @@ export default function BidDocViewerModal({ bid, onClose }) {
       >
         {/* Header */}
         <div
-          className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0"
+          className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex-shrink-0"
           style={{ backgroundColor: FG }}
         >
-          <div className="min-w-0">
-            <h2 className="text-base font-bold text-white truncate">Bid Document</h2>
-            <p className="text-xs text-green-200 mt-0.5 truncate">
-              {bid.client_name || '—'}
-              {bid.date_submitted ? ` · ${new Date(bid.date_submitted).toLocaleDateString()}` : ''}
-              {hasSavedVersion && (
-                <span className="ml-2 px-2 py-0.5 rounded-full bg-green-600/40 text-green-100 text-[10px]">
-                  Edited version
-                </span>
-              )}
-            </p>
+          {/* Top row: title + always-reachable close button */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-base font-bold text-white truncate">Bid Document</h2>
+              <p className="text-xs text-green-200 mt-0.5 truncate">
+                {bid.client_name || '—'}
+                {bid.date_submitted ? ` · ${new Date(bid.date_submitted).toLocaleDateString()}` : ''}
+                {hasSavedVersion && (
+                  <span className="ml-2 px-2 py-0.5 rounded-full bg-green-600/40 text-green-100 text-[10px]">
+                    Edited version
+                  </span>
+                )}
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-white/80 hover:text-white text-2xl leading-none px-2 -mr-1 flex-shrink-0"
+              aria-label="Close"
+            >
+              ✕
+            </button>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+
+          {/* Action toolbar: scrolls horizontally on narrow screens so the
+              buttons never push the close button off-screen. */}
+          <div className="flex items-center gap-2 mt-3 overflow-x-auto -mb-1 pb-1">
             <button
               onClick={handleRegenerate}
               disabled={regenerating || loading}
               title="Discard edits and regenerate from the current estimate"
-              className="text-xs px-3 py-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold"
+              className="flex-shrink-0 whitespace-nowrap text-xs px-3 py-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold"
             >
               {regenerating ? 'Regenerating…' : 'Regenerate'}
             </button>
             <button
               onClick={handleSave}
               disabled={!dirty || saving || loading}
-              className="text-xs px-3 py-1.5 rounded-lg bg-white text-green-800 hover:bg-green-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold"
+              className="flex-shrink-0 whitespace-nowrap text-xs px-3 py-1.5 rounded-lg bg-white text-green-800 hover:bg-green-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold"
             >
               {saving ? 'Saving…' : 'Save'}
             </button>
@@ -414,7 +427,7 @@ export default function BidDocViewerModal({ bid, onClose }) {
               onClick={handleDownloadPdf}
               disabled={loading || downloadingPdf}
               title="Download a PDF copy with the company letterhead"
-              className="text-xs px-3 py-1.5 rounded-lg bg-white text-green-800 hover:bg-green-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold"
+              className="flex-shrink-0 whitespace-nowrap text-xs px-3 py-1.5 rounded-lg bg-white text-green-800 hover:bg-green-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold"
             >
               {downloadingPdf ? 'Building PDF…' : '⬇ Download PDF'}
             </button>
@@ -422,16 +435,9 @@ export default function BidDocViewerModal({ bid, onClose }) {
               onClick={handleDownload}
               disabled={loading}
               title="Open the print dialog (also offers Save as PDF)"
-              className="text-xs px-3 py-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold"
+              className="flex-shrink-0 whitespace-nowrap text-xs px-3 py-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold"
             >
               🖨 Print
-            </button>
-            <button
-              onClick={onClose}
-              className="text-white/70 hover:text-white text-xl leading-none px-2"
-              aria-label="Close"
-            >
-              ✕
             </button>
           </div>
         </div>
