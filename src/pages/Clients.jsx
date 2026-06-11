@@ -66,7 +66,7 @@ const US_STATES = [
 // Column definitions — key matches the render switch below
 const COLUMNS = [
   { key: 'name', label: 'Name', always: true, defaultOn: true },
-  { key: 'phone', label: 'Cell Phone', always: false, defaultOn: true },
+  { key: 'cell', label: 'Cell Phone', always: false, defaultOn: true },
   { key: 'email', label: 'Email', always: false, defaultOn: true },
   { key: 'street', label: 'Address', always: false, defaultOn: true, mobileHide: true },
   { key: 'city_state', label: 'City / State', always: false, defaultOn: true, mobileHide: true },
@@ -1255,10 +1255,10 @@ export default function Clients() {
         ) : (
           <span className="text-gray-300">—</span>
         )
-      case 'phone':
-        return client.phone ? (
-          <a href={`tel:${client.phone}`} className="text-gray-600 hover:text-green-700">
-            {client.phone}
+      case 'cell':
+        return client.cell ? (
+          <a href={`tel:${client.cell}`} className="text-gray-600 hover:text-green-700">
+            {client.cell}
           </a>
         ) : (
           <span className="text-gray-300">—</span>
@@ -1682,7 +1682,7 @@ function colWidth(key) {
       return '9%'
     case 'company_name':
       return '14%'
-    case 'phone':
+    case 'cell':
       return '11%'
     case 'email':
       return '16%'
