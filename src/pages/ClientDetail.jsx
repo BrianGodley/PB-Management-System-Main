@@ -536,9 +536,9 @@ export default function ClientDetail() {
       {/* ── Padded wrapper → rounded slate block ── */}
       <div className="flex-1 min-h-0 p-3">
         <div className="h-full bg-slate-200 rounded-xl overflow-hidden">
-          <div className="h-full overflow-hidden grid" style={{ gridTemplateColumns: '20rem 1fr' }}>
+          <div className="h-full grid grid-cols-1 lg:grid-cols-[20rem_1fr] overflow-y-auto lg:overflow-hidden">
             {/* ══ LEFT COLUMN ══════════════════════════════════════════════ */}
-            <div className="border-r border-slate-300 bg-slate-200 overflow-y-auto">
+            <div className="lg:border-r border-slate-300 bg-slate-200 lg:overflow-y-auto">
               <div className="p-3 space-y-2">
                 {/* Identity card */}
                 <div className="bg-white border border-slate-300 rounded-xl p-4 shadow-sm">
@@ -903,7 +903,7 @@ export default function ClientDetail() {
             </div>
 
             {/* ══ RIGHT COLUMN ═════════════════════════════════════════════ */}
-            <div className="bg-slate-200 overflow-y-auto">
+            <div className="bg-slate-200 lg:overflow-y-auto">
               <div className="p-3 space-y-3">
                 {/* ── Estimates ── */}
                 <div className="bg-white border border-slate-300 rounded-xl shadow-sm overflow-hidden">
