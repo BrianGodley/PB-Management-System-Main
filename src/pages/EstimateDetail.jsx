@@ -1032,7 +1032,7 @@ export default function EstimateDetail() {
   const projGpmd = pt.manDays > 0 ? Math.round(pt.gp / pt.manDays) : 425
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col lg:h-full">
       {/* ── What If? scratchpad modal ── */}
       {whatIfOpen && (
         <EstimateWhatIfModal
@@ -1417,10 +1417,10 @@ export default function EstimateDetail() {
         </div>
       )}
 
-      {/* Three-panel layout */}
-      <div className="flex gap-4 flex-1 min-h-0" style={{ minHeight: '500px' }}>
+      {/* Three-panel layout — stacks vertically on mobile, side-by-side on desktop */}
+      <div className="flex flex-col lg:flex-row gap-4 lg:flex-1 lg:min-h-0 lg:[min-height:500px]">
         {/* ── Panel 1: Projects ── */}
-        <div className="w-1/3 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="w-full lg:w-1/3 min-h-[16rem] lg:min-h-0 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
             <h2 className="font-semibold text-gray-900 text-sm">Projects</h2>
             <button
@@ -1597,7 +1597,7 @@ export default function EstimateDetail() {
         </div>
 
         {/* ── Panel 2: Modules ── */}
-        <div className="w-1/3 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="w-full lg:w-1/3 min-h-[16rem] lg:min-h-0 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
             <h2 className="font-semibold text-gray-900 text-sm">
               {selectedProject ? selectedProject.project_name : 'Modules'}
@@ -1670,7 +1670,7 @@ export default function EstimateDetail() {
         </div>
 
         {/* ── Panel 3: Module Detail ── */}
-        <div className="w-1/3 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="w-full lg:w-1/3 min-h-[16rem] lg:min-h-0 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
             <h2 className="font-semibold text-gray-900 text-sm">
               {selectedModule

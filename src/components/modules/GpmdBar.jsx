@@ -43,6 +43,10 @@ export default function GpmdBar({
   const [draftGpmd, setDraftGpmd] = useState('')
   const [editingSubPct, setEditingSubPct] = useState(false)
   const [draftSubPct, setDraftSubPct] = useState('')
+  // On phones the bar collapses to just GPMD / Gross Profit / Total Price; the
+  // rest reveal via the More toggle (and wrap onto extra rows). Desktop (lg)
+  // always shows everything.
+  const [expanded, setExpanded] = useState(false)
 
   // Previously: `if (price <= 0) return null` — but the module-level
   // sticky wrapper has its own padding, so returning null left a thin
@@ -139,7 +143,9 @@ export default function GpmdBar({
   // ── Sub GP column — rendered separately so the rate is inline-editable ─────
   function SubGpCol() {
     return (
-      <div className="px-3 flex-1 flex-1 min-w-0 text-center">
+      <div
+        className={`px-3 flex-1 min-w-0 text-center ${expanded ? '' : 'hidden lg:block'}`}
+      >
         <p className="text-xs text-gray-400 whitespace-nowrap mb-0.5">Sub GP</p>
         <p className="font-bold whitespace-nowrap tabular-nums text-sm text-blue-400">
           {subGp > 0 ? fmt(subGp) : '—'}
@@ -188,12 +194,15 @@ export default function GpmdBar({
         {/* Data columns — flex-1 so they share width evenly */}
         {cols.map(col => {
           const isAfterSubCost = col.label === 'Gross Profit'
+          // Always visible (even collapsed on mobile): Gross Profit + Total Price.
+          const essential = col.label === 'Gross Profit' || col.label === 'Total Price'
+          const hideCls = essential || expanded ? '' : 'hidden lg:block'
           // Use a keyed Fragment so React stops warning about missing keys
           // on this iterator (shorthand <> can't accept a key prop).
           return (
             <React.Fragment key={col.label}>
               {isAfterSubCost && <SubGpCol />}
-              <div className="px-1.5 flex-1 min-w-0 text-center">
+              <div className={`px-1.5 flex-1 min-w-0 text-center ${hideCls}`}>
                 <p className="text-[10px] text-gray-400 truncate mb-0.5">{col.label}</p>
                 <p
                   className={`font-bold tabular-nums truncate ${
@@ -211,6 +220,15 @@ export default function GpmdBar({
             </React.Fragment>
           )
         })}
+
+        {/* Mobile-only expand/collapse toggle */}
+        <button
+          type="button"
+          onClick={() => setExpanded(e => !e)}
+          className="lg:hidden shrink-0 self-center ml-1 px-2 py-1 text-[10px] font-semibold text-gray-200 hover:text-white rounded-md border border-white/25"
+        >
+          {expanded ? 'Less ▴' : 'More ▾'}
+        </button>
       </div>
     </div>
   )
