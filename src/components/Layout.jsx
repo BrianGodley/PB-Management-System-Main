@@ -239,7 +239,11 @@ export default function Layout() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-100">
+    /* 100dvh (dynamic viewport height) matches the *visible* area on mobile, so
+       the page itself never scrolls and drags the header — only <main> scrolls.
+       Inline style wins on modern browsers; the h-screen class is the fallback
+       where dvh isn't supported. */
+    <div className="h-screen flex flex-col bg-gray-100" style={{ height: '100dvh' }}>
       {/* Floating tooltip portal — attached to <body> so the sidebar's
           overflow-y-auto can't clip it. Driven by hover on each collapsed
           nav item. left: 56 = w-12 sidebar (48px) + 8px margin. */}
@@ -264,7 +268,7 @@ export default function Layout() {
       {/* ── TOP BAR ── */}
       <header
         style={{ backgroundColor: forestGreen }}
-        className="w-full sticky top-0 z-50 shadow-md"
+        className="w-full flex-shrink-0 sticky top-0 z-50 shadow-md"
       >
         <div className="flex items-center h-11 px-4 gap-4">
           {/* Logo + system name */}

@@ -23,3 +23,14 @@ supabase_diagnose_*.sql
 supabase_construction_subcategories.sql
 supabase_make_*.sql
 supabase_fix_tiers.sql
+
+# Capacitor native build artifacts (the ios/ and android/ projects themselves
+# are committed, but these caches / synced web assets are regenerated)
+/ios/App/Pods/
+/ios/App/build/
+/ios/App/App/public/
+/android/.gradle/
+/android/build/
+/android/app/build/
+/android/app/src/main/assets/public/
+/android/capacitor-cordova-android-plugins/

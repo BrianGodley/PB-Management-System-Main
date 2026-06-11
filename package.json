@@ -10,9 +10,13 @@
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "format": "prettier --write \"src/**/*.{js,jsx,css}\"",
-    "format:check": "prettier --check \"src/**/*.{js,jsx,css}\""
+    "format:check": "prettier --check \"src/**/*.{js,jsx,css}\"",
+    "cap:sync": "vite build && npx cap sync",
+    "cap:ios": "npx cap open ios",
+    "cap:android": "npx cap open android"
   },
   "dependencies": {
+    "@capacitor/core": "^6.1.2",
     "@supabase/supabase-js": "^2.39.0",
     "docx": "^9.6.1",
     "html2canvas": "^1.4.1",
@@ -27,6 +31,9 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@capacitor/android": "^6.1.2",
+    "@capacitor/cli": "^6.1.2",
+    "@capacitor/ios": "^6.1.2",
     "@eslint/js": "^9.15.0",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.16",
