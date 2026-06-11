@@ -1170,7 +1170,7 @@ export default function Contacts() {
           dash
         ),
     },
-    { key: 'email', label: 'Email', render: emailCell },
+    { key: 'email', label: 'Email', mobileHide: true, render: emailCell },
     {
       key: 'address',
       label: 'Address',
@@ -1223,7 +1223,7 @@ export default function Contacts() {
           dash
         ),
     },
-    { key: 'email', label: 'Email', render: emailCell },
+    { key: 'email', label: 'Email', mobileHide: true, render: emailCell },
     {
       key: 'city_state',
       label: 'City / State',

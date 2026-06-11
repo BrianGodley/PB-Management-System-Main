@@ -763,7 +763,7 @@ export default function HR() {
             </div>
           ) : (
             <div className="bg-white overflow-x-auto -mx-2 sm:mx-0 sm:rounded-xl border-y sm:border border-gray-200">
-              <table className="w-full text-xs min-w-[860px]">
+              <table className="hr-emp-table w-full text-xs table-fixed lg:table-auto lg:min-w-[860px]">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
                     <SortTh col="name" label="Name" sticky />

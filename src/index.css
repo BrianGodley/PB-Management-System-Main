@@ -80,6 +80,24 @@
   .contacts-co-table th:nth-child(1) {
     width: 44%;
   }
+
+  /* HR employee table: show only Name (1) + Cell Phone (3) on mobile.
+     Hide Address (2), Email (4), Position (5), Role (6), Started (7). */
+  .hr-emp-table th:nth-child(2),
+  .hr-emp-table td:nth-child(2),
+  .hr-emp-table th:nth-child(4),
+  .hr-emp-table td:nth-child(4),
+  .hr-emp-table th:nth-child(5),
+  .hr-emp-table td:nth-child(5),
+  .hr-emp-table th:nth-child(6),
+  .hr-emp-table td:nth-child(6),
+  .hr-emp-table th:nth-child(7),
+  .hr-emp-table td:nth-child(7) {
+    display: none;
+  }
+  .hr-emp-table th:nth-child(1) {
+    width: 55%;
+  }
 }
 
 @layer components {
