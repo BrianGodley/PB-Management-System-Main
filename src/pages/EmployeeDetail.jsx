@@ -969,17 +969,17 @@ export default function EmployeeDetail() {
       </div>
 
       {/* ── Hero section ── */}
-      <div className="bg-white border-b border-gray-200 px-8 py-6 flex items-center gap-6 flex-shrink-0">
+      <div className="bg-white border-b border-gray-200 px-4 py-3 lg:px-8 lg:py-6 flex items-center gap-3 lg:gap-6 flex-shrink-0">
         {/* Large avatar */}
         <div className="relative flex-shrink-0">
           <div
             onClick={() => avatarInputRef.current?.click()}
-            className="w-24 h-24 rounded-full overflow-hidden cursor-pointer group bg-green-100 flex items-center justify-center"
+            className="w-14 h-14 lg:w-24 lg:h-24 rounded-full overflow-hidden cursor-pointer group bg-green-100 flex items-center justify-center"
           >
             {employee.avatar_url ? (
               <img src={employee.avatar_url} alt="" className="w-full h-full object-cover" />
             ) : (
-              <span className="text-3xl font-bold text-green-700">
+              <span className="text-lg lg:text-3xl font-bold text-green-700">
                 {employee.first_name?.[0]}
                 {employee.last_name?.[0]}
               </span>
@@ -999,7 +999,7 @@ export default function EmployeeDetail() {
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-lg lg:text-2xl font-bold text-gray-900">
               {employee.first_name} {employee.last_name}
             </h1>
             <span
@@ -1015,8 +1015,8 @@ export default function EmployeeDetail() {
           )}
         </div>
 
-        {/* Archive + Delete buttons */}
-        <div className="flex gap-2 flex-shrink-0">
+        {/* Archive + Delete buttons (desktop only) */}
+        <div className="hidden lg:flex gap-2 flex-shrink-0">
           <button
             onClick={toggleArchive}
             className="px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
@@ -1037,17 +1037,19 @@ export default function EmployeeDetail() {
         {[
           { key: 'profile', label: 'Profile', icon: '👤' },
           ...(currentUserIsAdmin ? [{ key: 'user', label: 'Access and Roles', icon: '🛡️' }] : []),
-          ...(currentUserIsAdmin ? [{ key: 'permissions', label: 'Permissions', icon: '🔑' }] : []),
-          { key: 'docs', label: `Documents (${docs.length})`, icon: '📁' },
-          { key: 'certs', label: `Certifications (${certs.length})`, icon: '🏅' },
-          { key: 'training', label: `Training (${training.length})`, icon: '🎓' },
-          { key: 'reviews', label: `Reviews (${reviews.length})`, icon: '⭐' },
-          { key: 'testing', label: 'Testing', icon: '🔬' },
+          ...(currentUserIsAdmin
+            ? [{ key: 'permissions', label: 'Permissions', icon: '🔑', mobileHide: true }]
+            : []),
+          { key: 'docs', label: `Documents (${docs.length})`, icon: '📁', mobileHide: true },
+          { key: 'certs', label: `Certifications (${certs.length})`, icon: '🏅', mobileHide: true },
+          { key: 'training', label: `Training (${training.length})`, icon: '🎓', mobileHide: true },
+          { key: 'reviews', label: `Reviews (${reviews.length})`, icon: '⭐', mobileHide: true },
+          { key: 'testing', label: 'Testing', icon: '🔬', mobileHide: true },
         ].map(t => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+            className={`${t.mobileHide ? 'hidden lg:flex' : 'flex'} items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               tab === t.key
                 ? 'border-green-700 text-green-700'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -1059,14 +1061,14 @@ export default function EmployeeDetail() {
       </div>
 
       {/* ── Tab content ── */}
-      <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+      <div className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-6 pt-0 pb-6 bg-gray-50">
         {/* ── PROFILE ── */}
         {tab === 'profile' && (
           <div className="max-w-6xl space-y-3">
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="jobinfo-fields bg-white rounded-xl border border-gray-200 p-4">
               {/* Sticky header — stays visible while scrolling the
                   long list of profile fields below. */}
-              <div className="flex items-center justify-between mb-3 sticky top-0 z-10 bg-white -mx-4 px-4 py-2 border-b border-gray-100 rounded-t-xl">
+              <div className="flex items-center justify-between mb-3 sticky top-0 z-20 bg-white -mx-4 px-4 py-2 border-b border-gray-100 rounded-t-xl">
                 <h3 className="font-semibold text-gray-800 text-sm">Employee Info</h3>
                 {!editing ? (
                   <button
@@ -1118,6 +1120,7 @@ export default function EmployeeDetail() {
                         value={draft[key]}
                         editing={editing}
                         onChange={v => set(key, v)}
+                        tel={key === 'phone' || key === 'cell_phone'}
                       />
                     ))}
                     <div className="col-span-2">
@@ -2352,20 +2355,35 @@ export default function EmployeeDetail() {
 }
 
 // ── Field helper ──────────────────────────────────────────────────────────────
-function Field({ label, value, editing, onChange }) {
+function Field({ label, value, editing, onChange, tel }) {
   // Same input layout in both modes — disabled in read mode so the user always
   // sees the field structure (matches the Job Details / Client tab convention).
+  const showCall = tel && !editing && value && String(value).trim()
   return (
     <div>
       <label className="block text-[11px] font-medium text-gray-600 mb-0.5">{label}</label>
-      <input
-        value={value || ''}
-        onChange={e => onChange(e.target.value)}
-        disabled={!editing}
-        className={`w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500 ${
-          !editing ? 'bg-gray-50 text-gray-700 cursor-default' : ''
-        }`}
-      />
+      <div className="relative">
+        <input
+          value={value || ''}
+          onChange={e => onChange(e.target.value)}
+          disabled={!editing}
+          className={`w-full border border-gray-200 rounded-md px-2.5 py-1.5 text-sm focus:outline-none focus:border-green-500 ${
+            showCall ? 'pr-9' : ''
+          } ${!editing ? 'bg-gray-50 text-gray-700 cursor-default' : ''}`}
+        />
+        {showCall && (
+          <a
+            href={`tel:${String(value).replace(/[^\d+]/g, '')}`}
+            onClick={e => e.stopPropagation()}
+            title={`Call ${value}`}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-6 rounded-full bg-green-100 text-green-700 hover:bg-green-200"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z" />
+            </svg>
+          </a>
+        )}
+      </div>
     </div>
   )
 }

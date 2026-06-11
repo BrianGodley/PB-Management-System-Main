@@ -226,20 +226,36 @@ export default function Layout() {
   // fields that exist now and any added later (e.g. modals). Login lives
   // outside this Layout, so its autofill is unaffected.
   useEffect(() => {
+    // Text-like inputs that browsers try to autofill (name/email/phone/etc.).
+    const TEXTY = new Set(['', 'text', 'email', 'tel', 'url', 'search', 'number', 'password'])
     const off = el => {
       if (el.dataset.autofillOff) return
       el.dataset.autofillOff = '1'
-      // Native browser autofill / history. A unique token defeats Chrome's
-      // field-name heuristics better than the (often-ignored) literal "off".
+      // Attribute hints (history + password managers).
       el.setAttribute('autocomplete', 'off')
       el.setAttribute('autocorrect', 'off')
       el.setAttribute('autocapitalize', 'off')
-      // Tell the common password managers to leave this field alone — these are
-      // the inline chips/suggestions that pop up on focus.
       el.setAttribute('data-lpignore', 'true') // LastPass
       el.setAttribute('data-1p-ignore', 'true') // 1Password
       el.setAttribute('data-bwignore', 'true') // Bitwarden
       el.setAttribute('data-form-type', 'other') // Dashlane
+
+      // Readonly-until-focus: the browser's native contact/address autofill
+      // ignores autocomplete="off", but it NEVER autofills a readonly field.
+      // We add readonly up front and remove it the moment the field is focused,
+      // so by the time the user can type it's a normal editable input — but the
+      // autofill overlay never gets a chance to appear. Skip if the field is
+      // already focused (e.g. autoFocus) so we don't trap it.
+      const isText =
+        el.tagName === 'TEXTAREA' ||
+        (el.tagName === 'INPUT' && TEXTY.has((el.getAttribute('type') || '').toLowerCase()))
+      if (isText && document.activeElement !== el) {
+        el.setAttribute('readonly', '')
+        const wake = () => el.removeAttribute('readonly')
+        // focus fires for taps, clicks and keyboard tabbing; removing readonly
+        // here keeps the keyboard/caret working normally.
+        el.addEventListener('focus', wake, { once: true })
+      }
     }
     const scan = node => {
       if (!node || node.nodeType !== 1) return
