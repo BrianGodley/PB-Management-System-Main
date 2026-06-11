@@ -558,18 +558,41 @@ function LogCard({ log, author, jobName, onEdit, onDelete, onPhotoClick }) {
 // Type-to-search picker limited to open jobs (active / on-hold / unstatused).
 function JobPicker({ jobs, value, onChange }) {
   const jobName = j => j.name || j.client_name || 'Untitled job'
-  const openJobs = jobs.filter(
-    j => j.status === 'active' || j.status === 'on_hold' || !j.status
-  )
+  const isOpenJob = j => j.status === 'active' || j.status === 'on_hold' || !j.status
   const selected = jobs.find(j => j.id === value)
   const [query, setQuery] = useState(selected ? jobName(selected) : '')
   const [open, setOpen] = useState(false)
+  const [filter, setFilter] = useState('open') // 'open' | 'closed'
 
+  const pool = jobs.filter(j => (filter === 'open' ? isOpenJob(j) : !isOpenJob(j)))
   const q = query.trim().toLowerCase()
-  const matches = q ? openJobs.filter(j => jobName(j).toLowerCase().includes(q)) : openJobs
+  const matches = q ? pool.filter(j => jobName(j).toLowerCase().includes(q)) : pool
 
   return (
     <div className="relative">
+      {/* Open / Closed dual picker */}
+      <div className="flex gap-1 mb-1.5">
+        {[
+          { v: 'open', l: 'Open Jobs' },
+          { v: 'closed', l: 'Closed Jobs' },
+        ].map(o => (
+          <button
+            key={o.v}
+            type="button"
+            onClick={() => {
+              setFilter(o.v)
+              setOpen(true)
+            }}
+            className={`flex-1 px-2 py-1 rounded-md text-xs font-semibold border transition-colors ${
+              filter === o.v
+                ? 'border-green-700 bg-green-50 text-green-800'
+                : 'border-gray-300 text-gray-600'
+            }`}
+          >
+            {o.l}
+          </button>
+        ))}
+      </div>
       <input
         type="text"
         value={query}
@@ -580,13 +603,13 @@ function JobPicker({ jobs, value, onChange }) {
         }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
-        placeholder="Search open jobs…"
+        placeholder={`Search ${filter} jobs…`}
         className="input text-sm w-full"
       />
       {open && (
         <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
           {matches.length === 0 ? (
-            <p className="px-3 py-2 text-xs text-gray-400">No open jobs match.</p>
+            <p className="px-3 py-2 text-xs text-gray-400">No {filter} jobs match.</p>
           ) : (
             matches.slice(0, 60).map(j => (
               <button
