@@ -746,7 +746,7 @@ export default function HR() {
       )}
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto py-3 sm:p-6">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden py-3 sm:p-6">
         {loading ? (
           <div className="flex items-center justify-center py-12 text-gray-400">Loading…</div>
         ) : /* ── EMPLOYEES TAB ── */
@@ -796,7 +796,20 @@ export default function HR() {
                           </button>
                         </td>
                         <td className="px-4 py-2 text-gray-600">{location}</td>
-                        <td className="px-4 py-2 text-gray-600">{emp.cell_phone || '—'}</td>
+                        <td className="px-4 py-2 text-gray-600">
+                          {emp.cell_phone ? (
+                            <a
+                              href={`tel:${String(emp.cell_phone).replace(/[^\d+]/g, '')}`}
+                              onClick={e => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 text-green-700 hover:underline"
+                            >
+                              <span aria-hidden="true">📞</span>
+                              {emp.cell_phone}
+                            </a>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
                         <td className="px-4 py-2 text-gray-600">{emp.email || '—'}</td>
                         <td className="px-4 py-2 text-gray-600">{emp.job_title || '—'}</td>
                         <td className="px-4 py-2">
@@ -927,7 +940,20 @@ export default function HR() {
                           </button>
                         </td>
                         <td className="px-4 py-2 text-gray-600">{location}</td>
-                        <td className="px-4 py-2 text-gray-600">{emp.cell_phone || '—'}</td>
+                        <td className="px-4 py-2 text-gray-600">
+                          {emp.cell_phone ? (
+                            <a
+                              href={`tel:${String(emp.cell_phone).replace(/[^\d+]/g, '')}`}
+                              onClick={e => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 text-green-700 hover:underline"
+                            >
+                              <span aria-hidden="true">📞</span>
+                              {emp.cell_phone}
+                            </a>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
                         <td className="px-4 py-2 text-gray-600">{emp.email || '—'}</td>
                         <td className="px-4 py-2 text-gray-600">{emp.job_title || '—'}</td>
                         <td className="px-4 py-2 text-gray-600">

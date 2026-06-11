@@ -81,6 +81,7 @@ const EMPTY_FORM = {
   notes: '',
   phone_ext: '',
   price_list: '',
+  price_list_files: [],
   services_pricing: '',
 }
 
@@ -160,6 +161,7 @@ export default function SubsVendors() {
       notes: sub.notes || '',
       phone_ext: sub.phone_ext || '',
       price_list: sub.price_list || '',
+      price_list_files: Array.isArray(sub.price_list_files) ? sub.price_list_files : [],
       services_pricing: sub.services_pricing || '',
     })
     setError('')
@@ -202,6 +204,7 @@ export default function SubsVendors() {
       notes: form.notes.trim() || null,
       phone_ext: form.phone_ext.trim() || null,
       price_list: form.price_list.trim() || null,
+      price_list_files: Array.isArray(form.price_list_files) ? form.price_list_files : [],
       services_pricing: form.services_pricing.trim() || null,
       updated_at: new Date().toISOString(),
     }
@@ -1285,6 +1288,65 @@ function SubModal({
   recordType,
 }) {
   const [customInput, setCustomInput] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const priceFileInputRef = useRef(null)
+
+  const priceFiles = Array.isArray(form.price_list_files) ? form.price_list_files : []
+
+  async function handlePriceFiles(fileList) {
+    const files = Array.from(fileList || [])
+    if (!files.length) return
+    setUploading(true)
+    for (const file of files) {
+      const safe = file.name.replace(/[^\w.\-]+/g, '_')
+      const path = `price-lists/${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safe}`
+      const { error: upErr } = await supabase.storage
+        .from('sub-vendor-files')
+        .upload(path, file, { upsert: false, contentType: file.type })
+      if (upErr) {
+        alert('Upload failed: ' + upErr.message)
+        continue
+      }
+      setForm(f => ({
+        ...f,
+        price_list_files: [
+          ...(Array.isArray(f.price_list_files) ? f.price_list_files : []),
+          { name: file.name, path, type: file.type || '', size: file.size },
+        ],
+      }))
+    }
+    setUploading(false)
+    if (priceFileInputRef.current) priceFileInputRef.current.value = ''
+  }
+
+  async function openPriceFile(pf) {
+    const { data, error: sErr } = await supabase.storage
+      .from('sub-vendor-files')
+      .createSignedUrl(pf.path, 300)
+    if (sErr || !data?.signedUrl) {
+      alert('Could not open file: ' + (sErr?.message || 'unknown error'))
+      return
+    }
+    window.open(data.signedUrl, '_blank')
+  }
+
+  async function removePriceFile(pf) {
+    await supabase.storage.from('sub-vendor-files').remove([pf.path])
+    setForm(f => ({
+      ...f,
+      price_list_files: (Array.isArray(f.price_list_files) ? f.price_list_files : []).filter(
+        x => x.path !== pf.path
+      ),
+    }))
+  }
+
+  function fileIcon(pf) {
+    const n = (pf.name || '').toLowerCase()
+    if (n.endsWith('.pdf')) return '📄'
+    if (n.endsWith('.xls') || n.endsWith('.xlsx') || n.endsWith('.csv')) return '📊'
+    if (n.endsWith('.doc') || n.endsWith('.docx')) return '📝'
+    return '📎'
+  }
 
   function addCustom() {
     const val = customInput.trim()
@@ -1562,6 +1624,62 @@ function SubModal({
               />
             </div>
           )}
+
+          {/* Price List Files (subs + vendors) — PDF, Excel, or Word */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Price List Files{' '}
+              <span className="font-normal text-gray-400">(PDF, Excel, or Word)</span>
+            </label>
+
+            {priceFiles.length > 0 && (
+              <ul className="mb-2 space-y-1.5">
+                {priceFiles.map(pf => (
+                  <li
+                    key={pf.path}
+                    className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => openPriceFile(pf)}
+                      className="flex items-center gap-2 min-w-0 flex-1 text-left"
+                      title="Open / download"
+                    >
+                      <span className="flex-shrink-0">{fileIcon(pf)}</span>
+                      <span className="truncate text-sm text-green-700 hover:underline">
+                        {pf.name}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removePriceFile(pf)}
+                      className="flex-shrink-0 text-gray-300 hover:text-red-500 text-sm"
+                      title="Remove file"
+                    >
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <input
+              ref={priceFileInputRef}
+              type="file"
+              multiple
+              accept=".pdf,.xls,.xlsx,.csv,.doc,.docx,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              onChange={e => handlePriceFiles(e.target.files)}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => priceFileInputRef.current?.click()}
+              disabled={uploading}
+              className="w-full border border-dashed border-gray-300 rounded-lg py-2 text-sm font-medium text-gray-500 hover:border-green-500 hover:text-green-700 disabled:opacity-50 transition-colors"
+            >
+              {uploading ? 'Uploading…' : '⬆ Upload price list file'}
+            </button>
+          </div>
 
           {/* Notes */}
           <div>
