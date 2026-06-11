@@ -717,16 +717,15 @@ export default function SubsVendors() {
       {svTab === 'directory' && (
         <>
           {/* ── Search + Type toggle on one row ────────────────── */}
-          <div className="flex items-center gap-3 mb-4 mt-4 flex-shrink-0">
+          <div className="flex flex-wrap items-center gap-3 mb-4 mt-4 flex-shrink-0">
             <input
               type="text"
               placeholder="Search by company, contact, division, or phone…"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="input text-sm w-64"
+              className="input text-sm flex-1 min-w-[10rem] sm:flex-none sm:w-64"
             />
-            <div className="flex-1" />
-            <div className="flex-shrink-0 flex rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+            <div className="flex-shrink-0 flex rounded-xl overflow-hidden border border-gray-200 shadow-sm sm:ml-auto">
               <button
                 onClick={() => setTypeView('sub')}
                 className={`px-4 py-1.5 text-xs font-semibold transition-colors ${
@@ -735,7 +734,7 @@ export default function SubsVendors() {
                     : 'bg-white text-gray-500 hover:bg-gray-50'
                 }`}
               >
-                🚜 Subcontractors
+                🚜 Subs
               </button>
               <button
                 onClick={() => setTypeView('vendor')}
