@@ -64,6 +64,45 @@
   appearance: textfield;
 }
 
+/* Contacts tables on mobile: show only Name / Phone / Stage so the table fits
+   the screen width. A wide, horizontally-scrollable table on iOS lets a vertical
+   swipe drift sideways (the "name column slides" jitter); fitting the columns to
+   the viewport removes horizontal scroll entirely. Full data is one tap away in
+   the contact detail view. Desktop (lg) shows every column. */
+@media (max-width: 1023px) {
+  /* Individuals: keep 1 Name, 3 Phone, 4 Cell, 5 Email — hide Assigned To (2),
+     Address (6), City/State (7), Stage (8), Created (9). */
+  .contacts-ind-table th:nth-child(2),
+  .contacts-ind-table td:nth-child(2),
+  .contacts-ind-table th:nth-child(6),
+  .contacts-ind-table td:nth-child(6),
+  .contacts-ind-table th:nth-child(7),
+  .contacts-ind-table td:nth-child(7),
+  .contacts-ind-table th:nth-child(8),
+  .contacts-ind-table td:nth-child(8),
+  .contacts-ind-table th:nth-child(9),
+  .contacts-ind-table td:nth-child(9),
+  /* Companies: keep 1 Name, 3 Phone, 4 Email — hide Assigned To (2),
+     City/State (5), Stage (6), Created (7). */
+  .contacts-co-table th:nth-child(2),
+  .contacts-co-table td:nth-child(2),
+  .contacts-co-table th:nth-child(5),
+  .contacts-co-table td:nth-child(5),
+  .contacts-co-table th:nth-child(6),
+  .contacts-co-table td:nth-child(6),
+  .contacts-co-table th:nth-child(7),
+  .contacts-co-table td:nth-child(7) {
+    display: none;
+  }
+  /* Give the Name column the bulk of the width; the rest split what remains. */
+  .contacts-ind-table th:nth-child(1) {
+    width: 38%;
+  }
+  .contacts-co-table th:nth-child(1) {
+    width: 46%;
+  }
+}
+
 @layer components {
   .btn-primary {
     @apply bg-green-700 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;

@@ -1202,8 +1202,8 @@ export default function Contacts() {
               ) : error ? (
                 <div className="text-red-500 text-sm py-8 text-center">{error}</div>
               ) : (
-                <div className="bg-white rounded-xl border border-gray-200 flex-1 min-h-0 overflow-auto overscroll-contain">
-                  <table className="w-full text-xs min-w-[900px] table-fixed">
+                <div className="bg-white rounded-xl border border-gray-200 flex-1 min-h-0 overflow-x-hidden overflow-y-auto lg:overflow-auto overscroll-contain">
+                  <table className="contacts-ind-table w-full text-xs table-fixed lg:min-w-[900px]">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200">
                         <th
@@ -1326,8 +1326,8 @@ export default function Contacts() {
             ) : companiesError ? (
               <div className="text-red-500 text-sm py-8 text-center">{companiesError}</div>
             ) : (
-              <div className="bg-white rounded-xl border border-gray-200 flex-1 min-h-0 overflow-auto overscroll-contain">
-                <table className="w-full text-xs min-w-[700px] table-fixed">
+              <div className="bg-white rounded-xl border border-gray-200 flex-1 min-h-0 overflow-x-hidden overflow-y-auto lg:overflow-auto overscroll-contain">
+                <table className="contacts-co-table w-full text-xs table-fixed lg:min-w-[700px]">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
                       <th
