@@ -2281,7 +2281,7 @@ export default function WorkOrders({ jobs, selectedJob, jobStatusFilter = 'open'
             </span>
             <span className="text-base font-bold text-white">{fmt(totalValue)}</span>
           </div>
-          <div className="px-5 py-2 flex-1 min-w-[140px]">
+          <div className="hidden lg:block px-5 py-2 flex-1 min-w-[140px]">
             <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block">
               Completion
             </span>
@@ -2295,7 +2295,7 @@ export default function WorkOrders({ jobs, selectedJob, jobStatusFilter = 'open'
 
         {/* Filter row + add button */}
         <div className="flex items-center justify-between gap-2">
-        <div className="flex gap-1.5 flex-wrap">
+        <div className="hidden lg:flex gap-1.5 flex-wrap">
           {['all', 'pending', 'in_progress', 'complete'].map(s => (
             <button
               key={s}

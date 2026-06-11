@@ -1334,7 +1334,9 @@ export default function JobsList() {
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
-                className={`px-2 sm:px-2.5 py-1 rounded-md text-[11px] sm:text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-colors ${
+                className={`${
+                  t.key === 'info' ? 'hidden lg:block ' : ''
+                }px-2 sm:px-2.5 py-1 rounded-md text-[11px] sm:text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-colors ${
                   tab === t.key
                     ? 'bg-black/20 text-white'
                     : 'text-white/80 hover:text-white hover:bg-black/15'
