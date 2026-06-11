@@ -1207,7 +1207,7 @@ export default function Contacts() {
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200">
                         <th
-                          className={`${thCls} sticky left-0 bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]`}
+                          className={`${thCls} lg:sticky lg:left-0 bg-gray-50 z-10 lg:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]`}
                           onClick={() => toggleSort('last_name')}
                         >
                           Name{arrow('last_name')}
@@ -1244,7 +1244,7 @@ export default function Contacts() {
                       ) : (
                         paginated.map(c => (
                           <tr key={c.id} className="group hover:bg-gray-50 transition-colors">
-                            <td className="px-4 py-2 sticky left-0 bg-white group-hover:bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]">
+                            <td className="px-4 py-2 lg:sticky lg:left-0 bg-white group-hover:bg-gray-50 z-10 lg:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]">
                               <button
                                 onClick={() => navigate(`/contacts/${c.id}`)}
                                 className="font-semibold text-green-700 hover:text-green-900 hover:underline text-left"
@@ -1331,7 +1331,7 @@ export default function Contacts() {
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
                       <th
-                        className={`${thCls} sticky left-0 bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]`}
+                        className={`${thCls} lg:sticky lg:left-0 bg-gray-50 z-10 lg:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]`}
                         onClick={() => toggleSort('company_name')}
                       >
                         Company Name{arrow('company_name')}
@@ -1364,7 +1364,7 @@ export default function Contacts() {
                     ) : (
                       paginated.map(c => (
                         <tr key={c.id} className="group hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-2 sticky left-0 bg-white group-hover:bg-gray-50 z-10 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]">
+                          <td className="px-4 py-2 lg:sticky lg:left-0 bg-white group-hover:bg-gray-50 z-10 lg:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]">
                             <button
                               onClick={() => navigate(`/companies/${c.id}`)}
                               className="font-semibold text-green-700 hover:text-green-900 hover:underline text-left"
