@@ -45,6 +45,9 @@ export default function ChecksheetBuilder({ course: initialCourse, onClose, onSa
   const [title, setTitle] = useState(initialCourse?.title || '')
   const [description, setDescription] = useState(initialCourse?.description || '')
   const [category, setCategory] = useState(initialCourse?.category || 'General')
+  const [imageUrl, setImageUrl] = useState(initialCourse?.image_url || '')
+  const [imageFile, setImageFile] = useState(null)
+  const imgRef = useRef()
   const [steps, setSteps] = useState([])
 
   const [readItems, setReadItems] = useState([])
@@ -215,16 +218,24 @@ export default function ChecksheetBuilder({ course: initialCourse, onClose, onSa
   const saveChecksheet = async () => {
     if (!title.trim()) return
     setSaving(true)
+    // Upload the header image to the lms-images bucket if a new one was picked.
+    let image_url = imageUrl || null
+    if (imageFile) {
+      const ipath = `course-headers/${Date.now()}_${imageFile.name.replace(/[^\w.\-]+/g, '_')}`
+      const { error: imgErr } = await supabase.storage
+        .from('lms-images').upload(ipath, imageFile, { contentType: imageFile.type, upsert: false })
+      if (!imgErr) image_url = supabase.storage.from('lms-images').getPublicUrl(ipath).data.publicUrl
+    }
     let courseId = initialCourse?.id
     if (courseId) {
       await supabase
         .from('lms_courses')
-        .update({ title, description, category, updated_at: new Date().toISOString() })
+        .update({ title, description, category, image_url, updated_at: new Date().toISOString() })
         .eq('id', courseId)
     } else {
       const { data } = await supabase
         .from('lms_courses')
-        .insert({ title, description, category, created_by_email: user?.email })
+        .insert({ title, description, category, image_url, created_by_email: user?.email })
         .select('id')
         .single()
       courseId = data?.id
@@ -511,6 +522,25 @@ export default function ChecksheetBuilder({ course: initialCourse, onClose, onSa
               placeholder="e.g. Irrigation Basics"
               className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500"
             />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Header Image</label>
+            {(imageFile || imageUrl) && (
+              <img
+                src={imageFile ? URL.createObjectURL(imageFile) : imageUrl}
+                alt=""
+                className="w-full h-24 object-cover rounded-lg mb-2 border border-gray-200"
+              />
+            )}
+            <div
+              onClick={() => imgRef.current?.click()}
+              className="flex items-center justify-center h-12 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-green-400 hover:bg-green-50 text-xs text-gray-500"
+            >
+              🖼️ {imageFile ? imageFile.name : imageUrl ? 'Change header image' : 'Upload a header image'}
+            </div>
+            <input ref={imgRef} type="file" accept="image/*" className="sr-only"
+              onChange={e => setImageFile(e.target.files?.[0] || null)} />
+            <p className="text-[10px] text-gray-400 mt-1">Shows in the header of the course card employees see.</p>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Category</label>

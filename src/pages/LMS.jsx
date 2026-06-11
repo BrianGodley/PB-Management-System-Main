@@ -59,6 +59,9 @@ function TrainingCard({ a, onStart }) {
 
   return (
     <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:shadow-md transition-shadow">
+      {a.course?.image_url && (
+        <img src={a.course.image_url} alt="" className="w-full h-28 object-cover" />
+      )}
       {/* Card header */}
       <div className="px-5 pt-5 pb-4">
         <div className="flex items-start justify-between gap-3 mb-1">
@@ -401,12 +404,21 @@ export default function LMS() {
               {courses.map(course => (
                 <tr key={course.id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="py-3 px-4">
-                    <p className="font-medium text-gray-900">{course.title}</p>
-                    {course.description && (
-                      <p className="text-xs text-gray-400 truncate max-w-xs">
-                        {course.description}
-                      </p>
-                    )}
+                    <div className="flex items-center gap-3">
+                      {course.image_url ? (
+                        <img src={course.image_url} alt="" className="w-12 h-10 object-cover rounded-md border border-gray-200 flex-shrink-0" />
+                      ) : (
+                        <div className="w-12 h-10 rounded-md bg-gray-100 flex items-center justify-center text-gray-300 flex-shrink-0">📋</div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="font-medium text-gray-900">{course.title}</p>
+                        {course.description && (
+                          <p className="text-xs text-gray-400 truncate max-w-xs">
+                            {course.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   </td>
                   <td className="py-3 px-4 text-gray-500 text-xs">{course.category || '—'}</td>
                   <td className="py-3 px-4">
