@@ -22,6 +22,7 @@ import {
   fetchFinanceOacRate,
   fetchConsultantNameForEstimate,
 } from '../lib/generateBidDoc'
+import CONotifyDialog from './CONotifyDialog'
 
 import DrainageModule from './modules/DrainageModule'
 import DrainageSummary from './modules/DrainageSummary'
@@ -118,6 +119,7 @@ export default function COEstimatePanel({
   isNew = false,
   onClose,
   onSaved,
+  onDeleted,
 }) {
   const { user } = useAuth()
   const [estimate, setEstimate] = useState(null)
@@ -142,20 +144,34 @@ export default function COEstimatePanel({
   const [title, setTitle] = useState(coName || '')
   const [description, setDescription] = useState('')
 
+  // ── CO lifecycle (mirrors the manual modal) ───────────────────────────────
+  const [coRow, setCoRow] = useState(null) // saved bid row (for status etc.)
+  const [notifyMode, setNotifyMode] = useState(null) // null | 'release' | 'resend'
+  const [lifecycleBusy, setLifecycleBusy] = useState(false)
+  const status = coRow?.status || 'unreleased'
+  const isApproved = status === 'sold'
+  const isDeclined = status === 'lost'
+  const isPending = status === 'pending' || status === 'presented'
+  const isUnreleased = !isApproved && !isDeclined && !isPending
+  const isTerminal = isApproved || isDeclined
+  const isReleased = isPending || isTerminal // can't edit pricing once released
+  const editable = isNew || isUnreleased // builder is locked once released
+
   useEffect(() => {
     fetchData()
   }, [estimateId])
 
   async function fetchData() {
     setLoading(true)
-    // Pull the CO's saved title + description so reopening keeps them.
+    // Pull the CO's saved title + description + status so reopening keeps them.
     if (bidId) {
       const { data: bidRow } = await supabase
         .from('bids')
-        .select('co_name, scope_of_work_html')
+        .select('*')
         .eq('id', bidId)
         .single()
       if (bidRow) {
+        setCoRow(bidRow)
         if (bidRow.co_name) setTitle(bidRow.co_name)
         setDescription(bidRow.scope_of_work_html || '')
       }
@@ -531,12 +547,132 @@ export default function COEstimatePanel({
         }
       }
 
+      if (bid) setCoRow(bid)
       onSaved(bid)
-      onClose()
+      // Stay open so the user can Release/Delete from here (Back returns).
     } catch (err) {
       alert('Error saving change order: ' + err.message)
     } finally {
       setSavingCO(false)
+    }
+  }
+
+  // ── CO lifecycle actions (release / resend / unrelease / delete) ──────────
+  async function setCoStatus(newStatus, extra = {}) {
+    if (!bidId) return null
+    const { data: bid, error: e } = await supabase
+      .from('bids')
+      .update({ status: newStatus, ...extra })
+      .eq('id', bidId)
+      .select('*')
+      .single()
+    if (e) {
+      alert('Error: ' + e.message)
+      return null
+    }
+    setCoRow(bid)
+    onSaved && onSaved(bid)
+    return bid
+  }
+
+  async function fetchClientContact() {
+    let cid = coRow?.client_id || null
+    if (!cid && jobId) {
+      const { data: j } = await supabase.from('jobs').select('client_id').eq('id', jobId).single()
+      cid = j?.client_id || null
+    }
+    if (cid) {
+      const { data: c } = await supabase
+        .from('clients')
+        .select('email, cell, phone')
+        .eq('id', cid)
+        .single()
+      if (c) return { email: c.email || '', cell: c.cell || c.phone || '' }
+    }
+    return { email: '', cell: '' }
+  }
+
+  async function sendClientNotification(method) {
+    const { email, cell } = await fetchClientContact()
+    const portalUrl = `${window.location.origin}/client-portal`
+    const amount = `$${Number(coRow?.bid_amount || 0).toLocaleString()}`
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    const base = import.meta.env.VITE_SUPABASE_URL
+    const headers = {
+      Authorization: `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json',
+    }
+    let sent = 0
+    if ((method === 'email' || method === 'both') && email) {
+      await fetch(`${base}/functions/v1/send-email`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          to: email,
+          subject: `Change Order #${coRow?.custom_co_id || ''} — approval requested`,
+          html: `<p>${clientName || ''}, a change order (${title || 'Change Order'}, ${amount}) is awaiting your approval.</p><p>Please review and approve it in your client portal: <a href="${portalUrl}">${portalUrl}</a></p>`,
+        }),
+      })
+      sent++
+    }
+    if ((method === 'text' || method === 'both') && cell) {
+      await fetch(`${base}/functions/v1/send-sms`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          to: cell,
+          body: `${clientName || ''}: Change Order ${amount} is awaiting your approval. Review it in your client portal: ${portalUrl}`,
+        }),
+      })
+      sent++
+    }
+    if (sent === 0) throw new Error('No client contact on file for the selected method.')
+  }
+
+  async function handleNotifySend(method) {
+    setLifecycleBusy(true)
+    try {
+      await sendClientNotification(method)
+      if (notifyMode === 'release') await setCoStatus('pending')
+      setNotifyMode(null)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e))
+    }
+    setLifecycleBusy(false)
+  }
+
+  async function handleUnrelease() {
+    setLifecycleBusy(true)
+    await setCoStatus('unreleased')
+    setLifecycleBusy(false)
+  }
+
+  async function handleDeleteCO() {
+    if (!bidId) return
+    if (!confirm(`Delete change order #${coRow?.custom_co_id || '?'} ("${title || ''}")?`)) return
+    setLifecycleBusy(true)
+    if (estimateId) await supabase.from('estimates').delete().eq('id', estimateId)
+    await supabase.from('bids').delete().eq('id', bidId)
+    setLifecycleBusy(false)
+    onDeleted && onDeleted(bidId)
+    onClose()
+  }
+
+  async function handlePrintCO() {
+    try {
+      if (!estimate || !projects.length) {
+        window.print()
+        return
+      }
+      const financeOacRate = await fetchFinanceOacRate()
+      const consultantName = await fetchConsultantNameForEstimate(supabase, estimate)
+      const blob = await generateBidDoc(estimate, projects, '', { financeOacRate, consultantName })
+      const safeName = (title || 'ChangeOrder').replace(/[^a-z0-9]/gi, '_')
+      downloadBidDoc(blob, `${safeName}_CO_${new Date().toISOString().split('T')[0]}.docx`)
+    } catch {
+      window.print()
     }
   }
 
@@ -643,8 +779,9 @@ export default function COEstimatePanel({
                 <input
                   value={title}
                   onChange={e => setTitle(e.target.value)}
+                  disabled={!editable}
                   placeholder="e.g. Add Patio Extension…"
-                  className="w-full text-sm font-semibold text-gray-900 border-b border-gray-300 focus:border-blue-500 outline-none bg-transparent pb-0.5 placeholder-gray-300"
+                  className="w-full text-sm font-semibold text-gray-900 border-b border-gray-300 focus:border-blue-500 outline-none bg-transparent pb-0.5 placeholder-gray-300 disabled:text-gray-500"
                 />
               </div>
               <div>
@@ -654,22 +791,117 @@ export default function COEstimatePanel({
                 <input
                   value={description}
                   onChange={e => setDescription(e.target.value)}
+                  disabled={!editable}
                   placeholder="Scope / notes (optional)…"
-                  className="w-full text-sm text-gray-700 border-b border-gray-200 focus:border-blue-500 outline-none bg-transparent pb-0.5 placeholder-gray-300"
+                  className="w-full text-sm text-gray-700 border-b border-gray-200 focus:border-blue-500 outline-none bg-transparent pb-0.5 placeholder-gray-300 disabled:text-gray-400"
                 />
               </div>
             </div>
           </div>
         </div>
 
-        <button
-          onClick={handleSaveCO}
-          disabled={savingCO}
-          className="text-sm px-4 py-2 rounded-lg bg-blue-700 text-white font-semibold hover:bg-blue-800 transition-colors disabled:opacity-50 flex items-center gap-1.5 flex-shrink-0"
-        >
-          {savingCO ? '⏳ Saving…' : isNew ? '📋 Save Change Order' : '💾 Update Change Order'}
-        </button>
+        {/* Status-aware action bar (mirrors the manual CO modal) */}
+        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+          {!isReleased && (
+            <>
+              <button
+                onClick={handleSaveCO}
+                disabled={savingCO}
+                className="text-sm px-4 py-2 rounded-lg bg-blue-700 text-white font-semibold hover:bg-blue-800 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {savingCO ? '⏳ Saving…' : isNew ? '📋 Save Change Order' : '💾 Update Change Order'}
+              </button>
+              {bidId && (
+                <button
+                  onClick={() => setNotifyMode('release')}
+                  disabled={lifecycleBusy}
+                  className="text-sm px-4 py-2 rounded-lg bg-green-700 text-white font-semibold hover:bg-green-800 transition-colors disabled:opacity-50"
+                >
+                  📤 Release
+                </button>
+              )}
+              {bidId && (
+                <button
+                  onClick={handleDeleteCO}
+                  disabled={lifecycleBusy}
+                  className="text-sm px-3 py-2 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 disabled:opacity-50"
+                >
+                  Delete
+                </button>
+              )}
+            </>
+          )}
+          {isPending && (
+            <>
+              <button
+                onClick={handlePrintCO}
+                className="text-sm px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50"
+              >
+                🖨️ Print
+              </button>
+              <button
+                onClick={() => setNotifyMode('resend')}
+                disabled={lifecycleBusy}
+                className="text-sm px-4 py-2 rounded-lg border border-blue-200 text-blue-700 font-semibold hover:bg-blue-50 disabled:opacity-50"
+              >
+                Resend Notification
+              </button>
+              <button
+                onClick={handleUnrelease}
+                disabled={lifecycleBusy}
+                className="text-sm px-4 py-2 rounded-lg border border-amber-300 text-amber-700 font-semibold hover:bg-amber-50 disabled:opacity-50"
+              >
+                Unrelease
+              </button>
+              <button
+                onClick={handleDeleteCO}
+                disabled={lifecycleBusy}
+                className="text-sm px-3 py-2 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 disabled:opacity-50"
+              >
+                Delete
+              </button>
+            </>
+          )}
+          {isTerminal && (
+            <>
+              <button
+                onClick={handlePrintCO}
+                className="text-sm px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50"
+              >
+                🖨️ Print
+              </button>
+              <button
+                onClick={handleDeleteCO}
+                disabled={lifecycleBusy}
+                className="text-sm px-3 py-2 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 disabled:opacity-50"
+              >
+                Delete
+              </button>
+            </>
+          )}
+        </div>
       </div>
+
+      {/* Released banner — pricing is locked until the CO is unreleased */}
+      {isReleased && (
+        <div className="mb-3 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
+          {isPending
+            ? 'This change order has been released to the client and is awaiting approval. Unrelease it to make edits.'
+            : isApproved
+              ? 'This change order has been approved by the client.'
+              : 'This change order was declined by the client.'}
+        </div>
+      )}
+
+      {/* Release / Resend notification dialog */}
+      {notifyMode && (
+        <CONotifyDialog
+          mode={notifyMode}
+          saving={lifecycleBusy}
+          onCancel={() => setNotifyMode(null)}
+          onSend={handleNotifySend}
+        />
+      )}
 
       {/* Estimate-wide GPMD bar */}
       <div className="mb-3">
@@ -745,15 +977,17 @@ export default function COEstimatePanel({
         <div className="w-full lg:w-1/3 min-h-[16rem] lg:min-h-0 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
             <h2 className="font-semibold text-gray-900 text-sm">Projects</h2>
-            <button
-              onClick={() => {
-                setShowAddProject(true)
-                setNewProjectName('')
-              }}
-              className="text-xs text-blue-700 font-semibold hover:underline"
-            >
-              + Add
-            </button>
+            {editable && (
+              <button
+                onClick={() => {
+                  setShowAddProject(true)
+                  setNewProjectName('')
+                }}
+                className="text-xs text-blue-700 font-semibold hover:underline"
+              >
+                + Add
+              </button>
+            )}
           </div>
           <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
             {showAddProject && (
@@ -816,9 +1050,11 @@ export default function COEstimatePanel({
             {projects.length === 0 && !showAddProject ? (
               <div className="p-6 text-center text-gray-400 text-sm">
                 <p className="mb-2">No projects yet.</p>
-                <button onClick={() => setShowAddProject(true)} className="btn-primary text-xs">
-                  + Add Project
-                </button>
+                {editable && (
+                  <button onClick={() => setShowAddProject(true)} className="btn-primary text-xs">
+                    + Add Project
+                  </button>
+                )}
               </div>
             ) : (
               projects.map(proj => {
@@ -888,7 +1124,7 @@ export default function COEstimatePanel({
             <h2 className="font-semibold text-gray-900 text-sm">
               {selectedProject ? selectedProject.project_name : 'Modules'}
             </h2>
-            {selectedProject && (
+            {selectedProject && editable && (
               <button
                 onClick={openModulePicker}
                 className="text-xs text-blue-700 font-semibold hover:underline"
@@ -905,9 +1141,11 @@ export default function COEstimatePanel({
             ) : activeModules.length === 0 ? (
               <div className="p-6 text-center text-gray-400 text-sm">
                 <p className="mb-2">No modules yet.</p>
-                <button onClick={openModulePicker} className="btn-primary text-xs">
-                  + Add Module
-                </button>
+                {editable && (
+                  <button onClick={openModulePicker} className="btn-primary text-xs">
+                    + Add Module
+                  </button>
+                )}
               </div>
             ) : (
               activeModules.map(mod => {

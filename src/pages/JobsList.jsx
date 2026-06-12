@@ -5557,6 +5557,7 @@ function JobChangeOrdersPanel({ job, coDeepLink = null, newCoDeepLink = null }) 
           isNew={openIsNew}
           onClose={closeEstimator}
           onSaved={handleCoSaved}
+          onDeleted={handleCoDeleted}
         />
       </div>
     )
