@@ -228,7 +228,13 @@ export default function JobsList() {
   // Default landing tab is Schedule (combined with selectedJob=ALL_JOBS this
   // gives the user "Schedule > All Jobs" on first arrival). A ?tab= URL param
   // still wins for deep-links from elsewhere in the app.
-  const [tab, setTab] = useState(() => searchParams.get('tab') || 'schedule')
+  const [tab, setTab] = useState(() => {
+    const p = searchParams.get('tab')
+    if (p) return p
+    // Schedule lives in the dock on mobile, so phones default to Work Orders.
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024
+    return isMobile ? 'work-orders' : 'schedule'
+  })
   // DOM node for the shared green app-header centre slot; the tab bar is
   // portalled into it. Resolved after mount so the portal never gets null.
   const [headerSlot, setHeaderSlot] = useState(null)
@@ -1356,18 +1362,30 @@ export default function JobsList() {
           headerSlot
         )}
 
-      {/* Mobile tab strip — full-width, scrollable (the header slot is too
-          narrow on phones). Hidden on desktop where the header tabs show. */}
-      <div className="lg:hidden -mx-2 mb-2 border-b border-gray-200 bg-white overflow-x-auto">
-        <div className="flex gap-0.5 px-3 w-max">
-          {TABS.filter(t => !['info', 'timeclock', 'daily-logs', 'settings'].includes(t.key)).map(t => (
+      {/* Mobile: small docked buttons under the job picker. Schedule, Change
+          Orders and Finance are intentionally excluded on phones (Schedule +
+          Change Orders live in the bottom dock / More menu). */}
+      <div className="lg:hidden mb-3 flex-shrink-0">
+        <div className="flex gap-2">
+          {TABS.filter(
+            t =>
+              ![
+                'info',
+                'timeclock',
+                'daily-logs',
+                'settings',
+                'schedule',
+                'change-orders',
+                'finance',
+              ].includes(t.key)
+          ).map(t => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`px-3 py-2 text-xs font-semibold whitespace-nowrap flex-shrink-0 border-b-2 transition-colors ${
+              className={`flex-1 px-1 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap border transition-colors ${
                 tab === t.key
-                  ? 'border-green-700 text-green-700'
-                  : 'border-transparent text-gray-500'
+                  ? 'bg-green-700 text-white border-green-700'
+                  : 'bg-gray-50 text-gray-600 border-gray-200 active:bg-gray-100'
               }`}
             >
               {t.label}

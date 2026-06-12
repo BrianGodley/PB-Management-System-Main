@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase'
 import SamChat from './SamChat'
 import ReportIssueModal from './ReportIssueModal'
 import CONavModal from './CONavModal'
+import ScheduleModal from './ScheduleModal'
 import SkidSteerIcon from './icons/SkidSteerIcon'
 import OrgChartIcon from './icons/OrgChartIcon'
 import OpportunitiesIcon from './icons/OpportunitiesIcon'
@@ -80,23 +81,24 @@ export default function Layout() {
   // (which would otherwise clip any absolutely-positioned child).
   const [navTip, setNavTip] = useState(null) // { label, top } | null
 
-  // Change-order quick-nav modal (opened from the dock)
+  // Change-order quick-nav + schedule modals (opened from the dock / More)
   const [showCONav, setShowCONav] = useState(false)
+  const [showSchedule, setShowSchedule] = useState(false)
 
   // Translated dock + main-menu items (re-computed whenever t() changes)
   const DOCK_ITEMS = [
     { to: '/daily-logs', label: t('dailyLogs'), icon: '📋' },
     { to: '/timeclock', label: t('timeClock'), icon: '⏱️' },
-    { key: 'schedule', label: 'Schedule', icon: '📅', onClick: () => navigate('/jobs?tab=schedule') },
-    { key: 'change-orders', label: 'Changes', icon: '🔄', onClick: () => setShowCONav(true) },
+    { key: 'schedule', label: 'Schedule', icon: '📅', onClick: () => setShowSchedule(true) },
     { to: '/info', label: 'Job Info', icon: 'ℹ️' },
-    { key: 'main', label: t('main'), icon: '⊞', onClick: () => setShowMainMenu(v => !v) },
+    { key: 'main', label: 'More', icon: '⊞', onClick: () => setShowMainMenu(v => !v) },
   ]
 
   const [userRole, setUserRole] = useState(null)
   const isAdmin = userRole === 'admin' || userRole === 'super_admin'
   const MAIN_MENU_ITEMS = [
     { path: '/', label: 'Dashboard', icon: <DashboardIcon /> },
+    { key: 'change-orders', label: 'Change Orders', icon: '🔄', onClick: () => setShowCONav(true) },
     { path: '/contacts', label: 'Contacts', icon: <ContactsIcon /> },
     { path: '/clients', label: t('clients'), icon: '👥' },
     { path: '/design', label: 'Design', icon: '📐' },
@@ -105,10 +107,6 @@ export default function Layout() {
     { path: '/statistics', label: t('statistics'), icon: '📈' },
     { path: '/portal/subs', label: t('subsVendors'), icon: '🧑‍🔧' },
     { path: '/hr', label: t('hr') || 'HR', icon: '🏢' },
-    // Admin tile — only present when the signed-in user is an admin. Lives
-    // in the mobile main menu instead of the desktop top bar so phones get
-    // a single, consistent place to find every admin tool.
-    ...(isAdmin ? [{ path: '/admin', label: 'Admin', icon: '🛡️' }] : []),
   ]
   const [showMainMenu, setShowMainMenu] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState(null)
@@ -553,7 +551,7 @@ export default function Layout() {
           if (item.onClick) {
             const active =
               (item.key === 'main' && showMainMenu) ||
-              (item.key === 'change-orders' && showCONav)
+              (item.key === 'schedule' && showSchedule)
             return (
               <button
                 key={item.key}
@@ -607,36 +605,47 @@ export default function Layout() {
             </p>
 
             <div className="grid grid-cols-3 gap-3">
-              {MAIN_MENU_ITEMS.map(item => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  onClick={() => setShowMainMenu(false)}
-                  className={`flex flex-col items-center gap-1.5 py-4 rounded-2xl border text-center transition-colors ${
-                    isActive(item.path)
-                      ? 'bg-green-50 border-green-200 text-green-800'
-                      : 'bg-gray-50 border-gray-200 text-gray-700 active:bg-gray-100'
-                  }`}
-                >
-                  <span className="text-2xl leading-none">{item.icon}</span>
-                  <span className="text-xs font-semibold leading-tight">{item.label}</span>
-                </Link>
-              ))}
+              {MAIN_MENU_ITEMS.map(item => {
+                const tileClass = `flex flex-col items-center gap-1.5 py-4 rounded-2xl border text-center transition-colors ${
+                  item.path && isActive(item.path)
+                    ? 'bg-green-50 border-green-200 text-green-800'
+                    : 'bg-gray-50 border-gray-200 text-gray-700 active:bg-gray-100'
+                }`
+                // Action tiles (e.g. Change Orders) run an onClick instead of navigating.
+                if (item.onClick) {
+                  return (
+                    <button
+                      key={item.key}
+                      onClick={() => {
+                        setShowMainMenu(false)
+                        item.onClick()
+                      }}
+                      className={tileClass}
+                    >
+                      <span className="text-2xl leading-none">{item.icon}</span>
+                      <span className="text-xs font-semibold leading-tight">{item.label}</span>
+                    </button>
+                  )
+                }
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    onClick={() => setShowMainMenu(false)}
+                    className={tileClass}
+                  >
+                    <span className="text-2xl leading-none">{item.icon}</span>
+                    <span className="text-xs font-semibold leading-tight">{item.label}</span>
+                  </Link>
+                )
+              })}
             </div>
-
-            {/* Sign out at bottom of sheet */}
-            <button
-              onClick={() => {
-                setShowMainMenu(false)
-                handleSignOut()
-              }}
-              className="w-full mt-4 py-3 rounded-xl border border-red-100 text-sm font-medium text-red-500 hover:bg-red-50 transition-colors"
-            >
-              🚪 {t('signOut')}
-            </button>
           </div>
         </>
       )}
+
+      {/* Schedule modal — opened from the mobile dock. */}
+      {showSchedule && <ScheduleModal onClose={() => setShowSchedule(false)} />}
 
       {/* Change-order quick-nav modal — opened from the mobile dock. */}
       {showCONav && (
