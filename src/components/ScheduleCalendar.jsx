@@ -2153,6 +2153,20 @@ export default function ScheduleCalendar({
           DESKTOP VIEW — hidden on mobile, shown on lg+
       ══════════════════════════════════════════════════════ */}
       <div className="hidden lg:flex lg:flex-col">
+        {/* View picker — Month / Week / Day. Sits above the whole calendar
+            container, centered, in the grey area above the white toolbar. */}
+        <div className="flex justify-center py-1.5">
+          <select
+            value={viewMode}
+            onChange={e => setViewMode(e.target.value)}
+            className="text-xs font-semibold text-gray-700 border border-gray-300 rounded-md px-2 py-1 bg-white shadow-sm focus:outline-none focus:border-green-600 cursor-pointer"
+          >
+            <option value="month">Month</option>
+            <option value="week">Week</option>
+            <option value="day">Day</option>
+          </select>
+        </div>
+
         {/* Month navigation + day headers — sticky.
             Toolbar row layout: [Add Schedule][Exceptions]  ‹‹ ‹ Month Year › ›› [Today]  [✨ Schedule Assistance]
             Each side button is ~60% of the old sidebar-button width. */}
@@ -2239,19 +2253,6 @@ export default function ScheduleCalendar({
 
             {/* Sat — spacer */}
             <div />
-          </div>
-
-          {/* View picker — Month / Week / Day, centered above the calendar */}
-          <div className="flex justify-center pb-1.5">
-            <select
-              value={viewMode}
-              onChange={e => setViewMode(e.target.value)}
-              className="text-xs font-semibold text-gray-700 border border-gray-300 rounded-md px-2 py-1 bg-white focus:outline-none focus:border-green-600 cursor-pointer"
-            >
-              <option value="month">Month</option>
-              <option value="week">Week</option>
-              <option value="day">Day</option>
-            </select>
           </div>
 
           {viewMode === 'day' ? (
