@@ -3759,8 +3759,8 @@ export default function ScheduleCalendar({
       {phase === 'details' && (
         <ModalOverlay onClose={closeModal}>
           <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-4 flex flex-col"
-            style={{ maxHeight: '92vh' }}
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mx-0 sm:mx-4 flex flex-col"
+            style={{ maxHeight: '92dvh' }}
           >
             {/* Header */}
             <div className="px-6 pt-5 pb-4 border-b border-gray-100 flex-shrink-0">
@@ -3957,7 +3957,7 @@ export default function ScheduleCalendar({
               )}
 
               {/* ── Schedule Details ── */}
-              <div className="border-t border-gray-100 pt-4 grid grid-cols-2 gap-4">
+              <div className="border-t border-gray-100 pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Left column */}
                 <div className="space-y-3">
                   <div>

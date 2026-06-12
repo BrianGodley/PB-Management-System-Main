@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useCachedData } from '../lib/useCachedData'
 import * as XLSX from 'xlsx'
+import DocViewerModal from '../components/DocViewerModal'
+import SubVendorContracts from '../components/SubVendorContracts'
 
 // ── Constants ────────────────────────────────────────────────
 const DIVISION_OPTIONS = [
@@ -570,6 +572,7 @@ export default function SubsVendors() {
       <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0">
         {[
           { key: 'directory', label: '📋 Directory' },
+          { key: 'contracts', label: '📑 Contracts' },
           { key: 'settings', label: '⚙️ Settings' },
         ].map(t => (
           <button
@@ -585,6 +588,9 @@ export default function SubsVendors() {
           </button>
         ))}
       </div>
+
+      {/* ── Contracts ── */}
+      {svTab === 'contracts' && <SubVendorContracts />}
 
       {/* ── Settings ── */}
       {svTab === 'settings' && (
@@ -1289,6 +1295,7 @@ function SubModal({
 }) {
   const [customInput, setCustomInput] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [viewerDoc, setViewerDoc] = useState(null) // { name, url } for in-app viewer
   const priceFileInputRef = useRef(null)
 
   const priceFiles = Array.isArray(form.price_list_files) ? form.price_list_files : []
@@ -1322,12 +1329,13 @@ function SubModal({
   async function openPriceFile(pf) {
     const { data, error: sErr } = await supabase.storage
       .from('sub-vendor-files')
-      .createSignedUrl(pf.path, 300)
+      .createSignedUrl(pf.path, 3600)
     if (sErr || !data?.signedUrl) {
       alert('Could not open file: ' + (sErr?.message || 'unknown error'))
       return
     }
-    window.open(data.signedUrl, '_blank')
+    // Show it inside the app rather than navigating away.
+    setViewerDoc({ name: pf.name, url: data.signedUrl })
   }
 
   async function removePriceFile(pf) {
@@ -1721,6 +1729,13 @@ function SubModal({
           )}
         </div>
       </div>
+      {viewerDoc && (
+        <DocViewerModal
+          name={viewerDoc.name}
+          url={viewerDoc.url}
+          onClose={() => setViewerDoc(null)}
+        />
+      )}
     </div>
   )
 }
