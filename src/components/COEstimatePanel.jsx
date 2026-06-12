@@ -115,6 +115,7 @@ export default function COEstimatePanel({
   coType,
   jobId,
   clientName,
+  isNew = false,
   onClose,
   onSaved,
 }) {
@@ -137,7 +138,9 @@ export default function COEstimatePanel({
   const [savingModule, setSavingModule] = useState(false)
   const [editingModule, setEditingModule] = useState(null)
   const [savingCO, setSavingCO] = useState(false)
-  const [description, setDescription] = useState(coName || '')
+  // Title -> co_name (required). Description -> scope_of_work_html (optional).
+  const [title, setTitle] = useState(coName || '')
+  const [description, setDescription] = useState('')
 
   useEffect(() => {
     fetchData()
@@ -145,6 +148,18 @@ export default function COEstimatePanel({
 
   async function fetchData() {
     setLoading(true)
+    // Pull the CO's saved title + description so reopening keeps them.
+    if (bidId) {
+      const { data: bidRow } = await supabase
+        .from('bids')
+        .select('co_name, scope_of_work_html')
+        .eq('id', bidId)
+        .single()
+      if (bidRow) {
+        if (bidRow.co_name) setTitle(bidRow.co_name)
+        setDescription(bidRow.scope_of_work_html || '')
+      }
+    }
     const { data: est } = await supabase.from('estimates').select('*').eq('id', estimateId).single()
     if (est) {
       setEstimate(est)
@@ -397,8 +412,8 @@ export default function COEstimatePanel({
 
   // ── Save / Update CO bid ─────────────────────────────────────────────────
   async function handleSaveCO() {
-    if (!description.trim()) {
-      alert('Please enter a Description before saving.')
+    if (!title.trim()) {
+      alert('Please enter a Title before saving.')
       return
     }
     if (!projects.length) {
@@ -408,39 +423,51 @@ export default function COEstimatePanel({
     setSavingCO(true)
     try {
       const allMods = projects.flatMap(p => p.estimate_modules || [])
+      // Use the same totals shown in the "CO Totals" bar so the saved amount
+      // always matches what the user sees (incl. per-project GPMD overrides).
       const grandTotal = allMods.reduce(
         (s, m) => s + parseFloat(m.total_price || m.data?.calc?.price || 0),
         0
       )
-      const totalGp = allMods.reduce(
-        (s, m) => s + parseFloat(m.gross_profit || m.data?.calc?.gp || 0),
-        0
-      )
+      const totalGp = projects.reduce((sum, proj) => {
+        const mods = proj.estimate_modules || []
+        const projMD = mods.reduce((s, m) => s + parseFloat(m.man_days || 0), 0)
+        const naturalGP = mods.reduce(
+          (s, m) => s + parseFloat(m.gross_profit || m.data?.calc?.gp || 0),
+          0
+        )
+        const override = projectGpmds[proj.id]
+        return sum + (override != null ? projMD * override : naturalGP)
+      }, 0)
       const totalMD = allMods.reduce((s, m) => s + parseFloat(m.man_days || 0), 0)
       const bidGpmd = totalMD > 0 ? Math.round(totalGp / totalMD) : 0
       const projNames = projects.map(p => p.project_name)
+      const coTitle = title.trim()
+      const coScope = description.trim() || null
 
-      // Always sync the estimate name to the description
+      // Keep the estimate name in sync with the CO title.
       await supabase
         .from('estimates')
-        .update({ estimate_name: description.trim() })
+        .update({ estimate_name: coTitle })
         .eq('id', estimateId)
 
       let bid
       if (bidId) {
-        // Update existing bid with new totals + description
-        const { data: updated } = await supabase
+        // Update existing bid with new totals + title + description
+        const { data: updated, error: updErr } = await supabase
           .from('bids')
           .update({
             bid_amount: grandTotal,
             gross_profit: totalGp,
             gpmd: bidGpmd,
             projects: projNames,
-            co_name: description.trim(),
+            co_name: coTitle,
+            scope_of_work_html: coScope,
           })
           .eq('id', bidId)
           .select()
           .single()
+        if (updErr) throw new Error(updErr.message)
         bid = updated
       } else {
         // Create new bid record
@@ -477,7 +504,9 @@ export default function COEstimatePanel({
             created_by: user?.id || null,
             record_type: 'change_order',
             linked_job_id: jobId,
-            co_name: description.trim(),
+            co_name: coTitle,
+            scope_of_work_html: coScope,
+            co_method: 'estimator',
             co_type: coType,
           })
           .select()
@@ -494,7 +523,7 @@ export default function COEstimatePanel({
               financeOacRate,
               consultantName,
             })
-            const safeName = (description.trim() || 'ChangeOrder').replace(/[^a-z0-9]/gi, '_')
+            const safeName = (coTitle || 'ChangeOrder').replace(/[^a-z0-9]/gi, '_')
             downloadBidDoc(blob, `${safeName}_CO_${new Date().toISOString().split('T')[0]}.docx`)
           } catch {
             /* doc gen failure is non-fatal */
@@ -606,16 +635,29 @@ export default function COEstimatePanel({
           <div className="h-4 w-px bg-gray-200 mt-2 flex-shrink-0" />
           <div className="flex items-start gap-2 flex-1 min-w-0">
             <span className="text-base mt-1">📋</span>
-            <div className="flex-1 min-w-0">
-              <label className="block text-[10px] font-semibold text-blue-600 uppercase tracking-wide mb-0.5">
-                Description <span className="text-red-500">*</span>
-              </label>
-              <input
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                placeholder="e.g. Add Patio Extension…"
-                className="w-full text-sm font-semibold text-gray-900 border-b border-gray-300 focus:border-blue-500 outline-none bg-transparent pb-0.5 placeholder-gray-300"
-              />
+            <div className="flex-1 min-w-0 space-y-1.5">
+              <div>
+                <label className="block text-[10px] font-semibold text-blue-600 uppercase tracking-wide mb-0.5">
+                  Title <span className="text-red-500">*</span>
+                </label>
+                <input
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                  placeholder="e.g. Add Patio Extension…"
+                  className="w-full text-sm font-semibold text-gray-900 border-b border-gray-300 focus:border-blue-500 outline-none bg-transparent pb-0.5 placeholder-gray-300"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">
+                  Description
+                </label>
+                <input
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  placeholder="Scope / notes (optional)…"
+                  className="w-full text-sm text-gray-700 border-b border-gray-200 focus:border-blue-500 outline-none bg-transparent pb-0.5 placeholder-gray-300"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -625,7 +667,7 @@ export default function COEstimatePanel({
           disabled={savingCO}
           className="text-sm px-4 py-2 rounded-lg bg-blue-700 text-white font-semibold hover:bg-blue-800 transition-colors disabled:opacity-50 flex items-center gap-1.5 flex-shrink-0"
         >
-          {savingCO ? '⏳ Saving…' : bidId ? '💾 Update Change Order' : '📋 Save Change Order'}
+          {savingCO ? '⏳ Saving…' : isNew ? '📋 Save Change Order' : '💾 Update Change Order'}
         </button>
       </div>
 

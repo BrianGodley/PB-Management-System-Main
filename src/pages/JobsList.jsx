@@ -5360,6 +5360,7 @@ function JobChangeOrdersPanel({ job, coDeepLink = null, newCoDeepLink = null }) 
   const [openBidId, setOpenBidId] = useState(null)
   const [openCoName, setOpenCoName] = useState('')
   const [openCoType, setOpenCoType] = useState('')
+  const [openIsNew, setOpenIsNew] = useState(false)
 
   useEffect(() => {
     if (job?.id) fetchCOs(job.id)
@@ -5418,17 +5419,19 @@ function JobChangeOrdersPanel({ job, coDeepLink = null, newCoDeepLink = null }) 
     setLoading(false)
   }
 
-  function openEstimator(estimateId, bidId, coName, coType) {
+  function openEstimator(estimateId, bidId, coName, coType, isNew = false) {
     setOpenEstimateId(estimateId)
     setOpenBidId(bidId || null)
     setOpenCoName(coName || '')
     setOpenCoType(coType || '')
+    setOpenIsNew(isNew)
   }
   function closeEstimator() {
     setOpenEstimateId(null)
     setOpenBidId(null)
     setOpenCoName('')
     setOpenCoType('')
+    setOpenIsNew(false)
     if (job?.id) fetchCOs(job.id)
   }
 
@@ -5488,7 +5491,7 @@ function JobChangeOrdersPanel({ job, coDeepLink = null, newCoDeepLink = null }) 
       if (bErr) throw new Error(bErr.message)
 
       setCos(prev => [bid, ...prev])
-      openEstimator(est.id, bid.id, bid.co_name, bid.co_type || '')
+      openEstimator(est.id, bid.id, bid.co_name, bid.co_type || '', true)
     } catch (err) {
       alert('Could not start change order: ' + (err?.message || err))
     } finally {
@@ -5549,6 +5552,7 @@ function JobChangeOrdersPanel({ job, coDeepLink = null, newCoDeepLink = null }) 
           coType={openCoType}
           jobId={job.id}
           clientName={job.client_name || job.name || ''}
+          isNew={openIsNew}
           onClose={closeEstimator}
           onSaved={handleCoSaved}
         />
@@ -5642,7 +5646,7 @@ function JobChangeOrdersPanel({ job, coDeepLink = null, newCoDeepLink = null }) 
                       )}
                     </td>
                     <td className="px-3 py-3">
-                      <span className="font-semibold text-gray-800">
+                      <span className="font-semibold text-blue-600 hover:underline">
                         {co.co_name || '(untitled)'}
                       </span>
                     </td>

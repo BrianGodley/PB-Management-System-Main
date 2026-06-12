@@ -139,8 +139,14 @@ export default function AllJobsChangeOrders({ jobs = [], statusFilter = 'open', 
                       </button>
                     </td>
                     <td className="px-4 py-2.5 text-gray-500">{c.custom_co_id || '—'}</td>
-                    <td className="px-4 py-2.5 text-gray-800">
-                      {c.co_name || c.co_type || '—'}
+                    <td className="px-4 py-2.5">
+                      <button
+                        type="button"
+                        onClick={() => onSelectJob?.(c.linked_job_id)}
+                        className="text-left font-semibold text-blue-600 hover:underline"
+                      >
+                        {c.co_name || c.co_type || '—'}
+                      </button>
                     </td>
                     <td className="px-4 py-2.5">
                       {c.co_method === 'manual' ? (
