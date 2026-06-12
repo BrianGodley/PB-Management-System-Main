@@ -2003,16 +2003,6 @@ export default function ScheduleCalendar({
             Today
           </span>
         )}
-        <button onClick={prevYear} className={dblBtn} title="Previous year">
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
-            />
-          </svg>
-        </button>
         <button onClick={prevMonth} className={btn} title="Previous month">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -2029,16 +2019,6 @@ export default function ScheduleCalendar({
         <button onClick={nextMonth} className={btn} title="Next month">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-        <button onClick={nextYear} className={dblBtn} title="Next year">
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M13 5l7 7-7 7M5 5l7 7-7 7"
-            />
           </svg>
         </button>
         <button
