@@ -5,6 +5,7 @@ import { useCachedData } from '../lib/useCachedData'
 import * as XLSX from 'xlsx'
 import DocViewerModal from '../components/DocViewerModal'
 import SubVendorContracts from '../components/SubVendorContracts'
+import SubVendorQuotes from '../components/SubVendorQuotes'
 
 // ── Constants ────────────────────────────────────────────────
 const DIVISION_OPTIONS = [
@@ -573,6 +574,7 @@ export default function SubsVendors() {
         {[
           { key: 'directory', label: '📋 Directory' },
           { key: 'contracts', label: '📑 Contracts' },
+          { key: 'quotes', label: '🧾 Quotes' },
           { key: 'settings', label: '⚙️ Settings' },
         ].map(t => (
           <button
@@ -591,6 +593,9 @@ export default function SubsVendors() {
 
       {/* ── Contracts ── */}
       {svTab === 'contracts' && <SubVendorContracts />}
+
+      {/* ── Quotes ── */}
+      {svTab === 'quotes' && <SubVendorQuotes />}
 
       {/* ── Settings ── */}
       {svTab === 'settings' && (
