@@ -56,6 +56,74 @@ export default function CODetailModal({
   // Local copy of co for live updates (after save / approve)
   const [coState, setCoState] = useState(co)
 
+  // Manual vs estimator. New COs created here are always manual (estimator COs
+  // are built in COEstimatePanel). Existing rows carry co_method; legacy rows
+  // (null) are treated as estimator so they keep the detailed-estimator link.
+  const isManual = (coState?.co_method || (isNew ? 'manual' : 'estimator')) === 'manual'
+
+  // Manual CO line items: [{ item, labor_hours, material_cost }]
+  const [lineItems, setLineItems] = useState(() => {
+    const li = co?.co_line_items
+    return Array.isArray(li) && li.length
+      ? li.map(r => ({
+          item: r.item || '',
+          labor_hours: r.labor_hours ?? '',
+          material_cost: r.material_cost ?? '',
+        }))
+      : [{ item: '', labor_hours: '', material_cost: '' }]
+  })
+  function updateLineItem(i, field, value) {
+    setLineItems(prev => prev.map((r, idx) => (idx === i ? { ...r, [field]: value } : r)))
+  }
+  function addLineItem() {
+    setLineItems(prev => [...prev, { item: '', labor_hours: '', material_cost: '' }])
+  }
+  function removeLineItem(i) {
+    setLineItems(prev => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== i)))
+  }
+  // Drop empty rows + coerce numbers for storage.
+  function cleanLineItems() {
+    return lineItems
+      .filter(r => (r.item || '').trim() || r.labor_hours !== '' || r.material_cost !== '')
+      .map(r => ({
+        item: (r.item || '').trim(),
+        labor_hours: parseFloat(r.labor_hours) || 0,
+        material_cost: parseFloat(r.material_cost) || 0,
+      }))
+  }
+  const itemsLaborTotal = lineItems.reduce((s, r) => s + (parseFloat(r.labor_hours) || 0), 0)
+  const itemsMaterialTotal = lineItems.reduce((s, r) => s + (parseFloat(r.material_cost) || 0), 0)
+
+  // When a CO is approved it becomes a single work order for the job.
+  async function createWorkOrderForCO(coRow) {
+    if (!coRow?.id || !job?.id) return
+    try {
+      const { data: existing } = await supabase
+        .from('work_orders')
+        .select('id')
+        .eq('source_change_order_id', coRow.id)
+        .limit(1)
+      if (existing && existing.length) return // already created
+      const items = Array.isArray(coRow.co_line_items) ? coRow.co_line_items : []
+      const laborHours = items.reduce((s, r) => s + (parseFloat(r.labor_hours) || 0), 0)
+      const materialCost = items.reduce((s, r) => s + (parseFloat(r.material_cost) || 0), 0)
+      await supabase.from('work_orders').insert({
+        job_id: job.id,
+        project_name: coRow.co_name || 'Change Order',
+        module_type: 'Change Order',
+        is_manual: true,
+        labor_hours: laborHours,
+        material_cost: materialCost,
+        total_price: parseFloat(coRow.bid_amount) || 0,
+        status: 'pending',
+        notes: `From Change Order #${coRow.custom_co_id || ''}`.trim(),
+        source_change_order_id: coRow.id,
+      })
+    } catch {
+      /* non-fatal: approval still succeeds even if work-order creation fails */
+    }
+  }
+
   // Attachments
   const [attachments, setAttachments] = useState([])
   const [uploading, setUploading] = useState(false)
@@ -128,6 +196,8 @@ export default function CODetailModal({
             estimate_id: est.id,
             notes: '',
             projects: [],
+            co_method: 'manual',
+            co_line_items: cleanLineItems(),
             created_by: user?.id,
           })
           .select('*')
@@ -143,6 +213,7 @@ export default function CODetailModal({
             co_name: title.trim(),
             scope_of_work_html: scope || null,
             bid_amount: parseFloat(bidAmount) || 0,
+            ...(isManual ? { co_line_items: cleanLineItems() } : {}),
           })
           .eq('id', coState.id)
           .select('*')
@@ -188,6 +259,8 @@ export default function CODetailModal({
       if (bErr) throw new Error(bErr.message)
       setCoState(bid)
       onSaved && onSaved(bid)
+      // Approved CO becomes a single work order for the job.
+      await createWorkOrderForCO(bid)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
@@ -420,11 +493,102 @@ export default function CODetailModal({
               )}
             </div>
 
+            {/* Manual line items — labor hours + material per item (manual COs only) */}
+            {isManual && (
+              <div className="border border-gray-200 rounded-xl p-4 bg-white">
+                <label className="block text-xs font-semibold text-gray-600 mb-2">
+                  Line Items{' '}
+                  <span className="font-normal text-gray-400">
+                    (labor hours + material per item)
+                  </span>
+                </label>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-[10px] uppercase text-gray-500">
+                        <th className="text-left font-semibold pb-1">Item</th>
+                        <th className="text-right font-semibold pb-1 w-20">Labor hrs</th>
+                        <th className="text-right font-semibold pb-1 w-24">Material $</th>
+                        <th className="w-8"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lineItems.map((r, i) => (
+                        <tr key={i}>
+                          <td className="pr-2 py-1">
+                            <input
+                              type="text"
+                              value={r.item}
+                              onChange={e => updateLineItem(i, 'item', e.target.value)}
+                              disabled={isApproved}
+                              placeholder="Description"
+                              className="input text-sm w-full"
+                            />
+                          </td>
+                          <td className="px-1 py-1">
+                            <input
+                              type="number"
+                              step="0.25"
+                              min="0"
+                              value={r.labor_hours}
+                              onChange={e => updateLineItem(i, 'labor_hours', e.target.value)}
+                              disabled={isApproved}
+                              className="input text-sm w-full text-right"
+                            />
+                          </td>
+                          <td className="px-1 py-1">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={r.material_cost}
+                              onChange={e => updateLineItem(i, 'material_cost', e.target.value)}
+                              disabled={isApproved}
+                              className="input text-sm w-full text-right"
+                            />
+                          </td>
+                          <td className="py-1 text-center">
+                            {!isApproved && (
+                              <button
+                                onClick={() => removeLineItem(i)}
+                                className="text-gray-300 hover:text-red-500 text-sm"
+                                title="Remove row"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="text-xs font-bold text-gray-700 border-t border-gray-200">
+                        <td className="pt-1.5 text-right pr-2">Totals</td>
+                        <td className="pt-1.5 text-right">{itemsLaborTotal.toLocaleString()}</td>
+                        <td className="pt-1.5 text-right">
+                          ${itemsMaterialTotal.toLocaleString()}
+                        </td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+                {!isApproved && (
+                  <button
+                    onClick={addLineItem}
+                    className="mt-2 text-xs font-semibold text-blue-700 hover:text-blue-900"
+                  >
+                    + Add row
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* Pricing — link out to the modular estimator */}
             <div className="border border-gray-200 rounded-xl p-4 bg-gray-50">
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs font-semibold text-gray-600">Pricing</label>
-                {coState?.id && onOpenEstimator && (
+                {coState?.id && onOpenEstimator && !isManual && (
                   <button
                     onClick={() => onOpenEstimator(coState)}
                     disabled={isApproved}
@@ -434,7 +598,7 @@ export default function CODetailModal({
                   </button>
                 )}
               </div>
-              <div className="grid grid-cols-3 gap-3 text-sm">
+              <div className={`grid ${isManual ? 'grid-cols-1' : 'grid-cols-3'} gap-3 text-sm`}>
                 <div>
                   <p className="text-[10px] uppercase text-gray-500 font-semibold">Owner price</p>
                   <input
@@ -447,23 +611,32 @@ export default function CODetailModal({
                     className="input text-sm w-full mt-1"
                   />
                 </div>
-                <div>
-                  <p className="text-[10px] uppercase text-gray-500 font-semibold">Gross profit</p>
-                  <p className="text-sm font-bold text-gray-800 mt-1.5">
-                    ${Number(coState?.gross_profit || 0).toLocaleString()}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] uppercase text-gray-500 font-semibold">GPMD</p>
-                  <p className="text-sm font-bold text-gray-800 mt-1.5">
-                    ${Number(coState?.gpmd || 0).toLocaleString()}
-                  </p>
-                </div>
+                {!isManual && (
+                  <>
+                    <div>
+                      <p className="text-[10px] uppercase text-gray-500 font-semibold">
+                        Gross profit
+                      </p>
+                      <p className="text-sm font-bold text-gray-800 mt-1.5">
+                        ${Number(coState?.gross_profit || 0).toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase text-gray-500 font-semibold">GPMD</p>
+                      <p className="text-sm font-bold text-gray-800 mt-1.5">
+                        ${Number(coState?.gpmd || 0).toLocaleString()}
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
-              <p className="text-[11px] text-gray-400 mt-2 italic">
-                For module-level pricing breakdown, click "Open detailed estimator" above. The owner
-                price field here is overwritten by what the estimator computes when it's saved.
-              </p>
+              {!isManual && (
+                <p className="text-[11px] text-gray-400 mt-2 italic">
+                  For module-level pricing breakdown, click "Open detailed estimator" above. The
+                  owner price field here is overwritten by what the estimator computes when it's
+                  saved.
+                </p>
+              )}
             </div>
 
             {/* Attachments */}

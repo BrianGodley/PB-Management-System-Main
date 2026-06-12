@@ -697,10 +697,10 @@ export default function COEstimatePanel({
         </div>
       )}
 
-      {/* Three-panel layout */}
-      <div className="flex gap-3 flex-1 min-h-0" style={{ minHeight: '420px' }}>
+      {/* Three-panel layout — stacks vertically on mobile, side-by-side on desktop */}
+      <div className="flex flex-col lg:flex-row gap-3 lg:flex-1 lg:min-h-0 lg:[min-height:420px]">
         {/* Panel 1: Projects */}
-        <div className="w-1/3 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="w-full lg:w-1/3 min-h-[16rem] lg:min-h-0 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
             <h2 className="font-semibold text-gray-900 text-sm">Projects</h2>
             <button
@@ -841,7 +841,7 @@ export default function COEstimatePanel({
         </div>
 
         {/* Panel 2: Modules */}
-        <div className="w-1/3 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="w-full lg:w-1/3 min-h-[16rem] lg:min-h-0 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
             <h2 className="font-semibold text-gray-900 text-sm">
               {selectedProject ? selectedProject.project_name : 'Modules'}
@@ -904,7 +904,7 @@ export default function COEstimatePanel({
         </div>
 
         {/* Panel 3: Module Detail */}
-        <div className="w-1/3 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="w-full lg:w-1/3 min-h-[16rem] lg:min-h-0 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
             <h2 className="font-semibold text-gray-900 text-sm">
               {selectedModule ? selectedModule.module_type : 'Module Detail'}

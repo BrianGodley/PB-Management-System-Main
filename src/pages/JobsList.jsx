@@ -241,6 +241,7 @@ export default function JobsList() {
   // Bumped each time the URL param changes so JobChangeOrdersPanel knows
   // to re-open even if the same coId arrives twice in a row.
   const [coDeepLink, setCoDeepLink] = useState(null) // { coId, ts } | null
+  const [newCoDeepLink, setNewCoDeepLink] = useState(null) // { method, ts } | null
   // Deep-link for the Finance tab — clicking a job name in the all-jobs
   // invoice table jumps to that job and opens the specific invoice.
   const [financeDeepLink, setFinanceDeepLink] = useState(null) // { invoiceId, ts } | null
@@ -1072,6 +1073,9 @@ export default function JobsList() {
       }
     }
     if (coParam) setCoDeepLink({ coId: coParam, ts: Date.now() })
+    const newCoParam = searchParams.get('newco')
+    if (newCoParam === 'manual' || newCoParam === 'estimator')
+      setNewCoDeepLink({ method: newCoParam, ts: Date.now() })
     // Dashboard "Add Schedule" quick-link: open the new-schedule modal once.
     if (searchParams.get('addSchedule') === '1' && !addSchedFired.current) {
       addSchedFired.current = true
@@ -1958,7 +1962,11 @@ export default function JobsList() {
               ))}
             {tab === 'change-orders' &&
               (selectedJobObj ? (
-                <JobChangeOrdersPanel job={selectedJobObj} coDeepLink={coDeepLink} />
+                <JobChangeOrdersPanel
+                  job={selectedJobObj}
+                  coDeepLink={coDeepLink}
+                  newCoDeepLink={newCoDeepLink}
+                />
               ) : (
                 <AllJobsChangeOrders
                   jobs={jobs}
@@ -5333,7 +5341,7 @@ const CO_STATUS_LABEL = {
   lost: 'Declined',
 }
 
-function JobChangeOrdersPanel({ job, coDeepLink = null }) {
+function JobChangeOrdersPanel({ job, coDeepLink = null, newCoDeepLink = null }) {
   const { user } = useAuth()
   const [cos, setCos] = useState([])
   const [loading, setLoading] = useState(false)
@@ -5344,6 +5352,7 @@ function JobChangeOrdersPanel({ job, coDeepLink = null }) {
   // Track which deep-link timestamps we've already auto-opened so opening a
   // CO once and closing it doesn't immediately re-open on next render.
   const lastOpenedDeepLinkTs = useRef(null)
+  const lastNewCoTs = useRef(null)
   // When the user clicks "Open detailed estimator" inside the modal, we
   // route to the existing COEstimatePanel full-page view. Same state shape
   // as before so behavior stays identical.
@@ -5372,6 +5381,18 @@ function JobChangeOrdersPanel({ job, coDeepLink = null }) {
       lastOpenedDeepLinkTs.current = coDeepLink.ts
     }
   }, [coDeepLink, cos])
+
+  // New-CO deep link from the dock's CO navigator: open the right new-CO flow
+  // for this job. 'manual' opens the manual detail modal; 'estimator' spins up
+  // a fresh estimate and routes into the estimator panel.
+  useEffect(() => {
+    if (!newCoDeepLink?.method || !job?.id) return
+    if (lastNewCoTs.current === newCoDeepLink.ts) return
+    lastNewCoTs.current = newCoDeepLink.ts
+    if (newCoDeepLink.method === 'manual') setActiveCo({})
+    else createCOWithEstimator()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newCoDeepLink, job?.id])
 
   async function fetchCOs(jobId) {
     setLoading(true)
@@ -5459,6 +5480,7 @@ function JobChangeOrdersPanel({ job, coDeepLink = null }) {
           estimate_id: est.id,
           notes: '',
           projects: [],
+          co_method: 'estimator',
           created_by: user?.id || null,
         })
         .select('*')
@@ -5546,13 +5568,13 @@ function JobChangeOrdersPanel({ job, coDeepLink = null }) {
             className="text-xs px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-60"
             title={`Build a change order for ${job.client_name || job.name || 'this client'} using the estimate toolkit`}
           >
-            {creatingBuilder ? 'Opening…' : '📐 Build with Estimator'}
+            {creatingBuilder ? 'Opening…' : '+ New Estimator Change Order'}
           </button>
           <button
             onClick={() => setActiveCo({})}
             className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
           >
-            + New Change Order
+            + New Manual Change Order
           </button>
         </div>
       </div>
@@ -5566,21 +5588,21 @@ function JobChangeOrdersPanel({ job, coDeepLink = null }) {
           <p className="text-4xl mb-3">📋</p>
           <p className="text-sm font-medium text-gray-500">No change orders yet for this job</p>
           <p className="text-xs mt-1 mb-5 text-center max-w-xs">
-            Build one with the estimate toolkit, or add a quick one.
+            Build one with the estimate toolkit, or enter one manually.
           </p>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-center gap-3">
             <button
               onClick={createCOWithEstimator}
               disabled={creatingBuilder}
               className="text-sm px-4 py-2 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition-colors disabled:opacity-60"
             >
-              {creatingBuilder ? 'Opening…' : '📐 Build with Estimator'}
+              {creatingBuilder ? 'Opening…' : '+ New Estimator Change Order'}
             </button>
             <button
               onClick={() => setActiveCo({})}
               className="text-sm px-4 py-2 rounded-lg bg-blue-700 text-white font-medium hover:bg-blue-800 transition-colors"
             >
-              + New Change Order
+              + New Manual Change Order
             </button>
           </div>
         </div>
@@ -5591,6 +5613,7 @@ function JobChangeOrdersPanel({ job, coDeepLink = null }) {
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="text-left px-3 py-3 font-semibold text-gray-700 w-16">CO #</th>
                 <th className="text-left px-3 py-3 font-semibold text-gray-700">Title</th>
+                <th className="text-left px-3 py-3 font-semibold text-gray-700 w-24">Type</th>
                 <th className="text-left px-3 py-3 font-semibold text-gray-700 w-28">Created</th>
                 <th className="text-center px-3 py-3 font-semibold text-gray-700 w-20">Files</th>
                 <th className="text-right px-3 py-3 font-semibold text-gray-700 w-28">
@@ -5622,6 +5645,17 @@ function JobChangeOrdersPanel({ job, coDeepLink = null }) {
                       <span className="font-semibold text-gray-800">
                         {co.co_name || '(untitled)'}
                       </span>
+                    </td>
+                    <td className="px-3 py-3">
+                      {co.co_method === 'manual' ? (
+                        <span className="rounded-full px-2 py-0.5 text-xs font-semibold bg-blue-50 text-blue-700">
+                          Manual
+                        </span>
+                      ) : (
+                        <span className="rounded-full px-2 py-0.5 text-xs font-semibold bg-indigo-50 text-indigo-700">
+                          Estimator
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-3 text-gray-500 whitespace-nowrap text-xs">
                       {co.date_submitted ? new Date(co.date_submitted).toLocaleDateString() : '—'}

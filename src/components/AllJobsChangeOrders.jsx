@@ -50,7 +50,7 @@ export default function AllJobsChangeOrders({ jobs = [], statusFilter = 'open', 
         supabase
           .from('bids')
           .select(
-            'id, linked_job_id, custom_co_id, co_name, co_type, status, bid_amount, date_submitted'
+            'id, linked_job_id, custom_co_id, co_name, co_type, co_method, status, bid_amount, date_submitted'
           )
           .eq('record_type', 'change_order')
           .order('id', { ascending: true })
@@ -118,6 +118,7 @@ export default function AllJobsChangeOrders({ jobs = [], statusFilter = 'open', 
                 <th className="px-4 py-2.5">Job</th>
                 <th className="px-4 py-2.5">CO #</th>
                 <th className="px-4 py-2.5">Name</th>
+                <th className="px-4 py-2.5">Type</th>
                 <th className="px-4 py-2.5 text-right">Amount</th>
                 <th className="px-4 py-2.5">Status</th>
                 <th className="px-4 py-2.5">Submitted</th>
@@ -141,6 +142,17 @@ export default function AllJobsChangeOrders({ jobs = [], statusFilter = 'open', 
                     <td className="px-4 py-2.5 text-gray-800">
                       {c.co_name || c.co_type || '—'}
                     </td>
+                    <td className="px-4 py-2.5">
+                      {c.co_method === 'manual' ? (
+                        <span className="rounded-full px-2 py-0.5 text-xs font-semibold bg-blue-50 text-blue-700">
+                          Manual
+                        </span>
+                      ) : (
+                        <span className="rounded-full px-2 py-0.5 text-xs font-semibold bg-indigo-50 text-indigo-700">
+                          Estimator
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-2.5 text-right text-gray-700">
                       {money(c.bid_amount)}
                     </td>
@@ -158,7 +170,7 @@ export default function AllJobsChangeOrders({ jobs = [], statusFilter = 'open', 
             </tbody>
             <tfoot>
               <tr className="bg-gray-50 font-bold text-gray-900">
-                <td className="px-4 py-2.5" colSpan={3}>
+                <td className="px-4 py-2.5" colSpan={4}>
                   Total
                 </td>
                 <td className="px-4 py-2.5 text-right">{money(total)}</td>

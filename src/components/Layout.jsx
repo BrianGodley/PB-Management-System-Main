@@ -6,6 +6,7 @@ import { useLang } from '../contexts/LanguageContext'
 import { supabase } from '../lib/supabase'
 import SamChat from './SamChat'
 import ReportIssueModal from './ReportIssueModal'
+import CONavModal from './CONavModal'
 import SkidSteerIcon from './icons/SkidSteerIcon'
 import OrgChartIcon from './icons/OrgChartIcon'
 import OpportunitiesIcon from './icons/OpportunitiesIcon'
@@ -79,12 +80,17 @@ export default function Layout() {
   // (which would otherwise clip any absolutely-positioned child).
   const [navTip, setNavTip] = useState(null) // { label, top } | null
 
+  // Change-order quick-nav modal (opened from the dock)
+  const [showCONav, setShowCONav] = useState(false)
+
   // Translated dock + main-menu items (re-computed whenever t() changes)
   const DOCK_ITEMS = [
     { to: '/daily-logs', label: t('dailyLogs'), icon: '📋' },
     { to: '/timeclock', label: t('timeClock'), icon: '⏱️' },
+    { key: 'schedule', label: 'Schedule', icon: '📅', onClick: () => navigate('/jobs?tab=schedule') },
+    { key: 'change-orders', label: 'Changes', icon: '🔄', onClick: () => setShowCONav(true) },
     { to: '/info', label: 'Job Info', icon: 'ℹ️' },
-    { key: 'main', label: t('main'), icon: '⊞' },
+    { key: 'main', label: t('main'), icon: '⊞', onClick: () => setShowMainMenu(v => !v) },
   ]
 
   const [userRole, setUserRole] = useState(null)
@@ -544,16 +550,19 @@ export default function Layout() {
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         {DOCK_ITEMS.map(item => {
-          if (item.key === 'main') {
+          if (item.onClick) {
+            const active =
+              (item.key === 'main' && showMainMenu) ||
+              (item.key === 'change-orders' && showCONav)
             return (
               <button
-                key="main"
-                onClick={() => setShowMainMenu(v => !v)}
-                className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-xs font-medium transition-colors ${
-                  showMainMenu ? 'text-green-700 bg-green-50' : 'text-gray-500'
+                key={item.key}
+                onClick={item.onClick}
+                className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-medium transition-colors ${
+                  active ? 'text-green-700 bg-green-50' : 'text-gray-500'
                 }`}
               >
-                <span className="text-xl leading-none">{item.icon}</span>
+                <span className="text-lg leading-none">{item.icon}</span>
                 <span>{item.label}</span>
               </button>
             )
@@ -562,13 +571,13 @@ export default function Layout() {
             <Link
               key={item.to}
               to={item.to}
-              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-xs font-medium transition-colors ${
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-medium transition-colors ${
                 dockActive(item.to)
                   ? 'text-green-700 bg-green-50'
                   : 'text-gray-500 hover:text-gray-800'
               }`}
             >
-              <span className="text-xl leading-none">{item.icon}</span>
+              <span className="text-lg leading-none">{item.icon}</span>
               <span>{item.label}</span>
             </Link>
           )
@@ -627,6 +636,17 @@ export default function Layout() {
             </button>
           </div>
         </>
+      )}
+
+      {/* Change-order quick-nav modal — opened from the mobile dock. */}
+      {showCONav && (
+        <CONavModal
+          onClose={() => setShowCONav(false)}
+          onNavigate={url => {
+            setShowCONav(false)
+            navigate(url)
+          }}
+        />
       )}
 
       {/* Report Issue modal — opened from the Help dropdown. */}
