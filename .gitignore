@@ -3,6 +3,8 @@ node_modules
 dist
 .env
 .env.local
+.env.*
+*.bak
 *.tmp
 *.csv
 *.log

@@ -163,9 +163,13 @@ function SignaturePad({ value, onChange }) {
 // ── Add / Edit contract modal ─────────────────────────────────────────────────
 const blankRow = () => ({ item: '', qty: '', unit: 'Each', unit_price: '' })
 
-function ContractModal({ parties, onClose, onSaved }) {
+function ContractModal({ parties, jobs, onClose, onSaved }) {
   const [mode, setMode] = useState('build') // 'build' | 'upload'
   const [partyId, setPartyId] = useState('')
+  const [jobId, setJobId] = useState('')
+  const [woId, setWoId] = useState('')
+  const [workOrders, setWorkOrders] = useState([])
+  const [woLoading, setWoLoading] = useState(false)
   const [rows, setRows] = useState([blankRow()])
   const [scope, setScope] = useState('')
   const [exclusions, setExclusions] = useState('')
@@ -178,7 +182,37 @@ function ContractModal({ parties, onClose, onSaved }) {
   const fileRef = useRef(null)
 
   const party = parties.find(p => p.id === partyId)
+  const job = jobs.find(j => j.id === jobId)
   const total = contractTotal(rows)
+
+  const jobLabel = j =>
+    [j.client_name, j.job_address].filter(Boolean).join(' — ') || j.client_name || 'Job'
+  const woLabel = w =>
+    [w.module_type, w.project_name].filter(Boolean).join(' — ') || w.module_type || 'Work Order'
+
+  // Load the selected job's work orders so the user can assign one.
+  useEffect(() => {
+    if (!jobId) {
+      setWorkOrders([])
+      setWoId('')
+      return
+    }
+    let alive = true
+    setWoLoading(true)
+    supabase
+      .from('work_orders')
+      .select('id, module_type, project_name, status')
+      .eq('job_id', jobId)
+      .order('created_at')
+      .then(({ data }) => {
+        if (!alive) return
+        setWorkOrders(data || [])
+        setWoLoading(false)
+      })
+    return () => {
+      alive = false
+    }
+  }, [jobId])
 
   const setRow = (i, patch) => setRows(rs => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
   const addRow = () => setRows(rs => [...rs, blankRow()])
@@ -192,10 +226,15 @@ function ContractModal({ parties, onClose, onSaved }) {
     setSaving(true)
     setError('')
 
+    const selectedWo = workOrders.find(w => w.id === woId)
     const base = {
       sub_vendor_id: partyId,
       party_type: party?.type || null,
       party_name: party?.company_name || null,
+      job_id: jobId || null,
+      job_name: job ? jobLabel(job) : null,
+      work_order_id: woId || null,
+      work_order_label: selectedWo ? woLabel(selectedWo) : null,
       kind: mode,
       updated_at: new Date().toISOString(),
     }
@@ -306,6 +345,51 @@ function ContractModal({ parties, onClose, onSaved }) {
                 </optgroup>
               )}
             </select>
+          </div>
+
+          {/* Job + Work Order assignment */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Assign to Job</label>
+              <select
+                value={jobId}
+                onChange={e => setJobId(e.target.value)}
+                className="input text-sm w-full"
+              >
+                <option value="">Select a job…</option>
+                {jobs.map(j => (
+                  <option key={j.id} value={j.id}>
+                    {jobLabel(j)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">
+                Work Order <span className="font-normal text-gray-400">(optional)</span>
+              </label>
+              <select
+                value={woId}
+                onChange={e => setWoId(e.target.value)}
+                disabled={!jobId || woLoading}
+                className="input text-sm w-full disabled:bg-gray-50 disabled:text-gray-400"
+              >
+                <option value="">
+                  {!jobId
+                    ? 'Select a job first…'
+                    : woLoading
+                      ? 'Loading…'
+                      : workOrders.length === 0
+                        ? 'No work orders for this job'
+                        : '— None —'}
+                </option>
+                {workOrders.map(w => (
+                  <option key={w.id} value={w.id}>
+                    {woLabel(w)}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Mode toggle */}
@@ -545,6 +629,24 @@ function ContractViewModal({ contract, onClose }) {
           </button>
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-5 space-y-4">
+          {(contract.job_name || contract.work_order_label) && (
+            <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+              {contract.job_name && (
+                <p className="text-gray-700">
+                  <span className="text-xs font-semibold text-gray-400 uppercase mr-1.5">Job</span>
+                  {contract.job_name}
+                </p>
+              )}
+              {contract.work_order_label && (
+                <p className="text-gray-700">
+                  <span className="text-xs font-semibold text-gray-400 uppercase mr-1.5">
+                    Work Order
+                  </span>
+                  {contract.work_order_label}
+                </p>
+              )}
+            </div>
+          )}
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-[10px] uppercase text-gray-400 border-b border-gray-200">
@@ -619,6 +721,7 @@ function ContractViewModal({ contract, onClose }) {
 export default function SubVendorContracts() {
   const [contracts, setContracts] = useState([])
   const [parties, setParties] = useState([])
+  const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
   const [viewBuilt, setViewBuilt] = useState(null)
@@ -626,12 +729,14 @@ export default function SubVendorContracts() {
 
   async function load() {
     setLoading(true)
-    const [cRes, pRes] = await Promise.all([
+    const [cRes, pRes, jRes] = await Promise.all([
       supabase.from('sub_vendor_contracts').select('*').order('created_at', { ascending: false }),
       supabase.from('subs_vendors').select('id, company_name, type').order('company_name'),
+      supabase.from('jobs').select('id, client_name, job_address').order('client_name'),
     ])
     setContracts(cRes.data || [])
     setParties(pRes.data || [])
+    setJobs(jRes.data || [])
     setLoading(false)
   }
   useEffect(() => {
@@ -690,7 +795,7 @@ export default function SubVendorContracts() {
                   <th className="px-4 py-2 font-semibold">Type</th>
                   <th className="px-4 py-2 font-semibold text-right">Total</th>
                   <th className="px-4 py-2 font-semibold">Date</th>
-                  <th className="px-4 py-2 font-semibold">Source</th>
+                  <th className="px-4 py-2 font-semibold hidden lg:table-cell">Source</th>
                   <th className="px-4 py-2 w-10" />
                 </tr>
               </thead>
@@ -714,7 +819,7 @@ export default function SubVendorContracts() {
                         ? new Date(c.signed_date + 'T00:00:00').toLocaleDateString()
                         : new Date(c.created_at).toLocaleDateString()}
                     </td>
-                    <td className="px-4 py-2">
+                    <td className="px-4 py-2 hidden lg:table-cell">
                       <span
                         className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
                           c.kind === 'uploaded'
@@ -745,6 +850,7 @@ export default function SubVendorContracts() {
       {showAdd && (
         <ContractModal
           parties={parties}
+          jobs={jobs}
           onClose={() => setShowAdd(false)}
           onSaved={() => {
             setShowAdd(false)
