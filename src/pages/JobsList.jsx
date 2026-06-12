@@ -5334,8 +5334,10 @@ const CO_STATUS_LABEL = {
 }
 
 function JobChangeOrdersPanel({ job, coDeepLink = null }) {
+  const { user } = useAuth()
   const [cos, setCos] = useState([])
   const [loading, setLoading] = useState(false)
+  const [creatingBuilder, setCreatingBuilder] = useState(false)
   const [activeCo, setActiveCo] = useState(null) // { id, ... } when modal is open; { id: null } for new
   // Counts of attachments per CO id, keyed by bid id
   const [attCounts, setAttCounts] = useState({})
@@ -5409,6 +5411,69 @@ function JobChangeOrdersPanel({ job, coDeepLink = null }) {
     if (job?.id) fetchCOs(job.id)
   }
 
+  // Create a fresh CO straight in the estimate builder (skips the simple form).
+  // Mirrors CODetailModal's new-CO insert: a paired draft estimate + a CO bid,
+  // then routes directly into COEstimatePanel where the user builds it out.
+  async function createCOWithEstimator() {
+    if (!job?.id || creatingBuilder) return
+    setCreatingBuilder(true)
+    try {
+      const clientName = job.client_name || job.name || ''
+      // 1. Paired draft estimate
+      const { data: est, error: eErr } = await supabase
+        .from('estimates')
+        .insert({
+          estimate_name: 'Change Order',
+          client_name: clientName,
+          status: 'draft',
+          created_by: user?.id || null,
+        })
+        .select('id')
+        .single()
+      if (eErr) throw new Error(eErr.message)
+
+      // 2. Next sequential CO number for this job
+      const { data: maxRows } = await supabase
+        .from('bids')
+        .select('custom_co_id')
+        .eq('linked_job_id', job.id)
+        .eq('record_type', 'change_order')
+        .order('custom_co_id', { ascending: false })
+        .limit(1)
+      const customCoId = (maxRows?.[0]?.custom_co_id || 0) + 1
+
+      // 3. CO bid linked to the job + estimate
+      const { data: bid, error: bErr } = await supabase
+        .from('bids')
+        .insert({
+          record_type: 'change_order',
+          linked_job_id: job.id,
+          co_name: 'Change Order',
+          custom_co_id: customCoId,
+          client_name: clientName,
+          bid_amount: 0,
+          gross_profit: 0,
+          gpmd: 0,
+          date_submitted: new Date().toISOString().slice(0, 10),
+          status: 'pending',
+          estimate_id: est.id,
+          notes: '',
+          projects: [],
+          created_by: user?.id || null,
+        })
+        .select('*')
+        .single()
+      if (bErr) throw new Error(bErr.message)
+
+      setCos(prev => [bid, ...prev])
+      openEstimator(est.id, bid.id, bid.co_name, bid.co_type || '')
+    } catch (err) {
+      alert('Could not start change order: ' + (err?.message || err))
+    } finally {
+      setCreatingBuilder(false)
+    }
+  }
+
   function handleCoSaved(bid) {
     if (!bid) return
     setCos(prev => {
@@ -5474,12 +5539,22 @@ function JobChangeOrdersPanel({ job, coDeepLink = null }) {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold text-gray-700">Change Orders</h2>
-        <button
-          onClick={() => setActiveCo({})}
-          className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors mr-6"
-        >
-          + New Change Order
-        </button>
+        <div className="flex items-center gap-2 mr-6">
+          <button
+            onClick={createCOWithEstimator}
+            disabled={creatingBuilder}
+            className="text-xs px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-60"
+            title={`Build a change order for ${job.client_name || job.name || 'this client'} using the estimate toolkit`}
+          >
+            {creatingBuilder ? 'Opening…' : '📐 Build with Estimator'}
+          </button>
+          <button
+            onClick={() => setActiveCo({})}
+            className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
+          >
+            + New Change Order
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -5491,14 +5566,23 @@ function JobChangeOrdersPanel({ job, coDeepLink = null }) {
           <p className="text-4xl mb-3">📋</p>
           <p className="text-sm font-medium text-gray-500">No change orders yet for this job</p>
           <p className="text-xs mt-1 mb-5 text-center max-w-xs">
-            Click "+ New Change Order" to add one.
+            Build one with the estimate toolkit, or add a quick one.
           </p>
-          <button
-            onClick={() => setActiveCo({})}
-            className="text-sm px-4 py-2 rounded-lg bg-blue-700 text-white font-medium hover:bg-blue-800 transition-colors"
-          >
-            + New Change Order
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={createCOWithEstimator}
+              disabled={creatingBuilder}
+              className="text-sm px-4 py-2 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition-colors disabled:opacity-60"
+            >
+              {creatingBuilder ? 'Opening…' : '📐 Build with Estimator'}
+            </button>
+            <button
+              onClick={() => setActiveCo({})}
+              className="text-sm px-4 py-2 rounded-lg bg-blue-700 text-white font-medium hover:bg-blue-800 transition-colors"
+            >
+              + New Change Order
+            </button>
+          </div>
         </div>
       ) : (
         <div className="overflow-x-auto">
