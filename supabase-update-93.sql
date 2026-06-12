@@ -78,6 +78,7 @@ BEGIN
   JOIN jobs j ON j.id = b.linked_job_id
   WHERE b.record_type = 'change_order'
     AND j.client_id = v_client_id
+    AND COALESCE(b.status, '') <> 'unreleased' -- hide drafts not yet released
   ORDER BY b.date_submitted DESC NULLS LAST, b.custom_co_id DESC NULLS LAST;
 END;
 $$;
