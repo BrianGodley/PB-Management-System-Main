@@ -5327,6 +5327,7 @@ function JobFilesPanel({ job }) {
 // Click a row → CODetailModal. Detailed pricing still uses COEstimatePanel
 // via the "Open detailed estimator" link inside the modal.
 const CO_STATUS_STYLE = {
+  unreleased: 'border-gray-300   text-gray-600   bg-gray-50',
   pending: 'border-yellow-400 text-yellow-800 bg-yellow-50',
   presented: 'border-blue-400   text-blue-800   bg-blue-50',
   sold: 'border-green-500  text-green-800  bg-green-50',
@@ -5335,6 +5336,7 @@ const CO_STATUS_STYLE = {
 // CO-context labels — underlying status values stay 'sold'/'lost' but
 // display reads more naturally as "Approved"/"Declined" for change orders.
 const CO_STATUS_LABEL = {
+  unreleased: 'Unreleased',
   pending: 'Pending',
   presented: 'Sent',
   sold: 'Approved',
@@ -5479,7 +5481,7 @@ function JobChangeOrdersPanel({ job, coDeepLink = null, newCoDeepLink = null }) 
           gross_profit: 0,
           gpmd: 0,
           date_submitted: new Date().toISOString().slice(0, 10),
-          status: 'pending',
+          status: 'unreleased',
           estimate_id: est.id,
           notes: '',
           projects: [],

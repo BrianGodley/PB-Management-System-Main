@@ -40,11 +40,9 @@ export default function CODetailModal({
   onSent,
 }) {
   const { user } = useAuth()
-  const isNew = !co?.id
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [showSig, setShowSig] = useState(false)
-  const [showSendMenu, setShowSendMenu] = useState(false)
 
   // Editable fields
   const [title, setTitle] = useState(co?.co_name || '')
@@ -53,8 +51,29 @@ export default function CODetailModal({
   const [scope, setScope] = useState(stripHtmlForEdit(co?.scope_of_work_html || ''))
   const [bidAmount, setBidAmount] = useState(co?.bid_amount || 0)
 
-  // Local copy of co for live updates (after save / approve)
+  // Local copy of co for live updates (after save / release / etc.)
   const [coState, setCoState] = useState(co)
+
+  // isNew tracks "no row yet" — flips false the moment we create it, so the
+  // footer switches from [Save] to the unreleased button set after first save.
+  const isNew = !coState?.id
+
+  // ── Change-order lifecycle ────────────────────────────────────────────────
+  // unreleased -> (Release) -> pending -> client approves/declines in portal.
+  const status = coState?.status || (isNew ? 'unreleased' : 'unreleased')
+  const isApproved = status === 'sold'
+  const isDeclined = status === 'lost'
+  const isPending = status === 'pending' || status === 'presented'
+  const isUnreleased = !isApproved && !isDeclined && !isPending // covers 'unreleased' + legacy
+  const isTerminal = isApproved || isDeclined
+
+  // Editing gate: new COs are editable; existing ones only after clicking Edit,
+  // and only while unreleased (released/approved COs can't be edited).
+  const [editing, setEditing] = useState(isNew)
+  const canEdit = isNew || (isUnreleased && editing)
+
+  // Release / resend notification dialog: null | 'release' | 'resend'
+  const [notifyMode, setNotifyMode] = useState(null)
 
   // Manual vs estimator. New COs created here are always manual (estimator COs
   // are built in COEstimatePanel). Existing rows carry co_method; legacy rows
@@ -192,7 +211,7 @@ export default function CODetailModal({
             gross_profit: 0,
             gpmd: 0,
             date_submitted: new Date().toISOString().slice(0, 10),
-            status: 'pending',
+            status: 'unreleased',
             estimate_id: est.id,
             notes: '',
             projects: [],
@@ -222,9 +241,112 @@ export default function CODetailModal({
         setCoState(bid)
         onSaved && onSaved(bid)
       }
+      setEditing(false) // back to read-only after a save
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
+    setSaving(false)
+  }
+
+  // Release / unrelease + notification lifecycle.
+  async function setStatus(newStatus, extra = {}) {
+    if (!coState?.id) return null
+    const { data: bid, error: e } = await supabase
+      .from('bids')
+      .update({ status: newStatus, ...extra })
+      .eq('id', coState.id)
+      .select('*')
+      .single()
+    if (e) {
+      setError(e.message)
+      return null
+    }
+    setCoState(bid)
+    onSaved && onSaved(bid)
+    return bid
+  }
+
+  // Fetch the client's email + cell for notifications (via the job's client).
+  async function fetchClientContact() {
+    let clientId = job?.client_id || null
+    if (!clientId && job?.id) {
+      const { data: j } = await supabase.from('jobs').select('client_id').eq('id', job.id).single()
+      clientId = j?.client_id || null
+    }
+    if (clientId) {
+      const { data: c } = await supabase
+        .from('clients')
+        .select('email, cell, phone, name')
+        .eq('id', clientId)
+        .single()
+      if (c) return { email: c.email || '', cell: c.cell || c.phone || '' }
+    }
+    return { email: '', cell: '' }
+  }
+
+  // Send the client a notification that a CO is awaiting their approval.
+  async function sendClientNotification(method) {
+    const { email, cell } = await fetchClientContact()
+    const portalUrl = `${window.location.origin}/client-portal`
+    const amount = `$${Number(coState.bid_amount || 0).toLocaleString()}`
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    const base = import.meta.env.VITE_SUPABASE_URL
+    const auth = { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' }
+    const results = []
+    if ((method === 'email' || method === 'both') && email) {
+      const res = await fetch(`${base}/functions/v1/send-email`, {
+        method: 'POST',
+        headers: auth,
+        body: JSON.stringify({
+          to: email,
+          subject: `Change Order #${coState.custom_co_id || ''} — approval requested`,
+          html:
+            buildPrintableHtml(coState, job) +
+            `<p style="margin-top:16px">Please review and approve this change order in your client portal: <a href="${portalUrl}">${portalUrl}</a></p>`,
+        }),
+      })
+      results.push(res.ok)
+    }
+    if ((method === 'text' || method === 'both') && cell) {
+      const res = await fetch(`${base}/functions/v1/send-sms`, {
+        method: 'POST',
+        headers: auth,
+        body: JSON.stringify({
+          to: cell,
+          body: `${job.client_name || job.name}: Change Order #${coState.custom_co_id || ''} (${amount}) is awaiting your approval. Review it in your client portal: ${portalUrl}`,
+        }),
+      })
+      results.push(res.ok)
+    }
+    if (results.length === 0) {
+      throw new Error('No client contact on file for the selected method.')
+    }
+  }
+
+  // Release: notify the client + flip to pending (visible in portal). Resend:
+  // notify only (status unchanged — no duplicate portal entry).
+  async function handleNotifySend(method) {
+    setSaving(true)
+    setError('')
+    try {
+      await sendClientNotification(method)
+      if (notifyMode === 'release') {
+        await setStatus('pending')
+      }
+      setNotifyMode(null)
+      onSent && onSent()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+    setSaving(false)
+  }
+
+  async function handleUnrelease() {
+    setSaving(true)
+    setError('')
+    await setStatus('unreleased')
     setSaving(false)
   }
 
@@ -396,9 +518,6 @@ export default function CODetailModal({
     setSaving(false)
   }
 
-  const isApproved = coState?.status === 'sold'
-  const isDeclined = coState?.status === 'lost'
-
   return (
     <>
       <div
@@ -421,6 +540,11 @@ export default function CODetailModal({
               <p className="text-xs text-gray-500 mt-0.5 truncate">{job.client_name || job.name}</p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
+              {!isNew && isUnreleased && (
+                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 border border-gray-300">
+                  Unreleased
+                </span>
+              )}
               {isApproved && (
                 <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-green-50 text-green-800 border border-green-300">
                   ✓ Approved
@@ -431,7 +555,7 @@ export default function CODetailModal({
                   ✕ Declined
                 </span>
               )}
-              {coState?.status === 'pending' && (
+              {isPending && (
                 <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-yellow-50 text-yellow-800 border border-yellow-300">
                   Pending
                 </span>
@@ -461,22 +585,22 @@ export default function CODetailModal({
                   setTitle(e.target.value)
                   setError('')
                 }}
-                disabled={isApproved}
+                disabled={!canEdit}
                 className="input text-sm w-full"
                 placeholder="e.g. Add planter wall along driveway"
               />
             </div>
 
-            {/* Scope of Work */}
+            {/* Description */}
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">
-                Scope of Work
+                Description
               </label>
               <textarea
                 rows={6}
                 value={scope}
                 onChange={e => setScope(e.target.value)}
-                disabled={isApproved}
+                disabled={!canEdit}
                 className="input text-sm w-full"
                 placeholder="Describe what's being added, modified, or credited…"
               />
@@ -520,7 +644,7 @@ export default function CODetailModal({
                               type="text"
                               value={r.item}
                               onChange={e => updateLineItem(i, 'item', e.target.value)}
-                              disabled={isApproved}
+                              disabled={!canEdit}
                               placeholder="Description"
                               className="input text-sm w-full"
                             />
@@ -532,7 +656,7 @@ export default function CODetailModal({
                               min="0"
                               value={r.labor_hours}
                               onChange={e => updateLineItem(i, 'labor_hours', e.target.value)}
-                              disabled={isApproved}
+                              disabled={!canEdit}
                               className="input text-sm w-full text-right"
                             />
                           </td>
@@ -543,12 +667,12 @@ export default function CODetailModal({
                               min="0"
                               value={r.material_cost}
                               onChange={e => updateLineItem(i, 'material_cost', e.target.value)}
-                              disabled={isApproved}
+                              disabled={!canEdit}
                               className="input text-sm w-full text-right"
                             />
                           </td>
                           <td className="py-1 text-center">
-                            {!isApproved && (
+                            {canEdit && (
                               <button
                                 onClick={() => removeLineItem(i)}
                                 className="text-gray-300 hover:text-red-500 text-sm"
@@ -573,7 +697,7 @@ export default function CODetailModal({
                     </tfoot>
                   </table>
                 </div>
-                {!isApproved && (
+                {canEdit && (
                   <button
                     onClick={addLineItem}
                     className="mt-2 text-xs font-semibold text-blue-700 hover:text-blue-900"
@@ -591,7 +715,7 @@ export default function CODetailModal({
                 {coState?.id && onOpenEstimator && !isManual && (
                   <button
                     onClick={() => onOpenEstimator(coState)}
-                    disabled={isApproved}
+                    disabled={!canEdit}
                     className="text-xs font-semibold text-indigo-700 hover:text-indigo-900 underline disabled:opacity-40"
                   >
                     Open detailed estimator →
@@ -607,7 +731,7 @@ export default function CODetailModal({
                     min="0"
                     value={bidAmount}
                     onChange={e => setBidAmount(e.target.value)}
-                    disabled={isApproved}
+                    disabled={!canEdit}
                     className="input text-sm w-full mt-1"
                   />
                 </div>
@@ -658,7 +782,7 @@ export default function CODetailModal({
                     />
                     <button
                       onClick={() => fileInputRef.current?.click()}
-                      disabled={uploading || isApproved}
+                      disabled={uploading || isTerminal}
                       className="text-xs font-semibold text-green-700 hover:text-green-900 underline disabled:opacity-40"
                     >
                       {uploading ? 'Uploading…' : '+ Attach file'}
@@ -685,7 +809,7 @@ export default function CODetailModal({
                       <span className="text-[10px] text-gray-400 flex-shrink-0">
                         {Math.round((att.file_size || 0) / 1024)} KB
                       </span>
-                      {!isApproved && (
+                      {!isTerminal && (
                         <button
                           onClick={() => handleAttachmentDelete(att)}
                           className="text-red-300 hover:text-red-600 text-xs"
@@ -765,82 +889,133 @@ export default function CODetailModal({
             )}
           </div>
 
-          {/* Footer actions */}
+          {/* Footer actions — depend on lifecycle status */}
           <div className="px-6 py-4 border-t border-gray-100 flex flex-wrap items-center gap-2 flex-shrink-0">
-            {!isApproved && (
+            {/* Creating a new CO, or editing an unreleased one → Save */}
+            {(isNew || (isUnreleased && editing)) && (
               <button
                 onClick={handleSave}
                 disabled={saving || !title.trim()}
                 className="flex-1 min-w-[120px] py-2.5 bg-green-700 text-white text-sm font-semibold rounded-xl hover:bg-green-800 disabled:opacity-40"
               >
-                {saving ? 'Saving…' : isNew ? 'Create CO' : 'Save'}
+                {saving ? 'Saving…' : 'Save'}
               </button>
             )}
-            {coState?.id && !isApproved && (
+            {/* Cancel an in-progress edit (existing unreleased CO) */}
+            {!isNew && isUnreleased && editing && (
               <button
-                onClick={() => setShowSig(true)}
-                className="flex-1 min-w-[120px] py-2.5 bg-indigo-700 text-white text-sm font-semibold rounded-xl hover:bg-indigo-800"
+                onClick={() => {
+                  setTitle(coState?.co_name || '')
+                  setScope(stripHtmlForEdit(coState?.scope_of_work_html || ''))
+                  setBidAmount(coState?.bid_amount || 0)
+                  setLineItems(
+                    Array.isArray(coState?.co_line_items) && coState.co_line_items.length
+                      ? coState.co_line_items.map(r => ({
+                          item: r.item || '',
+                          labor_hours: r.labor_hours ?? '',
+                          material_cost: r.material_cost ?? '',
+                        }))
+                      : [{ item: '', labor_hours: '', material_cost: '' }]
+                  )
+                  setError('')
+                  setEditing(false)
+                }}
+                className="px-3 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm hover:bg-gray-50"
               >
-                ✓ Approve
+                Cancel
               </button>
             )}
-            {coState?.id && (
-              <div className="relative">
+
+            {/* Unreleased (not editing) → Release / Edit / Delete */}
+            {!isNew && isUnreleased && !editing && (
+              <>
                 <button
-                  onClick={() => setShowSendMenu(v => !v)}
-                  className="px-3 py-2.5 rounded-xl border border-gray-200 text-gray-700 text-sm hover:bg-gray-50"
+                  onClick={() => {
+                    setError('')
+                    setNotifyMode('release')
+                  }}
+                  className="flex-1 min-w-[120px] py-2.5 bg-blue-700 text-white text-sm font-semibold rounded-xl hover:bg-blue-800"
                 >
-                  Send / Print ▾
+                  📤 Release
                 </button>
-                {showSendMenu && (
-                  <div className="absolute right-0 bottom-full mb-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-[140px]">
-                    <button
-                      onClick={() => {
-                        setShowSendMenu(false)
-                        handlePrint()
-                      }}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
-                    >
-                      🖨️ Print
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowSendMenu(false)
-                        handleEmail()
-                      }}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
-                    >
-                      ✉️ Email
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowSendMenu(false)
-                        handleText()
-                      }}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50"
-                    >
-                      📱 Text
-                    </button>
-                    <button
-                      disabled
-                      className="w-full text-left px-3 py-2 text-sm text-gray-300 cursor-not-allowed"
-                    >
-                      🌐 Send to client portal (soon)
-                    </button>
-                  </div>
-                )}
-              </div>
+                <button
+                  onClick={() => setEditing(true)}
+                  className="px-4 py-2.5 rounded-xl border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="px-3 py-2.5 rounded-xl border border-red-200 text-red-500 text-sm hover:bg-red-50"
+                >
+                  Delete
+                </button>
+              </>
             )}
-            {coState?.id && (
-              <button
-                onClick={handleDelete}
-                className="px-3 py-2.5 rounded-xl border border-red-200 text-red-500 text-sm hover:bg-red-50"
-              >
-                Delete
-              </button>
+
+            {/* Pending (released) → Print / Resend / Unrelease / Delete */}
+            {isPending && (
+              <>
+                <button
+                  onClick={handlePrint}
+                  className="px-4 py-2.5 rounded-xl border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
+                >
+                  🖨️ Print
+                </button>
+                <button
+                  onClick={() => {
+                    setError('')
+                    setNotifyMode('resend')
+                  }}
+                  className="px-4 py-2.5 rounded-xl border border-blue-200 text-blue-700 text-sm font-semibold hover:bg-blue-50"
+                >
+                  Resend Notification
+                </button>
+                <button
+                  onClick={handleUnrelease}
+                  disabled={saving}
+                  className="px-4 py-2.5 rounded-xl border border-amber-300 text-amber-700 text-sm font-semibold hover:bg-amber-50 disabled:opacity-40"
+                >
+                  Unrelease
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="px-3 py-2.5 rounded-xl border border-red-200 text-red-500 text-sm hover:bg-red-50"
+                >
+                  Delete
+                </button>
+              </>
+            )}
+
+            {/* Approved / Declined → Print / Delete */}
+            {isTerminal && (
+              <>
+                <button
+                  onClick={handlePrint}
+                  className="px-4 py-2.5 rounded-xl border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
+                >
+                  🖨️ Print
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="px-3 py-2.5 rounded-xl border border-red-200 text-red-500 text-sm hover:bg-red-50"
+                >
+                  Delete
+                </button>
+              </>
             )}
           </div>
         </div>
+
+        {/* Release / Resend notification dialog */}
+        {notifyMode && (
+          <NotifyDialog
+            mode={notifyMode}
+            saving={saving}
+            onCancel={() => setNotifyMode(null)}
+            onSend={handleNotifySend}
+          />
+        )}
       </div>
 
       {showSig && (
@@ -851,6 +1026,76 @@ export default function CODetailModal({
         />
       )}
     </>
+  )
+}
+
+// ── Release / Resend notification dialog ──────────────────────────────────
+function NotifyDialog({ mode, saving, onCancel, onSend }) {
+  const [method, setMethod] = useState('both') // 'text' | 'email' | 'both'
+  const isRelease = mode === 'release'
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4"
+      onClick={onCancel}
+    >
+      <div
+        className="w-full max-w-sm bg-white rounded-2xl shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+          <h3 className="text-base font-bold text-gray-900">
+            {isRelease ? 'Release Change Order' : 'Resend Notification'}
+          </h3>
+          <button
+            onClick={onCancel}
+            className="w-8 h-8 rounded-full text-gray-400 hover:bg-gray-100 flex items-center justify-center text-lg"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="px-5 py-4 space-y-4">
+          {isRelease && (
+            <p className="text-sm text-gray-600">
+              This will notify the client that a change order is pending. They can approve it in
+              their client portal, or sign in the app.
+            </p>
+          )}
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1.5">
+              Notify by
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { k: 'text', label: '📱 Text' },
+                { k: 'email', label: '✉️ Email' },
+                { k: 'both', label: 'Both' },
+              ].map(o => (
+                <button
+                  key={o.k}
+                  onClick={() => setMethod(o.k)}
+                  className={`py-2.5 rounded-xl border text-sm font-semibold transition-colors ${
+                    method === o.k
+                      ? 'border-blue-600 bg-blue-50 text-blue-800'
+                      : 'border-gray-200 text-gray-600'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="px-5 py-3 border-t border-gray-200">
+          <button
+            onClick={() => onSend(method)}
+            disabled={saving}
+            className="w-full py-3 rounded-xl bg-blue-700 text-white text-sm font-bold hover:bg-blue-800 disabled:opacity-50"
+          >
+            {saving ? 'Sending…' : isRelease ? 'Send & Release' : 'Send'}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 

@@ -29,7 +29,8 @@ const dateStr = v => {
 }
 
 const CO_STATUS = {
-  pending: { label: 'Pending', cls: 'bg-gray-100 text-gray-600' },
+  unreleased: { label: 'Unreleased', cls: 'bg-gray-100 text-gray-500' },
+  pending: { label: 'Pending', cls: 'bg-yellow-100 text-yellow-700' },
   presented: { label: 'Sent', cls: 'bg-amber-100 text-amber-700' },
   sold: { label: 'Approved', cls: 'bg-green-100 text-green-700' },
   lost: { label: 'Declined', cls: 'bg-red-100 text-red-600' },

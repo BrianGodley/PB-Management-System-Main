@@ -497,7 +497,7 @@ export default function COEstimatePanel({
             gross_profit: totalGp,
             gpmd: bidGpmd,
             date_submitted: new Date().toISOString().split('T')[0],
-            status: 'pending',
+            status: 'unreleased',
             estimate_id: estimateId,
             projects: projNames,
             notes: '',
