@@ -11,6 +11,7 @@
 import { Fragment, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import PortalCODetailModal from './PortalCODetailModal'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 const pick = (o, ...keys) => {
@@ -394,38 +395,85 @@ function DailyLogsView({ limit }) {
 }
 
 // ── Change Orders ────────────────────────────────────────────────────────────
+const CO_STATUS_LABEL = {
+  pending: { label: 'Pending', cls: 'bg-gray-100 text-gray-600' },
+  presented: { label: 'Awaiting your review', cls: 'bg-amber-100 text-amber-700' },
+  sold: { label: 'Approved', cls: 'bg-green-100 text-green-700' },
+  lost: { label: 'Declined', cls: 'bg-red-100 text-red-600' },
+}
+function coStatus(s) {
+  return CO_STATUS_LABEL[String(s || 'pending').toLowerCase()] || CO_STATUS_LABEL.pending
+}
+
 function ChangeOrdersView() {
   const [rows, setRows] = useState(null)
-  useEffect(() => {
+  const [active, setActive] = useState(null)
+
+  function load() {
     supabase.rpc('portal_change_orders', rpcArgs()).then(({ data }) => setRows(data || []))
+  }
+  useEffect(() => {
+    load()
   }, [])
+
   if (rows === null) return <Loading />
   if (rows.length === 0) return <Empty label="No change orders yet." />
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-      <table className="w-full text-sm">
-        <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
-          <tr>
-            <th className="px-4 py-2.5">CO #</th>
-            <th className="px-4 py-2.5">Title</th>
-            <th className="px-4 py-2.5">Amount</th>
-            <th className="px-4 py-2.5">Status</th>
-            <th className="px-4 py-2.5">Date</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {rows.map(b => (
-            <tr key={b.id}>
-              <td className="px-4 py-2.5 text-gray-800">{pick(b, 'custom_co_id', 'id') || '—'}</td>
-              <td className="px-4 py-2.5 text-gray-800">{pick(b, 'title', 'name', 'project_name') || '—'}</td>
-              <td className="px-4 py-2.5 text-gray-600">{money(pick(b, 'bid_amount', 'amount'))}</td>
-              <td className="px-4 py-2.5 text-gray-600 capitalize">{pick(b, 'status') || '—'}</td>
-              <td className="px-4 py-2.5 text-gray-600">{dateStr(pick(b, 'created_at'))}</td>
+    <>
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
+            <tr>
+              <th className="px-4 py-2.5">CO #</th>
+              <th className="px-4 py-2.5">Title</th>
+              <th className="px-4 py-2.5">Amount</th>
+              <th className="px-4 py-2.5">Status</th>
+              <th className="px-4 py-2.5">Date</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {rows.map(b => {
+              const st = coStatus(b.status)
+              return (
+                <tr
+                  key={b.id}
+                  onClick={() => setActive(b)}
+                  className="cursor-pointer hover:bg-gray-50 transition-colors"
+                >
+                  <td className="px-4 py-2.5 text-gray-500">
+                    {b.custom_co_id ? `#${b.custom_co_id}` : '—'}
+                  </td>
+                  <td className="px-4 py-2.5 font-medium text-green-700 hover:underline">
+                    {pick(b, 'co_name') || '—'}
+                  </td>
+                  <td className="px-4 py-2.5 text-gray-800 font-semibold">
+                    {money(pick(b, 'bid_amount'))}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${st.cls}`}
+                    >
+                      {st.label}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5 text-gray-500">
+                    {dateStr(pick(b, 'date_submitted', 'created_at'))}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {active && (
+        <PortalCODetailModal
+          co={active}
+          onClose={() => setActive(null)}
+          onActioned={load}
+        />
+      )}
+    </>
   )
 }
 
