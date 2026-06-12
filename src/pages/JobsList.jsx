@@ -166,7 +166,7 @@ function JobItem({
                 is clean. Open statuses are 'active' and 'on_hold'. */}
             {respInitials &&
               (job.status === 'active' || job.status === 'on_hold' || !job.status) && (
-                <span className="mr-1 text-gray-500 font-bold">({respInitials})</span>
+                <span className="mr-1 text-gray-500 font-normal">({respInitials})</span>
               )}
             {(job.name || job.client_name || '').replace(/\s*\([A-Za-z]{1,3}\)\s*$/, '')}
           </p>
@@ -1624,7 +1624,7 @@ export default function JobsList() {
               <div
                 ref={jobsListRef}
                 onScroll={onJobsListScroll}
-                className="overflow-y-auto flex-1 w-full pr-2"
+                className="overflow-y-auto flex-1 w-full pr-6"
               >
                 {/* Stage groups */}
                 {(() => {
