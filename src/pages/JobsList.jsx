@@ -1388,7 +1388,7 @@ export default function JobsList() {
       {tab !== 'settings' && (
         <div className="flex gap-2 flex-1 min-h-0 pt-2">
           {/* Jobs sidebar — desktop only */}
-          <div className="hidden lg:flex w-64 flex-shrink-0 flex-col min-h-0 bg-white border-r border-gray-200">
+          <div className="hidden lg:flex w-80 flex-shrink-0 flex-col min-h-0 bg-white border-r border-gray-200">
             {/* Inner column: 90% wide, centered */}
             <div className="flex flex-col w-[90%] mx-auto mt-2 flex-shrink-0">
               {/* ── User-specific Filter button (above Open/Closed) ──────
@@ -1674,7 +1674,7 @@ export default function JobsList() {
                           type="button"
                           onClick={() => toggleStageCollapsed(stageId)}
                           title={collapsed ? 'Expand' : 'Collapse'}
-                          className="w-full flex items-center gap-1.5 px-2 py-0 text-[11px] font-bold text-gray-500 uppercase tracking-wide truncate bg-gray-100 border border-gray-300 rounded leading-tight hover:bg-gray-200 transition-colors text-left"
+                          className="w-full flex items-center gap-1.5 px-2 py-0 text-[11px] font-bold text-gray-600 capitalize tracking-wide truncate bg-blue-50 border border-blue-100 rounded leading-tight hover:bg-blue-100 transition-colors text-left"
                         >
                           <svg
                             className={`w-3 h-3 flex-shrink-0 text-gray-400 transition-transform ${collapsed ? '' : 'rotate-90'}`}
