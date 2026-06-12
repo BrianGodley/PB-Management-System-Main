@@ -2271,7 +2271,7 @@ export default function ScheduleCalendar({
               {DAY_NAMES.map(d => (
                 <div
                   key={d}
-                  className="text-center text-xs font-semibold text-gray-400 py-1.5 border-r border-b border-gray-200 bg-white"
+                  className="text-center text-xs font-bold text-gray-600 py-1.5 border-r border-b border-gray-200 bg-white"
                 >
                   {d}
                 </div>
@@ -2288,64 +2288,55 @@ export default function ScheduleCalendar({
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-700" />
           </div>
         ) : viewMode === 'day' ? (
-          <div className="border-l border-r border-b border-gray-200 divide-y divide-gray-100">
-            {dayItems.length === 0 ? (
-              <p className="p-8 text-center text-sm text-gray-400">
-                No schedule items on this day.
-              </p>
-            ) : (
-              dayItems.map(item => (
-                <div
-                  key={item.id}
-                  onClick={e => handleItemClick(e, item)}
-                  className="flex items-start gap-2 p-3 hover:bg-gray-50 cursor-pointer"
-                >
+          // Single-day column — same calendar look, each item a full-width bar.
+          <div className="border-l border-r border-b border-gray-200 bg-white relative min-h-[360px]">
+            {/* Date number, top-left like a calendar cell */}
+            <div className="flex items-center gap-2 px-2 pt-1.5">
+              <span
+                className={`inline-flex items-center justify-center text-xs font-semibold rounded-full w-6 h-6 ${
+                  cursorStr === todayStr ? 'bg-green-700 text-white' : 'text-gray-500'
+                }`}
+              >
+                {cursorDate.getDate()}
+              </span>
+            </div>
+            {/* Item bars stretching the full width */}
+            <div className="px-2 pb-2 pt-1 space-y-1">
+              {dayItems.length === 0 ? (
+                <p className="py-10 text-center text-sm text-gray-400">
+                  No schedule items on this day.
+                </p>
+              ) : (
+                dayItems.map(item => (
                   <div
-                    className="w-1.5 self-stretch rounded-full flex-shrink-0"
+                    key={item.id}
+                    onClick={e => handleItemClick(e, item)}
                     style={{
                       backgroundColor: item.needs_crew
                         ? '#b45309'
                         : item.scheduling_type === 'yard_check'
                           ? '#3b82f6'
                           : item.display_color || '#15803d',
-                      minHeight: 36,
                     }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-900">
-                      {item.title}
-                      {jobMap[item.job_id] && (
-                        <span className="text-purple-600"> ({jobMap[item.job_id]})</span>
-                      )}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {new Date(item.start_date + 'T00:00:00').toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                      {item.start_date !== item.end_date && (
-                        <>
-                          {' – '}
-                          {new Date(item.end_date + 'T00:00:00').toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                          })}
-                        </>
-                      )}
-                      {item.work_days > 0 && (
-                        <span className="text-gray-400">
-                          {' '}
-                          · {item.work_days} day{item.work_days !== 1 ? 's' : ''}
-                        </span>
-                      )}
-                    </p>
-                    {item.assignees && (
-                      <p className="text-xs text-gray-400 mt-0.5">👤 {item.assignees}</p>
+                    className="flex items-center gap-1.5 px-2 py-1.5 rounded text-white text-sm cursor-pointer hover:opacity-80 leading-snug"
+                    title={item.title}
+                  >
+                    {item.assignee_color && !item.needs_crew && (
+                      <span
+                        className="flex-shrink-0 w-4 h-4 rounded-full border border-white/50"
+                        style={{ backgroundColor: item.assignee_color }}
+                      />
                     )}
+                    <span className="min-w-0 break-words">
+                      {jobMap[item.job_id] ? `${item.title} (${jobMap[item.job_id]})` : item.title}
+                      {item.needs_crew && (
+                        <span className="ml-1 text-yellow-200 text-[10px]">— Assign Crew</span>
+                      )}
+                    </span>
                   </div>
-                </div>
-              ))
-            )}
+                ))
+              )}
+            </div>
           </div>
         ) : (
           <div className="border-l border-gray-200">
