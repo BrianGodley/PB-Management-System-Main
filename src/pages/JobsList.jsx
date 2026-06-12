@@ -5619,13 +5619,13 @@ function JobChangeOrdersPanel({ job, coDeepLink = null, newCoDeepLink = null }) 
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="text-left px-3 py-3 font-semibold text-gray-700 w-16">CO #</th>
-                <th className="text-left px-3 py-3 font-semibold text-gray-700">Title</th>
+                <th className="text-left px-3 py-3 font-semibold text-gray-700 w-40">Title</th>
+                <th className="text-left px-3 py-3 font-semibold text-gray-700 w-[34%]">
+                  Description
+                </th>
                 <th className="text-left px-3 py-3 font-semibold text-gray-700 w-24">Type</th>
                 <th className="text-left px-3 py-3 font-semibold text-gray-700 w-28">Created</th>
                 <th className="text-center px-3 py-3 font-semibold text-gray-700 w-20">Files</th>
-                <th className="text-right px-3 py-3 font-semibold text-gray-700 w-28">
-                  Gross Profit
-                </th>
                 <th className="text-right px-3 py-3 font-semibold text-gray-700 w-28">Amount</th>
                 <th className="text-center px-3 py-3 font-semibold text-gray-700 w-28">Status</th>
                 <th className="text-center px-3 py-3 font-semibold text-gray-700 w-12"></th>
@@ -5648,12 +5648,18 @@ function JobChangeOrdersPanel({ job, coDeepLink = null, newCoDeepLink = null }) 
                         <span className="text-gray-300">—</span>
                       )}
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-3 py-3 align-top">
                       <span className="font-semibold text-blue-600 hover:underline">
                         {co.co_name || '(untitled)'}
                       </span>
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-3 py-3 align-top text-xs text-gray-600 whitespace-normal break-words">
+                      {(co.scope_of_work_html || '')
+                        .replace(/<[^>]+>/g, ' ')
+                        .replace(/&nbsp;/g, ' ')
+                        .trim() || <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-3 py-3 align-top">
                       {co.co_method === 'manual' ? (
                         <span className="rounded-full px-2 py-0.5 text-xs font-semibold bg-blue-50 text-blue-700">
                           Manual
@@ -5676,14 +5682,7 @@ function JobChangeOrdersPanel({ job, coDeepLink = null, newCoDeepLink = null }) 
                         <span className="text-gray-200">—</span>
                       )}
                     </td>
-                    <td className="px-3 py-3 text-right whitespace-nowrap font-semibold text-green-700 text-xs">
-                      {co.gross_profit > 0 ? (
-                        fmt(co.gross_profit)
-                      ) : (
-                        <span className="text-gray-300 font-normal">—</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-3 text-right font-bold text-gray-900 whitespace-nowrap">
+                    <td className="px-3 py-3 text-right font-bold text-gray-900 whitespace-nowrap align-top">
                       {fmt(co.bid_amount)}
                     </td>
                     <td className="px-3 py-3 text-center" onClick={e => e.stopPropagation()}>

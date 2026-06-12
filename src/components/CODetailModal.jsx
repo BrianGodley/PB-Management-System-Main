@@ -50,7 +50,7 @@ export default function CODetailModal({
   // Edit plain text (stripped from any stored HTML once, on open). Running the
   // strip on every render would .trim() the value mid-typing and eat spaces.
   const [scope, setScope] = useState(stripHtmlForEdit(co?.scope_of_work_html || ''))
-  const [bidAmount, setBidAmount] = useState(co?.bid_amount || 0)
+  const [bidAmount, setBidAmount] = useState(co?.bid_amount || '')
 
   // Local copy of co for live updates (after save / release / etc.)
   const [coState, setCoState] = useState(co)
@@ -80,6 +80,36 @@ export default function CODetailModal({
   // are built in COEstimatePanel). Existing rows carry co_method; legacy rows
   // (null) are treated as estimator so they keep the detailed-estimator link.
   const isManual = (coState?.co_method || (isNew ? 'manual' : 'estimator')) === 'manual'
+
+  // For estimator COs: labor hours + materials rolled up from the estimate's
+  // modules (man-days × 8 = hours). Total + GP come from the saved bid.
+  const [estSummary, setEstSummary] = useState({ laborHours: 0, materials: 0 })
+  useEffect(() => {
+    let alive = true
+    if (isManual || !coState?.estimate_id) {
+      setEstSummary({ laborHours: 0, materials: 0 })
+      return
+    }
+    ;(async () => {
+      const { data: projs } = await supabase
+        .from('estimate_projects')
+        .select('estimate_modules(man_days, material_cost)')
+        .eq('estimate_id', coState.estimate_id)
+      if (!alive) return
+      let md = 0
+      let mat = 0
+      for (const p of projs || []) {
+        for (const m of p.estimate_modules || []) {
+          md += parseFloat(m.man_days || 0)
+          mat += parseFloat(m.material_cost || 0)
+        }
+      }
+      setEstSummary({ laborHours: md * 8, materials: mat })
+    })()
+    return () => {
+      alive = false
+    }
+  }, [isManual, coState?.estimate_id])
 
   // Manual CO line items: [{ item, labor_hours, material_cost }]
   const [lineItems, setLineItems] = useState(() => {
@@ -652,23 +682,25 @@ export default function CODetailModal({
                           </td>
                           <td className="px-1 py-1">
                             <input
-                              type="number"
-                              step="0.25"
-                              min="0"
-                              value={r.labor_hours}
-                              onChange={e => updateLineItem(i, 'labor_hours', e.target.value)}
+                              type="text"
+                              inputMode="decimal"
+                              value={r.labor_hours === 0 ? '' : r.labor_hours}
+                              onChange={e => updateLineItem(i, 'labor_hours', numMask(e.target.value))}
                               disabled={!canEdit}
+                              placeholder="0"
                               className="input text-sm w-full text-right"
                             />
                           </td>
                           <td className="px-1 py-1">
                             <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={r.material_cost}
-                              onChange={e => updateLineItem(i, 'material_cost', e.target.value)}
+                              type="text"
+                              inputMode="numeric"
+                              value={moneyMask(r.material_cost)}
+                              onChange={e =>
+                                updateLineItem(i, 'material_cost', moneyDigits(e.target.value))
+                              }
                               disabled={!canEdit}
+                              placeholder="$0"
                               className="input text-sm w-full text-right"
                             />
                           </td>
@@ -716,51 +748,64 @@ export default function CODetailModal({
                 {coState?.id && onOpenEstimator && !isManual && (
                   <button
                     onClick={() => onOpenEstimator(coState)}
-                    disabled={!canEdit}
-                    className="text-xs font-semibold text-indigo-700 hover:text-indigo-900 underline disabled:opacity-40"
+                    className="text-xs font-semibold text-indigo-700 hover:text-indigo-900 underline"
                   >
-                    Open detailed estimator →
+                    {canEdit ? 'Open detailed estimator →' : 'View estimator →'}
                   </button>
                 )}
               </div>
-              <div className={`grid ${isManual ? 'grid-cols-1' : 'grid-cols-3'} gap-3 text-sm`}>
-                <div>
-                  <p className="text-[10px] uppercase text-gray-500 font-semibold">Owner price</p>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={bidAmount}
-                    onChange={e => setBidAmount(e.target.value)}
-                    disabled={!canEdit}
-                    className="input text-sm w-full mt-1"
-                  />
+              {isManual ? (
+                <div className="grid grid-cols-1 gap-3 text-sm">
+                  <div>
+                    <p className="text-[10px] uppercase text-gray-500 font-semibold">Owner price</p>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={moneyMask(bidAmount)}
+                      onChange={e => setBidAmount(moneyDigits(e.target.value))}
+                      disabled={!canEdit}
+                      placeholder="$0"
+                      className="input text-sm w-full mt-1"
+                    />
+                  </div>
                 </div>
-                {!isManual && (
-                  <>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                    <div>
+                      <p className="text-[10px] uppercase text-gray-500 font-semibold">
+                        Labor hours
+                      </p>
+                      <p className="text-sm font-bold text-gray-800 mt-1.5">
+                        {Math.round(estSummary.laborHours).toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase text-gray-500 font-semibold">Materials</p>
+                      <p className="text-sm font-bold text-gray-800 mt-1.5">
+                        ${Math.round(estSummary.materials).toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase text-gray-500 font-semibold">Total</p>
+                      <p className="text-sm font-bold text-gray-900 mt-1.5">
+                        ${Number(coState?.bid_amount || 0).toLocaleString()}
+                      </p>
+                    </div>
                     <div>
                       <p className="text-[10px] uppercase text-gray-500 font-semibold">
                         Gross profit
                       </p>
-                      <p className="text-sm font-bold text-gray-800 mt-1.5">
+                      <p className="text-sm font-bold text-green-700 mt-1.5">
                         ${Number(coState?.gross_profit || 0).toLocaleString()}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-[10px] uppercase text-gray-500 font-semibold">GPMD</p>
-                      <p className="text-sm font-bold text-gray-800 mt-1.5">
-                        ${Number(coState?.gpmd || 0).toLocaleString()}
-                      </p>
-                    </div>
-                  </>
-                )}
-              </div>
-              {!isManual && (
-                <p className="text-[11px] text-gray-400 mt-2 italic">
-                  For module-level pricing breakdown, click "Open detailed estimator" above. The
-                  owner price field here is overwritten by what the estimator computes when it's
-                  saved.
-                </p>
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-2 italic">
+                    These figures come from the estimator. Click "Open detailed estimator" above to
+                    view{canEdit ? ' or edit' : ''} the calculations.
+                  </p>
+                </>
               )}
             </div>
 
@@ -1028,6 +1073,24 @@ export default function CODetailModal({
       )}
     </>
   )
+}
+
+// ── Input helpers ──────────────────────────────────────────────────────────
+// Currency mask: show "$1,234" as the user types whole dollars; blank when
+// empty (no leading zero). Stored value is a plain number (or '').
+function moneyMask(v) {
+  const d = String(v ?? '').replace(/[^0-9]/g, '')
+  return d ? '$' + Number(d).toLocaleString('en-US') : ''
+}
+function moneyDigits(v) {
+  const d = String(v ?? '').replace(/[^0-9]/g, '')
+  return d ? Number(d) : ''
+}
+// Plain number mask (no $): digits + one decimal point, blank when empty.
+function numMask(v) {
+  const s = String(v ?? '').replace(/[^0-9.]/g, '')
+  const i = s.indexOf('.')
+  return i === -1 ? s : s.slice(0, i + 1) + s.slice(i + 1).replace(/\./g, '')
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────

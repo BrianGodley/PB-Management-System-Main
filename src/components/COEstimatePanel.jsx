@@ -549,7 +549,7 @@ export default function COEstimatePanel({
 
       if (bid) setCoRow(bid)
       onSaved(bid)
-      // Stay open so the user can Release/Delete from here (Back returns).
+      onClose() // return to the table; lifecycle happens in the detail modal
     } catch (err) {
       alert('Error saving change order: ' + err.message)
     } finally {
@@ -800,108 +800,15 @@ export default function COEstimatePanel({
           </div>
         </div>
 
-        {/* Status-aware action bar (mirrors the manual CO modal) */}
-        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
-          {!isReleased && (
-            <>
-              <button
-                onClick={handleSaveCO}
-                disabled={savingCO}
-                className="text-sm px-4 py-2 rounded-lg bg-blue-700 text-white font-semibold hover:bg-blue-800 transition-colors disabled:opacity-50 flex items-center gap-1.5"
-              >
-                {savingCO ? '⏳ Saving…' : isNew ? '📋 Save Change Order' : '💾 Update Change Order'}
-              </button>
-              {bidId && (
-                <button
-                  onClick={() => setNotifyMode('release')}
-                  disabled={lifecycleBusy}
-                  className="text-sm px-4 py-2 rounded-lg bg-green-700 text-white font-semibold hover:bg-green-800 transition-colors disabled:opacity-50"
-                >
-                  📤 Release
-                </button>
-              )}
-              {bidId && (
-                <button
-                  onClick={handleDeleteCO}
-                  disabled={lifecycleBusy}
-                  className="text-sm px-3 py-2 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 disabled:opacity-50"
-                >
-                  Delete
-                </button>
-              )}
-            </>
-          )}
-          {isPending && (
-            <>
-              <button
-                onClick={handlePrintCO}
-                className="text-sm px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50"
-              >
-                🖨️ Print
-              </button>
-              <button
-                onClick={() => setNotifyMode('resend')}
-                disabled={lifecycleBusy}
-                className="text-sm px-4 py-2 rounded-lg border border-blue-200 text-blue-700 font-semibold hover:bg-blue-50 disabled:opacity-50"
-              >
-                Resend Notification
-              </button>
-              <button
-                onClick={handleUnrelease}
-                disabled={lifecycleBusy}
-                className="text-sm px-4 py-2 rounded-lg border border-amber-300 text-amber-700 font-semibold hover:bg-amber-50 disabled:opacity-50"
-              >
-                Unrelease
-              </button>
-              <button
-                onClick={handleDeleteCO}
-                disabled={lifecycleBusy}
-                className="text-sm px-3 py-2 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 disabled:opacity-50"
-              >
-                Delete
-              </button>
-            </>
-          )}
-          {isTerminal && (
-            <>
-              <button
-                onClick={handlePrintCO}
-                className="text-sm px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50"
-              >
-                🖨️ Print
-              </button>
-              <button
-                onClick={handleDeleteCO}
-                disabled={lifecycleBusy}
-                className="text-sm px-3 py-2 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 disabled:opacity-50"
-              >
-                Delete
-              </button>
-            </>
-          )}
-        </div>
+        {/* Save returns to the table; release/edit/delete live in the detail modal. */}
+        <button
+          onClick={handleSaveCO}
+          disabled={savingCO}
+          className="text-sm px-4 py-2 rounded-lg bg-blue-700 text-white font-semibold hover:bg-blue-800 transition-colors disabled:opacity-50 flex items-center gap-1.5 flex-shrink-0"
+        >
+          {savingCO ? '⏳ Saving…' : '💾 Save'}
+        </button>
       </div>
-
-      {/* Released banner — pricing is locked until the CO is unreleased */}
-      {isReleased && (
-        <div className="mb-3 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
-          {isPending
-            ? 'This change order has been released to the client and is awaiting approval. Unrelease it to make edits.'
-            : isApproved
-              ? 'This change order has been approved by the client.'
-              : 'This change order was declined by the client.'}
-        </div>
-      )}
-
-      {/* Release / Resend notification dialog */}
-      {notifyMode && (
-        <CONotifyDialog
-          mode={notifyMode}
-          saving={lifecycleBusy}
-          onCancel={() => setNotifyMode(null)}
-          onSend={handleNotifySend}
-        />
-      )}
 
       {/* Estimate-wide GPMD bar */}
       <div className="mb-3">
