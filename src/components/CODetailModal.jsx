@@ -48,7 +48,9 @@ export default function CODetailModal({
 
   // Editable fields
   const [title, setTitle] = useState(co?.co_name || '')
-  const [scope, setScope] = useState(co?.scope_of_work_html || '')
+  // Edit plain text (stripped from any stored HTML once, on open). Running the
+  // strip on every render would .trim() the value mid-typing and eat spaces.
+  const [scope, setScope] = useState(stripHtmlForEdit(co?.scope_of_work_html || ''))
   const [bidAmount, setBidAmount] = useState(co?.bid_amount || 0)
 
   // Local copy of co for live updates (after save / approve)
@@ -399,7 +401,7 @@ export default function CODetailModal({
               </label>
               <textarea
                 rows={6}
-                value={stripHtmlForEdit(scope)}
+                value={scope}
                 onChange={e => setScope(e.target.value)}
                 disabled={isApproved}
                 className="input text-sm w-full"
