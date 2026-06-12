@@ -97,6 +97,11 @@ const MONTH_NAMES = [
 ]
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
+// Non-uniform week columns: Sun & Sat are a bit narrower, the five weekdays a
+// bit wider. Used for the toolbar, the day-name header, and every WeekRow grid
+// so the columns line up across all layers.
+const GRID_COLS = '0.88fr 1.05fr 1.05fr 1.05fr 1.05fr 1.05fr 0.88fr'
+
 const DAY_H = 30 // height of the day-number header row in px
 
 // ── Date helpers ─────────────────────────────────────────────
@@ -364,7 +369,7 @@ function WeekRow({
   return (
     <div className="relative border-b border-gray-200">
       {/* ── Layer 1: day cell backgrounds + click targets (absolute, fills full row height) ── */}
-      <div className="absolute inset-0 grid grid-cols-7">
+      <div className="absolute inset-0 grid" style={{ gridTemplateColumns: GRID_COLS }}>
         {weekDays.map((cellDate, col) => {
           const inMonth = cellDate.getMonth() === month
           const isExcept = isCellException(cellDate, exceptions)
@@ -386,7 +391,10 @@ function WeekRow({
       </div>
 
       {/* ── Layer 2: day number headers (normal flow — sets the top DAY_H px of the row) ── */}
-      <div className="relative grid grid-cols-7 pointer-events-none" style={{ height: DAY_H }}>
+      <div
+        className="relative grid pointer-events-none"
+        style={{ height: DAY_H, gridTemplateColumns: GRID_COLS }}
+      >
         {weekDays.map((cellDate, col) => {
           const ds = `${cellDate.getFullYear()}-${String(cellDate.getMonth() + 1).padStart(2, '0')}-${String(cellDate.getDate()).padStart(2, '0')}`
           const isToday = ds === todayStr
@@ -417,7 +425,7 @@ function WeekRow({
         className="relative pointer-events-none"
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(7, 1fr)',
+          gridTemplateColumns: GRID_COLS,
           gridAutoRows: 'minmax(30px, auto)',
           rowGap: '3px',
           paddingBottom: '10px',
@@ -1132,6 +1140,10 @@ export default function ScheduleCalendar({
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
+  // Calendar view: 'month' (default) | 'week' | 'day'. cursorDate drives the
+  // week/day views and keeps month/year in sync for shared logic.
+  const [viewMode, setViewMode] = useState('month')
+  const [cursorDate, setCursorDate] = useState(today)
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
 
@@ -1979,6 +1991,63 @@ export default function ScheduleCalendar({
   const jobMap = Object.fromEntries(jobs.map(j => [j.id, j.name || j.client_name]))
   const todayStr = dateStr(today)
 
+  // ── Week / Day view helpers ─────────────────────────────────
+  const weekStart = (() => {
+    const d = new Date(cursorDate)
+    d.setHours(0, 0, 0, 0)
+    d.setDate(d.getDate() - d.getDay())
+    return d
+  })()
+  const weekDaysArr = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekStart)
+    d.setDate(weekStart.getDate() + i)
+    return d
+  })
+  const cursorStr = dateStr(cursorDate)
+  const dayItems = items
+    .filter(it => it.start_date <= cursorStr && it.end_date >= cursorStr)
+    .sort((a, b) => (a.title || '').localeCompare(b.title || ''))
+
+  function syncFromDate(d) {
+    setCursorDate(d)
+    setMonth(d.getMonth())
+    setYear(d.getFullYear())
+  }
+  function goPrev() {
+    if (viewMode === 'month') prevMonth()
+    else {
+      const d = new Date(cursorDate)
+      d.setDate(d.getDate() - (viewMode === 'week' ? 7 : 1))
+      syncFromDate(d)
+    }
+  }
+  function goNext() {
+    if (viewMode === 'month') nextMonth()
+    else {
+      const d = new Date(cursorDate)
+      d.setDate(d.getDate() + (viewMode === 'week' ? 7 : 1))
+      syncFromDate(d)
+    }
+  }
+  function goTodayView() {
+    syncFromDate(new Date(today))
+  }
+  const navLabel =
+    viewMode === 'month'
+      ? `${MONTH_NAMES[month]} ${year}`
+      : viewMode === 'week'
+        ? `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${weekDaysArr[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+        : cursorDate.toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          })
+  const navIsCurrent =
+    viewMode === 'month'
+      ? month === today.getMonth() && year === today.getFullYear()
+      : cursorStr === todayStr
+
   // Month navigation header (shared between mobile and desktop)
   // Compact group of controls centered together: << < Month Year [Today] > >>
   const MonthNav = ({ compact = false, inline = false } = {}) => {
@@ -2003,7 +2072,7 @@ export default function ScheduleCalendar({
             Today
           </span>
         )}
-        <button onClick={prevMonth} className={btn} title="Previous month">
+        <button onClick={goPrev} className={btn} title="Previous">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
@@ -2013,23 +2082,23 @@ export default function ScheduleCalendar({
             />
           </svg>
         </button>
-        <h3 className="text-sm font-bold text-gray-800 min-w-[7rem] text-center px-1">
-          {MONTH_NAMES[month]} {year}
+        <h3 className="text-sm font-bold text-gray-800 min-w-[7rem] text-center px-1 whitespace-nowrap">
+          {navLabel}
         </h3>
-        <button onClick={nextMonth} className={btn} title="Next month">
+        <button onClick={goNext} className={btn} title="Next">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         </button>
         <button
-          onClick={goToToday}
-          disabled={isCurrent}
+          onClick={goTodayView}
+          disabled={navIsCurrent}
           className={`ml-2 text-xs font-semibold px-2.5 py-1 rounded-md border transition-colors ${
-            isCurrent
+            navIsCurrent
               ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-default'
               : 'border-green-700 text-green-700 hover:bg-green-50'
           }`}
-          title="Jump to current month"
+          title="Jump to today"
         >
           Today
         </button>
@@ -2094,7 +2163,10 @@ export default function ScheduleCalendar({
                 Wed: Month nav (centered) | Thu-Fri: Schedule Assistance
                 Sat: spacer
               items-center keeps every control on the same vertical center. */}
-          <div className="grid grid-cols-7 items-center gap-0 mb-2 h-12">
+          <div
+            className="grid items-center gap-0 mb-2 h-12"
+            style={{ gridTemplateColumns: GRID_COLS }}
+          >
             {/* Sun — spacer */}
             <div />
 
@@ -2103,7 +2175,7 @@ export default function ScheduleCalendar({
             <div className="col-span-2 flex items-center gap-1.5 h-full">
               <button
                 onClick={handleAddNew}
-                className="flex items-center justify-center gap-1 h-7 px-2 rounded-lg bg-green-700 text-white text-[11px] font-semibold hover:bg-green-800 transition-colors w-[140px]"
+                className="relative -left-[70px] flex items-center justify-center gap-1 h-7 px-2 rounded-lg bg-green-700 text-white text-[11px] font-semibold hover:bg-green-800 transition-colors w-[140px]"
               >
                 <svg
                   className="w-3 h-3 flex-shrink-0"
@@ -2157,7 +2229,7 @@ export default function ScheduleCalendar({
               {onOpenScheduleAssist && (
                 <button
                   onClick={onOpenScheduleAssist}
-                  className="flex items-center justify-center gap-1 h-7 px-2 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[11px] font-semibold hover:from-purple-700 hover:to-indigo-700 transition-colors w-[140px]"
+                  className="relative left-[70px] flex items-center justify-center gap-1 h-7 px-2 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[11px] font-semibold hover:from-purple-700 hover:to-indigo-700 transition-colors w-[140px]"
                 >
                   <span>✨</span>
                   <span>Schedule Assistance</span>
@@ -2169,16 +2241,42 @@ export default function ScheduleCalendar({
             <div />
           </div>
 
-          <div className="grid grid-cols-7 border-l border-t border-gray-200">
-            {DAY_NAMES.map(d => (
-              <div
-                key={d}
-                className="text-center text-xs font-semibold text-gray-400 py-1.5 border-r border-b border-gray-200 bg-white"
-              >
-                {d}
-              </div>
-            ))}
+          {/* View picker — Month / Week / Day, centered above the calendar */}
+          <div className="flex justify-center pb-1.5">
+            <select
+              value={viewMode}
+              onChange={e => setViewMode(e.target.value)}
+              className="text-xs font-semibold text-gray-700 border border-gray-300 rounded-md px-2 py-1 bg-white focus:outline-none focus:border-green-600 cursor-pointer"
+            >
+              <option value="month">Month</option>
+              <option value="week">Week</option>
+              <option value="day">Day</option>
+            </select>
           </div>
+
+          {viewMode === 'day' ? (
+            <div className="border-l border-t border-gray-200 text-center text-sm font-semibold text-gray-600 py-2 bg-white">
+              {cursorDate.toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+              })}
+            </div>
+          ) : (
+            <div
+              className="grid border-l border-t border-gray-200"
+              style={{ gridTemplateColumns: GRID_COLS }}
+            >
+              {DAY_NAMES.map(d => (
+                <div
+                  key={d}
+                  className="text-center text-xs font-semibold text-gray-400 py-1.5 border-r border-b border-gray-200 bg-white"
+                >
+                  {d}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Week rows — keep the existing grid mounted during refetches so
@@ -2188,9 +2286,69 @@ export default function ScheduleCalendar({
           <div className="flex justify-center py-10">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-700" />
           </div>
+        ) : viewMode === 'day' ? (
+          <div className="border-l border-r border-b border-gray-200 divide-y divide-gray-100">
+            {dayItems.length === 0 ? (
+              <p className="p-8 text-center text-sm text-gray-400">
+                No schedule items on this day.
+              </p>
+            ) : (
+              dayItems.map(item => (
+                <div
+                  key={item.id}
+                  onClick={e => handleItemClick(e, item)}
+                  className="flex items-start gap-2 p-3 hover:bg-gray-50 cursor-pointer"
+                >
+                  <div
+                    className="w-1.5 self-stretch rounded-full flex-shrink-0"
+                    style={{
+                      backgroundColor: item.needs_crew
+                        ? '#b45309'
+                        : item.scheduling_type === 'yard_check'
+                          ? '#3b82f6'
+                          : item.display_color || '#15803d',
+                      minHeight: 36,
+                    }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-900">
+                      {item.title}
+                      {jobMap[item.job_id] && (
+                        <span className="text-purple-600"> ({jobMap[item.job_id]})</span>
+                      )}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {new Date(item.start_date + 'T00:00:00').toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                      {item.start_date !== item.end_date && (
+                        <>
+                          {' – '}
+                          {new Date(item.end_date + 'T00:00:00').toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </>
+                      )}
+                      {item.work_days > 0 && (
+                        <span className="text-gray-400">
+                          {' '}
+                          · {item.work_days} day{item.work_days !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </p>
+                    {item.assignees && (
+                      <p className="text-xs text-gray-400 mt-0.5">👤 {item.assignees}</p>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         ) : (
           <div className="border-l border-gray-200">
-            {weeks.map((weekDays, idx) => (
+            {(viewMode === 'week' ? [weekDaysArr] : weeks).map((weekDays, idx) => (
               <WeekRow
                 key={idx}
                 weekDays={weekDays}
