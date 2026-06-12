@@ -1136,13 +1136,15 @@ export default function ScheduleCalendar({
   // Opens the Schedule Assistance modal in the parent. Rendered as a
   // button on the far right of the desktop month-nav toolbar.
   onOpenScheduleAssist,
+  // Calendar view ('month' | 'week' | 'day') is controlled by the parent so
+  // the Month/Week/Day picker can live above the whole jobs+calendar row.
+  viewMode = 'month',
+  setViewMode = () => {},
 }) {
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
-  // Calendar view: 'month' (default) | 'week' | 'day'. cursorDate drives the
-  // week/day views and keeps month/year in sync for shared logic.
-  const [viewMode, setViewMode] = useState('month')
+  // cursorDate drives the week/day views and keeps month/year in sync.
   const [cursorDate, setCursorDate] = useState(today)
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
@@ -2153,24 +2155,10 @@ export default function ScheduleCalendar({
           DESKTOP VIEW — hidden on mobile, shown on lg+
       ══════════════════════════════════════════════════════ */}
       <div className="hidden lg:flex lg:flex-col">
-        {/* View picker — Month / Week / Day. Sits above the whole calendar
-            container, centered, in the grey area above the white toolbar. */}
-        <div className="flex justify-center py-1.5">
-          <select
-            value={viewMode}
-            onChange={e => setViewMode(e.target.value)}
-            className="text-xs font-semibold text-gray-700 border border-gray-300 rounded-md px-2 py-1 bg-white shadow-sm focus:outline-none focus:border-green-600 cursor-pointer"
-          >
-            <option value="month">Month</option>
-            <option value="week">Week</option>
-            <option value="day">Day</option>
-          </select>
-        </div>
-
-        {/* Month navigation + day headers — sticky.
-            Toolbar row layout: [Add Schedule][Exceptions]  ‹‹ ‹ Month Year › ›› [Today]  [✨ Schedule Assistance]
-            Each side button is ~60% of the old sidebar-button width. */}
+        {/* Month navigation + day headers — sticky (incl. the view picker so the
+            whole top stays pinned and the grid doesn't jump while scrolling). */}
         <div className="sticky top-0 z-10 bg-white pb-0">
+
           {/* Toolbar — a 7-column grid matching the calendar columns below so
               each control aligns to specific day columns:
                 Sun: spacer | Mon-Tue: Add Schedule + Exceptions

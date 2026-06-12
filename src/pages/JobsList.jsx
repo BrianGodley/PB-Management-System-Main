@@ -235,6 +235,7 @@ export default function JobsList() {
   const [jobModal, setJobModal] = useState(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('open') // 'open' | 'closed'
+  const [scheduleView, setScheduleView] = useState('month') // 'month' | 'week' | 'day'
   // Auto-open trigger for the CO modal when the user deep-links from
   // ClientDetail like ?tab=change-orders&job=<jobId>&co=<coId>.
   // Bumped each time the URL param changes so JobChangeOrdersPanel knows
@@ -1384,6 +1385,25 @@ export default function JobsList() {
         </div>
       )}
 
+      {/* Month/Week/Day picker — sits above BOTH the jobs box and the calendar,
+          centered over the calendar area (schedule tab, desktop only). */}
+      {tab === 'schedule' && (
+        <div className="hidden lg:flex flex-shrink-0 pt-1">
+          <div className="w-[248px] flex-shrink-0" />
+          <div className="flex-1 flex justify-center">
+            <select
+              value={scheduleView}
+              onChange={e => setScheduleView(e.target.value)}
+              className="text-xs font-semibold text-gray-700 border border-gray-300 rounded-md px-2 py-1 bg-white shadow-sm focus:outline-none focus:border-green-600 cursor-pointer"
+            >
+              <option value="month">Month</option>
+              <option value="week">Week</option>
+              <option value="day">Day</option>
+            </select>
+          </div>
+        </div>
+      )}
+
       {/* Main content: sidebar + right panel (non-settings tabs) */}
       {tab !== 'settings' && (
         <div className="flex gap-2 flex-1 min-h-0 pt-2">
@@ -1881,6 +1901,8 @@ export default function JobsList() {
                   setSchedAssistMode(null)
                   setShowSchedAssist(true)
                 }}
+                viewMode={scheduleView}
+                setViewMode={setScheduleView}
                 onReopenJob={() => {
                   // Reopen now writes stage_id, responsible_employee_id, and
                   // job_supervisor in addition to status. Refetch the full
