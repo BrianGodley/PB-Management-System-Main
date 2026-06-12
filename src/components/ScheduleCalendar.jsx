@@ -2013,7 +2013,7 @@ export default function ScheduleCalendar({
             />
           </svg>
         </button>
-        <h3 className="text-sm font-bold text-gray-800 min-w-[8.5rem] text-center px-1">
+        <h3 className="text-sm font-bold text-gray-800 min-w-[7rem] text-center px-1">
           {MONTH_NAMES[month]} {year}
         </h3>
         <button onClick={nextMonth} className={btn} title="Next month">
