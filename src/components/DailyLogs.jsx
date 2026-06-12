@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { sendEmail, sendSMS } from '../lib/notify'
 
 // ── Constants ────────────────────────────────────────────────
 const PERMISSION_OPTIONS = [
@@ -23,7 +24,6 @@ function today() {
 
 const EMPTY_FORM = {
   date: today(),
-  title: '',
   notes: '',
   permissions: ['internal'],
   weather_conditions: false,
@@ -70,6 +70,10 @@ export default function DailyLogs({
   const [error, setError] = useState('')
   const [lightbox, setLightbox] = useState(null) // { photos, index }
   const [page, setPage] = useState(1)
+  // Alert: notify users by text/email when the log is saved.
+  const [alertEmployees, setAlertEmployees] = useState([])
+  const [alertUserIds, setAlertUserIds] = useState(() => new Set())
+  const [alertMethod, setAlertMethod] = useState('email') // 'email' | 'text' | 'both'
   const fileRef = useRef(null)
   const listRef = useRef(null)
   const reqId = useRef(0)
@@ -78,7 +82,22 @@ export default function DailyLogs({
 
   useEffect(() => {
     fetchProfiles()
+    supabase
+      .from('employees')
+      .select('id, first_name, last_name, email, cell_phone, status')
+      .order('last_name')
+      .then(({ data }) =>
+        setAlertEmployees((data || []).filter(e => e.status !== 'archived'))
+      )
   }, [])
+
+  function toggleAlertUser(id) {
+    setAlertUserIds(prev => {
+      const n = new Set(prev)
+      n.has(id) ? n.delete(id) : n.add(id)
+      return n
+    })
+  }
   // Reset to the first page when the job selection or Open/Closed filter changes.
   useEffect(() => {
     setPage(1)
@@ -153,6 +172,7 @@ export default function DailyLogs({
     setForm({ ...EMPTY_FORM, date: today(), job_id: selectedJob !== 'all' ? selectedJob : '' })
     setPhotoFiles([])
     setPhotoPreviews([])
+    setAlertUserIds(new Set())
     setError('')
     setShowModal(true)
   }
@@ -162,7 +182,6 @@ export default function DailyLogs({
     setForm({
       date: log.date,
       job_id: log.job_id || '',
-      title: log.title || '',
       notes: log.notes || '',
       permissions: log.permissions || ['internal'],
       weather_conditions: log.weather_conditions || false,
@@ -170,6 +189,7 @@ export default function DailyLogs({
     })
     setPhotoFiles([])
     setPhotoPreviews([])
+    setAlertUserIds(new Set())
     setError('')
     setShowModal(true)
   }
@@ -231,7 +251,6 @@ export default function DailyLogs({
           .update({
             job_id: jobId,
             date: form.date,
-            title: form.title.trim() || null,
             notes: form.notes.trim() || null,
             permissions: form.permissions,
             weather_conditions: form.weather_conditions,
@@ -248,7 +267,6 @@ export default function DailyLogs({
           .insert({
             job_id: jobId,
             date: form.date,
-            title: form.title.trim() || null,
             notes: form.notes.trim() || null,
             created_by: user?.id,
             permissions: form.permissions,
@@ -274,6 +292,29 @@ export default function DailyLogs({
             file_name: file.name,
             mime_type: file.type,
           })
+        }
+      }
+
+      // ── Alerts — text / email the selected users about this log ──
+      if (alertUserIds.size > 0) {
+        const jobName = jobMap[jobId] || 'a job'
+        const dateStr = formatDate(form.date)
+        const noteText = form.notes.trim() || '(no notes added)'
+        const subject = `Daily Log — ${jobName} (${dateStr})`
+        const html = `
+          <p><strong>${jobName}</strong> · ${dateStr}</p>
+          <p style="white-space:pre-wrap">${noteText.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</p>
+          ${photoFiles.length ? `<p style="color:#6b7280">${photoFiles.length} photo(s) attached in the app.</p>` : ''}`
+        const smsText = `${subject}\n${noteText}`
+        for (const uid of alertUserIds) {
+          const u = alertEmployees.find(e => e.id === uid)
+          if (!u) continue
+          if ((alertMethod === 'email' || alertMethod === 'both') && u.email) {
+            sendEmail({ to: u.email, subject, html }).catch(() => {})
+          }
+          if ((alertMethod === 'text' || alertMethod === 'both') && u.cell_phone) {
+            sendSMS({ to: u.cell_phone, message: smsText }).catch(() => {})
+          }
         }
       }
 
@@ -416,6 +457,11 @@ export default function DailyLogs({
           fileRef={fileRef}
           selectedJob={selectedJob}
           jobs={jobs}
+          alertEmployees={alertEmployees}
+          alertUserIds={alertUserIds}
+          toggleAlertUser={toggleAlertUser}
+          alertMethod={alertMethod}
+          setAlertMethod={setAlertMethod}
         />
       )}
 
@@ -654,8 +700,15 @@ function LogModal({
   fileRef,
   selectedJob,
   jobs,
+  alertEmployees = [],
+  alertUserIds,
+  toggleAlertUser,
+  alertMethod,
+  setAlertMethod,
 }) {
   const cameraRef = useRef(null)
+  const alertSelected = alertEmployees.filter(e => alertUserIds?.has(e.id))
+  const empName = e => `${e.first_name || ''} ${e.last_name || ''}`.trim() || 'Unnamed'
 
   return (
     <div
@@ -704,18 +757,6 @@ function LogModal({
                     className="input text-sm w-28 flex-shrink-0 mr-1"
                   />
                 }
-              />
-            </div>
-
-            {/* Title */}
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Title</label>
-              <input
-                type="text"
-                value={form.title}
-                onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                placeholder="Optional title…"
-                className="input text-sm w-full"
               />
             </div>
 
@@ -818,6 +859,77 @@ function LogModal({
                       <span className="sm:hidden">Tap Camera or Library above</span>
                     </button>
                   )
+                )}
+              </div>
+
+              {/* Alert — text / email people about this log on save */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Alert <span className="font-normal text-gray-400">(notify on save)</span>
+                </label>
+
+                {/* Selected people chips */}
+                {alertSelected.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {alertSelected.map(e => (
+                      <span
+                        key={e.id}
+                        className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-green-700 text-white"
+                      >
+                        {empName(e)}
+                        <button
+                          type="button"
+                          onClick={() => toggleAlertUser(e.id)}
+                          className="hover:text-green-200 leading-none"
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add person */}
+                <select
+                  value=""
+                  onChange={e => {
+                    if (e.target.value) toggleAlertUser(e.target.value)
+                  }}
+                  className="input text-sm w-full"
+                >
+                  <option value="">+ Add a person to alert…</option>
+                  {alertEmployees
+                    .filter(e => !alertUserIds?.has(e.id))
+                    .map(e => (
+                      <option key={e.id} value={e.id}>
+                        {empName(e)}
+                        {e.email || e.cell_phone ? '' : ' (no contact info)'}
+                      </option>
+                    ))}
+                </select>
+
+                {/* Method — only relevant once someone is selected */}
+                {alertSelected.length > 0 && (
+                  <div className="flex gap-1 mt-2">
+                    {[
+                      { v: 'text', l: 'Text' },
+                      { v: 'email', l: 'Email' },
+                      { v: 'both', l: 'Both' },
+                    ].map(o => (
+                      <button
+                        key={o.v}
+                        type="button"
+                        onClick={() => setAlertMethod(o.v)}
+                        className={`flex-1 px-2 py-1 rounded-md text-xs font-semibold border transition-colors ${
+                          alertMethod === o.v
+                            ? 'border-green-700 bg-green-50 text-green-800'
+                            : 'border-gray-300 text-gray-600'
+                        }`}
+                      >
+                        {o.l}
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
 
