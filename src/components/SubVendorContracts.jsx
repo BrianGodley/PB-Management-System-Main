@@ -732,11 +732,13 @@ export default function SubVendorContracts() {
     const [cRes, pRes, jRes] = await Promise.all([
       supabase.from('sub_vendor_contracts').select('*').order('created_at', { ascending: false }),
       supabase.from('subs_vendors').select('id, company_name, type').order('company_name'),
-      supabase.from('jobs').select('id, client_name, job_address').order('client_name'),
+      supabase.from('jobs').select('id, client_name, job_address, status').order('client_name'),
     ])
     setContracts(cRes.data || [])
     setParties(pRes.data || [])
-    setJobs(jRes.data || [])
+    setJobs(
+      (jRes.data || []).filter(j => j.status === 'active' || j.status === 'on_hold' || !j.status)
+    )
     setLoading(false)
   }
   useEffect(() => {

@@ -43,7 +43,7 @@ const STATUS_BADGE = {
 
 // ── Send-method modal ─────────────────────────────────────────────────────────
 function SendModal({ vendor, emailBody, smsBody, subject, onCancel, onConfirm }) {
-  const emails = vendor ? splitEmails([vendor.email, vendor.additional_emails].join(',')) : []
+  const emails = vendor ? splitEmails(vendor.email) : []
   const cell = vendor?.cell || vendor?.phone || ''
   const [method, setMethod] = useState(emails.length ? 'email' : cell ? 'text' : 'email')
   const [picked, setPicked] = useState(() => new Set(emails.slice(0, 1)))
@@ -140,10 +140,11 @@ function SendModal({ vendor, emailBody, smsBody, subject, onCancel, onConfirm })
 }
 
 // ── Add / Edit quote modal ────────────────────────────────────────────────────
-function QuoteModal({ parties, jobs, onClose, onSaved, onVendorAdded }) {
+function QuoteModal({ parties, jobs, estimates = [], onClose, onSaved, onVendorAdded }) {
   const [direction, setDirection] = useState('request') // 'request' | 'received'
   const [partyId, setPartyId] = useState('')
   const [jobId, setJobId] = useState('')
+  const [estimateId, setEstimateId] = useState('')
   const [rows, setRows] = useState(emptyRows(10))
   const [notes, setNotes] = useState('')
   const [attachFile, setAttachFile] = useState(null)
@@ -156,6 +157,8 @@ function QuoteModal({ parties, jobs, onClose, onSaved, onVendorAdded }) {
 
   const party = parties.find(p => p.id === partyId)
   const job = jobs.find(j => j.id === jobId)
+  const estimate = estimates.find(e => e.id === estimateId)
+  const estLabel = e => [e.estimate_name, e.client_name].filter(Boolean).join(' — ') || 'Estimate'
   const total = quoteTotal(rows)
 
   const setRow = (i, patch) => setRows(rs => rs.map((r, idx) => (idx === i ? { ...r, ...patch } : r)))
@@ -178,7 +181,7 @@ function QuoteModal({ parties, jobs, onClose, onSaved, onVendorAdded }) {
         cell: newVendor.cell.trim() || null,
         status: 'no_email',
       })
-      .select('id, company_name, email, additional_emails, cell, phone, type')
+      .select('id, company_name, email, cell, phone, type')
       .single()
     if (e) {
       setError('Could not add vendor: ' + e.message)
@@ -234,6 +237,8 @@ function QuoteModal({ parties, jobs, onClose, onSaved, onVendorAdded }) {
       vendor_name: party?.company_name || null,
       job_id: jobId || null,
       job_name: job ? jobLabel(job) : null,
+      estimate_id: estimateId || null,
+      estimate_name: estimate ? estLabel(estimate) : null,
       direction,
       line_items: items,
       total,
@@ -426,6 +431,25 @@ function QuoteModal({ parties, jobs, onClose, onSaved, onVendorAdded }) {
               {jobs.map(j => (
                 <option key={j.id} value={j.id}>
                   {jobLabel(j)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Estimate (optional) */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">
+              Attach to Estimate <span className="font-normal text-gray-400">(optional)</span>
+            </label>
+            <select
+              value={estimateId}
+              onChange={e => setEstimateId(e.target.value)}
+              className="input text-sm w-full"
+            >
+              <option value="">None</option>
+              {estimates.map(e => (
+                <option key={e.id} value={e.id}>
+                  {estLabel(e)}
                 </option>
               ))}
             </select>
@@ -668,6 +692,7 @@ export default function SubVendorQuotes() {
   const [quotes, setQuotes] = useState([])
   const [parties, setParties] = useState([])
   const [jobs, setJobs] = useState([])
+  const [estimates, setEstimates] = useState([])
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
   const [viewQuote, setViewQuote] = useState(null)
@@ -675,17 +700,22 @@ export default function SubVendorQuotes() {
 
   async function load() {
     setLoading(true)
-    const [qRes, pRes, jRes] = await Promise.all([
+    const [qRes, pRes, jRes, eRes] = await Promise.all([
       supabase.from('sub_vendor_quotes').select('*').order('created_at', { ascending: false }),
       supabase
         .from('subs_vendors')
-        .select('id, company_name, email, additional_emails, cell, phone, type')
+        .select('id, company_name, email, cell, phone, type')
         .order('company_name'),
-      supabase.from('jobs').select('id, client_name, job_address').order('client_name'),
+      supabase.from('jobs').select('id, client_name, job_address, status').order('client_name'),
+      supabase.from('estimates').select('id, estimate_name, client_name, status').order('created_at', { ascending: false }),
     ])
     setQuotes(qRes.data || [])
     setParties(pRes.data || [])
-    setJobs(jRes.data || [])
+    const openJobs = (jRes.data || []).filter(
+      j => j.status === 'active' || j.status === 'on_hold' || !j.status
+    )
+    setJobs(openJobs)
+    setEstimates((eRes.data || []).filter(e => e.status !== 'archived'))
     setLoading(false)
   }
   useEffect(() => {
@@ -799,6 +829,7 @@ export default function SubVendorQuotes() {
         <QuoteModal
           parties={parties}
           jobs={jobs}
+          estimates={estimates}
           onClose={() => setShowAdd(false)}
           onSaved={() => {
             setShowAdd(false)

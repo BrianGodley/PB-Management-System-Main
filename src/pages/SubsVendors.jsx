@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx'
 import DocViewerModal from '../components/DocViewerModal'
 import SubVendorContracts from '../components/SubVendorContracts'
 import SubVendorQuotes from '../components/SubVendorQuotes'
+import PartyHistory from '../components/PartyHistory'
 
 // ── Constants ────────────────────────────────────────────────
 const DIVISION_OPTIONS = [
@@ -1270,6 +1271,7 @@ export default function SubsVendors() {
               error={error}
               toggleDivision={toggleDivision}
               recordType={form.type}
+              recordId={editSub?.id}
             />
           )}
         </>
@@ -1297,8 +1299,10 @@ function SubModal({
   error,
   toggleDivision,
   recordType,
+  recordId,
 }) {
   const [customInput, setCustomInput] = useState('')
+  const [stab, setStab] = useState('details') // 'details' | 'quotes' | 'contracts'
   const [uploading, setUploading] = useState(false)
   const [viewerDoc, setViewerDoc] = useState(null) // { name, url } for in-app viewer
   const priceFileInputRef = useRef(null)
@@ -1396,8 +1400,38 @@ function SubModal({
           </button>
         </div>
 
+        {/* Tabs — only when editing an existing record */}
+        {isEdit && recordId && (
+          <div className="flex gap-0 border-b border-gray-100 px-3 flex-shrink-0">
+            {[
+              { k: 'details', l: 'Details' },
+              { k: 'quotes', l: 'Quotes' },
+              { k: 'contracts', l: 'Contracts' },
+            ].map(t => (
+              <button
+                key={t.k}
+                type="button"
+                onClick={() => setStab(t.k)}
+                className={`px-3 py-2 text-xs font-semibold border-b-2 transition-colors ${
+                  stab === t.k
+                    ? 'border-green-700 text-green-700'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {t.l}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Body */}
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-5 space-y-4">
+          {stab === 'quotes' ? (
+            <PartyHistory partyId={recordId} kind="quotes" />
+          ) : stab === 'contracts' ? (
+            <PartyHistory partyId={recordId} kind="contracts" />
+          ) : (
+          <>
           {/* Company name */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -1707,17 +1741,21 @@ function SubModal({
           </div>
 
           {error && <p className="text-xs text-red-500">{error}</p>}
+          </>
+          )}
         </div>
 
         {/* Footer */}
         <div className="px-5 py-4 flex gap-2 flex-shrink-0 border-t border-gray-100">
-          <button
-            onClick={onSave}
-            disabled={saving}
-            className="flex-1 btn-primary text-sm py-3 disabled:opacity-50"
-          >
-            {saving ? 'Saving…' : isEdit ? 'Update' : 'Save'}
-          </button>
+          {stab === 'details' && (
+            <button
+              onClick={onSave}
+              disabled={saving}
+              className="flex-1 btn-primary text-sm py-3 disabled:opacity-50"
+            >
+              {saving ? 'Saving…' : isEdit ? 'Update' : 'Save'}
+            </button>
+          )}
           <button
             onClick={onClose}
             className="px-5 py-3 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
