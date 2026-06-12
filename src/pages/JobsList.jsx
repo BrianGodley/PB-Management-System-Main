@@ -1624,7 +1624,7 @@ export default function JobsList() {
               <div
                 ref={jobsListRef}
                 onScroll={onJobsListScroll}
-                className="overflow-y-auto flex-1 w-[90%] mx-auto"
+                className="overflow-y-auto flex-1 w-full pr-2"
               >
                 {/* Stage groups */}
                 {(() => {
