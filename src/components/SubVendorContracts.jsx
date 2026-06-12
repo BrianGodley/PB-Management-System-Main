@@ -170,7 +170,7 @@ function ContractModal({ parties, jobs, onClose, onSaved }) {
   const [woId, setWoId] = useState('')
   const [workOrders, setWorkOrders] = useState([])
   const [woLoading, setWoLoading] = useState(false)
-  const [rows, setRows] = useState([blankRow()])
+  const [rows, setRows] = useState([blankRow(), blankRow(), blankRow()])
   const [scope, setScope] = useState('')
   const [exclusions, setExclusions] = useState('')
   const [signature, setSignature] = useState('')

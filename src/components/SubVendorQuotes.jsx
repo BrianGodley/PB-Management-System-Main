@@ -417,7 +417,7 @@ function QuoteModal({ parties, jobs, estimates = [], onClose, onSaved, onVendorA
           {/* Job */}
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">
-              Quote for Job{' '}
+              Job{' '}
               <span className="font-normal text-gray-400">
                 {direction === 'received' ? '(optional)' : ''}
               </span>
