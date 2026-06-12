@@ -1388,7 +1388,7 @@ export default function JobsList() {
       {tab !== 'settings' && (
         <div className="flex gap-2 flex-1 min-h-0 pt-2">
           {/* Jobs sidebar — desktop only */}
-          <div className="hidden lg:flex w-[308px] -ml-[12px] flex-shrink-0 flex-col min-h-0 bg-white border-r border-gray-200">
+          <div className="hidden lg:flex w-[284px] -ml-[12px] flex-shrink-0 flex-col min-h-0 bg-white border-r border-gray-200">
             {/* Inner column: 90% wide, centered */}
             <div className="flex flex-col w-[90%] mx-auto mt-2 flex-shrink-0">
               {/* ── User-specific Filter button (above Open/Closed) ──────
@@ -1624,7 +1624,7 @@ export default function JobsList() {
               <div
                 ref={jobsListRef}
                 onScroll={onJobsListScroll}
-                className="overflow-y-auto flex-1 w-full pr-6"
+                className="overflow-y-auto flex-1 w-full pr-2"
               >
                 {/* Stage groups */}
                 {(() => {
