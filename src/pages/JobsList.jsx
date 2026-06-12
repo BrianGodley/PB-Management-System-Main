@@ -161,14 +161,14 @@ function JobItem({
             {/* Strip any trailing "(XX)" of 1–3 letters from the stored
                 name — some legacy rows already have initials baked into
                 jobs.name, which would otherwise show as "(XX) (YY)". */}
-            {(job.name || job.client_name || '').replace(/\s*\([A-Za-z]{1,3}\)\s*$/, '')}
-            {/* Hide the (initials) suffix for closed jobs — the data on
-                the row stays intact, but the display is clean. Open
-                statuses are 'active' and 'on_hold'. */}
+            {/* Assigned-supervisor initials shown to the LEFT of the name.
+                Hidden for closed jobs — the data stays intact, the display
+                is clean. Open statuses are 'active' and 'on_hold'. */}
             {respInitials &&
               (job.status === 'active' || job.status === 'on_hold' || !job.status) && (
-                <span className="ml-1 text-gray-500 font-normal">({respInitials})</span>
+                <span className="mr-1 text-gray-500 font-normal">({respInitials})</span>
               )}
+            {(job.name || job.client_name || '').replace(/\s*\([A-Za-z]{1,3}\)\s*$/, '')}
           </p>
         </button>
 
