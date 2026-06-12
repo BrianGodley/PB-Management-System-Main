@@ -156,7 +156,7 @@ function JobItem({
           onMouseLeave={() => setHoverPos(null)}
         >
           <p
-            className={`font-bold truncate ${selectedJob === job.id ? 'text-green-800' : 'text-gray-800'}`}
+            className={`truncate ${selectedJob === job.id ? 'text-green-800' : 'text-gray-800'}`}
           >
             {/* Strip any trailing "(XX)" of 1–3 letters from the stored
                 name — some legacy rows already have initials baked into
@@ -166,7 +166,7 @@ function JobItem({
                 is clean. Open statuses are 'active' and 'on_hold'. */}
             {respInitials &&
               (job.status === 'active' || job.status === 'on_hold' || !job.status) && (
-                <span className="mr-1 text-gray-500 font-normal">({respInitials})</span>
+                <span className="mr-1 text-gray-500 font-bold">({respInitials})</span>
               )}
             {(job.name || job.client_name || '').replace(/\s*\([A-Za-z]{1,3}\)\s*$/, '')}
           </p>
@@ -1845,7 +1845,7 @@ export default function JobsList() {
 
           {/* Right panel — only thing that scrolls. overflow-x-hidden traps any
             tiny horizontal overflow from inner cards on mobile. */}
-          <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden lg:-mr-6">
+          <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden lg:-mr-3">
             {tab === 'info' &&
               (selectedJobObj ? (
                 <JobInfoModal
