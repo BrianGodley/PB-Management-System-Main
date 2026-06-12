@@ -1624,7 +1624,7 @@ export default function JobsList() {
               <div
                 ref={jobsListRef}
                 onScroll={onJobsListScroll}
-                className="overflow-y-auto flex-1 w-full pr-2"
+                className="overflow-y-auto flex-1 w-full pl-1.5 pr-2"
               >
                 {/* Stage groups */}
                 {(() => {
@@ -1845,7 +1845,7 @@ export default function JobsList() {
 
           {/* Right panel — only thing that scrolls. overflow-x-hidden traps any
             tiny horizontal overflow from inner cards on mobile. */}
-          <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden lg:-mr-3">
+          <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden lg:-mr-[18px]">
             {tab === 'info' &&
               (selectedJobObj ? (
                 <JobInfoModal

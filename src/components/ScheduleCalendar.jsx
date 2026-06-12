@@ -477,7 +477,7 @@ function WeekRow({
                       ? '2px dashed rgba(147,197,253,0.8)'
                       : 'none',
                 }}
-                className="flex items-start gap-1.5 px-2 pt-1.5 pb-1.5 text-white text-sm font-semibold cursor-pointer hover:opacity-80 leading-snug"
+                className="flex items-start gap-1.5 px-2 pt-1.5 pb-1.5 text-white text-sm font-normal cursor-pointer hover:opacity-80 leading-snug"
                 title={item.needs_crew ? `${displayText} — Crew not assigned` : displayText}
               >
                 {isFirst && (
