@@ -150,7 +150,7 @@ function JobItem({
         }`}
       >
         <button
-          className="flex-1 px-2 py-1.5 text-sm min-w-0 text-left"
+          className="flex-1 px-2 py-1.5 text-[13px] min-w-0 text-left"
           onMouseEnter={e => setHoverPos({ x: e.clientX, y: e.clientY })}
           onMouseMove={e => setHoverPos({ x: e.clientX, y: e.clientY })}
           onMouseLeave={() => setHoverPos(null)}
