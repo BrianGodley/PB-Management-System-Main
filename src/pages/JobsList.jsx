@@ -1674,7 +1674,7 @@ export default function JobsList() {
                           type="button"
                           onClick={() => toggleStageCollapsed(stageId)}
                           title={collapsed ? 'Expand' : 'Collapse'}
-                          className="w-full flex items-center gap-1.5 px-2 py-0 text-[11px] font-bold text-gray-600 capitalize tracking-wide truncate bg-blue-50 border border-blue-100 rounded leading-tight hover:bg-blue-100 transition-colors text-left"
+                          className="w-[calc(100%-6px)] ml-1.5 flex items-center gap-1.5 px-2 py-0 text-[11px] font-bold text-gray-600 capitalize tracking-wide truncate bg-blue-50 border border-blue-100 rounded leading-tight hover:bg-blue-100 transition-colors text-left"
                         >
                           <svg
                             className={`w-3 h-3 flex-shrink-0 text-gray-400 transition-transform ${collapsed ? '' : 'rotate-90'}`}
