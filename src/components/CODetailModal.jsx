@@ -381,6 +381,25 @@ export default function CODetailModal({
     setSaving(false)
   }
 
+  // Revert an approved CO back to pending: clear the signature and remove the
+  // work order that approval created (so it isn't left orphaned on the job).
+  async function handleUnapprove() {
+    if (!coState?.id) return
+    setSaving(true)
+    setError('')
+    try {
+      await setStatus('pending', {
+        signed_at: null,
+        signed_by_name: null,
+        signature_data_url: null,
+      })
+      await supabase.from('work_orders').delete().eq('source_change_order_id', coState.id)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+    setSaving(false)
+  }
+
   async function handleDelete() {
     if (!coState?.id) return
     if (!confirm(`Delete change order #${coState.custom_co_id || '?'} ("${coState.co_name}")?`))
@@ -999,9 +1018,18 @@ export default function CODetailModal({
               </>
             )}
 
-            {/* Pending (released) → Print / Resend / Unrelease / Delete */}
+            {/* Pending (released) → Approve / Print / Resend / Unrelease / Delete */}
             {isPending && (
               <>
+                <button
+                  onClick={() => {
+                    setError('')
+                    setShowSig(true)
+                  }}
+                  className="flex-1 min-w-[120px] py-2.5 rounded-xl bg-indigo-700 text-white text-sm font-bold hover:bg-indigo-800"
+                >
+                  ✍️ Approve
+                </button>
                 <button
                   onClick={handlePrint}
                   className="px-4 py-2.5 rounded-xl border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
@@ -1033,7 +1061,7 @@ export default function CODetailModal({
               </>
             )}
 
-            {/* Approved / Declined → Print / Delete */}
+            {/* Approved → Print / Unapprove / Delete ; Declined → Print / Delete */}
             {isTerminal && (
               <>
                 <button
@@ -1042,6 +1070,15 @@ export default function CODetailModal({
                 >
                   🖨️ Print
                 </button>
+                {isApproved && (
+                  <button
+                    onClick={handleUnapprove}
+                    disabled={saving}
+                    className="px-4 py-2.5 rounded-xl border border-amber-300 text-amber-700 text-sm font-semibold hover:bg-amber-50 disabled:opacity-40"
+                  >
+                    Unapprove
+                  </button>
+                )}
                 <button
                   onClick={handleDelete}
                   className="px-3 py-2.5 rounded-xl border border-red-200 text-red-500 text-sm hover:bg-red-50"
