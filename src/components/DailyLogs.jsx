@@ -655,12 +655,12 @@ function LogModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50"
+      className="fixed inset-x-0 top-0 h-[100dvh] z-[60] flex items-end sm:items-center justify-center bg-black/50"
       onMouseDown={e => {
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-[680px] max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-[680px] max-h-[95dvh] sm:max-h-[90dvh] flex flex-col overflow-hidden">
         {/* ── Header — always visible ── */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
           <div>
@@ -685,12 +685,11 @@ function LogModal({
 
         {/* ── Scrollable body ── */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
-          <div className="flex flex-col sm:flex-row sm:min-h-full">
-            {/* Left column */}
-            <div className="w-full sm:w-64 flex-shrink-0 px-5 py-4 border-b sm:border-b-0 sm:border-r border-gray-100 space-y-4">
-              {/* Job selector (all-jobs mode) */}
+          <div className="flex flex-col px-5 py-4 space-y-4">
+            {/* Job + Date on one row */}
+            <div className="flex gap-3">
               {selectedJob === 'all' && (
-                <div>
+                <div className="flex-1 min-w-0">
                   <label className="block text-xs font-medium text-gray-600 mb-1">Job</label>
                   <JobPicker
                     jobs={jobs}
@@ -699,9 +698,7 @@ function LogModal({
                   />
                 </div>
               )}
-
-              {/* Date */}
-              <div>
+              <div className={selectedJob === 'all' ? 'w-32 flex-shrink-0' : 'w-40'}>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   Date <span className="text-red-400">*</span>
                 </label>
@@ -712,72 +709,34 @@ function LogModal({
                   className="input text-sm w-full"
                 />
               </div>
-
-              {/* Title */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Title</label>
-                <input
-                  type="text"
-                  value={form.title}
-                  onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                  placeholder="Optional title…"
-                  className="input text-sm w-full"
-                />
-              </div>
-
-              {/* Permissions */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-2">Permissions</label>
-                <div className="space-y-1">
-                  {PERMISSION_OPTIONS.map(opt => (
-                    <label
-                      key={opt.key}
-                      className={`flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
-                        form.permissions.includes(opt.key)
-                          ? 'bg-green-50 border border-green-200'
-                          : 'bg-gray-50 border border-transparent hover:bg-gray-100'
-                      }`}
-                    >
-                      <span className="text-sm text-gray-700">
-                        {opt.icon} {opt.label}
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={form.permissions.includes(opt.key)}
-                        onChange={() => togglePermission(opt.key)}
-                        className="accent-green-700 w-4 h-4"
-                      />
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Weather */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-2">Weather</label>
-                <label className="flex items-center gap-2 cursor-pointer mb-2">
-                  <input
-                    type="checkbox"
-                    checked={form.weather_conditions}
-                    onChange={e => setForm(f => ({ ...f, weather_conditions: e.target.checked }))}
-                    className="accent-green-700 w-4 h-4"
-                  />
-                  <span className="text-sm text-gray-600">Include weather conditions</span>
-                </label>
-                {form.weather_conditions && (
-                  <input
-                    type="text"
-                    value={form.weather_notes}
-                    onChange={e => setForm(f => ({ ...f, weather_notes: e.target.value }))}
-                    placeholder="e.g. Sunny, 78°F"
-                    className="input text-sm w-full"
-                  />
-                )}
-              </div>
             </div>
 
-            {/* Right column */}
-            <div className="flex-1 flex flex-col px-5 py-4 space-y-4">
+            {/* Title */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Title</label>
+              <input
+                type="text"
+                value={form.title}
+                onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                placeholder="Optional title…"
+                className="input text-sm w-full"
+              />
+            </div>
+
+            {/* Notes */}
+            <div className="flex flex-col">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Notes</label>
+              <textarea
+                value={form.notes}
+                onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+                placeholder="Describe today's work, observations, materials used…"
+                rows={6}
+                className="input text-sm resize-none leading-relaxed"
+              />
+            </div>
+
+            {/* Photos + Permissions */}
+            <div className="flex-1 flex flex-col space-y-4">
               {/* Photos — mobile gets Camera + Library buttons */}
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -866,16 +825,31 @@ function LogModal({
                 )}
               </div>
 
-              {/* Notes */}
-              <div className="flex flex-col">
-                <label className="block text-xs font-medium text-gray-600 mb-1">Notes</label>
-                <textarea
-                  value={form.notes}
-                  onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                  placeholder="Describe today's work, observations, materials used…"
-                  rows={6}
-                  className="input text-sm resize-none leading-relaxed"
-                />
+              {/* Permissions — directly above the Save button */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-2">Permissions</label>
+                <div className="space-y-1">
+                  {PERMISSION_OPTIONS.map(opt => (
+                    <label
+                      key={opt.key}
+                      className={`flex items-center justify-between px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
+                        form.permissions.includes(opt.key)
+                          ? 'bg-green-50 border border-green-200'
+                          : 'bg-gray-50 border border-transparent hover:bg-gray-100'
+                      }`}
+                    >
+                      <span className="text-sm text-gray-700">
+                        {opt.icon} {opt.label}
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={form.permissions.includes(opt.key)}
+                        onChange={() => togglePermission(opt.key)}
+                        className="accent-green-700 w-4 h-4"
+                      />
+                    </label>
+                  ))}
+                </div>
               </div>
 
               {/* Error */}
