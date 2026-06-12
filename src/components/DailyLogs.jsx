@@ -150,7 +150,7 @@ export default function DailyLogs({
   // ── Modal open/close ───────────────────────────────────────
   function openNew() {
     setEditLog(null)
-    setForm({ ...EMPTY_FORM, date: today() })
+    setForm({ ...EMPTY_FORM, date: today(), job_id: selectedJob !== 'all' ? selectedJob : '' })
     setPhotoFiles([])
     setPhotoPreviews([])
     setError('')
@@ -161,6 +161,7 @@ export default function DailyLogs({
     setEditLog(log)
     setForm({
       date: log.date,
+      job_id: log.job_id || '',
       title: log.title || '',
       notes: log.notes || '',
       permissions: log.permissions || ['internal'],
@@ -210,15 +211,15 @@ export default function DailyLogs({
       setError('Please add notes or at least one photo.')
       return
     }
-    if (!editLog && selectedJob === 'all' && !form.job_id) {
+    if (!editLog && !form.job_id) {
       setError('Please select a job for this daily log.')
       return
     }
     setSaving(true)
     setError('')
 
-    // In all-jobs mode the job comes from the modal's Job picker.
-    const jobId = selectedJob !== 'all' ? selectedJob : form.job_id || null
+    // The job comes from the modal's Job picker (open/closed filtered).
+    const jobId = form.job_id || (selectedJob !== 'all' ? selectedJob : null)
 
     try {
       let logId
@@ -228,6 +229,7 @@ export default function DailyLogs({
         const { error } = await supabase
           .from('daily_logs')
           .update({
+            job_id: jobId,
             date: form.date,
             title: form.title.trim() || null,
             notes: form.notes.trim() || null,
@@ -556,7 +558,7 @@ function LogCard({ log, author, jobName, onEdit, onDelete, onPhotoClick }) {
 
 // ── Open-jobs combobox for the daily-log Job field ──────────
 // Type-to-search picker limited to open jobs (active / on-hold / unstatused).
-function JobPicker({ jobs, value, onChange }) {
+function JobPicker({ jobs, value, onChange, rightSlot }) {
   const jobName = j => j.name || j.client_name || 'Untitled job'
   const isOpenJob = j => j.status === 'active' || j.status === 'on_hold' || !j.status
   const selected = jobs.find(j => j.id === value)
@@ -593,19 +595,22 @@ function JobPicker({ jobs, value, onChange }) {
           </button>
         ))}
       </div>
-      <input
-        type="text"
-        value={query}
-        onChange={e => {
-          setQuery(e.target.value)
-          setOpen(true)
-          if (!e.target.value.trim()) onChange(null)
-        }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
-        placeholder={`Search ${filter} jobs…`}
-        className="input text-sm w-full"
-      />
+      <div className="flex gap-2 items-center">
+        <input
+          type="text"
+          value={query}
+          onChange={e => {
+            setQuery(e.target.value)
+            setOpen(true)
+            if (!e.target.value.trim()) onChange(null)
+          }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          placeholder={`Search ${filter} jobs…`}
+          className="input text-sm flex-1 min-w-0"
+        />
+        {rightSlot}
+      </div>
       {open && (
         <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
           {matches.length === 0 ? (
@@ -651,7 +656,6 @@ function LogModal({
   jobs,
 }) {
   const cameraRef = useRef(null)
-  const jobMap = Object.fromEntries(jobs.map(j => [j.id, j.name || j.client_name]))
 
   return (
     <div
@@ -667,9 +671,6 @@ function LogModal({
             <h2 className="text-base font-bold text-gray-900">
               {isEdit ? 'Edit Daily Log' : 'Daily Log'}
             </h2>
-            {selectedJob !== 'all' && (
-              <p className="text-xs text-green-700 font-medium mt-0.5">{jobMap[selectedJob]}</p>
-            )}
           </div>
           <button onClick={onClose} className="text-gray-300 hover:text-gray-500 p-2">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -686,29 +687,24 @@ function LogModal({
         {/* ── Scrollable body ── */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
           <div className="flex flex-col px-5 py-4 space-y-4">
-            {/* Job + Date on one row */}
-            <div className="flex gap-3">
-              {selectedJob === 'all' && (
-                <div className="flex-1 min-w-0">
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Job</label>
-                  <JobPicker
-                    jobs={jobs}
-                    value={form.job_id}
-                    onChange={id => setForm(f => ({ ...f, job_id: id }))}
+            {/* Job picker (Open/Closed row) with the Date inline next to the
+                search field on the second row. */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Job &amp; Date</label>
+              <JobPicker
+                jobs={jobs}
+                value={form.job_id}
+                onChange={id => setForm(f => ({ ...f, job_id: id }))}
+                rightSlot={
+                  <input
+                    type="date"
+                    value={form.date}
+                    onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+                    title="Date"
+                    className="input text-sm w-28 flex-shrink-0 mr-1"
                   />
-                </div>
-              )}
-              <div className={selectedJob === 'all' ? 'w-32 flex-shrink-0' : 'w-40'}>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Date <span className="text-red-400">*</span>
-                </label>
-                <input
-                  type="date"
-                  value={form.date}
-                  onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
-                  className="input text-sm w-full"
-                />
-              </div>
+                }
+              />
             </div>
 
             {/* Title */}
