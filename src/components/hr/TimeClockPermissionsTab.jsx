@@ -165,4 +165,51 @@ export default function TimeClockPermissionsTab({ employees = [] }) {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {filtered.map(e => {
-              const isChief = ch
+              const isChief = chiefIds.has(e.id)
+              return (
+                <tr key={e.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-2.5">
+                    <span className="font-medium text-gray-800">
+                      {e.last_name}, {e.first_name}
+                    </span>
+                    {isChief && (
+                      <span className="ml-2 text-[10px] font-semibold uppercase text-indigo-600">
+                        Crew Chief
+                      </span>
+                    )}
+                    {savingId === e.id && (
+                      <span className="ml-2 text-[10px] text-gray-400">saving…</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5 text-center">
+                    <input
+                      type="checkbox"
+                      checked={effective(e.id, 'manager')}
+                      onChange={() => toggle(e.id, 'manager')}
+                      className="w-4 h-4 accent-green-700 cursor-pointer"
+                    />
+                  </td>
+                  <td className="px-4 py-2.5 text-center">
+                    <input
+                      type="checkbox"
+                      checked={effective(e.id, 'crew_chief')}
+                      onChange={() => toggle(e.id, 'crew_chief')}
+                      className="w-4 h-4 accent-green-700 cursor-pointer"
+                    />
+                  </td>
+                </tr>
+              )
+            })}
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={3} className="px-4 py-8 text-center text-gray-400">
+                  No employees found
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}

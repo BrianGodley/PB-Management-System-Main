@@ -366,4 +366,6 @@ export default function Design() {
           </div>
         </div>
       )}
- 
+    </div>
+  )
+}

@@ -6090,4 +6090,6 @@ function JobTasksPanel({ job }) {
           </table>
         </div>
       )}
-    </d
+    </div>
+  )
+}

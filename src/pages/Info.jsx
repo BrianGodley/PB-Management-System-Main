@@ -186,4 +186,6 @@ export default function Info() {
           />
         </div>
       )}
- 
+    </div>
+  )
+}

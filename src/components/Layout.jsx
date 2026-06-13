@@ -53,7 +53,7 @@ const SCREEN_TITLES = [
   ['/bids', 'Bids'],
   ['/jobs', 'Jobs'],
   ['/info', 'Job Info'],
-  ['/hr', 'Human Resources'],
+  ['/hr', 'Employees'],
 ]
 function screenTitle(path) {
   if (path === '/') return 'Dashboard'
@@ -134,7 +134,7 @@ export default function Layout() {
     { path: '/jobs', label: t('jobs'), icon: '🏡' },
     { path: '/statistics', label: t('statistics'), icon: '📈' },
     { path: '/portal/subs', label: t('subsVendors'), icon: '🧑‍🔧' },
-    { path: '/hr', label: t('hr') || 'HR', icon: '🏢' },
+    { path: '/hr', label: 'Employees', icon: '🏢' },
   ]
   const [showMainMenu, setShowMainMenu] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState(null)
@@ -707,4 +707,11 @@ export default function Layout() {
       {showReportIssue && user && (
         <ReportIssueModal
           user={user}
-        
+          onClose={() => setShowReportIssue(false)}
+          onCreated={() => setShowReportIssue(false)}
+        />
+      )}
+
+    </div>
+  )
+}

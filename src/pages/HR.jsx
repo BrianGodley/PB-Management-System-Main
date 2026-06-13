@@ -669,8 +669,9 @@ export default function HR() {
         </div>
       </div>
 
-      {/* Tab bar */}
-      <div className="bg-white border-b border-gray-200 px-2 sm:px-6 flex gap-0 flex-shrink-0 overflow-x-auto">
+      {/* Tab bar — desktop only; on mobile the More > Employees screen shows
+          just the employee table (no Employees/Applicants/Settings bar). */}
+      <div className="bg-white border-b border-gray-200 px-2 sm:px-6 hidden lg:flex gap-0 flex-shrink-0 overflow-x-auto">
         {[
           {
             key: 'employees',
@@ -1638,4 +1639,6 @@ export default function HR() {
           }}
         />
       )}
- 
+    </div>
+  )
+}

@@ -111,4 +111,6 @@ export default function DailyLogsPage() {
           />
         )}
       </div>
- 
+    </div>
+  )
+}
