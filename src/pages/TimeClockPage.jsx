@@ -5,6 +5,7 @@ import { fetchAllPaginated } from '../lib/fetchAll'
 import { useLang } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
 import TimeClock from '../components/TimeClock'
+import MobileTimeClock from '../components/MobileTimeClock'
 
 const today = () => new Date().toISOString().split('T')[0]
 
@@ -88,16 +89,27 @@ export default function TimeClockPage() {
     setShowList(false)
   }
 
+  // Clock in/out is only valid against OPEN jobs — never closed ones.
+  const jobIsOpen = j => {
+    const s = j?.status || 'active'
+    return s === 'active' || s === 'on_hold'
+  }
+  const openJobs = jobs.filter(jobIsOpen)
   const q = query.trim().toLowerCase()
-  const matches = (q ? jobs.filter(j => jobLabel(j).toLowerCase().includes(q)) : jobs).slice(0, 50)
+  const matches = (q ? openJobs.filter(j => jobLabel(j).toLowerCase().includes(q)) : openJobs).slice(
+    0,
+    50
+  )
 
   return (
     <div className="flex flex-col h-full">
       {/* Minimal header with searchable job picker */}
       <div className="flex-shrink-0 mb-4">
         <h1 className="text-lg font-bold text-gray-900 mb-3">{t('timeClockTitle')}</h1>
+        {/* Desktop uses this page-level job picker; mobile has its own inside
+            MobileTimeClock, so it's hidden on phones. */}
         {!loading && (
-          <div className="relative">
+          <div className="relative hidden lg:block">
             <input
               type="text"
               value={query}
@@ -131,9 +143,9 @@ export default function TimeClockPage() {
                     </li>
                   ))
                 )}
-                {!q && jobs.length > 50 && (
+                {!q && openJobs.length > 50 && (
                   <li className="px-3 py-1.5 text-[11px] text-gray-400 border-t border-gray-100">
-                    Showing first 50 — type to search all {jobs.length} jobs
+                    Showing first 50 — type to search all {openJobs.length} open jobs
                   </li>
                 )}
               </ul>
@@ -145,14 +157,21 @@ export default function TimeClockPage() {
         )}
       </div>
 
-      {/* TimeClock component */}
+      {/* Desktop = full table (TimeClock); mobile = new clock-in flow. */}
       <div className="flex-1 min-h-0 overflow-y-auto">
         {loading ? (
           <div className="flex justify-center py-16">
             <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-green-700" />
           </div>
         ) : (
-          <TimeClock jobs={jobs} selectedJob={selectedJob} />
+          <>
+            <div className="hidden lg:block">
+              <TimeClock jobs={jobs} selectedJob={selectedJob} />
+            </div>
+            <div className="lg:hidden">
+              <MobileTimeClock />
+            </div>
+          </>
         )}
       </div>
     </div>

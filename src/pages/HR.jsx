@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useCachedData } from '../lib/useCachedData'
 import AddEmployeeModal from '../components/AddEmployeeModal'
 import ReviewBuilder from '../components/hr/ReviewBuilder'
+import TimeClockPermissionsTab from '../components/hr/TimeClockPermissionsTab'
 
 const APPLICANT_STATUSES = ['new', 'reviewing', 'interview', 'offered', 'hired', 'rejected']
 
@@ -1315,7 +1316,10 @@ export default function HR() {
           <div className="-mx-6 -mt-3 flex flex-col">
             {/* Statistics-style white sub-tab bar */}
             <div className="flex border-b border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0">
-              {[{ key: 'employee-groups', label: '👥 Employee Groups' }].map(st => (
+              {[
+                { key: 'employee-groups', label: '👥 Employee Groups' },
+                { key: 'time-clock', label: '⏰ Time Clock' },
+              ].map(st => (
                 <button
                   key={st.key}
                   onClick={() => setSettingsTab(st.key)}
@@ -1545,6 +1549,9 @@ export default function HR() {
                   )}
                 </div>
               )}
+
+              {/* ── Time Clock permissions ── */}
+              {settingsTab === 'time-clock' && <TimeClockPermissionsTab employees={employees} />}
             </div>
             {/* end bg-gray-50 */}
           </div>

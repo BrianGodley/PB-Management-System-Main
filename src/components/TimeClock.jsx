@@ -397,6 +397,7 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [profileName, setProfileName] = useState('')
+  const [employeeId, setEmployeeId] = useState(null)
   const [nowTime, setNowTime] = useState(new Date())
   const [payrollWeekStart, setPayrollWeekStart] = useState(0) // 0=Sunday
   const [myWeekEntries, setMyWeekEntries] = useState([])
@@ -433,6 +434,13 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
           'Unknown'
         setProfileName(name)
       })
+    // Resolve this user's employee row for reliable time-entry linking.
+    supabase
+      .from('employees')
+      .select('id')
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data }) => setEmployeeId(data?.id || null))
   }, [user?.id])
 
   // Load payroll week start from company_settings
@@ -660,6 +668,7 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
     const timeIn = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
     await supabase.from('time_entries').insert({
       employee_name: profileName,
+      employee_id: employeeId,
       job_id: resolvedJobId,
       date: todayDate(),
       time_in: timeIn,
@@ -731,10 +740,16 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
             </div>
           )}
 
-          {/* The dynamic Clock In / Clock Out button */}
+          {/* The dynamic Clock In / Clock Out button. Clock-in needs a job:
+              when "All Jobs" is selected the button is disabled (previously it
+              silently no-opped). */}
           <button
-            onClick={isClockedIn ? handleClockOut : handleClockIn}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-all bg-blue-600 hover:bg-blue-700 text-white"
+            onClick={isClockedIn ? handleClockOut : () => handleClockIn(selectedJob)}
+            disabled={!isClockedIn && selectedJob === 'all'}
+            title={
+              !isClockedIn && selectedJob === 'all' ? 'Pick a job before clocking in' : undefined
+            }
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-all bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <span
               className={`w-2 h-2 rounded-full bg-white ${isClockedIn ? 'animate-pulse' : ''}`}
