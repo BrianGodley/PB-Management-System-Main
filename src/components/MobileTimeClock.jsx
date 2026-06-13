@@ -25,6 +25,9 @@ const dStr = d => {
   return `${y}-${m}-${da}`
 }
 const hhmm = d => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+// Seconds precision for clock-in so the live timer is exact (and a quick
+// clock-out/in actually restarts from 0).
+const hms = d => `${hhmm(d)}:${String(d.getSeconds()).padStart(2, '0')}`
 // "07:56:00" / "07:56" -> "7:56 AM"
 const fmt12h = t => {
   if (!t) return ''
@@ -289,7 +292,7 @@ export default function MobileTimeClock() {
       employee_name: employeeName || 'Employee',
       job_id: jobId,
       date: todayStr(),
-      time_in: hhmm(d),
+      time_in: hms(d),
       time_out: null,
       created_by: user.id,
       updated_at: d.toISOString(),
@@ -369,7 +372,7 @@ export default function MobileTimeClock() {
           employee_id: id,
           job_id: jobId,
           date: todayStr(),
-          time_in: hhmm(d),
+          time_in: hms(d),
           time_out: null,
           created_by: user.id,
           updated_at: d.toISOString(),
