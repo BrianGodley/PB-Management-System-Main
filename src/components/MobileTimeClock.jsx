@@ -141,11 +141,7 @@ export default function MobileTimeClock() {
     ;(async () => {
      try {
       const [{ data: prof }, { data: emp }] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('first_name,last_name,full_name,display_name,name,role')
-          .eq('id', user.id)
-          .maybeSingle(),
+        supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
         supabase.from('employees').select('id').eq('user_id', user.id).maybeSingle(),
       ])
       if (!alive) return
@@ -436,9 +432,10 @@ export default function MobileTimeClock() {
         meId={meId}
         meName={meName}
         myEntry={myEntry}
+        defaultJobId={myEntry?.job_id || clockInJob || ''}
         crewMemberIds={crewMemberIds}
         chiefIds={chiefIds}
-        canManager={canManager}
+        canManager={canManager || isAdmin}
         onCancel={() => setScreen(myEntry ? 'running' : 'clockin')}
         busy={busy}
         onClockIn={async (jobId, slots) => {
@@ -515,6 +512,15 @@ export default function MobileTimeClock() {
           >
             🔁 Switch Job
           </button>
+
+          {canMultiple && (
+            <button
+              onClick={() => setScreen('multi-setup')}
+              className="w-full mt-2 py-2.5 rounded-xl border border-indigo-300 text-indigo-700 text-sm font-semibold hover:bg-indigo-50"
+            >
+              👥 Clock In Others
+            </button>
+          )}
         </div>
 
         {multiEntries.length > 0 && (
@@ -749,6 +755,7 @@ function MultiSetup({
   meId,
   meName,
   myEntry,
+  defaultJobId = '',
   crewMemberIds,
   chiefIds,
   canManager,
@@ -756,7 +763,7 @@ function MultiSetup({
   onClockIn,
   busy,
 }) {
-  const [jobId, setJobId] = useState('')
+  const [jobId, setJobId] = useState(defaultJobId)
   // Slots auto-filled from the chief's crew. Chief is slot 1 unless already
   // clocked in. Each slot: { key, employee_id }.
   const [slots, setSlots] = useState(() => {
