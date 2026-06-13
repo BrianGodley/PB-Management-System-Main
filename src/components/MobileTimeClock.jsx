@@ -98,6 +98,64 @@ function breakInfo(breaks, nowMs) {
   return { deduct, active }
 }
 
+// Promise-wrapped geolocation — resolves null on denial/timeout/unsupported.
+function getPos(timeoutMs = 8000) {
+  return new Promise(resolve => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return resolve(null)
+    navigator.geolocation.getCurrentPosition(
+      p => resolve({ lat: p.coords.latitude, lon: p.coords.longitude, accuracy: p.coords.accuracy }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 30000 }
+    )
+  })
+}
+
+// Haversine distance in meters.
+function distMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000
+  const r = d => (d * Math.PI) / 180
+  const dLat = r(lat2 - lat1)
+  const dLon = r(lon2 - lon1)
+  const a =
+    Math.sin(dLat / 2) ** 2 + Math.cos(r(lat1)) * Math.cos(r(lat2)) * Math.sin(dLon / 2) ** 2
+  return 2 * R * Math.asin(Math.sqrt(a))
+}
+
+// Capture GPS for a clock event and compare to the job's geocoded location so
+// the desktop table can show on-site / off-site + proximity.
+async function captureClockGps(jobId) {
+  const pos = await getPos()
+  if (!pos) return { no_gps: true }
+  let jlat = null
+  let jlon = null
+  if (jobId) {
+    const { data } = await supabase.from('jobs').select('lat, lon').eq('id', jobId).maybeSingle()
+    if (data?.lat != null) {
+      jlat = Number(data.lat)
+      jlon = Number(data.lon)
+    }
+  }
+  let distance_m = null
+  let on_site = null
+  if (jlat != null && jlon != null) {
+    distance_m = distMeters(pos.lat, pos.lon, jlat, jlon)
+    on_site = distance_m <= 402 // ~1/4 mile
+  }
+  return { lat: pos.lat, lon: pos.lon, accuracy_m: pos.accuracy, distance_m, on_site, no_gps: false }
+}
+
+// Spread a captured-GPS object into clock_in_* / clock_out_* columns.
+function gpsCols(side, g) {
+  return {
+    [`clock_${side}_lat`]: g?.lat ?? null,
+    [`clock_${side}_lon`]: g?.lon ?? null,
+    [`clock_${side}_accuracy_m`]: g?.accuracy_m ?? null,
+    [`clock_${side}_distance_m`]: g?.distance_m ?? null,
+    [`clock_${side}_on_site`]: g?.on_site ?? null,
+    [`clock_${side}_no_gps`]: g?.no_gps ?? null,
+  }
+}
+
 export default function MobileTimeClock() {
   const { user } = useAuth()
   const [meId, setMeId] = useState(null)
@@ -305,7 +363,8 @@ export default function MobileTimeClock() {
   // ── Actions ───────────────────────────────────────────────────────────────
   // Insert one clock-in row. Falls back to omitting employee_id if that column
   // isn't present yet (migration not run).
-  async function insertOne(jobId, employeeId, employeeName) {
+  async function insertOne(jobId, employeeId, employeeName, gps) {
+    const g = gps !== undefined ? gps : await captureClockGps(jobId)
     const d = new Date()
     const base = {
       employee_name: employeeName || 'Employee',
@@ -315,6 +374,7 @@ export default function MobileTimeClock() {
       time_out: null,
       created_by: user.id,
       updated_at: d.toISOString(),
+      ...gpsCols('in', g),
     }
     let res = await supabase
       .from('time_entries')
@@ -343,10 +403,11 @@ export default function MobileTimeClock() {
 
   async function clockOutEntry(entry) {
     setBusy(true)
+    const g = await captureClockGps(entry.job_id)
     const d = new Date()
     await supabase
       .from('time_entries')
-      .update({ time_out: hhmm(d), updated_at: d.toISOString() })
+      .update({ time_out: hhmm(d), updated_at: d.toISOString(), ...gpsCols('out', g) })
       .eq('id', entry.id)
     await refreshEntries()
     await refreshTotals()
@@ -367,10 +428,11 @@ export default function MobileTimeClock() {
   async function switchJobEntry(entry, jobId) {
     if (!entry || !jobId) return
     setBusy(true)
+    const gOut = await captureClockGps(entry.job_id)
     const d = new Date()
     await supabase
       .from('time_entries')
-      .update({ time_out: hhmm(d), updated_at: d.toISOString() })
+      .update({ time_out: hhmm(d), updated_at: d.toISOString(), ...gpsCols('out', gOut) })
       .eq('id', entry.id)
     await insertOne(jobId, entry.employee_id || null, entry.employee_name)
     await refreshEntries()
@@ -381,6 +443,8 @@ export default function MobileTimeClock() {
   async function clockInMany(jobId, employeeIds) {
     setBusy(true)
     setError('')
+    // One GPS read for the whole crew (they're clocked in from one spot).
+    const g = await captureClockGps(jobId)
     const d = new Date()
     const rows = (employeeIds || [])
       .filter(Boolean)
@@ -395,6 +459,7 @@ export default function MobileTimeClock() {
           time_out: null,
           created_by: user.id,
           updated_at: d.toISOString(),
+          ...gpsCols('in', g),
         }
       })
     if (!rows.length) {
