@@ -785,11 +785,23 @@ export default function COEstimatePanel({
         </label>
         <textarea
           value={description}
-          onChange={e => setDescription(e.target.value)}
+          onChange={e => {
+            setDescription(e.target.value)
+            // Auto-grow with content (like the Sam chat box).
+            e.target.style.height = 'auto'
+            e.target.style.height = `${e.target.scrollHeight}px`
+          }}
+          ref={el => {
+            // Size to existing content on first render.
+            if (el && el.scrollHeight > el.clientHeight) {
+              el.style.height = 'auto'
+              el.style.height = `${el.scrollHeight}px`
+            }
+          }}
           disabled={!editable}
-          rows={2}
+          rows={5}
           placeholder="Scope / notes (optional)…"
-          className="w-full text-sm text-gray-700 border border-gray-300 rounded-lg px-2.5 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none resize-none placeholder-gray-300 disabled:bg-gray-50 disabled:text-gray-500"
+          className="w-full text-sm leading-relaxed text-gray-700 border border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none resize-y min-h-[140px] max-h-[55vh] overflow-y-auto placeholder-gray-300 disabled:bg-gray-50 disabled:text-gray-500"
         />
       </div>
 

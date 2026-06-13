@@ -328,7 +328,7 @@ function AddIndividualModal({ onSave, onClose, user }) {
   const lbl = 'block text-xs font-medium text-gray-600 mb-0.5'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
@@ -736,7 +736,7 @@ function AddCompanyModal({ onSave, onClose, user }) {
     'w-full border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-green-500'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
@@ -1389,16 +1389,16 @@ export default function Clients() {
       {/* Page header */}
       <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
         <h1 className="hidden lg:block text-xl font-bold text-gray-900">Opportunities</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-1 lg:flex-none">
           <button
             onClick={() => setClientModal('individual')}
-            className="btn-primary text-sm px-3 py-1.5"
+            className="btn-primary text-sm px-3 py-1.5 flex-1 lg:flex-none"
           >
             + Add Individual
           </button>
           <button
             onClick={() => setClientModal('company')}
-            className="btn-primary text-sm px-3 py-1.5"
+            className="btn-primary text-sm px-3 py-1.5 flex-1 lg:flex-none"
           >
             + Add Company
           </button>

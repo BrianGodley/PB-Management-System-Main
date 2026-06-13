@@ -581,12 +581,13 @@ export default function CODetailModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+        className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
+        style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
         onClick={e => {
           if (e.target === e.currentTarget) onClose()
         }}
       >
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92dvh] flex flex-col overflow-hidden">
           {/* Header */}
           <div className="px-6 pt-5 pb-3 border-b border-gray-100 flex items-start justify-between flex-shrink-0">
             <div className="min-w-0">

@@ -166,8 +166,8 @@ export default function AddEmployeeModal({ onSave, onClose, positions = [] }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 max-h-[90dvh] overflow-y-auto">
         <h3 className="text-lg font-bold text-gray-900 mb-4">Add New Employee</h3>
         {error && (
           <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
