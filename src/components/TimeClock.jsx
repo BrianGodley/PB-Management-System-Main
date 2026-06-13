@@ -353,7 +353,7 @@ function buildMapHref({ lat, lon, jobLat, jobLon }) {
 // pin icon that opens the captured location in Google Maps.
 function GpsLine({ label, onSite, noGps, distanceM, lat, lon, jobLat, jobLon, onMap }) {
   let cls = 'text-gray-400 bg-gray-50'
-  let text = '—'
+  let text = ''
   if (noGps) {
     cls = 'text-gray-600 bg-gray-100'
     text = 'No GPS'
@@ -370,12 +370,15 @@ function GpsLine({ label, onSite, noGps, distanceM, lat, lon, jobLat, jobLon, on
 
   const hasLoc = lat != null && lon != null
 
+  // No status and no location for this side → render nothing (leave it blank).
+  if (!text && !hasLoc) return null
+
   return (
     <div className="flex items-center gap-1 text-[10px] whitespace-nowrap leading-tight">
       <span className="text-gray-400 font-semibold uppercase tracking-wide w-5 flex-shrink-0">
         {label}
       </span>
-      <span className={`px-1.5 py-0.5 rounded font-semibold ${cls}`}>{text}</span>
+      {text && <span className={`px-1.5 py-0.5 rounded font-semibold ${cls}`}>{text}</span>}
       {hasLoc && (
         <button
           type="button"
@@ -441,20 +444,17 @@ function ProximityCell({ entry, jobLoc, companyLocs }) {
     ? closestLocation(entry.clock_out_lat, entry.clock_out_lon, candidates)
     : null
 
-  const Line = ({ label, c }) => (
-    <div className="flex items-center gap-1 text-[10px] whitespace-nowrap leading-tight">
-      <span className="text-gray-400 font-semibold uppercase tracking-wide w-5 flex-shrink-0">
-        {label}
-      </span>
-      {c ? (
+  const Line = ({ label, c }) =>
+    c ? (
+      <div className="flex items-center gap-1 text-[10px] whitespace-nowrap leading-tight">
+        <span className="text-gray-400 font-semibold uppercase tracking-wide w-5 flex-shrink-0">
+          {label}
+        </span>
         <span className="text-gray-700">
           <span className="font-semibold">{c.name}</span> · {fmtDistance(c.meters)}
         </span>
-      ) : (
-        <span className="text-gray-300">—</span>
-      )}
-    </div>
-  )
+      </div>
+    ) : null
 
   return (
     <div className="flex flex-col gap-0.5">
@@ -1099,7 +1099,7 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
                       </td>
 
                       {/* Employee */}
-                      <td className="px-4 py-3 font-medium text-gray-800">
+                      <td className="pl-4 pr-2 py-3 font-medium text-gray-800">
                         {entry.employee_name}
                         {isClockedIn && (
                           <span className="ml-2 text-[10px] font-semibold text-green-700 bg-green-100 px-1.5 py-0.5 rounded-full">
@@ -1109,7 +1109,7 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
                       </td>
 
                       {/* Job */}
-                      <td className="px-4 py-3 text-gray-500 max-w-[180px] truncate">
+                      <td className="pl-1 pr-4 py-3 text-gray-500 max-w-[180px] truncate">
                         {jobMap[entry.job_id] || (
                           <span className="text-gray-300 italic text-xs">No job</span>
                         )}
@@ -1121,12 +1121,8 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
                       </td>
 
                       {/* Break — total lunch + short-break minutes for this shift */}
-                      <td className="px-2 py-3 text-right font-mono text-sm">
-                        {brk > 0 ? (
-                          <span className="text-gray-600">{fmtMins(brk)}</span>
-                        ) : (
-                          <span className="text-gray-300">—</span>
-                        )}
+                      <td className="px-4 py-3 text-left font-mono text-sm">
+                        {brk > 0 ? <span className="text-gray-600">{fmtMins(brk)}</span> : ''}
                       </td>
 
                       {/* Time Out — or Clock Out link */}
@@ -1146,23 +1142,21 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
                       </td>
 
                       {/* Total */}
-                      <td className="px-2 py-3 text-right font-mono font-semibold text-gray-800 text-sm">
-                        {isClockedIn ? <span className="text-gray-300">—</span> : fmtMins(total)}
+                      <td className="px-4 py-3 text-left font-mono font-semibold text-gray-800 text-sm">
+                        {isClockedIn ? '' : fmtMins(total)}
                       </td>
 
                       {/* Overtime */}
-                      <td className="px-2 py-3 text-right font-mono text-sm">
-                        {isClockedIn ? (
-                          <span className="text-gray-300">—</span>
-                        ) : ot > 0 ? (
+                      <td className="px-4 py-3 text-left font-mono text-sm">
+                        {!isClockedIn && ot > 0 ? (
                           <span className="text-orange-600 font-semibold">{fmtMins(ot)}</span>
                         ) : (
-                          <span className="text-gray-300">—</span>
+                          ''
                         )}
                       </td>
 
                       {/* GPS — clock-in/out location status + map popup */}
-                      <td className="px-3 py-3 align-middle">
+                      <td className="px-4 py-3 align-middle">
                         <GpsCell
                           entry={entry}
                           jobLoc={jobLocMap[entry.job_id]}
@@ -1171,7 +1165,7 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
                       </td>
 
                       {/* Proximity — closest known location to the clock point */}
-                      <td className="px-3 py-3 align-middle">
+                      <td className="px-4 py-3 align-middle">
                         <ProximityCell
                           entry={entry}
                           jobLoc={jobLocMap[entry.job_id]}
