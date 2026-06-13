@@ -231,7 +231,7 @@ export default function PortalCODetailModal({ co, onClose, onActioned }) {
                   disabled={busy}
                   className="flex-1 py-3 rounded-xl border border-red-200 text-sm font-bold text-red-600 hover:bg-red-50 disabled:opacity-50"
                 >
-                  Disapprove
+                  Decline
                 </button>
                 <button
                   onClick={() => {

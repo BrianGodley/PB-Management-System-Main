@@ -381,6 +381,16 @@ export default function CODetailModal({
     setSaving(false)
   }
 
+  // Office-side decline of a pending CO (mirrors the client's decline).
+  async function handleDecline() {
+    const reason = window.prompt('Reason for declining this change order:')
+    if (reason === null) return // cancelled
+    setSaving(true)
+    setError('')
+    await setStatus('lost', { co_decline_reason: reason.trim() || null })
+    setSaving(false)
+  }
+
   // Revert an approved CO back to pending: clear the signature and remove the
   // work order that approval created (so it isn't left orphaned on the job).
   async function handleUnapprove() {
@@ -1026,9 +1036,16 @@ export default function CODetailModal({
                     setError('')
                     setShowSig(true)
                   }}
-                  className="flex-1 min-w-[120px] py-2.5 rounded-xl bg-indigo-700 text-white text-sm font-bold hover:bg-indigo-800"
+                  className="flex-1 min-w-[110px] py-2.5 rounded-xl bg-indigo-700 text-white text-sm font-bold hover:bg-indigo-800"
                 >
                   ✍️ Approve
+                </button>
+                <button
+                  onClick={handleDecline}
+                  disabled={saving}
+                  className="flex-1 min-w-[110px] py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 disabled:opacity-50"
+                >
+                  ✕ Decline
                 </button>
                 <button
                   onClick={handlePrint}

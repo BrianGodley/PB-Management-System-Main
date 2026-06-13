@@ -21,6 +21,7 @@ export default function CONavModal({ onClose, onNavigate }) {
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [jobId, setJobId] = useState('')
+  const [statusFilter, setStatusFilter] = useState('open') // 'open' | 'closed'
   const searchRef = useRef(null)
 
   useEffect(() => {
@@ -48,15 +49,18 @@ export default function CONavModal({ onClose, onNavigate }) {
     }
   }, [])
 
+  const isOpen = j => j.status === 'active' || j.status === 'on_hold' || !j.status
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return jobs
-    return jobs.filter(
-      j =>
+    return jobs.filter(j => {
+      if (statusFilter === 'open' ? !isOpen(j) : isOpen(j)) return false
+      if (!q) return true
+      return (
         (j.name || '').toLowerCase().includes(q) ||
         (j.client_name || '').toLowerCase().includes(q)
-    )
-  }, [jobs, query])
+      )
+    })
+  }, [jobs, query, statusFilter])
 
   const selectedJob = jobs.find(j => j.id === jobId)
   const canGo = !!jobId
@@ -72,11 +76,11 @@ export default function CONavModal({ onClose, onNavigate }) {
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/40"
+      className="fixed inset-0 z-[70] flex items-stretch sm:items-center justify-center bg-black/40"
       onClick={onClose}
     >
       <div
-        className="w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[92dvh] flex flex-col"
+        className="w-full h-[100dvh] sm:h-auto sm:max-w-md bg-white sm:rounded-2xl shadow-2xl sm:max-h-[92dvh] flex flex-col"
         onClick={e => e.stopPropagation()}
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
@@ -116,11 +120,29 @@ export default function CONavModal({ onClose, onNavigate }) {
             </button>
           </div>
 
-          {/* Job picker (search + list) */}
+          {/* Job picker (open/closed filter + search + list) */}
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
               Select Job
             </label>
+            <div className="flex gap-2 mb-2">
+              {['open', 'closed'].map(s => (
+                <button
+                  key={s}
+                  onClick={() => {
+                    setStatusFilter(s)
+                    setJobId('')
+                  }}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                    statusFilter === s
+                      ? 'bg-green-700 text-white border-green-700'
+                      : 'bg-gray-50 text-gray-600 border-gray-200'
+                  }`}
+                >
+                  {s === 'open' ? 'Open Jobs' : 'Closed Jobs'}
+                </button>
+              ))}
+            </div>
             <input
               ref={searchRef}
               type="text"

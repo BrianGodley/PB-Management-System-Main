@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { fetchAllPaginated } from '../lib/fetchAll'
 import { useLang } from '../contexts/LanguageContext'
@@ -10,14 +11,17 @@ const today = () => new Date().toISOString().split('T')[0]
 export default function TimeClockPage() {
   const { t } = useLang()
   const { user } = useAuth()
+  const [searchParams] = useSearchParams()
+  const jobParam = searchParams.get('job')
   const [jobs, setJobs] = useState([])
-  const [selectedJob, setSelectedJob] = useState('all')
+  const [selectedJob, setSelectedJob] = useState(jobParam || 'all')
   const [loading, setLoading] = useState(true)
 
   // Searchable job picker state.
   const [query, setQuery] = useState('')
   const [showList, setShowList] = useState(false)
-  const autoApplied = useRef(false) // only auto-pick the scheduled job once
+  // Skip the schedule-based auto-pick if a job was passed in the URL.
+  const autoApplied = useRef(!!jobParam)
 
   const jobLabel = j => j.name || j.client_name || 'Untitled job'
 

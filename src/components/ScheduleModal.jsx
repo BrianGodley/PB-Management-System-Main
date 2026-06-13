@@ -9,6 +9,7 @@
 //                 defaults scrolled to today.
 
 import { useState, useEffect, useMemo, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 const WD_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -36,9 +37,16 @@ function dayLabel(s) {
 }
 
 export default function ScheduleModal({ onClose }) {
+  const navigate = useNavigate()
   const [view, setView] = useState('list') // 'list' | 'month'
   const [jobs, setJobs] = useState([])
+  const [crews, setCrews] = useState([])
+  const [subs, setSubs] = useState([])
+  const [activeItem, setActiveItem] = useState(null) // tapped schedule item
   const [selectedJob, setSelectedJob] = useState('all')
+  const [jobStatusFilter, setJobStatusFilter] = useState('open') // 'open' | 'closed'
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [jobQuery, setJobQuery] = useState('')
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [monthCursor, setMonthCursor] = useState(() => {
@@ -49,19 +57,45 @@ export default function ScheduleModal({ onClose }) {
   const todayRef = useRef(null)
   const scrollRef = useRef(null)
 
-  // Jobs for the picker + name lookup.
+  // Jobs (incl. address for the map), crews + subs for name lookups.
   useEffect(() => {
     supabase
       .from('jobs')
-      .select('id, name, client_name, status')
+      .select('id, name, client_name, status, job_address, job_city, job_state, job_zip, lat, lon')
       .order('name')
       .then(({ data }) => setJobs(data || []))
+    supabase
+      .from('crews')
+      .select('id, label')
+      .then(({ data }) => setCrews(data || []))
+    supabase
+      .from('subs_vendors')
+      .select('id, company_name')
+      .eq('type', 'sub')
+      .then(({ data }) => setSubs(data || []))
   }, [])
   const jobMap = useMemo(() => {
     const m = {}
     for (const j of jobs) m[j.id] = j.name || j.client_name || 'Job'
     return m
   }, [jobs])
+  const jobById = useMemo(() => Object.fromEntries(jobs.map(j => [j.id, j])), [jobs])
+  const crewById = useMemo(() => Object.fromEntries(crews.map(c => [c.id, c])), [crews])
+  const subById = useMemo(() => Object.fromEntries(subs.map(s => [s.id, s])), [subs])
+
+  const jobIsOpen = j => j.status === 'active' || j.status === 'on_hold' || !j.status
+  const pickerJobs = useMemo(() => {
+    const q = jobQuery.trim().toLowerCase()
+    return jobs.filter(j => {
+      if (jobStatusFilter === 'open' ? !jobIsOpen(j) : jobIsOpen(j)) return false
+      if (!q) return true
+      return (
+        (j.name || '').toLowerCase().includes(q) ||
+        (j.client_name || '').toLowerCase().includes(q)
+      )
+    })
+  }, [jobs, jobQuery, jobStatusFilter])
+  const selectedJobLabel = selectedJob === 'all' ? 'All Jobs' : jobMap[selectedJob] || 'Select job'
 
   // Fetch schedule items for the active range.
   useEffect(() => {
@@ -139,20 +173,79 @@ export default function ScheduleModal({ onClose }) {
         </button>
       </div>
 
-      {/* Job picker */}
+      {/* Open / Closed job filter (above the picker) */}
       <div className="px-4 pt-3 flex-shrink-0">
-        <select
-          value={selectedJob}
-          onChange={e => setSelectedJob(e.target.value)}
-          className="input text-sm w-full"
-        >
-          <option value="all">All Jobs</option>
-          {jobs.map(j => (
-            <option key={j.id} value={j.id}>
-              {j.name || j.client_name}
-            </option>
+        <div className="flex gap-2 mb-2">
+          {['open', 'closed'].map(s => (
+            <button
+              key={s}
+              onClick={() => setJobStatusFilter(s)}
+              className={`flex-1 py-1 rounded-md text-[11px] font-semibold border transition-colors ${
+                jobStatusFilter === s
+                  ? 'bg-green-700 text-white border-green-700'
+                  : 'bg-gray-50 text-gray-600 border-gray-200'
+              }`}
+            >
+              {s === 'open' ? 'Open Jobs' : 'Closed Jobs'}
+            </button>
           ))}
-        </select>
+        </div>
+
+        {/* Searchable job picker (dropdown + search) */}
+        <button
+          onClick={() => setPickerOpen(v => !v)}
+          className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white"
+        >
+          <span className="truncate text-gray-800">{selectedJobLabel}</span>
+          <span className="text-gray-400">{pickerOpen ? '▲' : '▼'}</span>
+        </button>
+        {pickerOpen && (
+          <div className="mt-1 rounded-lg border border-gray-200 shadow-sm bg-white">
+            <input
+              autoFocus
+              type="text"
+              value={jobQuery}
+              onChange={e => setJobQuery(e.target.value)}
+              placeholder="Search jobs…"
+              className="w-full px-3 py-2 border-b border-gray-100 text-sm focus:outline-none"
+            />
+            <div className="max-h-56 overflow-y-auto divide-y divide-gray-100">
+              <button
+                onClick={() => {
+                  setSelectedJob('all')
+                  setPickerOpen(false)
+                  setJobQuery('')
+                }}
+                className={`w-full text-left px-3 py-2 text-sm ${
+                  selectedJob === 'all' ? 'bg-green-50 text-green-800' : 'hover:bg-gray-50'
+                }`}
+              >
+                All Jobs
+              </button>
+              {pickerJobs.map(j => (
+                <button
+                  key={j.id}
+                  onClick={() => {
+                    setSelectedJob(j.id)
+                    setPickerOpen(false)
+                    setJobQuery('')
+                  }}
+                  className={`w-full text-left px-3 py-2 text-sm ${
+                    selectedJob === j.id ? 'bg-green-50 text-green-800' : 'hover:bg-gray-50'
+                  }`}
+                >
+                  <span className="block truncate">{j.name || j.client_name}</span>
+                  {j.client_name && j.name && (
+                    <span className="block text-xs text-gray-400 truncate">{j.client_name}</span>
+                  )}
+                </button>
+              ))}
+              {pickerJobs.length === 0 && (
+                <p className="px-3 py-3 text-sm text-gray-400 text-center">No jobs found</p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* View toggle — small docked buttons */}
@@ -201,9 +294,26 @@ export default function ScheduleModal({ onClose }) {
             todayStr={todayStr}
             todayRef={todayRef}
             selectedJob={selectedJob}
+            onItemClick={setActiveItem}
           />
         )}
       </div>
+
+      {/* Day Schedule item detail */}
+      {activeItem && (
+        <DayItemModal
+          item={activeItem}
+          job={jobById[activeItem.job_id]}
+          crew={activeItem.crew_id ? crewById[activeItem.crew_id] : null}
+          sub={activeItem.sub_id ? subById[activeItem.sub_id] : null}
+          onClose={() => setActiveItem(null)}
+          onGo={url => {
+            setActiveItem(null)
+            onClose()
+            navigate(url)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -294,7 +404,7 @@ function MonthView({ monthCursor, setMonthCursor, selectedJob, itemsOnDay, today
 }
 
 // ── List by Day (sticky day sections) ──────────────────────────────────────
-function ListView({ listDays, itemsOnDay, jobMap, todayStr, todayRef, selectedJob }) {
+function ListView({ listDays, itemsOnDay, jobMap, todayStr, todayRef, selectedJob, onItemClick }) {
   if (listDays.length === 0) {
     return <p className="py-12 text-center text-sm text-gray-400">No scheduled work.</p>
   }
@@ -321,9 +431,10 @@ function ListView({ listDays, itemsOnDay, jobMap, todayStr, todayRef, selectedJo
                 <p className="text-xs text-gray-400 italic px-1 py-1">No jobs scheduled.</p>
               ) : (
                 dayItems.map(it => (
-                  <div
+                  <button
                     key={it.id}
-                    className={`bg-white rounded-xl p-3 shadow-sm flex items-start gap-3 ${
+                    onClick={() => onItemClick(it)}
+                    className={`w-full text-left bg-white rounded-xl p-3 shadow-sm flex items-start gap-3 active:bg-gray-50 ${
                       it.needs_crew ? 'border-2 border-amber-400 bg-amber-50' : 'border border-gray-200'
                     }`}
                   >
@@ -366,13 +477,86 @@ function ListView({ listDays, itemsOnDay, jobMap, todayStr, todayRef, selectedJo
                         </p>
                       )}
                     </div>
-                  </div>
+                  </button>
                 ))
               )}
             </div>
           </div>
         )
       })}
+    </div>
+  )
+}
+
+// ── Day Schedule item detail (crew/subs, job, map, time clock, daily log) ───
+function jobMapHref(job) {
+  if (!job) return null
+  if (job.lat != null && job.lon != null) {
+    return `https://www.google.com/maps/?q=${job.lat},${job.lon}`
+  }
+  const addr = [job.job_address, job.job_city, job.job_state, job.job_zip]
+    .filter(Boolean)
+    .join(', ')
+  return addr ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}` : null
+}
+
+function DayItemModal({ item, job, crew, sub, onClose, onGo }) {
+  const jobName = job ? job.name || job.client_name : 'Job'
+  const mapHref = jobMapHref(job)
+  const crewSub = crew ? `Crew ${crew.label}` : sub ? sub.company_name : null
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/50" onClick={onClose}>
+      <div
+        className="w-full sm:max-w-sm bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl"
+        onClick={e => e.stopPropagation()}
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        {/* Header: crew / subs + assignees */}
+        <div className="px-5 pt-4 pb-3 border-b border-gray-100">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-lg font-bold text-gray-900 leading-tight">
+                {crewSub || item.title || 'Scheduled work'}
+              </p>
+              {item.assignees && (
+                <p className="text-sm text-gray-600 mt-0.5">{item.assignees}</p>
+              )}
+              {/* Small-font job name */}
+              <p className="text-xs text-purple-600 font-medium mt-1">{jobName}</p>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 flex-shrink-0 rounded-full text-gray-400 hover:bg-gray-100 flex items-center justify-center text-lg"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="px-5 py-4 space-y-2">
+          <button
+            onClick={() => mapHref && window.open(mapHref, '_blank')}
+            disabled={!mapHref}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+          >
+            <span className="text-lg">🗺️</span> View on map
+          </button>
+          <button
+            onClick={() => onGo(`/timeclock?job=${item.job_id}`)}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            <span className="text-lg">⏱️</span> Time clock
+          </button>
+          <button
+            onClick={() => onGo(`/daily-logs?new=1&job=${item.job_id}`)}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            <span className="text-lg">📝</span> Add daily log
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

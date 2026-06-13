@@ -9,7 +9,7 @@ export default function DailyLogsPage() {
   const { t } = useLang()
   const [searchParams] = useSearchParams()
   const [jobs, setJobs] = useState([])
-  const [selectedJob, setSelectedJob] = useState('all')
+  const [selectedJob, setSelectedJob] = useState(searchParams.get('job') || 'all')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
