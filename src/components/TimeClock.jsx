@@ -125,6 +125,48 @@ function fmtDistance(m) {
   return `${(ft / 5280).toFixed(2)} mi`
 }
 
+// Of the known locations (jobsite + company addresses), which was the clock
+// point closest to? Returns { name, meters } or null when we can't tell.
+function closestLocation(lat, lon, candidates) {
+  if (lat == null || lon == null) return null
+  let best = null
+  for (const c of candidates) {
+    if (c.lat == null || c.lon == null) continue
+    const m = distanceMeters(Number(lat), Number(lon), Number(c.lat), Number(c.lon))
+    if (best == null || m < best.meters) best = { name: c.name, meters: m }
+  }
+  return best
+}
+
+// Lazy-load Leaflet from CDN once for the location map popup (no build dep).
+let leafletPromise = null
+function loadLeaflet() {
+  if (typeof window !== 'undefined' && window.L) return Promise.resolve(window.L)
+  if (leafletPromise) return leafletPromise
+  leafletPromise = new Promise((resolve, reject) => {
+    if (!document.getElementById('leaflet-css')) {
+      const link = document.createElement('link')
+      link.id = 'leaflet-css'
+      link.rel = 'stylesheet'
+      link.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'
+      document.head.appendChild(link)
+    }
+    if (!document.getElementById('cl-pin-style')) {
+      const st = document.createElement('style')
+      st.id = 'cl-pin-style'
+      st.textContent = '.leaflet-div-icon.cl-pin{background:transparent;border:none;}'
+      document.head.appendChild(st)
+    }
+    const s = document.createElement('script')
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js'
+    s.async = true
+    s.onload = () => resolve(window.L)
+    s.onerror = reject
+    document.body.appendChild(s)
+  })
+  return leafletPromise
+}
+
 // Promise-wrapped navigator.geolocation with an 8s timeout. Resolves with
 // { ok: true, lat, lon, accuracy } on success or { ok: false, reason } on
 // denial / timeout / unsupported. Never rejects, so callers don't need
@@ -309,7 +351,7 @@ function buildMapHref({ lat, lon, jobLat, jobLon }) {
 
 // One row of the dedicated GPS column — a labeled status pill plus a tiny
 // pin icon that opens the captured location in Google Maps.
-function GpsLine({ label, onSite, noGps, distanceM, lat, lon, jobLat, jobLon }) {
+function GpsLine({ label, onSite, noGps, distanceM, lat, lon, jobLat, jobLon, onMap }) {
   let cls = 'text-gray-400 bg-gray-50'
   let text = '—'
   if (noGps) {
@@ -326,7 +368,7 @@ function GpsLine({ label, onSite, noGps, distanceM, lat, lon, jobLat, jobLon }) 
     text = 'No job loc'
   }
 
-  const href = buildMapHref({ lat, lon, jobLat, jobLon })
+  const hasLoc = lat != null && lon != null
 
   return (
     <div className="flex items-center gap-1 text-[10px] whitespace-nowrap leading-tight">
@@ -334,18 +376,17 @@ function GpsLine({ label, onSite, noGps, distanceM, lat, lon, jobLat, jobLon }) 
         {label}
       </span>
       <span className={`px-1.5 py-0.5 rounded font-semibold ${cls}`}>{text}</span>
-      {href && (
-        <a
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          title="Open in Google Maps"
+      {hasLoc && (
+        <button
+          type="button"
+          onClick={() => onMap && onMap({ lat, lon, label, jobLat, jobLon })}
+          title="View location on map"
           className="text-gray-400 hover:text-blue-600 flex-shrink-0"
         >
-          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z" />
           </svg>
-        </a>
+        </button>
       )}
     </div>
   )
@@ -354,7 +395,7 @@ function GpsLine({ label, onSite, noGps, distanceM, lat, lon, jobLat, jobLon }) 
 // Dedicated GPS cell — stacks the clock-in and (if present) clock-out
 // GpsLines so supervisors can see at a glance whether each side was on/off
 // site and jump to a map of where the employee was.
-function GpsCell({ entry, jobLoc }) {
+function GpsCell({ entry, jobLoc, onMap }) {
   const jobLat = jobLoc?.lat ?? null
   const jobLon = jobLoc?.lon ?? null
   return (
@@ -368,6 +409,7 @@ function GpsCell({ entry, jobLoc }) {
         lon={entry.clock_in_lon}
         jobLat={jobLat}
         jobLon={jobLon}
+        onMap={onMap}
       />
       {entry.time_out && (
         <GpsLine
@@ -379,8 +421,133 @@ function GpsCell({ entry, jobLoc }) {
           lon={entry.clock_out_lon}
           jobLat={jobLat}
           jobLon={jobLon}
+          onMap={onMap}
         />
       )}
+    </div>
+  )
+}
+
+// Proximity cell — for clock-in (and clock-out), which known location was the
+// employee closest to: the Jobsite, Main Office, or Truck Yard, and how far.
+function ProximityCell({ entry, jobLoc, companyLocs }) {
+  const candidates = [
+    { name: 'Jobsite', lat: jobLoc?.lat ?? null, lon: jobLoc?.lon ?? null },
+    { name: 'Main Office', lat: companyLocs?.office?.lat ?? null, lon: companyLocs?.office?.lon ?? null },
+    { name: 'Truck Yard', lat: companyLocs?.yard?.lat ?? null, lon: companyLocs?.yard?.lon ?? null },
+  ]
+  const inC = closestLocation(entry.clock_in_lat, entry.clock_in_lon, candidates)
+  const outC = entry.time_out
+    ? closestLocation(entry.clock_out_lat, entry.clock_out_lon, candidates)
+    : null
+
+  const Line = ({ label, c }) => (
+    <div className="flex items-center gap-1 text-[10px] whitespace-nowrap leading-tight">
+      <span className="text-gray-400 font-semibold uppercase tracking-wide w-5 flex-shrink-0">
+        {label}
+      </span>
+      {c ? (
+        <span className="text-gray-700">
+          <span className="font-semibold">{c.name}</span> · {fmtDistance(c.meters)}
+        </span>
+      ) : (
+        <span className="text-gray-300">—</span>
+      )}
+    </div>
+  )
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <Line label="In" c={inC} />
+      {entry.time_out && <Line label="Out" c={outC} />}
+    </div>
+  )
+}
+
+// Large popup: a Leaflet map with a pin at the captured clock location, the
+// reverse-geocoded address, and whether it was the clock-in or clock-out.
+function LocationMapModal({ lat, lon, label, jobLat, jobLon, onClose }) {
+  const mapEl = useRef(null)
+  const mapObj = useRef(null)
+  const [addr, setAddr] = useState('')
+
+  useEffect(() => {
+    if (lat == null || lon == null) return
+    let alive = true
+    ;(async () => {
+      try {
+        const L = await loadLeaflet()
+        if (!alive || !mapEl.current || mapObj.current) return
+        const map = L.map(mapEl.current, { attributionControl: false }).setView([lat, lon], 16)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map)
+        const pin = L.divIcon({
+          className: 'cl-pin',
+          html: '<div style="font-size:46px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))">📍</div>',
+          iconSize: [46, 46],
+          iconAnchor: [23, 44],
+        })
+        L.marker([lat, lon], { icon: pin }).addTo(map)
+        if (jobLat != null && jobLon != null) {
+          L.circleMarker([jobLat, jobLon], {
+            radius: 7,
+            color: '#2563eb',
+            weight: 2,
+            fillColor: '#3b82f6',
+            fillOpacity: 0.6,
+          })
+            .addTo(map)
+            .bindTooltip('Job site')
+        }
+        mapObj.current = map
+        setTimeout(() => mapObj.current && mapObj.current.invalidateSize(), 250)
+      } catch {
+        /* map optional */
+      }
+      try {
+        const r = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`,
+          { headers: { Accept: 'application/json' } }
+        ).then(res => res.json())
+        if (alive) setAddr(r.display_name || '')
+      } catch {
+        /* address optional */
+      }
+    })()
+    return () => {
+      alive = false
+      if (mapObj.current) {
+        mapObj.current.remove()
+        mapObj.current = null
+      }
+    }
+  }, [lat, lon, jobLat, jobLon])
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4"
+      onClick={e => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92dvh] flex flex-col overflow-hidden">
+        <div className="flex items-start justify-between px-5 py-3 border-b border-gray-100 gap-3">
+          <div className="min-w-0">
+            <h3 className="font-bold text-gray-900">
+              Clock {label === 'Out' ? 'Out' : 'In'} Location
+            </h3>
+            <p className="text-xs text-gray-500 truncate">{addr || 'Looking up address…'}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-700 text-2xl leading-none flex-shrink-0"
+          >
+            ×
+          </button>
+        </div>
+        <div className="relative" style={{ height: '62vh' }}>
+          <div ref={mapEl} className="absolute inset-0 bg-gray-100" />
+        </div>
+      </div>
     </div>
   )
 }
@@ -392,6 +559,8 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
   const [entries, setEntries] = useState([])
   const [breakMins, setBreakMins] = useState({}) // entryId -> total break minutes
   const [myWeekBreakMins, setMyWeekBreakMins] = useState({}) // entryId -> break minutes (personal week)
+  const [companyLocs, setCompanyLocs] = useState({ office: null, yard: null }) // office/yard coords
+  const [mapModal, setMapModal] = useState(null) // { lat, lon, label, jobLat, jobLon } | null
   const [loading, setLoading] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [editEntry, setEditEntry] = useState(null)
@@ -443,6 +612,27 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
       setEmployeeId(emp?.id || null)
     })()
   }, [user?.id])
+
+  // Company office + truck-yard coordinates for the Proximity column.
+  useEffect(() => {
+    supabase
+      .from('company_settings')
+      .select('main_office_lat, main_office_lon, truck_yard_lat, truck_yard_lon')
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!data) return
+        setCompanyLocs({
+          office:
+            data.main_office_lat != null
+              ? { lat: Number(data.main_office_lat), lon: Number(data.main_office_lon) }
+              : null,
+          yard:
+            data.truck_yard_lat != null
+              ? { lat: Number(data.truck_yard_lat), lon: Number(data.truck_yard_lon) }
+              : null,
+        })
+      })
+  }, [])
 
   // Load payroll week start from company_settings
   useEffect(() => {
@@ -871,6 +1061,9 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
                   <th className="px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left w-44">
                     GPS
                   </th>
+                  <th className="px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left w-40">
+                    Proximity
+                  </th>
                   <th className="px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right w-16">
                     Break
                   </th>
@@ -944,9 +1137,22 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
                         )}
                       </td>
 
-                      {/* GPS — clock-in/out location status + map link */}
+                      {/* GPS — clock-in/out location status + map popup */}
                       <td className="px-3 py-3 align-middle">
-                        <GpsCell entry={entry} jobLoc={jobLocMap[entry.job_id]} />
+                        <GpsCell
+                          entry={entry}
+                          jobLoc={jobLocMap[entry.job_id]}
+                          onMap={setMapModal}
+                        />
+                      </td>
+
+                      {/* Proximity — closest known location to the clock point */}
+                      <td className="px-3 py-3 align-middle">
+                        <ProximityCell
+                          entry={entry}
+                          jobLoc={jobLocMap[entry.job_id]}
+                          companyLocs={companyLocs}
+                        />
                       </td>
 
                       {/* Break — total lunch + short-break minutes for this shift */}
@@ -1093,6 +1299,17 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
                 }
               : null
           }
+        />
+      )}
+
+      {mapModal && (
+        <LocationMapModal
+          lat={mapModal.lat}
+          lon={mapModal.lon}
+          label={mapModal.label}
+          jobLat={mapModal.jobLat}
+          jobLon={mapModal.jobLon}
+          onClose={() => setMapModal(null)}
         />
       )}
     </div>

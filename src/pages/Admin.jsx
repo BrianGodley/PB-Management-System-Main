@@ -1296,6 +1296,15 @@ function CompanySettings({ currentUserIsAdmin }) {
     company_name: '',
     license_number: '',
     labor_rate_per_man_day: '400',
+    main_office_address: '',
+    truck_yard_address: '',
+  })
+  // Geocoded coords for the two addresses (kept out of the form; refreshed on save).
+  const companyCoords = useRef({
+    main_office_lat: null,
+    main_office_lon: null,
+    truck_yard_lat: null,
+    truck_yard_lon: null,
   })
   const [loadingCompany, setLoadingCompany] = useState(true)
   const [savingCompany, setSavingCompany] = useState(false)
@@ -1331,7 +1340,15 @@ function CompanySettings({ currentUserIsAdmin }) {
         company_name: data.company_name || '',
         license_number: data.license_number || '',
         labor_rate_per_man_day: String(data.labor_rate_per_man_day || '400'),
+        main_office_address: data.main_office_address || '',
+        truck_yard_address: data.truck_yard_address || '',
       })
+      companyCoords.current = {
+        main_office_lat: data.main_office_lat ?? null,
+        main_office_lon: data.main_office_lon ?? null,
+        truck_yard_lat: data.truck_yard_lat ?? null,
+        truck_yard_lon: data.truck_yard_lon ?? null,
+      }
       const val = data.week_ending_day ?? null
       setWeekEndingDay(val)
       setPendingDay(val)
@@ -1384,6 +1401,25 @@ function CompanySettings({ currentUserIsAdmin }) {
     setTimeout(() => setLogoMsg(''), 4000)
   }
 
+  // Geocode an address via our edge function (keeps the Google key server-side).
+  async function geocodeAddress(address) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/geocode-address`
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ address }),
+    })
+    const data = await res.json()
+    if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`)
+    return { lat: data.lat, lon: data.lon }
+  }
+
   async function saveCompany(e) {
     e.preventDefault()
     const rate = parseFloat(companyForm.labor_rate_per_man_day)
@@ -1393,6 +1429,38 @@ function CompanySettings({ currentUserIsAdmin }) {
     }
     setSavingCompany(true)
     setCompanyMsg('')
+
+    // Geocode the office + yard addresses (best-effort; keep prior coords on failure).
+    const coords = { ...companyCoords.current }
+    const mainAddr = companyForm.main_office_address.trim()
+    const yardAddr = companyForm.truck_yard_address.trim()
+    let geoWarn = ''
+    try {
+      if (mainAddr) {
+        const g = await geocodeAddress(mainAddr)
+        coords.main_office_lat = g.lat
+        coords.main_office_lon = g.lon
+      } else {
+        coords.main_office_lat = null
+        coords.main_office_lon = null
+      }
+    } catch {
+      geoWarn = ' (could not geocode Main Office address)'
+    }
+    try {
+      if (yardAddr) {
+        const g = await geocodeAddress(yardAddr)
+        coords.truck_yard_lat = g.lat
+        coords.truck_yard_lon = g.lon
+      } else {
+        coords.truck_yard_lat = null
+        coords.truck_yard_lon = null
+      }
+    } catch {
+      geoWarn += ' (could not geocode Truck Yard address)'
+    }
+    companyCoords.current = coords
+
     const { data: existing } = await supabase.from('company_settings').select('id').maybeSingle()
     const { error } = await supabase.from('company_settings').upsert(
       {
@@ -1400,11 +1468,17 @@ function CompanySettings({ currentUserIsAdmin }) {
         company_name: companyForm.company_name.trim(),
         license_number: companyForm.license_number.trim(),
         labor_rate_per_man_day: rate,
+        main_office_address: mainAddr,
+        main_office_lat: coords.main_office_lat,
+        main_office_lon: coords.main_office_lon,
+        truck_yard_address: yardAddr,
+        truck_yard_lat: coords.truck_yard_lat,
+        truck_yard_lon: coords.truck_yard_lon,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'id' }
     )
-    setCompanyMsg(error ? 'error:' + error.message : 'ok:Settings saved.')
+    setCompanyMsg(error ? 'error:' + error.message : 'ok:Settings saved.' + geoWarn)
     setSavingCompany(false)
     setTimeout(() => setCompanyMsg(''), 4000)
   }
@@ -1527,6 +1601,30 @@ function CompanySettings({ currentUserIsAdmin }) {
                 At ${rate.toFixed(2)}/MD that's ${(rate / 8).toFixed(2)}/hr.
               </p>
             )}
+          </div>
+
+          <div>
+            <label className={labelCls}>Main Office Address</label>
+            <input
+              className={inputCls}
+              value={companyForm.main_office_address}
+              onChange={e => setCompanyForm(p => ({ ...p, main_office_address: e.target.value }))}
+              placeholder="12410 Foothill Blvd Unit U, Sylmar, CA 91342"
+              disabled={!currentUserIsAdmin}
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Used by the Time Clock to gauge how close a clock-in was to the office.
+            </p>
+          </div>
+          <div>
+            <label className={labelCls}>Truck Yard Address</label>
+            <input
+              className={inputCls}
+              value={companyForm.truck_yard_address}
+              onChange={e => setCompanyForm(p => ({ ...p, truck_yard_address: e.target.value }))}
+              placeholder="13241 Bradley Ave, Sylmar, CA 91342"
+              disabled={!currentUserIsAdmin}
+            />
           </div>
 
           {companyMsg && <Msg m={companyMsg} />}
