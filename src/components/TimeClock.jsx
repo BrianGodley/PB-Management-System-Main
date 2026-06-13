@@ -1062,10 +1062,10 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
                     Time Out
                   </th>
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left">
-                    Total
+                    OT
                   </th>
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left">
-                    OT
+                    Total
                   </th>
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left w-44">
                     GPS
@@ -1141,11 +1141,6 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
                         )}
                       </td>
 
-                      {/* Total */}
-                      <td className="px-4 py-3 text-left font-mono font-semibold text-gray-800 text-sm">
-                        {isClockedIn ? '' : fmtMins(total)}
-                      </td>
-
                       {/* Overtime */}
                       <td className="px-4 py-3 text-left font-mono text-sm">
                         {!isClockedIn && ot > 0 ? (
@@ -1153,6 +1148,11 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
                         ) : (
                           ''
                         )}
+                      </td>
+
+                      {/* Total */}
+                      <td className="px-4 py-3 text-left font-mono font-semibold text-gray-800 text-sm">
+                        {isClockedIn ? '' : fmtMins(total)}
                       </td>
 
                       {/* GPS — clock-in/out location status + map popup */}
