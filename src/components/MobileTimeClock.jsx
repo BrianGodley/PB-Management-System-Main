@@ -213,31 +213,8 @@ export default function MobileTimeClock() {
         setClockInJob(prev => prev || seen[0] || '') // prefill last job
       }
 
-      // Day + week hours so far (completed shifts). Week start day comes from
-      // company_settings (configurable in HR > Settings > Time Clock).
-      const { data: cs } = await supabase
-        .from('company_settings')
-        .select('payroll_week_start')
-        .maybeSingle()
-      const weekStartDay = cs?.payroll_week_start ?? 0
-      const { weekStart, weekEnd } = getWeekRange(weekStartDay)
-      const wkStart = dStr(weekStart)
-      const wkEnd = dStr(weekEnd)
-      let totQ = supabase.from('time_entries').select('date, time_in, time_out')
-      totQ = eid ? totQ.eq('employee_id', eid) : totQ.eq('created_by', user.id)
-      const { data: totRows } = await totQ.gte('date', wkStart).lte('date', wkEnd)
-      const today = dStr(new Date())
-      let dMin = 0
-      let wMin = 0
-      for (const r of totRows || []) {
-        const mins = diffMins(r.time_in, r.time_out)
-        wMin += mins
-        if (r.date === today) dMin += mins
-      }
-      if (alive) {
-        setDayMins(dMin)
-        setWeekMins(wMin)
-      }
+      // Day + week hours so far (completed shifts).
+      await refreshTotals(eid)
      } catch (err) {
        if (alive) setError(err?.message || 'Failed to load time clock.')
      } finally {
@@ -249,6 +226,30 @@ export default function MobileTimeClock() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id])
+
+  // Recompute Day's / Weekly totals from completed shifts (call after clock-out).
+  async function refreshTotals(eidArg) {
+    const eid = eidArg !== undefined ? eidArg : meId
+    const { data: cs } = await supabase
+      .from('company_settings')
+      .select('payroll_week_start')
+      .maybeSingle()
+    const weekStartDay = cs?.payroll_week_start ?? 0
+    const { weekStart, weekEnd } = getWeekRange(weekStartDay)
+    let totQ = supabase.from('time_entries').select('date, time_in, time_out')
+    totQ = eid ? totQ.eq('employee_id', eid) : totQ.eq('created_by', user.id)
+    const { data: totRows } = await totQ.gte('date', dStr(weekStart)).lte('date', dStr(weekEnd))
+    const today = dStr(new Date())
+    let dMin = 0
+    let wMin = 0
+    for (const r of totRows || []) {
+      const mins = diffMins(r.time_in, r.time_out)
+      wMin += mins
+      if (r.date === today) dMin += mins
+    }
+    setDayMins(dMin)
+    setWeekMins(wMin)
+  }
 
   async function refreshEntries(eid, name) {
     const d = todayStr()
@@ -349,6 +350,7 @@ export default function MobileTimeClock() {
     setMyEntry(null)
     setMyBreaks([])
     setScreen('clockin')
+    await refreshTotals() // fold the just-finished shift into Day's/Weekly totals
     setBusy(false)
   }
 
