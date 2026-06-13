@@ -3,7 +3,6 @@ import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { sendWelcomeEmail, sendSMS, sendFeedbackStatusEmail } from '../lib/notify'
-import StartLocationsCard from '../components/StartLocationsCard'
 
 const FG = '#3A5038'
 
@@ -1296,6 +1295,8 @@ function CompanySettings({ currentUserIsAdmin }) {
     company_name: '',
     license_number: '',
     labor_rate_per_man_day: '400',
+    main_phone: '',
+    pbs_system_phone: '',
     main_office_address: '',
     truck_yard_address: '',
   })
@@ -1340,6 +1341,8 @@ function CompanySettings({ currentUserIsAdmin }) {
         company_name: data.company_name || '',
         license_number: data.license_number || '',
         labor_rate_per_man_day: String(data.labor_rate_per_man_day || '400'),
+        main_phone: data.main_phone || '',
+        pbs_system_phone: data.pbs_system_phone || '',
         main_office_address: data.main_office_address || '',
         truck_yard_address: data.truck_yard_address || '',
       })
@@ -1468,6 +1471,8 @@ function CompanySettings({ currentUserIsAdmin }) {
         company_name: companyForm.company_name.trim(),
         license_number: companyForm.license_number.trim(),
         labor_rate_per_man_day: rate,
+        main_phone: companyForm.main_phone.trim(),
+        pbs_system_phone: companyForm.pbs_system_phone.trim(),
         main_office_address: mainAddr,
         main_office_lat: coords.main_office_lat,
         main_office_lon: coords.main_office_lon,
@@ -1548,7 +1553,7 @@ function CompanySettings({ currentUserIsAdmin }) {
     )
 
   return (
-    <div className="max-w-xl space-y-4">
+    <div className="max-w-4xl space-y-4">
       {!currentUserIsAdmin && (
         <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm px-4 py-3 rounded-xl">
           ⚠️ Only admins can change these settings.
@@ -1578,6 +1583,30 @@ function CompanySettings({ currentUserIsAdmin }) {
               placeholder="e.g. CA-12345"
               disabled={!currentUserIsAdmin}
             />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Main Phone</label>
+              <input
+                className={inputCls}
+                type="tel"
+                value={companyForm.main_phone}
+                onChange={e => setCompanyForm(p => ({ ...p, main_phone: e.target.value }))}
+                placeholder="(555) 123-4567"
+                disabled={!currentUserIsAdmin}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>PBS System Phone</label>
+              <input
+                className={inputCls}
+                type="tel"
+                value={companyForm.pbs_system_phone}
+                onChange={e => setCompanyForm(p => ({ ...p, pbs_system_phone: e.target.value }))}
+                placeholder="(555) 123-4567"
+                disabled={!currentUserIsAdmin}
+              />
+            </div>
           </div>
           <div>
             <label className={labelCls}>Labor Rate — Per Man Day (1 MD = 8 hrs)</label>
@@ -1640,6 +1669,52 @@ function CompanySettings({ currentUserIsAdmin }) {
             </button>
           )}
         </form>
+
+        {/* Company logo — combined into Company Info */}
+        <div className="mt-6 pt-5 border-t border-gray-100">
+          <h4 className="font-semibold text-gray-800 mb-1">🖼️ Company Logo</h4>
+          <p className="text-sm text-gray-500 mb-4">
+            Used as the app icon (favicon) in the browser tab. PNG, JPG, SVG or WebP recommended.
+          </p>
+          <div className="flex items-center gap-4">
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt="Company logo"
+                className="h-16 w-16 object-contain rounded-lg border border-gray-200 bg-gray-50 p-1"
+              />
+            ) : (
+              <div className="h-16 w-16 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-300 text-2xl">
+                🖼️
+              </div>
+            )}
+            <div className="flex-1">
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/svg+xml,image/webp"
+                className="hidden"
+                onChange={e => uploadLogo(e.target.files?.[0])}
+                disabled={!currentUserIsAdmin}
+              />
+              {currentUserIsAdmin && (
+                <button
+                  onClick={() => logoInputRef.current?.click()}
+                  disabled={uploadingLogo}
+                  className="px-4 py-2 rounded-xl text-sm font-bold text-white disabled:opacity-50"
+                  style={{ backgroundColor: FG }}
+                >
+                  {uploadingLogo ? 'Uploading…' : logoUrl ? 'Replace Logo' : 'Upload Logo'}
+                </button>
+              )}
+              {logoMsg && (
+                <div className="mt-2">
+                  <Msg m={logoMsg} />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* ── GP explanation ────────────────────────────────────────────────── */}
@@ -1736,52 +1811,6 @@ function CompanySettings({ currentUserIsAdmin }) {
           !companyWeekMsg && <p className="text-xs text-gray-400 mt-2">No changes to save.</p>}
       </div>
 
-      {/* ── Company Logo ─────────────────────────────────────────────────── */}
-      <div className="card">
-        <h3 className="font-semibold text-gray-800 mb-1">🖼️ Company Logo</h3>
-        <p className="text-sm text-gray-500 mb-4">
-          Used as the app icon (favicon) in the browser tab. PNG, JPG, SVG or WebP recommended.
-        </p>
-        <div className="flex items-center gap-4">
-          {logoUrl ? (
-            <img
-              src={logoUrl}
-              alt="Company logo"
-              className="h-16 w-16 object-contain rounded-lg border border-gray-200 bg-gray-50 p-1"
-            />
-          ) : (
-            <div className="h-16 w-16 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-300 text-2xl">
-              🖼️
-            </div>
-          )}
-          <div className="flex-1">
-            <input
-              ref={logoInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/gif,image/svg+xml,image/webp"
-              className="hidden"
-              onChange={e => uploadLogo(e.target.files?.[0])}
-              disabled={!currentUserIsAdmin}
-            />
-            {currentUserIsAdmin && (
-              <button
-                onClick={() => logoInputRef.current?.click()}
-                disabled={uploadingLogo}
-                className="px-4 py-2 rounded-xl text-sm font-bold text-white disabled:opacity-50"
-                style={{ backgroundColor: FG }}
-              >
-                {uploadingLogo ? 'Uploading…' : logoUrl ? 'Replace Logo' : 'Upload Logo'}
-              </button>
-            )}
-            {logoMsg && (
-              <div className="mt-2">
-                <Msg m={logoMsg} />
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* ── Period reference ──────────────────────────────────────────────── */}
       <div className="card bg-gray-50 border-gray-200">
         <h3 className="font-semibold text-gray-700 mb-3 text-sm">
@@ -1808,8 +1837,6 @@ function CompanySettings({ currentUserIsAdmin }) {
         </div>
       </div>
 
-      {/* ── Schedule Assistant: Start Locations ──────────────────────── */}
-      <StartLocationsCard currentUserIsAdmin={currentUserIsAdmin} />
     </div>
   )
 }
@@ -3922,7 +3949,7 @@ function FeedbackInbox() {
 
 export default function Admin() {
   const { user } = useAuth()
-  const [tab, setTab] = useState('overview')
+  const [tab, setTab] = useState('settings')
 
   // ── Overview state ─────────────────────────────────────────────────────────
   const [counts, setCounts] = useState({
@@ -3977,9 +4004,7 @@ export default function Admin() {
   const currentUserIsAdmin = currentUserRole === 'admin' || currentUserRole === 'super_admin'
 
   const tabs = [
-    { key: 'overview', label: 'Overview' },
     { key: 'settings', label: 'Company Settings' },
-    { key: 'feedback', label: '📬 Feedback Inbox' },
     { key: 'sms', label: '📱 SMS Settings' },
     { key: 'email', label: '✉️ Email Settings' },
     { key: 'integrations', label: '🔗 Integrations' },
@@ -4038,81 +4063,62 @@ export default function Admin() {
         ))}
       </div>
 
-      {/* ── OVERVIEW TAB ──────────────────────────────────────────────────── */}
-      {tab === 'overview' &&
-        (loadingOverview ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-700"></div>
-          </div>
-        ) : (
-          <>
-            {/* Stat cards */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-              {statCards.map(s => (
-                <div key={s.label} className={`card border ${s.color} text-center`}>
-                  <p className="text-3xl mb-2">{s.icon}</p>
-                  <p className="text-2xl font-bold text-gray-900">{s.value}</p>
-                  <p className="text-xs text-gray-500 mt-1">{s.label}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Quick links */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div className="card">
-                <h2 className="font-semibold text-gray-900 mb-2">Supabase Dashboard</h2>
-                <p className="text-sm text-gray-500 mb-4">
-                  Manage auth users, view raw tables, and run SQL queries.
-                </p>
-                <a
-                  href="https://supabase.com/dashboard/project/jjlnpywpmoukgwmwczbz/auth/users"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-primary inline-flex items-center gap-2"
-                >
-                  👤 Auth Users
-                </a>
-                <a
-                  href="https://supabase.com/dashboard/project/jjlnpywpmoukgwmwczbz/editor"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-secondary inline-flex items-center gap-2 ml-2"
-                >
-                  🗄️ SQL Editor
-                </a>
-              </div>
-
-              <div className="card bg-gray-50 border-gray-200">
-                <h2 className="font-semibold text-gray-900 mb-3">App Info</h2>
-                <div className="text-sm text-gray-600 space-y-1">
-                  <p>
-                    <span className="font-medium">Supabase Project:</span> jjlnpywpmoukgwmwczbz
-                  </p>
-                  <p>
-                    <span className="font-medium">Version:</span> 1.0.0
-                  </p>
-                  <p>
-                    <span className="font-medium">Stack:</span> React + Vite + Supabase + Tailwind
-                  </p>
-                  <p>
-                    <span className="font-medium">Logged in as:</span> {user?.email}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </>
-        ))}
-
       {/* ── SETTINGS TAB ──────────────────────────────────────────────────── */}
       {tab === 'settings' && <CompanySettings currentUserIsAdmin={currentUserIsAdmin} />}
-
-      {tab === 'feedback' && <FeedbackInbox />}
 
       {tab === 'sms' && <SmsSettings />}
 
       {tab === 'email' && <EmailSettings />}
 
-      {tab === 'integrations' && <IntegrationsSettings />}
+      {tab === 'integrations' && (
+        <div className="space-y-4">
+          {/* Supabase dashboard + app info (moved here from the old Overview) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="card">
+              <h2 className="font-semibold text-gray-900 mb-2">Supabase Dashboard</h2>
+              <p className="text-sm text-gray-500 mb-4">
+                Manage auth users, view raw tables, and run SQL queries.
+              </p>
+              <a
+                href="https://supabase.com/dashboard/project/jjlnpywpmoukgwmwczbz/auth/users"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-primary inline-flex items-center gap-2"
+              >
+                👤 Auth Users
+              </a>
+              <a
+                href="https://supabase.com/dashboard/project/jjlnpywpmoukgwmwczbz/editor"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-secondary inline-flex items-center gap-2 ml-2"
+              >
+                🗄️ SQL Editor
+              </a>
+            </div>
+
+            <div className="card bg-gray-50 border-gray-200">
+              <h2 className="font-semibold text-gray-900 mb-3">App Info</h2>
+              <div className="text-sm text-gray-600 space-y-1">
+                <p>
+                  <span className="font-medium">Supabase Project:</span> jjlnpywpmoukgwmwczbz
+                </p>
+                <p>
+                  <span className="font-medium">Version:</span> 1.0.0
+                </p>
+                <p>
+                  <span className="font-medium">Stack:</span> React + Vite + Supabase + Tailwind
+                </p>
+                <p>
+                  <span className="font-medium">Logged in as:</span> {user?.email}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <IntegrationsSettings />
+        </div>
+      )}
     </div>
   )
 }

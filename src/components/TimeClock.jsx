@@ -1046,31 +1046,31 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left">
                     Date
                   </th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left">
+                  <th className="pl-4 pr-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left">
                     Employee
                   </th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left">
+                  <th className="pl-1 pr-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left">
                     Job
                   </th>
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left">
                     Time In
                   </th>
-                  <th className="px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right w-16">
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left">
                     Break
                   </th>
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left">
                     Time Out
                   </th>
-                  <th className="px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right w-16">
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left">
                     Total
                   </th>
-                  <th className="px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right w-16">
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left">
                     OT
                   </th>
-                  <th className="px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left w-44">
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left w-44">
                     GPS
                   </th>
-                  <th className="px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left w-40">
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left w-40">
                     Proximity
                   </th>
                 </tr>
