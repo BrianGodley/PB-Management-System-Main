@@ -506,8 +506,7 @@ export default function MobileTimeClock() {
         </p>
         {entries.map(entry => {
           const breaks = breaksByEntry[entry.id] || []
-          const { deduct, active } = breakInfo(breaks, now)
-          const worked = now - entryStartMs(entry) - deduct
+          const { active } = breakInfo(breaks, now)
           const isMe =
             (meId && entry.employee_id === meId) || entry.employee_name === meName
           return (
@@ -517,12 +516,10 @@ export default function MobileTimeClock() {
                   {entry.employee_name}
                   {isMe ? ' (You)' : ''}
                 </p>
-                {/* Job name + elapsed time on one line, same text size. */}
+                {/* Job name + clock-in time on one line, same text size. */}
                 <p className="text-xs text-purple-600 truncate">
                   {jobName(entry.job_id)}{' '}
-                  <span className="text-green-700 font-semibold tabular-nums">
-                    · {fmtHMS(worked)}
-                  </span>
+                  <span className="text-gray-500">· in at {fmt12h(entry.time_in)}</span>
                 </p>
               </div>
               {active && (

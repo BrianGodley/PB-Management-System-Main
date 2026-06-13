@@ -168,7 +168,7 @@ export default function TimeClockPage() {
             <div className="hidden lg:block">
               <TimeClock jobs={jobs} selectedJob={selectedJob} />
             </div>
-            <div className="lg:hidden">
+            <div className="lg:hidden h-full">
               <MobileTimeClock />
             </div>
           </>
