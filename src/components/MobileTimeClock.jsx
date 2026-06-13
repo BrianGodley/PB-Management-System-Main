@@ -108,10 +108,12 @@ export default function MobileTimeClock() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [dayMins, setDayMins] = useState(0)
   const [weekMins, setWeekMins] = useState(0)
-  const [myEntry, setMyEntry] = useState(null)
-  const [myBreaks, setMyBreaks] = useState([])
-  const [multiEntries, setMultiEntries] = useState([])
-  const [screen, setScreen] = useState('clockin') // clockin|pick-job|running|switch|multi-setup|multi-view
+  // All of the current user's active (open) entries today — their own plus
+  // anyone they clocked in. One unified running interface lists them all.
+  const [entries, setEntries] = useState([])
+  const [breaksByEntry, setBreaksByEntry] = useState({}) // entryId -> [breaks]
+  const [switchEntryId, setSwitchEntryId] = useState(null) // entry being switched
+  const [screen, setScreen] = useState('clockin') // clockin|pick-job|running|switch|multi-setup
   const [clockInJob, setClockInJob] = useState('') // job prefilled / chosen on the clock-in screen
   const [recentJobIds, setRecentJobIds] = useState([]) // this user's recent (open) jobs, newest first
   const [now, setNow] = useState(Date.now())
@@ -127,6 +129,9 @@ export default function MobileTimeClock() {
     return j ? j.name || j.client_name : 'Job'
   }
   const empName = e => `${e.first_name} ${e.last_name}`
+  // The current user's own active entry (if they're clocked in).
+  const myEntry =
+    entries.find(e => (meId && e.employee_id === meId) || e.employee_name === meName) || null
 
   // Live ticking clock.
   useEffect(() => {
@@ -190,7 +195,7 @@ export default function MobileTimeClock() {
       setCanManager(!!permRow?.clock_in_multiple_manager)
       setCanChief(permRow ? !!permRow.clock_in_multiple_crew_chief : isChief)
 
-      await refreshEntries(eid, name)
+      await refreshEntries()
 
       // Recent jobs this user has clocked into (OPEN only, newest first).
       let recQ = supabase.from('time_entries').select('job_id, date, time_in')
@@ -247,74 +252,55 @@ export default function MobileTimeClock() {
     setWeekMins(wMin)
   }
 
-  async function refreshEntries(eid, name) {
-    const d = todayStr()
-    // My own open shift.
-    let mine = null
-    if (eid) {
-      const { data } = await supabase
-        .from('time_entries')
-        .select('*')
-        .eq('employee_id', eid)
-        .is('time_out', null)
-        .eq('date', d)
-        .order('time_in', { ascending: false })
-        .limit(1)
-      mine = data?.[0] || null
-    }
-    if (!mine && name) {
-      const { data } = await supabase
-        .from('time_entries')
-        .select('*')
-        .eq('employee_name', name)
-        .is('time_out', null)
-        .eq('date', d)
-        .order('time_in', { ascending: false })
-        .limit(1)
-      mine = data?.[0] || null
-    }
-    setMyEntry(mine)
-    if (mine) {
-      const { data: brk } = await supabase
-        .from('time_clock_breaks')
-        .select('*')
-        .eq('time_entry_id', mine.id)
-      setMyBreaks(brk || [])
-    } else {
-      setMyBreaks([])
-    }
-    // Others I clocked in (still open today).
-    const { data: others } = await supabase
+  // Load every open entry the current user is responsible for today (their own
+  // + anyone they clocked in), plus each entry's breaks.
+  async function refreshEntries() {
+    const { data } = await supabase
       .from('time_entries')
       .select('*')
       .eq('created_by', user.id)
       .is('time_out', null)
-      .eq('date', d)
-    const filteredOthers = (others || []).filter(e => (eid ? e.employee_id !== eid : e.employee_name !== name))
-    setMultiEntries(filteredOthers)
-    setScreen(mine ? 'running' : 'clockin')
+      .eq('date', todayStr())
+      .order('time_in', { ascending: true })
+    const list = data || []
+    setEntries(list)
+    if (list.length) {
+      const ids = list.map(e => e.id)
+      const { data: brk } = await supabase
+        .from('time_clock_breaks')
+        .select('*')
+        .in('time_entry_id', ids)
+      const map = {}
+      for (const b of brk || []) (map[b.time_entry_id] ||= []).push(b)
+      setBreaksByEntry(map)
+      setScreen('running')
+    } else {
+      setBreaksByEntry({})
+      setScreen('clockin')
+    }
   }
 
   // ── Actions ───────────────────────────────────────────────────────────────
-  // Insert a clock-in row. Falls back to omitting employee_id if that column
-  // isn't present yet (migration not run), so clock-in still works.
-  async function insertEntry(extra) {
+  // Insert one clock-in row. Falls back to omitting employee_id if that column
+  // isn't present yet (migration not run).
+  async function insertOne(jobId, employeeId, employeeName) {
     const d = new Date()
     const base = {
-      employee_name: meName,
-      job_id: extra.job_id,
+      employee_name: employeeName || 'Employee',
+      job_id: jobId,
       date: todayStr(),
       time_in: hhmm(d),
       time_out: null,
       created_by: user.id,
       updated_at: d.toISOString(),
-      ...extra,
     }
-    let res = await supabase.from('time_entries').insert({ employee_id: meId, ...base }).select().single()
+    let res = await supabase
+      .from('time_entries')
+      .insert({ employee_id: employeeId, ...base })
+      .select()
+      .single()
     if (res.error && /employee_id/.test(res.error.message || '')) {
-      // Column missing — retry without it.
-      const { employee_id, ...noEid } = { employee_id: meId, ...base }
-      res = await supabase.from('time_entries').insert(noEid).select().single()
+      res = await supabase.from('time_entries').insert(base).select().single()
     }
     return res
   }
@@ -323,69 +309,50 @@ export default function MobileTimeClock() {
     if (!jobId) return
     setBusy(true)
     setError('')
-    const { data, error: e } = await insertEntry({ job_id: jobId })
+    const { error: e } = await insertOne(jobId, meId, meName)
     if (e) {
       setError(e.message || 'Could not clock in.')
       setBusy(false)
       return
     }
-    setMyEntry(data)
-    setMyBreaks([])
-    setScreen('running')
+    await refreshEntries()
     setBusy(false)
   }
 
-  async function clockOut() {
-    if (!myEntry) return
+  async function clockOutEntry(entry) {
     setBusy(true)
     const d = new Date()
     await supabase
       .from('time_entries')
       .update({ time_out: hhmm(d), updated_at: d.toISOString() })
-      .eq('id', myEntry.id)
-    setMyEntry(null)
-    setMyBreaks([])
-    setScreen('clockin')
-    await refreshTotals() // fold the just-finished shift into Day's/Weekly totals
+      .eq('id', entry.id)
+    await refreshEntries()
+    await refreshTotals()
     setBusy(false)
   }
 
-  async function switchJob(jobId) {
-    if (!myEntry || !jobId) return
-    setBusy(true)
-    const d = new Date()
-    await supabase
-      .from('time_entries')
-      .update({ time_out: hhmm(d), updated_at: d.toISOString() })
-      .eq('id', myEntry.id)
-    const { data } = await supabase
-      .from('time_entries')
-      .insert({
-        employee_name: meName,
-        employee_id: meId,
-        job_id: jobId,
-        date: todayStr(),
-        time_in: hhmm(d),
-        time_out: null,
-        created_by: user.id,
-        updated_at: d.toISOString(),
-      })
-      .select()
-      .single()
-    setMyEntry(data)
-    setMyBreaks([])
-    setBusy(false)
-  }
-
-  async function takeBreak(kind) {
-    if (!myEntry) return
+  async function breakEntry(entryId, kind) {
     const minutes = kind === 'lunch' ? 30 : 15
     const { data } = await supabase
       .from('time_clock_breaks')
-      .insert({ time_entry_id: myEntry.id, kind, minutes, started_at: new Date().toISOString() })
+      .insert({ time_entry_id: entryId, kind, minutes, started_at: new Date().toISOString() })
       .select()
       .single()
-    if (data) setMyBreaks(b => [...b, data])
+    if (data) setBreaksByEntry(m => ({ ...m, [entryId]: [...(m[entryId] || []), data] }))
+  }
+
+  // Switch a person's job: close their current entry, open a new one.
+  async function switchJobEntry(entry, jobId) {
+    if (!entry || !jobId) return
+    setBusy(true)
+    const d = new Date()
+    await supabase
+      .from('time_entries')
+      .update({ time_out: hhmm(d), updated_at: d.toISOString() })
+      .eq('id', entry.id)
+    await insertOne(jobId, entry.employee_id || null, entry.employee_name)
+    await refreshEntries()
+    setBusy(false)
   }
 
   // Clock in a list of employee ids onto a job (multi).
@@ -414,7 +381,6 @@ export default function MobileTimeClock() {
     }
     let { error: e } = await supabase.from('time_entries').insert(rows)
     if (e && /employee_id/.test(e.message || '')) {
-      // employee_id column not present yet — retry without it.
       const rows2 = rows.map(({ employee_id, ...r }) => r)
       ;({ error: e } = await supabase.from('time_entries').insert(rows2))
     }
@@ -423,17 +389,7 @@ export default function MobileTimeClock() {
       alert('Could not clock in: ' + e.message)
       return
     }
-    await refreshEntries(meId, meName)
-    setScreen('multi-view') // show who's now on the clock
-  }
-
-  async function clockOutOther(entryId) {
-    const d = new Date()
-    await supabase
-      .from('time_entries')
-      .update({ time_out: hhmm(d), updated_at: d.toISOString() })
-      .eq('id', entryId)
-    setMultiEntries(list => list.filter(e => e.id !== entryId))
+    await refreshEntries() // unified running list now shows everyone
   }
 
   if (!ready) {
@@ -442,7 +398,7 @@ export default function MobileTimeClock() {
 
   // ── Screens ─────────────────────────────────────────────────────────────
   if (screen === 'multi-setup') {
-    const mJobId = myEntry?.job_id || clockInJob || ''
+    const mJobId = myEntry?.job_id || entries[0]?.job_id || clockInJob || ''
     return (
       <MultiSetup
         jobId={mJobId}
@@ -454,7 +410,7 @@ export default function MobileTimeClock() {
         crewMemberIds={crewMemberIds}
         chiefIds={chiefIds}
         canManager={canManager || isAdmin}
-        onCancel={() => setScreen(myEntry ? 'running' : 'clockin')}
+        onCancel={() => setScreen(entries.length ? 'running' : 'clockin')}
         busy={busy}
         onClockIn={async ids => {
           await clockInMany(mJobId, ids)
@@ -463,110 +419,105 @@ export default function MobileTimeClock() {
     )
   }
 
-  if (screen === 'multi-view') {
+  // Unified running interface — one section per active person (you + anyone
+  // you clocked in), each with its own Clock Out / Lunch / Short / Switch Job.
+  if (screen === 'running' && entries.length > 0) {
     return (
-      <MultiView
-        entries={multiEntries}
-        jobName={jobName}
-        now={now}
-        onBack={() => setScreen(myEntry ? 'running' : 'clockin')}
-        onClockOut={clockOutOther}
-        onAdd={() => setScreen('multi-setup')}
-      />
-    )
-  }
+      <div className="max-w-md mx-auto py-4 space-y-3">
+        <p className="text-xs uppercase tracking-wide text-gray-400 font-semibold px-1">
+          On the Clock ({entries.length})
+        </p>
+        {entries.map(entry => {
+          const breaks = breaksByEntry[entry.id] || []
+          const { deduct, active } = breakInfo(breaks, now)
+          const worked = now - entryStartMs(entry) - deduct
+          const isMe =
+            (meId && entry.employee_id === meId) || entry.employee_name === meName
+          return (
+            <div key={entry.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-bold text-gray-900 truncate">
+                    {entry.employee_name}
+                    {isMe ? ' (You)' : ''}
+                  </p>
+                  <p className="text-xs text-purple-600 truncate">{jobName(entry.job_id)}</p>
+                </div>
+                <p className="text-xl font-extrabold text-green-700 tabular-nums flex-shrink-0">
+                  {fmtHMS(worked)}
+                </p>
+              </div>
+              {active && (
+                <p className="mt-1 text-xs font-semibold text-amber-600">
+                  On {active.kind === 'lunch' ? 'lunch' : 'short'} break · resumes in{' '}
+                  {Math.max(0, Math.ceil((active.endsMs - now) / 60000))} min
+                </p>
+              )}
+              <div className="grid grid-cols-4 gap-1.5 mt-3">
+                <button
+                  onClick={() => clockOutEntry(entry)}
+                  disabled={busy}
+                  className="py-2 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 disabled:opacity-50"
+                >
+                  Out
+                </button>
+                <button
+                  onClick={() => breakEntry(entry.id, 'lunch')}
+                  disabled={!!active}
+                  className="py-2 rounded-lg border border-amber-300 text-amber-700 text-xs font-semibold hover:bg-amber-50 disabled:opacity-40"
+                >
+                  🍔 Lunch
+                </button>
+                <button
+                  onClick={() => breakEntry(entry.id, 'short')}
+                  disabled={!!active}
+                  className="py-2 rounded-lg border border-amber-300 text-amber-700 text-xs font-semibold hover:bg-amber-50 disabled:opacity-40"
+                >
+                  ☕ Short
+                </button>
+                <button
+                  onClick={() => {
+                    setSwitchEntryId(entry.id)
+                    setScreen('switch')
+                  }}
+                  className="py-2 rounded-lg border border-gray-300 text-gray-700 text-xs font-semibold hover:bg-gray-50"
+                >
+                  🔁 Switch
+                </button>
+              </div>
+            </div>
+          )
+        })}
 
-  if (screen === 'running' && myEntry) {
-    const { deduct, active } = breakInfo(myBreaks, now)
-    const worked = now - entryStartMs(myEntry) - deduct
-    return (
-      <div className="max-w-md mx-auto py-4">
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-sm">
-          <p className="text-xs uppercase tracking-wide text-gray-400 font-semibold">On the clock</p>
-          <p className="text-lg font-bold text-gray-900 mt-1">{jobName(myEntry.job_id)}</p>
-          <p className="text-4xl font-extrabold text-green-700 mt-4 tabular-nums">
-            {fmtHMS(worked)}
-          </p>
-          {active ? (
-            <p className="mt-2 text-sm font-semibold text-amber-600">
-              On {active.kind === 'lunch' ? 'lunch' : 'short'} break · resumes in{' '}
-              {Math.max(0, Math.ceil((active.endsMs - now) / 60000))} min
-            </p>
-          ) : (
-            <p className="mt-2 text-xs text-gray-400">
-              Clocked in at {fmt12h(myEntry.time_in)}
-              {deduct > 0 && ` · ${Math.round(deduct / 60000)} min break`}
-            </p>
-          )}
-
+        {canMultiple && (
           <button
-            onClick={clockOut}
-            disabled={busy}
-            className="w-full mt-5 py-3 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700 disabled:opacity-50"
+            onClick={() => setScreen('multi-setup')}
+            className="w-full py-3 rounded-xl border border-indigo-300 text-indigo-700 font-bold hover:bg-indigo-50"
           >
-            Clock Out
-          </button>
-
-          <div className="grid grid-cols-2 gap-2 mt-2">
-            <button
-              onClick={() => takeBreak('lunch')}
-              disabled={!!active}
-              className="py-2.5 rounded-xl border border-amber-300 text-amber-700 text-sm font-semibold hover:bg-amber-50 disabled:opacity-40"
-            >
-              🍔 Lunch (30)
-            </button>
-            <button
-              onClick={() => takeBreak('short')}
-              disabled={!!active}
-              className="py-2.5 rounded-xl border border-amber-300 text-amber-700 text-sm font-semibold hover:bg-amber-50 disabled:opacity-40"
-            >
-              ☕ Short (15)
-            </button>
-          </div>
-
-          <button
-            onClick={() => setScreen('switch')}
-            className="w-full mt-2 py-2.5 rounded-xl border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
-          >
-            🔁 Switch Job
-          </button>
-
-          {canMultiple && (
-            <button
-              onClick={() => setScreen('multi-setup')}
-              className="w-full mt-2 py-2.5 rounded-xl border border-indigo-300 text-indigo-700 text-sm font-semibold hover:bg-indigo-50"
-            >
-              👥 Clock In Others
-            </button>
-          )}
-        </div>
-
-        {multiEntries.length > 0 && (
-          <button
-            onClick={() => setScreen('multi-view')}
-            className="w-full mt-3 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700"
-          >
-            View Multiple ({multiEntries.length})
+            👥 Clock In Others
           </button>
         )}
       </div>
     )
   }
 
-  if (screen === 'switch' && myEntry) {
-    return (
-      <JobPickerScreen
-        title="Switch Job"
-        openJobs={openJobs}
-        recentJobIds={recentJobIds}
-        onCancel={() => setScreen('running')}
-        busy={busy}
-        onPick={async jobId => {
-          await switchJob(jobId)
-          setScreen('running')
-        }}
-      />
-    )
+  if (screen === 'switch') {
+    const entry = entries.find(e => e.id === switchEntryId)
+    if (entry) {
+      return (
+        <JobPickerScreen
+          title="Switch Job"
+          openJobs={openJobs}
+          recentJobIds={recentJobIds}
+          onCancel={() => setScreen('running')}
+          busy={busy}
+          onPick={async jobId => {
+            await switchJobEntry(entry, jobId)
+            setScreen('running')
+          }}
+        />
+      )
+    }
   }
 
   // Job-selection screen for the clock-in field (search + recent-first list,
@@ -602,13 +553,11 @@ export default function MobileTimeClock() {
       busy={busy}
       error={error}
       canMultiple={canMultiple}
-      multiCount={multiEntries.length}
       dayMins={dayMins}
       weekMins={weekMins}
       onPickJob={() => setScreen('pick-job')}
       onClockIn={() => clockIn(clockInJob)}
       onMulti={() => setScreen('multi-setup')}
-      onViewMulti={() => setScreen('multi-view')}
     />
   )
 }
@@ -665,13 +614,11 @@ function ClockInScreen({
   busy,
   error,
   canMultiple,
-  multiCount,
   dayMins,
   weekMins,
   onPickJob,
   onClockIn,
   onMulti,
-  onViewMulti,
 }) {
   return (
     <div className="max-w-md mx-auto py-4">
@@ -726,14 +673,6 @@ function ClockInScreen({
           className="w-full mt-2 py-3 rounded-xl border border-indigo-300 text-indigo-700 font-bold hover:bg-indigo-50 disabled:opacity-40"
         >
           👥 Clock In Multiple
-        </button>
-      )}
-      {multiCount > 0 && (
-        <button
-          onClick={onViewMulti}
-          className="w-full mt-2 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700"
-        >
-          View Multiple ({multiCount})
         </button>
       )}
     </div>
@@ -890,53 +829,3 @@ function MultiSetup({
   )
 }
 
-// ── View multiple running clocks ────────────────────────────────────────────
-function MultiView({ entries, jobName, now, onBack, onClockOut, onAdd }) {
-  return (
-    <div className="max-w-md mx-auto py-4">
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-base font-bold text-gray-900">On the Clock</p>
-        <button onClick={onBack} className="text-sm text-gray-500">
-          Back
-        </button>
-      </div>
-      {entries.length === 0 ? (
-        <p className="py-8 text-center text-sm text-gray-400">No one currently clocked in.</p>
-      ) : (
-        <div className="space-y-2">
-          {entries.map(e => {
-            const worked = now - entryStartMs(e)
-            return (
-              <div
-                key={e.id}
-                className="flex items-center justify-between gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3"
-              >
-                <div className="min-w-0">
-                  <p className="font-semibold text-gray-900 truncate">{e.employee_name}</p>
-                  <p className="text-xs text-gray-500 truncate">{jobName(e.job_id)}</p>
-                </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  <span className="text-sm font-bold text-green-700 tabular-nums">
-                    {fmtDur(worked)}
-                  </span>
-                  <button
-                    onClick={() => onClockOut(e.id)}
-                    className="text-xs font-semibold text-red-600 border border-red-200 rounded-lg px-2 py-1 hover:bg-red-50"
-                  >
-                    Out
-                  </button>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-      <button
-        onClick={onAdd}
-        className="w-full mt-4 py-3 rounded-xl border border-indigo-300 text-indigo-700 font-bold hover:bg-indigo-50"
-      >
-        + Add employee
-      </button>
-    </div>
-  )
-}
