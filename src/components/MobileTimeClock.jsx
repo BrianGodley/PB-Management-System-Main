@@ -388,25 +388,43 @@ export default function MobileTimeClock() {
     if (data) setMyBreaks(b => [...b, data])
   }
 
-  // Clock in a list of { employee_id, name } onto a job (multi).
+  // Clock in a list of { employee_id } onto a job (multi).
   async function clockInMany(jobId, slots) {
     setBusy(true)
+    setError('')
     const d = new Date()
     const rows = slots
       .filter(s => s.employee_id)
-      .map(s => ({
-        employee_name: s.name,
-        employee_id: s.employee_id,
-        job_id: jobId,
-        date: todayStr(),
-        time_in: hhmm(d),
-        time_out: null,
-        created_by: user.id,
-        updated_at: d.toISOString(),
-      }))
-    if (rows.length) await supabase.from('time_entries').insert(rows)
-    await refreshEntries(meId, meName)
+      .map(s => {
+        const e = empById[s.employee_id]
+        return {
+          employee_name: e ? `${e.first_name} ${e.last_name}` : 'Employee',
+          employee_id: s.employee_id,
+          job_id: jobId,
+          date: todayStr(),
+          time_in: hhmm(d),
+          time_out: null,
+          created_by: user.id,
+          updated_at: d.toISOString(),
+        }
+      })
+    if (!rows.length) {
+      setBusy(false)
+      return
+    }
+    let { error: e } = await supabase.from('time_entries').insert(rows)
+    if (e && /employee_id/.test(e.message || '')) {
+      // employee_id column not present yet — retry without it.
+      const rows2 = rows.map(({ employee_id, ...r }) => r)
+      ;({ error: e } = await supabase.from('time_entries').insert(rows2))
+    }
     setBusy(false)
+    if (e) {
+      alert('Could not clock in: ' + e.message)
+      return
+    }
+    await refreshEntries(meId, meName)
+    setScreen('multi-view') // show who's now on the clock
   }
 
   async function clockOutOther(entryId) {
