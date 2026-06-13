@@ -105,7 +105,7 @@ export default function TimeClockPage() {
     <div className="flex flex-col h-full">
       {/* Title + close X are provided centrally by Layout's green bar. */}
       {/* Minimal header with searchable job picker */}
-      <div className="flex-shrink-0 mb-4">
+      <div className="flex-shrink-0 lg:mb-4">
         {/* Desktop uses this page-level job picker; mobile has its own inside
             MobileTimeClock, so it's hidden on phones. */}
         {!loading && (

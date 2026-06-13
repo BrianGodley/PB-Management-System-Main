@@ -11,7 +11,7 @@
 //
 // Jobs offered are OPEN only. Breaks subtract from elapsed via time_clock_breaks.
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { fetchAllPaginated } from '../lib/fetchAll'
 import { useAuth } from '../contexts/AuthContext'
@@ -718,9 +718,9 @@ function ClockInScreen({
   onMulti,
 }) {
   return (
-    <div className="flex flex-col h-full max-w-md mx-auto pt-1 pb-2">
+    <div className="flex flex-col h-full max-w-md mx-auto pt-0 pb-2">
       <div className="flex-shrink-0">
-        <p className="text-sm font-semibold text-gray-500 text-center mb-2">Not clocked in</p>
+        <p className="text-sm font-semibold text-gray-500 text-center mb-1.5">Not clocked in</p>
 
         {/* Hours so far — today and this week (Sun–Sat or per HR setting) */}
         <div className="grid grid-cols-2 gap-2 mb-2.5">
@@ -781,13 +781,52 @@ function ClockInScreen({
   )
 }
 
-// Shows the user's current GPS location on a map, with the nearest street
-// address in a thin row above it. Uses keyless OpenStreetMap services so no
-// API key/config is required.
+// Lazy-load Leaflet from CDN once (no build dependency needed).
+let leafletPromise = null
+function loadLeaflet() {
+  if (typeof window !== 'undefined' && window.L) return Promise.resolve(window.L)
+  if (leafletPromise) return leafletPromise
+  leafletPromise = new Promise((resolve, reject) => {
+    if (!document.getElementById('leaflet-css')) {
+      const link = document.createElement('link')
+      link.id = 'leaflet-css'
+      link.rel = 'stylesheet'
+      link.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'
+      document.head.appendChild(link)
+    }
+    // Strip the default white box/border Leaflet puts behind a divIcon so the
+    // emoji pin shows cleanly.
+    if (!document.getElementById('cl-pin-style')) {
+      const st = document.createElement('style')
+      st.id = 'cl-pin-style'
+      st.textContent = '.leaflet-div-icon.cl-pin{background:transparent;border:none;}'
+      document.head.appendChild(st)
+    }
+    const s = document.createElement('script')
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js'
+    s.async = true
+    s.onload = () => resolve(window.L)
+    s.onerror = reject
+    document.body.appendChild(s)
+  })
+  return leafletPromise
+}
+
+// Shows the user's current GPS location on an interactive map (Leaflet), with
+// the nearest street address as a tappable "recenter" row above it. No tile
+// attribution overlay, and a large pin marks the location.
 function CurrentLocationMap() {
-  const [pos, setPos] = useState(null) // { lat, lon }
   const [addr, setAddr] = useState('')
   const [status, setStatus] = useState('loading') // loading | ok | denied | error
+  const mapEl = useRef(null) // map container div
+  const mapObj = useRef(null) // Leaflet map instance
+  const posRef = useRef(null) // { lat, lon }
+
+  const recenter = () => {
+    if (mapObj.current && posRef.current) {
+      mapObj.current.setView([posRef.current.lat, posRef.current.lon], 16, { animate: true })
+    }
+  }
 
   useEffect(() => {
     if (!('geolocation' in navigator)) {
@@ -800,8 +839,39 @@ function CurrentLocationMap() {
         if (!alive) return
         const lat = p.coords.latitude
         const lon = p.coords.longitude
-        setPos({ lat, lon })
+        posRef.current = { lat, lon }
         setStatus('ok')
+
+        // Build the interactive map.
+        try {
+          const L = await loadLeaflet()
+          if (!alive || !mapEl.current) return
+          if (!mapObj.current) {
+            const map = L.map(mapEl.current, {
+              attributionControl: false, // no "Leaflet | © OpenStreetMap" overlay
+              zoomControl: true,
+            }).setView([lat, lon], 16)
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(
+              map
+            )
+            // Large pin marker.
+            const pin = L.divIcon({
+              className: 'cl-pin',
+              html: '<div style="font-size:46px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))">📍</div>',
+              iconSize: [46, 46],
+              iconAnchor: [23, 44],
+            })
+            L.marker([lat, lon], { icon: pin }).addTo(map)
+            mapObj.current = map
+            // The container sizes after layout settles; refresh tiles.
+            setTimeout(() => mapObj.current && mapObj.current.invalidateSize(), 250)
+          } else {
+            mapObj.current.setView([lat, lon], 16)
+          }
+        } catch {
+          /* map is optional */
+        }
+
         // Reverse-geocode to the closest known address (best-effort).
         try {
           const r = await fetch(
@@ -827,34 +897,39 @@ function CurrentLocationMap() {
     )
     return () => {
       alive = false
+      if (mapObj.current) {
+        mapObj.current.remove()
+        mapObj.current = null
+      }
     }
   }, [])
 
-  const d = 0.004
-  const mapSrc = pos
-    ? `https://www.openstreetmap.org/export/embed.html?bbox=${pos.lon - d}%2C${pos.lat - d}%2C${pos.lon + d}%2C${pos.lat + d}&layer=mapnik&marker=${pos.lat}%2C${pos.lon}`
-    : null
-
   return (
-    <div className="flex flex-col flex-1 min-h-0 mt-3">
-      {/* Thin address row above the map */}
-      <div className="flex-shrink-0 px-2.5 py-1 text-[11px] text-gray-500 truncate border border-gray-200 border-b-0 rounded-t-lg bg-gray-50">
-        {status === 'loading' && 'Locating you…'}
-        {status === 'denied' && 'Location permission denied'}
-        {status === 'error' && 'Location unavailable on this device'}
-        {status === 'ok' && (addr ? `📍 ${addr}` : '📍 Current location')}
-      </div>
-      <div className="flex-1 min-h-0 rounded-b-lg overflow-hidden border border-gray-200 bg-gray-100">
-        {mapSrc ? (
-          <iframe
-            title="Current location map"
-            src={mapSrc}
-            className="w-full h-full"
-            style={{ border: 0 }}
-            loading="lazy"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">
+    <div className="flex flex-col flex-1 min-h-0 mt-2">
+      {/* Tappable address row — recenters the map on the user's location. */}
+      <button
+        onClick={recenter}
+        disabled={status !== 'ok'}
+        title="Tap to recenter on your location"
+        className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1 text-[11px] text-gray-600 border border-gray-200 border-b-0 rounded-t-lg bg-gray-50 hover:bg-gray-100 disabled:hover:bg-gray-50 text-left"
+      >
+        <span aria-hidden="true" className="flex-shrink-0">
+          📍
+        </span>
+        <span className="truncate flex-1">
+          {status === 'loading' && 'Locating you…'}
+          {status === 'denied' && 'Location permission denied'}
+          {status === 'error' && 'Location unavailable on this device'}
+          {status === 'ok' && (addr || 'Current location')}
+        </span>
+        {status === 'ok' && (
+          <span className="text-green-700 font-semibold flex-shrink-0">Recenter</span>
+        )}
+      </button>
+      <div className="flex-1 min-h-0 rounded-b-lg overflow-hidden border border-gray-200 bg-gray-100 relative">
+        <div ref={mapEl} className="absolute inset-0" />
+        {status !== 'ok' && (
+          <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-400">
             {status === 'denied' || status === 'error' ? 'Map unavailable' : 'Loading map…'}
           </div>
         )}
