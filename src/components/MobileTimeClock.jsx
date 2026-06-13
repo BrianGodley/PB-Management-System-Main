@@ -419,9 +419,86 @@ export default function MobileTimeClock() {
     )
   }
 
-  // Unified running interface — one section per active person (you + anyone
-  // you clocked in), each with its own Clock Out / Lunch / Short / Switch Job.
-  if (screen === 'running' && entries.length > 0) {
+  // Single person on the clock → the simple centered running view.
+  if (screen === 'running' && entries.length === 1) {
+    const entry = entries[0]
+    const breaks = breaksByEntry[entry.id] || []
+    const { deduct, active } = breakInfo(breaks, now)
+    const worked = now - entryStartMs(entry) - deduct
+    const isMe = (meId && entry.employee_id === meId) || entry.employee_name === meName
+    return (
+      <div className="max-w-md mx-auto py-4">
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-sm">
+          <p className="text-xs uppercase tracking-wide text-gray-400 font-semibold">
+            {isMe ? 'On the clock' : entry.employee_name}
+          </p>
+          <p className="text-lg font-bold text-gray-900 mt-1">{jobName(entry.job_id)}</p>
+          <p className="text-4xl font-extrabold text-green-700 mt-4 tabular-nums">
+            {fmtHMS(worked)}
+          </p>
+          {active ? (
+            <p className="mt-2 text-sm font-semibold text-amber-600">
+              On {active.kind === 'lunch' ? 'lunch' : 'short'} break · resumes in{' '}
+              {Math.max(0, Math.ceil((active.endsMs - now) / 60000))} min
+            </p>
+          ) : (
+            <p className="mt-2 text-xs text-gray-400">
+              Clocked in at {fmt12h(entry.time_in)}
+              {deduct > 0 && ` · ${Math.round(deduct / 60000)} min break`}
+            </p>
+          )}
+
+          <button
+            onClick={() => clockOutEntry(entry)}
+            disabled={busy}
+            className="w-full mt-5 py-3 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700 disabled:opacity-50"
+          >
+            Clock Out
+          </button>
+
+          <div className="grid grid-cols-2 gap-2 mt-2">
+            <button
+              onClick={() => breakEntry(entry.id, 'lunch')}
+              disabled={!!active}
+              className="py-2.5 rounded-xl border border-amber-300 text-amber-700 text-sm font-semibold hover:bg-amber-50 disabled:opacity-40"
+            >
+              🍔 Lunch (30)
+            </button>
+            <button
+              onClick={() => breakEntry(entry.id, 'short')}
+              disabled={!!active}
+              className="py-2.5 rounded-xl border border-amber-300 text-amber-700 text-sm font-semibold hover:bg-amber-50 disabled:opacity-40"
+            >
+              ☕ Short (15)
+            </button>
+          </div>
+
+          <button
+            onClick={() => {
+              setSwitchEntryId(entry.id)
+              setScreen('switch')
+            }}
+            className="w-full mt-2 py-2.5 rounded-xl border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
+          >
+            🔁 Switch Job
+          </button>
+
+          {canMultiple && (
+            <button
+              onClick={() => setScreen('multi-setup')}
+              className="w-full mt-2 py-2.5 rounded-xl border border-indigo-300 text-indigo-700 text-sm font-semibold hover:bg-indigo-50"
+            >
+              👥 Clock In Others
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // Multiple people on the clock → one section per active person, each with its
+  // own Clock Out / Lunch / Short / Switch Job.
+  if (screen === 'running' && entries.length > 1) {
     return (
       <div className="max-w-md mx-auto py-4 space-y-3">
         <p className="text-xs uppercase tracking-wide text-gray-400 font-semibold px-1">
