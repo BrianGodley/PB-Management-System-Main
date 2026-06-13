@@ -25,6 +25,14 @@ const dStr = d => {
   return `${y}-${m}-${da}`
 }
 const hhmm = d => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+// "07:56:00" / "07:56" -> "7:56 AM"
+const fmt12h = t => {
+  if (!t) return ''
+  const [h, m] = t.split(':').map(Number)
+  const ap = h >= 12 ? 'PM' : 'AM'
+  const h12 = h % 12 || 12
+  return `${h12}:${String(m).padStart(2, '0')} ${ap}`
+}
 // time_in may come back as "HH:MM" or "HH:MM:SS" (Postgres time) — don't append
 // seconds (that would make an invalid date and yield NaN elapsed).
 const entryStartMs = e => new Date(`${e.date}T${e.time_in || '00:00'}`).getTime()
@@ -469,7 +477,7 @@ export default function MobileTimeClock() {
             </p>
           ) : (
             <p className="mt-2 text-xs text-gray-400">
-              Since {myEntry.time_in}
+              Clocked in at {fmt12h(myEntry.time_in)}
               {deduct > 0 && ` · ${Math.round(deduct / 60000)} min break`}
             </p>
           )}
