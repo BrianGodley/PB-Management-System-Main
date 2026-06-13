@@ -1055,17 +1055,11 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left">
                     Time In
                   </th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left">
-                    Time Out
-                  </th>
-                  <th className="px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left w-44">
-                    GPS
-                  </th>
-                  <th className="px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left w-40">
-                    Proximity
-                  </th>
                   <th className="px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right w-16">
                     Break
+                  </th>
+                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left">
+                    Time Out
                   </th>
                   <th className="px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right w-16">
                     Total
@@ -1073,7 +1067,12 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
                   <th className="px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right w-16">
                     OT
                   </th>
-                  <th className="px-4 py-3 w-16" />
+                  <th className="px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left w-44">
+                    GPS
+                  </th>
+                  <th className="px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-left w-40">
+                    Proximity
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 bg-white">
@@ -1121,6 +1120,15 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
                         {fmt12h(entry.time_in)}
                       </td>
 
+                      {/* Break — total lunch + short-break minutes for this shift */}
+                      <td className="px-2 py-3 text-right font-mono text-sm">
+                        {brk > 0 ? (
+                          <span className="text-gray-600">{fmtMins(brk)}</span>
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
+                      </td>
+
                       {/* Time Out — or Clock Out link */}
                       <td className="px-4 py-3">
                         {isClockedIn ? (
@@ -1134,33 +1142,6 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
                           <span className="text-gray-700 font-mono text-sm">
                             {fmt12h(entry.time_out)}
                           </span>
-                        )}
-                      </td>
-
-                      {/* GPS — clock-in/out location status + map popup */}
-                      <td className="px-3 py-3 align-middle">
-                        <GpsCell
-                          entry={entry}
-                          jobLoc={jobLocMap[entry.job_id]}
-                          onMap={setMapModal}
-                        />
-                      </td>
-
-                      {/* Proximity — closest known location to the clock point */}
-                      <td className="px-3 py-3 align-middle">
-                        <ProximityCell
-                          entry={entry}
-                          jobLoc={jobLocMap[entry.job_id]}
-                          companyLocs={companyLocs}
-                        />
-                      </td>
-
-                      {/* Break — total lunch + short-break minutes for this shift */}
-                      <td className="px-2 py-3 text-right font-mono text-sm">
-                        {brk > 0 ? (
-                          <span className="text-gray-600">{fmtMins(brk)}</span>
-                        ) : (
-                          <span className="text-gray-300">—</span>
                         )}
                       </td>
 
@@ -1180,48 +1161,22 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
                         )}
                       </td>
 
-                      {/* Actions */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => openEdit(entry)}
-                            className="p-1.5 rounded hover:bg-gray-200 text-gray-400 hover:text-gray-700"
-                            title="Edit"
-                          >
-                            <svg
-                              className="w-3.5 h-3.5"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 0l.172.172a2 2 0 010 2.828L12 16H9v-3z"
-                              />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => deleteEntry(entry)}
-                            className="p-1.5 rounded hover:bg-red-100 text-gray-400 hover:text-red-500"
-                            title="Delete"
-                          >
-                            <svg
-                              className="w-3.5 h-3.5"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                              />
-                            </svg>
-                          </button>
-                        </div>
+                      {/* GPS — clock-in/out location status + map popup */}
+                      <td className="px-3 py-3 align-middle">
+                        <GpsCell
+                          entry={entry}
+                          jobLoc={jobLocMap[entry.job_id]}
+                          onMap={setMapModal}
+                        />
+                      </td>
+
+                      {/* Proximity — closest known location to the clock point */}
+                      <td className="px-3 py-3 align-middle">
+                        <ProximityCell
+                          entry={entry}
+                          jobLoc={jobLocMap[entry.job_id]}
+                          companyLocs={companyLocs}
+                        />
                       </td>
                     </tr>
                   )
