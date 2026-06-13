@@ -360,15 +360,16 @@ export default function DailyLogs({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
+      {/* Header — on mobile the title/count are hidden and the New Daily Log
+          button stretches full width. */}
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
-        <h2 className="text-sm font-semibold text-gray-700">
+        <h2 className="hidden lg:block text-sm font-semibold text-gray-700">
           Daily Logs{' '}
           {totalCount > 0 && <span className="text-gray-400 font-normal">({totalCount})</span>}
         </h2>
         <button
           onClick={openNew}
-          className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg flex items-center gap-1.5 mr-6"
+          className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-2 rounded-lg flex items-center justify-center gap-1.5 w-full lg:w-auto lg:mr-6"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
