@@ -388,18 +388,18 @@ export default function MobileTimeClock() {
     if (data) setMyBreaks(b => [...b, data])
   }
 
-  // Clock in a list of { employee_id } onto a job (multi).
-  async function clockInMany(jobId, slots) {
+  // Clock in a list of employee ids onto a job (multi).
+  async function clockInMany(jobId, employeeIds) {
     setBusy(true)
     setError('')
     const d = new Date()
-    const rows = slots
-      .filter(s => s.employee_id)
-      .map(s => {
-        const e = empById[s.employee_id]
+    const rows = (employeeIds || [])
+      .filter(Boolean)
+      .map(id => {
+        const e = empById[id]
         return {
           employee_name: e ? `${e.first_name} ${e.last_name}` : 'Employee',
-          employee_id: s.employee_id,
+          employee_id: id,
           job_id: jobId,
           date: todayStr(),
           time_in: hhmm(d),
@@ -442,22 +442,22 @@ export default function MobileTimeClock() {
 
   // ── Screens ─────────────────────────────────────────────────────────────
   if (screen === 'multi-setup') {
+    const mJobId = myEntry?.job_id || clockInJob || ''
     return (
       <MultiSetup
-        openJobs={openJobs}
+        jobId={mJobId}
+        jobName={jobName(mJobId)}
         employees={employees}
         empName={empName}
         meId={meId}
-        meName={meName}
         myEntry={myEntry}
-        defaultJobId={myEntry?.job_id || clockInJob || ''}
         crewMemberIds={crewMemberIds}
         chiefIds={chiefIds}
         canManager={canManager || isAdmin}
         onCancel={() => setScreen(myEntry ? 'running' : 'clockin')}
         busy={busy}
-        onClockIn={async (jobId, slots) => {
-          await clockInMany(jobId, slots)
+        onClockIn={async ids => {
+          await clockInMany(mJobId, ids)
         }}
       />
     )
@@ -721,7 +721,9 @@ function ClockInScreen({
       {canMultiple && (
         <button
           onClick={onMulti}
-          className="w-full mt-2 py-3 rounded-xl border border-indigo-300 text-indigo-700 font-bold hover:bg-indigo-50"
+          disabled={!hasJob}
+          title={!hasJob ? 'Pick a job first' : undefined}
+          className="w-full mt-2 py-3 rounded-xl border border-indigo-300 text-indigo-700 font-bold hover:bg-indigo-50 disabled:opacity-40"
         >
           👥 Clock In Multiple
         </button>
@@ -766,14 +768,15 @@ function JobPickerScreen({ title, openJobs, recentJobIds, onCancel, onPick, busy
 }
 
 // ── Multi clock-in setup ────────────────────────────────────────────────────
+// Job is chosen on the previous screen (shown as small text here). Selected
+// employees appear as removable chips; tap names in the list below to add them.
 function MultiSetup({
-  openJobs,
+  jobId,
+  jobName,
   employees,
   empName,
   meId,
-  meName,
   myEntry,
-  defaultJobId = '',
   crewMemberIds,
   chiefIds,
   canManager,
@@ -781,91 +784,111 @@ function MultiSetup({
   onClockIn,
   busy,
 }) {
-  const [jobId, setJobId] = useState(defaultJobId)
-  // Slots auto-filled from the chief's crew. Chief is slot 1 unless already
-  // clocked in. Each slot: { key, employee_id }.
-  const [slots, setSlots] = useState(() => {
-    const arr = []
-    if (meId && !myEntry) arr.push({ key: 'me', employee_id: meId })
-    for (const id of crewMemberIds) arr.push({ key: id, employee_id: id })
-    if (arr.length === 0) arr.push({ key: 'new0', employee_id: '' })
-    return arr
+  // Pre-select the chief's crew (+ self when not already clocked in).
+  const [selected, setSelected] = useState(() => {
+    const ids = [...(meId && !myEntry ? [meId] : []), ...crewMemberIds]
+    return [...new Set(ids)]
   })
+  const [q, setQ] = useState('')
 
-  // Who can be picked: managers see everyone; crew chiefs see their crew + chiefs.
+  // Who can be picked: managers/admins see everyone; crew chiefs see their
+  // crew + other chiefs.
   const pickable = useMemo(() => {
-    if (canManager) return employees
-    const allow = new Set([...(meId ? [meId] : []), ...crewMemberIds, ...chiefIds])
-    return employees.filter(e => allow.has(e.id))
-  }, [employees, canManager, crewMemberIds, chiefIds, meId])
+    const list = canManager
+      ? employees
+      : employees.filter(e =>
+          new Set([...(meId ? [meId] : []), ...crewMemberIds, ...chiefIds]).has(e.id)
+        )
+    const ql = q.trim().toLowerCase()
+    return ql ? list.filter(e => empName(e).toLowerCase().includes(ql)) : list
+  }, [employees, canManager, crewMemberIds, chiefIds, meId, q, empName])
 
-  const used = new Set(slots.map(s => s.employee_id).filter(Boolean))
-  function setSlot(i, employee_id) {
-    setSlots(s => s.map((x, idx) => (idx === i ? { ...x, employee_id } : x)))
+  function toggle(id) {
+    setSelected(s => (s.includes(id) ? s.filter(x => x !== id) : [...s, id]))
   }
-  function removeSlot(i) {
-    setSlots(s => s.filter((_, idx) => idx !== i))
-  }
-  function addSlot() {
-    setSlots(s => [...s, { key: `new${s.length}_${Date.now()}`, employee_id: '' }])
-  }
+  const selectedSet = new Set(selected)
 
   return (
-    <div className="max-w-md mx-auto py-4">
-      <div className="flex items-center justify-between mb-3">
+    <div className="flex flex-col h-full max-w-md mx-auto py-4">
+      <div className="flex items-center justify-between flex-shrink-0">
         <p className="text-base font-bold text-gray-900">Clock In Multiple</p>
         <button onClick={onCancel} className="text-sm text-gray-500">
           Cancel
         </button>
       </div>
+      {/* Job (chosen on the previous screen) */}
+      <p className="text-xs text-purple-600 font-medium mt-1 flex-shrink-0">{jobName || 'Job'}</p>
 
-      <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Job</p>
-      <JobSearchPicker openJobs={openJobs} value={jobId} onChange={setJobId} />
-
-      <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mt-4 mb-1">
-        Employees
-      </p>
-      <div className="space-y-2">
-        {slots.map((s, i) => (
-          <div key={s.key} className="flex items-center gap-2">
-            <select
-              value={s.employee_id}
-              onChange={e => setSlot(i, e.target.value)}
-              className="input text-sm flex-1"
-            >
-              <option value="">— Select employee —</option>
-              {pickable
-                .filter(e => e.id === s.employee_id || !used.has(e.id))
-                .map(e => (
-                  <option key={e.id} value={e.id}>
-                    {empName(e)}
-                    {e.id === meId ? ' (me)' : ''}
-                  </option>
-                ))}
-            </select>
-            <button
-              onClick={() => removeSlot(i)}
-              className="w-8 h-8 flex-shrink-0 rounded-full text-gray-400 hover:bg-gray-100 hover:text-red-500"
-              title="Remove"
-            >
-              ✕
-            </button>
-          </div>
-        ))}
+      {/* Selected employees — removable chips */}
+      <div className="flex flex-wrap gap-2 mt-3 flex-shrink-0">
+        {selected.length === 0 ? (
+          <p className="text-xs text-gray-400 italic">No one selected yet — tap names below.</p>
+        ) : (
+          selected.map(id => {
+            const e = employees.find(x => x.id === id)
+            return (
+              <span
+                key={id}
+                className="inline-flex items-center gap-1.5 bg-green-50 border border-green-200 text-green-800 rounded-full pl-3 pr-1.5 py-1 text-sm font-medium"
+              >
+                {e ? empName(e) : 'Employee'}
+                {id === meId ? ' (me)' : ''}
+                <button
+                  onClick={() => toggle(id)}
+                  className="w-5 h-5 rounded-full hover:bg-green-200 flex items-center justify-center text-green-700"
+                >
+                  ✕
+                </button>
+              </span>
+            )
+          })
+        )}
       </div>
-      <button
-        onClick={addSlot}
-        className="mt-2 text-sm font-semibold text-blue-700 hover:text-blue-900"
-      >
-        + Add employee
-      </button>
+
+      {/* Employee list (tap to select) */}
+      <input
+        type="text"
+        value={q}
+        onChange={e => setQ(e.target.value)}
+        placeholder="Search employees…"
+        className="input text-sm w-full mt-3 mb-2 flex-shrink-0"
+      />
+      <div className="flex-1 min-h-0 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-100">
+        {pickable.map(e => {
+          const on = selectedSet.has(e.id)
+          return (
+            <button
+              key={e.id}
+              onClick={() => toggle(e.id)}
+              className={`w-full flex items-center justify-between px-3 py-2.5 text-sm text-left ${
+                on ? 'bg-green-50' : 'hover:bg-gray-50'
+              }`}
+            >
+              <span className={on ? 'text-green-800 font-semibold' : 'text-gray-800'}>
+                {empName(e)}
+                {e.id === meId ? ' (me)' : ''}
+              </span>
+              <span
+                className={`w-5 h-5 rounded border flex items-center justify-center text-xs ${
+                  on ? 'bg-green-600 border-green-600 text-white' : 'border-gray-300 text-transparent'
+                }`}
+              >
+                ✓
+              </span>
+            </button>
+          )
+        })}
+        {pickable.length === 0 && (
+          <p className="px-3 py-6 text-center text-sm text-gray-400">No employees</p>
+        )}
+      </div>
 
       <button
-        onClick={() => onClockIn(jobId, slots)}
-        disabled={!jobId || busy || slots.every(s => !s.employee_id)}
-        className="w-full mt-5 py-3 rounded-xl bg-green-700 text-white font-bold hover:bg-green-800 disabled:opacity-40"
+        onClick={() => onClockIn(selected)}
+        disabled={busy || selected.length === 0}
+        className="w-full mt-4 py-3 rounded-xl bg-green-700 text-white font-bold hover:bg-green-800 disabled:opacity-40 flex-shrink-0"
       >
-        Clock Everyone In
+        Clock In {selected.length || ''} {selected.length === 1 ? 'Person' : 'People'}
       </button>
     </div>
   )
