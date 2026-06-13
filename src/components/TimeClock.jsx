@@ -828,6 +828,7 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
             myWeekMins={myWeekMins}
             weekRangeLabel={weekRangeLabel}
             myWeekEntries={myWeekEntries}
+            myWeekBreakMins={myWeekBreakMins}
             jobMap={jobMap}
             jobs={jobs}
             selectedJob={selectedJob}
@@ -1049,6 +1050,7 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
             myWeekMins={myWeekMins}
             weekRangeLabel={weekRangeLabel}
             myWeekEntries={myWeekEntries}
+            myWeekBreakMins={myWeekBreakMins}
             jobMap={jobMap}
             jobs={jobs}
             selectedJob={selectedJob}
@@ -1094,6 +1096,7 @@ function MobileHero({
   myWeekMins,
   weekRangeLabel,
   myWeekEntries,
+  myWeekBreakMins = {},
   jobMap,
   selectedJob,
   onClockIn,

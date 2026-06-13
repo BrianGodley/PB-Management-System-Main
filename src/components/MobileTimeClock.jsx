@@ -718,60 +718,147 @@ function ClockInScreen({
   onMulti,
 }) {
   return (
-    <div className="max-w-md mx-auto py-4">
-      <p className="text-sm font-semibold text-gray-500 text-center mb-3">Not clocked in</p>
+    <div className="flex flex-col h-full max-w-md mx-auto pt-1 pb-2">
+      <div className="flex-shrink-0">
+        <p className="text-sm font-semibold text-gray-500 text-center mb-2">Not clocked in</p>
 
-      {/* Hours so far — today and this week (Sun–Sat or per HR setting) */}
-      <div className="grid grid-cols-2 gap-2 mb-4">
-        <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-center">
-          <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">
-            Day's Total
-          </p>
-          <p className="text-lg font-bold text-gray-900 mt-0.5">{fmtHm(dayMins)}</p>
+        {/* Hours so far — today and this week (Sun–Sat or per HR setting) */}
+        <div className="grid grid-cols-2 gap-2 mb-2.5">
+          <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-center">
+            <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">
+              Day's Total
+            </p>
+            <p className="text-lg font-bold text-gray-900 mt-0.5">{fmtHm(dayMins)}</p>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-center">
+            <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">
+              Weekly Total
+            </p>
+            <p className="text-lg font-bold text-gray-900 mt-0.5">{fmtHm(weekMins)}</p>
+          </div>
         </div>
-        <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-center">
-          <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">
-            Weekly Total
+
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Job</p>
+        {/* The field shows the last job clocked into; tap it to choose another. */}
+        <button
+          onClick={onPickJob}
+          className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-gray-300 bg-white text-left"
+        >
+          <span className={`truncate ${hasJob ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>
+            {jobLabel || 'Tap to select a job'}
+          </span>
+          <span className="text-gray-400 text-lg flex-shrink-0 ml-2">▾</span>
+        </button>
+
+        {error && (
+          <p className="mt-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            {error}
           </p>
-          <p className="text-lg font-bold text-gray-900 mt-0.5">{fmtHm(weekMins)}</p>
-        </div>
+        )}
+
+        <button
+          onClick={onClockIn}
+          disabled={!hasJob || busy}
+          className="w-full mt-3 py-3 rounded-xl bg-green-700 text-white font-bold hover:bg-green-800 disabled:opacity-40"
+        >
+          {busy ? 'Clocking in…' : 'Clock In'}
+        </button>
+        {canMultiple && (
+          <button
+            onClick={onMulti}
+            disabled={!hasJob}
+            title={!hasJob ? 'Pick a job first' : undefined}
+            className="w-full mt-2 py-3 rounded-xl border border-indigo-300 text-indigo-700 font-bold hover:bg-indigo-50 disabled:opacity-40"
+          >
+            👥 Clock In Multiple
+          </button>
+        )}
       </div>
 
-      <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1.5">Job</p>
-      {/* The field shows the last job clocked into; tap it to choose another. */}
-      <button
-        onClick={onPickJob}
-        className="w-full flex items-center justify-between px-3 py-3 rounded-xl border border-gray-300 bg-white text-left"
-      >
-        <span className={`truncate ${hasJob ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>
-          {jobLabel || 'Tap to select a job'}
-        </span>
-        <span className="text-gray-400 text-lg flex-shrink-0 ml-2">▾</span>
-      </button>
+      {/* Current location map fills the remaining space below the buttons. */}
+      <CurrentLocationMap />
+    </div>
+  )
+}
 
-      {error && (
-        <p className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-          {error}
-        </p>
-      )}
+// Shows the user's current GPS location on a map, with the nearest street
+// address in a thin row above it. Uses keyless OpenStreetMap services so no
+// API key/config is required.
+function CurrentLocationMap() {
+  const [pos, setPos] = useState(null) // { lat, lon }
+  const [addr, setAddr] = useState('')
+  const [status, setStatus] = useState('loading') // loading | ok | denied | error
 
-      <button
-        onClick={onClockIn}
-        disabled={!hasJob || busy}
-        className="w-full mt-4 py-3 rounded-xl bg-green-700 text-white font-bold hover:bg-green-800 disabled:opacity-40"
-      >
-        {busy ? 'Clocking in…' : 'Clock In'}
-      </button>
-      {canMultiple && (
-        <button
-          onClick={onMulti}
-          disabled={!hasJob}
-          title={!hasJob ? 'Pick a job first' : undefined}
-          className="w-full mt-2 py-3 rounded-xl border border-indigo-300 text-indigo-700 font-bold hover:bg-indigo-50 disabled:opacity-40"
-        >
-          👥 Clock In Multiple
-        </button>
-      )}
+  useEffect(() => {
+    if (!('geolocation' in navigator)) {
+      setStatus('error')
+      return
+    }
+    let alive = true
+    navigator.geolocation.getCurrentPosition(
+      async p => {
+        if (!alive) return
+        const lat = p.coords.latitude
+        const lon = p.coords.longitude
+        setPos({ lat, lon })
+        setStatus('ok')
+        // Reverse-geocode to the closest known address (best-effort).
+        try {
+          const r = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`,
+            { headers: { Accept: 'application/json' } }
+          ).then(res => res.json())
+          if (!alive) return
+          const a = r.address || {}
+          const street = [a.house_number, a.road].filter(Boolean).join(' ')
+          const city = a.city || a.town || a.village || a.hamlet || a.county || ''
+          const short = [street || a.neighbourhood || a.suburb, city, a.state]
+            .filter(Boolean)
+            .join(', ')
+          setAddr(short || r.display_name || '')
+        } catch {
+          /* address is optional */
+        }
+      },
+      () => {
+        if (alive) setStatus('denied')
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    )
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const d = 0.004
+  const mapSrc = pos
+    ? `https://www.openstreetmap.org/export/embed.html?bbox=${pos.lon - d}%2C${pos.lat - d}%2C${pos.lon + d}%2C${pos.lat + d}&layer=mapnik&marker=${pos.lat}%2C${pos.lon}`
+    : null
+
+  return (
+    <div className="flex flex-col flex-1 min-h-0 mt-3">
+      {/* Thin address row above the map */}
+      <div className="flex-shrink-0 px-2.5 py-1 text-[11px] text-gray-500 truncate border border-gray-200 border-b-0 rounded-t-lg bg-gray-50">
+        {status === 'loading' && 'Locating you…'}
+        {status === 'denied' && 'Location permission denied'}
+        {status === 'error' && 'Location unavailable on this device'}
+        {status === 'ok' && (addr ? `📍 ${addr}` : '📍 Current location')}
+      </div>
+      <div className="flex-1 min-h-0 rounded-b-lg overflow-hidden border border-gray-200 bg-gray-100">
+        {mapSrc ? (
+          <iframe
+            title="Current location map"
+            src={mapSrc}
+            className="w-full h-full"
+            style={{ border: 0 }}
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">
+            {status === 'denied' || status === 'error' ? 'Map unavailable' : 'Loading map…'}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
