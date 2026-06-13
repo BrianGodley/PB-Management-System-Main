@@ -759,66 +759,54 @@ export default function COEstimatePanel({
 
   return (
     <div className="flex flex-col h-full">
-      {/* CO header bar */}
-      <div className="flex items-start justify-between gap-3 mb-3 px-1 flex-wrap">
-        <div className="flex items-start gap-3 flex-1 min-w-0">
+      {/* CO header */}
+      <div className="mb-3">
+        {/* Small Save + close X */}
+        <div className="flex items-center justify-end gap-2 mb-2">
+          <button
+            onClick={handleSaveCO}
+            disabled={savingCO}
+            className="text-xs px-3 py-1.5 rounded-lg bg-blue-700 text-white font-semibold hover:bg-blue-800 transition-colors disabled:opacity-50"
+          >
+            {savingCO ? 'Saving…' : 'Save'}
+          </button>
           <button
             onClick={onClose}
-            className="text-sm text-gray-500 hover:text-gray-800 font-medium flex items-center gap-1 mt-1 flex-shrink-0"
+            aria-label="Close"
+            className="w-7 h-7 rounded-full text-gray-400 hover:bg-gray-100 flex items-center justify-center text-lg flex-shrink-0"
           >
-            ← Back
+            ✕
           </button>
-          <div className="h-4 w-px bg-gray-200 mt-2 flex-shrink-0" />
-          <div className="flex items-start gap-2 flex-1 min-w-0">
-            <span className="text-base mt-1">📋</span>
-            <div className="flex-1 min-w-0 space-y-1.5">
-              <div>
-                <label className="block text-[10px] font-semibold text-blue-600 uppercase tracking-wide mb-0.5">
-                  Title <span className="text-red-500">*</span>
-                </label>
-                <input
-                  value={title}
-                  onChange={e => setTitle(e.target.value)}
-                  disabled={!editable}
-                  placeholder="e.g. Add Patio Extension…"
-                  className="w-full text-sm font-semibold text-gray-900 border-b border-gray-300 focus:border-blue-500 outline-none bg-transparent pb-0.5 placeholder-gray-300 disabled:text-gray-500"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">
-                  Description
-                </label>
-                <input
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                  disabled={!editable}
-                  placeholder="Scope / notes (optional)…"
-                  className="w-full text-sm text-gray-700 border-b border-gray-200 focus:border-blue-500 outline-none bg-transparent pb-0.5 placeholder-gray-300 disabled:text-gray-400"
-                />
-              </div>
-            </div>
-          </div>
         </div>
 
-        {/* Save returns to the table; release/edit/delete live in the detail modal. */}
-        <button
-          onClick={handleSaveCO}
-          disabled={savingCO}
-          className="text-sm px-4 py-2 rounded-lg bg-blue-700 text-white font-semibold hover:bg-blue-800 transition-colors disabled:opacity-50 flex items-center gap-1.5 flex-shrink-0"
-        >
-          {savingCO ? '⏳ Saving…' : '💾 Save'}
-        </button>
+        {/* Title — enclosed field */}
+        <label className="block text-[10px] font-semibold text-blue-600 uppercase tracking-wide mb-0.5">
+          Title <span className="text-red-500">*</span>
+        </label>
+        <input
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          disabled={!editable}
+          placeholder="e.g. Add Patio Extension…"
+          className="w-full text-sm font-semibold text-gray-900 border border-gray-300 rounded-lg px-2.5 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none placeholder-gray-300 disabled:bg-gray-50 disabled:text-gray-500"
+        />
+
+        {/* Description — enclosed field that wraps */}
+        <label className="block text-[10px] font-semibold text-blue-600 uppercase tracking-wide mb-0.5 mt-2">
+          Description
+        </label>
+        <textarea
+          value={description}
+          onChange={e => setDescription(e.target.value)}
+          disabled={!editable}
+          rows={2}
+          placeholder="Scope / notes (optional)…"
+          className="w-full text-sm text-gray-700 border border-gray-300 rounded-lg px-2.5 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none resize-none placeholder-gray-300 disabled:bg-gray-50 disabled:text-gray-500"
+        />
       </div>
 
       {/* Estimate-wide GPMD bar */}
       <div className="mb-3">
-        <div className="flex items-center justify-between mb-1.5 px-1">
-          <p className="text-xs font-bold uppercase tracking-wider text-gray-500">CO Totals</p>
-          <p className="text-xs text-gray-400">
-            {allModules.length} module{allModules.length !== 1 ? 's' : ''} across {projects.length}{' '}
-            project{projects.length !== 1 ? 's' : ''}
-          </p>
-        </div>
         {allModules.length === 0 ? (
           <div className="bg-gray-900 text-white rounded-xl px-5 py-4">
             <p className="text-xs text-gray-500 text-center py-1">
