@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { fetchAllPaginated } from '../lib/fetchAll'
 
 /**
  * CONavModal — change-order quick navigator (opened from the mobile dock).
@@ -27,10 +28,11 @@ export default function CONavModal({ onClose, onNavigate }) {
   useEffect(() => {
     let alive = true
     ;(async () => {
-      const { data } = await supabase
-        .from('jobs')
-        .select('id, name, client_name, status')
-        .order('name', { ascending: true })
+      // Paginated — the jobs table exceeds the 1k row cap, so a plain select
+      // would stop partway through the alphabet.
+      const { data } = await fetchAllPaginated(() =>
+        supabase.from('jobs').select('id, name, client_name, status').order('name', { ascending: true })
+      )
       if (!alive) return
       // Current (open) jobs first, then the rest.
       const rows = data || []
