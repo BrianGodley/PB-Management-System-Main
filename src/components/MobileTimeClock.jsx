@@ -30,6 +30,31 @@ function fmtDur(ms) {
   const m = totalMin % 60
   return `${h}h ${String(m).padStart(2, '0')}m`
 }
+// Minutes between two HH:MM strings (handles past-midnight).
+function diffMins(tin, tout) {
+  if (!tin || !tout) return 0
+  const [h1, m1] = tin.split(':').map(Number)
+  const [h2, m2] = tout.split(':').map(Number)
+  let mins = h2 * 60 + m2 - (h1 * 60 + m1)
+  if (mins < 0) mins += 24 * 60
+  return mins
+}
+function fmtHm(mins) {
+  const m = Math.max(0, Math.round(mins))
+  return `${Math.floor(m / 60)}h ${m % 60}m`
+}
+// Week range containing today, given the configured start day (0=Sun … 6=Sat).
+function getWeekRange(startDay) {
+  const today = new Date()
+  const diff = (today.getDay() - startDay + 7) % 7
+  const start = new Date(today)
+  start.setDate(today.getDate() - diff)
+  start.setHours(0, 0, 0, 0)
+  const end = new Date(start)
+  end.setDate(start.getDate() + 6)
+  return { weekStart: start, weekEnd: end }
+}
+
 // Total break time to subtract, and any currently-active break.
 function breakInfo(breaks, nowMs) {
   let deduct = 0
@@ -54,6 +79,9 @@ export default function MobileTimeClock() {
   const [chiefIds, setChiefIds] = useState(new Set())
   const [canManager, setCanManager] = useState(false)
   const [canChief, setCanChief] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [dayMins, setDayMins] = useState(0)
+  const [weekMins, setWeekMins] = useState(0)
   const [myEntry, setMyEntry] = useState(null)
   const [myBreaks, setMyBreaks] = useState([])
   const [multiEntries, setMultiEntries] = useState([])
@@ -65,7 +93,7 @@ export default function MobileTimeClock() {
   const [ready, setReady] = useState(false)
   const [error, setError] = useState('')
 
-  const canMultiple = canManager || canChief
+  const canMultiple = canManager || canChief || isAdmin
   const openJobs = useMemo(() => jobs.filter(jobIsOpen), [jobs])
   const empById = useMemo(() => Object.fromEntries(employees.map(e => [e.id, e])), [employees])
   const jobName = id => {
@@ -89,12 +117,14 @@ export default function MobileTimeClock() {
       const [{ data: prof }, { data: emp }] = await Promise.all([
         supabase
           .from('profiles')
-          .select('first_name,last_name,full_name,display_name,name')
+          .select('first_name,last_name,full_name,display_name,name,role')
           .eq('id', user.id)
           .maybeSingle(),
         supabase.from('employees').select('id').eq('user_id', user.id).maybeSingle(),
       ])
       if (!alive) return
+      const admin = prof?.role === 'admin' || prof?.role === 'super_admin'
+      setIsAdmin(admin)
       const name =
         (prof &&
           ([prof.first_name, prof.last_name].filter(Boolean).join(' ') ||
@@ -155,6 +185,32 @@ export default function MobileTimeClock() {
       if (alive) {
         setRecentJobIds(seen)
         setClockInJob(prev => prev || seen[0] || '') // prefill last job
+      }
+
+      // Day + week hours so far (completed shifts). Week start day comes from
+      // company_settings (configurable in HR > Settings > Time Clock).
+      const { data: cs } = await supabase
+        .from('company_settings')
+        .select('payroll_week_start')
+        .maybeSingle()
+      const weekStartDay = cs?.payroll_week_start ?? 0
+      const { weekStart, weekEnd } = getWeekRange(weekStartDay)
+      const wkStart = dStr(weekStart)
+      const wkEnd = dStr(weekEnd)
+      let totQ = supabase.from('time_entries').select('date, time_in, time_out')
+      totQ = eid ? totQ.eq('employee_id', eid) : totQ.eq('created_by', user.id)
+      const { data: totRows } = await totQ.gte('date', wkStart).lte('date', wkEnd)
+      const today = dStr(new Date())
+      let dMin = 0
+      let wMin = 0
+      for (const r of totRows || []) {
+        const mins = diffMins(r.time_in, r.time_out)
+        wMin += mins
+        if (r.date === today) dMin += mins
+      }
+      if (alive) {
+        setDayMins(dMin)
+        setWeekMins(wMin)
       }
      } catch (err) {
        if (alive) setError(err?.message || 'Failed to load time clock.')
@@ -461,17 +517,19 @@ export default function MobileTimeClock() {
     )
   }
 
-  // Job-selection screen for the clock-in field (search + recent-first list).
+  // Job-selection screen for the clock-in field (search + recent-first list,
+  // filling the whole screen).
   if (screen === 'pick-job') {
     return (
-      <div className="max-w-md mx-auto py-4">
-        <div className="flex items-center justify-between mb-3">
+      <div className="flex flex-col h-full max-w-md mx-auto py-4">
+        <div className="flex items-center justify-between mb-3 flex-shrink-0">
           <p className="text-base font-bold text-gray-900">Select Job</p>
           <button onClick={() => setScreen('clockin')} className="text-sm text-gray-500">
             Cancel
           </button>
         </div>
         <JobSearchPicker
+          fill
           openJobs={openJobs}
           value={clockInJob}
           recentJobIds={recentJobIds}
@@ -493,6 +551,8 @@ export default function MobileTimeClock() {
       error={error}
       canMultiple={canMultiple}
       multiCount={multiEntries.length}
+      dayMins={dayMins}
+      weekMins={weekMins}
       onPickJob={() => setScreen('pick-job')}
       onClockIn={() => clockIn(clockInJob)}
       onMulti={() => setScreen('multi-setup')}
@@ -502,7 +562,7 @@ export default function MobileTimeClock() {
 }
 
 // ── Searchable open-job picker (shared) ─────────────────────────────────────
-function JobSearchPicker({ openJobs, value, onChange, recentJobIds = [] }) {
+function JobSearchPicker({ openJobs, value, onChange, recentJobIds = [], fill = false }) {
   const [q, setQ] = useState('')
   const ql = q.trim().toLowerCase()
   const recent = recentJobIds
@@ -512,15 +572,19 @@ function JobSearchPicker({ openJobs, value, onChange, recentJobIds = [] }) {
     ? openJobs.filter(j => (j.name || j.client_name || '').toLowerCase().includes(ql))
     : [...recent, ...openJobs.filter(j => !recentJobIds.includes(j.id))]
   return (
-    <div>
+    <div className={fill ? 'flex flex-col flex-1 min-h-0' : ''}>
       <input
         type="text"
         value={q}
         onChange={e => setQ(e.target.value)}
         placeholder="Search open jobs…"
-        className="input text-sm w-full mb-2"
+        className="input text-sm w-full mb-2 flex-shrink-0"
       />
-      <div className="max-h-64 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-100">
+      <div
+        className={`overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-100 ${
+          fill ? 'flex-1 min-h-0' : 'max-h-64'
+        }`}
+      >
         {base.slice(0, 80).map(j => (
           <button
             key={j.id}
@@ -550,6 +614,8 @@ function ClockInScreen({
   error,
   canMultiple,
   multiCount,
+  dayMins,
+  weekMins,
   onPickJob,
   onClockIn,
   onMulti,
@@ -557,6 +623,24 @@ function ClockInScreen({
 }) {
   return (
     <div className="max-w-md mx-auto py-4">
+      <p className="text-sm font-semibold text-gray-500 text-center mb-3">Not clocked in</p>
+
+      {/* Hours so far — today and this week (Sun–Sat or per HR setting) */}
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-center">
+          <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">
+            Day's Total
+          </p>
+          <p className="text-lg font-bold text-gray-900 mt-0.5">{fmtHm(dayMins)}</p>
+        </div>
+        <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-center">
+          <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold">
+            Weekly Total
+          </p>
+          <p className="text-lg font-bold text-gray-900 mt-0.5">{fmtHm(weekMins)}</p>
+        </div>
+      </div>
+
       <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1.5">Job</p>
       {/* The field shows the last job clocked into; tap it to choose another. */}
       <button
@@ -566,7 +650,7 @@ function ClockInScreen({
         <span className={`truncate ${hasJob ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>
           {jobLabel || 'Tap to select a job'}
         </span>
-        <span className="text-gray-400 text-sm flex-shrink-0 ml-2">Change ›</span>
+        <span className="text-gray-400 text-lg flex-shrink-0 ml-2">▾</span>
       </button>
 
       {error && (

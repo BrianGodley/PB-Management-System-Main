@@ -14,13 +14,16 @@ export default function TimeClockPermissionsTab({ employees = [] }) {
   const [loading, setLoading] = useState(true)
   const [savingId, setSavingId] = useState(null)
   const [query, setQuery] = useState('')
+  const [weekStart, setWeekStart] = useState(0) // 0=Sunday
+  const [settingsId, setSettingsId] = useState(null)
 
   useEffect(() => {
     let alive = true
     ;(async () => {
-      const [{ data: permRows }, { data: crews }] = await Promise.all([
+      const [{ data: permRows }, { data: crews }, { data: cs }] = await Promise.all([
         supabase.from('time_clock_permissions').select('*'),
         supabase.from('crews').select('crew_chief_id'),
+        supabase.from('company_settings').select('id, payroll_week_start').maybeSingle(),
       ])
       if (!alive) return
       const p = {}
@@ -32,12 +35,34 @@ export default function TimeClockPermissionsTab({ employees = [] }) {
       }
       setPerms(p)
       setChiefIds(new Set((crews || []).map(c => c.crew_chief_id).filter(Boolean)))
+      if (cs) {
+        setSettingsId(cs.id || null)
+        if (cs.payroll_week_start != null) setWeekStart(cs.payroll_week_start)
+      }
       setLoading(false)
     })()
     return () => {
       alive = false
     }
   }, [])
+
+  const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  async function saveWeekStart(day) {
+    setWeekStart(day)
+    if (settingsId) {
+      await supabase
+        .from('company_settings')
+        .update({ payroll_week_start: day })
+        .eq('id', settingsId)
+    } else {
+      const { data } = await supabase
+        .from('company_settings')
+        .insert({ payroll_week_start: day })
+        .select('id')
+        .single()
+      if (data) setSettingsId(data.id)
+    }
+  }
 
   const activeEmps = useMemo(
     () =>
@@ -98,6 +123,28 @@ export default function TimeClockPermissionsTab({ employees = [] }) {
         Crew chiefs (assigned on a master crew) are enabled automatically — you can override
         either setting below.
       </p>
+
+      {/* Payroll week start — defines the weekly time-clock period (Sun–Sat by default). */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4 mb-5 flex items-center gap-3 flex-wrap">
+        <div>
+          <p className="text-sm font-semibold text-gray-800">Weekly time-clock period</p>
+          <p className="text-xs text-gray-400">The week the “Weekly Total” is measured against.</p>
+        </div>
+        <label className="ml-auto text-sm text-gray-600 flex items-center gap-2">
+          Week starts on
+          <select
+            value={weekStart}
+            onChange={e => saveWeekStart(Number(e.target.value))}
+            className="input text-sm py-1.5"
+          >
+            {WEEKDAYS.map((d, i) => (
+              <option key={d} value={i}>
+                {d}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
 
       <input
         type="text"
