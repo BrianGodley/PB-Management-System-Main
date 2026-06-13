@@ -468,12 +468,23 @@ function ListView({ listDays, itemsOnDay, jobMap, todayStr, todayRef, selectedJo
                           Crew Not Assigned
                         </p>
                       )}
-                      <p className="font-semibold text-gray-900 text-sm leading-tight">
-                        {it.title || '(untitled)'}
-                      </p>
-                      {selectedJob === 'all' && jobMap[it.job_id] && (
-                        <p className="text-xs text-purple-600 mt-0.5 font-medium">
-                          {jobMap[it.job_id]}
+                      {/* Job name is the headline when the item is tied to a
+                          job; the crew/title shows underneath. Crew-only items
+                          (no job_id) just show their title. */}
+                      {jobMap[it.job_id] ? (
+                        <>
+                          <p className="font-semibold text-gray-900 text-sm leading-tight">
+                            {jobMap[it.job_id]}
+                          </p>
+                          {it.title && (
+                            <p className="text-xs text-purple-600 mt-0.5 font-medium">
+                              {it.title}
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="font-semibold text-gray-900 text-sm leading-tight">
+                          {it.title || '(untitled)'}
                         </p>
                       )}
                       {it.start_date !== it.end_date && (
