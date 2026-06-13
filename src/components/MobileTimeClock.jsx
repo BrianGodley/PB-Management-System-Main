@@ -810,14 +810,21 @@ function MultiSetup({
 
   return (
     <div className="flex flex-col h-full max-w-md mx-auto py-4">
-      <div className="flex items-center justify-between flex-shrink-0">
-        <p className="text-base font-bold text-gray-900">Clock In Multiple</p>
-        <button onClick={onCancel} className="text-sm text-gray-500">
+      {/* Action docked at the top (it doubles as the screen label). */}
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <button onClick={onCancel} className="text-sm text-gray-500 flex-shrink-0">
           Cancel
+        </button>
+        <button
+          onClick={() => onClockIn(selected)}
+          disabled={busy || selected.length === 0}
+          className="flex-1 py-2.5 rounded-xl bg-green-700 text-white font-bold hover:bg-green-800 disabled:opacity-40"
+        >
+          Clock In {selected.length || ''} {selected.length === 1 ? 'Person' : 'People'}
         </button>
       </div>
       {/* Job (chosen on the previous screen) */}
-      <p className="text-xs text-purple-600 font-medium mt-1 flex-shrink-0">{jobName || 'Job'}</p>
+      <p className="text-xs text-purple-600 font-medium mt-2 flex-shrink-0">{jobName || 'Job'}</p>
 
       {/* Selected employees — removable chips */}
       <div className="flex flex-wrap gap-2 mt-3 flex-shrink-0">
@@ -882,14 +889,6 @@ function MultiSetup({
           <p className="px-3 py-6 text-center text-sm text-gray-400">No employees</p>
         )}
       </div>
-
-      <button
-        onClick={() => onClockIn(selected)}
-        disabled={busy || selected.length === 0}
-        className="w-full mt-4 py-3 rounded-xl bg-green-700 text-white font-bold hover:bg-green-800 disabled:opacity-40 flex-shrink-0"
-      >
-        Clock In {selected.length || ''} {selected.length === 1 ? 'Person' : 'People'}
-      </button>
     </div>
   )
 }
