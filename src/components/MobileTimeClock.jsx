@@ -32,8 +32,17 @@ const jobIsOpen = j => {
   const s = j?.status || 'active'
   return s === 'active' || s === 'on_hold'
 }
+// Live elapsed with seconds: "1h 04m 09s".
+function fmtHMS(ms) {
+  if (!Number.isFinite(ms) || ms < 0) ms = 0
+  const totalSec = Math.floor(ms / 1000)
+  const h = Math.floor(totalSec / 3600)
+  const m = Math.floor((totalSec % 3600) / 60)
+  const s = totalSec % 60
+  return `${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`
+}
 function fmtDur(ms) {
-  if (ms < 0) ms = 0
+  if (!Number.isFinite(ms) || ms < 0) ms = 0
   const totalMin = Math.floor(ms / 60000)
   const h = Math.floor(totalMin / 60)
   const m = totalMin % 60
@@ -450,8 +459,8 @@ export default function MobileTimeClock() {
         <div className="rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-sm">
           <p className="text-xs uppercase tracking-wide text-gray-400 font-semibold">On the clock</p>
           <p className="text-lg font-bold text-gray-900 mt-1">{jobName(myEntry.job_id)}</p>
-          <p className="text-5xl font-extrabold text-green-700 mt-4 tabular-nums">
-            {fmtDur(worked)}
+          <p className="text-4xl font-extrabold text-green-700 mt-4 tabular-nums">
+            {fmtHMS(worked)}
           </p>
           {active ? (
             <p className="mt-2 text-sm font-semibold text-amber-600">
