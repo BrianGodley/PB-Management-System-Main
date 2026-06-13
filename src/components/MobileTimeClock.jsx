@@ -512,16 +512,17 @@ export default function MobileTimeClock() {
             (meId && entry.employee_id === meId) || entry.employee_name === meName
           return (
             <div key={entry.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-bold text-gray-900 truncate">
-                    {entry.employee_name}
-                    {isMe ? ' (You)' : ''}
-                  </p>
-                  <p className="text-xs text-purple-600 truncate">{jobName(entry.job_id)}</p>
-                </div>
-                <p className="text-xl font-extrabold text-green-700 tabular-nums flex-shrink-0">
-                  {fmtHMS(worked)}
+              <div className="min-w-0">
+                <p className="font-bold text-gray-900 truncate">
+                  {entry.employee_name}
+                  {isMe ? ' (You)' : ''}
+                </p>
+                {/* Job name + elapsed time on one line, same text size. */}
+                <p className="text-xs text-purple-600 truncate">
+                  {jobName(entry.job_id)}{' '}
+                  <span className="text-green-700 font-semibold tabular-nums">
+                    · {fmtHMS(worked)}
+                  </span>
                 </p>
               </div>
               {active && (
@@ -663,7 +664,7 @@ function JobSearchPicker({ openJobs, value, onChange, recentJobIds = [], fill = 
           fill ? 'flex-1 min-h-0' : 'max-h-64'
         }`}
       >
-        {base.slice(0, 80).map(j => (
+        {base.slice(0, 500).map(j => (
           <button
             key={j.id}
             onClick={() => onChange(j.id)}
@@ -759,14 +760,16 @@ function ClockInScreen({
 function JobPickerScreen({ title, openJobs, recentJobIds, onCancel, onPick, busy }) {
   const [jobId, setJobId] = useState('')
   return (
-    <div className="max-w-md mx-auto py-4">
-      <div className="flex items-center justify-between mb-3">
+    <div className="flex flex-col h-full max-w-md mx-auto py-4">
+      <div className="flex items-center justify-between mb-3 flex-shrink-0">
         <p className="text-base font-bold text-gray-900">{title}</p>
         <button onClick={onCancel} className="text-sm text-gray-500">
           Cancel
         </button>
       </div>
+      {/* List fills the screen down to just above the docked button. */}
       <JobSearchPicker
+        fill
         openJobs={openJobs}
         value={jobId}
         onChange={setJobId}
@@ -775,7 +778,7 @@ function JobPickerScreen({ title, openJobs, recentJobIds, onCancel, onPick, busy
       <button
         onClick={() => onPick(jobId)}
         disabled={!jobId || busy}
-        className="w-full mt-4 py-3 rounded-xl bg-green-700 text-white font-bold hover:bg-green-800 disabled:opacity-40"
+        className="w-full mt-3 py-3 rounded-xl bg-green-700 text-white font-bold hover:bg-green-800 disabled:opacity-40 flex-shrink-0"
       >
         {title}
       </button>
