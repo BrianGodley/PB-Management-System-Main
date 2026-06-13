@@ -17,6 +17,13 @@ import { fetchAllPaginated } from '../lib/fetchAll'
 import { useAuth } from '../contexts/AuthContext'
 
 const todayStr = () => new Date().toISOString().split('T')[0]
+// Local YYYY-MM-DD (avoids the UTC shift that toISOString would introduce).
+const dStr = d => {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const da = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${da}`
+}
 const hhmm = d => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 const entryStartMs = e => new Date(`${e.date}T${(e.time_in || '00:00')}:00`).getTime()
 const jobIsOpen = j => {
