@@ -57,7 +57,9 @@ export default function MobileTimeClock() {
   const [myEntry, setMyEntry] = useState(null)
   const [myBreaks, setMyBreaks] = useState([])
   const [multiEntries, setMultiEntries] = useState([])
-  const [screen, setScreen] = useState('clockin') // clockin|running|multi-setup|multi-view
+  const [screen, setScreen] = useState('clockin') // clockin|pick-job|running|switch|multi-setup|multi-view
+  const [clockInJob, setClockInJob] = useState('') // job prefilled / chosen on the clock-in screen
+  const [recentJobIds, setRecentJobIds] = useState([]) // this user's recent (open) jobs, newest first
   const [now, setNow] = useState(Date.now())
   const [busy, setBusy] = useState(false)
   const [ready, setReady] = useState(false)
@@ -137,6 +139,23 @@ export default function MobileTimeClock() {
       setCanChief(permRow ? !!permRow.clock_in_multiple_crew_chief : isChief)
 
       await refreshEntries(eid, name)
+
+      // Recent jobs this user has clocked into (OPEN only, newest first).
+      let recQ = supabase.from('time_entries').select('job_id, date, time_in')
+      recQ = eid ? recQ.eq('employee_id', eid) : recQ.eq('employee_name', name)
+      const { data: recRows } = await recQ
+        .order('date', { ascending: false })
+        .order('time_in', { ascending: false })
+        .limit(60)
+      const openSet = new Set((js || []).filter(jobIsOpen).map(j => j.id))
+      const seen = []
+      for (const r of recRows || []) {
+        if (r.job_id && openSet.has(r.job_id) && !seen.includes(r.job_id)) seen.push(r.job_id)
+      }
+      if (alive) {
+        setRecentJobIds(seen)
+        setClockInJob(prev => prev || seen[0] || '') // prefill last job
+      }
      } catch (err) {
        if (alive) setError(err?.message || 'Failed to load time clock.')
      } finally {
@@ -431,7 +450,7 @@ export default function MobileTimeClock() {
       <JobPickerScreen
         title="Switch Job"
         openJobs={openJobs}
-        recentJobIds={[]}
+        recentJobIds={recentJobIds}
         onCancel={() => setScreen('running')}
         busy={busy}
         onPick={async jobId => {
@@ -442,15 +461,40 @@ export default function MobileTimeClock() {
     )
   }
 
-  // Default: clock-in screen.
+  // Job-selection screen for the clock-in field (search + recent-first list).
+  if (screen === 'pick-job') {
+    return (
+      <div className="max-w-md mx-auto py-4">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-base font-bold text-gray-900">Select Job</p>
+          <button onClick={() => setScreen('clockin')} className="text-sm text-gray-500">
+            Cancel
+          </button>
+        </div>
+        <JobSearchPicker
+          openJobs={openJobs}
+          value={clockInJob}
+          recentJobIds={recentJobIds}
+          onChange={jobId => {
+            setClockInJob(jobId)
+            setScreen('clockin')
+          }}
+        />
+      </div>
+    )
+  }
+
+  // Default: clock-in screen with the last job prefilled in the field.
   return (
     <ClockInScreen
-      openJobs={openJobs}
+      jobLabel={clockInJob ? jobName(clockInJob) : ''}
+      hasJob={!!clockInJob}
       busy={busy}
       error={error}
       canMultiple={canMultiple}
       multiCount={multiEntries.length}
-      onClockIn={clockIn}
+      onPickJob={() => setScreen('pick-job')}
+      onClockIn={() => clockIn(clockInJob)}
       onMulti={() => setScreen('multi-setup')}
       onViewMulti={() => setScreen('multi-view')}
     />
@@ -499,20 +543,41 @@ function JobSearchPicker({ openJobs, value, onChange, recentJobIds = [] }) {
   )
 }
 
-function ClockInScreen({ openJobs, busy, error, canMultiple, multiCount, onClockIn, onMulti, onViewMulti }) {
-  const [jobId, setJobId] = useState('')
+function ClockInScreen({
+  jobLabel,
+  hasJob,
+  busy,
+  error,
+  canMultiple,
+  multiCount,
+  onPickJob,
+  onClockIn,
+  onMulti,
+  onViewMulti,
+}) {
   return (
     <div className="max-w-md mx-auto py-4">
-      <p className="text-sm font-semibold text-gray-700 mb-2">Select a job</p>
-      <JobSearchPicker openJobs={openJobs} value={jobId} onChange={setJobId} />
+      <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1.5">Job</p>
+      {/* The field shows the last job clocked into; tap it to choose another. */}
+      <button
+        onClick={onPickJob}
+        className="w-full flex items-center justify-between px-3 py-3 rounded-xl border border-gray-300 bg-white text-left"
+      >
+        <span className={`truncate ${hasJob ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>
+          {jobLabel || 'Tap to select a job'}
+        </span>
+        <span className="text-gray-400 text-sm flex-shrink-0 ml-2">Change ›</span>
+      </button>
+
       {error && (
         <p className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
           {error}
         </p>
       )}
+
       <button
-        onClick={() => onClockIn(jobId)}
-        disabled={!jobId || busy}
+        onClick={onClockIn}
+        disabled={!hasJob || busy}
         className="w-full mt-4 py-3 rounded-xl bg-green-700 text-white font-bold hover:bg-green-800 disabled:opacity-40"
       >
         {busy ? 'Clocking in…' : 'Clock In'}
