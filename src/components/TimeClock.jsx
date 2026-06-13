@@ -872,6 +872,9 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
                     GPS
                   </th>
                   <th className="px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right w-16">
+                    Break
+                  </th>
+                  <th className="px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right w-16">
                     Total
                   </th>
                   <th className="px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right w-16">
@@ -944,6 +947,15 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
                       {/* GPS — clock-in/out location status + map link */}
                       <td className="px-3 py-3 align-middle">
                         <GpsCell entry={entry} jobLoc={jobLocMap[entry.job_id]} />
+                      </td>
+
+                      {/* Break — total lunch + short-break minutes for this shift */}
+                      <td className="px-2 py-3 text-right font-mono text-sm">
+                        {brk > 0 ? (
+                          <span className="text-gray-600">{fmtMins(brk)}</span>
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
                       </td>
 
                       {/* Total */}
