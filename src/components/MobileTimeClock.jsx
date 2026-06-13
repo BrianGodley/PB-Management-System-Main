@@ -25,7 +25,9 @@ const dStr = d => {
   return `${y}-${m}-${da}`
 }
 const hhmm = d => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-const entryStartMs = e => new Date(`${e.date}T${(e.time_in || '00:00')}:00`).getTime()
+// time_in may come back as "HH:MM" or "HH:MM:SS" (Postgres time) — don't append
+// seconds (that would make an invalid date and yield NaN elapsed).
+const entryStartMs = e => new Date(`${e.date}T${e.time_in || '00:00'}`).getTime()
 const jobIsOpen = j => {
   const s = j?.status || 'active'
   return s === 'active' || s === 'on_hold'
