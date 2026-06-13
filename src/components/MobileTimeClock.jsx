@@ -174,6 +174,7 @@ export default function MobileTimeClock() {
   const [entries, setEntries] = useState([])
   const [breaksByEntry, setBreaksByEntry] = useState({}) // entryId -> [breaks]
   const [switchEntryId, setSwitchEntryId] = useState(null) // entry being switched
+  const [showLocModal, setShowLocModal] = useState(false) // enlarged clock-out location map (multi view)
   const [screen, setScreen] = useState('clockin') // clockin|pick-job|running|switch|multi-setup
   const [clockInJob, setClockInJob] = useState('') // job prefilled / chosen on the clock-in screen
   const [recentJobIds, setRecentJobIds] = useState([]) // this user's recent (open) jobs, newest first
@@ -514,8 +515,8 @@ export default function MobileTimeClock() {
     const worked = now - entryStartMs(entry) - deduct
     const isMe = (meId && entry.employee_id === meId) || entry.employee_name === meName
     return (
-      <div className="max-w-md mx-auto py-4">
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-sm">
+      <div className="flex flex-col h-full max-w-md mx-auto py-2">
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-sm flex-shrink-0">
           <p className="text-xs uppercase tracking-wide text-gray-400 font-semibold">
             {isMe ? 'On the clock' : entry.employee_name}
           </p>
@@ -579,6 +580,12 @@ export default function MobileTimeClock() {
             </button>
           )}
         </div>
+
+        {/* Live clock-out location — this is the spot captured when you clock out. */}
+        <p className="text-[11px] text-gray-400 mt-3 mb-1 px-1 flex-shrink-0">
+          Clock-out location (live)
+        </p>
+        <CurrentLocationMap />
       </div>
     )
   }
@@ -598,16 +605,25 @@ export default function MobileTimeClock() {
             (meId && entry.employee_id === meId) || entry.employee_name === meName
           return (
             <div key={entry.id} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-              <div className="min-w-0">
-                <p className="font-bold text-gray-900 truncate">
-                  {entry.employee_name}
-                  {isMe ? ' (You)' : ''}
-                </p>
-                {/* Job name + clock-in time on one line, same text size. */}
-                <p className="text-xs text-purple-600 truncate">
-                  {jobName(entry.job_id)}{' '}
-                  <span className="text-gray-500">· in at {fmt12h(entry.time_in)}</span>
-                </p>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-bold text-gray-900 truncate">
+                    {entry.employee_name}
+                    {isMe ? ' (You)' : ''}
+                  </p>
+                  {/* Job name + clock-in time on one line, same text size. */}
+                  <p className="text-xs text-purple-600 truncate">
+                    {jobName(entry.job_id)}{' '}
+                    <span className="text-gray-500">· in at {fmt12h(entry.time_in)}</span>
+                  </p>
+                </div>
+                {/* Clock-out location for this person (captured when they clock out). */}
+                <button
+                  onClick={() => setShowLocModal(true)}
+                  className="text-[11px] font-semibold text-blue-600 hover:underline flex-shrink-0 whitespace-nowrap"
+                >
+                  📍 Location
+                </button>
               </div>
               {active && (
                 <p className="mt-1 text-xs font-semibold text-amber-600">
@@ -659,6 +675,8 @@ export default function MobileTimeClock() {
             👥 Clock In Others
           </button>
         )}
+
+        {showLocModal && <LiveLocationModal onClose={() => setShowLocModal(false)} />}
       </div>
     )
   }
@@ -878,6 +896,31 @@ function loadLeaflet() {
 }
 
 // Shows the user's current GPS location on an interactive map (Leaflet), with
+// Enlarged clock-out location popup (multi-user running view). Shows the live
+// device location — the spot that gets captured when the person is clocked out.
+function LiveLocationModal({ onClose }) {
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4"
+      onClick={e => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col" style={{ height: '80vh' }}>
+        <div className="flex items-center justify-between px-4 h-12 border-b border-gray-100 flex-shrink-0">
+          <h3 className="font-bold text-gray-900">Clock-Out Location (live)</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-2xl leading-none">
+            ×
+          </button>
+        </div>
+        <div className="flex-1 min-h-0 flex flex-col p-3">
+          <CurrentLocationMap />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // the nearest street address as a tappable "recenter" row above it. No tile
 // attribution overlay, and a large pin marks the location.
 function CurrentLocationMap() {
