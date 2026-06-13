@@ -779,20 +779,8 @@ export default function COEstimatePanel({
           </button>
         </div>
 
-        {/* Title — enclosed field */}
-        <label className="block text-[10px] font-semibold text-blue-600 uppercase tracking-wide mb-0.5">
-          Title <span className="text-red-500">*</span>
-        </label>
-        <input
-          value={title}
-          onChange={e => setTitle(e.target.value)}
-          disabled={!editable}
-          placeholder="e.g. Add Patio Extension…"
-          className="w-full text-sm font-semibold text-gray-900 border border-gray-300 rounded-lg px-2.5 py-1.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none placeholder-gray-300 disabled:bg-gray-50 disabled:text-gray-500"
-        />
-
         {/* Description — enclosed field that wraps */}
-        <label className="block text-[10px] font-semibold text-blue-600 uppercase tracking-wide mb-0.5 mt-2">
+        <label className="block text-[10px] font-semibold text-blue-600 uppercase tracking-wide mb-0.5">
           Description
         </label>
         <textarea

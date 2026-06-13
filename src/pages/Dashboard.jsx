@@ -864,6 +864,4 @@ function DashboardSettings({ prefs, stats, userId, isAdmin, weatherLocation, set
           </p>
         )}
       </div>
-    </div>
-  )
-}
+ 

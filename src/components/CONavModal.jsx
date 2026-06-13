@@ -77,8 +77,7 @@ export default function CONavModal({ onClose, onNavigate }) {
   async function handleGo() {
     if (!canGo) return
     if (mode === 'existing') {
-      // Viewing existing COs lives in the job's change-order list.
-      onNavigate(`/jobs?tab=change-orders&job=${jobId}`)
+      setCreating('existing') // its own screen, not the Jobs tab
       return
     }
     // Create flows open as their own screens here (no Jobs-area detour).
@@ -178,6 +177,19 @@ export default function CONavModal({ onClose, onNavigate }) {
     )
   }
 
+  // ── Standalone "view existing" screen (its own screen, not the Jobs tab) ────
+  if (creating === 'existing' && selectedJob) {
+    return (
+      <ExistingCOScreen
+        job={selectedJob}
+        starting={starting}
+        onClose={onClose}
+        onManual={() => setCreating('manual')}
+        onEstimator={() => startEstimator(selectedJob)}
+      />
+    )
+  }
+
   return (
     <div
       className="fixed inset-0 z-[70] flex items-stretch sm:items-center justify-center bg-black/40"
@@ -236,106 +248,4 @@ export default function CONavModal({ onClose, onNavigate }) {
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => setMethod('manual')}
-                  className={`py-3 px-2 rounded-xl border text-sm font-semibold transition-colors ${
-                    method === 'manual'
-                      ? 'border-blue-600 bg-blue-50 text-blue-800'
-                      : 'border-gray-200 text-gray-600'
-                  }`}
-                >
-                  ✍️ Manual
-                </button>
-                <button
-                  onClick={() => setMethod('estimator')}
-                  className={`py-3 px-2 rounded-xl border text-sm font-semibold transition-colors ${
-                    method === 'estimator'
-                      ? 'border-indigo-600 bg-indigo-50 text-indigo-800'
-                      : 'border-gray-200 text-gray-600'
-                  }`}
-                >
-                  📐 Estimator
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Job picker — fills the rest of the screen down to the Go button */}
-          <div className="flex-1 flex flex-col min-h-0">
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 flex-shrink-0">
-              Select Job
-            </label>
-            <div className="flex gap-2 mb-2 flex-shrink-0">
-              {['open', 'closed'].map(s => (
-                <button
-                  key={s}
-                  onClick={() => {
-                    setStatusFilter(s)
-                    setJobId('')
-                  }}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
-                    statusFilter === s
-                      ? 'bg-green-700 text-white border-green-700'
-                      : 'bg-gray-50 text-gray-600 border-gray-200'
-                  }`}
-                >
-                  {s === 'open' ? 'Open Jobs' : 'Closed Jobs'}
-                </button>
-              ))}
-            </div>
-            <input
-              ref={searchRef}
-              type="text"
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder="Search by job or client…"
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm mb-2 flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
-            <div className="flex-1 min-h-0 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-100">
-              {loading ? (
-                <div className="py-8 text-center text-sm text-gray-400">Loading jobs…</div>
-              ) : filtered.length === 0 ? (
-                <div className="py-8 text-center text-sm text-gray-400">No jobs found</div>
-              ) : (
-                filtered.map(j => (
-                  <button
-                    key={j.id}
-                    onClick={() => setJobId(j.id)}
-                    className={`w-full text-left px-3 py-2.5 transition-colors ${
-                      jobId === j.id ? 'bg-green-50' : 'hover:bg-gray-50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium text-gray-800 truncate">
-                        {j.name || '(unnamed job)'}
-                      </span>
-                      {jobId === j.id && <span className="text-green-600 text-sm">✓</span>}
-                    </div>
-                    {j.client_name && (
-                      <span className="text-xs text-gray-500 truncate block">{j.client_name}</span>
-                    )}
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="px-4 py-3 border-t border-gray-200">
-          <button
-            onClick={handleGo}
-            disabled={!canGo || starting}
-            className="w-full py-3 rounded-xl bg-green-700 text-white text-sm font-bold hover:bg-green-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {starting
-              ? 'Starting…'
-              : mode === 'existing'
-                ? selectedJob
-                  ? `Go to ${selectedJob.name || 'job'} →`
-                  : 'Go →'
-                : `Create ${method === 'manual' ? 'Manual' : 'Estimator'} CO →`}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
+                  className={`py-3 px-2 rounded-xl border text-

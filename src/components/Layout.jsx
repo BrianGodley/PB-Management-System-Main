@@ -707,11 +707,4 @@ export default function Layout() {
       {showReportIssue && user && (
         <ReportIssueModal
           user={user}
-          onClose={() => setShowReportIssue(false)}
-          onCreated={() => setShowReportIssue(false)}
-        />
-      )}
-
-    </div>
-  )
-}
+        

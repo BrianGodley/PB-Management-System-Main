@@ -1096,10 +1096,4 @@ function Lightbox({ photos, index, onClose }) {
 
       {multiple && (
         <p className="absolute bottom-5 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/50 text-white text-sm">
-          {cur + 1} / {photos.length}
-          <span className="hidden sm:inline text-white/60">  ·  swipe or use arrows</span>
-        </p>
-      )}
-    </div>
-  )
-}
+          {cur + 1

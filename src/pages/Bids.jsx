@@ -1305,6 +1305,4 @@ function FinanceSettingsCard() {
           </>
         )}
       </div>
-    </div>
-  )
-}
+ 

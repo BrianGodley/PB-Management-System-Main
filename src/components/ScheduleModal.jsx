@@ -571,19 +571,4 @@ function DayItemModal({ item, job, crew, sub, onClose, onGo }) {
             <span className="text-lg">🗺️</span> View on map
           </button>
           <button
-            onClick={() => onGo(`/timeclock?job=${item.job_id}`)}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-          >
-            <span className="text-lg">⏱️</span> Time clock
-          </button>
-          <button
-            onClick={() => onGo(`/daily-logs?new=1&job=${item.job_id}`)}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-          >
-            <span className="text-lg">📝</span> Add daily log
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
+            onClick={() => onGo(`/timeclock?jo

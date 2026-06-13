@@ -1609,6 +1609,4 @@ export default function Contacts() {
           )}
         </>
       )}
-    </div>
-  )
-}
+ 

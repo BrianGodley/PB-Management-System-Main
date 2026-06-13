@@ -1638,6 +1638,4 @@ export default function HR() {
           }}
         />
       )}
-    </div>
-  )
-}
+ 

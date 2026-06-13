@@ -2380,5 +2380,3 @@ function EstimatesView({ onCountChange }) {
       </div>
     </div>
   )
-}
-           
