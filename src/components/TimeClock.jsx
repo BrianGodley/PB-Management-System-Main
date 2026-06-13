@@ -390,6 +390,8 @@ function GpsCell({ entry, jobLoc }) {
 export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open' }) {
   const { user } = useAuth()
   const [entries, setEntries] = useState([])
+  const [breakMins, setBreakMins] = useState({}) // entryId -> total break minutes
+  const [myWeekBreakMins, setMyWeekBreakMins] = useState({}) // entryId -> break minutes (personal week)
   const [loading, setLoading] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [editEntry, setEditEntry] = useState(null)
@@ -415,32 +417,31 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
       .map(j => [j.id, { lat: Number(j.lat), lon: Number(j.lon) }])
   )
 
-  // Fetch current user's display name for clock-in
+  // Fetch current user's display name for clock-in. The employees table is the
+  // most reliable source of a real name (first/last); the profiles row often
+  // has those blank, which is why some entries used to record the email.
   useEffect(() => {
     if (!user?.id) return
-    supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single()
-      .then(({ data }) => {
-        const name =
-          (data &&
-            ([data.first_name, data.last_name].filter(Boolean).join(' ') ||
-              data.full_name ||
-              data.display_name ||
-              data.name)) ||
-          user.email ||
-          'Unknown'
-        setProfileName(name)
-      })
-    // Resolve this user's employee row for reliable time-entry linking.
-    supabase
-      .from('employees')
-      .select('id')
-      .eq('user_id', user.id)
-      .maybeSingle()
-      .then(({ data }) => setEmployeeId(data?.id || null))
+    ;(async () => {
+      const [{ data: prof }, { data: emp }] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
+        supabase
+          .from('employees')
+          .select('id, first_name, last_name')
+          .eq('user_id', user.id)
+          .maybeSingle(),
+      ])
+      const empName = emp ? [emp.first_name, emp.last_name].filter(Boolean).join(' ').trim() : ''
+      const profName =
+        (prof &&
+          ([prof.first_name, prof.last_name].filter(Boolean).join(' ') ||
+            prof.full_name ||
+            prof.display_name ||
+            prof.name)) ||
+        ''
+      setProfileName(empName || profName || user.email || 'Unknown')
+      setEmployeeId(emp?.id || null)
+    })()
   }, [user?.id])
 
   // Load payroll week start from company_settings
@@ -500,11 +501,19 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
 
   const myTodayMins = myWeekEntries
     .filter(e => e.date === todayDate() && e.time_out)
-    .reduce((sum, e) => sum + (diffMins(e.time_in, e.time_out) || 0), 0)
+    .reduce(
+      (sum, e) =>
+        sum + Math.max(0, (diffMins(e.time_in, e.time_out) || 0) - (myWeekBreakMins[e.id] || 0)),
+      0
+    )
 
   const myWeekMins = myWeekEntries
     .filter(e => e.time_out)
-    .reduce((sum, e) => sum + (diffMins(e.time_in, e.time_out) || 0), 0)
+    .reduce(
+      (sum, e) =>
+        sum + Math.max(0, (diffMins(e.time_in, e.time_out) || 0) - (myWeekBreakMins[e.id] || 0)),
+      0
+    )
 
   async function fetchEntries() {
     const myReq = ++reqId.current
@@ -544,6 +553,21 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
     if (!error) {
       setEntries(data || [])
       setTotalCount(count || 0)
+      // Pull break minutes for the visible rows so worked time excludes breaks.
+      const ids = (data || []).map(e => e.id)
+      if (ids.length) {
+        const { data: brk } = await supabase
+          .from('time_clock_breaks')
+          .select('time_entry_id, minutes')
+          .in('time_entry_id', ids)
+        const m = {}
+        for (const b of brk || []) {
+          m[b.time_entry_id] = (m[b.time_entry_id] || 0) + (b.minutes || 0)
+        }
+        setBreakMins(m)
+      } else {
+        setBreakMins({})
+      }
     }
     setLoading(false)
 
@@ -556,7 +580,21 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
         .eq('created_by', user.id)
         .gte('date', ws.toISOString().split('T')[0])
         .lte('date', we.toISOString().split('T')[0])
-      if (wd) setMyWeekEntries(wd)
+      if (wd) {
+        setMyWeekEntries(wd)
+        const wids = wd.map(e => e.id)
+        const m = {}
+        if (wids.length) {
+          const { data: brk } = await supabase
+            .from('time_clock_breaks')
+            .select('time_entry_id, minutes')
+            .in('time_entry_id', wids)
+          for (const b of brk || []) {
+            m[b.time_entry_id] = (m[b.time_entry_id] || 0) + (b.minutes || 0)
+          }
+        }
+        setMyWeekBreakMins(m)
+      }
     }
   }
 
@@ -843,7 +881,11 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
               </thead>
               <tbody className="divide-y divide-gray-100 bg-white">
                 {entries.map(entry => {
-                  const { total, ot } = calcTimes(entry.time_in, entry.time_out)
+                  const raw = calcTimes(entry.time_in, entry.time_out)
+                  // Worked time excludes break minutes recorded for this entry.
+                  const brk = breakMins[entry.id] || 0
+                  const total = raw.total == null ? null : Math.max(0, raw.total - brk)
+                  const ot = total == null ? null : Math.max(0, total - 480)
                   const isClockedIn = !entry.time_out
                   return (
                     <tr
@@ -1140,7 +1182,10 @@ function MobileHero({
               )
               .slice(0, 7)
               .map(entry => {
-                const { total, ot } = calcTimes(entry.time_in, entry.time_out)
+                const raw = calcTimes(entry.time_in, entry.time_out)
+                const brk = myWeekBreakMins[entry.id] || 0
+                const total = raw.total == null ? null : Math.max(0, raw.total - brk)
+                const ot = total == null ? null : Math.max(0, total - 480)
                 return (
                   <button
                     key={entry.id}

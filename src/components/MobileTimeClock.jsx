@@ -150,19 +150,26 @@ export default function MobileTimeClock() {
      try {
       const [{ data: prof }, { data: emp }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
-        supabase.from('employees').select('id').eq('user_id', user.id).maybeSingle(),
+        supabase
+          .from('employees')
+          .select('id, first_name, last_name')
+          .eq('user_id', user.id)
+          .maybeSingle(),
       ])
       if (!alive) return
       const admin = prof?.role === 'admin' || prof?.role === 'super_admin'
       setIsAdmin(admin)
-      const name =
+      // Prefer the employees table name (profiles often has blank name fields,
+      // which is why some entries recorded the email instead of a real name).
+      const empName = emp ? [emp.first_name, emp.last_name].filter(Boolean).join(' ').trim() : ''
+      const profName =
         (prof &&
           ([prof.first_name, prof.last_name].filter(Boolean).join(' ') ||
             prof.full_name ||
             prof.display_name ||
             prof.name)) ||
-        user.email ||
-        'Unknown'
+        ''
+      const name = empName || profName || user.email || 'Unknown'
       setMeName(name)
       const eid = emp?.id || null
       setMeId(eid)
@@ -240,14 +247,26 @@ export default function MobileTimeClock() {
       .maybeSingle()
     const weekStartDay = cs?.payroll_week_start ?? 0
     const { weekStart, weekEnd } = getWeekRange(weekStartDay)
-    let totQ = supabase.from('time_entries').select('date, time_in, time_out')
+    let totQ = supabase.from('time_entries').select('id, date, time_in, time_out')
     totQ = eid ? totQ.eq('employee_id', eid) : totQ.eq('created_by', user.id)
     const { data: totRows } = await totQ.gte('date', dStr(weekStart)).lte('date', dStr(weekEnd))
+    // Break minutes per entry so worked time excludes breaks.
+    const ids = (totRows || []).map(r => r.id)
+    const brkMap = {}
+    if (ids.length) {
+      const { data: brk } = await supabase
+        .from('time_clock_breaks')
+        .select('time_entry_id, minutes')
+        .in('time_entry_id', ids)
+      for (const b of brk || []) {
+        brkMap[b.time_entry_id] = (brkMap[b.time_entry_id] || 0) + (b.minutes || 0)
+      }
+    }
     const today = dStr(new Date())
     let dMin = 0
     let wMin = 0
     for (const r of totRows || []) {
-      const mins = diffMins(r.time_in, r.time_out)
+      const mins = Math.max(0, diffMins(r.time_in, r.time_out) - (brkMap[r.id] || 0))
       wMin += mins
       if (r.date === today) dMin += mins
     }
