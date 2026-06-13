@@ -812,9 +812,6 @@ function MultiSetup({
     <div className="flex flex-col h-full max-w-md mx-auto py-4">
       {/* Action docked at the top (it doubles as the screen label). */}
       <div className="flex items-center gap-2 flex-shrink-0">
-        <button onClick={onCancel} className="text-sm text-gray-500 flex-shrink-0">
-          Cancel
-        </button>
         <button
           onClick={() => onClockIn(selected)}
           disabled={busy || selected.length === 0}
