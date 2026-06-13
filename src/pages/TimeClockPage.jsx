@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { fetchAllPaginated } from '../lib/fetchAll'
@@ -18,12 +17,6 @@ export default function TimeClockPage() {
   const [jobs, setJobs] = useState([])
   const [selectedJob, setSelectedJob] = useState(jobParam || 'all')
   const [loading, setLoading] = useState(true)
-
-  // Centered page title in the green app bar.
-  const [headerSlot, setHeaderSlot] = useState(null)
-  useEffect(() => {
-    setHeaderSlot(document.getElementById('app-header-center'))
-  }, [])
 
   // Searchable job picker state.
   const [query, setQuery] = useState('')
@@ -110,12 +103,7 @@ export default function TimeClockPage() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Page name centered in the green app bar */}
-      {headerSlot &&
-        createPortal(
-          <span className="text-white font-semibold text-sm">{t('timeClockTitle')}</span>,
-          headerSlot
-        )}
+      {/* Title + close X are provided centrally by Layout's green bar. */}
       {/* Minimal header with searchable job picker */}
       <div className="flex-shrink-0 mb-4">
         {/* Desktop uses this page-level job picker; mobile has its own inside

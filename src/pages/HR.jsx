@@ -624,7 +624,7 @@ export default function HR() {
       )}
       {/* Header */}
       <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
-        <h1 className="text-xl font-bold text-gray-900">Human Resources</h1>
+        <h1 className="hidden lg:block text-xl font-bold text-gray-900">Human Resources</h1>
         <div className="flex gap-2">
           {tab === 'employees' && (
             <button onClick={() => setShowAddEmp(true)} className="btn-primary text-sm px-3 py-1.5">

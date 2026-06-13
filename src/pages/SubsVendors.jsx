@@ -559,7 +559,7 @@ export default function SubsVendors() {
     <div className="flex flex-col h-full">
       {/* ── Page title + Add buttons ── */}
       <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
-        <h1 className="text-xl font-bold text-gray-900">Subs &amp; Vendors</h1>
+        <h1 className="hidden lg:block text-xl font-bold text-gray-900">Subs &amp; Vendors</h1>
         <div className="flex items-center gap-2">
           <button onClick={() => openNew('sub')} className="btn-primary text-xs px-2.5 py-1 whitespace-nowrap">
             + Sub

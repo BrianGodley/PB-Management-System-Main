@@ -104,7 +104,7 @@ export default function Design() {
     <div className="flex flex-col h-full">
       {/* Page title */}
       <div className="mb-4 flex-shrink-0">
-        <h1 className="text-xl font-bold text-gray-900">Design</h1>
+        <h1 className="hidden lg:block text-xl font-bold text-gray-900">Design</h1>
       </div>
 
       {/* Tab bar */}

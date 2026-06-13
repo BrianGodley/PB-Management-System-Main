@@ -40,6 +40,34 @@ const navItems = [
 const forestGreen = '#4E7B4C'
 const forestGreenDark = '#3A5038'
 
+// Mobile screen titles shown centered in the green bar. Longest path prefix
+// wins (so /portal/subs beats /portal). '/' matches Dashboard exactly.
+const SCREEN_TITLES = [
+  ['/portal/subs', 'Subs & Vendors'],
+  ['/daily-logs', 'Daily Logs'],
+  ['/timeclock', 'Time Clock'],
+  ['/contacts', 'Contacts'],
+  ['/clients', 'Opportunities'],
+  ['/statistics', 'Statistics'],
+  ['/design', 'Design'],
+  ['/bids', 'Bids'],
+  ['/jobs', 'Jobs'],
+  ['/info', 'Job Info'],
+  ['/hr', 'Human Resources'],
+]
+function screenTitle(path) {
+  if (path === '/') return 'Dashboard'
+  let best = null
+  let bestLen = 0
+  for (const [p, title] of SCREEN_TITLES) {
+    if ((path === p || path.startsWith(p + '/')) && p.length > bestLen) {
+      best = title
+      bestLen = p.length
+    }
+  }
+  return best
+}
+
 function setFavicon(url) {
   let link = document.querySelector("link[rel~='icon']")
   if (!link) {
@@ -345,8 +373,26 @@ export default function Layout() {
             <SamChat />
           </div>
 
-          {/* Centre slot — pages can portal content here */}
-          <div className="flex-1 flex justify-center items-center" id="app-header-center" />
+          {/* Centre slot — pages portal content here (desktop). On mobile it
+              shows the current screen name centered in white. */}
+          <div className="flex-1 flex justify-center items-center min-w-0" id="app-header-center">
+            {screenTitle(location.pathname) && (
+              <span className="lg:hidden text-white font-semibold text-sm truncate px-2">
+                {screenTitle(location.pathname)}
+              </span>
+            )}
+          </div>
+
+          {/* Right: mobile close (X) for screens with a green-bar title */}
+          {screenTitle(location.pathname) && (
+            <button
+              onClick={() => navigate(-1)}
+              aria-label="Close"
+              className="lg:hidden ml-auto w-8 h-8 rounded-full text-white/90 hover:bg-black/15 flex items-center justify-center text-lg flex-shrink-0"
+            >
+              ✕
+            </button>
+          )}
 
           {/* Right: Admin + user dropdown (desktop) */}
           <div className="flex items-center gap-1 ml-auto">

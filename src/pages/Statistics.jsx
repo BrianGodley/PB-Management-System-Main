@@ -9903,7 +9903,7 @@ export default function Statistics() {
           are kept (they double as a visual key the user can tap). Tablets and
           up show the full label. */}
       {createPortal(
-        <div className="flex items-center gap-0.5 overflow-x-auto max-w-full">
+        <div className="hidden lg:flex items-center gap-0.5 overflow-x-auto max-w-full">
           {[
             { id: 'graphs', icon: '📈', label: 'Graphs', short: 'Graphs' },
             { id: 'multiple-entry', icon: '📝', label: 'Multiple Entry', short: 'Entry' },
@@ -9944,9 +9944,31 @@ export default function Statistics() {
         </div>,
         document.getElementById('app-header-center')
       )}
+      {/* Mobile: view-mode tabs sit just below the green header (the green bar
+          shows the "Statistics" title on mobile via Layout). */}
+      <div className="lg:hidden flex items-center gap-1 overflow-x-auto px-3 py-2 bg-white border-b border-gray-200 flex-shrink-0">
+        {[
+          { id: 'graphs', short: 'Graphs' },
+          { id: 'multiple-entry', short: 'Entry' },
+          { id: 'comparison', short: 'Compare' },
+          ...(isCurrentUserAdmin ? [{ id: 'settings', short: 'Settings' }] : []),
+        ].map(m => (
+          <button
+            key={m.id}
+            onClick={() => setViewMode(m.id)}
+            className={`px-3 py-1 rounded-md text-xs font-semibold whitespace-nowrap flex-shrink-0 border transition-colors ${
+              viewMode === m.id
+                ? 'bg-green-700 text-white border-green-700'
+                : 'bg-gray-50 text-gray-600 border-gray-200'
+            }`}
+          >
+            {m.short}
+          </button>
+        ))}
+      </div>
       {/* ── COMBINED MODULE HEADER ───────────────────────────────────────── */}
       <div className="flex items-center gap-2 flex-wrap px-3 sm:px-6 pt-3 sm:pt-6 pb-2 sm:pb-4 bg-gray-50 border-b border-gray-200 flex-shrink-0">
-        <h1 className="text-base sm:text-xl font-bold text-gray-900 flex-shrink-0">Statistics</h1>
+        <h1 className="hidden lg:block text-base sm:text-xl font-bold text-gray-900 flex-shrink-0">Statistics</h1>
         {viewMode === 'graphs' && selectedStat && (
           <>
             {/* ── Mobile-only: Edits + Entry buttons next to the title ── */}

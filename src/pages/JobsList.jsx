@@ -1300,7 +1300,7 @@ export default function JobsList() {
   return (
     <div className="flex flex-col h-full">
       {/* ── Breadcrumb: Jobs / <tab> / <selection> ──────────────── */}
-      <div className="mb-4 flex-shrink-0 flex items-baseline gap-2 min-w-0">
+      <div className="mb-4 flex-shrink-0 hidden lg:flex items-baseline gap-2 min-w-0">
         <h1 className="text-xl font-bold text-gray-900 flex-shrink-0">Jobs</h1>
         <span className="text-gray-300 flex-shrink-0">/</span>
         <span className="text-lg font-semibold text-gray-500 flex-shrink-0">{tabName}</span>

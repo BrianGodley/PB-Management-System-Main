@@ -1304,7 +1304,7 @@ export default function Contacts() {
     <div className="h-full flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
-        <h1 className="text-xl font-bold text-gray-900">Contacts</h1>
+        <h1 className="hidden lg:block text-xl font-bold text-gray-900">Contacts</h1>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowAdd(true)}

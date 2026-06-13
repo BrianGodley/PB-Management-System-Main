@@ -600,7 +600,7 @@ export default function Dashboard() {
     <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-4 gap-3">
-        <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
+        <h1 className="hidden lg:block text-xl font-bold text-gray-900">Dashboard</h1>
       </div>
 
       {/* Tab bar */}

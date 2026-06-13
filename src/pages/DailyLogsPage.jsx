@@ -39,7 +39,7 @@ export default function DailyLogsPage() {
     <div className="flex flex-col h-full">
       {/* Minimal header with searchable job picker (dropdown + search) */}
       <div className="flex-shrink-0 mb-4">
-        <h1 className="text-lg font-bold text-gray-900 mb-3">{t('dailyLogsTitle')}</h1>
+        <h1 className="hidden lg:block text-lg font-bold text-gray-900 mb-3">{t('dailyLogsTitle')}</h1>
         {!loading && (
           <div className="relative">
             <button
