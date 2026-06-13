@@ -13,6 +13,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import { fetchAllPaginated } from '../lib/fetchAll'
 import { useAuth } from '../contexts/AuthContext'
 
 const todayStr = () => new Date().toISOString().split('T')[0]
@@ -60,6 +61,7 @@ export default function MobileTimeClock() {
   const [now, setNow] = useState(Date.now())
   const [busy, setBusy] = useState(false)
   const [ready, setReady] = useState(false)
+  const [error, setError] = useState('')
 
   const canMultiple = canManager || canChief
   const openJobs = useMemo(() => jobs.filter(jobIsOpen), [jobs])
@@ -81,6 +83,7 @@ export default function MobileTimeClock() {
     if (!user?.id) return
     let alive = true
     ;(async () => {
+     try {
       const [{ data: prof }, { data: emp }] = await Promise.all([
         supabase
           .from('profiles')
@@ -103,7 +106,7 @@ export default function MobileTimeClock() {
       setMeId(eid)
 
       const [{ data: js }, { data: emps }, { data: crews }, { data: permRow }] = await Promise.all([
-        supabase.from('jobs').select('id, name, client_name, status'),
+        fetchAllPaginated(() => supabase.from('jobs').select('id, name, client_name, status').order('name')),
         supabase
           .from('employees')
           .select('id, first_name, last_name, job_title, status')
@@ -134,7 +137,11 @@ export default function MobileTimeClock() {
       setCanChief(permRow ? !!permRow.clock_in_multiple_crew_chief : isChief)
 
       await refreshEntries(eid, name)
-      setReady(true)
+     } catch (err) {
+       if (alive) setError(err?.message || 'Failed to load time clock.')
+     } finally {
+       if (alive) setReady(true)
+     }
     })()
     return () => {
       alive = false
@@ -191,24 +198,39 @@ export default function MobileTimeClock() {
   }
 
   // ── Actions ───────────────────────────────────────────────────────────────
+  // Insert a clock-in row. Falls back to omitting employee_id if that column
+  // isn't present yet (migration not run), so clock-in still works.
+  async function insertEntry(extra) {
+    const d = new Date()
+    const base = {
+      employee_name: meName,
+      job_id: extra.job_id,
+      date: todayStr(),
+      time_in: hhmm(d),
+      time_out: null,
+      created_by: user.id,
+      updated_at: d.toISOString(),
+      ...extra,
+    }
+    let res = await supabase.from('time_entries').insert({ employee_id: meId, ...base }).select().single()
+    if (res.error && /employee_id/.test(res.error.message || '')) {
+      // Column missing — retry without it.
+      const { employee_id, ...noEid } = { employee_id: meId, ...base }
+      res = await supabase.from('time_entries').insert(noEid).select().single()
+    }
+    return res
+  }
+
   async function clockIn(jobId) {
     if (!jobId) return
     setBusy(true)
-    const d = new Date()
-    const { data } = await supabase
-      .from('time_entries')
-      .insert({
-        employee_name: meName,
-        employee_id: meId,
-        job_id: jobId,
-        date: todayStr(),
-        time_in: hhmm(d),
-        time_out: null,
-        created_by: user.id,
-        updated_at: d.toISOString(),
-      })
-      .select()
-      .single()
+    setError('')
+    const { data, error: e } = await insertEntry({ job_id: jobId })
+    if (e) {
+      setError(e.message || 'Could not clock in.')
+      setBusy(false)
+      return
+    }
     setMyEntry(data)
     setMyBreaks([])
     setScreen('running')
@@ -425,6 +447,7 @@ export default function MobileTimeClock() {
     <ClockInScreen
       openJobs={openJobs}
       busy={busy}
+      error={error}
       canMultiple={canMultiple}
       multiCount={multiEntries.length}
       onClockIn={clockIn}
@@ -476,18 +499,23 @@ function JobSearchPicker({ openJobs, value, onChange, recentJobIds = [] }) {
   )
 }
 
-function ClockInScreen({ openJobs, busy, canMultiple, multiCount, onClockIn, onMulti, onViewMulti }) {
+function ClockInScreen({ openJobs, busy, error, canMultiple, multiCount, onClockIn, onMulti, onViewMulti }) {
   const [jobId, setJobId] = useState('')
   return (
     <div className="max-w-md mx-auto py-4">
       <p className="text-sm font-semibold text-gray-700 mb-2">Select a job</p>
       <JobSearchPicker openJobs={openJobs} value={jobId} onChange={setJobId} />
+      {error && (
+        <p className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          {error}
+        </p>
+      )}
       <button
         onClick={() => onClockIn(jobId)}
         disabled={!jobId || busy}
         className="w-full mt-4 py-3 rounded-xl bg-green-700 text-white font-bold hover:bg-green-800 disabled:opacity-40"
       >
-        Clock In
+        {busy ? 'Clocking in…' : 'Clock In'}
       </button>
       {canMultiple && (
         <button

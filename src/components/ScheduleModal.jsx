@@ -11,6 +11,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { fetchAllPaginated } from '../lib/fetchAll'
 
 const WD_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -58,12 +59,15 @@ export default function ScheduleModal({ onClose }) {
   const scrollRef = useRef(null)
 
   // Jobs (incl. address for the map), crews + subs for name lookups.
+  // Paginated — the jobs table exceeds the 1k row cap, so a plain select would
+  // miss most jobs (and the open ones with it).
   useEffect(() => {
-    supabase
-      .from('jobs')
-      .select('id, name, client_name, status, job_address, job_city, job_state, job_zip, lat, lon')
-      .order('name')
-      .then(({ data }) => setJobs(data || []))
+    fetchAllPaginated(() =>
+      supabase
+        .from('jobs')
+        .select('id, name, client_name, status, job_address, job_city, job_state, job_zip, lat, lon')
+        .order('name')
+    ).then(({ data }) => setJobs(data || []))
     supabase
       .from('crews')
       .select('id, label')
@@ -87,7 +91,9 @@ export default function ScheduleModal({ onClose }) {
   const pickerJobs = useMemo(() => {
     const q = jobQuery.trim().toLowerCase()
     return jobs.filter(j => {
-      if (jobStatusFilter === 'open' ? !jobIsOpen(j) : jobIsOpen(j)) return false
+      if (jobStatusFilter === 'open' && !jobIsOpen(j)) return false
+      if (jobStatusFilter === 'closed' && jobIsOpen(j)) return false
+      // 'all' => no status filter
       if (!q) return true
       return (
         (j.name || '').toLowerCase().includes(q) ||
@@ -173,34 +179,40 @@ export default function ScheduleModal({ onClose }) {
         </button>
       </div>
 
-      {/* Open / Closed job filter (above the picker) */}
-      <div className="px-4 pt-3 flex-shrink-0">
+      {/* Open / Closed / All job filter (above the picker) */}
+      <div className="px-4 pt-3 flex-shrink-0 relative z-20">
         <div className="flex gap-2 mb-2">
-          {['open', 'closed'].map(s => (
+          {[
+            { k: 'open', label: 'Open Jobs' },
+            { k: 'closed', label: 'Closed Jobs' },
+            { k: 'all', label: 'All Jobs' },
+          ].map(o => (
             <button
-              key={s}
-              onClick={() => setJobStatusFilter(s)}
+              key={o.k}
+              onClick={() => setJobStatusFilter(o.k)}
               className={`flex-1 py-1 rounded-md text-[11px] font-semibold border transition-colors ${
-                jobStatusFilter === s
+                jobStatusFilter === o.k
                   ? 'bg-green-700 text-white border-green-700'
                   : 'bg-gray-50 text-gray-600 border-gray-200'
               }`}
             >
-              {s === 'open' ? 'Open Jobs' : 'Closed Jobs'}
+              {o.label}
             </button>
           ))}
         </div>
 
-        {/* Searchable job picker (dropdown + search) */}
-        <button
-          onClick={() => setPickerOpen(v => !v)}
-          className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white"
-        >
-          <span className="truncate text-gray-800">{selectedJobLabel}</span>
-          <span className="text-gray-400">{pickerOpen ? '▲' : '▼'}</span>
-        </button>
-        {pickerOpen && (
-          <div className="mt-1 rounded-lg border border-gray-200 shadow-sm bg-white">
+        {/* Searchable job picker — dropdown is absolutely positioned so it
+            overlays content instead of pushing the Month / List toggle down. */}
+        <div className="relative">
+          <button
+            onClick={() => setPickerOpen(v => !v)}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-lg border border-gray-300 text-sm bg-white"
+          >
+            <span className="truncate text-gray-800">{selectedJobLabel}</span>
+            <span className="text-gray-400">{pickerOpen ? '▲' : '▼'}</span>
+          </button>
+          {pickerOpen && (
+            <div className="absolute left-0 right-0 mt-1 rounded-lg border border-gray-200 shadow-lg bg-white z-30">
             <input
               autoFocus
               type="text"
@@ -245,7 +257,8 @@ export default function ScheduleModal({ onClose }) {
               )}
             </div>
           </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* View toggle — small docked buttons */}
