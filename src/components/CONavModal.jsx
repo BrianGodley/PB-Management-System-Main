@@ -1,6 +1,9 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { fetchAllPaginated } from '../lib/fetchAll'
+import { useAuth } from '../contexts/AuthContext'
+import CODetailModal from './CODetailModal'
+import COEstimatePanel from './COEstimatePanel'
 
 /**
  * CONavModal — change-order quick navigator (opened from the mobile dock).
@@ -16,6 +19,7 @@ import { fetchAllPaginated } from '../lib/fetchAll'
  *   new       -> /jobs?tab=change-orders&job=<id>&newco=manual|estimator
  */
 export default function CONavModal({ onClose, onNavigate }) {
+  const { user } = useAuth()
   const [mode, setMode] = useState('existing') // 'existing' | 'new'
   const [method, setMethod] = useState('manual') // 'manual' | 'estimator'
   const [jobs, setJobs] = useState([])
@@ -23,6 +27,9 @@ export default function CONavModal({ onClose, onNavigate }) {
   const [query, setQuery] = useState('')
   const [jobId, setJobId] = useState('')
   const [statusFilter, setStatusFilter] = useState('open') // 'open' | 'closed'
+  const [creating, setCreating] = useState(null) // null | 'manual' | 'estimator'
+  const [estCO, setEstCO] = useState(null) // { estimateId, bidId, coName, coType }
+  const [starting, setStarting] = useState(false)
   const searchRef = useRef(null)
 
   useEffect(() => {
@@ -67,13 +74,108 @@ export default function CONavModal({ onClose, onNavigate }) {
   const selectedJob = jobs.find(j => j.id === jobId)
   const canGo = !!jobId
 
-  function handleGo() {
+  async function handleGo() {
     if (!canGo) return
     if (mode === 'existing') {
+      // Viewing existing COs lives in the job's change-order list.
       onNavigate(`/jobs?tab=change-orders&job=${jobId}`)
-    } else {
-      onNavigate(`/jobs?tab=change-orders&job=${jobId}&newco=${method}`)
+      return
     }
+    // Create flows open as their own screens here (no Jobs-area detour).
+    if (method === 'manual') {
+      setCreating('manual')
+    } else {
+      await startEstimator(selectedJob)
+    }
+  }
+
+  // Estimator CO: create the paired draft estimate + the CO bid, then open the
+  // estimator builder right here.
+  async function startEstimator(job) {
+    if (!job || starting) return
+    setStarting(true)
+    try {
+      const clientName = job.client_name || job.name || ''
+      const { data: est, error: eErr } = await supabase
+        .from('estimates')
+        .insert({ estimate_name: 'Change Order', client_name: clientName, status: 'draft', created_by: user?.id || null })
+        .select('id')
+        .single()
+      if (eErr) throw new Error(eErr.message)
+      const { data: maxRows } = await supabase
+        .from('bids')
+        .select('custom_co_id')
+        .eq('linked_job_id', job.id)
+        .eq('record_type', 'change_order')
+        .order('custom_co_id', { ascending: false })
+        .limit(1)
+      const customCoId = (maxRows?.[0]?.custom_co_id || 0) + 1
+      const { data: bid, error: bErr } = await supabase
+        .from('bids')
+        .insert({
+          record_type: 'change_order',
+          linked_job_id: job.id,
+          co_name: 'Change Order',
+          custom_co_id: customCoId,
+          client_name: clientName,
+          bid_amount: 0,
+          gross_profit: 0,
+          gpmd: 0,
+          date_submitted: new Date().toISOString().slice(0, 10),
+          status: 'unreleased',
+          estimate_id: est.id,
+          notes: '',
+          projects: [],
+          co_method: 'estimator',
+          created_by: user?.id || null,
+        })
+        .select('*')
+        .single()
+      if (bErr) throw new Error(bErr.message)
+      setEstCO({ estimateId: est.id, bidId: bid.id, coName: bid.co_name, coType: bid.co_type || '' })
+      setCreating('estimator')
+    } catch (err) {
+      alert('Could not start change order: ' + (err?.message || err))
+    }
+    setStarting(false)
+  }
+
+  // ── Standalone create screens ─────────────────────────────────────────────
+  if (creating === 'manual' && selectedJob) {
+    return (
+      <div className="fixed inset-0 z-[70] bg-black/40">
+        <CODetailModal
+          co={null}
+          job={selectedJob}
+          onClose={onClose}
+          onSaved={() => {}}
+          onDeleted={onClose}
+          onSent={() => {}}
+        />
+      </div>
+    )
+  }
+
+  if (creating === 'estimator' && estCO && selectedJob) {
+    return (
+      <div
+        className="fixed inset-0 z-[70] bg-white flex flex-col p-3"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        <COEstimatePanel
+          estimateId={estCO.estimateId}
+          bidId={estCO.bidId}
+          coName={estCO.coName}
+          coType={estCO.coType}
+          jobId={selectedJob.id}
+          clientName={selectedJob.client_name || selectedJob.name || ''}
+          isNew
+          onClose={onClose}
+          onSaved={() => {}}
+          onDeleted={onClose}
+        />
+      </div>
+    )
   }
 
   return (
@@ -221,14 +323,16 @@ export default function CONavModal({ onClose, onNavigate }) {
         <div className="px-4 py-3 border-t border-gray-200">
           <button
             onClick={handleGo}
-            disabled={!canGo}
+            disabled={!canGo || starting}
             className="w-full py-3 rounded-xl bg-green-700 text-white text-sm font-bold hover:bg-green-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {mode === 'existing'
-              ? selectedJob
-                ? `Go to ${selectedJob.name || 'job'} →`
-                : 'Go →'
-              : `Create ${method === 'manual' ? 'Manual' : 'Estimator'} CO →`}
+            {starting
+              ? 'Starting…'
+              : mode === 'existing'
+                ? selectedJob
+                  ? `Go to ${selectedJob.name || 'job'} →`
+                  : 'Go →'
+                : `Create ${method === 'manual' ? 'Manual' : 'Estimator'} CO →`}
           </button>
         </div>
       </div>
