@@ -351,9 +351,9 @@ export default function Layout() {
         style={{ backgroundColor: forestGreen }}
         className="w-full flex-shrink-0 sticky top-0 z-50 shadow-md"
       >
-        <div className="flex items-center h-11 px-4 gap-4">
-          {/* Logo + system name */}
-          <Link to="/" className="flex items-center gap-2.5 flex-shrink-0">
+        <div className="relative flex items-center h-11 px-4 gap-4">
+          {/* Logo + system name — desktop only (mobile shows Sam in this spot). */}
+          <Link to="/" className="hidden lg:flex items-center gap-2.5 flex-shrink-0">
             <img
               src={companyLogoUrl || '/logo.png'}
               alt="Logo"
@@ -367,21 +367,20 @@ export default function Layout() {
             </span>
           </Link>
 
-          {/* Sam — AI assistant trigger (desktop only; mobile keeps the green
-              bar clean with just the centered page name). */}
-          <div className="hidden lg:block">
-            <SamChat />
-          </div>
+          {/* Sam — AI assistant trigger (shown on all sizes; on mobile it sits
+              top-left in place of the logo/Dashboard link). */}
+          <SamChat />
 
-          {/* Centre slot — pages portal content here (desktop). On mobile it
-              shows the current screen name centered in white. */}
-          <div className="flex-1 flex justify-center items-center min-w-0" id="app-header-center">
-            {screenTitle(location.pathname) && (
-              <span className="lg:hidden text-white font-semibold text-sm truncate px-2">
-                {screenTitle(location.pathname)}
-              </span>
-            )}
-          </div>
+          {/* Mobile: screen name truly centered across the full bar (absolute so
+              it doesn't shift with the left/right button widths). */}
+          {screenTitle(location.pathname) && (
+            <span className="lg:hidden absolute left-1/2 -translate-x-1/2 text-white font-semibold text-sm truncate max-w-[60%] text-center pointer-events-none">
+              {screenTitle(location.pathname)}
+            </span>
+          )}
+
+          {/* Centre slot — pages portal content here (desktop). */}
+          <div className="flex-1 flex justify-center items-center min-w-0" id="app-header-center" />
 
           {/* Right: mobile close (X) for screens with a green-bar title */}
           {screenTitle(location.pathname) && (
