@@ -737,8 +737,8 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
 
     const { data, count, error } = await q
       .order('date', { ascending: false })
-      .order('time_in', { ascending: true })
-      .order('id', { ascending: true })
+      .order('time_in', { ascending: false })
+      .order('id', { ascending: false })
       .range(from, to)
 
     // Drop results from a superseded fetch (filter or page changed mid-flight).
