@@ -16,7 +16,6 @@ import { supabase } from '../lib/supabase'
 import { fetchAllPaginated } from '../lib/fetchAll'
 import { useAuth } from '../contexts/AuthContext'
 
-const todayStr = () => new Date().toISOString().split('T')[0]
 // Local YYYY-MM-DD (avoids the UTC shift that toISOString would introduce).
 const dStr = d => {
   const y = d.getFullYear()
@@ -24,6 +23,9 @@ const dStr = d => {
   const da = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${da}`
 }
+// Today's LOCAL date — must match the local time_in, or evening clock-ins
+// (past midnight UTC) would land on the wrong calendar day.
+const todayStr = () => dStr(new Date())
 const hhmm = d => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 // Seconds precision for clock-in so the live timer is exact (and a quick
 // clock-out/in actually restarts from 0).

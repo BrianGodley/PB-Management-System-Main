@@ -38,7 +38,11 @@ function calcTimes(timeIn, timeOut) {
 }
 
 function todayDate() {
-  return new Date().toISOString().split('T')[0]
+  // Local calendar date — not UTC. Using toISOString() here would roll an
+  // evening clock-in (past midnight UTC) onto the next day while the stored
+  // time stays local, making entries show up as "tomorrow".
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 function fmtDateLabel(d) {
