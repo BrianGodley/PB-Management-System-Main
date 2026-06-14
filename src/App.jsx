@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { lazy, Suspense } from 'react'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { LanguageProvider } from './contexts/LanguageContext'
 import { RateIconsProvider } from './contexts/RateIconsContext'
@@ -61,21 +61,6 @@ function PortalPlaceholder({ label, icon }) {
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
-  const navigate = useNavigate()
-
-  // On mobile, a fresh app launch should land on the main screen (Dashboard).
-  // iOS standalone PWAs otherwise restore whatever page the user was last on.
-  // We run this once per session (sessionStorage clears on a real cold start /
-  // app kill, but survives in-session reloads, so manual reloads stay put).
-  useEffect(() => {
-    if (loading || !user) return
-    if (sessionStorage.getItem('pbsLaunchHandled')) return
-    sessionStorage.setItem('pbsLaunchHandled', '1')
-    const isMobile = window.matchMedia('(max-width: 1023px)').matches
-    if (isMobile && window.location.pathname !== '/') {
-      navigate('/', { replace: true })
-    }
-  }, [loading, user, navigate])
 
   if (loading)
     return (
@@ -87,6 +72,21 @@ function ProtectedRoute({ children }) {
       </div>
     )
   if (!user) return <Navigate to="/login" replace />
+
+  // On mobile, a fresh app launch should land on Dashboard. iOS standalone
+  // PWAs / browser tabs otherwise restore whatever page the user was last on.
+  // Decide this synchronously — before the restored page renders — so the
+  // previous page never flashes on screen. Runs once per session
+  // (sessionStorage survives in-session reloads, so manual reloads stay put,
+  // but clears on a real cold start / app kill).
+  if (!sessionStorage.getItem('pbsLaunchHandled')) {
+    sessionStorage.setItem('pbsLaunchHandled', '1')
+    const isMobile = window.matchMedia('(max-width: 1023px)').matches
+    if (isMobile && window.location.pathname !== '/') {
+      return <Navigate to="/" replace />
+    }
+  }
+
   return children
 }
 
