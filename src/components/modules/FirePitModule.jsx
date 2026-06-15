@@ -20,6 +20,7 @@ const FP_RATES = {
   fpGroutPump: { dbName: 'FP Grout Pump Setup', fallback: 150.0 }, // flat fee when pump used
   fpGasRing: { dbName: 'FP Gas Ring/Burner', fallback: 25.0 }, // $/unit hardware
   fpGasPipe: { dbName: 'FP Gas Pipe', fallback: 3.0 }, // $/LF
+  fpCap: { dbName: 'FP Wall Cap', fallback: 18.0 }, // $/LF (default cap material, editable per-job)
 
   // ── Wall finish material costs ──────────────────────────────────────────────
   sandStucco: { dbName: 'Sand Stucco - FP', fallback: 0.0 }, // $/SF (labor only by default)
@@ -37,6 +38,7 @@ const FP_RATES = {
   handGroutLab: { dbName: 'FP Hand Grout Labor Rate', fallback: 5.5 }, // CF/hr
   pumpGroutLab: { dbName: 'FP Pump Grout Labor Rate', fallback: 81.0 }, // CF/hr
   gasTrenchLab: { dbName: 'FP Gas Trench Labor Rate', fallback: 35.0 }, // LF/day
+  capLab: { dbName: 'FP Cap Labor Rate', fallback: 12.0 }, // LF/hr (set & mortar wall cap)
   sandStuccoLab: { dbName: 'Sand Stucco - FP Labor Rate', fallback: 92 }, // SF/day
   smoothStuccoLab: { dbName: 'Smooth Stucco - FP Labor Rate', fallback: 65 }, // SF/day
   ledgerstoneLab: { dbName: 'Ledgerstone - FP Labor Rate', fallback: 24 }, // SF/day
@@ -84,6 +86,8 @@ function calcFirePit(
     pctGrouted,
     pctCurved,
     useGroutPump,
+    capLF,
+    capMatPerLF,
     gasRingCount,
     gasTrenchLF,
     sandStuccoSF,
@@ -136,6 +140,11 @@ function calcFirePit(
     n(gasTrenchLF) > 0
       ? (n(gasTrenchLF) / p(FP_RATES.gasTrenchLab.dbName, FP_RATES.gasTrenchLab.fallback)) * 8
       : 0
+  // ── Wall cap (seat/perimeter cap on top of the block wall) ──
+  const capRatePerLF = n(capMatPerLF) || p(FP_RATES.fpCap.dbName, FP_RATES.fpCap.fallback)
+  const capMat = n(capLF) * capRatePerLF
+  const capHrs =
+    n(capLF) > 0 ? n(capLF) / p(FP_RATES.capLab.dbName, FP_RATES.capLab.fallback) : 0
 
   // Curved adjustment: curved sections take 25% more structural labor
   const structuralBaseHrs = digHrs + rebarHrs + setBlockHrs + groutHrs
@@ -232,6 +241,7 @@ function calcFirePit(
     structuralBaseHrs +
     curveAddHrs +
     gasTrenchHrs +
+    capHrs +
     sandStuccoHrs +
     smoothStuccoHrs +
     ledgerstoneHrs +
@@ -255,6 +265,7 @@ function calcFirePit(
     pumpSetupMat +
     gasRingMat +
     gasPipeMat +
+    capMat +
     sandStuccoMat +
     smoothStuccoMat +
     ledgerstoneMat +
@@ -292,7 +303,9 @@ function calcFirePit(
     groutCY,
     totalRebarLF,
     curveAddHrs,
-    structureMat: blockMat + rebarMat + footingMat + groutMat + pumpSetupMat,
+    structureMat: blockMat + rebarMat + footingMat + groutMat + pumpSetupMat + capMat,
+    capMat,
+    capHrs,
     fixturesMat: gasRingMat + gasPipeMat,
     finishesMat:
       sandStuccoMat +
@@ -429,6 +442,9 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
   const [pctGrouted, setPctGrouted] = useState(initialData?.pctGrouted ?? '100')
   const [pctCurved, setPctCurved] = useState(initialData?.pctCurved ?? '0')
   const [useGroutPump, setUseGroutPump] = useState(initialData?.useGroutPump ?? 'No')
+  // Wall cap (seat/perimeter cap on top of the wall)
+  const [capLF, setCapLF] = useState(initialData?.capLF ?? '')
+  const [capMatPerLF, setCapMatPerLF] = useState(initialData?.capMatPerLF ?? '')
   // Fixtures
   const [gasRingCount, setGasRingCount] = useState(initialData?.gasRingCount ?? '')
   const [gasTrenchLF, setGasTrenchLF] = useState(initialData?.gasTrenchLF ?? '')
@@ -488,6 +504,8 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
     pctGrouted,
     pctCurved,
     useGroutPump,
+    capLF,
+    capMatPerLF,
     gasRingCount,
     gasTrenchLF,
     sandStuccoSF,
@@ -802,6 +820,43 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
                 Curve add: <strong>{calc.curveAddHrs.toFixed(2)} hrs</strong>
               </span>
             )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Wall Cap ── */}
+      <div>
+        <SectionHeader title="Wall Cap (optional)" />
+        <p className="text-[11px] text-gray-500 mb-2 px-1">
+          Seat-wall or perimeter cap on top of the block wall. Enter the cap length and a $/LF
+          material cost; install labor is added automatically.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Cap Length (LF)</label>
+            <NumInput
+              value={capLF}
+              onChange={setCapLF}
+              placeholder={n(wallLF) > 0 ? `Wall = ${n(wallLF)}` : '0'}
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Cap Material ($/LF)</label>
+            <NumInput
+              value={capMatPerLF}
+              onChange={setCapMatPerLF}
+              placeholder={p(FP_RATES.fpCap.dbName, FP_RATES.fpCap.fallback).toFixed(2)}
+            />
+          </div>
+        </div>
+        {n(capLF) > 0 && (
+          <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-gray-600 flex flex-wrap gap-4">
+            <span>
+              Cap material: <strong>${calc.capMat.toFixed(2)}</strong>
+            </span>
+            <span>
+              Cap install: <strong>{calc.capHrs.toFixed(2)} hrs</strong>
+            </span>
           </div>
         )}
       </div>

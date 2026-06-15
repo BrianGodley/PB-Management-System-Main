@@ -146,7 +146,11 @@ function calcPaver(
   const areas = (state.areaRows || []).map(row => {
     const sf = n(row.sf)
     const depthIn = n(row.depth) || 6
-    const baseTons = sfToTons(sf, depthIn)
+    // Base area can be larger than the paver field (overdig, edge transitions,
+    // base prep beyond the pavers). Use the optional Base SF when provided;
+    // otherwise fall back to the paver SF.
+    const baseSf = row.baseSf !== '' && row.baseSf != null ? n(row.baseSf) : sf
+    const baseTons = sfToTons(baseSf, depthIn)
     const baseRate = BASE_RATE_MAP[row.method] ?? baseBobcatOK
     const baseHrs = baseTons > 0 ? baseTons / baseRate : 0
 
@@ -162,7 +166,7 @@ function calcPaver(
     const pallets = sf > 0 && sfPerPallet > 0 ? Math.ceil(sf / sfPerPallet) : 0
     const paverCost = sf * pricePerSF
 
-    return { sf, depthIn, baseTons, baseHrs, paverCost, pallets, pricePerSF, sfPerPallet }
+    return { sf, baseSf, depthIn, baseTons, baseHrs, paverCost, pallets, pricePerSF, sfPerPallet }
   })
 
   const totalInstallSF = areas.reduce((s, a) => s + a.sf, 0)
@@ -989,7 +993,15 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                     <Inp
                       value={row.sf}
                       onChange={e => setRow('areaRows', i, 'sf', e.target.value)}
+                      placeholder="Paver SF"
                     />
+                    <div className="mt-1">
+                      <Inp
+                        value={row.baseSf ?? ''}
+                        onChange={e => setRow('areaRows', i, 'baseSf', e.target.value)}
+                        placeholder={row.sf ? `Base SF (def ${row.sf})` : 'Base SF'}
+                      />
+                    </div>
                   </td>
                   <td className={td}>
                     <div className="flex items-center gap-1">

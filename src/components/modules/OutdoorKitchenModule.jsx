@@ -99,9 +99,19 @@ function calcOutdoorKitchen(
     realStoneSF,
     realStoneRateInput,
     manualRows,
+    finishPrices,
   } = state
 
   const p = (dbName, fallback) => mp[dbName] ?? fallback
+  // Per-finish $/SF: an editable override when the user typed one, otherwise
+  // the fixed default price from Master Rates (DB) / fallback.
+  const fp = finishPrices || {}
+  const priceFor = key => {
+    const o = fp[key]
+    return o !== '' && o != null && !isNaN(parseFloat(o))
+      ? parseFloat(o)
+      : p(OK_RATES[key].dbName, OK_RATES[key].fallback)
+  }
 
   // ── Structure derived quantities ────────────────────────────────────────────
   const bbqWallSF = (n(bbqHeightIn) / 12) * n(bbqLengthLF)
@@ -214,10 +224,8 @@ function calcOutdoorKitchen(
   const gasMat = n(gasTrenchLF) * p(OK_RATES.gasPipe.dbName, OK_RATES.gasPipe.fallback)
 
   // Finish materials
-  const sandStuccoMat =
-    n(sandStuccoSF) * p(OK_RATES.sandStucco.dbName, OK_RATES.sandStucco.fallback)
-  const smoothStuccoMat =
-    n(smoothStuccoSF) * p(OK_RATES.smoothStucco.dbName, OK_RATES.smoothStucco.fallback)
+  const sandStuccoMat = n(sandStuccoSF) * priceFor('sandStucco')
+  const smoothStuccoMat = n(smoothStuccoSF) * priceFor('smoothStucco')
   const ledgerstoneMat =
     n(ledgerstoneSF) > 0
       ? n(ledgerstoneSF) * p(OK_RATES.ledgerstone.dbName, OK_RATES.ledgerstone.fallback) * 1.1 +
@@ -467,6 +475,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
   const [sinkYN, setSinkYN] = useState(initialData?.sinkYN ?? 'No')
   const [gasTrenchLF, setGasTrenchLF] = useState(initialData?.gasTrenchLF ?? '')
   // Wall Finishes
+  const [finishPrices, setFinishPrices] = useState(initialData?.finishPrices ?? {})
   const [sandStuccoSF, setSandStuccoSF] = useState(initialData?.sandStuccoSF ?? '')
   const [smoothStuccoSF, setSmoothStuccoSF] = useState(initialData?.smoothStuccoSF ?? '')
   const [ledgerstoneSF, setLedgerstoneSF] = useState(initialData?.ledgerstoneSF ?? '')
@@ -536,6 +545,7 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
     realStoneRateInput,
     manualRows,
     distanceLF,
+    finishPrices,
   }
   const calcRaw = calcOutdoorKitchen(state, laborRatePerHour, materialPrices, gpmd, walkAccess)
   // Apply company sales tax to the module's total material cost so the
@@ -1116,7 +1126,16 @@ export default function OutdoorKitchenModule({ onSave, onBack, saving, initialDa
                   </td>
                   <td className="py-1 pr-2 text-xs text-gray-400">
                     <span className="inline-flex items-center gap-1 flex-wrap">
-                      ${p(OK_RATES[matKey].dbName, fallback).toFixed(2)}/SF
+                      {/* Per-estimate $/SF override — blank uses the default. */}
+                      <span className="inline-flex items-center gap-0.5 w-24">
+                        $
+                        <NumInput
+                          value={finishPrices[matKey] ?? ''}
+                          onChange={v => setFinishPrices(m => ({ ...m, [matKey]: v }))}
+                          placeholder={p(OK_RATES[matKey].dbName, fallback).toFixed(2)}
+                        />
+                        /SF
+                      </span>
                       <RateEditPopover
                         table="material_rates"
                         name={OK_RATES[matKey].dbName}

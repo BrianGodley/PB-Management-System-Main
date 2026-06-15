@@ -208,11 +208,21 @@ function calcPlanting(
     manSub += n(r.subCost)
   })
 
+  // Optional yard checks — return visits for watering/health checks during the
+  // establishment period. Default 1 MD + 5% of plant material; both editable.
+  // Not scaled by difficulty or walk access.
+  const yc = state.yardCheck || {}
+  const ycOn = !!yc.enabled
+  const ycMD = yc.manDays === '' || yc.manDays == null ? 1 : n(yc.manDays)
+  const ycPct = yc.pct === '' || yc.pct == null ? 5 : n(yc.pct)
+  const yardCheckHrs = ycOn ? ycMD * 8 : 0
+  const yardCheckMat = ycOn ? (smallMat + largeMat) * (ycPct / 100) : 0
+
   const _preWalkHrs = plantHrs + addonHrs + diffHrs + manHrs + (parseFloat(hoursAdj) || 0)
   const walkHrs = calcWalkAccessLabor(_preWalkHrs, state.distanceLF, { paceLfPerMin: _pace })
-  const totalHrs = _preWalkHrs + walkHrs
+  const totalHrs = _preWalkHrs + walkHrs + yardCheckHrs
   const manDays = totalHrs / 8
-  const totalMat = smallMat + largeMat + addonMat + manMat
+  const totalMat = smallMat + largeMat + addonMat + manMat + yardCheckMat
   const laborCost = totalHrs * laborRatePerHour
   const burden = laborCost * WORKER_DEFAULTS.laborBurdenPct
   const subCost = craneSub + manSub
@@ -236,6 +246,8 @@ function calcPlanting(
     largeHrs,
     addonHrs,
     diffHrs,
+    yardCheckHrs,
+    yardCheckMat,
   }
 }
 
@@ -400,6 +412,9 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
   const [addons, setAddons] = useState(initialData?.addons ?? DEFAULT_ADDONS)
   const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
   const [distanceLF, setDistanceLF] = useState(initialData?.distanceLF ?? '')
+  const [yardCheck, setYardCheck] = useState(
+    initialData?.yardCheck ?? { enabled: false, manDays: '1', pct: '5' }
+  )
 
   // ── Sales tax — applied to totalMat across every module so the bid
   //    reflects supplier-invoiced material cost. Sourced from
@@ -426,6 +441,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
       addons,
       manualRows,
       distanceLF,
+      yardCheck,
     },
     laborRatePerHour,
     gpmd,
@@ -488,6 +504,8 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
         largePlantRows,
         addons,
         manualRows,
+        distanceLF,
+        yardCheck,
         laborRatePerHour,
         gpmd,
         materialPrices, // snapshot so summary always reflects save-time prices
@@ -1172,6 +1190,47 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* ── Yard Checks (optional) ── */}
+      <SectionHeader title="Yard Checks (optional)" />
+      <div className="bg-white border border-gray-200 rounded-lg p-4 -mt-1">
+        <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+          <input
+            type="checkbox"
+            checked={!!yardCheck.enabled}
+            onChange={e => setYardCheck(y => ({ ...y, enabled: e.target.checked }))}
+            className="accent-green-700"
+          />
+          Include yard checks (return visits for watering / health checks)
+        </label>
+        {yardCheck.enabled && (
+          <div className="grid grid-cols-2 gap-4 mt-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Man-Days</label>
+              <NumInput
+                value={yardCheck.manDays}
+                onChange={v => setYardCheck(y => ({ ...y, manDays: v }))}
+                placeholder="1"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">
+                % of plant material
+              </label>
+              <NumInput
+                value={yardCheck.pct}
+                onChange={v => setYardCheck(y => ({ ...y, pct: v }))}
+                placeholder="5"
+              />
+            </div>
+            <p className="col-span-2 text-xs text-gray-400">
+              Adds {calc.yardCheckHrs?.toFixed(1) || 0} hrs and $
+              {Math.round(calc.yardCheckMat || 0).toLocaleString()} material. Defaults: 1 MD + 5% of
+              plant material.
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-3 pt-2">
