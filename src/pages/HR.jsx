@@ -10,6 +10,8 @@ import { useCachedData } from '../lib/useCachedData'
 import AddEmployeeModal from '../components/AddEmployeeModal'
 import ReviewBuilder from '../components/hr/ReviewBuilder'
 import TimeClockPermissionsTab from '../components/hr/TimeClockPermissionsTab'
+import HrEmployeeFiles from '../components/hr/HrEmployeeFiles'
+import DocViewerModal from '../components/DocViewerModal'
 
 const APPLICANT_STATUSES = ['new', 'reviewing', 'interview', 'offered', 'hired', 'rejected']
 
@@ -219,6 +221,33 @@ export default function HR() {
   const [tab, setTab] = useState('employees')
   const [settingsTab, setSettingsTab] = useState('employee-groups')
 
+  // New Employee file template (default folders copied into each new hire's Files).
+  const [empTemplate, setEmpTemplate] = useState([])
+  const [newFolderName, setNewFolderName] = useState('')
+  const [tmplSaving, setTmplSaving] = useState(false)
+  const [tmplMsg, setTmplMsg] = useState('')
+  useEffect(() => {
+    supabase
+      .from('company_settings')
+      .select('new_employee_file_template')
+      .maybeSingle()
+      .then(({ data }) => {
+        const t = data?.new_employee_file_template
+        setEmpTemplate(Array.isArray(t) ? t : ['Full Hat', 'Quick Hat', 'Application', 'Review Forms'])
+      })
+  }, [])
+  async function saveEmpTemplate(next) {
+    setTmplSaving(true)
+    setTmplMsg('')
+    const { data: existing } = await supabase.from('company_settings').select('id').maybeSingle()
+    const { error } = await supabase
+      .from('company_settings')
+      .upsert({ id: existing?.id || 1, new_employee_file_template: next }, { onConflict: 'id' })
+    setTmplMsg(error ? 'error:' + error.message : 'ok:Template saved.')
+    setTmplSaving(false)
+    setTimeout(() => setTmplMsg(''), 3000)
+  }
+
   // All HR data comes through the shared cache: a revisit renders instantly
   // from cache, then refreshes quietly in the background. refresh() forces a
   // refetch — called after every save/delete below.
@@ -272,12 +301,19 @@ export default function HR() {
     description: '',
     vfp: '',
     write_up_url: '',
+    quick_hat_url: '',
+    quick_hat_name: '',
+    full_hat_url: '',
+    full_hat_name: '',
   })
   const [positionSaving, setPositionSaving] = useState(false)
   const [selectedCourses, setSelectedCourses] = useState(new Set())
   const [selectedPosEmployees, setSelectedPosEmployees] = useState(new Set())
   const [posWriteUpFile, setPosWriteUpFile] = useState(null)
   const posWriteUpRef = useRef()
+  const [posQuickHatFile, setPosQuickHatFile] = useState(null)
+  const [posFullHatFile, setPosFullHatFile] = useState(null)
+  const [hatDoc, setHatDoc] = useState(null) // { name, url } for the Hat viewer
 
   const isAdmin = (profiles || []).some(
     p => p.id === user?.id && (p.role === 'admin' || p.role === 'super_admin')
@@ -384,10 +420,15 @@ export default function HR() {
   const togglePosEmployee = togglefn(setSelectedPosEmployees)
 
   function openNewPosition() {
-    setPositionForm({ title: '', description: '', vfp: '', write_up_url: '' })
+    setPositionForm({
+      title: '', description: '', vfp: '', write_up_url: '',
+      quick_hat_url: '', quick_hat_name: '', full_hat_url: '', full_hat_name: '',
+    })
     setSelectedCourses(new Set())
     setSelectedPosEmployees(new Set())
     setPosWriteUpFile(null)
+    setPosQuickHatFile(null)
+    setPosFullHatFile(null)
     setEditingPosition('new')
   }
 
@@ -397,10 +438,16 @@ export default function HR() {
       description: pos.description || '',
       vfp: pos.vfp || '',
       write_up_url: pos.write_up_url || '',
+      quick_hat_url: pos.quick_hat_url || '',
+      quick_hat_name: pos.quick_hat_name || '',
+      full_hat_url: pos.full_hat_url || '',
+      full_hat_name: pos.full_hat_name || '',
     })
     setSelectedCourses(new Set(positionCourses[pos.id] || []))
     setSelectedPosEmployees(new Set(positionEmployees[String(pos.id)] || []))
     setPosWriteUpFile(null)
+    setPosQuickHatFile(null)
+    setPosFullHatFile(null)
     setEditingPosition(pos)
   }
 
@@ -424,30 +471,55 @@ export default function HR() {
         }
       }
 
+      // Quick Hat / Full Hat documents (hr-files bucket).
+      let quickHatUrl = positionForm.quick_hat_url
+      let quickHatName = positionForm.quick_hat_name
+      let fullHatUrl = positionForm.full_hat_url
+      let fullHatName = positionForm.full_hat_name
+      const uploadHat = async file => {
+        const path = `position-hats/${Date.now()}_${file.name}`
+        const { error: e } = await supabase.storage.from('hr-files').upload(path, file)
+        if (e) return null
+        const { data } = supabase.storage.from('hr-files').getPublicUrl(path)
+        return data?.publicUrl || null
+      }
+      if (posQuickHatFile) {
+        const u = await uploadHat(posQuickHatFile)
+        if (u) {
+          quickHatUrl = u
+          quickHatName = posQuickHatFile.name
+        }
+      }
+      if (posFullHatFile) {
+        const u = await uploadHat(posFullHatFile)
+        if (u) {
+          fullHatUrl = u
+          fullHatName = posFullHatFile.name
+        }
+      }
+
+      const posPayload = {
+        title: positionForm.title.trim(),
+        description: positionForm.description.trim() || null,
+        vfp: positionForm.vfp.trim() || null,
+        write_up_url: writeUpUrl || null,
+        quick_hat_url: quickHatUrl || null,
+        quick_hat_name: quickHatName || null,
+        full_hat_url: fullHatUrl || null,
+        full_hat_name: fullHatName || null,
+      }
+
       let positionId
       if (editingPosition === 'new') {
         const { data, error } = await supabase
           .from('positions')
-          .insert({
-            title: positionForm.title.trim(),
-            description: positionForm.description.trim() || null,
-            vfp: positionForm.vfp.trim() || null,
-            write_up_url: writeUpUrl || null,
-          })
+          .insert(posPayload)
           .select()
           .single()
         if (error) throw error
         positionId = data.id
       } else {
-        await supabase
-          .from('positions')
-          .update({
-            title: positionForm.title.trim(),
-            description: positionForm.description.trim() || null,
-            vfp: positionForm.vfp.trim() || null,
-            write_up_url: writeUpUrl || null,
-          })
-          .eq('id', editingPosition.id)
+        await supabase.from('positions').update(posPayload).eq('id', editingPosition.id)
         positionId = editingPosition.id
         await supabase.from('position_courses').delete().eq('position_id', positionId)
       }
@@ -683,7 +755,7 @@ export default function HR() {
           },
           { key: 'applicants', label: `Applicants (${applicants.length})`, icon: '📋' },
           { key: 'positions', label: `Positions (${positions.length})`, icon: '🏷️', mobileHide: true },
-          { key: 'forms', label: `Review Forms (${reviewForms.length})`, icon: '⭐', mobileHide: true },
+          { key: 'files', label: 'Files', icon: '📁', mobileHide: true },
           {
             key: 'archive',
             label: `Archive (${employees.filter(e => e.status === 'archived').length})`,
@@ -1090,6 +1162,50 @@ export default function HR() {
                     </div>
                   </div>
 
+                  {/* Quick Hat / Full Hat documents — opened from the Positions
+                      table via the Quick Hat / Full Hat buttons. */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[
+                      { key: 'quick', label: 'Quick Hat', file: posQuickHatFile, setFile: setPosQuickHatFile,
+                        url: positionForm.quick_hat_url, name: positionForm.quick_hat_name,
+                        clear: () => setPositionForm(f => ({ ...f, quick_hat_url: '', quick_hat_name: '' })) },
+                      { key: 'full', label: 'Full Hat', file: posFullHatFile, setFile: setPosFullHatFile,
+                        url: positionForm.full_hat_url, name: positionForm.full_hat_name,
+                        clear: () => setPositionForm(f => ({ ...f, full_hat_url: '', full_hat_name: '' })) },
+                    ].map(h => (
+                      <div key={h.key}>
+                        <label className="text-xs font-medium text-gray-500 block mb-1">
+                          {h.label} Document
+                        </label>
+                        {h.url && !h.file && (
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span className="text-xs text-green-700 truncate">
+                              📄 {h.name || 'Current file'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={h.clear}
+                              className="text-xs text-red-500 hover:text-red-700"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        )}
+                        <label className="block">
+                          <span className="inline-block px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-50 cursor-pointer">
+                            📎 {h.file ? h.file.name : 'Choose File (.pdf, .doc, .docx)'}
+                          </span>
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept=".pdf,.doc,.docx,.txt"
+                            onChange={e => h.setFile(e.target.files?.[0] || null)}
+                          />
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+
                   {/* Required LMS Courses */}
                   <div>
                     <label className="text-xs font-medium text-gray-500 block mb-2">
@@ -1266,7 +1382,29 @@ export default function HR() {
                               <span className="font-medium text-gray-500">VFP:</span> {pos.vfp}
                             </p>
                           )}
-                          <div className="flex items-center gap-3 mt-2 flex-wrap">
+                          <div className="flex items-center gap-2 mt-2 flex-wrap">
+                            <button
+                              onClick={() =>
+                                pos.quick_hat_url &&
+                                setHatDoc({ name: pos.quick_hat_name || 'Quick Hat', url: pos.quick_hat_url })
+                              }
+                              disabled={!pos.quick_hat_url}
+                              title={pos.quick_hat_url ? 'View Quick Hat' : 'No Quick Hat document'}
+                              className="text-xs px-2.5 py-1 rounded-lg border border-blue-200 text-blue-700 font-semibold hover:bg-blue-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              ⚡ Quick Hat
+                            </button>
+                            <button
+                              onClick={() =>
+                                pos.full_hat_url &&
+                                setHatDoc({ name: pos.full_hat_name || 'Full Hat', url: pos.full_hat_url })
+                              }
+                              disabled={!pos.full_hat_url}
+                              title={pos.full_hat_url ? 'View Full Hat' : 'No Full Hat document'}
+                              className="text-xs px-2.5 py-1 rounded-lg border border-indigo-200 text-indigo-700 font-semibold hover:bg-indigo-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              🎩 Full Hat
+                            </button>
                             {pos.write_up_url && (
                               <a
                                 href={pos.write_up_url}
@@ -1315,6 +1453,9 @@ export default function HR() {
               </>
             )}
           </div>
+        ) : /* ── FILES TAB ── */
+        tab === 'files' ? (
+          <HrEmployeeFiles employees={employees} />
         ) : /* ── SETTINGS TAB ── */
         tab === 'settings' && isAdmin ? (
           <div className="-mx-6 -mt-3 flex flex-col">
@@ -1323,6 +1464,7 @@ export default function HR() {
               {[
                 { key: 'employee-groups', label: '👥 Employee Groups' },
                 { key: 'time-clock', label: '⏰ Time Clock' },
+                { key: 'new-employee', label: '🗂️ New Employee' },
               ].map(st => (
                 <button
                   key={st.key}
@@ -1556,6 +1698,86 @@ export default function HR() {
 
               {/* ── Time Clock permissions ── */}
               {settingsTab === 'time-clock' && <TimeClockPermissionsTab employees={employees} />}
+
+              {/* ── New Employee template ── */}
+              {settingsTab === 'new-employee' && (
+                <div className="max-w-xl">
+                  <div className="bg-white border border-gray-200 rounded-xl p-5">
+                    <h3 className="font-semibold text-gray-900 mb-1">New Employee File Template</h3>
+                    <p className="text-sm text-gray-500 mb-4">
+                      These folders are automatically created in every new employee's Files tab
+                      when they're added. Edit the default structure here.
+                    </p>
+
+                    <div className="space-y-2 mb-4">
+                      {empTemplate.length === 0 && (
+                        <p className="text-xs text-gray-400 italic">No folders yet — add one below.</p>
+                      )}
+                      {empTemplate.map((name, i) => (
+                        <div
+                          key={`${name}-${i}`}
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 bg-gray-50"
+                        >
+                          <span className="text-lg">📁</span>
+                          <span className="flex-1 text-sm font-medium text-gray-800 truncate">
+                            {name}
+                          </span>
+                          <button
+                            onClick={() => {
+                              const next = empTemplate.filter((_, idx) => idx !== i)
+                              setEmpTemplate(next)
+                              saveEmpTemplate(next)
+                            }}
+                            className="text-red-300 hover:text-red-600 text-xs px-1.5"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={newFolderName}
+                        onChange={e => setNewFolderName(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' && newFolderName.trim()) {
+                            const next = [...empTemplate, newFolderName.trim()]
+                            setEmpTemplate(next)
+                            setNewFolderName('')
+                            saveEmpTemplate(next)
+                          }
+                        }}
+                        placeholder="New folder name (e.g. Onboarding)"
+                        className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500"
+                      />
+                      <button
+                        onClick={() => {
+                          if (!newFolderName.trim()) return
+                          const next = [...empTemplate, newFolderName.trim()]
+                          setEmpTemplate(next)
+                          setNewFolderName('')
+                          saveEmpTemplate(next)
+                        }}
+                        disabled={!newFolderName.trim() || tmplSaving}
+                        className="px-4 py-2 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800 disabled:opacity-40"
+                      >
+                        Add Folder
+                      </button>
+                    </div>
+                    {tmplMsg && (
+                      <p
+                        className={`text-xs mt-2 ${
+                          tmplMsg.startsWith('ok:') ? 'text-green-700' : 'text-red-600'
+                        }`}
+                      >
+                        {tmplMsg.slice(tmplMsg.indexOf(':') + 1)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
             {/* end bg-gray-50 */}
           </div>
@@ -1641,6 +1863,10 @@ export default function HR() {
             setEditForm(null)
           }}
         />
+      )}
+
+      {hatDoc && (
+        <DocViewerModal name={hatDoc.name} url={hatDoc.url} onClose={() => setHatDoc(null)} />
       )}
     </div>
   )
