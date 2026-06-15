@@ -25,6 +25,7 @@ const Settings = lazy(() => import('./pages/Settings'))
 const Admin = lazy(() => import('./pages/Admin'))
 const EstimateDetail = lazy(() => import('./pages/EstimateDetail'))
 const EDocuments = lazy(() => import('./pages/EDocuments'))
+const SignDocument = lazy(() => import('./pages/SignDocument'))
 const MasterRates = lazy(() => import('./pages/MasterRates'))
 const MasterCrews = lazy(() => import('./pages/MasterCrews'))
 const Statistics = lazy(() => import('./pages/Statistics'))
@@ -110,6 +111,7 @@ function AppRoutes() {
         <Route path="/apply" element={<ApplyForm />} />
         <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/sign/:token" element={<SignDocument />} />
         <Route path="/client-portal/login" element={<PortalLogin />} />
         <Route path="/client-portal/activate" element={<PortalActivate />} />
         <Route path="/client-portal" element={<PortalShell />} />

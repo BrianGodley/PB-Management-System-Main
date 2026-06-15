@@ -16,6 +16,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import EDocFieldEditor from '../components/edoc/EDocFieldEditor'
+import EDocDocumentModal from '../components/edoc/EDocDocumentModal'
 
 const STORAGE_BUCKET = 'edocuments'
 
@@ -108,6 +109,7 @@ function ContractsTab({ clientId, userId, embedded }) {
   const [loading, setLoading] = useState(true)
   const [scope, setScope] = useState('all') // 'mine' | 'all'
   const [statusFilter, setStatusFilter] = useState('all')
+  const [openDoc, setOpenDoc] = useState(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -184,9 +186,7 @@ function ContractsTab({ clientId, userId, embedded }) {
               {docs.map(d => (
                 <tr
                   key={d.id}
-                  onClick={() =>
-                    alert('Document editor & send flow arrives in the next phase.')
-                  }
+                  onClick={() => setOpenDoc(d)}
                   className="hover:bg-gray-50 cursor-pointer"
                 >
                   <td className="px-4 py-2 font-medium text-gray-800">{d.name}</td>
@@ -206,6 +206,17 @@ function ContractsTab({ clientId, userId, embedded }) {
             </tbody>
           </table>
         </div>
+      )}
+
+      {openDoc && (
+        <EDocDocumentModal
+          doc={openDoc}
+          onClose={() => setOpenDoc(null)}
+          onChanged={() => {
+            setOpenDoc(null)
+            load()
+          }}
+        />
       )}
     </div>
   )
