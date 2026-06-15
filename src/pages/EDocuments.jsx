@@ -15,6 +15,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import EDocFieldEditor from '../components/edoc/EDocFieldEditor'
 
 const STORAGE_BUCKET = 'edocuments'
 
@@ -215,6 +216,7 @@ function TemplatesTab({ userId }) {
   const [templates, setTemplates] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [editing, setEditing] = useState(null) // template being field-edited
   const fileRef = useRef(null)
 
   const load = useCallback(async () => {
@@ -319,7 +321,7 @@ function TemplatesTab({ userId }) {
               </div>
               <div className="flex gap-2 mt-3">
                 <button
-                  onClick={() => alert('PDF field-placement editor arrives in the next phase.')}
+                  onClick={() => setEditing(t)}
                   className="flex-1 text-xs border border-gray-300 rounded-lg py-1.5 text-gray-700 hover:bg-gray-50 font-medium"
                 >
                   ✎ Edit Fields
@@ -334,6 +336,17 @@ function TemplatesTab({ userId }) {
             </div>
           ))}
         </div>
+      )}
+
+      {editing && (
+        <EDocFieldEditor
+          template={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null)
+            load()
+          }}
+        />
       )}
     </div>
   )
