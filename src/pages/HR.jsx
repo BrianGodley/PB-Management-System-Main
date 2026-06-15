@@ -1463,7 +1463,7 @@ export default function HR() {
               {[
                 { key: 'employee-groups', label: '👥 Employee Groups' },
                 { key: 'time-clock', label: '⏰ Time Clock' },
-                { key: 'new-employee', label: '🗂️ New Employee' },
+                { key: 'new-employee', label: '🗂️ Employee Templates' },
               ].map(st => (
                 <button
                   key={st.key}
