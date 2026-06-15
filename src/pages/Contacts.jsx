@@ -963,7 +963,8 @@ export default function Contacts() {
       if (!t) continue
       q = q.or(
         `first_name.ilike.%${t}%,last_name.ilike.%${t}%,email.ilike.%${t}%,` +
-          `city.ilike.%${t}%,phone.ilike.%${t}%,cell.ilike.%${t}%`
+          `street_address.ilike.%${t}%,city.ilike.%${t}%,state.ilike.%${t}%,zip.ilike.%${t}%,` +
+          `phone.ilike.%${t}%,cell.ilike.%${t}%`
       )
     }
 
@@ -1007,7 +1008,9 @@ export default function Contacts() {
       const t = raw.replace(/[%(),*]/g, '').trim()
       if (!t) continue
       q = q.or(
-        `company_name.ilike.%${t}%,email.ilike.%${t}%,company_city.ilike.%${t}%,phone.ilike.%${t}%`
+        `company_name.ilike.%${t}%,email.ilike.%${t}%,` +
+          `company_street.ilike.%${t}%,company_city.ilike.%${t}%,company_state.ilike.%${t}%,company_zip.ilike.%${t}%,` +
+          `phone.ilike.%${t}%`
       )
     }
 

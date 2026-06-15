@@ -531,10 +531,10 @@ export default function SamChat() {
                     send()
                   }
                 }}
-                rows={composerExpanded ? 8 : 1}
+                rows={composerExpanded ? 10 : 2}
                 placeholder="Ask Sam, or attach a photo/document…  (Shift+Enter for a new line)"
-                className={`flex-1 resize-none border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700/30 focus:border-green-700 transition-all ${
-                  composerExpanded ? 'max-h-72' : 'max-h-40'
+                className={`flex-1 resize-y border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-700/30 focus:border-green-700 transition-all ${
+                  composerExpanded ? 'max-h-96' : 'max-h-40'
                 }`}
               />
               <button

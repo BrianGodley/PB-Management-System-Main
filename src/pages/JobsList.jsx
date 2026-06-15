@@ -1262,12 +1262,22 @@ export default function JobsList() {
       return ((j[filterRole] || '').trim().toLowerCase()) === filterEmpLc
     })
     .filter(j => {
-      const q = search.toLowerCase()
-      return (
-        !q ||
-        (j.name || '').toLowerCase().includes(q) ||
-        (j.client_name || '').toLowerCase().includes(q)
-      )
+      const q = search.trim().toLowerCase()
+      if (!q) return true
+      // Match job name, client, and the full address (street/city/state/zip)
+      // so a site can be found by address when the client name isn't recalled.
+      const hay = [
+        j.name,
+        j.client_name,
+        j.job_address,
+        j.job_city,
+        j.job_state,
+        j.job_zip,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return hay.includes(q)
     })
     .sort((a, b) => {
       const la = lastName(a.name || a.client_name || '')
@@ -1638,7 +1648,7 @@ export default function JobsList() {
 
               <input
                 type="text"
-                placeholder="Search jobs…"
+                placeholder="Search by name, address, or client…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 className="input text-xs mb-2 py-1.5 flex-shrink-0 text-center"

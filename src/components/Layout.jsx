@@ -587,9 +587,12 @@ export default function Layout() {
         </main>
       </div>
 
-      {/* ── MOBILE BOTTOM DOCK ── */}
+      {/* ── MOBILE BOTTOM DOCK ──
+           z-40 (not z-50): sits above page content but BELOW standard modals
+           (z-50+), so a modal's bottom confirm buttons are never covered by the
+           dock. The More-menu sheet below is z-50, so it still floats above. */}
       <nav
-        className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-white border-t border-gray-200 flex"
+        className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200 flex"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         {DOCK_ITEMS.map(item => {

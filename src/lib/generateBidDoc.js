@@ -288,7 +288,13 @@ function buildOpening(estimate, bidDate, clientAddress, consultantName = '') {
 function buildModuleSection(mod, project) {
   const out = []
   const v = MODULE_VERBIAGE[mod.module_type]
-  const title = v?.title || mod.module_type || 'Scope of Work'
+  // Prefer the user's descriptive names so the proposal reads naturally:
+  //   1) a custom module name, if one was set
+  //   2) the custom project name from the Projects section
+  //   3) the generic module-type title (fallback)
+  const customName = (mod.name || mod.module_name || mod.data?.moduleName || '').trim()
+  const projName = (project?.project_name || '').trim()
+  const title = customName || projName || v?.title || mod.module_type || 'Scope of Work'
 
   // Heading 2 → mammoth renders <h2>; print CSS sizes it to 16pt.
   out.push(
