@@ -23,6 +23,7 @@ import {
   fetchConsultantNameForEstimate,
 } from '../lib/generateBidDoc'
 import CONotifyDialog from './CONotifyDialog'
+import ErrorBoundary from './ErrorBoundary'
 
 import DrainageModule from './modules/DrainageModule'
 import DrainageSummary from './modules/DrainageSummary'
@@ -1248,6 +1249,7 @@ export default function COEstimatePanel({
                 </button>
               </div>
               <div className="overflow-y-auto px-6 pb-6 flex-1">
+                <ErrorBoundary inline resetKey={selectedType}>
                 {selectedType === 'Drainage' && (
                   <DrainageModule
                     projectName={selectedProject?.project_name}
@@ -1407,6 +1409,7 @@ export default function COEstimatePanel({
                     initialData={moduleInitialData}
                   />
                 )}
+                </ErrorBoundary>
               </div>
             </div>
           ) : (

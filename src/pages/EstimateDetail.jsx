@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { fetchGlobalGpmd, DEFAULT_ESTIMATE_GPMD } from '../lib/companyDefaults'
 import { useRateIcons } from '../contexts/RateIconsContext'
+import ErrorBoundary from '../components/ErrorBoundary'
 const DrainageModule = lazy(() => import('../components/modules/DrainageModule'))
 import DrainageSummary from '../components/modules/DrainageSummary'
 const LightingModule = lazy(() => import('../components/modules/LightingModule'))
@@ -826,7 +827,10 @@ export default function EstimateDetail() {
       }, 0)
       const grandTotal = moduleSum + subGp + subGp * 0.12
       const totalGp = moduleGp + subGp
-      const bidGpmd = totalMD > 0 ? Math.round(totalGp / totalMD) : 0
+      // GPMD = CREW gross profit ÷ crew man-days. Sub GP does not tie to labor
+      // days, so it must be excluded from the numerator here (otherwise the
+      // main bid sheet shows an inflated GPMD vs. the estimate detail).
+      const bidGpmd = totalMD > 0 ? Math.round(moduleGp / totalMD) : 0
       const projNames = projsForBid.map(p => p.project_name)
 
       // Save bid / change order record to Supabase
@@ -1997,6 +2001,7 @@ export default function EstimateDetail() {
                     </div>
                   }
                 >
+                  <ErrorBoundary inline resetKey={selectedType}>
                   {selectedType === 'Drainage' && (
                     <DrainageModule
                       projectName={selectedProject?.project_name}
@@ -2159,6 +2164,7 @@ export default function EstimateDetail() {
                       initialData={moduleInitialData}
                     />
                   )}
+                  </ErrorBoundary>
                 </Suspense>
               </div>
             </div>

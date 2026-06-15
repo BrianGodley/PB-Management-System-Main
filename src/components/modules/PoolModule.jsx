@@ -315,8 +315,16 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   const shotMatCY = subRates['Shotcrete Material'] ?? SHOTCRETE_MAT_PER_CY
   const shotLabCY = subRates['Shotcrete Labor'] ?? SHOTCRETE_LABOR_PER_CY
   const shotMin = subRates['Shotcrete Minimum Labor'] ?? SHOTCRETE_LABOR_MIN
-  const autoShotcreteSub = totalShotCY * shotMatCY + Math.max(shotMin, totalShotCY * shotLabCY)
-  const shotcreteSub = n(shotcrete.manualSubCost) || autoShotcreteSub
+  // An override counts only when the user actually typed a value — '' means
+  // "use auto", but a typed 0 is a real override that removes the auto sub.
+  const hasOverride = v => v !== '' && v != null && !isNaN(parseFloat(v))
+  // No pool structure → no shotcrete sub (don't apply the labor minimum to an
+  // empty scope, e.g. a remodel with no new walls).
+  const autoShotcreteSub =
+    totalShotCY > 0 ? totalShotCY * shotMatCY + Math.max(shotMin, totalShotCY * shotLabCY) : 0
+  const shotcreteSub = hasOverride(shotcrete.manualSubCost)
+    ? n(shotcrete.manualSubCost)
+    : autoShotcreteSub
 
   // ─ Waterline Tile ─
   let tileHrs = 0,
@@ -409,22 +417,26 @@ function calcPool(state, materialPrices, laborRates, subRates = {}, walkAccess =
   const plumbBaseRate =
     subRates[`Plumbing ${plumbing.baseType}`] ?? PLUMBING_BASES[plumbing.baseType] ?? 4500
   let plumbSub
-  if (n(plumbing.manualSubCost) > 0) {
+  if (hasOverride(plumbing.manualSubCost)) {
     plumbSub = n(plumbing.manualSubCost)
-  } else {
+  } else if (n(pool.perimLF) > 0 || spa.enabled) {
+    // Only auto-charge the plumbing base when there's actual pool/spa scope.
     plumbSub =
       plumbBaseRate +
       (plumbing.over20ft ? (subRates['Plumbing Over 20ft Add'] ?? 300) : 0) +
       (plumbing.remodel ? (subRates['Plumbing Remodel Add'] ?? 200) : 0) +
       n(plumbing.extraLights) * (subRates['Plumbing Extra Light'] ?? 150) +
       n(plumbing.sheerDescents) * (subRates['Plumbing Sheer Descent'] ?? 450)
+  } else {
+    plumbSub = 0
   }
 
   // ─ Steel (rates from subcontractor_rates, category='Pool') ─
   let steelSub
-  if (n(steel.manualSubCost) > 0) {
+  if (hasOverride(steel.manualSubCost)) {
     steelSub = n(steel.manualSubCost)
   } else {
+    // Steel is qty-driven (perimeter + spa), so it's already 0 with no scope.
     const poolPerim = n(pool.perimLF)
     const steelPerLF = subRates['Steel Per LF'] ?? 8
     const steelSpaBonus = subRates['Steel Spa Bonus'] ?? 200

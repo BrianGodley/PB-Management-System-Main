@@ -20,6 +20,16 @@ export default class ErrorBoundary extends Component {
     console.error('[ErrorBoundary] caught a render error:', error, info)
   }
 
+  componentDidUpdate(prevProps) {
+    // Auto-clear the error when resetKey changes (e.g. the user switches to a
+    // different module), so a one-off crash in one section doesn't get stuck.
+    if (this.state.error && prevProps.resetKey !== this.props.resetKey) {
+      this.setState({ error: null, info: null })
+    }
+  }
+
+  reset = () => this.setState({ error: null, info: null })
+
   render() {
     const { error, info } = this.state
     if (!error) return this.props.children
@@ -27,6 +37,41 @@ export default class ErrorBoundary extends Component {
     const detail = [error?.stack || '', info?.componentStack || '']
       .filter(Boolean)
       .join('\n\n')
+
+    // Inline mode — contains a crash to one section (e.g. a single estimator
+    // module) and shows the error there, leaving the rest of the page intact
+    // so unsaved work isn't lost. Includes the message + stack to diagnose.
+    if (this.props.inline) {
+      return (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 m-2">
+          <p className="text-sm font-bold text-red-800">⚠️ This section hit an error</p>
+          <p className="mt-0.5 text-xs text-gray-600">
+            The rest of your estimate is safe — nothing else was lost. Try again, or close this
+            section and reopen it.
+          </p>
+          <p className="mt-2 break-words font-mono text-xs text-red-700">
+            {error?.name ? `${error.name}: ` : ''}
+            {error?.message || String(error)}
+          </p>
+          {detail && (
+            <details className="mt-2">
+              <summary className="cursor-pointer text-xs font-semibold text-gray-500 hover:text-gray-700">
+                Technical details (for support)
+              </summary>
+              <pre className="mt-1 max-h-48 overflow-auto rounded-lg bg-gray-900 p-2 text-[11px] leading-relaxed text-gray-200">
+                {detail}
+              </pre>
+            </details>
+          )}
+          <button
+            onClick={this.reset}
+            className="mt-3 rounded-lg bg-red-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-800"
+          >
+            Try again
+          </button>
+        </div>
+      )
+    }
 
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
