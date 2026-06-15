@@ -95,6 +95,14 @@ export default function EstimateDetail() {
   const returnTo = searchParams.get('return_to') || null
   const [estimate, setEstimate] = useState(null)
   const [projects, setProjects] = useState([])
+  // All versions in this estimate's tree (root + children), for the version
+  // switcher dropdown. Each row: { id, version, status, created_at }.
+  const [versions, setVersions] = useState([])
+  const [versionMenuOpen, setVersionMenuOpen] = useState(false)
+  // Legacy estimates may store client_name without client_id. We resolve the
+  // id by name on load so the breadcrumb links to the client (opportunity)
+  // detail rather than falling back to the opportunities table.
+  const [resolvedClientId, setResolvedClientId] = useState(null)
   // Drag-and-drop reorder of the project list (left column).
   const [dragProjId, setDragProjId] = useState(null)
   const [dragOverProjId, setDragOverProjId] = useState(null)
@@ -448,6 +456,35 @@ export default function EstimateDetail() {
 
     if (est) {
       setEstimate(est)
+      // Load every version in this estimate's tree for the version switcher.
+      // rootId = the original; children all carry parent_estimate_id = root.
+      const rootId = est.parent_estimate_id || est.id
+      const { data: vers } = await supabase
+        .from('estimates')
+        .select('id, version, status, created_at')
+        .or(`id.eq.${rootId},parent_estimate_id.eq.${rootId}`)
+      // Sort ascending by version (fallback to created_at), so v1 is first.
+      const sorted = (vers || []).sort(
+        (a, b) =>
+          (a.version || 1) - (b.version || 1) ||
+          new Date(a.created_at) - new Date(b.created_at)
+      )
+      setVersions(sorted)
+
+      // Resolve client id by name when the estimate lacks one (legacy rows),
+      // so the breadcrumb can link to the client detail.
+      if (!est.client_id && est.client_name) {
+        const { data: cli } = await supabase
+          .from('clients')
+          .select('id')
+          .eq('name', est.client_name)
+          .limit(1)
+          .maybeSingle()
+        setResolvedClientId(cli?.id || null)
+      } else {
+        setResolvedClientId(null)
+      }
+
       const { data: projs } = await supabase
         .from('estimate_projects')
         .select('*, estimate_modules(*)')
@@ -959,15 +996,42 @@ export default function EstimateDetail() {
   }
 
   async function deleteEstimate() {
-    if (estimate.status !== 'pending') return
+    // A sold estimate is tied to a live job — block that one path (with a
+    // message) rather than silently doing nothing. Everything else (pending,
+    // lost, draft, or a legacy NULL status) is deletable.
+    if (estimate.status === 'sold') {
+      alert(
+        'This estimate is marked Sold and is linked to a job. Change its status before deleting.'
+      )
+      return
+    }
 
-    // Look up any bids and associated work orders
-    const { data: bidsData } = await supabase.from('bids').select('id').eq('estimate_id', id)
-    const bidCount = bidsData?.length || 0
+    const _cid = estimate.client_id || resolvedClientId
+    const clientLink = _cid ? `/clients/${_cid}` : '/clients'
 
-    const { data: jobsData } = await supabase.from('jobs').select('id').eq('estimate_id', id)
-    let woCount = 0
+    // Every estimate in this version tree (root + child versions) gets
+    // removed together, so deleting a parent doesn't orphan its versions.
+    const rootId = estimate.parent_estimate_id || estimate.id
+    const { data: treeRows } = await supabase
+      .from('estimates')
+      .select('id')
+      .or(`id.eq.${rootId},parent_estimate_id.eq.${rootId}`)
+    const estIds = Array.from(new Set([...(treeRows || []).map(r => r.id), id]))
+
+    // Count bids + work orders across the whole tree for the warning modal.
+    const { data: bidsData } = await supabase
+      .from('bids')
+      .select('id')
+      .in('estimate_id', estIds)
+    const bidIds = bidsData?.map(b => b.id) || []
+    const bidCount = bidIds.length
+
+    const { data: jobsData } = await supabase
+      .from('jobs')
+      .select('id')
+      .in('estimate_id', estIds)
     const jobIds = jobsData?.map(j => j.id) || []
+    let woCount = 0
     if (jobIds.length > 0) {
       const { count } = await supabase
         .from('work_orders')
@@ -976,29 +1040,76 @@ export default function EstimateDetail() {
       woCount = count || 0
     }
 
-    const bidIds = bidsData?.map(b => b.id) || []
+    // Remove projects + their modules first so the estimates delete isn't
+    // blocked by a foreign-key constraint. Returns an error message or null.
+    async function deleteProjectsAndModules() {
+      const { data: projRows, error: projSelErr } = await supabase
+        .from('estimate_projects')
+        .select('id')
+        .in('estimate_id', estIds)
+      if (projSelErr) return projSelErr.message
+      const projIds = (projRows || []).map(p => p.id)
+      if (projIds.length) {
+        const { error: modErr } = await supabase
+          .from('estimate_modules')
+          .delete()
+          .in('project_id', projIds)
+        if (modErr) return modErr.message
+        const { error: pErr } = await supabase
+          .from('estimate_projects')
+          .delete()
+          .in('id', projIds)
+        if (pErr) return pErr.message
+      }
+      return null
+    }
 
     setEstDeleteModal({
       bidCount,
       woCount,
-      // Delete all — bids + WOs + estimate
+      // Delete all — projects/modules + bids + WOs + every version
       onConfirm: async () => {
         setStatusLoading(true)
+        const projErr = await deleteProjectsAndModules()
+        if (projErr) {
+          setStatusLoading(false)
+          alert('Delete failed: ' + projErr)
+          return
+        }
         if (jobIds.length) await supabase.from('work_orders').delete().in('job_id', jobIds)
         if (bidIds.length) await supabase.from('bids').delete().in('id', bidIds)
-        await supabase.from('estimates').delete().eq('id', id)
+        const { error: estErr } = await supabase.from('estimates').delete().in('id', estIds)
+        if (estErr) {
+          setStatusLoading(false)
+          alert('Delete failed: ' + estErr.message)
+          return
+        }
         setEstDeleteModal(null)
-        navigate(estimate.client_id ? `/clients/${estimate.client_id}` : '/clients')
+        navigate(clientLink)
       },
-      // Keep bid — only delete WOs + estimate, leave bids
+      // Keep bid — delete projects/modules + WOs + versions, leave bids
       onKeepBid:
         bidCount > 0
           ? async () => {
               setStatusLoading(true)
+              const projErr = await deleteProjectsAndModules()
+              if (projErr) {
+                setStatusLoading(false)
+                alert('Delete failed: ' + projErr)
+                return
+              }
               if (jobIds.length) await supabase.from('work_orders').delete().in('job_id', jobIds)
-              await supabase.from('estimates').delete().eq('id', id)
+              // Detach bids from the estimates we're about to delete so the
+              // bids survive without a dangling FK.
+              await supabase.from('bids').update({ estimate_id: null }).in('estimate_id', estIds)
+              const { error: estErr } = await supabase.from('estimates').delete().in('id', estIds)
+              if (estErr) {
+                setStatusLoading(false)
+                alert('Delete failed: ' + estErr.message)
+                return
+              }
               setEstDeleteModal(null)
-              navigate(estimate.client_id ? `/clients/${estimate.client_id}` : '/clients')
+              navigate(clientLink)
             }
           : null,
     })
@@ -1236,7 +1347,11 @@ export default function EstimateDetail() {
           <>
             <span className="text-gray-300">/</span>
             <Link
-              to={estimate.client_id ? `/clients/${estimate.client_id}` : '/clients'}
+              to={
+                estimate.client_id || resolvedClientId
+                  ? `/clients/${estimate.client_id || resolvedClientId}`
+                  : '/clients'
+              }
               className="text-gray-400 hover:text-gray-600 hover:underline"
             >
               {estimate.client_name}
@@ -1247,10 +1362,74 @@ export default function EstimateDetail() {
         <span className="text-gray-700 font-medium">
           {editingName ? nameInput || estimate.estimate_name : estimate.estimate_name}
         </span>
-        {(estimate.version > 1 || estimate.parent_estimate_id) && (
-          <span className="ml-2 text-[11px] bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-2 py-0.5 font-medium">
-            Estimate {estimate.version || 2}
-          </span>
+        {versions.length > 1 ? (
+          <div className="relative ml-2 inline-block">
+            <button
+              onClick={() => setVersionMenuOpen(o => !o)}
+              className="text-[11px] bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-2 py-0.5 font-medium hover:bg-blue-100 inline-flex items-center gap-1"
+              title="Switch between saved versions of this estimate"
+            >
+              Estimate {estimate.version || 1} of {versions.length}
+              <span className="text-blue-400">▾</span>
+            </button>
+            {versionMenuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setVersionMenuOpen(false)}
+                />
+                <div className="absolute left-0 mt-1 z-20 w-60 bg-white border border-gray-200 rounded-lg shadow-lg py-1">
+                  <p className="px-3 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                    Versions
+                  </p>
+                  {versions.map(v => {
+                    const isCurrent = v.id === estimate.id
+                    return (
+                      <button
+                        key={v.id}
+                        onClick={() => {
+                          setVersionMenuOpen(false)
+                          if (isCurrent) return
+                          if (
+                            dirty &&
+                            !window.confirm(
+                              'You have unsaved changes that will be lost if you switch versions. Continue?'
+                            )
+                          )
+                            return
+                          navigate(`/estimates/${v.id}`)
+                        }}
+                        className={`w-full text-left px-3 py-1.5 flex items-center justify-between gap-2 hover:bg-gray-50 ${
+                          isCurrent ? 'bg-blue-50' : ''
+                        }`}
+                      >
+                        <span className="text-sm font-medium text-gray-800">
+                          Estimate {v.version || 1}
+                          {isCurrent && <span className="ml-1 text-blue-600">✓</span>}
+                        </span>
+                        <span className="text-[11px] text-gray-400 whitespace-nowrap">
+                          {v.created_at
+                            ? new Date(v.created_at).toLocaleDateString('en-US', {
+                                month: 'numeric',
+                                day: 'numeric',
+                                year: '2-digit',
+                              })
+                            : ''}
+                          {v.status ? ` · ${v.status}` : ''}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          (estimate.version > 1 || estimate.parent_estimate_id) && (
+            <span className="ml-2 text-[11px] bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-2 py-0.5 font-medium">
+              Estimate {estimate.version || 2}
+            </span>
+          )
         )}
       </div>
 
