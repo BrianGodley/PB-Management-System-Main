@@ -329,6 +329,81 @@ export default function EstimateDetail() {
     return true
   }
 
+  // Overwrite the CURRENT estimate version in place with the local draft.
+  // Unlike applyAsNewVersion (which forks a new Estimate N+1), this replaces
+  // the projects/modules under the existing estimate.id and keeps the same
+  // version number — the user's chosen "save over this one" path. We delete
+  // the estimate's existing project/module rows (reading their ids from the
+  // DB so it's correct regardless of cascade settings) and re-insert from
+  // local state with ids stripped so Postgres assigns fresh ones.
+  async function applyOverwrite() {
+    if (!estimate) return false
+
+    // 1) Remove the existing rows for this estimate.
+    const { data: exProjs, error: exErr } = await supabase
+      .from('estimate_projects')
+      .select('id')
+      .eq('estimate_id', estimate.id)
+    if (exErr) {
+      alert('Save failed: ' + exErr.message)
+      return false
+    }
+    const exIds = (exProjs || []).map(p => p.id)
+    if (exIds.length) {
+      const { error: delModErr } = await supabase
+        .from('estimate_modules')
+        .delete()
+        .in('project_id', exIds)
+      if (delModErr) {
+        alert('Save failed: ' + delModErr.message)
+        return false
+      }
+      const { error: delProjErr } = await supabase
+        .from('estimate_projects')
+        .delete()
+        .in('id', exIds)
+      if (delProjErr) {
+        alert('Save failed: ' + delProjErr.message)
+        return false
+      }
+    }
+
+    // 2) Re-insert each project + its modules from local state.
+    for (const proj of projects) {
+      const {
+        id: _projId,
+        estimate_modules: _mods,
+        estimate_id: _eid,
+        created_at: _ca,
+        ...projShell
+      } = proj
+      const { data: newProj, error: projErr } = await supabase
+        .from('estimate_projects')
+        .insert({ ...projShell, estimate_id: estimate.id })
+        .select()
+        .single()
+      if (projErr || !newProj) {
+        alert('Project save failed: ' + (projErr?.message || 'unknown'))
+        return false
+      }
+      const newRows = (proj.estimate_modules || []).map(m => {
+        const { id: _modId, project_id: _pid, created_at: _mca, ...modShell } = m
+        return { ...modShell, project_id: newProj.id }
+      })
+      if (newRows.length > 0) {
+        const { error: modErr } = await supabase.from('estimate_modules').insert(newRows)
+        if (modErr) {
+          alert('Module save failed: ' + modErr.message)
+          return false
+        }
+      }
+    }
+
+    // Reload the freshly-saved rows into local state.
+    await fetchData()
+    return true
+  }
+
   // Add / Edit module modals
   const [showModulePicker, setShowModulePicker] = useState(false)
   const [selectedType, setSelectedType] = useState(null)
@@ -766,7 +841,7 @@ export default function EstimateDetail() {
     // saves the draft as a new version or discards it.
     if (dirty) {
       alert(
-        'You have unsaved changes on this estimate. Click "Save Changes as New Version" first — the bid will then use that new version\'s numbers.'
+        'You have unsaved changes on this estimate. Save them first (Overwrite or Save as New Version) — the bid will then use the saved numbers.'
       )
       return
     }
@@ -1252,36 +1327,60 @@ export default function EstimateDetail() {
                (Estimate N+1, where N = max version across the whole tree
                regardless of which version the user is currently on). */}
           {dirty && (() => {
-            // First save of a brand-new estimate (no prior versions) gets a
-            // plain "Save" label. Once the tree has at least one prior
-            // version saved, subsequent saves become "Save New Version" to
-            // make the version-snapshotting behavior explicit.
+            // First save of a brand-new estimate (no prior versions): a
+            // single "Save" that writes into the current row in place — there
+            // is no earlier version to preserve, so forking would be noise.
+            // Once the tree has at least one version, the user gets a choice:
+            //   • Overwrite       → save over THIS version (applyOverwrite)
+            //   • Save as New Ver → snapshot a fresh Estimate N+1
             const isFirstSave =
               !estimate.parent_estimate_id &&
               (!estimate.version || estimate.version <= 1)
-            const label = savingDraft
-              ? 'Saving…'
-              : isFirstSave
-                ? '💾 Save'
-                : '💾 Save New Version'
+
+            async function runOverwrite() {
+              setSavingDraft(true)
+              const ok = await applyOverwrite()
+              setSavingDraft(false)
+              if (ok) setDirty(false)
+            }
+            async function runNewVersion() {
+              setSavingDraft(true)
+              const ok = await applyAsNewVersion({})
+              setSavingDraft(false)
+              if (ok) setDirty(false)
+            }
+
+            if (isFirstSave) {
+              return (
+                <button
+                  onClick={runOverwrite}
+                  disabled={savingDraft}
+                  className="px-4 py-1 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800 disabled:opacity-50"
+                  title="Save this estimate"
+                >
+                  {savingDraft ? 'Saving…' : '💾 Save'}
+                </button>
+              )
+            }
             return (
-              <button
-                onClick={async () => {
-                  setSavingDraft(true)
-                  const ok = await applyAsNewVersion({})
-                  setSavingDraft(false)
-                  if (ok) setDirty(false)
-                }}
-                disabled={savingDraft}
-                className="px-4 py-1 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800 disabled:opacity-50"
-                title={
-                  isFirstSave
-                    ? 'Save this estimate'
-                    : 'Snapshot every change as the next estimate version'
-                }
-              >
-                {label}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={runOverwrite}
+                  disabled={savingDraft}
+                  className="px-4 py-1 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800 disabled:opacity-50"
+                  title={`Save over the current version (Estimate ${estimate.version || 1}) — no new version is created`}
+                >
+                  {savingDraft ? 'Saving…' : '💾 Overwrite'}
+                </button>
+                <button
+                  onClick={runNewVersion}
+                  disabled={savingDraft}
+                  className="px-4 py-1 rounded-lg border border-green-700 text-green-700 text-sm font-semibold hover:bg-green-50 disabled:opacity-50"
+                  title="Keep the current version and snapshot these changes as the next estimate version"
+                >
+                  {savingDraft ? 'Saving…' : '🔁 Save as New Version'}
+                </button>
+              </div>
             )
           })()}
           {/* Create Bid / Change Order */}
