@@ -449,6 +449,9 @@ export default function EstimateDetail() {
   const [moduleForm, setModuleForm] = useState({ man_days: '', material_cost: '', notes: '' })
   const [savingModule] = useState(false)
   const [editingModule, setEditingModule] = useState(null) // set when editing existing module
+  // When true, the module modal opens read-only (all inputs/buttons disabled
+  // via a disabled <fieldset>) so a saved estimate can be viewed without edits.
+  const [moduleReadOnly, setModuleReadOnly] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -662,9 +665,11 @@ export default function EstimateDetail() {
     setSwitchDemoData(null)
     setModuleForm({ man_days: '', material_cost: '', notes: '' })
     setEditingModule(null)
+    setModuleReadOnly(false)
   }
 
   function openEditModule(mod) {
+    setModuleReadOnly(false)
     setEditingModule(mod)
     setSelectedType(mod.module_type)
     setPickerStep(3) // skip the two add-flow steps when editing
@@ -675,6 +680,13 @@ export default function EstimateDetail() {
       material_cost: mod.material_cost || '',
       notes: mod.notes || '',
     })
+  }
+
+  // Open the module modal read-only (view mode on a saved estimate). Same as
+  // openEditModule but flags the modal so its inputs/buttons are disabled.
+  function openViewModule(mod) {
+    openEditModule(mod)
+    setModuleReadOnly(true)
   }
 
   function extractFinancials(payload) {
@@ -2119,18 +2131,16 @@ export default function EstimateDetail() {
                   </div>
                 ) : (
                   <div className="pt-1 space-y-2">
+                    <button
+                      onClick={() => openViewModule(selectedModule)}
+                      className="w-full text-sm text-gray-700 hover:text-gray-900 border border-gray-300 hover:border-gray-400 rounded-lg py-2 transition-colors font-medium"
+                    >
+                      👁 View Module
+                    </button>
                     <p className="text-[11px] text-gray-400 text-center">
-                      🔒 Viewing only — click <span className="font-semibold">Edit</span> on the
-                      estimate to change modules.
+                      Viewing only — click <span className="font-semibold">Edit</span> on the
+                      estimate to make changes.
                     </p>
-                    {hasSavedContent && (
-                      <button
-                        onClick={() => setEditMode(true)}
-                        className="w-full text-sm text-green-700 hover:text-green-900 border border-green-300 hover:border-green-500 rounded-lg py-2 transition-colors font-medium"
-                      >
-                        ✎ Edit Estimate
-                      </button>
-                    )}
                   </div>
                 )}
               </div>
@@ -2274,16 +2284,17 @@ export default function EstimateDetail() {
               <div className="flex items-start justify-between px-6 pt-5 pb-3 border-b border-gray-200 flex-shrink-0">
                 <div className="flex-1">
                   <p className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-0.5">
-                    {editingModule ? 'Edit Module' : 'Add Module'}
+                    {moduleReadOnly ? 'View Module' : editingModule ? 'Edit Module' : 'Add Module'}
                   </p>
                   {editingModule ? (
                     <input
                       type="text"
                       value={moduleNameInput}
                       onChange={e => setModuleNameInput(e.target.value)}
+                      disabled={moduleReadOnly}
                       placeholder={editingModule.module_type || selectedType}
                       title="Edit the module name — saved when you click Update Module"
-                      className="w-full max-w-md rounded-md border border-dashed border-gray-300 bg-white px-2 py-1 text-xl font-bold text-gray-900 focus:border-green-500 focus:outline-none"
+                      className="w-full max-w-md rounded-md border border-dashed border-gray-300 bg-white px-2 py-1 text-xl font-bold text-gray-900 focus:border-green-500 focus:outline-none disabled:bg-gray-50 disabled:text-gray-700"
                     />
                   ) : (
                     <h2 className="text-xl font-bold text-gray-900">
@@ -2298,7 +2309,7 @@ export default function EstimateDetail() {
                       in the dark bar). Permission-gated and module-only. */}
                   <div className="flex items-center justify-between gap-3 mt-0.5">
                     <p className="text-sm text-gray-500">{selectedProject?.project_name}</p>
-                    {canAccessRates && (
+                    {canAccessRates && !moduleReadOnly && (
                       <button
                         type="button"
                         onClick={toggleRateIcons}
@@ -2350,6 +2361,18 @@ export default function EstimateDetail() {
                 </button>
               </div>
               <div className="overflow-y-auto overscroll-contain px-6 pb-6 flex-1 min-h-0">
+                {moduleReadOnly && (
+                  <div className="sticky top-0 z-10 -mx-6 px-6 py-2 bg-gray-100 border-b border-gray-200 text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                    🔒 Viewing only — read-only. Close and click Edit on the estimate to make changes.
+                  </div>
+                )}
+                {/* A disabled fieldset natively disables every input, select,
+                    textarea and button inside it — so read-only view can't be
+                    edited or saved. The header ✕ Close sits outside it. */}
+                <fieldset
+                  disabled={moduleReadOnly}
+                  className={`min-w-0 border-0 p-0 m-0 ${moduleReadOnly ? 'opacity-90' : ''}`}
+                >
                 <Suspense
                   fallback={
                     <div className="flex items-center justify-center py-12 text-sm text-gray-400">
@@ -2522,6 +2545,7 @@ export default function EstimateDetail() {
                   )}
                   </ErrorBoundary>
                 </Suspense>
+                </fieldset>
               </div>
             </div>
           ) : (
