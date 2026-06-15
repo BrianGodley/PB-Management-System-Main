@@ -209,13 +209,19 @@ function calcPlanting(
   })
 
   // Optional yard checks — return visits for watering/health checks during the
-  // establishment period. Default 1 MD + 5% of plant material; both editable.
+  // establishment period. Default 3 hrs + 2% of plant material; both editable.
   // Not scaled by difficulty or walk access.
   const yc = state.yardCheck || {}
   const ycOn = !!yc.enabled
-  const ycMD = yc.manDays === '' || yc.manDays == null ? 1 : n(yc.manDays)
-  const ycPct = yc.pct === '' || yc.pct == null ? 5 : n(yc.pct)
-  const yardCheckHrs = ycOn ? ycMD * 8 : 0
+  // Back-compat: older saves stored manDays; convert to hours (×8).
+  const ycHrs =
+    yc.hours === '' || yc.hours == null
+      ? yc.manDays != null && yc.manDays !== ''
+        ? n(yc.manDays) * 8
+        : 3
+      : n(yc.hours)
+  const ycPct = yc.pct === '' || yc.pct == null ? 2 : n(yc.pct)
+  const yardCheckHrs = ycOn ? ycHrs : 0
   const yardCheckMat = ycOn ? (smallMat + largeMat) * (ycPct / 100) : 0
 
   const _preWalkHrs = plantHrs + addonHrs + diffHrs + manHrs + (parseFloat(hoursAdj) || 0)
@@ -413,7 +419,7 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
   const [manualRows, setManualRows] = useState(initialData?.manualRows ?? DEFAULT_MANUAL_ROWS)
   const [distanceLF, setDistanceLF] = useState(initialData?.distanceLF ?? '')
   const [yardCheck, setYardCheck] = useState(
-    initialData?.yardCheck ?? { enabled: false, manDays: '1', pct: '5' }
+    initialData?.yardCheck ?? { enabled: false, hours: '3', pct: '2' }
   )
 
   // ── Sales tax — applied to totalMat across every module so the bid
@@ -1207,11 +1213,11 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
         {yardCheck.enabled && (
           <div className="grid grid-cols-2 gap-4 mt-3">
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Man-Days</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Hours</label>
               <NumInput
-                value={yardCheck.manDays}
-                onChange={v => setYardCheck(y => ({ ...y, manDays: v }))}
-                placeholder="1"
+                value={yardCheck.hours ?? ''}
+                onChange={v => setYardCheck(y => ({ ...y, hours: v }))}
+                placeholder="3"
               />
             </div>
             <div>
@@ -1221,12 +1227,12 @@ export default function PlantingModule({ onSave, onBack, saving, initialData }) 
               <NumInput
                 value={yardCheck.pct}
                 onChange={v => setYardCheck(y => ({ ...y, pct: v }))}
-                placeholder="5"
+                placeholder="2"
               />
             </div>
             <p className="col-span-2 text-xs text-gray-400">
               Adds {calc.yardCheckHrs?.toFixed(1) || 0} hrs and $
-              {Math.round(calc.yardCheckMat || 0).toLocaleString()} material. Defaults: 1 MD + 5% of
+              {Math.round(calc.yardCheckMat || 0).toLocaleString()} material. Defaults: 3 hrs + 2% of
               plant material.
             </p>
           </div>

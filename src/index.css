@@ -52,13 +52,20 @@
   font-weight: 400;
 }
 
-/* Number inputs with this class show no up/down spinner — just the editable
-   number. Used by the org chart's numeric fields. */
+/* PROJECT-WIDE RULE: number inputs never show up/down spinner arrows.
+   Every <input type="number"> across the app renders as a plain editable
+   field (no stepper arrows, no scroll-wheel increment). Do NOT reintroduce
+   spinner arrows anywhere — if a numeric field is needed, type="number"
+   automatically inherits this. The .no-spin class is kept as an alias so
+   existing markup that references it stays valid. */
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button,
 .no-spin::-webkit-outer-spin-button,
 .no-spin::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
+input[type='number'],
 .no-spin {
   -moz-appearance: textfield;
   appearance: textfield;

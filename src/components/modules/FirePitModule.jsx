@@ -20,7 +20,13 @@ const FP_RATES = {
   fpGroutPump: { dbName: 'FP Grout Pump Setup', fallback: 150.0 }, // flat fee when pump used
   fpGasRing: { dbName: 'FP Gas Ring/Burner', fallback: 25.0 }, // $/unit hardware
   fpGasPipe: { dbName: 'FP Gas Pipe', fallback: 3.0 }, // $/LF
-  fpCap: { dbName: 'FP Wall Cap', fallback: 18.0 }, // $/LF (default cap material, editable per-job)
+  // ── Wall cap costs — SHARED with Walls > Wall Caps. These reference the
+  //    exact same Walls-category rate rows, so editing a cap rate here also
+  //    updates the Walls module (and vice-versa). Edited under category 'Walls'.
+  capFlagstone: { dbName: 'Wall Cap Flagstone', fallback: 500.0 }, // $/ton
+  capPrecast: { dbName: 'Wall Cap Precast', fallback: 50.0 }, // $/ea (keyed to 8" cap)
+  capBullnose: { dbName: 'Wall Cap Bullnose Brick', fallback: 5.0 }, // $/LF
+  capConcrete: { dbName: 'Wall Concrete Truck', fallback: 185.0 }, // $/CY (PIP poured cap)
 
   // ── Wall finish material costs ──────────────────────────────────────────────
   sandStucco: { dbName: 'Sand Stucco - FP', fallback: 0.0 }, // $/SF (labor only by default)
@@ -38,7 +44,6 @@ const FP_RATES = {
   handGroutLab: { dbName: 'FP Hand Grout Labor Rate', fallback: 5.5 }, // CF/hr
   pumpGroutLab: { dbName: 'FP Pump Grout Labor Rate', fallback: 81.0 }, // CF/hr
   gasTrenchLab: { dbName: 'FP Gas Trench Labor Rate', fallback: 35.0 }, // LF/day
-  capLab: { dbName: 'FP Cap Labor Rate', fallback: 12.0 }, // LF/hr (set & mortar wall cap)
   sandStuccoLab: { dbName: 'Sand Stucco - FP Labor Rate', fallback: 92 }, // SF/day
   smoothStuccoLab: { dbName: 'Smooth Stucco - FP Labor Rate', fallback: 65 }, // SF/day
   ledgerstoneLab: { dbName: 'Ledgerstone - FP Labor Rate', fallback: 24 }, // SF/day
@@ -86,8 +91,6 @@ function calcFirePit(
     pctGrouted,
     pctCurved,
     useGroutPump,
-    capLF,
-    capMatPerLF,
     gasRingCount,
     gasTrenchLF,
     sandStuccoSF,
@@ -140,11 +143,34 @@ function calcFirePit(
     n(gasTrenchLF) > 0
       ? (n(gasTrenchLF) / p(FP_RATES.gasTrenchLab.dbName, FP_RATES.gasTrenchLab.fallback)) * 8
       : 0
-  // ── Wall cap (seat/perimeter cap on top of the block wall) ──
-  const capRatePerLF = n(capMatPerLF) || p(FP_RATES.fpCap.dbName, FP_RATES.fpCap.fallback)
-  const capMat = n(capLF) * capRatePerLF
-  const capHrs =
-    n(capLF) > 0 ? n(capLF) / p(FP_RATES.capLab.dbName, FP_RATES.capLab.fallback) : 0
+  // ── Wall cap (identical calculator to Walls > Wall Caps) ──
+  // Per-row cap: Flagstone / Precast / PIP Concrete / Bullnose Brick, each
+  // with the same material formula and labor coefficient used in WallsModule.
+  let capHrs = 0,
+    capMat = 0
+  ;(state.capRows || []).forEach(cap => {
+    const lf = n(cap.lf),
+      qty = n(cap.qty)
+    if (cap.type === 'Flagstone') {
+      capMat +=
+        (((n(cap.widthIn) / 12) * lf * 0.0833 * 100) / 2000) *
+        p(FP_RATES.capFlagstone.dbName, FP_RATES.capFlagstone.fallback)
+      capHrs += lf * 0.25
+    } else if (cap.type === 'Precast') {
+      // Width scales the unit price — base $/ea is keyed to an 8" cap.
+      const widthFactor = (n(cap.widthIn) || 8) / 8
+      capMat += qty * p(FP_RATES.capPrecast.dbName, FP_RATES.capPrecast.fallback) * widthFactor
+      capHrs += qty * 0.2
+    } else if (cap.type === 'PIP Concrete') {
+      capMat +=
+        ((lf * (n(cap.widthIn) / 12) * 0.333) / 27) *
+        p(FP_RATES.capConcrete.dbName, FP_RATES.capConcrete.fallback)
+      capHrs += lf * 0.15
+    } else if (cap.type === 'Bullnose Brick') {
+      capMat += lf * p(FP_RATES.capBullnose.dbName, FP_RATES.capBullnose.fallback)
+      capHrs += lf * 0.08
+    }
+  })
 
   // Curved adjustment: curved sections take 25% more structural labor
   const structuralBaseHrs = digHrs + rebarHrs + setBlockHrs + groutHrs
@@ -357,6 +383,12 @@ function LabeledRow({ label, children, note }) {
   )
 }
 
+const CAP_TYPES = ['None', 'Flagstone', 'Precast', 'PIP Concrete', 'Bullnose Brick']
+const DEFAULT_CAP_ROWS = [
+  { type: 'None', widthIn: '', lf: '', qty: '' },
+  { type: 'None', widthIn: '', lf: '', qty: '' },
+]
+
 const DEFAULT_MANUAL_ROWS = [
   { label: 'Misc 1', hours: '', materials: '', subCost: '' },
   { label: 'Misc 2', hours: '', materials: '', subCost: '' },
@@ -385,9 +417,23 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
 
   // Re-fetch Fire Pit merged labor+material map. Used on mount and after edit.
   const refreshAllRates = useCallback(async () => {
-    const [matRes, labRes] = await Promise.all([
+    // Wall caps share the Walls-category rate rows, so pull those too. The
+    // cap rate keys (Wall Cap Flagstone / Precast / Bullnose Brick + Wall
+    // Concrete Truck) merge into the same price map the module reads.
+    const CAP_RATE_NAMES = [
+      'Wall Cap Flagstone',
+      'Wall Cap Precast',
+      'Wall Cap Bullnose Brick',
+      'Wall Concrete Truck',
+    ]
+    const [matRes, labRes, capRes] = await Promise.all([
       supabase.from('material_rates').select('name, unit_cost').eq('category', 'Fire Pit'),
       supabase.from('labor_rates').select('name, rate').eq('category', 'Fire Pit'),
+      supabase
+        .from('material_rates')
+        .select('name, unit_cost')
+        .eq('category', 'Walls')
+        .in('name', CAP_RATE_NAMES),
     ])
     const prices = {}
     ;(matRes.data || []).forEach(r => {
@@ -395,6 +441,9 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
     })
     ;(labRes.data || []).forEach(r => {
       prices[r.name] = parseFloat(r.rate) || 0
+    })
+    ;(capRes.data || []).forEach(r => {
+      prices[r.name] = parseFloat(r.unit_cost) || 0
     })
     setMaterialPrices(prices)
   }, [])
@@ -442,9 +491,8 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
   const [pctGrouted, setPctGrouted] = useState(initialData?.pctGrouted ?? '100')
   const [pctCurved, setPctCurved] = useState(initialData?.pctCurved ?? '0')
   const [useGroutPump, setUseGroutPump] = useState(initialData?.useGroutPump ?? 'No')
-  // Wall cap (seat/perimeter cap on top of the wall)
-  const [capLF, setCapLF] = useState(initialData?.capLF ?? '')
-  const [capMatPerLF, setCapMatPerLF] = useState(initialData?.capMatPerLF ?? '')
+  // Wall cap (seat/perimeter cap on top of the wall) — same model as Walls
+  const [capRows, setCapRows] = useState(initialData?.capRows ?? DEFAULT_CAP_ROWS)
   // Fixtures
   const [gasRingCount, setGasRingCount] = useState(initialData?.gasRingCount ?? '')
   const [gasTrenchLF, setGasTrenchLF] = useState(initialData?.gasTrenchLF ?? '')
@@ -504,8 +552,7 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
     pctGrouted,
     pctCurved,
     useGroutPump,
-    capLF,
-    capMatPerLF,
+    capRows,
     gasRingCount,
     gasTrenchLF,
     sandStuccoSF,
@@ -540,6 +587,10 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
 
   function updateManual(i, field, val) {
     setManualRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
+  }
+
+  function updateCap(i, field, val) {
+    setCapRows(rows => rows.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)))
   }
 
   function handleSave() {
@@ -824,33 +875,97 @@ export default function FirePitModule({ onSave, onBack, saving, initialData }) {
         )}
       </div>
 
-      {/* ── Wall Cap ── */}
+      {/* ── Wall Caps ── */}
       <div>
-        <SectionHeader title="Wall Cap (optional)" />
-        <p className="text-[11px] text-gray-500 mb-2 px-1">
-          Seat-wall or perimeter cap on top of the block wall. Enter the cap length and a $/LF
-          material cost; install labor is added automatically.
+        <SectionHeader title="Wall Caps" />
+        <p className="text-xs text-gray-400 mb-1 inline-flex items-center flex-wrap gap-x-2">
+          <span className="inline-flex items-center gap-1">
+            Flagstone ${p(FP_RATES.capFlagstone.dbName, FP_RATES.capFlagstone.fallback)}/ton
+            <RateEditPopover
+              table="material_rates"
+              name={FP_RATES.capFlagstone.dbName}
+              category="Walls"
+              unitLabel="ton"
+              currentValue={p(FP_RATES.capFlagstone.dbName, FP_RATES.capFlagstone.fallback)}
+              onSaved={refreshAllRates}
+            />
+          </span>
+          ·
+          <span className="inline-flex items-center gap-1">
+            Precast ${p(FP_RATES.capPrecast.dbName, FP_RATES.capPrecast.fallback)}/ea
+            <RateEditPopover
+              table="material_rates"
+              name={FP_RATES.capPrecast.dbName}
+              category="Walls"
+              unitLabel="ea"
+              currentValue={p(FP_RATES.capPrecast.dbName, FP_RATES.capPrecast.fallback)}
+              onSaved={refreshAllRates}
+            />
+          </span>
+          ·
+          <span className="inline-flex items-center gap-1">
+            Bullnose ${p(FP_RATES.capBullnose.dbName, FP_RATES.capBullnose.fallback)}/LF
+            <RateEditPopover
+              table="material_rates"
+              name={FP_RATES.capBullnose.dbName}
+              category="Walls"
+              unitLabel="LF"
+              currentValue={p(FP_RATES.capBullnose.dbName, FP_RATES.capBullnose.fallback)}
+              onSaved={refreshAllRates}
+            />
+          </span>
         </p>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Cap Length (LF)</label>
-            <NumInput
-              value={capLF}
-              onChange={setCapLF}
-              placeholder={n(wallLF) > 0 ? `Wall = ${n(wallLF)}` : '0'}
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Cap Material ($/LF)</label>
-            <NumInput
-              value={capMatPerLF}
-              onChange={setCapMatPerLF}
-              placeholder={p(FP_RATES.fpCap.dbName, FP_RATES.fpCap.fallback).toFixed(2)}
-            />
-          </div>
-        </div>
-        {n(capLF) > 0 && (
-          <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-gray-600 flex flex-wrap gap-4">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-xs text-gray-500 border-b border-gray-200">
+              <th className="text-left pb-1 pr-2 font-medium">Type</th>
+              <th className="text-left pb-1 pr-2 font-medium">Width (in)</th>
+              <th className="text-left pb-1 font-medium">Lin. Ft / Qty</th>
+            </tr>
+          </thead>
+          <tbody>
+            {capRows.map((cap, i) => {
+              const isActive = cap.type !== 'None'
+              return (
+                <tr key={i} className="border-b border-gray-100">
+                  <td className="py-1 pr-2">
+                    <select
+                      className="input text-sm py-1 w-36"
+                      value={cap.type}
+                      onChange={e => updateCap(i, 'type', e.target.value)}
+                    >
+                      {CAP_TYPES.map(t => (
+                        <option key={t}>{t}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="py-1 pr-2">
+                    {isActive && (
+                      <NumInput
+                        value={cap.widthIn}
+                        onChange={v => updateCap(i, 'widthIn', v)}
+                        className="w-20"
+                        placeholder="4"
+                      />
+                    )}
+                  </td>
+                  <td className="py-1">
+                    {isActive && (
+                      <NumInput
+                        value={cap.type === 'Precast' ? cap.qty : cap.lf}
+                        onChange={v => updateCap(i, cap.type === 'Precast' ? 'qty' : 'lf', v)}
+                        className="w-20"
+                        placeholder="0"
+                      />
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+        {calc.capMat > 0 && (
+          <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-gray-600 flex flex-wrap gap-4">
             <span>
               Cap material: <strong>${calc.capMat.toFixed(2)}</strong>
             </span>

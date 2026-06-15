@@ -904,35 +904,16 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
         </div>
       </div>
 
-      {/* ── Paver Material ──────────────────────────────────────────────────────── */}
+      {/* ── Paver Choices ───────────────────────────────────────────────────────── */}
       <div>
         <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
-          <span>Paver Material</span>
+          <span>Paver Choices</span>
           {calc.totalInstallSF > 0 && (
             <span className="font-normal normal-case text-gray-400">
-              {calc.totalInstallSF.toLocaleString()} SF total · {calc.totalBaseTons.toFixed(1)} tons
-              base
+              {calc.totalInstallSF.toLocaleString()} SF total
             </span>
           )}
           <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
-            · Base rock ${calc.baseRockPerTon}/ton
-            <RateEditPopover
-              table="material_rates"
-              name="Paver - Base Rock"
-              category="Paver"
-              unitLabel="ton"
-              currentValue={calc.baseRockPerTon}
-              onSaved={refreshAllRates}
-            />
-            · Bedding sand ${calc.beddingSandPerTon}/ton
-            <RateEditPopover
-              table="material_rates"
-              name="Paver - Bedding Sand"
-              category="Paver"
-              unitLabel="ton"
-              currentValue={calc.beddingSandPerTon}
-              onSaved={refreshAllRates}
-            />
             · Joint sand ${calc.jointSandPerSF}/SF
             <RateEditPopover
               table="material_rates"
@@ -958,10 +939,6 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
             cols={[
               { label: 'Area', w: 'w-20' },
               { label: 'SF', w: 'w-24' },
-              { label: 'Base Install', w: 'w-36' },
-              { label: 'Base (in)', w: 'w-14' },
-              { label: 'Tons', w: 'w-12' },
-              { label: 'Hrs', w: 'w-12' },
               { label: 'Paver Brand / Type' },
               { label: '$/SF', w: 'w-12' },
               { label: 'Pallets', w: 'w-12' },
@@ -971,14 +948,6 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
           <tbody className="divide-y divide-gray-50">
             {state.areaRows.map((row, i) => {
               const a = calc.areas[i] || {}
-              const baseRate =
-                row.method === 'Skid Good'
-                  ? calc.baseBobcatGood
-                  : row.method === 'Skid OK'
-                    ? calc.baseBobcatOK
-                    : row.method === 'Mini Skid'
-                      ? calc.baseMiniBobcat
-                      : calc.baseHand
               return (
                 <tr key={i}>
                   <td className={td}>
@@ -995,13 +964,93 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                       onChange={e => setRow('areaRows', i, 'sf', e.target.value)}
                       placeholder="Paver SF"
                     />
-                    <div className="mt-1">
-                      <Inp
-                        value={row.baseSf ?? ''}
-                        onChange={e => setRow('areaRows', i, 'baseSf', e.target.value)}
-                        placeholder={row.sf ? `Base SF (def ${row.sf})` : 'Base SF'}
-                      />
-                    </div>
+                  </td>
+                  <td className={td}>
+                    <PaverPicker
+                      brand={row.paverBrand}
+                      name={row.paverName}
+                      onSelect={(b, nm) => {
+                        setRow('areaRows', i, 'paverBrand', b)
+                        setRow('areaRows', i, 'paverName', nm)
+                      }}
+                      paverPrices={paverPrices}
+                      customPrice={row.customPricePerSF || ''}
+                      onCustomPriceChange={v =>
+                        setRow('areaRows', i, 'customPricePerSF', v)
+                      }
+                    />
+                  </td>
+                  <td className={num}>{a.pricePerSF > 0 ? fmt2(a.pricePerSF) : '—'}</td>
+                  <td className={num}>{a.pallets > 0 ? a.pallets : '—'}</td>
+                  <td className={num}>{a.paverCost > 0 ? fmt(a.paverCost) : '—'}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* ── Base Material ───────────────────────────────────────────────────────── */}
+      <div>
+        <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-xs font-bold text-gray-600 uppercase tracking-wider bg-gray-50 rounded-lg border border-gray-200 px-4 py-2.5 mt-4 mb-2">
+          <span>Base Material</span>
+          {calc.totalBaseTons > 0 && (
+            <span className="font-normal normal-case text-gray-400">
+              {calc.totalBaseTons.toFixed(1)} tons base
+            </span>
+          )}
+          <span className="font-normal normal-case text-gray-400 inline-flex items-center gap-1">
+            · Base rock ${calc.baseRockPerTon}/ton
+            <RateEditPopover
+              table="material_rates"
+              name="Paver - Base Rock"
+              category="Paver"
+              unitLabel="ton"
+              currentValue={calc.baseRockPerTon}
+              onSaved={refreshAllRates}
+            />
+            · Bedding sand ${calc.beddingSandPerTon}/ton
+            <RateEditPopover
+              table="material_rates"
+              name="Paver - Bedding Sand"
+              category="Paver"
+              unitLabel="ton"
+              currentValue={calc.beddingSandPerTon}
+              onSaved={refreshAllRates}
+            />
+          </span>
+        </div>
+        <table className="w-full text-xs">
+          <TH
+            cols={[
+              { label: 'Area', w: 'w-20' },
+              { label: 'Base SF', w: 'w-24' },
+              { label: 'Base Install', w: 'w-36' },
+              { label: 'Base (in)', w: 'w-14' },
+              { label: 'Tons', w: 'w-12' },
+              { label: 'Hrs', w: 'w-12' },
+            ]}
+          />
+          <tbody className="divide-y divide-gray-50">
+            {state.areaRows.map((row, i) => {
+              const a = calc.areas[i] || {}
+              const baseRate =
+                row.method === 'Skid Good'
+                  ? calc.baseBobcatGood
+                  : row.method === 'Skid OK'
+                    ? calc.baseBobcatOK
+                    : row.method === 'Mini Skid'
+                      ? calc.baseMiniBobcat
+                      : calc.baseHand
+              return (
+                <tr key={i}>
+                  <td className={`${td} text-gray-500`}>{row.label || `Area ${i + 1}`}</td>
+                  <td className={td}>
+                    <Inp
+                      value={row.baseSf ?? ''}
+                      onChange={e => setRow('areaRows', i, 'baseSf', e.target.value)}
+                      placeholder={row.sf ? `Base SF (def ${row.sf})` : 'Base SF'}
+                    />
                   </td>
                   <td className={td}>
                     <div className="flex items-center gap-1">
@@ -1032,24 +1081,6 @@ export default function PaverModule({ initialData, onSave, onCancel }) {
                   </td>
                   <td className={num}>{a.baseTons > 0 ? a.baseTons.toFixed(1) : '—'}</td>
                   <td className={num}>{fh(a.baseHrs)}</td>
-                  <td className={td}>
-                    <PaverPicker
-                      brand={row.paverBrand}
-                      name={row.paverName}
-                      onSelect={(b, nm) => {
-                        setRow('areaRows', i, 'paverBrand', b)
-                        setRow('areaRows', i, 'paverName', nm)
-                      }}
-                      paverPrices={paverPrices}
-                      customPrice={row.customPricePerSF || ''}
-                      onCustomPriceChange={v =>
-                        setRow('areaRows', i, 'customPricePerSF', v)
-                      }
-                    />
-                  </td>
-                  <td className={num}>{a.pricePerSF > 0 ? fmt2(a.pricePerSF) : '—'}</td>
-                  <td className={num}>{a.pallets > 0 ? a.pallets : '—'}</td>
-                  <td className={num}>{a.paverCost > 0 ? fmt(a.paverCost) : '—'}</td>
                 </tr>
               )
             })}
