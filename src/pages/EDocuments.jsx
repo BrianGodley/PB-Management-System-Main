@@ -50,13 +50,24 @@ export default function EDocuments({ clientId = null, embedded = false }) {
 
   return (
     <div className={embedded ? '' : 'p-4 max-w-6xl mx-auto'}>
-      {!embedded && <h1 className="text-2xl font-bold text-gray-900 mb-1">E-Documents</h1>}
       {!embedded && (
-        <p className="text-sm text-gray-500 mb-4">
-          Create, send and track contracts for digital signature.
-        </p>
+        <>
+          <h1 className="text-2xl font-bold text-gray-900 mb-3">Documents</h1>
+          {/* Top-level white tab bar (matches Opportunities / Contacts). The
+              E-Documents area lives under its own tab so more document types
+              can be added here later. */}
+          <div className="bg-white border border-gray-200 rounded-t-lg flex gap-0 -mb-px">
+            <button
+              type="button"
+              className="flex items-center gap-1.5 px-5 py-3 text-sm font-medium border-b-2 border-green-700 text-green-700"
+            >
+              ✍️ E-Documents
+            </button>
+          </div>
+        </>
       )}
 
+      <div className={embedded ? '' : 'bg-white border border-gray-200 rounded-b-lg rounded-tr-lg p-4'}>
       {/* Sub-tab bar */}
       <div className="flex items-center gap-1 border-b border-gray-200 mb-4">
         {[
@@ -85,6 +96,7 @@ export default function EDocuments({ clientId = null, embedded = false }) {
       {subTab === 'new' && (
         <NewDocumentTab clientId={clientId} userId={user?.id} onCreated={() => setSubTab('contracts')} />
       )}
+      </div>
     </div>
   )
 }
