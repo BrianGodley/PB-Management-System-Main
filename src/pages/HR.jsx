@@ -10,7 +10,6 @@ import { useCachedData } from '../lib/useCachedData'
 import AddEmployeeModal from '../components/AddEmployeeModal'
 import ReviewBuilder from '../components/hr/ReviewBuilder'
 import TimeClockPermissionsTab from '../components/hr/TimeClockPermissionsTab'
-import HrEmployeeFiles from '../components/hr/HrEmployeeFiles'
 import DocViewerModal from '../components/DocViewerModal'
 
 const APPLICANT_STATUSES = ['new', 'reviewing', 'interview', 'offered', 'hired', 'rejected']
@@ -233,7 +232,11 @@ export default function HR() {
       .maybeSingle()
       .then(({ data }) => {
         const t = data?.new_employee_file_template
-        setEmpTemplate(Array.isArray(t) ? t : ['Full Hat', 'Quick Hat', 'Application', 'Review Forms'])
+        setEmpTemplate(
+          Array.isArray(t)
+            ? t
+            : ['Full Hat', 'Quick Hat', 'Application', 'Review Forms', 'Personnel Records', 'ID Documents', 'Other']
+        )
       })
   }, [])
   async function saveEmpTemplate(next) {
@@ -755,7 +758,6 @@ export default function HR() {
           },
           { key: 'applicants', label: `Applicants (${applicants.length})`, icon: '📋' },
           { key: 'positions', label: `Positions (${positions.length})`, icon: '🏷️', mobileHide: true },
-          { key: 'files', label: 'Files', icon: '📁', mobileHide: true },
           {
             key: 'archive',
             label: `Archive (${employees.filter(e => e.status === 'archived').length})`,
@@ -1453,9 +1455,6 @@ export default function HR() {
               </>
             )}
           </div>
-        ) : /* ── FILES TAB ── */
-        tab === 'files' ? (
-          <HrEmployeeFiles employees={employees} />
         ) : /* ── SETTINGS TAB ── */
         tab === 'settings' && isAdmin ? (
           <div className="-mx-6 -mt-3 flex flex-col">

@@ -97,30 +97,6 @@ export default function AddEmployeeModal({ onSave, onClose, positions = [] }) {
         return
       }
 
-      // Seed the New Employee file template folders into this hire's Files tab
-      // (HR > Files). Non-fatal — a failure here shouldn't block the hire.
-      try {
-        const { data: cs } = await supabase
-          .from('company_settings')
-          .select('new_employee_file_template')
-          .maybeSingle()
-        const tmpl = Array.isArray(cs?.new_employee_file_template)
-          ? cs.new_employee_file_template
-          : ['Full Hat', 'Quick Hat', 'Application', 'Review Forms']
-        if (tmpl.length) {
-          await supabase.from('employee_files').insert(
-            tmpl.map(name => ({
-              employee_id: empData.id,
-              parent_id: null,
-              is_folder: true,
-              name: String(name),
-            }))
-          )
-        }
-      } catch {
-        /* non-fatal */
-      }
-
       // If user account fields are filled, create auth user and profile
       if (form.email.trim() && form.password.trim()) {
         try {

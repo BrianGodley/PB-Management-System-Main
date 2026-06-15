@@ -278,11 +278,27 @@ const DEFAULT_PERMS = {
   hr_add_edit_employee: true,
   hr_delete_employee: false,
 }
-const DOC_CATEGORIES = [
-  { key: 'records', label: 'Personnel Records', icon: '📁' },
-  { key: 'id', label: 'ID Documents', icon: '🪪' },
-  { key: 'other', label: 'Other', icon: '📎' },
+// Employee Files folders. The list is driven by the New Employee template
+// (company_settings.new_employee_file_template); these are the fallback
+// defaults. The folder name doubles as the document category.
+const DEFAULT_DOC_FOLDERS = [
+  'Full Hat',
+  'Quick Hat',
+  'Application',
+  'Review Forms',
+  'Personnel Records',
+  'ID Documents',
+  'Other',
 ]
+const DOC_ICONS = {
+  'Full Hat': '🎩',
+  'Quick Hat': '⚡',
+  Application: '📝',
+  'Review Forms': '⭐',
+  'Personnel Records': '📁',
+  'ID Documents': '🪪',
+  Other: '📎',
+}
 
 function formatDate(d) {
   if (!d) return '—'
@@ -318,6 +334,9 @@ export default function EmployeeDetail() {
   // Sam's per-user greeting signoff (e.g. "Go Rams!"). Stored on profiles.
   const [greetingTagline, setGreetingTagline] = useState('')
   const [docs, setDocs] = useState([])
+  const [docFolders, setDocFolders] = useState(
+    DEFAULT_DOC_FOLDERS.map(n => ({ key: n, label: n, icon: DOC_ICONS[n] || '📁' }))
+  )
   const [certs, setCerts] = useState([])
   const [training, setTraining] = useState([]) // lms_assignments with steps
   const [reviews, setReviews] = useState([])
@@ -332,7 +351,32 @@ export default function EmployeeDetail() {
 
   // Doc state
   const [showDocAdd, setShowDocAdd] = useState(false)
-  const [docCategory, setDocCategory] = useState('records')
+  const [docCategory, setDocCategory] = useState('')
+
+  // Load the employee Files folders from the New Employee template so they
+  // match what's configured in HR > Settings.
+  useEffect(() => {
+    supabase
+      .from('company_settings')
+      .select('new_employee_file_template')
+      .maybeSingle()
+      .then(({ data }) => {
+        const t = data?.new_employee_file_template
+        const names = Array.isArray(t) && t.length ? t : DEFAULT_DOC_FOLDERS
+        const folders = names.map(n => ({ key: String(n), label: String(n), icon: DOC_ICONS[n] || '📁' }))
+        setDocFolders(folders)
+        setDocCategory(prev => prev || folders[0]?.key || '')
+      })
+  }, [])
+
+  // Template folders, plus any legacy categories present on existing docs so
+  // nothing is hidden after switching to template-driven folders.
+  const docFoldersToShow = (() => {
+    const extra = [...new Set(docs.map(d => d.category).filter(Boolean))]
+      .filter(c => !docFolders.some(f => f.key === c))
+      .map(c => ({ key: c, label: c, icon: '📄' }))
+    return [...docFolders, ...extra]
+  })()
   const [docName, setDocName] = useState('')
   const [docUrl, setDocUrl] = useState('')
   const [docFile, setDocFile] = useState(null)
@@ -1040,7 +1084,7 @@ export default function EmployeeDetail() {
           ...(currentUserIsAdmin
             ? [{ key: 'permissions', label: 'Permissions', icon: '🔑', mobileHide: true }]
             : []),
-          { key: 'docs', label: `Documents (${docs.length})`, icon: '📁', mobileHide: true },
+          { key: 'docs', label: `Files (${docs.length})`, icon: '📁', mobileHide: true },
           { key: 'certs', label: `Certifications (${certs.length})`, icon: '🏅', mobileHide: true },
           { key: 'training', label: `Training (${training.length})`, icon: '🎓', mobileHide: true },
           { key: 'reviews', label: `Reviews (${reviews.length})`, icon: '⭐', mobileHide: true },
@@ -1903,7 +1947,7 @@ export default function EmployeeDetail() {
         {/* ── DOCUMENTS ── */}
         {tab === 'docs' && (
           <div className="max-w-3xl space-y-5">
-            {DOC_CATEGORIES.map(cat => {
+            {docFoldersToShow.map(cat => {
               const catDocs = docs.filter(d => d.category === cat.key)
               return (
                 <div
@@ -1988,7 +2032,7 @@ export default function EmployeeDetail() {
                         onChange={e => setDocCategory(e.target.value)}
                         className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-green-500"
                       >
-                        {DOC_CATEGORIES.map(c => (
+                        {docFolders.map(c => (
                           <option key={c.key} value={c.key}>
                             {c.label}
                           </option>
