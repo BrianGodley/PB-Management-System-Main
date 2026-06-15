@@ -1745,15 +1745,17 @@ export default function EstimateDetail() {
         <div className="w-full lg:w-1/3 min-h-[16rem] lg:min-h-0 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
             <h2 className="font-semibold text-gray-900 text-sm">Projects</h2>
-            <button
-              onClick={() => {
-                setShowAddProject(true)
-                setNewProjectName('')
-              }}
-              className="text-xs text-green-700 font-semibold hover:underline"
-            >
-              + Add
-            </button>
+            {editMode && (
+              <button
+                onClick={() => {
+                  setShowAddProject(true)
+                  setNewProjectName('')
+                }}
+                className="text-xs text-green-700 font-semibold hover:underline"
+              >
+                + Add
+              </button>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
@@ -1839,7 +1841,7 @@ export default function EstimateDetail() {
                 return (
                   <div
                     key={proj.id}
-                    draggable
+                    draggable={editMode}
                     onDragStart={() => setDragProjId(proj.id)}
                     onDragEnd={() => {
                       setDragProjId(null)
@@ -1874,36 +1876,40 @@ export default function EstimateDetail() {
                       <p
                         className={`flex items-center text-sm font-semibold ${isSelected ? 'text-green-800' : 'text-gray-800'}`}
                       >
-                        <span
-                          className="mr-1.5 cursor-grab select-none text-gray-300"
-                          title="Drag to reorder"
-                        >
-                          ⠿
-                        </span>
+                        {editMode && (
+                          <span
+                            className="mr-1.5 cursor-grab select-none text-gray-300"
+                            title="Drag to reorder"
+                          >
+                            ⠿
+                          </span>
+                        )}
                         {proj.project_name}
                       </p>
-                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={e => {
-                            e.stopPropagation()
-                            setEditingProject(proj)
-                            setEditProjectName(proj.project_name)
-                          }}
-                          className="text-gray-400 hover:text-gray-700 text-xs"
-                          title="Rename"
-                        >
-                          ✎
-                        </button>
-                        <button
-                          onClick={e => {
-                            e.stopPropagation()
-                            deleteProject(proj)
-                          }}
-                          className="text-red-300 hover:text-red-500 text-xs"
-                        >
-                          ✕
-                        </button>
-                      </div>
+                      {editMode && (
+                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={e => {
+                              e.stopPropagation()
+                              setEditingProject(proj)
+                              setEditProjectName(proj.project_name)
+                            }}
+                            className="text-gray-400 hover:text-gray-700 text-xs"
+                            title="Rename"
+                          >
+                            ✎
+                          </button>
+                          <button
+                            onClick={e => {
+                              e.stopPropagation()
+                              deleteProject(proj)
+                            }}
+                            className="text-red-300 hover:text-red-500 text-xs"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      )}
                     </div>
                     <p className="text-xs text-gray-400 mt-0.5">
                       {(proj.estimate_modules || []).length} module
@@ -1924,7 +1930,7 @@ export default function EstimateDetail() {
             <h2 className="font-semibold text-gray-900 text-sm">
               {selectedProject ? selectedProject.project_name : 'Modules'}
             </h2>
-            {selectedProject && (
+            {selectedProject && editMode && (
               <button
                 onClick={openModulePicker}
                 className="text-xs text-green-700 font-semibold hover:underline"
@@ -1942,9 +1948,11 @@ export default function EstimateDetail() {
             ) : activeModules.length === 0 ? (
               <div className="p-6 text-center text-gray-400 text-sm">
                 <p className="mb-2">No modules yet.</p>
-                <button onClick={openModulePicker} className="btn-primary text-xs">
-                  + Add Module
-                </button>
+                {editMode && (
+                  <button onClick={openModulePicker} className="btn-primary text-xs">
+                    + Add Module
+                  </button>
+                )}
               </div>
             ) : (
               activeModules.map(mod => {
@@ -1970,15 +1978,17 @@ export default function EstimateDetail() {
                       >
                         {mod.module_name || mod.module_type}
                       </p>
-                      <button
-                        onClick={e => {
-                          e.stopPropagation()
-                          deleteModule(mod)
-                        }}
-                        className="text-red-300 hover:text-red-500 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        ✕
-                      </button>
+                      {editMode && (
+                        <button
+                          onClick={e => {
+                            e.stopPropagation()
+                            deleteModule(mod)
+                          }}
+                          className="text-red-300 hover:text-red-500 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          ✕
+                        </button>
+                      )}
                     </div>
                     <p className="text-xs text-gray-400 mt-0.5">
                       {parseFloat(mod.man_days || 0).toFixed(1)} MD · $
@@ -2092,20 +2102,37 @@ export default function EstimateDetail() {
                   {selectedProject?.project_name} · {selectedModule.module_type}
                 </p>
 
-                <div className="flex gap-2 pt-1">
-                  <button
-                    onClick={() => openEditModule(selectedModule)}
-                    className="flex-1 text-sm text-green-700 hover:text-green-900 border border-green-300 hover:border-green-500 rounded-lg py-2 transition-colors font-medium"
-                  >
-                    ✎ Edit Module
-                  </button>
-                  <button
-                    onClick={() => deleteModule(selectedModule)}
-                    className="flex-1 text-sm text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 rounded-lg py-2 transition-colors"
-                  >
-                    Remove
-                  </button>
-                </div>
+                {editMode ? (
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      onClick={() => openEditModule(selectedModule)}
+                      className="flex-1 text-sm text-green-700 hover:text-green-900 border border-green-300 hover:border-green-500 rounded-lg py-2 transition-colors font-medium"
+                    >
+                      ✎ Edit Module
+                    </button>
+                    <button
+                      onClick={() => deleteModule(selectedModule)}
+                      className="flex-1 text-sm text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 rounded-lg py-2 transition-colors"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <div className="pt-1 space-y-2">
+                    <p className="text-[11px] text-gray-400 text-center">
+                      🔒 Viewing only — click <span className="font-semibold">Edit</span> on the
+                      estimate to change modules.
+                    </p>
+                    {hasSavedContent && (
+                      <button
+                        onClick={() => setEditMode(true)}
+                        className="w-full text-sm text-green-700 hover:text-green-900 border border-green-300 hover:border-green-500 rounded-lg py-2 transition-colors font-medium"
+                      >
+                        ✎ Edit Estimate
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
