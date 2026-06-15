@@ -32,13 +32,53 @@ Deno.serve(async req => {
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405)
 
   try {
-    const { invoice_id, method, save } = await req.json().catch(() => ({}))
-    if (!invoice_id) return json({ error: 'invoice_id is required' }, 400)
+    const { invoice_id, edoc_token, method, save } = await req.json().catch(() => ({}))
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
+
+    // ── E-Document deposit flow (tokenized, no login) ─────────────────────────
+    // The amount is read from edoc_documents server-side — never trusted from
+    // the browser. Keyed strictly on the document's access_token.
+    if (edoc_token) {
+      const apiTokenE = Deno.env.get('HELCIM_API_TOKEN')
+      if (!apiTokenE) return json({ error: 'Helcim is not configured.' }, 500)
+      const { data: doc, error: dErr } = await supabase
+        .from('edoc_documents')
+        .select('id, name, deposit_required, deposit_amount, deposit_paid_at, status')
+        .eq('access_token', edoc_token)
+        .maybeSingle()
+      if (dErr || !doc) return json({ error: 'Document not found' }, 404)
+      if (!doc.deposit_required || !(Number(doc.deposit_amount) > 0))
+        return json({ error: 'No deposit is due on this document.' }, 400)
+      if (doc.deposit_paid_at) return json({ error: 'The deposit has already been paid.' }, 400)
+
+      const depAmt = Number(Number(doc.deposit_amount).toFixed(2))
+      const hResD = await fetch('https://api.helcim.com/v2/helcim-pay/initialize', {
+        method: 'POST',
+        headers: {
+          accept: 'application/json',
+          'api-token': apiTokenE,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          paymentType: 'purchase',
+          amount: depAmt,
+          currency: 'USD',
+          paymentMethod: method === 'ach' ? 'ach' : method === 'card' ? 'cc' : 'cc-ach',
+        }),
+      })
+      const hDataD = await hResD.json().catch(() => null)
+      if (!hResD.ok || !hDataD?.checkoutToken) {
+        const detail = hDataD?.errors || hDataD?.message || `HTTP ${hResD.status}`
+        return json({ error: `Helcim initialize failed: ${JSON.stringify(detail)}` }, 502)
+      }
+      return json({ checkoutToken: hDataD.checkoutToken, amount: depAmt })
+    }
+
+    if (!invoice_id) return json({ error: 'invoice_id is required' }, 400)
     const { data: inv, error } = await supabase
       .from('job_invoices')
       .select('id, invoice_number, amount, amount_paid, status, job_id')

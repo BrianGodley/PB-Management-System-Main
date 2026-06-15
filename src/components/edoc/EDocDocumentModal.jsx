@@ -29,6 +29,10 @@ export default function EDocDocumentModal({ doc, onClose, onChanged }) {
   const [token, setToken] = useState(doc.access_token)
   const [preparing, setPreparing] = useState(false)
   const [localDoc, setLocalDoc] = useState(doc) // tracks pre-filled fields
+  const [depositOn, setDepositOn] = useState(!!doc.deposit_required)
+  const [depositAmount, setDepositAmount] = useState(
+    doc.deposit_amount != null ? String(doc.deposit_amount) : ''
+  )
 
   const signUrl = `${window.location.origin}/sign/${token}`
 
@@ -60,14 +64,21 @@ export default function EDocDocumentModal({ doc, onClose, onChanged }) {
       alert('Enter the signer email address.')
       return
     }
+    const depAmt = parseFloat(depositAmount)
+    if (depositOn && !(depAmt > 0)) {
+      alert('Enter a deposit amount greater than 0, or turn off the deposit.')
+      return
+    }
     setBusy(true)
     try {
-      // Persist signer + flip to sent. (access_token already defaults on insert.)
+      // Persist signer + deposit + flip to sent. (access_token defaults on insert.)
       const { error } = await supabase
         .from('edoc_documents')
         .update({
           signer_name: signerName.trim() || null,
           signer_email: signerEmail.trim(),
+          deposit_required: depositOn,
+          deposit_amount: depositOn ? depAmt : null,
           status: 'sent',
           sent_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -178,6 +189,40 @@ export default function EDocDocumentModal({ doc, onClose, onChanged }) {
                   placeholder="client@email.com"
                 />
               </label>
+              <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={depositOn}
+                    onChange={e => setDepositOn(e.target.checked)}
+                    className="accent-green-700"
+                  />
+                  Collect a deposit with this contract
+                </label>
+                {depositOn && (
+                  <div className="mt-2">
+                    <span className="text-xs font-semibold text-gray-500 uppercase">
+                      Deposit amount
+                    </span>
+                    <div className="relative mt-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={depositAmount}
+                        onChange={e => setDepositAmount(e.target.value)}
+                        placeholder="0.00"
+                        className="input w-full text-sm py-1.5 pl-7"
+                      />
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      The buyer pays this securely (card or bank) right after they sign.
+                    </p>
+                  </div>
+                )}
+              </div>
+
               <button
                 onClick={() => setPreparing(true)}
                 disabled={!localDoc.pdf_path}
@@ -206,6 +251,15 @@ export default function EDocDocumentModal({ doc, onClose, onChanged }) {
                   Sent to <span className="font-semibold">{signerEmail || 'the signer'}</span>.
                   {status === 'viewed' && ' The signer has opened it.'}
                 </p>
+                {doc.deposit_required && (
+                  <p className="text-gray-600 mt-1">
+                    Deposit due:{' '}
+                    <span className="font-semibold">
+                      ${Number(doc.deposit_amount || 0).toLocaleString()}
+                    </span>{' '}
+                    {doc.deposit_paid_at ? '· paid ✅' : '· unpaid'}
+                  </p>
+                )}
               </div>
               <div>
                 <span className="text-xs font-semibold text-gray-500 uppercase">Signing link</span>
@@ -248,6 +302,16 @@ export default function EDocDocumentModal({ doc, onClose, onChanged }) {
               {doc.completed_at && (
                 <p className="text-xs text-gray-500 mt-0.5">
                   {new Date(doc.completed_at).toLocaleString()}
+                </p>
+              )}
+              {doc.deposit_required && (
+                <p className="text-sm mt-1 text-gray-700">
+                  Deposit ${Number(doc.deposit_amount || 0).toLocaleString()}:{' '}
+                  {doc.deposit_paid_at ? (
+                    <span className="text-green-700 font-semibold">paid ✅</span>
+                  ) : (
+                    <span className="text-amber-600 font-semibold">awaiting payment</span>
+                  )}
                 </p>
               )}
               <div className="flex flex-col items-center gap-2 mt-4">

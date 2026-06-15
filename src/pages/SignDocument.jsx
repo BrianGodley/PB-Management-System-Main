@@ -11,6 +11,24 @@ import { flattenEDoc, mergeFieldValues, downloadBytes } from '../lib/flattenEDoc
 
 const BUCKET = 'edocuments'
 
+// Load Helcim's hosted HelcimPay.js once (same approach as the client portal).
+function loadHelcimPay() {
+  return new Promise((resolve, reject) => {
+    if (window.appendHelcimPayIframe) return resolve()
+    let s = document.getElementById('helcim-pay-js')
+    if (!s) {
+      s = document.createElement('script')
+      s.id = 'helcim-pay-js'
+      s.src = 'https://secure.helcim.app/helcim-pay/services/start.js'
+      s.onload = () => resolve()
+      s.onerror = () => reject(new Error('Could not load the secure payment window.'))
+      document.body.appendChild(s)
+    } else {
+      resolve()
+    }
+  })
+}
+
 export default function SignDocument() {
   const { token } = useParams()
   const [doc, setDoc] = useState(null)
@@ -21,6 +39,63 @@ export default function SignDocument() {
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
   const [downloading, setDownloading] = useState(false)
+  const [depositPaid, setDepositPaid] = useState(false)
+  const [paying, setPaying] = useState(false)
+
+  const depositNeeded = !!doc?.deposit_required && Number(doc?.deposit_amount) > 0
+  const depositDue = depositNeeded && !depositPaid
+
+  async function payDeposit() {
+    setPaying(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('helcim-checkout', {
+        body: { edoc_token: token },
+      })
+      if (error || !data?.checkoutToken)
+        throw new Error(data?.error || error?.message || 'Could not start the payment.')
+      const { checkoutToken, amount } = data
+      await loadHelcimPay()
+      const handler = async event => {
+        if (!event.data || event.data.eventName !== `helcim-pay-js-${checkoutToken}`) return
+        if (event.data.eventStatus === 'ABORTED') {
+          window.removeEventListener('message', handler)
+          window.removeHelcimPayIframe?.()
+          setPaying(false)
+          return
+        }
+        if (event.data.eventStatus === 'SUCCESS') {
+          window.removeEventListener('message', handler)
+          let d = null
+          try {
+            const parsed = JSON.parse(event.data.eventMessage)
+            d = parsed?.data?.data || parsed?.data || parsed
+          } catch {
+            d = null
+          }
+          const txnId = d?.transactionId || d?.id || null
+          const { data: rec, error: re } = await supabase.rpc('edoc_record_deposit', {
+            p_token: token,
+            p_amount: amount,
+            p_txn: txnId ? String(txnId) : null,
+          })
+          window.removeHelcimPayIframe?.()
+          setPaying(false)
+          if (re || !rec?.ok) {
+            alert(
+              'Your payment went through, but recording it failed — please contact Picture Build so we can reconcile it.'
+            )
+            return
+          }
+          setDepositPaid(true)
+        }
+      }
+      window.addEventListener('message', handler)
+      window.appendHelcimPayIframe(checkoutToken)
+    } catch (e) {
+      setPaying(false)
+      alert(String(e?.message || e))
+    }
+  }
 
   async function downloadSigned() {
     if (!url) return
@@ -48,7 +123,8 @@ export default function SignDocument() {
       }
       setDoc(data)
       setSignerName(data.signer_name || '')
-      if (data.status === 'completed') setDone(true)
+      if (data.status === 'completed' || data.status === 'paid') setDone(true)
+      if (data.deposit_paid_at || data.status === 'paid') setDepositPaid(true)
       // Seed any previously-entered values from the stored fields.
       const seed = {}
       ;(data.fields || []).forEach(f => {
@@ -140,12 +216,41 @@ export default function SignDocument() {
         </div>
       </div>
 
-      {done ? (
+      {done && depositDue ? (
+        <div className="max-w-md mx-auto mt-16 bg-white rounded-2xl shadow p-8 text-center">
+          <div className="text-3xl mb-2">💳</div>
+          <h2 className="text-xl font-bold text-gray-900 mb-1">One last step — your deposit</h2>
+          <p className="text-sm text-gray-500 mb-1">
+            Your document is signed. To lock in your contract, please pay the deposit below.
+          </p>
+          <p className="text-3xl font-bold text-gray-900 my-3">
+            ${Number(doc.deposit_amount).toLocaleString()}
+          </p>
+          <button
+            onClick={payDeposit}
+            disabled={paying}
+            className="bg-green-700 text-white text-sm font-semibold px-6 py-2.5 rounded-lg hover:bg-green-800 disabled:opacity-50"
+          >
+            {paying ? 'Opening secure payment…' : 'Pay deposit'}
+          </button>
+          <p className="text-[11px] text-gray-400 mt-3">
+            Payment is processed securely by Helcim. Card or bank accepted.
+          </p>
+          <button
+            onClick={downloadSigned}
+            disabled={downloading}
+            className="block mx-auto mt-4 text-xs text-gray-500 hover:underline"
+          >
+            {downloading ? 'Preparing…' : 'Download signed copy'}
+          </button>
+        </div>
+      ) : done ? (
         <div className="max-w-md mx-auto mt-16 bg-white rounded-2xl shadow p-8 text-center">
           <div className="text-4xl mb-2">✅</div>
-          <h2 className="text-xl font-bold text-gray-900 mb-1">Thank you — your document is signed.</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-1">Thank you — you're all set.</h2>
           <p className="text-sm text-gray-500 mb-4">
-            A copy has been recorded. You can download a signed copy for your records.
+            Your document is signed{depositNeeded ? ' and your deposit is paid' : ''}. You can
+            download a copy for your records.
           </p>
           <button
             onClick={downloadSigned}
