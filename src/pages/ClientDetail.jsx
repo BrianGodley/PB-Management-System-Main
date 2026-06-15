@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import NewEstimateModal from '../components/NewEstimateModal'
 import BidDocViewerModal from '../components/BidDocViewerModal'
 import ConsultantPicker from '../components/ConsultantPicker'
+import EDocuments from './EDocuments'
 import { useAuth } from '../contexts/AuthContext'
 
 const BID_STATUS_STYLES = {
@@ -1023,6 +1024,16 @@ export default function ClientDetail() {
                       </table>
                     </div>
                   )}
+                </div>
+
+                {/* ── E-Documents ── */}
+                <div className="bg-white border border-slate-300 rounded-xl shadow-sm overflow-hidden">
+                  <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-200">
+                    <h3 className="text-sm font-bold text-gray-700">E-Documents</h3>
+                  </div>
+                  <div className="p-3">
+                    <EDocuments clientId={id} embedded />
+                  </div>
                 </div>
 
                 {/* ── Bids ── */}

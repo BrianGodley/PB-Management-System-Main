@@ -24,6 +24,7 @@ const Collections = lazy(() => import('./pages/Collections'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Admin = lazy(() => import('./pages/Admin'))
 const EstimateDetail = lazy(() => import('./pages/EstimateDetail'))
+const EDocuments = lazy(() => import('./pages/EDocuments'))
 const MasterRates = lazy(() => import('./pages/MasterRates'))
 const MasterCrews = lazy(() => import('./pages/MasterCrews'))
 const Statistics = lazy(() => import('./pages/Statistics'))
@@ -138,6 +139,7 @@ function AppRoutes() {
           <Route path="jobs/:id/tracker" element={<JobTracker />} />
           <Route path="estimates/:id" element={<EstimateDetail />} />
           <Route path="bids" element={<Bids />} />
+          <Route path="edocuments" element={<EDocuments />} />
           <Route path="tracker" element={<JobTracker />} />
           <Route path="collections" element={<Collections />} />
           <Route path="settings" element={<Settings />} />
