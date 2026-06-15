@@ -7,6 +7,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import EDocFillView from '../components/edoc/EDocFillView'
+import { flattenEDoc, mergeFieldValues, downloadBytes } from '../lib/flattenEDoc'
 
 const BUCKET = 'edocuments'
 
@@ -19,6 +20,21 @@ export default function SignDocument() {
   const [signerName, setSignerName] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
+  const [downloading, setDownloading] = useState(false)
+
+  async function downloadSigned() {
+    if (!url) return
+    setDownloading(true)
+    try {
+      const merged = mergeFieldValues(doc.fields || [], values)
+      const bytes = await flattenEDoc(url, merged)
+      downloadBytes(bytes, (doc.name || 'signed-document').replace(/[^\w.-]+/g, '_'))
+    } catch (e) {
+      alert('Could not generate the PDF: ' + (e.message || 'unknown error'))
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   useEffect(() => {
     let alive = true
@@ -128,9 +144,16 @@ export default function SignDocument() {
         <div className="max-w-md mx-auto mt-16 bg-white rounded-2xl shadow p-8 text-center">
           <div className="text-4xl mb-2">✅</div>
           <h2 className="text-xl font-bold text-gray-900 mb-1">Thank you — your document is signed.</h2>
-          <p className="text-sm text-gray-500">
-            A copy has been recorded. You can close this page.
+          <p className="text-sm text-gray-500 mb-4">
+            A copy has been recorded. You can download a signed copy for your records.
           </p>
+          <button
+            onClick={downloadSigned}
+            disabled={downloading}
+            className="bg-green-700 text-white text-sm font-semibold px-5 py-2 rounded-lg hover:bg-green-800 disabled:opacity-50"
+          >
+            {downloading ? 'Preparing…' : '⬇ Download signed copy'}
+          </button>
         </div>
       ) : (
         <>

@@ -6,6 +6,10 @@
 // Sending emails the tokenized /sign/<token> link via the send-email edge fn.
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { flattenEDoc, downloadBytes } from '../../lib/flattenEDoc'
+import EDocPrepareModal from './EDocPrepareModal'
+
+const BUCKET = 'edocuments'
 
 const STATUS_LABEL = {
   draft: 'Draft',
@@ -23,6 +27,8 @@ export default function EDocDocumentModal({ doc, onClose, onChanged }) {
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState(doc.status)
   const [token, setToken] = useState(doc.access_token)
+  const [preparing, setPreparing] = useState(false)
+  const [localDoc, setLocalDoc] = useState(doc) // tracks pre-filled fields
 
   const signUrl = `${window.location.origin}/sign/${token}`
 
@@ -101,6 +107,37 @@ export default function EDocDocumentModal({ doc, onClose, onChanged }) {
     alert('Signing link copied to clipboard.')
   }
 
+  async function downloadSigned() {
+    if (!doc.pdf_path) {
+      alert('No source PDF on this document.')
+      return
+    }
+    setBusy(true)
+    try {
+      const url = supabase.storage.from(BUCKET).getPublicUrl(doc.pdf_path).data.publicUrl
+      const bytes = await flattenEDoc(url, doc.fields || [])
+      const fname = (doc.name || 'signed-document').replace(/[^\w.-]+/g, '_')
+      downloadBytes(bytes, fname)
+      // Best-effort: store the flattened copy for the record (staff is authed).
+      try {
+        const path = `signed/${doc.id}.pdf`
+        await supabase.storage
+          .from(BUCKET)
+          .upload(path, new Blob([bytes], { type: 'application/pdf' }), {
+            contentType: 'application/pdf',
+            upsert: true,
+          })
+        await supabase.from('edoc_documents').update({ signed_pdf_path: path }).eq('id', doc.id)
+      } catch {
+        /* download already succeeded; storing is non-critical */
+      }
+    } catch (e) {
+      alert('Could not generate the PDF: ' + (e.message || 'unknown error'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const isDraft = status === 'draft'
   const isSentOrViewed = status === 'sent' || status === 'viewed'
   const isDone = status === 'completed' || status === 'paid'
@@ -142,6 +179,13 @@ export default function EDocDocumentModal({ doc, onClose, onChanged }) {
                 />
               </label>
               <button
+                onClick={() => setPreparing(true)}
+                disabled={!localDoc.pdf_path}
+                className="w-full border border-green-700 text-green-700 text-sm font-semibold py-2 rounded-lg hover:bg-green-50 disabled:opacity-50"
+              >
+                ✎ Fill my fields
+              </button>
+              <button
                 onClick={handleSend}
                 disabled={busy}
                 className="w-full bg-green-700 text-white text-sm font-semibold py-2.5 rounded-lg hover:bg-green-800 disabled:opacity-50"
@@ -149,7 +193,8 @@ export default function EDocDocumentModal({ doc, onClose, onChanged }) {
                 {busy ? 'Sending…' : '📤 Send for Signature'}
               </button>
               <p className="text-[11px] text-gray-400 text-center">
-                Tip: place the buyer's fields on the document first (Templates → Edit Fields).
+                Tip: place fields on the document first (Templates → Edit Fields), fill your own,
+                then send for the buyer to complete.
               </p>
             </>
           )}
@@ -205,18 +250,38 @@ export default function EDocDocumentModal({ doc, onClose, onChanged }) {
                   {new Date(doc.completed_at).toLocaleString()}
                 </p>
               )}
-              <a
-                href={signUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-block mt-3 text-sm text-green-700 hover:underline"
-              >
-                View signed document →
-              </a>
+              <div className="flex flex-col items-center gap-2 mt-4">
+                <button
+                  onClick={downloadSigned}
+                  disabled={busy}
+                  className="bg-green-700 text-white text-sm font-semibold px-5 py-2 rounded-lg hover:bg-green-800 disabled:opacity-50"
+                >
+                  {busy ? 'Preparing…' : '⬇ Download Signed PDF'}
+                </button>
+                <a
+                  href={signUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sm text-green-700 hover:underline"
+                >
+                  View signed document →
+                </a>
+              </div>
             </div>
           )}
         </div>
       </div>
+
+      {preparing && (
+        <EDocPrepareModal
+          doc={localDoc}
+          onClose={() => setPreparing(false)}
+          onSaved={merged => {
+            setLocalDoc(d => ({ ...d, fields: merged }))
+            setPreparing(false)
+          }}
+        />
+      )}
     </div>
   )
 }
