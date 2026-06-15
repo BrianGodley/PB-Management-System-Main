@@ -103,6 +103,11 @@ export default function EstimateDetail() {
   // id by name on load so the breadcrumb links to the client (opportunity)
   // detail rather than falling back to the opportunities table.
   const [resolvedClientId, setResolvedClientId] = useState(null)
+  // Edit gate: a saved estimate opens in view mode showing an Edit button.
+  // Clicking Edit reveals the two save options. Brand-new estimates (no saved
+  // content yet) start editable so the first save can happen.
+  const [editMode, setEditMode] = useState(false)
+  const [hasSavedContent, setHasSavedContent] = useState(false)
   // Drag-and-drop reorder of the project list (left column).
   const [dragProjId, setDragProjId] = useState(null)
   const [dragOverProjId, setDragOverProjId] = useState(null)
@@ -493,6 +498,11 @@ export default function EstimateDetail() {
         .order('created_at')
       if (projs) {
         setProjects(projs)
+        // An estimate with saved projects opens in view mode (Edit button);
+        // an empty/new one opens editable so the first save can happen.
+        const savedHasContent = projs.length > 0
+        setHasSavedContent(savedHasContent)
+        setEditMode(!savedHasContent)
         // Initialise per-project GPMD overrides from DB
         const overrides = {}
         projs.forEach(p => {
@@ -1009,27 +1019,18 @@ export default function EstimateDetail() {
     const _cid = estimate.client_id || resolvedClientId
     const clientLink = _cid ? `/clients/${_cid}` : '/clients'
 
-    // Every estimate in this version tree (root + child versions) gets
-    // removed together, so deleting a parent doesn't orphan its versions.
-    const rootId = estimate.parent_estimate_id || estimate.id
-    const { data: treeRows } = await supabase
-      .from('estimates')
-      .select('id')
-      .or(`id.eq.${rootId},parent_estimate_id.eq.${rootId}`)
-    const estIds = Array.from(new Set([...(treeRows || []).map(r => r.id), id]))
+    // Delete ONLY this estimate. Forks/versions are independent — siblings,
+    // the parent, and child versions are never removed. If this estimate is
+    // itself a parent of other versions, we detach those children (null their
+    // parent_estimate_id) so they survive as standalone estimates and the
+    // delete isn't blocked by a foreign-key constraint.
 
-    // Count bids + work orders across the whole tree for the warning modal.
-    const { data: bidsData } = await supabase
-      .from('bids')
-      .select('id')
-      .in('estimate_id', estIds)
+    // Bids + work orders for THIS estimate only.
+    const { data: bidsData } = await supabase.from('bids').select('id').eq('estimate_id', id)
     const bidIds = bidsData?.map(b => b.id) || []
     const bidCount = bidIds.length
 
-    const { data: jobsData } = await supabase
-      .from('jobs')
-      .select('id')
-      .in('estimate_id', estIds)
+    const { data: jobsData } = await supabase.from('jobs').select('id').eq('estimate_id', id)
     const jobIds = jobsData?.map(j => j.id) || []
     let woCount = 0
     if (jobIds.length > 0) {
@@ -1040,13 +1041,13 @@ export default function EstimateDetail() {
       woCount = count || 0
     }
 
-    // Remove projects + their modules first so the estimates delete isn't
-    // blocked by a foreign-key constraint. Returns an error message or null.
+    // Remove this estimate's projects + their modules first so the estimates
+    // delete isn't blocked by a foreign-key constraint. Returns msg or null.
     async function deleteProjectsAndModules() {
       const { data: projRows, error: projSelErr } = await supabase
         .from('estimate_projects')
         .select('id')
-        .in('estimate_id', estIds)
+        .eq('estimate_id', id)
       if (projSelErr) return projSelErr.message
       const projIds = (projRows || []).map(p => p.id)
       if (projIds.length) {
@@ -1064,12 +1065,28 @@ export default function EstimateDetail() {
       return null
     }
 
+    // Detach any child versions of THIS estimate so they become independent
+    // standalone estimates rather than being orphaned or blocking the delete.
+    async function detachChildren() {
+      const { error } = await supabase
+        .from('estimates')
+        .update({ parent_estimate_id: null })
+        .eq('parent_estimate_id', id)
+      return error?.message || null
+    }
+
     setEstDeleteModal({
       bidCount,
       woCount,
-      // Delete all — projects/modules + bids + WOs + every version
+      // Delete this estimate only — its projects/modules + bids + WOs.
       onConfirm: async () => {
         setStatusLoading(true)
+        const childErr = await detachChildren()
+        if (childErr) {
+          setStatusLoading(false)
+          alert('Delete failed: ' + childErr)
+          return
+        }
         const projErr = await deleteProjectsAndModules()
         if (projErr) {
           setStatusLoading(false)
@@ -1078,7 +1095,7 @@ export default function EstimateDetail() {
         }
         if (jobIds.length) await supabase.from('work_orders').delete().in('job_id', jobIds)
         if (bidIds.length) await supabase.from('bids').delete().in('id', bidIds)
-        const { error: estErr } = await supabase.from('estimates').delete().in('id', estIds)
+        const { error: estErr } = await supabase.from('estimates').delete().eq('id', id)
         if (estErr) {
           setStatusLoading(false)
           alert('Delete failed: ' + estErr.message)
@@ -1087,11 +1104,17 @@ export default function EstimateDetail() {
         setEstDeleteModal(null)
         navigate(clientLink)
       },
-      // Keep bid — delete projects/modules + WOs + versions, leave bids
+      // Keep bid — delete this estimate's projects/modules + WOs, leave bids.
       onKeepBid:
         bidCount > 0
           ? async () => {
               setStatusLoading(true)
+              const childErr = await detachChildren()
+              if (childErr) {
+                setStatusLoading(false)
+                alert('Delete failed: ' + childErr)
+                return
+              }
               const projErr = await deleteProjectsAndModules()
               if (projErr) {
                 setStatusLoading(false)
@@ -1099,10 +1122,10 @@ export default function EstimateDetail() {
                 return
               }
               if (jobIds.length) await supabase.from('work_orders').delete().in('job_id', jobIds)
-              // Detach bids from the estimates we're about to delete so the
-              // bids survive without a dangling FK.
-              await supabase.from('bids').update({ estimate_id: null }).in('estimate_id', estIds)
-              const { error: estErr } = await supabase.from('estimates').delete().in('id', estIds)
+              // Detach bids from this estimate so they survive without a
+              // dangling FK.
+              await supabase.from('bids').update({ estimate_id: null }).eq('estimate_id', id)
+              const { error: estErr } = await supabase.from('estimates').delete().eq('id', id)
               if (estErr) {
                 setStatusLoading(false)
                 alert('Delete failed: ' + estErr.message)
@@ -1505,31 +1528,36 @@ export default function EstimateDetail() {
                Snapshots local state into a brand-new estimate version
                (Estimate N+1, where N = max version across the whole tree
                regardless of which version the user is currently on). */}
-          {dirty && (() => {
-            // First save of a brand-new estimate (no prior versions): a
-            // single "Save" that writes into the current row in place — there
-            // is no earlier version to preserve, so forking would be noise.
-            // Once the tree has at least one version, the user gets a choice:
-            //   • Overwrite       → save over THIS version (applyOverwrite)
-            //   • Save as New Ver → snapshot a fresh Estimate N+1
-            const isFirstSave =
-              !estimate.parent_estimate_id &&
-              (!estimate.version || estimate.version <= 1)
-
+          {(() => {
             async function runOverwrite() {
               setSavingDraft(true)
               const ok = await applyOverwrite()
               setSavingDraft(false)
-              if (ok) setDirty(false)
+              if (ok) {
+                setDirty(false)
+                setEditMode(false)
+              }
             }
             async function runNewVersion() {
               setSavingDraft(true)
               const ok = await applyAsNewVersion({})
               setSavingDraft(false)
-              if (ok) setDirty(false)
+              if (ok) {
+                setDirty(false)
+                setEditMode(false)
+              }
+            }
+            async function cancelEdit() {
+              if (dirty && !window.confirm('Discard your unsaved changes?')) return
+              await fetchData() // reload the saved version, discarding the draft
+              setDirty(false)
+              setEditMode(false)
             }
 
-            if (isFirstSave) {
+            // Brand-new estimate with no saved content yet: a single Save that
+            // writes into the current row (no version fork on the first save).
+            if (!hasSavedContent) {
+              if (!dirty) return null
               return (
                 <button
                   onClick={runOverwrite}
@@ -1541,15 +1569,30 @@ export default function EstimateDetail() {
                 </button>
               )
             }
+
+            // Saved estimate in view mode → show the Edit button.
+            if (!editMode) {
+              return (
+                <button
+                  onClick={() => setEditMode(true)}
+                  className="px-4 py-1 rounded-lg border border-green-700 text-green-700 text-sm font-semibold hover:bg-green-50"
+                  title="Edit this estimate"
+                >
+                  ✏️ Edit
+                </button>
+              )
+            }
+
+            // Saved estimate in edit mode → two save options + cancel.
             return (
               <div className="flex gap-2">
                 <button
                   onClick={runOverwrite}
-                  disabled={savingDraft}
+                  disabled={savingDraft || !dirty}
                   className="px-4 py-1 rounded-lg bg-green-700 text-white text-sm font-semibold hover:bg-green-800 disabled:opacity-50"
                   title={`Save over the current version (Estimate ${estimate.version || 1}) — no new version is created`}
                 >
-                  {savingDraft ? 'Saving…' : '💾 Overwrite'}
+                  {savingDraft ? 'Saving…' : '💾 Save Current Version'}
                 </button>
                 <button
                   onClick={runNewVersion}
@@ -1558,6 +1601,14 @@ export default function EstimateDetail() {
                   title="Keep the current version and snapshot these changes as the next estimate version"
                 >
                   {savingDraft ? 'Saving…' : '🔁 Save as New Version'}
+                </button>
+                <button
+                  onClick={cancelEdit}
+                  disabled={savingDraft}
+                  className="px-4 py-1 rounded-lg border border-gray-300 text-gray-500 text-sm font-semibold hover:bg-gray-50 disabled:opacity-50"
+                  title="Stop editing and discard unsaved changes"
+                >
+                  Cancel
                 </button>
               </div>
             )
