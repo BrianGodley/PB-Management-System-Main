@@ -1007,9 +1007,21 @@ function CurrentLocationMap() {
     )
     return () => {
       alive = false
-      if (mapObj.current) {
-        mapObj.current.remove()
-        mapObj.current = null
+      // Tear the Leaflet map down hard. On mobile Safari, just unmounting the
+      // React node can leave the map's GPU-composited tiles painted over the
+      // next screen — removing the map AND clearing the container forces the
+      // layer to drop so it doesn't bleed onto the page you navigate to.
+      const m = mapObj.current
+      mapObj.current = null
+      try {
+        if (m) m.remove()
+      } catch {
+        /* ignore */
+      }
+      try {
+        if (mapEl.current) mapEl.current.innerHTML = ''
+      } catch {
+        /* ignore */
       }
     }
   }, [])
@@ -1036,7 +1048,7 @@ function CurrentLocationMap() {
           <span className="text-green-700 font-semibold flex-shrink-0">Recenter</span>
         )}
       </button>
-      <div className="flex-1 min-h-0 rounded-b-lg overflow-hidden border border-gray-200 bg-gray-100 relative">
+      <div className="flex-1 min-h-0 rounded-b-lg overflow-hidden border border-gray-200 bg-gray-100 relative isolate">
         <div ref={mapEl} className="absolute inset-0" />
         {status !== 'ok' && (
           <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-400">

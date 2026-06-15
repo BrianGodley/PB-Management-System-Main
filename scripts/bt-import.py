@@ -162,6 +162,40 @@ def supabase_select_all(table, select):
     return all_rows
 
 
+def pick(r, *names):
+    """First present, non-blank value among several candidate column names."""
+    for n in names:
+        if n in r:
+            v = clean(r.get(n))
+            if v is not None:
+                return v
+    return None
+
+def existing_int_ids(table, col):
+    """Set of already-imported BuilderTrend IDs (ints) for idempotency."""
+    ids = set()
+    for row in supabase_select_all(table, col):
+        v = row.get(col)
+        if v is None:
+            continue
+        try:
+            ids.add(int(float(v)))
+        except (TypeError, ValueError):
+            ids.add(v)
+    return ids
+
+def supabase_insert_returning(table, row):
+    """Insert one row and return the created record (needs the id back)."""
+    url = f"{SUPABASE_URL}/rest/v1/{table}"
+    headers = {**HEADERS, "Prefer": "return=representation"}
+    resp = requests.post(url, headers=headers, json=row)
+    if resp.status_code in (200, 201):
+        data = resp.json()
+        return data[0] if isinstance(data, list) and data else data
+    print(f"  ERROR inserting into {table}: {resp.status_code} — {resp.text[:200]}")
+    return None
+
+
 def detect_type(df):
     """Detect the BuilderTrend CSV type from column names."""
     cols = set(df.columns.str.lower().str.strip())
@@ -170,28 +204,41 @@ def detect_type(df):
         return "jobsites_rollup"
     if "job_id" in cols and "schedule_id" in cols and "schedule_title" in cols:
         return "schedule"
-    if "job_id" in cols and "entity_type" in cols and "payment_id" in cols:
-        return "invoices_bills_pos"
-    if "job_id" in cols and "transaction_id" in cols and "vendor_name" in cols:
-        return "qb_costs"
     if "job_id" in cols and "estimates_revised_costs_id" in cols:
         return "estimate_revised"
     if "lead_id" in cols and "lead_title" in cols:
         return "sales_rollup"
-    if "job_id" in cols and "shift_id" in cols:
-        return "schedule_shifts"
     # The Daily Logs export also carries todo_* columns, so check
     # daily_log_id first or it gets misdetected as a todos CSV.
     if "job_id" in cols and "daily_log_id" in cols:
         return "daily_logs"
+    # ── Change Orders → bids (+estimates) ──
+    if "change_order_id" in cols or "bt_change_order_id" in cols:
+        return "change_orders"
+    # ── Time Clock → time_entries (check clock_in BEFORE shift-only rules) ──
+    if {"clock_in", "clock_in_at", "clock_in_time"} & cols:
+        return "time_clock"
+    # ── Owner Invoices → job_invoices (distinct from the bills/POs export,
+    #    which carries entity_type + payment_id) ──
+    if ("invoice_id" in cols or "bt_invoice_id" in cols) and "payment_id" not in cols \
+       and "entity_type" not in cols and ("invoice_number" in cols or "amount_paid" in cols
+                                          or "paid_status" in cols):
+        return "owner_invoices"
+    # ── Payments → job_invoice_payments ──
+    if ("payment_id" in cols or "bt_payment_id" in cols) and \
+       ("invoice_id" in cols or "bt_invoice_id" in cols or "payment_date" in cols):
+        return "payments"
+
+    if "job_id" in cols and "entity_type" in cols and "payment_id" in cols:
+        return "invoices_bills_pos"
+    if "job_id" in cols and "transaction_id" in cols and "vendor_name" in cols:
+        return "qb_costs"
+    if "job_id" in cols and "shift_id" in cols:
+        return "schedule_shifts"
     if "job_id" in cols and "todo_id" in cols:
         return "todos"
-    if "job_id" in cols and "change_order_id" in cols:
-        return "change_orders"
     if "job_id" in cols and "purchase_order_id" in cols:
         return "purchase_orders"
-    if "job_id" in cols and "shift_id" in cols and "clock_in" in cols:
-        return "time_clock"
     if "job_id" in cols and "warranty_id" in cols:
         return "warranty"
 
@@ -584,6 +631,267 @@ def import_daily_logs(df, dry_run):
     return ok, err
 
 
+def import_change_orders(df, dry_run):
+    """Change Orders → bids (+ a paired estimates row), matching the prior
+    SQL import. Idempotent: COs already present (bids.bt_change_order_id) are
+    skipped, so re-running only adds new ones (and never duplicates estimates).
+    Requires bids.bt_change_order_id + its unique index (created by the
+    original supabase-import-bt-change-orders.sql)."""
+    print(f"\n→ Importing Change Orders ({len(df)} rows) into bids/estimates…")
+
+    job_map = {}
+    for j in supabase_select_all("jobs", "id,bt_job_id,client_name"):
+        bt = j.get("bt_job_id")
+        if bt is not None:
+            job_map[int(bt)] = j
+    existing = existing_int_ids("bids", "bt_change_order_id")
+    print(f"  {len(job_map)} jobs mapped · {len(existing)} COs already imported.")
+
+    todo, skipped_existing, skipped_no_job = [], 0, 0
+    for _, r in df.iterrows():
+        co_id = to_float(pick(r, "bt_change_order_id", "change_order_id"))
+        if co_id is None:
+            continue
+        co_id = int(co_id)
+        if co_id in existing:
+            skipped_existing += 1
+            continue
+        bt_job = to_float(pick(r, "bt_jobsite_id", "job_id", "jobsite_id"))
+        job = job_map.get(int(bt_job)) if bt_job is not None else None
+        if not job:
+            skipped_no_job += 1
+            continue
+        title = clean(pick(r, "title", "change_order_title")) or f"Change Order {co_id}"
+        desc = clean(pick(r, "description", "notes"))
+        owner_price = to_float(pick(r, "owner_price", "amount", "price")) or 0
+        status_raw = (clean(pick(r, "bt_status", "status", "approval_status")) or "").lower()
+        status_target = "sold" if ("approv" in status_raw or "sold" in status_raw) else "pending"
+        date_sub = to_date(pick(r, "date_entered", "date_submitted", "created_date", "date"))
+        todo.append({
+            "co_id": co_id, "job": job, "title": title, "desc": desc,
+            "owner_price": owner_price, "status_target": status_target,
+            "date_sub": date_sub,
+        })
+
+    print(f"  {len(todo)} new · {skipped_existing} already imported · "
+          f"{skipped_no_job} skipped (job not in PBS).")
+    if dry_run:
+        if todo:
+            print(f"  [DRY RUN] Sample: {json.dumps(todo[0], default=str, indent=2)}")
+        return len(todo), 0
+
+    ok = err = 0
+    for c in todo:
+        est = supabase_insert_returning("estimates", {
+            "estimate_name": c["title"],
+            "client_name": c["job"].get("client_name") or c["title"],
+            "status": "approved" if c["status_target"] == "sold" else "draft",
+            "notes": c["desc"],
+        })
+        if not est or not est.get("id"):
+            err += 1
+            continue
+        bid = supabase_insert_returning("bids", {
+            "bt_change_order_id": c["co_id"],
+            "record_type": "change_order",
+            "linked_job_id": c["job"]["id"],
+            "co_name": c["title"],
+            "co_type": None,
+            "client_name": c["job"].get("client_name") or c["title"],
+            "bid_amount": c["owner_price"],
+            "gross_profit": 0,
+            "gpmd": 0,
+            "date_submitted": c["date_sub"] or datetime.now().date().isoformat(),
+            "status": c["status_target"],
+            "estimate_id": est["id"],
+            "notes": c["desc"],
+            "projects": [],
+        })
+        if bid:
+            ok += 1
+        else:
+            err += 1
+    print(f"  ✓ {ok} change orders imported, {err} errors")
+    return ok, err
+
+
+def import_time_clock(df, dry_run):
+    """Time Clock → time_entries. Idempotent on bt_timecard_item_id. Rows with
+    no jobsite (or bt_job_id 0) land on the 'Picture Build Internal' job.
+    Requires the bt_timecard_item_id column + unique index from
+    supabase-import-bt-clock-setup.sql."""
+    print(f"\n→ Importing Time Clock ({len(df)} rows) into time_entries…")
+
+    job_map = {}
+    for j in supabase_select_all("jobs", "id,bt_job_id"):
+        bt = j.get("bt_job_id")
+        if bt is not None:
+            job_map[int(bt)] = j["id"]
+    # Ensure the internal "no jobsite" home job exists (bt_job_id 0).
+    internal_id = job_map.get(0)
+    if internal_id is None and not dry_run:
+        row = supabase_insert_returning("jobs", {
+            "bt_job_id": 0, "name": "Picture Build Internal",
+            "client_name": "Picture Build", "status": "active", "source": "buildertrend",
+        })
+        internal_id = row.get("id") if row else None
+        if internal_id:
+            job_map[0] = internal_id
+
+    existing = existing_int_ids("time_entries", "bt_timecard_item_id")
+    print(f"  {len(job_map)} jobs mapped · {len(existing)} clock entries already imported.")
+
+    rows, skipped_existing, skipped_bad = [], 0, 0
+    for _, r in df.iterrows():
+        tc_id = to_float(pick(r, "bt_timecard_item_id", "timecard_item_id", "shift_id", "time_card_id"))
+        if tc_id is None:
+            continue
+        tc_id = int(tc_id)
+        if tc_id in existing:
+            skipped_existing += 1
+            continue
+        ci = to_ts(pick(r, "clock_in_at", "clock_in", "clock_in_time"))
+        if not ci:
+            skipped_bad += 1
+            continue
+        co = to_ts(pick(r, "clock_out_at", "clock_out", "clock_out_time"))
+        bt_job = to_float(pick(r, "job_id", "bt_job_id", "bt_jobsite_id", "jobsite_id"))
+        job_id = job_map.get(int(bt_job)) if bt_job not in (None,) else None
+        if job_id is None:
+            job_id = job_map.get(0)  # internal job
+        rows.append({
+            "bt_timecard_item_id": tc_id,
+            "job_id": job_id,
+            "employee_name": clean(pick(r, "employee_name", "user_name", "full_name", "name")) or "Unknown",
+            "date": ci[:10],
+            "time_in": ci[11:19],
+            "time_out": co[11:19] if co else None,
+            "notes": clean(pick(r, "notes", "description")),
+            "bt_hours_regular": to_float(pick(r, "hours_regular", "regular_hours")),
+            "bt_hours_overtime": to_float(pick(r, "hours_overtime", "overtime_hours")),
+            "bt_break_time": to_float(pick(r, "break_time", "break_minutes")),
+            "bt_approval_status": clean(pick(r, "approval_status", "status")),
+            "source": "buildertrend",
+        })
+
+    print(f"  {len(rows)} new · {skipped_existing} already imported · {skipped_bad} skipped (no clock-in time).")
+    if dry_run:
+        if rows:
+            print(f"  [DRY RUN] Sample: {json.dumps(rows[0], default=str, indent=2)}")
+        return len(rows), 0
+    ok, err = supabase_upsert("time_entries", rows, "bt_timecard_item_id", dry_run)
+    print(f"  ✓ {ok} clock entries imported, {err} errors")
+    return ok, err
+
+
+def import_owner_invoices(df, dry_run):
+    """Owner Invoices → job_invoices. Idempotent on bt_invoice_id."""
+    print(f"\n→ Importing Owner Invoices ({len(df)} rows) into job_invoices…")
+
+    job_map = {}
+    for j in supabase_select_all("jobs", "id,bt_job_id"):
+        bt = j.get("bt_job_id")
+        if bt is not None:
+            job_map[int(bt)] = j["id"]
+    existing = existing_int_ids("job_invoices", "bt_invoice_id")
+    print(f"  {len(job_map)} jobs mapped · {len(existing)} invoices already imported.")
+
+    rows, skipped_existing, skipped_no_job = [], 0, 0
+    for _, r in df.iterrows():
+        inv_id = to_float(pick(r, "bt_invoice_id", "invoice_id"))
+        if inv_id is None:
+            continue
+        inv_id = int(inv_id)
+        if inv_id in existing:
+            skipped_existing += 1
+            continue
+        bt_job = to_float(pick(r, "bt_job_id", "job_id", "bt_jobsite_id", "jobsite_id"))
+        job_id = job_map.get(int(bt_job)) if bt_job is not None else None
+        if job_id is None:
+            skipped_no_job += 1
+            continue
+        rows.append({
+            "job_id": job_id,
+            "bt_invoice_id": inv_id,
+            "invoice_number": clean(pick(r, "invoice_number", "number")) or f"BT-{inv_id}",
+            "title": clean(pick(r, "title", "invoice_title", "description")),
+            "amount": to_float(pick(r, "amount", "invoice_amount")),
+            "amount_paid": to_float(pick(r, "amount_paid", "paid")),
+            "invoice_date": to_date(pick(r, "invoice_date", "date", "issued_date"))
+                            or datetime.now().date().isoformat(),
+            "due_date": to_date(pick(r, "due_date")),
+            "paid_status": clean(pick(r, "paid_status", "payment_status")),
+            "status": clean(pick(r, "status")),
+            "is_manual": True,
+            "source": "buildertrend",
+        })
+
+    print(f"  {len(rows)} new · {skipped_existing} already imported · {skipped_no_job} skipped (job not in PBS).")
+    if dry_run:
+        if rows:
+            print(f"  [DRY RUN] Sample: {json.dumps(rows[0], default=str, indent=2)}")
+        return len(rows), 0
+    ok, err = supabase_upsert("job_invoices", rows, "bt_invoice_id", dry_run)
+    print(f"  ✓ {ok} invoices imported, {err} errors")
+    return ok, err
+
+
+def import_payments(df, dry_run):
+    """Payments → job_invoice_payments. Idempotent on bt_payment_id; each
+    payment is linked to its invoice via bt_invoice_id → job_invoices.id."""
+    print(f"\n→ Importing Payments ({len(df)} rows) into job_invoice_payments…")
+
+    job_map = {}
+    for j in supabase_select_all("jobs", "id,bt_job_id"):
+        bt = j.get("bt_job_id")
+        if bt is not None:
+            job_map[int(bt)] = j["id"]
+    inv_map = {}
+    for inv in supabase_select_all("job_invoices", "id,bt_invoice_id"):
+        bt = inv.get("bt_invoice_id")
+        if bt is not None:
+            inv_map[int(bt)] = inv["id"]
+    existing = existing_int_ids("job_invoice_payments", "bt_payment_id")
+    print(f"  {len(inv_map)} invoices mapped · {len(existing)} payments already imported.")
+
+    rows, skipped_existing, skipped_no_inv = [], 0, 0
+    for _, r in df.iterrows():
+        pay_id = to_float(pick(r, "bt_payment_id", "payment_id"))
+        if pay_id is None:
+            continue
+        pay_id = int(pay_id)
+        if pay_id in existing:
+            skipped_existing += 1
+            continue
+        bt_inv = to_float(pick(r, "bt_invoice_id", "invoice_id"))
+        invoice_id = inv_map.get(int(bt_inv)) if bt_inv is not None else None
+        if invoice_id is None:
+            skipped_no_inv += 1
+            continue
+        bt_job = to_float(pick(r, "bt_job_id", "job_id", "bt_jobsite_id"))
+        rows.append({
+            "invoice_id": invoice_id,
+            "job_id": job_map.get(int(bt_job)) if bt_job is not None else None,
+            "bt_payment_id": pay_id,
+            "amount": to_float(pick(r, "amount", "payment_amount")),
+            "payment_date": to_date(pick(r, "payment_date", "date"))
+                            or datetime.now().date().isoformat(),
+            "method": clean(pick(r, "method", "payment_method")),
+            "status": clean(pick(r, "status", "payment_status")),
+            "source": "buildertrend",
+        })
+
+    print(f"  {len(rows)} new · {skipped_existing} already imported · "
+          f"{skipped_no_inv} skipped (invoice not in PBS yet — import invoices first).")
+    if dry_run:
+        if rows:
+            print(f"  [DRY RUN] Sample: {json.dumps(rows[0], default=str, indent=2)}")
+        return len(rows), 0
+    ok, err = supabase_upsert("job_invoice_payments", rows, "bt_payment_id", dry_run)
+    print(f"  ✓ {ok} payments imported, {err} errors")
+    return ok, err
+
+
 # ── SQL for new tables (printed if they don't exist) ──────────────────────────
 
 SETUP_SQL = """
@@ -768,14 +1076,18 @@ def main():
         "estimate_revised":   import_estimate_revised,
         "sales_rollup":       import_sales_rollup,
         "daily_logs":         import_daily_logs,
+        "change_orders":      import_change_orders,
+        "time_clock":         import_time_clock,
+        "owner_invoices":     import_owner_invoices,
+        "payments":           import_payments,
     }
 
     if csv_type not in dispatch:
         print(f"\nUnrecognized CSV type '{csv_type}'.")
         print("Columns found:", list(df.columns[:15]))
         print("\nSupported types: Jobsites Rollup, Schedule, Invoices/Bills/POs,")
-        print("QB Costs, Estimate Revised, Sales Rollup, Daily Logs")
-        print("\nMore CSV types (Change Orders, Time Clock, etc.) can be added — just ask!")
+        print("QB Costs, Estimate Revised, Sales Rollup, Daily Logs,")
+        print("Change Orders, Time Clock, Owner Invoices, Payments")
         sys.exit(1)
 
     ok, err = dispatch[csv_type](df, args.dry_run)
