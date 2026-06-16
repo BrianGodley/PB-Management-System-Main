@@ -3080,7 +3080,7 @@ function IntegrationsSettings() {
     'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600'
 
   return (
-    <div className="max-w-2xl">
+    <div className="w-full">
       <div className="mb-6">
         <h2 className="text-lg font-bold text-gray-900">Integrations</h2>
         <p className="text-sm text-gray-500 mt-0.5">
@@ -3090,7 +3090,7 @@ function IntegrationsSettings() {
       </div>
 
       {/* Sub-tabs */}
-      <div className="flex gap-1 border-b border-gray-200 mb-6">
+      <div className="flex justify-center gap-1 bg-white border border-gray-200 rounded-xl mb-6">
         <button className={tabBtnCls('qbo')} onClick={() => setActiveTab('qbo')}>
           QuickBooks Online
         </button>

@@ -1524,7 +1524,7 @@ export default function Collections() {
                   </button>
                 ))}
               </div>
-              <div className="thin-scroll-white bg-gray-50 px-6 py-6 flex-1 overflow-y-auto">
+              <div className="thin-scroll-white bg-gray-50 px-6 py-6 flex-1 overflow-y-auto rounded-xl">
                 {collSettingsTab === 'general' && (
                   <div className="flex items-center justify-center py-20 text-center">
                     <div>
@@ -1564,7 +1564,8 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
   const allGroups = [...Object.entries(grouped), ...(noManager.length ? [['', noManager]] : [])]
 
   return (
-    <div className="thin-scroll-white flex-1 overflow-auto rounded-xl border border-gray-200 shadow-sm">
+    <div className="rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
+      <div className="thin-scroll-white flex-1 overflow-auto">
       <table className="text-xs w-full table-fixed" style={{ minWidth: '1120px' }}>
         <colgroup>
           <col style={{ width: '115px' }} />
@@ -1637,7 +1638,7 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
         <tbody className="divide-y divide-gray-100 bg-white">
           {allGroups.length === 0 && (
             <tr>
-              <td colSpan={14} className="px-4 py-6 text-center text-gray-400 text-xs">
+              <td colSpan={15} className="px-4 py-6 text-center text-gray-400 text-xs">
                 No clients yet — add a row below
               </td>
             </tr>
@@ -1646,7 +1647,7 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
             <>
               {manager && (
                 <tr key={'mgr-' + manager} className="bg-green-50">
-                  <td colSpan={14} className="px-3 py-2">
+                  <td colSpan={15} className="px-3 py-2">
                     <div className="flex items-center gap-1.5">
                       <span className="text-green-700 text-[10px] font-bold">▸</span>
                       {editingManager === manager ? (
@@ -1809,7 +1810,7 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
 
           {/* New group row */}
           <tr className="bg-gray-50 border-t-2 border-gray-200">
-            <td colSpan={14} className="px-3 py-2">
+            <td colSpan={15} className="px-3 py-2">
               <div className="flex items-center gap-2">
                 <input
                   type="text"
@@ -1841,6 +1842,7 @@ function CollectionTable({ section, rows, summary, onUpdate, onDelete, onAdd }) 
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
   )
 }

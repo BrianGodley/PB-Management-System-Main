@@ -890,7 +890,7 @@ export default function Bids() {
               </button>
             ))}
           </div>
-          <div className="bg-gray-50 px-6 py-6">
+          <div className="bg-gray-50 px-6 py-6 rounded-xl">
             {bidsSettingsTab === 'general' && (
               <div className="flex items-center justify-center py-20 text-center">
                 <div>

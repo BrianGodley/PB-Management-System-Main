@@ -3469,7 +3469,7 @@ function JobScheduleSettings({
           </button>
         ))}
       </div>
-      <div className="bg-gray-50 px-6 py-6 flex-1 overflow-y-auto">
+      <div className="bg-gray-50 px-6 py-6 flex-1 overflow-y-auto rounded-xl">
         {settingsTab === 'templates' && <TemplatesManager />}
 
         {settingsTab === 'email-templates' && <EmailTemplatesManager />}

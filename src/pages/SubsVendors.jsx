@@ -619,7 +619,7 @@ export default function SubsVendors() {
               </button>
             ))}
           </div>
-          <div className="bg-gray-50 px-6 py-6 flex-1 overflow-y-auto">
+          <div className="bg-gray-50 px-6 py-6 flex-1 overflow-y-auto rounded-xl">
             {/* General */}
             {svSettingsTab === 'general' && (
               <div className="flex items-center justify-center py-20 text-center">

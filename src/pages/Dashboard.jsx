@@ -798,7 +798,7 @@ function DashboardSettings({ prefs, stats, userId, isAdmin, weatherLocation, set
   }
 
   return (
-    <div className="max-w-xl space-y-5">
+    <div className="w-full space-y-5">
       {/* Mini-graph stats */}
       <div className="card">
         <h3 className="text-sm font-bold text-gray-800 mb-1">Dashboard Stats</h3>

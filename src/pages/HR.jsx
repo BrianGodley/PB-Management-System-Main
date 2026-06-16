@@ -1053,7 +1053,7 @@ export default function HR() {
           )
         ) : /* ── POSITIONS TAB ── */
         tab === 'positions' ? (
-          <div className="max-w-4xl">
+          <div className="w-full">
             {/* Position editor — modal overlay */}
             {editingPosition && (
               <div
@@ -1478,7 +1478,7 @@ export default function HR() {
                 </button>
               ))}
             </div>
-            <div className="bg-gray-50 px-6 py-6 flex-1 overflow-y-auto">
+            <div className="bg-gray-50 px-6 py-6 flex-1 overflow-y-auto rounded-xl">
               {/* ── Employee Groups ── */}
               {settingsTab === 'employee-groups' && (
                 <div>
