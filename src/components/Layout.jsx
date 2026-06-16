@@ -512,7 +512,7 @@ export default function Layout() {
       <div className="flex flex-1 min-h-0">
         {/* LEFT SIDEBAR — desktop only */}
         <aside
-          className={`group hidden lg:flex flex-col bg-white/25 backdrop-blur-md border-r border-white/30 shadow-sm sticky top-11 h-[calc(100vh-2.75rem)] overflow-y-auto transition-[width] duration-200 ${
+          className={`group hidden lg:flex flex-col bg-transparent sticky top-11 h-[calc(100vh-2.75rem)] overflow-y-auto transition-[width] duration-200 ${
             navCollapsed ? 'w-12' : 'w-32'
           }`}
         >
@@ -552,10 +552,10 @@ export default function Layout() {
                   setNavTip({ label: item.label, top: r.top + r.height / 2 })
                 }}
                 onMouseLeave={() => setNavTip(null)}
-                className={`flex items-center ${navCollapsed ? 'justify-center' : 'gap-2'} px-2 py-2 rounded-lg text-xs font-medium transition-colors ${
+                className={`flex items-center ${navCollapsed ? 'justify-center' : 'gap-2'} px-2 py-2 rounded-lg text-xs font-semibold transition-colors drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)] ${
                   isActive(item.path)
-                    ? 'bg-gray-100 text-gray-900'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    ? 'bg-white/45 text-gray-900'
+                    : 'text-gray-800 hover:bg-white/30 hover:text-gray-900'
                 }`}
               >
                 <span className="text-sm">{item.icon}</span>
@@ -563,7 +563,7 @@ export default function Layout() {
               </Link>
             ))}
           </nav>
-          <div className="px-1.5 py-3 border-t border-gray-100">
+          <div className="px-1.5 py-3 border-t border-white/20">
             <button
               onClick={handleSignOut}
               onMouseEnter={e => {
@@ -572,7 +572,7 @@ export default function Layout() {
                 setNavTip({ label: 'Sign Out', top: r.top + r.height / 2 })
               }}
               onMouseLeave={() => setNavTip(null)}
-              className={`w-full flex items-center ${navCollapsed ? 'justify-center' : 'gap-2'} px-2 py-2 rounded-lg text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-colors`}
+              className={`w-full flex items-center ${navCollapsed ? 'justify-center' : 'gap-2'} px-2 py-2 rounded-lg text-xs font-semibold text-gray-800 hover:bg-white/30 hover:text-gray-900 transition-colors drop-shadow-[0_1px_1px_rgba(255,255,255,0.9)]`}
             >
               <span>🚪</span>
               {!navCollapsed && <span>Sign Out</span>}
