@@ -100,7 +100,16 @@ export default function Customize() {
     selected === 'all'
       ? 'All modules'
       : CUSTOMIZE_MODULES.find(m => m.key === selected)?.label || selected
-  const currentBg = selected === 'all' ? null : map[selected] || 'none'
+  // For "All", reflect the background only if every module shares the same one
+  // — that way the applied tile shows its black border + check mark.
+  const currentBg =
+    selected === 'all'
+      ? (() => {
+          const vals = CUSTOMIZE_MODULES.map(m => map[m.key] || 'none')
+          const first = vals[0]
+          return vals.every(v => v === first) ? first : null
+        })()
+      : map[selected] || 'none'
   const currentSidebar = map[SIDEBAR_KEY] ?? null
   // Undefined (never set) → default green; explicit null → Clear.
   const currentHeader = map[HEADER_KEY] !== undefined ? map[HEADER_KEY] : HEADER_DEFAULT
