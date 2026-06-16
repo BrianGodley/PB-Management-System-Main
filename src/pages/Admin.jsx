@@ -1553,7 +1553,7 @@ function CompanySettings({ currentUserIsAdmin }) {
     )
 
   return (
-    <div className="max-w-4xl space-y-4">
+    <div className="space-y-4">
       {!currentUserIsAdmin && (
         <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm px-4 py-3 rounded-xl">
           ⚠️ Only admins can change these settings.
@@ -2361,7 +2361,7 @@ function SmsSettings() {
     )
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6">
       {/* Current provider banner */}
       <div className="bg-green-50 border border-green-200 rounded-xl px-5 py-3 flex items-center gap-3">
         <span className="text-xl">{activeProvider?.logo}</span>
