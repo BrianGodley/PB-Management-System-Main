@@ -169,7 +169,7 @@ export default function TimeClockPage() {
               <TimeClock jobs={jobs} selectedJob={selectedJob} />
             </div>
             <div className="lg:hidden h-full">
-              <MobileTimeClock />
+              <MobileTimeClock initialJobId={jobParam || ''} />
             </div>
           </>
         )}

@@ -158,7 +158,7 @@ function gpsCols(side, g) {
   }
 }
 
-export default function MobileTimeClock() {
+export default function MobileTimeClock({ initialJobId = '' }) {
   const { user } = useAuth()
   const [meId, setMeId] = useState(null)
   const [meName, setMeName] = useState('')
@@ -282,7 +282,11 @@ export default function MobileTimeClock() {
       }
       if (alive) {
         setRecentJobIds(seen)
-        setClockInJob(prev => prev || seen[0] || '') // prefill last job
+        // Prefill: a job passed in from a Schedule item (initialJobId) wins if
+        // it's open; otherwise fall back to this user's most recent job.
+        const preset =
+          initialJobId && openSet.has(initialJobId) ? initialJobId : seen[0] || ''
+        setClockInJob(prev => prev || preset)
       }
 
       // Day + week hours so far (completed shifts).

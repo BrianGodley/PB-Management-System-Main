@@ -518,13 +518,16 @@ function ListView({ listDays, itemsOnDay, jobMap, todayStr, todayRef, selectedJo
 // ── Day Schedule item detail (crew/subs, job, map, time clock, daily log) ───
 function jobMapHref(job) {
   if (!job) return null
-  if (job.lat != null && job.lon != null) {
-    return `https://www.google.com/maps/?q=${job.lat},${job.lon}`
-  }
+  // Prefer the job's street address so Maps shows the place (not raw lat/lon
+  // coordinates). Fall back to coordinates only when there's no address.
   const addr = [job.job_address, job.job_city, job.job_state, job.job_zip]
     .filter(Boolean)
     .join(', ')
-  return addr ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}` : null
+  if (addr) return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`
+  if (job.lat != null && job.lon != null) {
+    return `https://www.google.com/maps/?q=${job.lat},${job.lon}`
+  }
+  return null
 }
 
 function DayItemModal({ item, job, crew, sub, onClose, onGo }) {
@@ -568,19 +571,19 @@ function DayItemModal({ item, job, crew, sub, onClose, onGo }) {
             disabled={!mapHref}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40"
           >
-            <span className="text-lg">🗺️</span> View on map
+            <span className="text-lg">🗺️</span> View on Map
           </button>
           <button
             onClick={() => onGo(`/timeclock?job=${item.job_id}`)}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50"
           >
-            <span className="text-lg">⏱️</span> Time clock
+            <span className="text-lg">⏱️</span> Time Clock
           </button>
           <button
             onClick={() => onGo(`/daily-logs?new=1&job=${item.job_id}`)}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50"
           >
-            <span className="text-lg">📝</span> Add daily log
+            <span className="text-lg">📝</span> Add Daily Log
           </button>
         </div>
       </div>
