@@ -63,6 +63,10 @@ export default function TierCanvas({
   const minH = containerSize.h ? containerSize.h / zoom : 400
   const vw = Math.max(width, minW)
   const vh = Math.max(height, minH)
+  // Small hardcoded left margin so the leftmost item never sits flush against
+  // the edge. (The right margin already varies with content width; the left
+  // start can otherwise go to 0 once an item is dragged left.)
+  const LEFT_MARGIN = 24
 
   function toSvgCoords(clientX, clientY) {
     const svg = svgRef.current
@@ -240,9 +244,9 @@ export default function TierCanvas({
     <div ref={wrapRef} style={{ width: '100%', height: '100%' }}>
       <svg
         ref={svgRef}
-        width={vw * zoom}
+        width={(vw + LEFT_MARGIN) * zoom}
         height={vh * zoom}
-        viewBox={`0 0 ${vw} ${vh}`}
+        viewBox={`${-LEFT_MARGIN} 0 ${vw + LEFT_MARGIN} ${vh}`}
         preserveAspectRatio="xMidYMin meet"
         style={{ background: '#F8FAFC', display: 'block', userSelect: 'none' }}
         onMouseMove={handleSvgMouseMove}
