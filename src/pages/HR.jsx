@@ -703,7 +703,7 @@ export default function HR() {
           {tab === 'employees' && (
             <button
               onClick={() => setShowAddEmp(true)}
-              className="btn-primary text-sm px-3 py-1.5 w-full lg:w-auto"
+              className="btn-primary text-sm px-3 py-1.5 w-full lg:hidden"
             >
               + Add Employee
             </button>
@@ -748,7 +748,8 @@ export default function HR() {
 
       {/* Tab bar — desktop only; on mobile the More > Employees screen shows
           just the employee table (no Employees/Applicants/Settings bar). */}
-      <div className="bg-white border-b border-gray-200 hidden lg:flex justify-center gap-0 flex-shrink-0 overflow-x-auto rounded-xl">
+      <div className="bg-white border-b border-gray-200 hidden lg:flex justify-between gap-0 flex-shrink-0 overflow-x-auto rounded-xl">
+        <div className="flex items-center justify-center flex-1 min-w-0 overflow-x-auto">
         {[
           {
             key: 'employees',
@@ -780,6 +781,17 @@ export default function HR() {
             {t.icon} {t.label}
           </button>
         ))}
+        </div>
+        <div className="flex items-center gap-2 pr-2 flex-shrink-0">
+          {tab === 'employees' && (
+            <button
+              onClick={() => setShowAddEmp(true)}
+              className="btn-primary text-xs px-3 py-1.5"
+            >
+              + Add Employee
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Search + filter bar — hidden on Settings and Positions tabs */}

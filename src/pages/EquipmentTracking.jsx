@@ -344,39 +344,39 @@ export default function EquipmentTracking() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-end mb-3 flex-shrink-0">
-        {eqTab === 'equipment' && (
-          <button
-            onClick={() => {
-              setEditItem(null)
-              setShowModal(true)
-            }}
-            className="btn-primary text-sm px-4 py-2 rounded-lg"
-          >
-            + Add Equipment
-          </button>
-        )}
-      </div>
-
       {/* ── Module tabs ── */}
-      <div className="bg-white border-b border-gray-200 flex justify-center gap-0 flex-shrink-0 rounded-xl">
-        {[
-          { key: 'equipment', label: `🛠️ Equipment (${equipment.length})` },
-          { key: 'settings', label: '⚙️ Settings' },
-        ].map(t => (
-          <button
-            key={t.key}
-            onClick={() => setEqTab(t.key)}
-            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              eqTab === t.key
-                ? 'border-green-700 text-green-700'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="bg-white border-b border-gray-200 flex justify-between gap-0 flex-shrink-0 rounded-xl">
+        <div className="flex items-center justify-center flex-1 min-w-0 overflow-x-auto">
+          {[
+            { key: 'equipment', label: `🛠️ Equipment (${equipment.length})` },
+            { key: 'settings', label: '⚙️ Settings' },
+          ].map(t => (
+            <button
+              key={t.key}
+              onClick={() => setEqTab(t.key)}
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                eqTab === t.key
+                  ? 'border-green-700 text-green-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 pr-2 flex-shrink-0">
+          {eqTab === 'equipment' && (
+            <button
+              onClick={() => {
+                setEditItem(null)
+                setShowModal(true)
+              }}
+              className="btn-primary text-xs px-3 py-1.5 rounded-lg"
+            >
+              + Add Equipment
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── Settings ── */}

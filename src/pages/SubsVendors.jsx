@@ -557,38 +557,36 @@ export default function SubsVendors() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* ── Add buttons ── */}
-      <div className="flex items-center justify-end mb-3 flex-shrink-0 gap-3">
-        <div className="flex items-center gap-2">
-          <button onClick={() => openNew('sub')} className="btn-primary text-xs px-2.5 py-1 whitespace-nowrap">
+      {/* ── Module tab bar ── */}
+      <div className="bg-white border-b border-gray-200 flex justify-between gap-0 flex-shrink-0 rounded-xl">
+        <div className="flex items-center justify-center flex-1 min-w-0 overflow-x-auto">
+          {[
+            { key: 'directory', label: '📋 Directory' },
+            { key: 'contracts', label: '📑 Contracts' },
+            { key: 'quotes', label: '🧾 Quotes' },
+            { key: 'settings', label: '⚙️ Settings', mobileHide: true },
+          ].map(t => (
+            <button
+              key={t.key}
+              onClick={() => setSvTab(t.key)}
+              className={`${t.mobileHide ? 'hidden lg:flex' : 'flex'} items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                svTab === t.key
+                  ? 'border-green-700 text-green-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 pr-2 flex-shrink-0">
+          <button onClick={() => openNew('sub')} className="btn-primary text-xs px-3 py-1.5 whitespace-nowrap">
             + Sub
           </button>
-          <button onClick={() => openNew('vendor')} className="btn-primary text-xs px-2.5 py-1 whitespace-nowrap">
+          <button onClick={() => openNew('vendor')} className="btn-primary text-xs px-3 py-1.5 whitespace-nowrap">
             + Vendor
           </button>
         </div>
-      </div>
-
-      {/* ── Module tab bar ── */}
-      <div className="bg-white border-b border-gray-200 flex justify-center gap-0 flex-shrink-0 rounded-xl">
-        {[
-          { key: 'directory', label: '📋 Directory' },
-          { key: 'contracts', label: '📑 Contracts' },
-          { key: 'quotes', label: '🧾 Quotes' },
-          { key: 'settings', label: '⚙️ Settings', mobileHide: true },
-        ].map(t => (
-          <button
-            key={t.key}
-            onClick={() => setSvTab(t.key)}
-            className={`${t.mobileHide ? 'hidden lg:flex' : 'flex'} items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              svTab === t.key
-                ? 'border-green-700 text-green-700'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
       </div>
 
       {/* ── Contracts ── */}

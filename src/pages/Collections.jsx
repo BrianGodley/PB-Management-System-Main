@@ -1043,65 +1043,6 @@ export default function Collections() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* ── Header & week nav ────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 mb-3 flex-shrink-0 flex-wrap">
-        <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl shadow-sm px-2 py-1">
-          <button
-            onClick={() => setWeekIdx(i => Math.min(i + 1, weeks.length - 1))}
-            disabled={weekIdx >= weeks.length - 1}
-            className="px-2 py-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-30 font-bold text-lg"
-          >
-            ‹
-          </button>
-          <span className="text-sm font-semibold text-gray-700 px-2 min-w-[210px] text-center">
-            {selectedWeek
-              ? `${prevWeekStart(selectedWeek.week_ending, companyWeekEndDay)} – ${fmtWeekEnd(selectedWeek.week_ending)}`
-              : 'No weeks yet'}
-          </span>
-          <button
-            onClick={() => setWeekIdx(i => Math.max(i - 1, 0))}
-            disabled={weekIdx <= 0}
-            className="px-2 py-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-30 font-bold text-lg"
-          >
-            ›
-          </button>
-        </div>
-        <div className="flex-1" />
-        {selectedWeek && isPastWeek && (
-          <button
-            onClick={() => setEditingPastWeek(v => !v)}
-            className={`text-sm px-3 py-1.5 rounded-lg font-medium transition-colors ${
-              editingPastWeek
-                ? 'bg-amber-100 text-amber-800 hover:bg-amber-200'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-            title={
-              editingPastWeek
-                ? 'Click Save to lock this week again (changes auto-save as you type)'
-                : 'This week is locked — click to edit'
-            }
-          >
-            {editingPastWeek ? '💾 Save' : '🔒 Edit'}
-          </button>
-        )}
-        {selectedWeek && selectedWeek.week_ending >= new Date().toISOString().split('T')[0] && (
-          <button
-            onClick={() => setDeleteWeekConfirm(true)}
-            disabled={deletingWeek}
-            className="text-sm px-3 py-1.5 rounded-lg bg-red-100 text-red-700 font-medium hover:bg-red-200 disabled:opacity-50"
-          >
-            🗑 Delete Week
-          </button>
-        )}
-        <button
-          onClick={handleNewWeekClick}
-          disabled={creatingWeek}
-          className="text-sm px-3 py-1.5 rounded-lg bg-green-700 text-white font-medium hover:bg-green-800 disabled:opacity-50"
-        >
-          {creatingWeek ? 'Loading…' : '+ New Week'}
-        </button>
-      </div>
-
       {/* ── New Week Confirmation Modal ───────────────────────────────────── */}
       {newWeekModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -1225,26 +1166,89 @@ export default function Collections() {
         </div>
       ) : (
         <>
-          {/* ── Main tabs ──────────────────────────────────────────────────── */}
-          <div className="bg-white border-b border-gray-200 flex justify-center gap-0 flex-shrink-0 rounded-xl">
-            {[
-              { key: 'collections', label: '💰 Collections' },
-              { key: 'payables', label: '💳 Payables' },
-              { key: 'financial', label: '📊 Financial Planning' },
-              { key: 'settings', label: '⚙️ Settings' },
-            ].map(t => (
+          {/* ── Main tabs — week navigator (left) + tabs (center) + week
+                 actions (right) ───────────────────────────────────────────── */}
+          <div className="bg-white border-b border-gray-200 flex items-center justify-between gap-2 flex-shrink-0 rounded-xl px-2">
+            {/* Left: week navigator */}
+            <div className="flex items-center gap-1 flex-shrink-0">
               <button
-                key={t.key}
-                onClick={() => setMainTab(t.key)}
-                className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                  mainTab === t.key
-                    ? 'border-green-700 text-green-700'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
+                onClick={() => setWeekIdx(i => Math.min(i + 1, weeks.length - 1))}
+                disabled={weekIdx >= weeks.length - 1}
+                className="px-1.5 py-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-30 font-bold text-lg"
               >
-                {t.label}
+                ‹
               </button>
-            ))}
+              <span className="text-xs font-semibold text-gray-700 px-1 min-w-[170px] text-center">
+                {selectedWeek
+                  ? `${prevWeekStart(selectedWeek.week_ending, companyWeekEndDay)} – ${fmtWeekEnd(selectedWeek.week_ending)}`
+                  : 'No weeks yet'}
+              </span>
+              <button
+                onClick={() => setWeekIdx(i => Math.max(i - 1, 0))}
+                disabled={weekIdx <= 0}
+                className="px-1.5 py-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-30 font-bold text-lg"
+              >
+                ›
+              </button>
+            </div>
+            {/* Center: tabs */}
+            <div className="flex items-center justify-center flex-1 min-w-0 overflow-x-auto">
+              {[
+                { key: 'collections', label: '💰 Collections' },
+                { key: 'payables', label: '💳 Payables' },
+                { key: 'financial', label: '📊 Financial Planning' },
+                { key: 'settings', label: '⚙️ Settings' },
+              ].map(t => (
+                <button
+                  key={t.key}
+                  onClick={() => setMainTab(t.key)}
+                  className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                    mainTab === t.key
+                      ? 'border-green-700 text-green-700'
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            {/* Right: week actions */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {selectedWeek && isPastWeek && (
+                <button
+                  onClick={() => setEditingPastWeek(v => !v)}
+                  className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                    editingPastWeek
+                      ? 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                  title={
+                    editingPastWeek
+                      ? 'Click Save to lock this week again (changes auto-save as you type)'
+                      : 'This week is locked — click to edit'
+                  }
+                >
+                  {editingPastWeek ? '💾 Save' : '🔒 Edit'}
+                </button>
+              )}
+              {selectedWeek &&
+                selectedWeek.week_ending >= new Date().toISOString().split('T')[0] && (
+                  <button
+                    onClick={() => setDeleteWeekConfirm(true)}
+                    disabled={deletingWeek}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-red-100 text-red-700 font-medium hover:bg-red-200 disabled:opacity-50"
+                  >
+                    🗑 Delete Week
+                  </button>
+                )}
+              <button
+                onClick={handleNewWeekClick}
+                disabled={creatingWeek}
+                className="text-xs px-3 py-1.5 rounded-lg bg-green-700 text-white font-medium hover:bg-green-800 disabled:opacity-50"
+              >
+                {creatingWeek ? 'Loading…' : '+ New Week'}
+              </button>
+            </div>
           </div>
 
           {/* ── Collections ────────────────────────────────────────────────── */}

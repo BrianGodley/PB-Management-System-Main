@@ -1386,59 +1386,57 @@ export default function Clients() {
         />
       )}
 
-      {/* Page header */}
-      <div className="flex items-center justify-between mb-3 flex-shrink-0 gap-3">
-        <div className="flex items-center gap-2 flex-1 lg:flex-none">
+      {/* ── Active / Inactive / Settings tabs ── */}
+      {/* The strip scrolls horizontally on its own (mobile) so the tabs never
+          push the page wide; tabs don't shrink or wrap. */}
+      <div className="bg-white border-b border-gray-200 flex justify-between gap-0 flex-shrink-0 rounded-xl">
+        <div className="flex items-center justify-center flex-1 min-w-0 overflow-x-auto">
+          {[
+            { key: 'individuals', label: '👤 Individuals', count: tabCounts.individuals },
+            { key: 'companies',   label: '🏢 Companies',   count: tabCounts.companies },
+            { key: 'estimates',   label: '📋 Estimates',   count: tabCounts.estimates },
+            { key: 'past',        label: '📦 Past',        count: tabCounts.past },
+            { key: 'settings',    label: '⚙️ Settings',    count: null },
+          ].map(t => (
+            <button
+              key={t.key}
+              onClick={() => {
+                setTab(t.key)
+                setSearch('')
+              }}
+              className={`flex flex-shrink-0 whitespace-nowrap items-center gap-1.5 px-3 sm:px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                tab === t.key
+                  ? 'border-green-700 text-green-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {t.label}
+              {t.count !== null && (
+                <span
+                  className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
+                    tab === t.key ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                  }`}
+                >
+                  {t.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 pr-2 flex-shrink-0">
           <button
             onClick={() => setClientModal('individual')}
-            className="btn-primary text-sm px-3 py-1.5 flex-1 lg:flex-none"
+            className="btn-primary text-xs px-3 py-1.5"
           >
             + Add Individual
           </button>
           <button
             onClick={() => setClientModal('company')}
-            className="btn-primary text-sm px-3 py-1.5 flex-1 lg:flex-none"
+            className="btn-primary text-xs px-3 py-1.5"
           >
             + Add Company
           </button>
         </div>
-      </div>
-
-      {/* ── Active / Inactive / Settings tabs ── */}
-      {/* The strip scrolls horizontally on its own (mobile) so the tabs never
-          push the page wide; tabs don't shrink or wrap. */}
-      <div className="bg-white border-b border-gray-200 flex justify-center gap-0 flex-shrink-0 overflow-x-auto rounded-xl">
-        {[
-          { key: 'individuals', label: '👤 Individuals', count: tabCounts.individuals },
-          { key: 'companies',   label: '🏢 Companies',   count: tabCounts.companies },
-          { key: 'estimates',   label: '📋 Estimates',   count: tabCounts.estimates },
-          { key: 'past',        label: '📦 Past',        count: tabCounts.past },
-          { key: 'settings',    label: '⚙️ Settings',    count: null },
-        ].map(t => (
-          <button
-            key={t.key}
-            onClick={() => {
-              setTab(t.key)
-              setSearch('')
-            }}
-            className={`flex flex-shrink-0 whitespace-nowrap items-center gap-1.5 px-3 sm:px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              tab === t.key
-                ? 'border-green-700 text-green-700'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {t.label}
-            {t.count !== null && (
-              <span
-                className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
-                  tab === t.key ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                }`}
-              >
-                {t.count}
-              </span>
-            )}
-          </button>
-        ))}
       </div>
 
       {/* ── Settings tab ── */}

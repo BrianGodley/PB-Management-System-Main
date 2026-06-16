@@ -1305,20 +1305,9 @@ export default function Contacts() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3 flex-shrink-0 gap-3">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowAdd(true)}
-            className="hidden sm:flex btn-primary text-sm px-3 py-1.5"
-          >
-            + {isIndividuals ? 'Add Contact' : 'Add Company'}
-          </button>
-        </div>
-      </div>
-
       {/* Tab bar */}
-      <div className="bg-white border-b border-gray-200 flex justify-center gap-0 flex-shrink-0 rounded-xl">
+      <div className="bg-white border-b border-gray-200 flex justify-between gap-0 flex-shrink-0 rounded-xl">
+        <div className="flex items-center justify-center flex-1 min-w-0 overflow-x-auto">
         {[
           { id: 'individuals', label: `👤 Individuals (${contactsTotal.toLocaleString()})` },
           { id: 'companies', label: `🏢 Companies (${companiesTotal.toLocaleString()})` },
@@ -1342,6 +1331,15 @@ export default function Contacts() {
             {tab.label}
           </button>
         ))}
+        </div>
+        <div className="flex items-center gap-2 pr-2 flex-shrink-0">
+          <button
+            onClick={() => setShowAdd(true)}
+            className="hidden sm:flex btn-primary text-xs px-3 py-1.5"
+          >
+            + {isIndividuals ? 'Add Contact' : 'Add Company'}
+          </button>
+        </div>
       </div>
 
       {/* Settings panel */}
