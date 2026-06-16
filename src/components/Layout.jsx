@@ -529,14 +529,6 @@ export default function Layout() {
 
           {/* Right: Admin + user dropdown (desktop) */}
           <div className="flex items-center gap-1 ml-auto">
-            {/* Top-bar Customize link (pick per-module backgrounds). */}
-            <Link
-              to="/customize"
-              style={{ color: headerText, ...(isActive('/customize') ? { backgroundColor: headerActiveBg } : {}) }}
-              className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${headerHoverPill}`}
-            >
-              🎨 <span className="hidden sm:inline">Customize</span>
-            </Link>
             {/* Top-bar Admin link — desktop only. On mobile, Admin lives in
                 the main menu (gated by isAdmin). */}
             <Link
@@ -630,6 +622,13 @@ export default function Layout() {
                     className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
                   >
                     👤 Profile
+                  </Link>
+                  <Link
+                    to="/customize"
+                    onClick={() => setShowUserMenu(false)}
+                    className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    🎨 Customize
                   </Link>
                   <div className="border-t border-gray-100 my-1" />
                   <button
