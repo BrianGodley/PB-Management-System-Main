@@ -512,7 +512,7 @@ export default function Layout() {
       <div className="flex flex-1 min-h-0">
         {/* LEFT SIDEBAR — desktop only */}
         <aside
-          className={`hidden lg:flex flex-col bg-white border-r border-gray-200 sticky top-11 h-[calc(100vh-2.75rem)] overflow-y-auto transition-[width] duration-200 ${
+          className={`hidden lg:flex flex-col bg-white/70 backdrop-blur-md border-r border-white/40 sticky top-11 h-[calc(100vh-2.75rem)] overflow-y-auto transition-[width] duration-200 ${
             navCollapsed ? 'w-12' : 'w-32'
           }`}
         >
