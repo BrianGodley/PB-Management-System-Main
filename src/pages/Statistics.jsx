@@ -9902,48 +9902,7 @@ export default function Statistics() {
       {/* On phones we drop the verbose labels so all six tabs fit; the icons
           are kept (they double as a visual key the user can tap). Tablets and
           up show the full label. */}
-      {createPortal(
-        <div className="hidden lg:flex items-center gap-0.5 overflow-x-auto max-w-full">
-          {[
-            { id: 'graphs', icon: '📈', label: 'Graphs', short: 'Graphs' },
-            { id: 'multiple-entry', icon: '📝', label: 'Multiple Entry', short: 'Entry' },
-            {
-              id: 'print-multiple',
-              icon: '🖨️',
-              label: 'Print Multiple',
-              short: 'Print',
-              mobileHidden: true,
-            },
-            { id: 'comparison', icon: '⚖️', label: 'Comparison', short: 'Compare' },
-            {
-              id: 'import-export',
-              icon: '↕️',
-              label: 'Import / Export',
-              short: 'I/E',
-              mobileHidden: true,
-            },
-            ...(isCurrentUserAdmin
-              ? [{ id: 'settings', icon: '⚙️', label: 'Settings', short: 'Settings' }]
-              : []),
-          ].map(m => (
-            <button
-              key={m.id}
-              onClick={() => setViewMode(m.id)}
-              title={m.label}
-              className={`${m.mobileHidden ? 'hidden sm:flex' : 'flex'} items-center gap-1 px-1.5 sm:px-2.5 py-1 rounded-md text-[11px] sm:text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-colors ${
-                viewMode === m.id
-                  ? 'bg-black/20 text-white'
-                  : 'text-white/70 hover:text-white hover:bg-black/15'
-              }`}
-            >
-              <span>{m.icon}</span>
-              <span className="hidden sm:inline">{m.label}</span>
-              <span className="sm:hidden">{m.short}</span>
-            </button>
-          ))}
-        </div>,
-        document.getElementById('app-header-center')
-      )}
+      {/* View-mode tabs were moved into the module's white top bar (below). */}
       {/* Mobile: view-mode tabs sit just below the green header (the green bar
           shows the "Statistics" title on mobile via Layout). */}
       <div className="lg:hidden flex items-center gap-1 overflow-x-auto px-3 py-2 bg-white border-b border-gray-200 flex-shrink-0">
@@ -10030,6 +9989,33 @@ export default function Statistics() {
             </button>
           </>
         )}
+        {/* View-mode tabs — moved here from the green app header (desktop). */}
+        <div className="hidden lg:flex items-center gap-0.5 flex-shrink-0">
+          {[
+            { id: 'graphs', icon: '📈', label: 'Graphs' },
+            { id: 'multiple-entry', icon: '📝', label: 'Multiple Entry' },
+            { id: 'print-multiple', icon: '🖨️', label: 'Print Multiple' },
+            { id: 'comparison', icon: '⚖️', label: 'Comparison' },
+            { id: 'import-export', icon: '↕️', label: 'Import / Export' },
+            ...(isCurrentUserAdmin
+              ? [{ id: 'settings', icon: '⚙️', label: 'Settings' }]
+              : []),
+          ].map(m => (
+            <button
+              key={m.id}
+              onClick={() => setViewMode(m.id)}
+              title={m.label}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-colors ${
+                viewMode === m.id
+                  ? 'bg-green-700 text-white'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <span>{m.icon}</span>
+              <span>{m.label}</span>
+            </button>
+          ))}
+        </div>
         <div className="flex-1 min-w-0" />
         {viewMode !== 'print-multiple' && (
           /* Mobile: only show Add when there's no selected stat (i.e. user is

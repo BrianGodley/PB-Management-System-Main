@@ -15,6 +15,9 @@ import {
   MODULE_BG_LS_KEY,
   SIDEBAR_KEY,
   SIDEBAR_ICONS_KEY,
+  SIDEBAR_FONT_KEY,
+  SIDEBAR_FONTS,
+  SIDEBAR_FONT_SIZES,
   HEADER_KEY,
   HEADER_DEFAULT,
   readModuleBackgrounds,
@@ -102,6 +105,7 @@ export default function Customize() {
   // Undefined (never set) → default green; explicit null → Clear.
   const currentHeader = map[HEADER_KEY] !== undefined ? map[HEADER_KEY] : HEADER_DEFAULT
   const showIcons = map[SIDEBAR_ICONS_KEY] !== false
+  const font = map[SIDEBAR_FONT_KEY] || {}
 
   function pickBackground(bgId) {
     setMap(m => {
@@ -129,6 +133,11 @@ export default function Customize() {
 
   function setIcons(show) {
     setMap(m => ({ ...m, [SIDEBAR_ICONS_KEY]: show }))
+    setSavedMsg('')
+  }
+
+  function setFont(patch) {
+    setMap(m => ({ ...m, [SIDEBAR_FONT_KEY]: { ...(m[SIDEBAR_FONT_KEY] || {}), ...patch } }))
     setSavedMsg('')
   }
 
@@ -309,6 +318,80 @@ export default function Customize() {
         </p>
         <div className="bg-white border border-gray-200 rounded-xl p-4">
           <BarPalette value={currentSidebar} onChange={pickSidebar} />
+        </div>
+
+        {/* ── Menu font ── */}
+        <h2 className="text-lg font-bold text-gray-900 mt-6 mb-1">Menu font</h2>
+        <p className="text-sm text-gray-500 mb-3">Change the menu text font, size, and style.</p>
+        <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4">
+          <div>
+            <p className="text-xs font-semibold text-gray-500 mb-1.5">Font</p>
+            <div className="flex flex-wrap gap-2">
+              {SIDEBAR_FONTS.map(f => {
+                const isSel = (font.family || '') === f.value
+                return (
+                  <button
+                    key={f.id}
+                    onClick={() => setFont({ family: f.value })}
+                    style={f.value ? { fontFamily: f.value } : undefined}
+                    className={`text-sm px-3 py-1.5 rounded-lg transition-colors ${
+                      isSel
+                        ? 'bg-green-700 text-white border-2 border-black'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:border-green-400'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-gray-500 mb-1.5">Size</p>
+            <div className="flex flex-wrap gap-2">
+              {SIDEBAR_FONT_SIZES.map(s => {
+                const isSel = (font.size || '') === s.value
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => setFont({ size: s.value })}
+                    className={`text-sm w-10 py-1.5 rounded-lg transition-colors ${
+                      isSel
+                        ? 'bg-green-700 text-white border-2 border-black'
+                        : 'bg-white text-gray-700 border border-gray-300 hover:border-green-400'
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-gray-500 mb-1.5">Style</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setFont({ bold: !font.bold })}
+                className={`w-10 py-1.5 rounded-lg font-bold transition-colors ${
+                  font.bold
+                    ? 'bg-green-700 text-white border-2 border-black'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:border-green-400'
+                }`}
+              >
+                B
+              </button>
+              <button
+                onClick={() => setFont({ italic: !font.italic })}
+                className={`w-10 py-1.5 rounded-lg italic transition-colors ${
+                  font.italic
+                    ? 'bg-green-700 text-white border-2 border-black'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:border-green-400'
+                }`}
+              >
+                I
+              </button>
+            </div>
+          </div>
         </div>
         </>
         )}

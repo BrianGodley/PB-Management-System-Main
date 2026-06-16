@@ -48,6 +48,37 @@ export const SIDEBAR_KEY = '__sidebar'
 // false, the nav shows text labels only and they shift left.
 export const SIDEBAR_ICONS_KEY = '__sidebarIcons'
 
+// Reserved key: left menu font settings { family, size, bold, italic }.
+export const SIDEBAR_FONT_KEY = '__sidebarFont'
+
+export const SIDEBAR_FONTS = [
+  { id: 'default', label: 'Default', value: '' },
+  { id: 'sans', label: 'Sans', value: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' },
+  { id: 'serif', label: 'Serif', value: 'Georgia, "Times New Roman", serif' },
+  { id: 'mono', label: 'Mono', value: 'ui-monospace, "SF Mono", Menlo, monospace' },
+  { id: 'rounded', label: 'Rounded', value: '"Trebuchet MS", "Segoe UI", Verdana, sans-serif' },
+  { id: 'condensed', label: 'Condensed', value: '"Arial Narrow", "Helvetica Neue", sans-serif' },
+]
+
+// Sizes are kept modest (≤14px) so the menu never gets oversized.
+export const SIDEBAR_FONT_SIZES = [
+  { id: 'sm', label: 'S', value: '11px' },
+  { id: 'default', label: 'M', value: '' },
+  { id: 'md', label: 'L', value: '13px' },
+  { id: 'lg', label: 'XL', value: '14px' },
+]
+
+// Build an inline style object for the menu text from saved font settings.
+export function sidebarFontStyle(font) {
+  if (!font || typeof font !== 'object') return undefined
+  const s = {}
+  if (font.family) s.fontFamily = font.family
+  if (font.size) s.fontSize = font.size
+  if (font.bold) s.fontWeight = 700
+  if (font.italic) s.fontStyle = 'italic'
+  return Object.keys(s).length ? s : undefined
+}
+
 // Reserved (non-route) key that stores the top header bar color. Undefined in
 // the map means "never set" → fall back to the default green (HEADER_DEFAULT).
 export const HEADER_KEY = '__header'

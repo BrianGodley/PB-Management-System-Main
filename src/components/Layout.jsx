@@ -10,6 +10,8 @@ import {
   MODULE_BG_LS_KEY,
   SIDEBAR_KEY,
   SIDEBAR_ICONS_KEY,
+  SIDEBAR_FONT_KEY,
+  sidebarFontStyle,
   sidebarNavColor,
   HEADER_KEY,
   HEADER_DEFAULT,
@@ -170,6 +172,14 @@ export default function Layout() {
       return true
     }
   })
+  // Left menu font settings { family, size, bold, italic }.
+  const [sidebarFont, setSidebarFont] = useState(() => {
+    try {
+      return readModuleBackgrounds()[SIDEBAR_FONT_KEY] || null
+    } catch {
+      return null
+    }
+  })
   // Top header bar color. Undefined in the map = never set → default green.
   const [headerBg, setHeaderBg] = useState(() => {
     try {
@@ -241,7 +251,7 @@ export default function Layout() {
         applyBackgroundForPath(window.location.pathname, map)
         setSidebarBg(map[SIDEBAR_KEY] || null)
         setHeaderBg(map[HEADER_KEY] !== undefined ? map[HEADER_KEY] : HEADER_DEFAULT)
-        setSidebarIcons(map[SIDEBAR_ICONS_KEY] !== false)
+        setSidebarIcons(map[SIDEBAR_ICONS_KEY] !== false); setSidebarFont(map[SIDEBAR_FONT_KEY] || null)
         setCurrentBgId(bgIdForPath(window.location.pathname, map))
       })
   }, [user?.id])
@@ -253,7 +263,7 @@ export default function Layout() {
     applyBackgroundForPath(location.pathname, map)
     setSidebarBg(map[SIDEBAR_KEY] || null)
     setHeaderBg(map[HEADER_KEY] !== undefined ? map[HEADER_KEY] : HEADER_DEFAULT)
-    setSidebarIcons(map[SIDEBAR_ICONS_KEY] !== false)
+    setSidebarIcons(map[SIDEBAR_ICONS_KEY] !== false); setSidebarFont(map[SIDEBAR_FONT_KEY] || null)
     setCurrentBgId(bgIdForPath(location.pathname, map))
   }, [location.pathname])
   useEffect(() => {
@@ -262,7 +272,7 @@ export default function Layout() {
       applyBackgroundForPath(window.location.pathname, map)
       setSidebarBg(map[SIDEBAR_KEY] || null)
       setHeaderBg(map[HEADER_KEY] !== undefined ? map[HEADER_KEY] : HEADER_DEFAULT)
-      setSidebarIcons(map[SIDEBAR_ICONS_KEY] !== false)
+      setSidebarIcons(map[SIDEBAR_ICONS_KEY] !== false); setSidebarFont(map[SIDEBAR_FONT_KEY] || null)
       setCurrentBgId(bgIdForPath(window.location.pathname, map))
     }
     window.addEventListener('module-backgrounds-updated', handler)
@@ -279,6 +289,9 @@ export default function Layout() {
   const navActivePill = navTheme.dark ? 'bg-white/20' : 'bg-black/10'
   const navHoverPill = navTheme.dark ? 'hover:bg-white/15' : 'hover:bg-black/5'
   const navTextStyle = navTheme.text ? { color: navTheme.text } : undefined
+  const navFontStyle = sidebarFontStyle(sidebarFont)
+  const navItemStyle =
+    navTextStyle || navFontStyle ? { ...navTextStyle, ...navFontStyle } : undefined
 
   // Auto header text/tint: from the header color if set, else (Clear) from the
   // page background's darkness. Mirrors the sidebar's auto-contrast.
@@ -681,7 +694,7 @@ export default function Layout() {
                   setNavTip({ label: item.label, top: r.top + r.height / 2 })
                 }}
                 onMouseLeave={() => setNavTip(null)}
-                style={navTextStyle}
+                style={navItemStyle}
                 className={`flex items-center ${navCollapsed ? 'justify-center' : 'gap-2'} px-2 py-2 rounded-lg text-xs font-semibold text-gray-800 transition-colors ${
                   isActive(item.path) ? navActivePill : navHoverPill
                 }`}
