@@ -2178,7 +2178,7 @@ function DateRangeScrubber({ minDate, maxDate, fromDate, toDate, onFromChange, o
   }
 
   return (
-    <div className="px-3 sm:px-6 pt-0 pb-2 sm:py-3 bg-white border-t border-gray-100 flex-shrink-0">
+    <div className="px-3 sm:px-6 pt-0 pb-2 sm:py-3 bg-white border-t border-gray-100 flex-shrink-0 sm:mr-3 sm:rounded-b-xl">
       {/* End-date labels — desktop only; mobile relies on the date flags
           inside the slider for the same info. */}
       <div className="hidden sm:flex justify-between text-[11px] text-gray-400 mb-1 px-0.5">
@@ -10242,7 +10242,7 @@ export default function Statistics() {
                 {/* Chart header: on mobile we let the row wrap so the stat name
                   drops onto its own line below the buttons; on desktop the
                   absolutely-centered layout still works. */}
-                <div className="relative flex flex-wrap items-center px-1 sm:px-6 py-1.5 bg-gray-100 border-b border-gray-200 flex-shrink-0 gap-y-1">
+                <div className="relative flex flex-wrap items-center px-1 sm:px-6 py-1.5 bg-gray-100 border-b border-gray-200 flex-shrink-0 gap-y-1 sm:mr-3 sm:rounded-t-xl">
                   {/* Left — back arrow (mobile only), print, share, auto min/max.
                     On mobile we shrink to the back-arrow's natural width so the
                     stat-name span (flex-1 on mobile) gets nearly the whole row
@@ -10378,7 +10378,7 @@ export default function Statistics() {
 
                 {selectedStat?.stat_category !== 'target' && (
                   /* Period tabs + FROM/TO + chart style toggle */
-                  <div className="flex items-center gap-2 py-2 px-3 bg-white border-b border-gray-100 flex-shrink-0 flex-wrap">
+                  <div className="flex items-center gap-2 py-2 px-3 bg-white border-b border-gray-100 flex-shrink-0 flex-wrap sm:mr-3">
                     <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
                       {/* Show-values toggle ("V") — sits inside the period-tabs
                         bar so it shares the same height. Click flips
@@ -10518,7 +10518,7 @@ export default function Statistics() {
                   so the slider scrubber sits flush against the x-axis. */}
                 <div
                   ref={chartPrintRef}
-                  className="flex-1 max-h-[50vh] sm:max-h-none px-1 sm:px-4 pt-4 pb-0 sm:pb-4 sm:mr-3 sm:rounded-xl overflow-hidden relative bg-white"
+                  className="flex-1 max-h-[50vh] sm:max-h-none px-1 sm:px-4 pt-4 pb-0 sm:pb-4 sm:mr-3 overflow-hidden relative bg-white"
                 >
                   {selectedStat.stat_category === 'overlay' ? (
                     /* ── Overlay chart ─────────────────────────────────────── */
