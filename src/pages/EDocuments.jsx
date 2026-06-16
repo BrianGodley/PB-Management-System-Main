@@ -111,9 +111,14 @@ export default function EDocuments({ clientId = null, embedded = false }) {
     ['edocuments', '✍️ E-Documents'],
   ]
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold text-gray-900 mb-3">Documents</h1>
-      <div className="bg-white border border-gray-200 rounded-t-lg flex gap-0 -mb-px overflow-x-auto">
+    <div className="h-full flex flex-col">
+      {/* Header — matches Contacts/Opportunities exactly */}
+      <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-3">
+        <h1 className="hidden lg:block text-xl font-bold text-gray-900">Documents</h1>
+      </div>
+
+      {/* Tab bar */}
+      <div className="bg-white border-b border-gray-200 flex gap-0 flex-shrink-0 overflow-x-auto">
         {MAIN_TABS.map(([key, label]) => (
           <button
             key={key}
@@ -129,7 +134,9 @@ export default function EDocuments({ clientId = null, embedded = false }) {
           </button>
         ))}
       </div>
-      <div className="bg-white border border-gray-200 rounded-b-lg rounded-tr-lg p-4">
+
+      {/* Content */}
+      <div className="flex-1 min-h-0 overflow-y-auto mt-4">
         {mainTab === 'files' && <FileManager root="files" />}
         {mainTab === 'photos' && <FileManager root="photos" accept="image/*" />}
         {mainTab === 'videos' && <FileManager root="videos" accept="video/*" />}
@@ -215,10 +222,10 @@ function DashboardTab({ userId, userName }) {
         </div>
       </div>
 
-      {/* Team — ~2in tall */}
+      {/* Team — matches the You height (2.5in) */}
       <div
         className="relative rounded-2xl overflow-hidden border border-gray-200 bg-gradient-to-br from-slate-50 to-slate-100"
-        style={{ height: '2in' }}
+        style={{ height: '2.5in' }}
       >
         <div className="absolute top-4 left-4">
           <h3 className="text-lg font-bold text-gray-700">Team</h3>
