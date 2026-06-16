@@ -9897,7 +9897,7 @@ export default function Statistics() {
        URL-bar collapse — without this the bottom nav dock appears to shift
        when scrolling. lg+ sticks with 100vh since desktop browsers don\'t
        have the same dynamic-viewport behavior. */
-    <div className="h-[calc(100dvh-2.75rem)] lg:h-[calc(100vh-2.75rem)] -m-4 lg:-m-6 flex flex-col overflow-hidden">
+    <div className="h-[calc(100dvh-2.75rem)] lg:h-[calc(100vh-2.75rem)] -mt-4 -mb-4 -mr-4 lg:-mt-6 lg:-mb-6 lg:-mr-6 flex flex-col overflow-hidden">
       {/* ── MODE TABS — portalled into the green app header bar ─── */}
       {/* On phones we drop the verbose labels so all six tabs fit; the icons
           are kept (they double as a visual key the user can tap). Tablets and
