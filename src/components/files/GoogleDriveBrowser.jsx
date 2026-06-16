@@ -42,6 +42,20 @@ const fmtSize = n => {
   return `${(Number(n) / Math.pow(k, i)).toFixed(i ? 1 : 0)} ${u[i] || 'B'}`
 }
 
+// Embeddable preview URL for the in-app viewer. Google-native types use their
+// docs.google.com /preview; everything else (PDF, Office Word/Excel, images)
+// uses the Drive file /preview, which Google renders inline.
+function previewUrl(f) {
+  const m = f.mimeType || ''
+  if (m === 'application/vnd.google-apps.spreadsheet')
+    return `https://docs.google.com/spreadsheets/d/${f.id}/preview`
+  if (m === 'application/vnd.google-apps.document')
+    return `https://docs.google.com/document/d/${f.id}/preview`
+  if (m === 'application/vnd.google-apps.presentation')
+    return `https://docs.google.com/presentation/d/${f.id}/preview`
+  return `https://drive.google.com/file/d/${f.id}/preview`
+}
+
 function useGisScript() {
   const [ready, setReady] = useState(!!window.google?.accounts?.oauth2)
   useEffect(() => {
@@ -75,6 +89,7 @@ export default function GoogleDriveBrowser() {
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
   const [searching, setSearching] = useState(false)
+  const [viewFile, setViewFile] = useState(null) // file open in the in-app viewer
   const fileRef = useRef(null)
 
   useEffect(() => {
@@ -467,9 +482,7 @@ export default function GoogleDriveBrowser() {
                 return (
                   <li key={f.id} className="group flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50">
                     <button
-                      onClick={() =>
-                        isFolder ? openFolder(f) : f.webViewLink && window.open(f.webViewLink, '_blank')
-                      }
+                      onClick={() => (isFolder ? openFolder(f) : setViewFile(f))}
                       className="flex items-center gap-3 flex-1 min-w-0 text-left"
                     >
                       {f.iconLink ? (
@@ -503,6 +516,51 @@ export default function GoogleDriveBrowser() {
           )}
         </div>
       </div>
+
+      {/* In-app viewer — embeds the Drive/Docs preview. Editing opens Google. */}
+      {viewFile && (
+        <div
+          className="fixed inset-0 z-[80] bg-black/60 flex items-center justify-center p-3"
+          onMouseDown={e => {
+            if (e.target === e.currentTarget) setViewFile(null)
+          }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-100 flex-shrink-0">
+              {viewFile.iconLink ? (
+                <img src={viewFile.iconLink} alt="" className="w-4 h-4" />
+              ) : (
+                <span>📄</span>
+              )}
+              <span className="font-semibold text-gray-800 text-sm truncate flex-1 min-w-0">
+                {viewFile.name}
+              </span>
+              {viewFile.webViewLink && (
+                <a
+                  href={viewFile.webViewLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs px-3 py-1.5 rounded-lg bg-green-700 text-white font-semibold hover:bg-green-800"
+                >
+                  ✏️ Open in Google to edit ↗
+                </a>
+              )}
+              <button
+                onClick={() => setViewFile(null)}
+                className="w-8 h-8 rounded-full text-gray-400 hover:bg-gray-100 flex items-center justify-center text-lg"
+              >
+                ✕
+              </button>
+            </div>
+            <iframe
+              title={viewFile.name}
+              src={previewUrl(viewFile)}
+              className="flex-1 w-full border-0"
+              allow="autoplay"
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
