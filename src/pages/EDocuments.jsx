@@ -52,6 +52,14 @@ export default function EDocuments({ clientId = null, embedded = false }) {
   const [subTab, setSubTab] = useState('contracts')
   const [mainTab, setMainTab] = useState('files')
 
+  // Friendly first name for the New Document dashboard greeting.
+  const firstName = (() => {
+    const raw = user?.user_metadata?.full_name || user?.email || ''
+    const base = raw.includes('@') ? raw.split('@')[0] : raw
+    const first = (base.split(/[ .]/)[0] || 'there').trim()
+    return first ? first.charAt(0).toUpperCase() + first.slice(1) : 'there'
+  })()
+
   // The E-Documents area (sub-tab bar + content). Reused at top-level (under
   // the E-Documents tab) and embedded in an opportunity.
   const eDocsContent = (
@@ -80,7 +88,12 @@ export default function EDocuments({ clientId = null, embedded = false }) {
       )}
       {subTab === 'templates' && <TemplatesTab userId={user?.id} />}
       {subTab === 'new' && (
-        <NewDocumentTab clientId={clientId} userId={user?.id} onCreated={() => setSubTab('contracts')} />
+        <NewDocumentTab
+          clientId={clientId}
+          userId={user?.id}
+          userName={firstName}
+          onCreated={() => setSubTab('contracts')}
+        />
       )}
     </>
   )
@@ -384,11 +397,39 @@ function TemplatesTab({ userId }) {
   )
 }
 
-// ── New Document ──────────────────────────────────────────────────────────────
-function NewDocumentTab({ clientId, userId, onCreated }) {
-  const [templates, setTemplates] = useState([])
-  const [creating, setCreating] = useState(false)
+// ── New Document (dashboard) ──────────────────────────────────────────────────
+// Opens to a status dashboard (drafts / waiting / finalized / rejected) with a
+// search bar and a big "Create document" empty state. "Create" / "+ Document"
+// switch to the Blank / from-Template chooser.
+const NEW_DOC_CATS = [
+  { id: 'drafts', label: 'Your drafts', match: s => s === 'draft' },
+  { id: 'waiting', label: 'Waiting for others', match: s => s === 'sent' || s === 'viewed' },
+  { id: 'finalized', label: 'Finalized', match: s => s === 'completed' || s === 'paid' },
+  { id: 'rejected', label: 'Rejected', match: s => s === 'declined' || s === 'voided' },
+]
 
+function NewDocumentTab({ clientId, userId, userName, onCreated }) {
+  const [view, setView] = useState('dashboard') // 'dashboard' | 'create'
+  const [templates, setTemplates] = useState([])
+  const [docs, setDocs] = useState([])
+  const [creating, setCreating] = useState(false)
+  const [statusTab, setStatusTab] = useState('drafts')
+  const [search, setSearch] = useState('')
+  const [openDoc, setOpenDoc] = useState(null)
+
+  const loadDocs = useCallback(async () => {
+    let q = supabase
+      .from('edoc_documents')
+      .select('*, clients ( name )')
+      .order('created_at', { ascending: false })
+    if (clientId) q = q.eq('client_id', clientId)
+    const { data } = await q
+    setDocs(data || [])
+  }, [clientId])
+
+  useEffect(() => {
+    loadDocs()
+  }, [loadDocs])
   useEffect(() => {
     supabase
       .from('edoc_templates')
@@ -398,22 +439,36 @@ function NewDocumentTab({ clientId, userId, onCreated }) {
       .then(({ data }) => setTemplates(data || []))
   }, [])
 
+  const counts = Object.fromEntries(
+    NEW_DOC_CATS.map(c => [c.id, docs.filter(d => c.match(d.status)).length])
+  )
+  const activeCat = NEW_DOC_CATS.find(c => c.id === statusTab) || NEW_DOC_CATS[0]
+  const visible = docs
+    .filter(d => activeCat.match(d.status))
+    .filter(d => !search || (d.name || '').toLowerCase().includes(search.toLowerCase()))
+
   async function createDoc({ template }) {
     setCreating(true)
     try {
-      const { error } = await supabase.from('edoc_documents').insert({
-        template_id: template?.id || null,
-        client_id: clientId || null,
-        name: template ? template.name : 'Untitled Document',
-        status: 'draft',
-        pdf_path: template?.pdf_path || null,
-        page_count: template?.page_count || 1,
-        fields: template?.fields || [],
-        created_by: userId || null,
-      })
+      const { data, error } = await supabase
+        .from('edoc_documents')
+        .insert({
+          template_id: template?.id || null,
+          client_id: clientId || null,
+          name: template ? template.name : 'Untitled Document',
+          status: 'draft',
+          pdf_path: template?.pdf_path || null,
+          page_count: template?.page_count || 1,
+          fields: template?.fields || [],
+          created_by: userId || null,
+        })
+        .select('*, clients ( name )')
+        .single()
       if (error) throw error
-      alert('Draft created. The document editor & send flow arrives in the next phase.')
-      onCreated?.()
+      await loadDocs()
+      setView('dashboard')
+      setStatusTab('drafts')
+      setOpenDoc(data) // jump straight into prepare / send
     } catch (err) {
       alert('Create failed: ' + (err.message || 'unknown error'))
     } finally {
@@ -421,32 +476,166 @@ function NewDocumentTab({ clientId, userId, onCreated }) {
     }
   }
 
+  // ── Create chooser ──
+  if (view === 'create') {
+    return (
+      <div>
+        <button
+          onClick={() => setView('dashboard')}
+          className="text-sm text-gray-500 hover:text-gray-700 mb-3"
+        >
+          ← Back
+        </button>
+        <p className="text-sm text-gray-500 mb-3">Start a new document to send for signature.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <button
+            disabled={creating}
+            onClick={() => createDoc({ template: null })}
+            className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-green-400 hover:bg-green-50 transition-colors disabled:opacity-50"
+          >
+            <div className="text-2xl mb-1">＋</div>
+            <p className="font-semibold text-gray-700">Blank Document</p>
+            <p className="text-xs text-gray-400 mt-0.5">Upload a PDF and add fields</p>
+          </button>
+          {templates.map(t => (
+            <button
+              key={t.id}
+              disabled={creating}
+              onClick={() => createDoc({ template: t })}
+              className="border border-gray-200 rounded-xl p-6 text-left hover:border-green-400 hover:bg-green-50 transition-colors disabled:opacity-50"
+            >
+              <div className="text-2xl mb-1">📄</div>
+              <p className="font-semibold text-gray-700 truncate">{t.name}</p>
+              <p className="text-xs text-gray-400 mt-0.5">From template</p>
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // ── Dashboard ──
   return (
     <div>
-      <p className="text-sm text-gray-500 mb-3">Start a new document to send for signature.</p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        <button
-          disabled={creating}
-          onClick={() => createDoc({ template: null })}
-          className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-green-400 hover:bg-green-50 transition-colors disabled:opacity-50"
-        >
-          <div className="text-2xl mb-1">＋</div>
-          <p className="font-semibold text-gray-700">Blank Document</p>
-          <p className="text-xs text-gray-400 mt-0.5">Upload a PDF and add fields</p>
-        </button>
-        {templates.map(t => (
+      {/* Search */}
+      <div className="relative mb-5">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search documents"
+          className="w-full bg-gray-50 border border-gray-200 rounded-lg pl-9 pr-9 py-2.5 text-sm focus:outline-none focus:border-green-500"
+        />
+        {search && (
           <button
-            key={t.id}
-            disabled={creating}
-            onClick={() => createDoc({ template: t })}
-            className="border border-gray-200 rounded-xl p-6 text-left hover:border-green-400 hover:bg-green-50 transition-colors disabled:opacity-50"
+            onClick={() => setSearch('')}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
           >
-            <div className="text-2xl mb-1">📄</div>
-            <p className="font-semibold text-gray-700 truncate">{t.name}</p>
-            <p className="text-xs text-gray-400 mt-0.5">From template</p>
+            ✕
+          </button>
+        )}
+      </div>
+
+      {/* Greeting + Document button */}
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <h2 className="text-2xl font-bold text-gray-900">Welcome back, {userName}</h2>
+        <button
+          onClick={() => setView('create')}
+          className="inline-flex items-center gap-1.5 bg-green-700 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-green-800"
+        >
+          ＋ Document
+        </button>
+      </div>
+
+      {/* Status strip */}
+      <div className="flex items-stretch gap-0 border-b border-gray-200 overflow-x-auto mb-6">
+        {NEW_DOC_CATS.map(c => (
+          <button
+            key={c.id}
+            onClick={() => setStatusTab(c.id)}
+            className={`px-5 py-2.5 text-left border-b-2 whitespace-nowrap transition-colors ${
+              statusTab === c.id
+                ? 'border-green-700 bg-green-50/40'
+                : 'border-transparent hover:bg-gray-50'
+            }`}
+          >
+            <p
+              className={`text-sm font-semibold ${
+                statusTab === c.id ? 'text-green-800' : 'text-gray-700'
+              }`}
+            >
+              {c.label}
+            </p>
+            <p className="text-xs text-gray-400">
+              {counts[c.id]} doc{counts[c.id] === 1 ? '' : 's'}
+            </p>
           </button>
         ))}
       </div>
+
+      {/* Content */}
+      {visible.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <button
+            onClick={() => setView('create')}
+            className="w-28 h-28 rounded-2xl bg-green-50 border border-green-100 flex items-center justify-center text-5xl text-gray-400 hover:bg-green-100 transition-colors mb-4"
+          >
+            ＋
+          </button>
+          <p className="font-bold text-gray-800">Start here — or pick up where you left off</p>
+          <p className="text-sm text-gray-500 mt-1 max-w-sm">
+            Create your first document, or return here to continue with any unsent documents.
+          </p>
+          <button
+            onClick={() => setView('create')}
+            className="mt-5 inline-flex items-center gap-1.5 border border-green-600 text-green-700 text-sm font-semibold px-5 py-2.5 rounded-lg hover:bg-green-50"
+          >
+            ＋ Create document
+          </button>
+        </div>
+      ) : (
+        <div className="overflow-x-auto border border-gray-200 rounded-xl">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 uppercase tracking-wide text-xs">
+                <th className="px-4 py-2 text-left font-semibold">Document</th>
+                {!clientId && <th className="px-3 py-2 text-left font-semibold">Client</th>}
+                <th className="px-3 py-2 text-left font-semibold">Status</th>
+                <th className="px-3 py-2 text-left font-semibold">Created</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {visible.map(d => (
+                <tr
+                  key={d.id}
+                  onClick={() => setOpenDoc(d)}
+                  className="hover:bg-gray-50 cursor-pointer"
+                >
+                  <td className="px-4 py-2 font-medium text-gray-800">{d.name}</td>
+                  {!clientId && (
+                    <td className="px-3 py-2 text-gray-600">{d.clients?.name || '—'}</td>
+                  )}
+                  <td className="px-3 py-2">
+                    <StatusBadge status={d.status} />
+                  </td>
+                  <td className="px-3 py-2 text-gray-500">{fmtDate(d.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {openDoc && (
+        <EDocDocumentModal
+          doc={openDoc}
+          onClose={() => setOpenDoc(null)}
+          onChanged={() => {
+            setOpenDoc(null)
+            loadDocs()
+          }}
+        />
+      )}
     </div>
   )
 }
