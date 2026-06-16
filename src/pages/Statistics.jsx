@@ -2178,7 +2178,7 @@ function DateRangeScrubber({ minDate, maxDate, fromDate, toDate, onFromChange, o
   }
 
   return (
-    <div className="px-3 sm:px-6 pt-0 pb-2 sm:py-3 bg-white border-t border-gray-100 flex-shrink-0 sm:mr-3 sm:rounded-b-xl">
+    <div className="px-3 sm:px-6 pt-0 pb-2 sm:py-3 bg-white border-t border-gray-100 flex-shrink-0 sm:mr-3 sm:rounded-br-xl">
       {/* End-date labels — desktop only; mobile relies on the date flags
           inside the slider for the same info. */}
       <div className="hidden sm:flex justify-between text-[11px] text-gray-400 mb-1 px-0.5">
@@ -10242,7 +10242,7 @@ export default function Statistics() {
                 {/* Chart header: on mobile we let the row wrap so the stat name
                   drops onto its own line below the buttons; on desktop the
                   absolutely-centered layout still works. */}
-                <div className="relative flex flex-wrap items-center px-1 sm:px-6 py-1.5 bg-gray-100 border-b border-gray-200 flex-shrink-0 gap-y-1 sm:mr-3 sm:rounded-t-xl">
+                <div className="relative flex flex-wrap items-center px-1 sm:px-6 py-1.5 bg-gray-100 border-b border-gray-200 flex-shrink-0 gap-y-1 sm:mr-3 sm:rounded-tr-xl">
                   {/* Left — back arrow (mobile only), print, share, auto min/max.
                     On mobile we shrink to the back-arrow's natural width so the
                     stat-name span (flex-1 on mobile) gets nearly the whole row
