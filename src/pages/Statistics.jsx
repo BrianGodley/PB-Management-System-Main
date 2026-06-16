@@ -7647,9 +7647,11 @@ function StatisticsSettingsView({
   const masterStats = masterSubTab === 'archive' ? masterArchive : masterCurrent
 
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50 mr-2 sm:mr-3 -mt-1.5">
-      {/* Sub-tab bar */}
-      <div className="flex justify-center border border-gray-200 bg-white px-6 rounded-xl mb-1.5">
+    <div className="flex-1 overflow-y-auto bg-gray-50 mr-2 sm:mr-3 -mt-1">
+      {/* Sub-tab bar — nudged up ~1/16"; the gap BELOW it is created with
+          padding on the content wrapper (padding can't margin-collapse, so it
+          reliably renders) and is kept equal to the gap above the bar. */}
+      <div className="flex justify-center border border-gray-200 bg-white px-6 rounded-xl">
         {SUB_TABS.map(t => (
           <button
             key={t.key}
@@ -7665,7 +7667,7 @@ function StatisticsSettingsView({
         ))}
       </div>
 
-      <div className="px-6 pb-6">
+      <div className="px-6 pt-2 pb-6">
         {/* The Master sub-tab needs the full width — its table has 5 columns
           and gets clipped by the narrow max-w-xl that's used for the
           settings forms. */}
