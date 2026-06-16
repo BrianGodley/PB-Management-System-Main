@@ -100,7 +100,7 @@ function SaveMsg({ msg }) {
 // WEATHER WIDGET — current conditions + 5-day outlook from the keyless
 // Open-Meteo API. `location` is a free-text place name (city/state or ZIP).
 // ═════════════════════════════════════════════════════════════════════════════
-function WeatherWidget({ location, onSaveLocation }) {
+function WeatherWidget({ location, onSaveLocation, bgColor }) {
   const [wx, setWx] = useState({ status: 'loading', current: null, days: [], place: '' })
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -196,7 +196,7 @@ function WeatherWidget({ location, onSaveLocation }) {
   const sel = dayIdx != null ? wx.days[dayIdx] : null
 
   return (
-    <div className="card">
+    <div className="card" style={bgColor ? { backgroundColor: bgColor } : undefined}>
       {/* Header — title + editable per-user location */}
       <div className="flex items-center justify-between mb-3 gap-2">
         <h3 className="text-sm font-bold text-gray-800 flex-shrink-0">Weather</h3>
@@ -332,7 +332,7 @@ function WeatherWidget({ location, onSaveLocation }) {
 // ═════════════════════════════════════════════════════════════════════════════
 // STAT MINI-GRAPH — a small trend line for one statistic from the stat system.
 // ═════════════════════════════════════════════════════════════════════════════
-function StatMiniGraph({ stat, allStats = [] }) {
+function StatMiniGraph({ stat, allStats = [], bgColor }) {
   const [points, setPoints] = useState(null)
 
   useEffect(() => {
@@ -366,7 +366,7 @@ function StatMiniGraph({ stat, allStats = [] }) {
   }, [stat?.id, allStats])
 
   return (
-    <div className="card">
+    <div className="card" style={bgColor ? { backgroundColor: bgColor } : undefined}>
       <h3 className="text-sm font-bold text-gray-800 mb-1 truncate">
         {stat ? stat.name : 'Stat'}
       </h3>
@@ -577,17 +577,54 @@ function applyDashBackground(id) {
   }
 }
 
+// The customizable dashboard areas (modules) + the light background-color
+// palette offered for each. 'page' is the whole dashboard background.
+const MODULE_AREAS = [
+  { id: 'page', label: 'Dashboard background' },
+  { id: 'weather', label: 'Weather' },
+  { id: 'stat1', label: 'Stat graph 1' },
+  { id: 'stat2', label: 'Stat graph 2' },
+  { id: 'quicklinks', label: 'Quick Links' },
+]
+const MODULE_COLOR_OPTIONS = [
+  { id: 'default', label: 'Default', value: null, swatch: '#ffffff' },
+  { id: 'slate', label: 'Slate', value: '#f1f5f9' },
+  { id: 'blue', label: 'Blue', value: '#eff6ff' },
+  { id: 'sky', label: 'Sky', value: '#e0f2fe' },
+  { id: 'green', label: 'Green', value: '#ecfdf5' },
+  { id: 'amber', label: 'Amber', value: '#fffbeb' },
+  { id: 'rose', label: 'Rose', value: '#fff1f2' },
+  { id: 'violet', label: 'Violet', value: '#f5f3ff' },
+]
+
 export default function Dashboard() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [tab, setTab] = useState('dashboard')
   const [dashBg, setDashBg] = useState(() => localStorage.getItem('pbs:dashboardBg') || 'none')
+  const [moduleColors, setModuleColors] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('pbs:dashModuleColors') || '{}')
+    } catch {
+      return {}
+    }
+  })
   useEffect(() => {
     localStorage.setItem('pbs:dashboardBg', dashBg)
     applyDashBackground(dashBg)
     // Restore the default grey when navigating away from the dashboard.
     return () => applyDashBackground('none')
   }, [dashBg])
+  // Apply the 'page' area color to the app shell (an image bg sits on top of it).
+  useEffect(() => {
+    localStorage.setItem('pbs:dashModuleColors', JSON.stringify(moduleColors))
+    const el = document.getElementById('app-shell')
+    if (el) el.style.backgroundColor = moduleColors.page || ''
+    return () => {
+      const e = document.getElementById('app-shell')
+      if (e) e.style.backgroundColor = ''
+    }
+  }, [moduleColors])
   const [showAddEmp, setShowAddEmp] = useState(false)
   const [showTraining, setShowTraining] = useState(false)
   const [trainingAssignment, setTrainingAssignment] = useState(null)
@@ -621,19 +658,36 @@ export default function Dashboard() {
     if (bgSyncedRef.current || !data) return
     bgSyncedRef.current = true
     if (prefs.background) setDashBg(prefs.background)
-  }, [data, prefs.background])
+    if (prefs.module_colors && typeof prefs.module_colors === 'object')
+      setModuleColors(prefs.module_colors)
+  }, [data, prefs.background, prefs.module_colors])
 
-  // Live preview a background (applies immediately; not yet persisted).
+  // Live preview handlers (apply immediately; persisted on Save).
   function previewDashBg(id) {
     setDashBg(id)
   }
-  // Persist the current background to the user's dashboard_preferences row.
-  async function saveDashBg(id) {
+  function setModuleColor(area, value) {
+    setModuleColors(m => ({ ...m, [area]: value }))
+  }
+  function setAllModuleColors(value) {
+    const next = {}
+    MODULE_AREAS.forEach(a => {
+      next[a.id] = value
+    })
+    setModuleColors(next)
+  }
+  // Persist the background image + per-module colors to the user's row.
+  async function saveCustomize() {
     if (!user?.id) return true
     const { error } = await supabase
       .from('dashboard_preferences')
       .upsert(
-        { user_id: user.id, background: id, updated_at: new Date().toISOString() },
+        {
+          user_id: user.id,
+          background: dashBg,
+          module_colors: moduleColors,
+          updated_at: new Date().toISOString(),
+        },
         { onConflict: 'user_id' }
       )
     return !error
@@ -691,13 +745,20 @@ export default function Dashboard() {
       {tab === 'dashboard' && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <WeatherWidget location={myWeatherLocation} onSaveLocation={saveWeatherLocation} />
-            <StatMiniGraph stat={stat1} allStats={stats} />
-            <StatMiniGraph stat={stat2} allStats={stats} />
+            <WeatherWidget
+              location={myWeatherLocation}
+              onSaveLocation={saveWeatherLocation}
+              bgColor={moduleColors.weather}
+            />
+            <StatMiniGraph stat={stat1} allStats={stats} bgColor={moduleColors.stat1} />
+            <StatMiniGraph stat={stat2} allStats={stats} bgColor={moduleColors.stat2} />
           </div>
 
           {/* Quick Links */}
-          <div className="card mt-4">
+          <div
+            className="card mt-4"
+            style={moduleColors.quicklinks ? { backgroundColor: moduleColors.quicklinks } : undefined}
+          >
             <h3 className="text-sm font-bold text-gray-800 mb-3">Quick Links</h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {QUICK_LINKS.map(q => (
@@ -789,7 +850,14 @@ export default function Dashboard() {
       )}
 
       {tab === 'customize' && (
-        <DashboardCustomize value={dashBg} onPreview={previewDashBg} onSave={saveDashBg} />
+        <DashboardCustomize
+          value={dashBg}
+          onPreview={previewDashBg}
+          moduleColors={moduleColors}
+          onModuleColor={setModuleColor}
+          onAllColors={setAllModuleColors}
+          onSave={saveCustomize}
+        />
       )}
 
       {tab === 'settings' && (
@@ -808,24 +876,57 @@ export default function Dashboard() {
 }
 
 // ── Customize: pick a dashboard background ────────────────────────────────────
-function DashboardCustomize({ value, onPreview, onSave }) {
+function ColorSwatches({ selected, onPick }) {
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      {MODULE_COLOR_OPTIONS.map(c => {
+        const isSel = (selected ?? null) === (c.value ?? null)
+        return (
+          <button
+            key={c.id}
+            title={c.label}
+            onClick={() => onPick(c.value)}
+            className={`w-7 h-7 rounded-full border flex items-center justify-center transition-all ${
+              isSel
+                ? 'ring-2 ring-green-600 ring-offset-1 border-green-600'
+                : 'border-gray-300 hover:border-gray-400'
+            }`}
+            style={{ backgroundColor: c.value || '#ffffff' }}
+          >
+            {!c.value && <span className="text-[9px] text-gray-400">∅</span>}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function DashboardCustomize({
+  value,
+  onPreview,
+  moduleColors = {},
+  onModuleColor,
+  onAllColors,
+  onSave,
+}) {
   const [savedMsg, setSavedMsg] = useState('')
   const [saving, setSaving] = useState(false)
 
   async function handleSave() {
     setSaving(true)
-    const ok = await onSave(value)
+    const ok = await onSave()
     setSaving(false)
-    setSavedMsg(ok ? '✓ Saved — your background is set across your devices.' : 'Could not save — try again.')
+    setSavedMsg(ok ? '✓ Saved — applied across your devices.' : 'Could not save — try again.')
     if (ok) setTimeout(() => setSavedMsg(''), 4000)
   }
 
   return (
     <div className="max-w-3xl">
+      {/* Background image */}
       <h2 className="text-lg font-bold text-gray-900 mb-1">Dashboard background</h2>
       <p className="text-sm text-gray-500 mb-4">
-        Pick a background to preview it instantly, then click <strong>Save</strong> to keep it. Your
-        choice follows you on any device.
+        Pick a background image to preview it instantly. Click <strong>Save</strong> to keep your
+        choices across devices.
       </p>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {DASH_BACKGROUNDS.map(bg => {
@@ -858,13 +959,47 @@ function DashboardCustomize({ value, onPreview, onSave }) {
         })}
       </div>
 
-      <div className="flex items-center gap-3 mt-5">
+      {/* Module colors */}
+      <div className="border-t border-gray-200 mt-8 pt-6">
+        <h2 className="text-lg font-bold text-gray-900 mb-1">Module colors</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Set a background color for each area, or use <strong>All areas</strong> to apply one color
+          to everything at once.
+        </p>
+        <div className="space-y-1">
+          <div className="flex items-center justify-between gap-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+            <span className="text-sm font-semibold text-gray-800">All areas</span>
+            <ColorSwatches
+              selected="__mixed__"
+              onPick={v => {
+                onAllColors(v)
+                setSavedMsg('')
+              }}
+            />
+          </div>
+          {MODULE_AREAS.map(a => (
+            <div key={a.id} className="flex items-center justify-between gap-3 px-4 py-2">
+              <span className="text-sm text-gray-700">{a.label}</span>
+              <ColorSwatches
+                selected={moduleColors[a.id] ?? null}
+                onPick={v => {
+                  onModuleColor(a.id, v)
+                  setSavedMsg('')
+                }}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Save */}
+      <div className="flex items-center gap-3 mt-8">
         <button
           onClick={handleSave}
           disabled={saving}
           className="bg-green-700 text-white text-sm font-semibold px-6 py-2.5 rounded-lg hover:bg-green-800 disabled:opacity-50"
         >
-          {saving ? 'Saving…' : '💾 Save background'}
+          {saving ? 'Saving…' : '💾 Save'}
         </button>
         {savedMsg && <span className="text-sm text-green-700 font-medium">{savedMsg}</span>}
       </div>
