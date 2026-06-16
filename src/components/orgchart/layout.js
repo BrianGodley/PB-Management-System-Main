@@ -270,7 +270,10 @@ export function layoutTiers(nodes, rowSpacing = {}, colSpacing = {}) {
   return {
     laidOut,
     tiers,
-    width: Math.max(maxWidth, contentRight) + CANVAS_PAD_X,
+    // No extra right padding — the canvas ends at the right edge of the
+    // furthest element so there's no empty margin to scroll into. (The left
+    // padding still comes from the first tier starting at CANVAS_PAD_X.)
+    width: Math.max(maxWidth, contentRight),
     height: contentBottom + CANVAS_PAD_Y,
   }
 }
