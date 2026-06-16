@@ -215,7 +215,7 @@ export default function AllJobsTasks({ jobs = [], statusFilter = 'open', onSelec
     <div className="flex flex-col h-full">
 
       {/* Filter bar — My / All x Open / Closed / Both */}
-      <div className="mb-3 flex flex-wrap gap-1.5 flex-shrink-0">
+      <div className="mb-3 mt-3 flex flex-wrap gap-1.5 flex-shrink-0">
         {TASK_FILTERS.map(f => (
           <button
             key={f.key}

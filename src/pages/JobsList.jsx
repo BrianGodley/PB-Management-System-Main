@@ -5842,7 +5842,7 @@ function JobTasksPanel({ job }) {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-end mb-4">
+      <div className="flex items-center justify-end mb-4 mt-3">
         <div className="flex items-center gap-2 mr-6">
           {tasks.length > 0 && (
             <button
