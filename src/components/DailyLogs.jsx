@@ -753,7 +753,7 @@ function LogModal({
                     value={form.date}
                     onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
                     title="Date"
-                    className="input text-sm w-28 flex-shrink-0 mr-1"
+                    className="input text-sm w-[136px] flex-shrink-0 mr-1"
                   />
                 }
               />

@@ -43,12 +43,6 @@ export default function AllJobsTracking({ jobs = [], statusFilter = 'open', onSe
 
   return (
     <div className="flex flex-col h-full">
-      <div className="mb-3 flex items-baseline justify-end flex-shrink-0">
-        <span className="text-xs text-gray-400 mr-6">
-          {rows.length} {statusFilter === 'closed' ? 'closed' : 'open'} job
-          {rows.length === 1 ? '' : 's'}
-        </span>
-      </div>
 
       {rows.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-gray-400">
