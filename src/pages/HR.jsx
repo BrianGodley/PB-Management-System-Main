@@ -1457,9 +1457,9 @@ export default function HR() {
           </div>
         ) : /* ── SETTINGS TAB ── */
         tab === 'settings' && isAdmin ? (
-          <div className="-mt-3 flex flex-col">
+          <div className="-mt-1 flex flex-col">
             {/* Statistics-style white sub-tab bar */}
-            <div className="flex border-b border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0">
+            <div className="flex border border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0 rounded-xl mb-3">
               {[
                 { key: 'employee-groups', label: '👥 Employee Groups' },
                 { key: 'time-clock', label: '⏰ Time Clock' },

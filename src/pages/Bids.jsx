@@ -872,7 +872,7 @@ export default function Bids() {
       {/* ── Settings ── */}
       {bidTab === 'settings' && (
         <div className="mt-3 flex-1 min-h-0 overflow-y-auto thin-scroll">
-          <div className="flex border-b border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0">
+          <div className="flex border border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0 rounded-xl mb-3">
             {[
               { key: 'general', label: '⚙️ General' },
               { key: 'finance', label: '💰 Finance' },

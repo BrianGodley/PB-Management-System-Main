@@ -1445,7 +1445,7 @@ export default function Clients() {
       {/* ── Settings tab ── */}
       {tab === 'settings' && (
         <div className="mt-3 flex-1 flex flex-col overflow-hidden">
-          <div className="flex border-b border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0">
+          <div className="flex border border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0 rounded-xl mb-3">
             {[
               { key: 'general', label: '⚙️ General' },
               { key: 'rates', label: '📊 Master Rates' },
