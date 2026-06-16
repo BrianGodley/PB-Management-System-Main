@@ -4,6 +4,11 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LanguageContext'
 import { supabase } from '../lib/supabase'
+import {
+  applyBackgroundForPath,
+  readModuleBackgrounds,
+  MODULE_BG_LS_KEY,
+} from '../lib/dashboardBackgrounds'
 import SamChat from './SamChat'
 import ReportIssueModal from './ReportIssueModal'
 import CONavModal from './CONavModal'
@@ -179,6 +184,37 @@ export default function Layout() {
     fetchProfile()
     fetchCompanyLogo()
   }, [user?.id])
+
+  // Per-module page backgrounds: load the user's saved route→background map
+  // into localStorage, then apply the current route's background.
+  useEffect(() => {
+    if (!user?.id) return
+    supabase
+      .from('dashboard_preferences')
+      .select('module_backgrounds')
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        const map = data?.module_backgrounds || {}
+        try {
+          localStorage.setItem(MODULE_BG_LS_KEY, JSON.stringify(map))
+        } catch {
+          /* ignore */
+        }
+        applyBackgroundForPath(window.location.pathname, map)
+      })
+  }, [user?.id])
+
+  // Re-apply on every route change + when the Customize page saves (it writes
+  // localStorage and dispatches 'module-backgrounds-updated').
+  useEffect(() => {
+    applyBackgroundForPath(location.pathname, readModuleBackgrounds())
+  }, [location.pathname])
+  useEffect(() => {
+    const handler = () => applyBackgroundForPath(window.location.pathname, readModuleBackgrounds())
+    window.addEventListener('module-backgrounds-updated', handler)
+    return () => window.removeEventListener('module-backgrounds-updated', handler)
+  }, [])
 
   useEffect(() => {
     const handler = () => fetchCompanyLogo()
@@ -397,6 +433,14 @@ export default function Layout() {
 
           {/* Right: Admin + user dropdown (desktop) */}
           <div className="flex items-center gap-1 ml-auto">
+            {/* Top-bar Customize link (pick per-module backgrounds). */}
+            <Link
+              to="/customize"
+              style={isActive('/customize') ? { backgroundColor: forestGreenDark } : {}}
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-white/80 hover:text-white hover:bg-black/20 transition-colors"
+            >
+              🎨 <span className="hidden sm:inline">Customize</span>
+            </Link>
             {/* Top-bar Admin link — desktop only. On mobile, Admin lives in
                 the main menu (gated by isAdmin). */}
             <Link

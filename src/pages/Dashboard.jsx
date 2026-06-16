@@ -609,22 +609,8 @@ export default function Dashboard() {
       return {}
     }
   })
-  useEffect(() => {
-    localStorage.setItem('pbs:dashboardBg', dashBg)
-    applyDashBackground(dashBg)
-    // Restore the default grey when navigating away from the dashboard.
-    return () => applyDashBackground('none')
-  }, [dashBg])
-  // Apply the 'page' area color to the app shell (an image bg sits on top of it).
-  useEffect(() => {
-    localStorage.setItem('pbs:dashModuleColors', JSON.stringify(moduleColors))
-    const el = document.getElementById('app-shell')
-    if (el) el.style.backgroundColor = moduleColors.page || ''
-    return () => {
-      const e = document.getElementById('app-shell')
-      if (e) e.style.backgroundColor = ''
-    }
-  }, [moduleColors])
+  // Page backgrounds are now applied app-wide by Layout (per module, via the
+  // Customize page). The Dashboard no longer touches the app-shell background.
   const [showAddEmp, setShowAddEmp] = useState(false)
   const [showTraining, setShowTraining] = useState(false)
   const [trainingAssignment, setTrainingAssignment] = useState(null)
@@ -653,45 +639,6 @@ export default function Dashboard() {
   // Sync the saved per-user background from the DB once prefs load (so the
   // choice follows the user across devices). Runs once; user changes after
   // that are authoritative.
-  const bgSyncedRef = useRef(false)
-  useEffect(() => {
-    if (bgSyncedRef.current || !data) return
-    bgSyncedRef.current = true
-    if (prefs.background) setDashBg(prefs.background)
-    if (prefs.module_colors && typeof prefs.module_colors === 'object')
-      setModuleColors(prefs.module_colors)
-  }, [data, prefs.background, prefs.module_colors])
-
-  // Live preview handlers (apply immediately; persisted on Save).
-  function previewDashBg(id) {
-    setDashBg(id)
-  }
-  function setModuleColor(area, value) {
-    setModuleColors(m => ({ ...m, [area]: value }))
-  }
-  function setAllModuleColors(value) {
-    const next = {}
-    MODULE_AREAS.forEach(a => {
-      next[a.id] = value
-    })
-    setModuleColors(next)
-  }
-  // Persist the background image + per-module colors to the user's row.
-  async function saveCustomize() {
-    if (!user?.id) return true
-    const { error } = await supabase
-      .from('dashboard_preferences')
-      .upsert(
-        {
-          user_id: user.id,
-          background: dashBg,
-          module_colors: moduleColors,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id' }
-      )
-    return !error
-  }
 
   // Persist this user's chosen weather location (per-user, in dashboard_preferences).
   async function saveWeatherLocation(loc) {
@@ -725,7 +672,6 @@ export default function Dashboard() {
       <div className="bg-white border-b border-gray-200 flex gap-0 mb-5">
         {[
           { key: 'dashboard', label: '🏠 Dashboard' },
-          { key: 'customize', label: '🎨 Customize' },
           { key: 'settings', label: '⚙️ Settings' },
         ].map(t => (
           <button
@@ -745,20 +691,13 @@ export default function Dashboard() {
       {tab === 'dashboard' && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <WeatherWidget
-              location={myWeatherLocation}
-              onSaveLocation={saveWeatherLocation}
-              bgColor={moduleColors.weather}
-            />
-            <StatMiniGraph stat={stat1} allStats={stats} bgColor={moduleColors.stat1} />
-            <StatMiniGraph stat={stat2} allStats={stats} bgColor={moduleColors.stat2} />
+            <WeatherWidget location={myWeatherLocation} onSaveLocation={saveWeatherLocation} />
+            <StatMiniGraph stat={stat1} allStats={stats} />
+            <StatMiniGraph stat={stat2} allStats={stats} />
           </div>
 
           {/* Quick Links */}
-          <div
-            className="card mt-4"
-            style={moduleColors.quicklinks ? { backgroundColor: moduleColors.quicklinks } : undefined}
-          >
+          <div className="card mt-4">
             <h3 className="text-sm font-bold text-gray-800 mb-3">Quick Links</h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {QUICK_LINKS.map(q => (
@@ -847,17 +786,6 @@ export default function Dashboard() {
             </div>
           )}
         </>
-      )}
-
-      {tab === 'customize' && (
-        <DashboardCustomize
-          value={dashBg}
-          onPreview={previewDashBg}
-          moduleColors={moduleColors}
-          onModuleColor={setModuleColor}
-          onAllColors={setAllModuleColors}
-          onSave={saveCustomize}
-        />
       )}
 
       {tab === 'settings' && (
