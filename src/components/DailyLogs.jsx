@@ -661,7 +661,7 @@ function JobPicker({ jobs, value, onChange, rightSlot }) {
           {matches.length === 0 ? (
             <p className="px-3 py-2 text-xs text-gray-400">No {filter} jobs match.</p>
           ) : (
-            matches.slice(0, 60).map(j => (
+            matches.slice(0, 500).map(j => (
               <button
                 type="button"
                 key={j.id}
