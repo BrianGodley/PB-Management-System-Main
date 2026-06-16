@@ -5850,7 +5850,6 @@ function JobTasksPanel({ job }) {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-sm font-semibold text-gray-700">
-          Tasks{' '}
           {tasks.length > 0 && (
             <span className="text-gray-400 font-normal">
               ({completed}/{tasks.length})

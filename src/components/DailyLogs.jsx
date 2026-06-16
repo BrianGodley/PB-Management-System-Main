@@ -364,7 +364,6 @@ export default function DailyLogs({
           button stretches full width. */}
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <h2 className="hidden lg:block text-sm font-semibold text-gray-700">
-          Daily Logs{' '}
           {totalCount > 0 && <span className="text-gray-400 font-normal">({totalCount})</span>}
         </h2>
         <button

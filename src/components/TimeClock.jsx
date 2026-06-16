@@ -952,7 +952,6 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
       <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-4 flex-wrap">
         {/* Left: title + entry count */}
         <h2 className="text-sm font-semibold text-gray-700 flex-shrink-0">
-          Time Clock{' '}
           {totalCount > 0 && (
             <span className="text-gray-400 font-normal">({totalCount} entries)</span>
           )}

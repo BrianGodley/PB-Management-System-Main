@@ -2251,9 +2251,10 @@ export default function WorkOrders({ jobs, selectedJob, jobStatusFilter = 'open'
 
       {/* Summary bar + filter buttons — sticky: they freeze at the top
           while the work-order list scrolls underneath. */}
-      <div className="sticky top-0 z-20 bg-white pb-3">
-        {/* Summary bar — single uniform row */}
-        <div className="mb-3 rounded-xl bg-gray-900 overflow-hidden shadow-sm w-1/2">
+      <div className="sticky top-0 z-20 bg-white pt-3 pb-3">
+        {/* Summary bar — single uniform row, centered over the work orders */}
+        <div className="mb-3 ml-[18px] flex justify-center">
+        <div className="rounded-xl bg-gray-900 overflow-hidden shadow-sm w-1/2">
         <div className="flex flex-wrap items-center gap-0 divide-x divide-gray-700">
           <div className="px-2 py-1 flex-1 min-w-0">
             <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block">
@@ -2291,11 +2292,12 @@ export default function WorkOrders({ jobs, selectedJob, jobStatusFilter = 'open'
             </span>
           </div>
         </div>
+        </div>
       </div>
 
         {/* Filter row + add button */}
-        <div className="flex items-center justify-between gap-2">
-        <div className="hidden lg:flex gap-1.5 flex-wrap">
+        <div className="relative flex items-center gap-2 ml-[18px]">
+        <div className="hidden lg:flex gap-1.5 flex-wrap flex-1 justify-center">
           {['all', 'pending', 'in_progress', 'complete'].map(s => (
             <button
               key={s}
@@ -2318,7 +2320,7 @@ export default function WorkOrders({ jobs, selectedJob, jobStatusFilter = 'open'
         {jobId && (
           <button
             onClick={() => setShowNewWOModal(true)}
-            className="flex-shrink-0 text-xs px-3 py-1.5 rounded-lg font-semibold bg-white border-2 border-green-700 text-green-700 hover:bg-green-50 transition-colors"
+            className="ml-auto flex-shrink-0 text-xs px-3 py-1.5 rounded-lg font-semibold bg-white border-2 border-green-700 text-green-700 hover:bg-green-50 transition-colors"
           >
             + Work Order
           </button>
@@ -2327,7 +2329,7 @@ export default function WorkOrders({ jobs, selectedJob, jobStatusFilter = 'open'
       </div>
 
       {/* Crew type sections — only render if the section has work orders */}
-      <div className="ml-3">
+      <div className="ml-[18px]">
       {sections
         .filter(s => s.workOrders.length > 0)
         .map(({ crewType, workOrders: sectionWOs }) => (
