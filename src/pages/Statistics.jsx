@@ -7647,9 +7647,9 @@ function StatisticsSettingsView({
   const masterStats = masterSubTab === 'archive' ? masterArchive : masterCurrent
 
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50 mr-2 sm:mr-3">
+    <div className="flex-1 overflow-y-auto bg-gray-50 mr-2 sm:mr-3 -mt-1.5">
       {/* Sub-tab bar */}
-      <div className="flex justify-center border border-gray-200 bg-white px-6 rounded-xl mb-3">
+      <div className="flex justify-center border border-gray-200 bg-white px-6 rounded-xl mb-1.5">
         {SUB_TABS.map(t => (
           <button
             key={t.key}

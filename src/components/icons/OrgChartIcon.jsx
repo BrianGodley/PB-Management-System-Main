@@ -43,7 +43,7 @@ export default function OrgChartIcon({ size = 20, className = '' }) {
     <svg
       width={size}
       height={size}
-      viewBox="0 0 32 32"
+      viewBox="1 1.5 30 29"
       className={className}
       aria-hidden="true"
       style={{ display: 'inline-block', verticalAlign: '-3px' }}

@@ -2253,39 +2253,39 @@ export default function WorkOrders({ jobs, selectedJob, jobStatusFilter = 'open'
           while the work-order list scrolls underneath. */}
       <div className="sticky top-0 z-20 bg-white pb-3">
         {/* Summary bar — single uniform row */}
-        <div className="mb-3 rounded-xl bg-gray-900 overflow-hidden shadow-sm">
+        <div className="mb-3 rounded-xl bg-gray-900 overflow-hidden shadow-sm w-1/2">
         <div className="flex flex-wrap items-center gap-0 divide-x divide-gray-700">
-          <div className="px-5 py-2 flex-1 min-w-[120px]">
+          <div className="px-2 py-1 flex-1 min-w-0">
             <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block">
               Total Man Days
             </span>
-            <span className="text-base font-bold text-white">{fmtDays(totalMD)}</span>
+            <span className="text-sm font-bold text-white">{fmtDays(totalMD)}</span>
           </div>
-          <div className="px-5 py-2 flex-1 min-w-[120px]">
+          <div className="px-2 py-1 flex-1 min-w-0">
             <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block">
               Materials
             </span>
-            <span className="text-base font-bold text-white">{fmt(totalMat)}</span>
+            <span className="text-sm font-bold text-white">{fmt(totalMat)}</span>
           </div>
           {totalSub > 0 && (
-            <div className="px-5 py-2 flex-1 min-w-[120px]">
+            <div className="px-2 py-1 flex-1 min-w-0">
               <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block">
                 Sub Costs
               </span>
-              <span className="text-base font-bold text-white">{fmt(totalSub)}</span>
+              <span className="text-sm font-bold text-white">{fmt(totalSub)}</span>
             </div>
           )}
-          <div className="px-5 py-2 flex-1 min-w-[140px]">
+          <div className="px-2 py-1 flex-1 min-w-0">
             <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block">
               Total Value
             </span>
-            <span className="text-base font-bold text-white">{fmt(totalValue)}</span>
+            <span className="text-sm font-bold text-white">{fmt(totalValue)}</span>
           </div>
-          <div className="hidden lg:block px-5 py-2 flex-1 min-w-[140px]">
+          <div className="hidden lg:block px-2 py-1 flex-1 min-w-0">
             <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide block">
               Completion
             </span>
-            <span className="text-base font-bold text-white">
+            <span className="text-sm font-bold text-white">
               {complete}{' '}
               <span className="text-sm font-normal text-gray-400">/ {workOrders.length}</span>
             </span>
@@ -2327,6 +2327,7 @@ export default function WorkOrders({ jobs, selectedJob, jobStatusFilter = 'open'
       </div>
 
       {/* Crew type sections — only render if the section has work orders */}
+      <div className="ml-3">
       {sections
         .filter(s => s.workOrders.length > 0)
         .map(({ crewType, workOrders: sectionWOs }) => (
@@ -2345,6 +2346,7 @@ export default function WorkOrders({ jobs, selectedJob, jobStatusFilter = 'open'
             singleJobName={singleJobName}
           />
         ))}
+      </div>
     </div>
   )
 }
