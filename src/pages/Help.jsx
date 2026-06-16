@@ -142,7 +142,7 @@ export default function Help() {
   }, [])
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6">
+    <div className="w-full">
       {/* Header */}
       <div className="mb-5">
         <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">

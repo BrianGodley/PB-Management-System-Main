@@ -1587,18 +1587,18 @@ export default function Clients() {
             ) : (
               <div className="bg-white rounded-xl border border-gray-200 flex-1 min-h-0 overflow-x-hidden overflow-y-auto lg:overflow-auto overscroll-contain">
                 <table className="w-full text-xs table-fixed lg:table-auto lg:min-w-[900px]">
-                  <thead>
+                  <thead className="sticky top-0 z-20">
                     <tr className="bg-gray-50 border-b border-gray-200">
                       {activeCols.map((col, ci) => (
                         <th
                           key={col.key}
-                          className={`px-4 py-2 text-left font-semibold text-gray-600 uppercase truncate ${col.mobileHide ? 'hidden lg:table-cell ' : ''}${ci === 0 ? 'lg:sticky lg:left-0 bg-gray-50 z-10 lg:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]' : ''}`}
+                          className={`px-4 py-2 text-left font-semibold text-gray-600 uppercase truncate bg-gray-50 ${col.mobileHide ? 'hidden lg:table-cell ' : ''}${ci === 0 ? 'lg:sticky lg:left-0 z-30 lg:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]' : ''}`}
                           style={{ width: colWidth(col.key) }}
                         >
                           {col.label}
                         </th>
                       ))}
-                      {tab === 'past' && <th className="px-4 py-2 w-16" />}
+                      {tab === 'past' && <th className="px-4 py-2 w-16 bg-gray-50" />}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">

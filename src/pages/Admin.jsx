@@ -4039,7 +4039,7 @@ export default function Admin() {
   ]
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="w-full">
       {/* Page header */}
       <div className="mb-5">
         <h1 className="text-2xl font-bold text-gray-900">Admin</h1>
@@ -4047,7 +4047,7 @@ export default function Admin() {
       </div>
 
       {/* Tab bar */}
-      <div className="flex gap-1 border-b border-gray-200 mb-6">
+      <div className="flex justify-center gap-1 bg-white border border-gray-200 rounded-xl mb-6">
         {tabs.map(t => (
           <button
             key={t.key}

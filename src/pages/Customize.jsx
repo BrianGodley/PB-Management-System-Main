@@ -174,7 +174,7 @@ export default function Customize() {
                   onClick={() => pickBackground(bg.id)}
                   className={`text-left rounded-lg overflow-hidden border-2 transition-all ${
                     isSel
-                      ? 'border-green-600 ring-2 ring-green-600/30'
+                      ? 'border-black ring-2 ring-black/20'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
@@ -192,7 +192,7 @@ export default function Customize() {
                   />
                   <div className="flex items-center justify-between px-2 py-1 bg-white">
                     <span className="text-[11px] font-medium text-gray-600 truncate">{bg.label}</span>
-                    {isSel && <span className="text-green-600 text-xs">✓</span>}
+                    {isSel && <span className="text-black text-xs">✓</span>}
                   </div>
                 </button>
               )

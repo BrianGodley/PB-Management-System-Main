@@ -449,7 +449,7 @@ export default function Layout() {
       {/* ── TOP BAR ── */}
       <header
         style={{ backgroundColor: headerBg || 'transparent' }}
-        className="w-full flex-shrink-0 sticky top-0 z-50 shadow-md"
+        className={`w-full flex-shrink-0 sticky top-0 z-50 ${headerBg ? 'shadow-md' : ''}`}
       >
         <div className="relative flex items-center h-11 px-4 gap-4">
           {/* Logo + system name — desktop only (mobile shows Sam in this spot). */}

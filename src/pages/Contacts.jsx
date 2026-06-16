@@ -1254,15 +1254,15 @@ export default function Contacts() {
     return (
       <div className="bg-white rounded-xl border border-gray-200 flex-1 min-h-0 overflow-x-hidden overflow-y-auto lg:overflow-auto overscroll-contain">
         <table className={`${tableClass} w-full text-xs table-fixed ${minWClass}`}>
-          <thead>
+          <thead className="sticky top-0 z-20">
             <tr className="bg-gray-50 border-b border-gray-200">
               {activeCols.map((col, ci) => (
                 <th
                   key={col.key}
                   onClick={col.sort ? () => toggleSort(col.sort) : undefined}
-                  className={`${thCls} ${col.sort ? '' : 'cursor-default hover:text-gray-600'} ${
+                  className={`${thCls} bg-gray-50 ${col.sort ? '' : 'cursor-default hover:text-gray-600'} ${
                     col.mobileHide ? 'hidden lg:table-cell ' : ''
-                  }${ci === 0 ? 'lg:sticky lg:left-0 bg-gray-50 z-10 lg:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]' : ''}`}
+                  }${ci === 0 ? 'lg:sticky lg:left-0 z-30 lg:shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]' : ''}`}
                 >
                   {col.label}
                   {col.sort ? arrow(col.sort) : ''}

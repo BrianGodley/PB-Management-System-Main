@@ -749,7 +749,7 @@ export default function HR() {
 
       {/* Tab bar — desktop only; on mobile the More > Employees screen shows
           just the employee table (no Employees/Applicants/Settings bar). */}
-      <div className="bg-white border-b border-gray-200 px-2 sm:px-6 hidden lg:flex justify-center gap-0 flex-shrink-0 overflow-x-auto rounded-xl">
+      <div className="bg-white border-b border-gray-200 hidden lg:flex justify-center gap-0 flex-shrink-0 overflow-x-auto rounded-xl">
         {[
           {
             key: 'employees',
@@ -785,7 +785,7 @@ export default function HR() {
 
       {/* Search + filter bar — hidden on Settings and Positions tabs */}
       {tab !== 'settings' && tab !== 'positions' && (
-        <div className="bg-gray-50 border-b border-gray-200 px-6 py-3 flex items-center gap-3 flex-shrink-0">
+        <div className="mb-4 mt-4 flex items-center gap-3 flex-shrink-0">
           <input
             type="text"
             value={search}
@@ -799,7 +799,7 @@ export default function HR() {
                     ? 'Search applicants…'
                     : ''
             }
-            className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-green-500"
+            className="flex-1 max-w-md bg-white border border-gray-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-600/30 focus:border-green-600"
           />
 
           {tab === 'applicants' && (
@@ -825,7 +825,7 @@ export default function HR() {
       )}
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden py-3 sm:p-6">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden py-3 sm:py-6">
         {loading ? (
           <div className="flex items-center justify-center py-12 text-gray-400">Loading…</div>
         ) : /* ── EMPLOYEES TAB ── */
@@ -1457,7 +1457,7 @@ export default function HR() {
           </div>
         ) : /* ── SETTINGS TAB ── */
         tab === 'settings' && isAdmin ? (
-          <div className="-mx-6 -mt-3 flex flex-col">
+          <div className="-mt-3 flex flex-col">
             {/* Statistics-style white sub-tab bar */}
             <div className="flex border-b border-gray-200 bg-white px-6 flex-nowrap overflow-x-auto flex-shrink-0">
               {[
