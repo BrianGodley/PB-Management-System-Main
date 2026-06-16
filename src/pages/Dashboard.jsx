@@ -11,7 +11,7 @@
 //   • company_settings.weather_location — company-wide weather location (text)
 // Run the SQL provided alongside this file before using the Settings tab.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -610,6 +610,30 @@ export default function Dashboard() {
   const stat1 = stats.find(s => s.id === statIds[0]) || null
   const stat2 = stats.find(s => s.id === statIds[1]) || null
 
+  // Sync the saved per-user background from the DB once prefs load (so the
+  // choice follows the user across devices). Runs once; user changes after
+  // that are authoritative.
+  const bgSyncedRef = useRef(false)
+  useEffect(() => {
+    if (bgSyncedRef.current || !data) return
+    bgSyncedRef.current = true
+    if (prefs.background) setDashBg(prefs.background)
+  }, [data, prefs.background])
+
+  // Persist a background choice to the user's dashboard_preferences row.
+  function changeDashBg(id) {
+    setDashBg(id)
+    if (user?.id) {
+      supabase
+        .from('dashboard_preferences')
+        .upsert(
+          { user_id: user.id, background: id, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id' }
+        )
+        .then(() => {})
+    }
+  }
+
   // Persist this user's chosen weather location (per-user, in dashboard_preferences).
   async function saveWeatherLocation(loc) {
     if (!user?.id) return
@@ -759,7 +783,7 @@ export default function Dashboard() {
         </>
       )}
 
-      {tab === 'customize' && <DashboardCustomize value={dashBg} onChange={setDashBg} />}
+      {tab === 'customize' && <DashboardCustomize value={dashBg} onChange={changeDashBg} />}
 
       {tab === 'settings' && (
         <DashboardSettings

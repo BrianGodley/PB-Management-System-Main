@@ -215,10 +215,10 @@ function DashboardTab({ userId, userName }) {
         </div>
       </div>
 
-      {/* Team — ~4in tall */}
+      {/* Team — ~2in tall */}
       <div
         className="relative rounded-2xl overflow-hidden border border-gray-200 bg-gradient-to-br from-slate-50 to-slate-100"
-        style={{ height: '4in' }}
+        style={{ height: '2in' }}
       >
         <div className="absolute top-4 left-4">
           <h3 className="text-lg font-bold text-gray-700">Team</h3>
