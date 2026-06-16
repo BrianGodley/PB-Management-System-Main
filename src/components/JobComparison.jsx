@@ -926,7 +926,7 @@ export default function JobComparison({ job }) {
   return (
     <div className="flex flex-col h-full">
       {/* Header — frozen */}
-      <div className="flex items-center justify-end flex-wrap gap-2 flex-shrink-0">
+      <div className="flex items-center justify-end flex-wrap gap-2 flex-shrink-0 mt-3">
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
           {[
             { key: 'overall', label: '📊 Overall' },

@@ -949,7 +949,7 @@ export default function TimeClock({ jobs = [], selectedJob, statusFilter = 'open
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4 flex-shrink-0 gap-4 flex-wrap">
+      <div className="flex items-center justify-between mb-4 mt-3 flex-shrink-0 gap-4 flex-wrap">
         {/* Left: title + entry count */}
 
         {/* Right: clock-in/out button + manual add — desktop only (mobile uses the hero button) */}
