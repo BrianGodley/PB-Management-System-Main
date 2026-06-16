@@ -1349,7 +1349,7 @@ export default function JobsList() {
 
       {/* ── Tabs — Contacts-style white bar in the page body (desktop). Mobile
              keeps the docked button strip below. ── */}
-      <div className="hidden lg:flex justify-center bg-white border-b border-gray-200 gap-0 flex-shrink-0 overflow-x-auto rounded-xl mb-3">
+      <div className="hidden lg:flex justify-center bg-white border-b border-gray-200 gap-0 flex-shrink-0 overflow-x-auto rounded-xl mb-3 -mr-3">
         {TABS.map(t => (
           <button
             key={t.key}
@@ -1413,7 +1413,7 @@ export default function JobsList() {
 
       {/* Main content: sidebar + right panel (non-settings tabs) */}
       {tab !== 'settings' && (
-        <div className="flex gap-2 flex-1 min-h-0 pt-2">
+        <div className="flex gap-0 flex-1 min-h-0 pt-2 -mr-3">
           {/* Jobs sidebar — desktop only */}
           <div className="hidden lg:flex w-[260px] flex-shrink-0 flex-col min-h-0 bg-white rounded-l-xl border border-gray-200 overflow-hidden">
             {/* Inner column: 90% wide, centered */}
@@ -1872,7 +1872,7 @@ export default function JobsList() {
 
           {/* Right panel — only thing that scrolls. overflow-x-hidden traps any
             tiny horizontal overflow from inner cards on mobile. */}
-          <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden rounded-xl border border-gray-200 bg-white">
+          <div className="thin-scroll flex-1 min-w-0 overflow-y-auto overflow-x-hidden rounded-r-xl border border-gray-200 bg-white">
             {tab === 'info' &&
               (selectedJobObj ? (
                 <JobInfoModal

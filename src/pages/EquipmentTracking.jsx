@@ -431,7 +431,7 @@ export default function EquipmentTracking() {
           </div>
 
           {/* Table */}
-          <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="flex-1 min-h-0 flex flex-col">
             {loading ? (
               <div className="flex justify-center py-16">
                 <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-green-700" />
@@ -446,9 +446,9 @@ export default function EquipmentTracking() {
                 </p>
               </div>
             ) : (
-              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="thin-scroll bg-white rounded-xl border border-gray-200 flex-1 min-h-0 overflow-y-auto overscroll-contain">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b border-gray-200">
+                  <thead className="sticky top-0 z-10 bg-gray-50 border-b border-gray-200">
                     <tr>
                       <th className="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">
                         Manufacturer
